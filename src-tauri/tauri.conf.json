@@ -56,10 +56,17 @@
     "windows": [
       {
         "fullscreen": false,
+        "center": true,
+        "maximized": true,
         "height": 600,
         "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
         "title": "Defguard",
-        "width": 800
+        "width": 992,
+        "minWidth": 992,
+        "minHeight": 600
       }
     ]
   }
