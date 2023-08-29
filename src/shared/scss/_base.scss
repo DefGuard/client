@@ -1,0 +1,70 @@
+@use '@scssutils' as *;
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+#root {
+  min-width: 100%;
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+}
+
+.hidden,
+.visually-hidden {
+  @include visually-hidden;
+}
+
+input,
+button {
+  margin: 0;
+  padding: 0;
+  &:focus,
+  &:focus-within {
+    outline: none;
+  }
+}
+
+p,
+span,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  padding: 0;
+  margin: 0;
+}
+
+// SCROLL
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 15px;
+
+  background-color: var(--text-body-tertiary);
+  opacity: 0.4;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+strong {
+  font-weight: 900;
+}
+
+ol,
+ul {
+  padding-inline-start: 30px;
+}

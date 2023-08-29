@@ -1,0 +1,39 @@
+@use '@scssutils' as *;
+
+#enrollment {
+  @include media-breakpoint-down(lg) {
+    padding: 0;
+    margin: 0;
+    margin-bottom: 140px;
+  }
+  @include media-breakpoint-up(lg) {
+    margin-left: 270px;
+
+    .card {
+      box-shadow: var(--box-shadow);
+
+      & > .step-indicator {
+        margin-bottom: 10px;
+        text-align: left;
+      }
+
+      & > h3 {
+        @include typography(app-body-1);
+
+        color: var(--text-body-primary);
+        width: 100%;
+        text-align: left;
+        user-select: none;
+      }
+    }
+
+    & > .logo-container {
+      margin-bottom: 50px;
+    }
+
+    & > .controls {
+      max-width: 650px;
+      margin-bottom: 50px;
+    }
+  }
+}

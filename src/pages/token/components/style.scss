@@ -1,0 +1,38 @@
+@use '@scssutils' as *;
+
+#token-page {
+  .token-card {
+    box-sizing: border-box;
+    padding: 50px 40px;
+    width: 100%;
+    max-width: 660px;
+
+    & > h2 {
+      @include typography(app-body-1);
+
+      color: var(--text-body-primary);
+      margin-bottom: 15px;
+      text-align: left;
+    }
+
+    & > form {
+      margin-top: 40px;
+      .controls {
+        width: 100%;
+        margin-top: 15px;
+        .btn {
+          width: 100%;
+          svg {
+            g {
+              fill: var(--surface-icon-secondary);
+            }
+          }
+          .arrow-single {
+            width: 100%;
+            height: 100%;
+          }
+        }
+      }
+    }
+  }
+}

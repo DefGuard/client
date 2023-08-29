@@ -1,0 +1,3 @@
+dist/
+src/shared/components/svg/*
+src/i18n/formatters.ts

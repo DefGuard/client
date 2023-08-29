@@ -1,0 +1,69 @@
+@use '@scssutils' as *;
+
+#enrollment-finish-card {
+  width: 100%;
+  max-width: 1200px;
+  padding: 50px 40px;
+
+  h3 {
+    margin-bottom: 20px;
+  }
+
+  & > .content {
+    width: 100%;
+
+    color: var(--text-body-tertiary);
+
+    strong {
+      @include typography(app-welcome-2);
+
+      font-weight: 700;
+    }
+
+    p,
+    span,
+    a,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5 {
+      @include typography(app-welcome-2);
+
+      color: var(--text-body-tertiary);
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5 {
+      font-weight: 500;
+      margin: 20px 0;
+    }
+
+    a {
+      text-decoration-color: var(--text-body-primary);
+    }
+
+    ul,
+    ol {
+      ::marker {
+        color: var(--text-body-tertiary);
+        background-color: var(--text-body-tertiary);
+      }
+
+      li {
+        @include typography(app-welcome-2);
+        color: var(--text-body-primary);
+
+        a {
+          @include typography(app-welcome-2);
+          color: var(--text-body-primary);
+          text-decoration-color: var(--text-body-primary);
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+}

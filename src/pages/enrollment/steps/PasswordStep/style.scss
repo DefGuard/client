@@ -1,0 +1,22 @@
+@use '@scssutils' as *;
+
+#enrollment-password-card {
+  width: 100%;
+  max-width: 650px;
+  padding: 50px 40px;
+
+  & > h3 {
+    margin-bottom: 40px;
+  }
+
+  & > form {
+    display: flex;
+    flex-flow: column;
+    width: 100%;
+    row-gap: 15px;
+
+    & > * {
+      width: 100%;
+    }
+  }
+}

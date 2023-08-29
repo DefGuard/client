@@ -1,0 +1,77 @@
+@use '@scssutils' as *;
+
+#configure-device-card {
+  .qr-info {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+
+    & > p {
+      @include typography(app-input);
+
+      white-space: normal;
+      color: var(--text-body-secondary);
+      text-align: center;
+      margin-bottom: 20px;
+      max-width: 75%;
+    }
+  }
+
+  #device-config-card {
+    box-sizing: border-box;
+    padding: 10px 0 0 0;
+    width: 100%;
+    height: auto;
+
+    border: 1px solid var(--border-primary) !important;
+    box-shadow: none;
+
+    & > .top {
+      display: flex;
+      flex-flow: row wrap;
+      gap: 20px;
+      width: 100%;
+      min-height: 40px;
+      align-items: center;
+      justify-content: flex-start;
+      height: auto;
+      box-sizing: border-box;
+      padding: 0 10px 10px 10px;
+      border-bottom: 1px solid var(--border-primary);
+
+      & > label {
+        @include typography(app-wizard-1);
+
+        white-space: nowrap;
+        user-select: none;
+        color: var(--text-body-tertiary);
+        display: block;
+      }
+
+      .select-container {
+        height: 40px;
+      }
+
+      & > .actions {
+        display: flex;
+        flex-flow: row nowrap;
+        height: 40px;
+        width: auto;
+        column-gap: 10px;
+        margin-left: auto;
+      }
+    }
+
+    & > .qr {
+      box-sizing: border-box;
+      padding: 10px;
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+  }
+}

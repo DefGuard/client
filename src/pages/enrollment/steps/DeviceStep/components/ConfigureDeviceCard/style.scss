@@ -1,0 +1,19 @@
+@use '@scssutils' as *;
+
+#configure-device-card {
+  .message-box {
+    margin-bottom: 20px;
+  }
+
+  form {
+    width: 100%;
+
+    .toggle {
+      margin-bottom: 25px;
+    }
+
+    & > .btn {
+      width: 100%;
+    }
+  }
+}

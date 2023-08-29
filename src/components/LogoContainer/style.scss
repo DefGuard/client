@@ -1,0 +1,27 @@
+@use '@scssutils' as *;
+
+.logo-container {
+  display: flex;
+  flex-flow: row;
+  column-gap: 40px;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  width: 100%;
+
+  & > .divider {
+    height: 100%;
+  }
+
+  & > .defguard {
+    path {
+      fill: var(--text-body-primary);
+    }
+  }
+
+  & > .teonite {
+    path {
+      fill: var(--surface-teonite-logo);
+    }
+  }
+}

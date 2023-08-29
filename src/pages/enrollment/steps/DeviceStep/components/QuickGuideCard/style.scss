@@ -1,0 +1,59 @@
+@use '@scssutils' as *;
+
+#device-setup-guide {
+  & > h3 {
+    margin-bottom: 23px;
+  }
+
+  .btn {
+    height: 47px;
+    width: clamp(100px, 275px, 100%);
+    margin-bottom: 20px;
+  }
+
+  & > .message-box {
+    margin-bottom: 10px;
+  }
+
+  & > .steps {
+    margin-bottom: 10px;
+    max-width: 100%;
+    width: 100%;
+
+    & > label {
+      @include typography(app-avatar-s);
+
+      color: var(--text-body-primary);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    & > p {
+      @include typography(app-body-2);
+
+      color: var(--text-body-secondary);
+
+      &:not(:last-child) {
+        margin-bottom: 20px;
+      }
+    }
+  }
+
+  & > .finish {
+    p,
+    span,
+    strong {
+      @include typography(app-body-2);
+    }
+
+    p,
+    span {
+      color: var(--text-body-secondary);
+    }
+
+    strong {
+      font-weight: 400;
+      color: var(--text-body-primary);
+    }
+  }
+}

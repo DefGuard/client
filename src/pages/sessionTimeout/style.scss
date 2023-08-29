@@ -1,0 +1,68 @@
+@use '@scssutils' as *;
+
+#session-timeout {
+  & > .logo-container {
+    display: none;
+
+    @include media-breakpoint-up(lg) {
+      display: flex;
+      margin-bottom: 100px;
+    }
+  }
+
+  & > .card {
+    margin-bottom: 50px;
+    display: flex;
+    flex-flow: column;
+    row-gap: 20px;
+    width: 100%;
+    max-width: 720px;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 50px 20px;
+
+    @include media-breakpoint-up(lg) {
+      margin-bottom: 100px;
+    }
+
+    h2 {
+      @include typography(app-welcome-1);
+      color: var(--text-button-primary);
+      text-align: center;
+    }
+
+    p {
+      @include typography(app-welcome-2);
+      color: var(--text-body-tertiary);
+      max-width: 490px;
+      text-align: center;
+    }
+  }
+
+  & > .controls {
+    display: flex;
+    flex-flow: row wrap;
+    box-sizing: border-box;
+    column-gap: 32px;
+    row-gap: 20px;
+    align-items: center;
+    justify-content: center;
+
+    & > .btn {
+      width: 100%;
+
+      @include media-breakpoint-up(lg) {
+        width: 344px;
+      }
+
+      &:nth-of-type(1) {
+        svg {
+          g {
+            fill: var(--surface-icon-primary);
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+@use '@scssutils' as *;
+
+.admin-info {
+  width: 100%;
+
+  & > p {
+    @include typography(app-welcome-2);
+
+    color: var(--text-body-primary);
+  }
+}

@@ -1,0 +1,48 @@
+@use '@scssutils' as *;
+
+#enrollment-device-step {
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  padding: 20px;
+
+  @include media-breakpoint-up(lg) {
+    padding: 0 25px 0 25px;
+  }
+
+  & > .message-box {
+    margin-bottom: 25px;
+
+    .message {
+      width: 100%;
+      & > * {
+        text-align: center;
+      }
+    }
+  }
+
+  & > .cards {
+    display: flex;
+    flex-flow: row wrap;
+    column-gap: 50px;
+    row-gap: 25px;
+    align-items: flex-start;
+    justify-content: center;
+    & > .card {
+      width: 100%;
+      max-width: 750px;
+      padding: 40px;
+
+      h3 {
+        @include typography(app-body-1);
+
+        margin-bottom: 23px;
+        user-select: none;
+      }
+
+      label {
+        user-select: none;
+      }
+    }
+  }
+}

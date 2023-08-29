@@ -1,0 +1,21 @@
+@use '@scssutils' as *;
+
+.time-left {
+  display: inline-block;
+
+  & > p {
+    @include typography(app-body-2);
+
+    color: var(--text-body-primary);
+
+    span {
+      color: var(--text-body-tertiary);
+    }
+  }
+
+  &.solo {
+    @include typography(app-body-2);
+
+    color: var(--text-body-tertiary);
+  }
+}

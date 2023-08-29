@@ -1,0 +1,12 @@
+@use '@scssutils' as *;
+
+#token-page {
+  & > .logo-container {
+    display: none;
+    margin-bottom: 30px;
+    @include media-breakpoint-up(lg) {
+      display: flex;
+      margin-bottom: 100px;
+    }
+  }
+}

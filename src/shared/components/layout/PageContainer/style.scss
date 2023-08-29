@@ -1,0 +1,19 @@
+@use '@scssutils' as *;
+
+.page-container {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0;
+  background-color: var(--surface-default-modal);
+  min-height: 100vh;
+  padding: 85px 0 70px 0;
+
+  @include media-breakpoint-up(lg) {
+    background-color: var(--surface-frame-bg);
+    padding: 100px 0;
+  }
+}

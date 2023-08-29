@@ -1,0 +1,3 @@
+[submodule "src/shared/defguard-ui"]
+	path = src/shared/defguard-ui
+	url = ../ui.git
