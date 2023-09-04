@@ -50,8 +50,11 @@
         display: block;
       }
 
-      .select-container {
-        height: 40px;
+      .select {
+        width: 140px;
+        .select-container {
+          height: 40px;
+        }
       }
 
       & > .actions {
