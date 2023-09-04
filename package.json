@@ -1,5 +1,5 @@
 {
-  "name": "client",
+  "name": "defguard/client",
   "private": false,
   "version": "0.0.1",
   "type": "module",
@@ -17,7 +17,8 @@
     "parse-client-svgs": "svgr --no-index --jsx-runtime automatic --svgo-config ./svgo.config.json --prettier-config ./.prettierrc --out-dir ./src/shared/components/svg/ --typescript ./src/shared/images/svg/",
     "parse-ui-svgs": "svgr --no-index --jsx-runtime automatic --svgo-config ./svgo.config.json --prettier-config ./.prettierrc --out-dir ./src/shared/defguard-ui/components/svg/ --typescript ./src/shared/defguard-ui/images/svg/",
     "parse-svgs": "pnpm parse-ui-svgs && pnpm parse-client-svgs",
-    "svgr": "svgr"
+    "svgr": "svgr",
+    "tauri": "tauri"
   },
   "browserslist": {
     "production": [
