@@ -17,6 +17,7 @@ import { localStorageDetector } from 'typesafe-i18n/detectors';
 import TypesafeI18n from '../../i18n/i18n-react';
 import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
+import { ClientPage } from '../../pages/client/ClientPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { TokenPage } from '../../pages/token/TokenPage';
@@ -32,6 +33,10 @@ dayjs.extend(timezone);
 
 const router = createBrowserRouter([
   {
+    index: true,
+    element: <Navigate to={routes.client} />,
+  },
+  {
     path: routes.token,
     element: <TokenPage />,
   },
@@ -42,6 +47,10 @@ const router = createBrowserRouter([
   {
     path: routes.enrollment,
     element: <EnrollmentPage />,
+  },
+  {
+    path: routes.client,
+    element: <ClientPage />,
   },
   {
     path: '/*',

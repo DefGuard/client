@@ -1,6 +1,21 @@
 import './style.scss';
 
-import { PageContainer } from '../../shared/components/layout/PageContainer/PageContainer';
+import { useI18nContext } from '../../i18n/i18n-react';
+import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
+import { LocationsList } from './components/LocationsList/LocationsList';
+
 export const ClientPage = () => {
-  return <PageContainer id="client-page"></PageContainer>;
+  const { LL } = useI18nContext();
+  const pageLL = LL.pages.client;
+  return (
+    <>
+      <section id="client-page">
+        <header>
+          <h1>{pageLL.title()}</h1>
+        </header>
+        <LocationsList />
+      </section>
+      <ClientSideBar />
+    </>
+  );
 };

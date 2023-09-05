@@ -43,6 +43,12 @@ const en = {
     },
   },
   pages: {
+    client: {
+      title: 'Device Overview',
+      locationsList: {
+        title: 'Available Locations',
+      },
+    },
     enrollment: {
       sideBar: {
         title: 'Enrollment',
