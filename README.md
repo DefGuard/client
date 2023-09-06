@@ -1,6 +1,6 @@
 # Defguard desktop client
 
-Dekstop client for managing connection via instance of defguard. Built with tauri and React.js
+Desktop client for managing connection via instance of defguard. Built with tauri and React.js
 
 ## Development
 
