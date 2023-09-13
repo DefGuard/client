@@ -1,5 +1,5 @@
-use sqlx::{query, FromRow};
 use crate::{database::DbPool, error::Error};
+use sqlx::{query, FromRow};
 
 #[derive(FromRow)]
 pub struct Instance {
@@ -9,10 +9,7 @@ pub struct Instance {
 
 impl Instance {
     pub fn new(name: String) -> Self {
-        Instance {
-            id: None,
-            name,
-        }
+        Instance { id: None, name }
     }
 
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {

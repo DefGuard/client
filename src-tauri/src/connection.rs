@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use sqlx::{FromRow, query};
+use sqlx::{query, FromRow};
 
 use crate::{database::DbPool, error::Error};
 
