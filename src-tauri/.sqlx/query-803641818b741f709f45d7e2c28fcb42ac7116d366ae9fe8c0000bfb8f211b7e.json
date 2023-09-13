@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "803641818b741f709f45d7e2c28fcb42ac7116d366ae9fe8c0000bfb8f211b7e"
+}

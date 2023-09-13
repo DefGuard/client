@@ -17,7 +17,7 @@ CREATE TABLE location (
 CREATE TABLE connection (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   location_id INTEGER NOT NULL,
-  connected_from TEXT NOT NULL, -- Renamed from 'from' as it reservedr
+  connected_from TEXT NOT NULL, -- Renamed from 'from' as it reserved
   start INTEGER,
   end INTEGER,
   FOREIGN KEY (location_id) REFERENCES location(id)
