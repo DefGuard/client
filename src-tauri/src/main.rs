@@ -2,11 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 pub mod appstate;
-pub mod connection;
 pub mod database;
 pub mod error;
-pub mod instance;
-pub mod location;
 
 use appstate::AppState;
 use tauri::{Manager, State};

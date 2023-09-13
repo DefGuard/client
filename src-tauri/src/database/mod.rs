@@ -1,5 +1,6 @@
-use std::fs;
+pub mod models;
 
+use std::fs;
 use tauri::AppHandle;
 
 const DB_NAME: &str = "defguard.db";
@@ -21,3 +22,9 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
     sqlx::migrate!().run(&pool).await?;
     Ok(pool)
 }
+
+pub use models::{
+    connection::Connection,
+    instance::Instance,
+    location::{Location, LocationStats},
+};
