@@ -22,6 +22,8 @@ sqlx = { version = "0.7.1", features = ["chrono", "sqlite", "runtime-tokio", "uu
 dirs = "5.0.1"
 thiserror = "1.0.48"
 chrono = "0.4.30"
+wireguard_rs = { path = "wireguard-rs"}
+base64 = "0.21.4"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

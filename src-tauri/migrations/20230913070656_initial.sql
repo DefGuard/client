@@ -9,7 +9,7 @@ CREATE TABLE location (
   address TEXT NOT NULL,
   pubkey TEXT NOT NULL,
   endpoint TEXT NOT NULL,
-  allowed_ips TEXT,
+  allowed_ips TEXT NOT NULL,
   FOREIGN KEY (instance_id) REFERENCES instance(id)
 );
 

@@ -4,6 +4,8 @@
 pub mod appstate;
 pub mod database;
 pub mod error;
+pub mod commands;
+pub mod wireguard;
 
 use appstate::AppState;
 use tauri::{Manager, State};

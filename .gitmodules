@@ -1,3 +1,6 @@
 [submodule "src/shared/defguard-ui"]
 	path = src/shared/defguard-ui
 	url = ../ui.git
+[submodule "src-tauri/wireguard-rs"]
+	path = src-tauri/wireguard-rs
+	url = git@github.com:DefGuard/wireguard-rs.git

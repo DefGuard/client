@@ -1,5 +1,7 @@
+use base64;
 use sqlx;
 use thiserror::Error;
+use wireguard_rs::{error::WireguardError, IpAddrParseError};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -11,4 +13,10 @@ pub enum Error {
     Database(#[from] sqlx::Error),
     #[error("Migrate error: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
+    #[error("Wireguard error")]
+    WireguardError(#[from] WireguardError),
+    #[error("WireGuard key error")]
+    KeyDecode(#[from] base64::DecodeError),
+    #[error("IP address/mask error")]
+    IpAddrMask(#[from] IpAddrParseError),
 }
