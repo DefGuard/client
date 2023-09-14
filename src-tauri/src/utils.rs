@@ -11,6 +11,7 @@ use crate::{
     error::Error,
 };
 
+// TODO: Learn how to run tauri app with sudo permissions to setup interface
 /// Setup client interface
 pub async fn setup_interface(location: Location, pool: &DbPool) -> Result<(), Error> {
     create_interface(&location.name)?;
