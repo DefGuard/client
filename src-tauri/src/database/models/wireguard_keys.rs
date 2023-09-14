@@ -5,10 +5,10 @@ use x25519_dalek::{PublicKey, StaticSecret};
 
 // User key pair
 pub struct WireguardKeys {
-    id: Option<i64>,
-    instance_id: i64,
-    pubkey: String,
-    prvkey: String,
+    pub id: Option<i64>,
+    pub instance_id: i64,
+    pub pubkey: String,
+    pub prvkey: String,
 }
 
 impl WireguardKeys {

@@ -1,3 +1,5 @@
+use std::net::AddrParseError;
+
 use base64;
 use sqlx;
 use thiserror::Error;
@@ -19,4 +21,6 @@ pub enum Error {
     KeyDecode(#[from] base64::DecodeError),
     #[error("IP address/mask error")]
     IpAddrMask(#[from] IpAddrParseError),
+    #[error("IP address/mask error")]
+    AddrParse(#[from] AddrParseError),
 }
