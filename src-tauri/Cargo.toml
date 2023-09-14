@@ -24,6 +24,11 @@ thiserror = "1.0.48"
 chrono = "0.4.30"
 wireguard_rs = { path = "wireguard-rs"}
 base64 = "0.21.4"
+x25519-dalek = { version = "2.0.0-rc.3", features = [
+    "getrandom",
+    "static_secrets",
+] }
+
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
