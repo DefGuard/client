@@ -16,7 +16,7 @@ use crate::{
 pub async fn setup_interface(location: Location, pool: &DbPool) -> Result<(), Error> {
     create_interface(&location.name)?;
     address_interface(&location.name, &IpAddrMask::from_str(&location.address)?)?;
-    let api = WGApi::new(location.name, false);
+    let api = WGApi::new(location.name.clone(), false);
     let mut host = api.read_host()?;
     if let Some(keys) = WireguardKeys::find_by_location_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
@@ -38,7 +38,7 @@ pub async fn setup_interface(location: Location, pool: &DbPool) -> Result<(), Er
             // TODO: Handle other OS than linux
             // Add a route for the allowed IP using the `ip -4 route add` command
             std::process::Command::new("ip")
-                .args(["-4", "route", "add", &allowed_ip, "dev", "wg0"])
+                .args(["-4", "route", "add", &allowed_ip, "dev", &location.name])
                 .output()?;
         }
     };
