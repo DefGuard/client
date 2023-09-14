@@ -27,4 +27,5 @@ pub use models::{
     connection::Connection,
     instance::Instance,
     location::{Location, LocationStats},
+    wireguard_keys::WireguardKeys,
 };

@@ -1,0 +1,85 @@
+@use '@scssutils' as *;
+
+#client-page-side {
+  z-index: 2;
+  position: fixed;
+  inset: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  width: 270px;
+  background-color: var(--surface-nav-bg);
+  border-right: 1px solid var(--border-primary);
+
+  & > .logo {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    height: 108px;
+    column-gap: 7px;
+    border-bottom: 1px solid var(--border-primary);
+  }
+
+  & > .items {
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    box-sizing: border-box;
+
+    @media (min-height: 600px) {
+      padding-top: 70px;
+    }
+
+    & > .client-bar-item {
+      display: grid;
+      grid-template-rows: 24px;
+      grid-template-columns: 24px 1fr;
+      align-items: center;
+      justify-items: start;
+      column-gap: 18px;
+      box-sizing: border-box;
+      padding: 0 10px 0 32px;
+      height: 58px;
+      overflow: hidden;
+
+      & > svg {
+        grid-column: 1;
+        grid-row: 1;
+        width: 24px;
+        height: 24px;
+      }
+
+      & > p {
+        grid-row: 1;
+        grid-column: 2;
+        width: 100%;
+        max-width: 100%;
+        display: block;
+        text-align: left;
+
+        @include text-overflow-dots;
+        @include typography(app-side-bar);
+
+        color: var(--text-body-tertiary);
+      }
+
+      &.active {
+        & > p {
+          color: var(--text-body-primary);
+        }
+      }
+    }
+  }
+}
+
+.client-bar-active-item-bar {
+  width: 2px;
+  height: 58px;
+  display: block;
+  background-color: var(--surface-main-primary);
+  content: ' ';
+  z-index: 3;
+}

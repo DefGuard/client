@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use sqlx::{query, FromRow, query_as, Error as SqlxError};
+use sqlx::{query, query_as, Error as SqlxError, FromRow};
 
 use crate::{database::DbPool, error::Error};
 
@@ -45,14 +45,16 @@ impl Location {
     }
 
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
-      let locations = query_as!(
-        Self,
-        "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips \
+        let locations = query_as!(
+            Self,
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips \
         FROM location;"
-        ).fetch_all(pool).await?;
-      Ok(locations)
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(locations)
     }
-    
+
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         let result = query!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips) \

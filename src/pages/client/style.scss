@@ -1,0 +1,20 @@
+@use '@scssutils' as *;
+
+#client-page {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 64px 75px 64px calc(75px + 270px);
+  min-height: 100vh;
+
+  & > header {
+    width: 100%;
+    display: flex;
+    flex-flow: row;
+    margin-bottom: 200px;
+
+    & > h1 {
+      @include typography(app-title);
+      color: var(--text-body-primary);
+    }
+  }
+}

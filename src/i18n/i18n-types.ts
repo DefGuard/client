@@ -112,6 +112,18 @@ type RootTranslation = {
 		}
 	}
 	pages: {
+		client: {
+			/**
+			 * D​e​v​i​c​e​ ​O​v​e​r​v​i​e​w
+			 */
+			title: string
+			locationsList: {
+				/**
+				 * A​v​a​i​l​a​b​l​e​ ​L​o​c​a​t​i​o​n​s
+				 */
+				title: string
+			}
+		}
 		enrollment: {
 			sideBar: {
 				/**
@@ -550,6 +562,18 @@ export type TranslationFunctions = {
 		}
 	}
 	pages: {
+		client: {
+			/**
+			 * Device Overview
+			 */
+			title: () => LocalizedString
+			locationsList: {
+				/**
+				 * Available Locations
+				 */
+				title: () => LocalizedString
+			}
+		}
 		enrollment: {
 			sideBar: {
 				/**

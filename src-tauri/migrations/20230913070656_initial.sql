@@ -33,3 +33,12 @@ CREATE TABLE  location_stats (
   collected_at INTEGER,
   FOREIGN KEY (location_id) REFERENCES location(id)
 );
+
+-- Create the LocationStats table
+CREATE TABLE  wireguard_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  instance_id INTEGER NOT NULL,
+  pubkey TEXT NOT NULL,
+  prvkey TEXT NOT NULL,
+  FOREIGN KEY (instance_id) REFERENCES instance(id)
+);

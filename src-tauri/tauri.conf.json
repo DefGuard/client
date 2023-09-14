@@ -11,8 +11,15 @@
     "version": "0.1.0"
   },
   "tauri": {
+    "systemTray": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": false
+    },
     "allowlist": {
-      "all": false
+      "all": false,
+      "window": {
+        "all": true
+      }
     },
     "bundle": {
       "active": true,
@@ -58,7 +65,7 @@
         "fullscreen": false,
         "center": true,
         "maximized": true,
-        "height": 600,
+        "height": 720,
         "resizable": true,
         "maximizable": true,
         "minimizable": true,
@@ -66,7 +73,7 @@
         "title": "Defguard",
         "width": 992,
         "minWidth": 992,
-        "minHeight": 600
+        "minHeight": 720
       }
     ]
   }
