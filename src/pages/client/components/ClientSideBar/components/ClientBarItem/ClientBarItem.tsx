@@ -5,7 +5,7 @@ import { ActivityIcon } from '../../../../../../shared/defguard-ui/components/ic
 import { ActivityIconVariant } from '../../../../../../shared/defguard-ui/components/icons/ActivityIcon/types';
 
 export const ClientBarItem = () => {
-  const cn = classNames('client-bar-item');
+  const cn = classNames('client-bar-item', 'clickable');
 
   const active = true;
 

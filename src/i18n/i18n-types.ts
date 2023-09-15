@@ -101,6 +101,18 @@ type RootTranslation = {
 			 * S​u​b​m​i​t
 			 */
 			submit: string
+			/**
+			 * C​a​n​c​e​l
+			 */
+			cancel: string
+			/**
+			 * C​l​o​s​e
+			 */
+			close: string
+			/**
+			 * R​e​s​e​t
+			 */
+			reset: string
 		}
 	}
 	components: {
@@ -114,14 +126,119 @@ type RootTranslation = {
 	pages: {
 		client: {
 			/**
-			 * D​e​v​i​c​e​ ​O​v​e​r​v​i​e​w
+			 * L​o​c​a​t​i​o​n​s
 			 */
 			title: string
-			locationsList: {
+			sideBar: {
 				/**
-				 * A​v​a​i​l​a​b​l​e​ ​L​o​c​a​t​i​o​n​s
+				 * I​n​s​t​a​n​c​e​s
+				 */
+				instances: string
+				/**
+				 * A​d​d​ ​I​n​s​t​a​n​c​e
+				 */
+				addInstance: string
+				copyright: {
+					/**
+					 * C​o​p​y​r​i​g​h​t​ ​©​ ​2​0​2​3
+					 */
+					copyright: string
+					/**
+					 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n​:​ ​{​v​e​r​s​i​o​n​}
+					 * @param {string} version
+					 */
+					appVersion: RequiredParams<'version'>
+				}
+			}
+			controls: {
+				/**
+				 * C​o​n​n​e​c​t
+				 */
+				connect: string
+				/**
+				 * D​i​s​c​o​n​n​e​c​t
+				 */
+				disconnect: string
+			}
+			header: {
+				/**
+				 * L​o​c​a​t​i​o​n​s
 				 */
 				title: string
+				filters: {
+					views: {
+						/**
+						 * G​r​i​d​ ​V​i​e​w
+						 */
+						grid: string
+						/**
+						 * D​e​t​a​i​l​ ​V​i​e​w
+						 */
+						detail: string
+					}
+				}
+			}
+			connectionLabels: {
+				/**
+				 * L​a​s​t​ ​c​o​n​n​e​c​t​e​d​ ​f​r​o​m
+				 */
+				lastConnectedFrom: string
+				/**
+				 * L​a​s​t​ ​c​o​n​n​e​c​t​e​d
+				 */
+				lastConnected: string
+				/**
+				 * A​s​s​i​g​n​e​d​ ​I​P
+				 */
+				assignedIp: string
+			}
+			detailView: {
+				history: {
+					/**
+					 * C​o​n​n​e​c​t​i​o​n​ ​h​i​s​t​o​r​y
+					 */
+					title: string
+					headers: {
+						/**
+						 * D​a​t​e
+						 */
+						date: string
+						/**
+						 * D​u​r​a​t​i​o​n
+						 */
+						duration: string
+						/**
+						 * C​o​n​n​e​c​t​e​d​ ​f​r​o​m
+						 */
+						connectedFrom: string
+						/**
+						 * U​p​l​o​a​d
+						 */
+						upload: string
+						/**
+						 * D​o​w​n​l​o​a​d
+						 */
+						download: string
+					}
+				}
+			}
+			modals: {
+				addInstanceModal: {
+					/**
+					 * A​d​d​ ​i​n​s​t​a​n​c​e
+					 */
+					title: string
+					form: {
+						fields: {
+							token: {
+								/**
+								 * T​o​k​e​n
+								 */
+								label: string
+							}
+						}
+					}
+				}
 			}
 		}
 		enrollment: {
@@ -551,6 +668,18 @@ export type TranslationFunctions = {
 			 * Submit
 			 */
 			submit: () => LocalizedString
+			/**
+			 * Cancel
+			 */
+			cancel: () => LocalizedString
+			/**
+			 * Close
+			 */
+			close: () => LocalizedString
+			/**
+			 * Reset
+			 */
+			reset: () => LocalizedString
 		}
 	}
 	components: {
@@ -564,14 +693,118 @@ export type TranslationFunctions = {
 	pages: {
 		client: {
 			/**
-			 * Device Overview
+			 * Locations
 			 */
 			title: () => LocalizedString
-			locationsList: {
+			sideBar: {
 				/**
-				 * Available Locations
+				 * Instances
+				 */
+				instances: () => LocalizedString
+				/**
+				 * Add Instance
+				 */
+				addInstance: () => LocalizedString
+				copyright: {
+					/**
+					 * Copyright © 2023
+					 */
+					copyright: () => LocalizedString
+					/**
+					 * Application version: {version}
+					 */
+					appVersion: (arg: { version: string }) => LocalizedString
+				}
+			}
+			controls: {
+				/**
+				 * Connect
+				 */
+				connect: () => LocalizedString
+				/**
+				 * Disconnect
+				 */
+				disconnect: () => LocalizedString
+			}
+			header: {
+				/**
+				 * Locations
 				 */
 				title: () => LocalizedString
+				filters: {
+					views: {
+						/**
+						 * Grid View
+						 */
+						grid: () => LocalizedString
+						/**
+						 * Detail View
+						 */
+						detail: () => LocalizedString
+					}
+				}
+			}
+			connectionLabels: {
+				/**
+				 * Last connected from
+				 */
+				lastConnectedFrom: () => LocalizedString
+				/**
+				 * Last connected
+				 */
+				lastConnected: () => LocalizedString
+				/**
+				 * Assigned IP
+				 */
+				assignedIp: () => LocalizedString
+			}
+			detailView: {
+				history: {
+					/**
+					 * Connection history
+					 */
+					title: () => LocalizedString
+					headers: {
+						/**
+						 * Date
+						 */
+						date: () => LocalizedString
+						/**
+						 * Duration
+						 */
+						duration: () => LocalizedString
+						/**
+						 * Connected from
+						 */
+						connectedFrom: () => LocalizedString
+						/**
+						 * Upload
+						 */
+						upload: () => LocalizedString
+						/**
+						 * Download
+						 */
+						download: () => LocalizedString
+					}
+				}
+			}
+			modals: {
+				addInstanceModal: {
+					/**
+					 * Add instance
+					 */
+					title: () => LocalizedString
+					form: {
+						fields: {
+							token: {
+								/**
+								 * Token
+								 */
+								label: () => LocalizedString
+							}
+						}
+					}
+				}
 			}
 		}
 		enrollment: {

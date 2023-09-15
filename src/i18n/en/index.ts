@@ -35,6 +35,9 @@ const en = {
       back: 'Back',
       next: 'Next',
       submit: 'Submit',
+      cancel: 'Cancel',
+      close: 'Close',
+      reset: 'Reset',
     },
   },
   components: {
@@ -44,9 +47,56 @@ const en = {
   },
   pages: {
     client: {
-      title: 'Device Overview',
-      locationsList: {
-        title: 'Available Locations',
+      title: 'Locations',
+      sideBar: {
+        instances: 'Instances',
+        addInstance: 'Add Instance',
+        copyright: {
+          copyright: `Copyright © 2023`,
+          appVersion: 'Application version: {version:string}',
+        },
+      },
+      controls: {
+        connect: 'Connect',
+        disconnect: 'Disconnect',
+      },
+      header: {
+        title: 'Locations',
+        filters: {
+          views: {
+            grid: 'Grid View',
+            detail: 'Detail View',
+          },
+        },
+      },
+      connectionLabels: {
+        lastConnectedFrom: 'Last connected from',
+        lastConnected: 'Last connected',
+        assignedIp: 'Assigned IP',
+      },
+      detailView: {
+        history: {
+          title: 'Connection history',
+          headers: {
+            date: 'Date',
+            duration: 'Duration',
+            connectedFrom: 'Connected from',
+            upload: 'Upload',
+            download: 'Download',
+          },
+        },
+      },
+      modals: {
+        addInstanceModal: {
+          title: 'Add instance',
+          form: {
+            fields: {
+              token: {
+                label: 'Token',
+              },
+            },
+          },
+        },
       },
     },
     enrollment: {

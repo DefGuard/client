@@ -37,15 +37,19 @@
       display: grid;
       grid-template-rows: 24px;
       grid-template-columns: 24px 1fr;
-      align-items: center;
       justify-items: start;
+      align-items: center;
+      justify-content: start;
+      align-content: center;
       column-gap: 18px;
       box-sizing: border-box;
       padding: 0 10px 0 32px;
       height: 58px;
+      width: 100%;
       overflow: hidden;
 
-      & > svg {
+      & > svg,
+      & > .icon-wrapper {
         grid-column: 1;
         grid-row: 1;
         width: 24px;
@@ -59,6 +63,7 @@
         max-width: 100%;
         display: block;
         text-align: left;
+        user-select: none;
 
         @include text-overflow-dots;
         @include typography(app-side-bar);
@@ -69,6 +74,18 @@
       &.active {
         & > p {
           color: var(--text-body-primary);
+        }
+      }
+
+      &.clickable {
+        cursor: pointer;
+      }
+
+      &:not(.active) {
+        &:hover {
+          & > p {
+            color: var(--text-body-primary);
+          }
         }
       }
     }
