@@ -12,6 +12,7 @@ use tauri::{Manager, State};
 
 use tauri::SystemTrayEvent;
 mod tray;
+use crate::commands::{all_instances, all_locations, save_device_config};
 use crate::tray::create_tray_menu;
 
 #[derive(Clone, serde::Serialize)]
@@ -27,6 +28,11 @@ fn main() {
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
 
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            all_locations,
+            save_device_config,
+            all_instances
+        ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 event.window().hide().unwrap();

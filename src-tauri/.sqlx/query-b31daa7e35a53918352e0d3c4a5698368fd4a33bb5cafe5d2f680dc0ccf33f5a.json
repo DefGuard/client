@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO instance (name, uuid) VALUES ($1, $2) RETURNING id;",
+  "query": "INSERT INTO instance (name, uuid, url) VALUES ($1, $2, $3) RETURNING id;",
   "describe": {
     "columns": [
       {
@@ -10,11 +10,11 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 3
     },
     "nullable": [
       false
     ]
   },
-  "hash": "6be8d403ea60ef3ab0e980a94d91218fd246d9885367d4669e7ee4c9d1344cd2"
+  "hash": "b31daa7e35a53918352e0d3c4a5698368fd4a33bb5cafe5d2f680dc0ccf33f5a"
 }

@@ -39,22 +39,51 @@ pub struct CreateDeviceResponse {
     device: Device,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
     mut response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
-) -> Result<(), Error> {
-    let mut transaction = app_state.get_pool().begin().await?;
-    response.instance.save(&mut *transaction).await?;
+) -> Result<(), String> {
+    let mut transaction = app_state
+        .get_pool()
+        .begin()
+        .await
+        .map_err(|err| err.to_string())?;
+    response
+        .instance
+        .save(&mut *transaction)
+        .await
+        .map_err(|err| err.to_string())?;
     let mut keys = WireguardKeys::new(
         response.instance.id.unwrap(),
         private_key,
         response.device.pubkey,
     );
-    keys.save(&mut *transaction).await?;
+    keys.save(&mut *transaction)
+        .await
+        .map_err(|err| err.to_string())?;
     for mut location in response.device_config {
-        location.save(&mut *transaction).await?;
+        location
+            .save(&mut *transaction)
+            .await
+            .map_err(|err| err.to_string())?;
     }
+    transaction.commit().await.map_err(|err| err.to_string())?;
     Ok(())
+}
+#[tauri::command(async)]
+pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instance>, String> {
+    Instance::all(&app_state.get_pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+#[tauri::command(async)]
+pub async fn all_locations(
+    instance_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<Vec<Location>, String> {
+    Location::find_by_instance_id(&app_state.get_pool(), instance_id)
+        .await
+        .map_err(|err| err.to_string())
 }
