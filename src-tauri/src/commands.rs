@@ -4,6 +4,7 @@ use crate::{
     utils::setup_interface,
     AppState,
 };
+use serde::{Deserialize, Serialize};
 use tauri::State;
 use wireguard_rs::netlink::delete_interface;
 
@@ -22,7 +23,7 @@ pub async fn disconnect(location_id: i64, app_state: State<'_, AppState>) -> Res
     }
     Ok(())
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
     pub id: i64,
     pub name: String,
@@ -31,13 +32,14 @@ pub struct Device {
     pub created_at: i64,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct CreateDeviceResponse {
     instance: Instance,
     device_config: Vec<Location>,
     device: Device,
 }
 
-/// Get location id and
+#[tauri::command]
 pub async fn save_device_config(
     private_key: String,
     mut response: CreateDeviceResponse,
@@ -48,10 +50,10 @@ pub async fn save_device_config(
     let mut keys = WireguardKeys::new(
         response.instance.id.unwrap(),
         private_key,
-        config.device.pubkey,
+        response.device.pubkey,
     );
     keys.save(&mut *transaction).await?;
-    for location in response.device_config {
+    for mut location in response.device_config {
         location.save(&mut *transaction).await?;
     }
     Ok(())

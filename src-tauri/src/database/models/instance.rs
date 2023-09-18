@@ -1,7 +1,8 @@
 use crate::error::Error;
+use serde::{Deserialize, Serialize};
 use sqlx::{query, FromRow};
 
-#[derive(FromRow)]
+#[derive(FromRow, Serialize, Deserialize)]
 pub struct Instance {
     pub id: Option<i64>,
     pub name: String,

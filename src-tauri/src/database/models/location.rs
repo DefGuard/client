@@ -2,8 +2,9 @@ use chrono::NaiveDateTime;
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 
 use crate::{database::DbPool, error::Error};
+use serde::{Deserialize, Serialize};
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct Location {
     pub id: Option<i64>,
     pub instance_id: i64,
