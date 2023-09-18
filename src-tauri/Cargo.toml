@@ -13,10 +13,24 @@ rust-version = "1.60"
 
 [build-dependencies]
 tauri-build = { version = "1.4.0", features = [] }
+tonic-build = { version = "0.9" }
+prost-build = { version = "0.11" }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.7.1", features = ["chrono", "sqlite", "runtime-tokio", "uuid", "macros"] }
+dirs = "5.0.1"
+thiserror = "1.0.48"
+chrono = "0.4.30"
+wireguard_rs = { path = "wireguard-rs"}
+base64 = "0.21.4"
+x25519-dalek = { version = "2", features = [
+    "getrandom",
+    "static_secrets",
+] }
+prost = "0.11"
+
 tauri = { version = "1.4.1", features = [ "window-all", "system-tray"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 
