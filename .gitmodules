@@ -4,3 +4,6 @@
 [submodule "src-tauri/wireguard-rs"]
 	path = src-tauri/wireguard-rs
 	url = git@github.com:DefGuard/wireguard-rs.git
+[submodule "src-tauri/proto"]
+	path = src-tauri/proto
+	url = git@github.com:DefGuard/proto.git

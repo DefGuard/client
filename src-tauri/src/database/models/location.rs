@@ -55,7 +55,10 @@ impl Location {
         Ok(locations)
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips) \
             VALUES ($1, $2, $3, $4, $5, $6) \
@@ -68,7 +71,7 @@ impl Location {
             self.endpoint,
             self.allowed_ips,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
         self.id = Some(result.id);
         Ok(())
@@ -81,6 +84,19 @@ impl Location {
             location_id
         )
         .fetch_optional(pool)
+        .await
+    }
+    pub async fn find_by_instance_id(
+        pool: &DbPool,
+        instance_id: i64,
+    ) -> Result<Vec<Self>, SqlxError> {
+        query_as!(
+            Self,
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips \
+            FROM location WHERE instance_id = $1;",
+            instance_id
+        )
+        .fetch_all(pool)
         .await
     }
 }

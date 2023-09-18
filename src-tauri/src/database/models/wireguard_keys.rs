@@ -1,7 +1,5 @@
 use crate::{database::DbPool, error::Error};
-use base64::Engine;
 use sqlx::{query, query_as, Error as SqlxError};
-use x25519_dalek::{PublicKey, StaticSecret};
 
 // User key pair
 pub struct WireguardKeys {
@@ -12,15 +10,7 @@ pub struct WireguardKeys {
 }
 
 impl WireguardKeys {
-    pub fn new(instance_id: i64) -> Self {
-        let secret = StaticSecret::random();
-
-        // Derive the corresponding public key
-        let public_key = PublicKey::from(&secret);
-        // Convert the keys to WireGuard's base64 format
-        let prvkey = base64::prelude::BASE64_STANDARD.encode(secret.to_bytes());
-        let pubkey = base64::prelude::BASE64_STANDARD.encode(public_key.to_bytes());
-
+    pub fn new(instance_id: i64, pubkey: String, prvkey: String) -> Self {
         WireguardKeys {
             id: None,
             instance_id,
@@ -28,7 +18,10 @@ impl WireguardKeys {
             prvkey,
         }
     }
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO wireguard_keys (instance_id, pubkey, prvkey) \
             VALUES ($1, $2, $3) \
@@ -38,7 +31,7 @@ impl WireguardKeys {
             self.pubkey,
             self.prvkey,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
         self.id = Some(result.id);
         Ok(())
