@@ -3,6 +3,7 @@ import './style.scss';
 import { useI18nContext } from '../../i18n/i18n-react';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
 import { LocationsList } from './components/LocationsList/LocationsList';
+import { AddInstanceModal } from './components/modals/AddInstanceModal/AddInstanceModal';
 
 export const ClientPage = () => {
   const { LL } = useI18nContext();
@@ -16,6 +17,7 @@ export const ClientPage = () => {
         <LocationsList />
       </section>
       <ClientSideBar />
+      <AddInstanceModal />
     </>
   );
 };

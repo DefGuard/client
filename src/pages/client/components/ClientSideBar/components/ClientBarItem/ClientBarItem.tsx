@@ -1,13 +1,24 @@
 import { autoUpdate, useFloating } from '@floating-ui/react';
 import classNames from 'classnames';
+import { isUndefined } from 'lodash-es';
+import { useMemo } from 'react';
 
-import { ActivityIcon } from '../../../../../../shared/defguard-ui/components/icons/ActivityIcon/ActivityIcon';
-import { ActivityIconVariant } from '../../../../../../shared/defguard-ui/components/icons/ActivityIcon/types';
+import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
+import { DefguardInstance } from '../../../../types';
 
-export const ClientBarItem = () => {
-  const cn = classNames('client-bar-item');
+type Props = {
+  instance: DefguardInstance;
+};
 
-  const active = true;
+export const ClientBarItem = ({ instance }: Props) => {
+  const active = useMemo(() => {
+    if (instance.locations.length === 0) return false;
+    return !isUndefined(instance.locations.find((l) => l.connected));
+  }, [instance.locations]);
+
+  const cn = classNames('client-bar-item', 'clickable', {
+    active,
+  });
 
   const { refs, floatingStyles } = useFloating({
     placement: 'right',
@@ -18,10 +29,8 @@ export const ClientBarItem = () => {
   return (
     <>
       <div className={cn} ref={refs.setReference}>
-        <ActivityIcon
-          status={active ? ActivityIconVariant.CONNECTED : ActivityIconVariant.BLANK}
-        />
-        <p>Placeholder instance name</p>
+        <SvgIconConnection className="connection-icon" />
+        <p>{instance.name}</p>
       </div>
       {active && (
         <div
