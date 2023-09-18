@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct Location {
     pub id: Option<i64>,
     pub instance_id: i64,
+    // Native id of network from defguard
+    pub network_id: i64,
     pub name: String,
     pub address: String,
     pub pubkey: String,
@@ -28,6 +30,7 @@ pub struct LocationStats {
 impl Location {
     pub fn new(
         instance_id: i64,
+        network_id: i64,
         name: String,
         address: String,
         pubkey: String,
@@ -37,6 +40,7 @@ impl Location {
         Location {
             id: None,
             instance_id,
+            network_id,
             name,
             address,
             pubkey,
@@ -48,7 +52,7 @@ impl Location {
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let locations = query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
         FROM location;"
         )
         .fetch_all(pool)
@@ -61,8 +65,8 @@ impl Location {
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         let result = query!(
-            "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips) \
-            VALUES ($1, $2, $3, $4, $5, $6) \
+            "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, network_id) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7) \
             RETURNING id;
             ",
             self.instance_id,
@@ -71,6 +75,7 @@ impl Location {
             self.pubkey,
             self.endpoint,
             self.allowed_ips,
+            self.network_id,
         )
         .fetch_one(executor)
         .await?;
@@ -80,7 +85,7 @@ impl Location {
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
             FROM location WHERE id = $1;",
             location_id
         )
@@ -93,7 +98,7 @@ impl Location {
     ) -> Result<Vec<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
             FROM location WHERE instance_id = $1;",
             instance_id
         )

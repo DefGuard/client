@@ -7,6 +7,7 @@ CREATE TABLE instance (
 CREATE TABLE location (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   instance_id INTEGER NOT NULL,
+  network_id INTEGER NOT NULL, -- Native id of network in defguard system
   name TEXT NOT NULL,
   address TEXT NOT NULL,
   pubkey TEXT NOT NULL,

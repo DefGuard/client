@@ -33,16 +33,40 @@ pub struct Device {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct DeviceConfig {
+    pub network_id: i64,
+    pub network_name: String,
+    pub config: String,
+    pub endpoint: String,
+    pub assigned_ip: String,
+    pub pubkey: String,
+    pub allowed_ips: String,
+}
+
+pub fn device_config_to_location(device_config: DeviceConfig) -> Location {
+    Location {
+        id: None,
+        instance_id: device_config.network_id,
+        network_id: device_config.network_id,
+        name: device_config.network_name,
+        address: device_config.assigned_ip, // Transforming assigned_ip to address
+        pubkey: device_config.pubkey,
+        endpoint: device_config.endpoint,
+        allowed_ips: device_config.allowed_ips,
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct CreateDeviceResponse {
-    instance: Instance,
-    device_config: Vec<Location>,
+    instance_info: Instance,
+    configs: Vec<DeviceConfig>,
     device: Device,
 }
 
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
-    mut response: CreateDeviceResponse,
+    response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
     let mut transaction = app_state
@@ -50,21 +74,19 @@ pub async fn save_device_config(
         .begin()
         .await
         .map_err(|err| err.to_string())?;
-    response
-        .instance
-        .save(&mut *transaction)
-        .await
-        .map_err(|err| err.to_string())?;
-    let mut keys = WireguardKeys::new(
-        response.instance.id.unwrap(),
-        private_key,
-        response.device.pubkey,
+    let mut instance = Instance::new(
+        response.instance_info.name,
+        response.instance_info.uuid,
+        response.instance_info.url,
     );
+    instance.save(&mut *transaction).await.map_err(|e| e.to_string())?;
+    let mut keys = WireguardKeys::new(instance.id.unwrap(), private_key, response.device.pubkey);
     keys.save(&mut *transaction)
         .await
         .map_err(|err| err.to_string())?;
-    for mut location in response.device_config {
-        location
+    for location in response.configs {
+        let mut new_location = device_config_to_location(location);
+        new_location
             .save(&mut *transaction)
             .await
             .map_err(|err| err.to_string())?;
@@ -72,12 +94,14 @@ pub async fn save_device_config(
     transaction.commit().await.map_err(|err| err.to_string())?;
     Ok(())
 }
+
 #[tauri::command(async)]
 pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instance>, String> {
     Instance::all(&app_state.get_pool())
         .await
         .map_err(|err| err.to_string())
 }
+
 #[tauri::command(async)]
 pub async fn all_locations(
     instance_id: i64,

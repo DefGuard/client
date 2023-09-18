@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips FROM location WHERE instance_id = $1;",
+  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id FROM location WHERE instance_id = $1;",
   "describe": {
     "columns": [
       {
@@ -37,6 +37,11 @@
         "name": "allowed_ips",
         "ordinal": 6,
         "type_info": "Text"
+      },
+      {
+        "name": "network_id",
+        "ordinal": 7,
+        "type_info": "Int64"
       }
     ],
     "parameters": {
@@ -49,8 +54,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "182ab8b6db5a145ebd17f7580d804a996c71e4545566671c48c3ffe986da3c33"
+  "hash": "3227eded261da8ddabd4d59a7d1af05669baeb14b639209ffa75e61e2c31cece"
 }
