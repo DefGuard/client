@@ -71,9 +71,20 @@
         color: var(--text-body-tertiary);
       }
 
+      & > .connection-icon {
+        path {
+          stroke: var(--surface-important);
+        }
+      }
+
       &.active {
         & > p {
           color: var(--text-body-primary);
+        }
+        & > .connection-icon {
+          path {
+            stroke: var(--surface-positive-primary);
+          }
         }
       }
 

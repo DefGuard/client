@@ -11,7 +11,7 @@
     width: 100%;
     display: flex;
     flex-flow: row;
-    margin-bottom: 200px;
+    margin-bottom: 60px;
 
     & > h1 {
       @include typography(app-title);

@@ -35,10 +35,12 @@ export const AddInstanceModal = () => {
 };
 
 type FormFields = {
+  url: string;
   token: string;
 };
 
 const defaultValues: FormFields = {
+  url: '',
   token: '',
 };
 
@@ -48,6 +50,11 @@ const ModalContent = () => {
   const schema = useMemo(
     () =>
       z.object({
+        url: z
+          .string()
+          .trim()
+          .nonempty(LL.form.errors.required())
+          .url(LL.form.errors.invalid()),
         token: z.string().trim().nonempty(LL.form.errors.required()),
       }),
     [LL.form.errors],
@@ -64,6 +71,10 @@ const ModalContent = () => {
 
   return (
     <form onSubmit={handleSubmit(handleValidSubmit)}>
+      <FormInput
+        controller={{ control, name: 'url' }}
+        label={LL.pages.client.modals.addInstanceModal.form.fields.token.label()}
+      />
       <FormInput
         controller={{ control, name: 'token' }}
         label={LL.pages.client.modals.addInstanceModal.form.fields.token.label()}

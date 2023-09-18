@@ -1,0 +1,47 @@
+@use '@scssutils' as *;
+
+#locations-grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(445px, 1fr));
+  grid-auto-rows: auto;
+  gap: 50px;
+  justify-content: start;
+  align-content: start;
+
+  & > .grid-item {
+    box-sizing: border-box;
+    padding: 20px 25px;
+    min-height: 245px;
+
+    & > .top {
+      width: 100%;
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: flex-start;
+
+      & > .btn {
+        margin-left: auto;
+        height: 40px;
+      }
+    }
+
+    & > .info {
+      margin: 32px 0;
+      display: flex;
+      flex-flow: row;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    & > .no-data {
+      width: 100%;
+      display: block;
+      text-align: center;
+      margin-top: 42px;
+
+      @include typography(app-button-xl);
+
+      color: var(--text-body-primary);
+    }
+  }
+}

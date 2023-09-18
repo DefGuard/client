@@ -192,6 +192,10 @@ type RootTranslation = {
 				 */
 				assignedIp: string
 			}
+			/**
+			 * T​h​i​s​ ​d​e​v​i​c​e​ ​w​a​s​ ​n​e​v​e​r​ ​c​o​n​n​e​c​t​e​d​ ​t​o​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​,​ ​c​o​n​n​e​c​t​ ​t​o​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​a​n​d​ ​i​n​f​o​r​m​a​t​i​o​n​ ​a​b​o​u​t​ ​c​o​n​n​e​c​t​i​o​n
+			 */
+			locationNoData: string
 			detailView: {
 				history: {
 					/**
@@ -228,11 +232,33 @@ type RootTranslation = {
 					 * A​d​d​ ​i​n​s​t​a​n​c​e
 					 */
 					title: string
+					messages: {
+						success: {
+							/**
+							 * I​n​s​t​a​n​c​e​ ​a​d​d​e​d
+							 */
+							add: string
+							/**
+							 * I​n​s​t​a​n​c​e​ ​i​n​f​o​r​m​a​t​i​o​n​ ​u​p​d​a​t​e​d
+							 */
+							update: string
+						}
+						/**
+						 * F​e​t​c​h​i​n​g​ ​i​n​f​o​r​m​a​t​i​o​n​ ​f​a​i​l​e​d​.
+						 */
+						error: string
+					}
 					form: {
 						fields: {
 							token: {
 								/**
 								 * T​o​k​e​n
+								 */
+								label: string
+							}
+							url: {
+								/**
+								 * P​r​o​x​y​ ​U​R​L​:
 								 */
 								label: string
 							}
@@ -758,6 +784,10 @@ export type TranslationFunctions = {
 				 */
 				assignedIp: () => LocalizedString
 			}
+			/**
+			 * This device was never connected to this location, connect to view statistics and information about connection
+			 */
+			locationNoData: () => LocalizedString
 			detailView: {
 				history: {
 					/**
@@ -794,11 +824,33 @@ export type TranslationFunctions = {
 					 * Add instance
 					 */
 					title: () => LocalizedString
+					messages: {
+						success: {
+							/**
+							 * Instance added
+							 */
+							add: () => LocalizedString
+							/**
+							 * Instance information updated
+							 */
+							update: () => LocalizedString
+						}
+						/**
+						 * Fetching information failed.
+						 */
+						error: () => LocalizedString
+					}
 					form: {
 						fields: {
 							token: {
 								/**
 								 * Token
+								 */
+								label: () => LocalizedString
+							}
+							url: {
+								/**
+								 * Proxy URL:
 								 */
 								label: () => LocalizedString
 							}

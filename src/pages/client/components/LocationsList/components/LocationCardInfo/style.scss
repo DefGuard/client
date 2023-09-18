@@ -1,0 +1,28 @@
+@use '@scssutils' as *;
+
+.location-card-info-from,
+.location-card-info-connected,
+.location-card-info-ip {
+  display: flex;
+  flex-flow: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  justify-items: flex-start;
+
+  & > label {
+    @include typography(app-modal-1);
+
+    color: var(--text-body-tertiary);
+    user-select: none;
+    margin-bottom: 8px;
+    display: block;
+    text-align: left;
+  }
+
+  & > p {
+    @include typography(app-button-xl);
+
+    color: var(--text-body-primary);
+    text-align: left;
+  }
+}

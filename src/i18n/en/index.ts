@@ -74,6 +74,8 @@ const en = {
         lastConnected: 'Last connected',
         assignedIp: 'Assigned IP',
       },
+      locationNoData:
+        'This device was never connected to this location, connect to view statistics and information about connection',
       detailView: {
         history: {
           title: 'Connection history',
@@ -89,10 +91,20 @@ const en = {
       modals: {
         addInstanceModal: {
           title: 'Add instance',
+          messages: {
+            success: {
+              add: 'Instance added',
+              update: 'Instance information updated',
+            },
+            error: 'Fetching information failed.',
+          },
           form: {
             fields: {
               token: {
                 label: 'Token',
+              },
+              url: {
+                label: 'Proxy URL:',
               },
             },
           },

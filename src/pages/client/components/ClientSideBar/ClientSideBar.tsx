@@ -6,10 +6,14 @@ import SvgDefguardLogoText from '../../../../shared/components/svg/DefguardLogoT
 import SvgIconNavConnections from '../../../../shared/components/svg/IconNavConnections';
 import { IconContainer } from '../../../../shared/defguard-ui/components/Layout/IconContainer/IconContainer';
 import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus';
+import { useClientStore } from '../../hooks/useClientStore';
 import { useAddInstanceModal } from '../modals/AddInstanceModal/hooks/useAddInstanceModal';
+import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 
 export const ClientSideBar = () => {
   const { LL } = useI18nContext();
+  const instances = useClientStore((state) => state.instances);
+
   return (
     <div id="client-page-side">
       <div className="logo">
@@ -21,6 +25,9 @@ export const ClientSideBar = () => {
           <SvgIconNavConnections />
           <p>{LL.pages.client.sideBar.instances()}</p>
         </div>
+        {instances.map((instance) => (
+          <ClientBarItem instance={instance} key={instance.id} />
+        ))}
         <AddInstance />
       </div>
     </div>
