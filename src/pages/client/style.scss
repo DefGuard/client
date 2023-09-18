@@ -5,12 +5,13 @@
   box-sizing: border-box;
   padding: 64px 75px 64px calc(75px + 270px);
   min-height: 100vh;
+  background-color: var(--surface-frame-bg);
 
   & > header {
     width: 100%;
     display: flex;
     flex-flow: row;
-    margin-bottom: 200px;
+    margin-bottom: 60px;
 
     & > h1 {
       @include typography(app-title);

@@ -1,15 +1,24 @@
-import './style.scss';
+import { useMemo } from 'react';
 
-import { useI18nContext } from '../../../../i18n/i18n-react';
+import { useClientStore } from '../../hooks/useClientStore';
+import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 
 export const LocationsList = () => {
-  const { LL } = useI18nContext();
-  const componentLL = LL.pages.client.locationsList;
+  const instances = useClientStore((state) => state.instances);
+  const selectedInstance = useClientStore((state) => state.selectedInstance);
+  const locations = useMemo(() => {
+    const selected = instances.find((i) => i.id === selectedInstance);
+    if (selected) {
+      return selected.locations;
+    }
+    return [];
+  }, [selectedInstance, instances]);
+
+  if (!selectedInstance) return null;
+
   return (
-    <section id="client-locations-list">
-      <header>
-        <h3>{componentLL.title()}</h3>
-      </header>
-    </section>
+    <>
+      <LocationsGridView locations={locations} instanceId={selectedInstance} />
+    </>
   );
 };

@@ -1,0 +1,19 @@
+@use '@scssutils' as *;
+
+.location-card-connect-button {
+  & > svg {
+    width: 18px;
+    height: 18px;
+    path {
+      fill: var(--surface-icon-primary);
+    }
+  }
+
+  &.connected {
+    & > svg {
+      path {
+        fill: var(--text-button-primary);
+      }
+    }
+  }
+}
