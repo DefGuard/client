@@ -54,10 +54,17 @@ pub fn device_config_to_location(device_config: DeviceConfig) -> Location {
         allowed_ips: device_config.allowed_ips,
     }
 }
+#[derive(Serialize, Deserialize)]
+pub struct InstanceResponse {
+    // uuid
+    pub id: String,
+    pub name: String,
+    pub url: String,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateDeviceResponse {
-    instance: Instance,
+    instance: InstanceResponse,
     configs: Vec<DeviceConfig>,
     device: Device,
 }
@@ -75,7 +82,7 @@ pub async fn save_device_config(
         .map_err(|err| err.to_string())?;
     let mut instance = Instance::new(
         response.instance.name,
-        response.instance.uuid,
+        response.instance.id,
         response.instance.url,
     );
     instance
