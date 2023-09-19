@@ -96,7 +96,7 @@ const en = {
               add: 'Instance added',
               update: 'Instance information updated',
             },
-            error: 'Fetching information failed.',
+            error: 'Operation failed, check url and token.',
           },
           form: {
             fields: {
@@ -104,7 +104,7 @@ const en = {
                 label: 'Token',
               },
               url: {
-                label: 'Proxy URL:',
+                label: 'Proxy URL',
               },
             },
           },

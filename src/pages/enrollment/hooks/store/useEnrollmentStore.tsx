@@ -11,11 +11,17 @@ import {
 } from '../../../../shared/hooks/api/types';
 
 const defaultValues: StoreValues = {
+  // assume default dev
+  proxy_url: '/api/v1/',
   loading: false,
   step: 0,
   stepsMax: 4,
+  sessionStart: undefined,
   sessionEnd: undefined,
   userInfo: undefined,
+  deviceName: undefined,
+  vpnOptional: undefined,
+  userPassword: undefined,
   nextSubject: new Subject<void>(),
 };
 
@@ -26,7 +32,7 @@ const persistKeys: Array<keyof StoreValues> = [
   'sessionEnd',
   'sessionStart',
   'adminInfo',
-  'deviceState',
+  'deviceName',
   'endContent',
   'vpnOptional',
 ];
@@ -75,6 +81,7 @@ type StoreValues = {
   stepsMax: number;
   nextSubject: Subject<void>;
   // Date
+  proxy_url: string;
   sessionStart?: string;
   sessionEnd?: string;
   userInfo?: UserInfo;
@@ -83,10 +90,7 @@ type StoreValues = {
   vpnOptional?: boolean;
   // Markdown content for final step card
   endContent?: string;
-  deviceState?: {
-    device?: Device;
-    configs?: DeviceConfig[];
-  };
+  deviceName?: string;
 };
 
 type StoreMethods = {

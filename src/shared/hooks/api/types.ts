@@ -1,3 +1,5 @@
+import { DefguardInstance } from '../../../pages/client/types';
+
 export type EmptyApiResponse = Record<string, never>;
 
 export type AdminInfo = {
@@ -11,7 +13,8 @@ export type UserInfo = {
   last_name: string;
   login: string;
   email: string;
-  phone_number?: string;
+  is_active: boolean;
+  phone_number: string;
 };
 
 export type EnrollmentStartRequest = {
@@ -24,6 +27,11 @@ export type EnrollmentStartResponse = {
   deadline_timestamp: number;
   final_page_content: string;
   vpn_setup_optional: boolean;
+  instance: {
+    id: string;
+    name: string;
+    url: string;
+  };
 };
 
 export type ActivateUserRequest = {

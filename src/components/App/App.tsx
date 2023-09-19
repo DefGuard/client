@@ -20,7 +20,6 @@ import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { ClientPage } from '../../pages/client/ClientPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
-import { TokenPage } from '../../pages/token/TokenPage';
 import { routes } from '../../shared/routes';
 
 dayjs.extend(duration);
@@ -37,10 +36,6 @@ const router = createBrowserRouter([
     element: <Navigate to={routes.client} />,
   },
   {
-    path: routes.token,
-    element: <TokenPage />,
-  },
-  {
     path: routes.timeout,
     element: <SessionTimeoutPage />,
   },
@@ -54,7 +49,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/*',
-    element: <Navigate to={routes.token} replace />,
+    element: <Navigate to={routes.client} replace />,
   },
 ]);
 

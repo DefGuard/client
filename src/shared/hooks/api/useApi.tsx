@@ -1,18 +1,17 @@
 import axios, { AxiosResponse } from 'axios';
 
+import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import { UseApi } from './types';
-
-const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
 const unpackRequest = <T,>(res: AxiosResponse<T>): T => res.data;
 
-const client = axios.create({
-  baseURL: envBaseUrl && String(envBaseUrl).length > 0 ? envBaseUrl : '/api/v1',
-});
-
-client.defaults.headers.common['Content-Type'] = 'application/json';
-
 export const useApi = (): UseApi => {
+  const url = useEnrollmentStore((state) => state.proxy_url);
+
+  const client = axios.create({
+    baseURL: url,
+  });
+
   const startEnrollment: UseApi['enrollment']['start'] = (data) =>
     client.post('/enrollment/start', data).then(unpackRequest);
 

@@ -77,32 +77,30 @@ export const EnrollmentPage = () => {
     <PageContainer id="enrollment">
       <EnrollmentSideBar />
       <LogoContainer />
-      {currentStep !== 4 && (
-        <EnrollmentStepControls>
-          <Button
-            text={LL.common.controls.back()}
-            size={controlsSize}
-            styleVariant={ButtonStyleVariant.STANDARD}
-            onClick={() => back()}
-            disabled={(steps[currentStep].backDisabled ?? false) || loading}
-            icon={
-              <ArrowSingle
-                size={ArrowSingleSize.SMALL}
-                direction={ArrowSingleDirection.LEFT}
-              />
-            }
-          />
-          <Button
-            data-testid="enrollment-next"
-            loading={loading}
-            text={LL.common.controls.next()}
-            size={controlsSize}
-            styleVariant={ButtonStyleVariant.PRIMARY}
-            onClick={() => nextSubject.next()}
-            rightIcon={<ArrowSingle size={ArrowSingleSize.SMALL} />}
-          />
-        </EnrollmentStepControls>
-      )}
+      <EnrollmentStepControls>
+        <Button
+          text={LL.common.controls.back()}
+          size={controlsSize}
+          styleVariant={ButtonStyleVariant.STANDARD}
+          onClick={() => back()}
+          disabled={(steps[currentStep].backDisabled ?? false) || loading}
+          icon={
+            <ArrowSingle
+              size={ArrowSingleSize.SMALL}
+              direction={ArrowSingleDirection.LEFT}
+            />
+          }
+        />
+        <Button
+          data-testid="enrollment-next"
+          loading={loading}
+          text={LL.common.controls.next()}
+          size={controlsSize}
+          styleVariant={ButtonStyleVariant.PRIMARY}
+          onClick={() => nextSubject.next()}
+          rightIcon={<ArrowSingle size={ArrowSingleSize.SMALL} />}
+        />
+      </EnrollmentStepControls>
       {steps[currentStep].step ?? null}
     </PageContainer>
   );

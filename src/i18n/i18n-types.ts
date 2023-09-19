@@ -244,7 +244,7 @@ type RootTranslation = {
 							update: string
 						}
 						/**
-						 * F​e​t​c​h​i​n​g​ ​i​n​f​o​r​m​a​t​i​o​n​ ​f​a​i​l​e​d​.
+						 * O​p​e​r​a​t​i​o​n​ ​f​a​i​l​e​d​,​ ​c​h​e​c​k​ ​u​r​l​ ​a​n​d​ ​t​o​k​e​n​.
 						 */
 						error: string
 					}
@@ -258,7 +258,7 @@ type RootTranslation = {
 							}
 							url: {
 								/**
-								 * P​r​o​x​y​ ​U​R​L​:
+								 * P​r​o​x​y​ ​U​R​L
 								 */
 								label: string
 							}
@@ -836,7 +836,7 @@ export type TranslationFunctions = {
 							update: () => LocalizedString
 						}
 						/**
-						 * Fetching information failed.
+						 * Operation failed, check url and token.
 						 */
 						error: () => LocalizedString
 					}
@@ -850,7 +850,7 @@ export type TranslationFunctions = {
 							}
 							url: {
 								/**
-								 * Proxy URL:
+								 * Proxy URL
 								 */
 								label: () => LocalizedString
 							}

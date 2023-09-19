@@ -1,5 +1,6 @@
 import './style.scss';
 
+import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
 import classNames from 'classnames';
 import { useEffect, useMemo, useState } from 'react';
 import { LocalizedString } from 'typesafe-i18n';
@@ -16,21 +17,7 @@ export const EnrollmentSideBar = () => {
 
   const vpnOptional = useEnrollmentStore((state) => state.vpnOptional);
 
-  // fetch app version
-  const { getAppInfo } = useApi();
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!appVersion) {
-      getAppInfo()
-        .then((res) => {
-          setAppVersion(res.version);
-        })
-        .catch((err) => {
-          console.error('Failed to fetch app info: ', err);
-        });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const steps = useMemo((): LocalizedString[] => {
     const steps = LL.pages.enrollment.sideBar.steps;
@@ -43,6 +30,17 @@ export const EnrollmentSideBar = () => {
       steps.finish(),
     ];
   }, [LL.pages.enrollment.sideBar.steps, vpnOptional]);
+
+  useEffect(() => {
+    const getAppVersion = async () => {
+      const version = await getVersion().catch(() => {
+        return '';
+      });
+      setAppVersion(version);
+    };
+
+    getAppVersion();
+  }, []);
 
   return (
     <div id="enrollment-side-bar">

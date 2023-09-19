@@ -1,6 +1,7 @@
 export type DefguardInstance = {
   id: string;
   name: string;
+  url: string;
   locations: DefguardLocation[];
 };
 
