@@ -54,10 +54,17 @@ pub fn device_config_to_location(device_config: DeviceConfig) -> Location {
         allowed_ips: device_config.allowed_ips,
     }
 }
+#[derive(Serialize, Deserialize)]
+pub struct InstanceResponse {
+    // uuid
+    pub id: String,
+    pub name: String,
+    pub url: String,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateDeviceResponse {
-    instance_info: Instance,
+    instance: InstanceResponse,
     configs: Vec<DeviceConfig>,
     device: Device,
 }
@@ -74,11 +81,14 @@ pub async fn save_device_config(
         .await
         .map_err(|err| err.to_string())?;
     let mut instance = Instance::new(
-        response.instance_info.name,
-        response.instance_info.uuid,
-        response.instance_info.url,
+        response.instance.name,
+        response.instance.id,
+        response.instance.url,
     );
-    instance.save(&mut *transaction).await.map_err(|e| e.to_string())?;
+    instance
+        .save(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut keys = WireguardKeys::new(instance.id.unwrap(), private_key, response.device.pubkey);
     keys.save(&mut *transaction)
         .await
