@@ -1,5 +1,5 @@
 use crate::{
-    database::{Instance, Location, WireguardKeys},
+    database::{models::instance::InstanceInfo, Instance, Location, WireguardKeys},
     error::Error,
     utils::setup_interface,
     AppState,
@@ -9,6 +9,7 @@ use tauri::State;
 use wireguard_rs::netlink::delete_interface;
 
 // Create new wireguard interface
+#[tauri::command(async)]
 pub async fn connect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), Error> {
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         setup_interface(location, &app_state.get_pool()).await?;
@@ -105,10 +106,36 @@ pub async fn save_device_config(
 }
 
 #[tauri::command(async)]
-pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instance>, String> {
-    Instance::all(&app_state.get_pool())
+pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo>, String> {
+    let instances = Instance::all(&app_state.get_pool())
         .await
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+    let mut instance_info: Vec<InstanceInfo> = vec![];
+    for instance in &instances {
+        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
+            .await
+            .map_err(|err| err.to_string())?;
+        let connection_ids: Vec<i64> = app_state
+            .active_connections
+            .iter()
+            .map(|connection| connection.location_id)
+            .collect();
+        let location_ids: Vec<i64> = locations
+            .iter()
+            .map(|location| location.id.unwrap())
+            .collect();
+        let connected = connection_ids
+            .iter()
+            .any(|item1| location_ids.iter().any(|item2| item1 == item2));
+        instance_info.push(InstanceInfo {
+            id: instance.id,
+            uuid: instance.uuid.clone(),
+            name: instance.name.clone(),
+            url: instance.url.clone(),
+            connected,
+        })
+    }
+    Ok(instance_info)
 }
 
 #[tauri::command(async)]
