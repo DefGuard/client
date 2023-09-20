@@ -1,9 +1,8 @@
 import { autoUpdate, useFloating } from '@floating-ui/react';
 import classNames from 'classnames';
-import { isUndefined } from 'lodash-es';
-import { useMemo } from 'react';
 
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
+import { useClientStore } from '../../../../hooks/useClientStore';
 import { DefguardInstance } from '../../../../types';
 
 type Props = {
@@ -11,13 +10,11 @@ type Props = {
 };
 
 export const ClientBarItem = ({ instance }: Props) => {
-  const active = useMemo(() => {
-    if (instance.locations.length === 0) return false;
-    return !isUndefined(instance.locations.find((l) => l.connected));
-  }, [instance.locations]);
-
+  const setClientStore = useClientStore((state) => state.setState);
+  const selectedInstance = useClientStore((state) => state.selectedInstance);
   const cn = classNames('client-bar-item', 'clickable', {
-    active,
+    active: instance.id === selectedInstance,
+    connected: instance.connected,
   });
 
   const { refs, floatingStyles } = useFloating({
@@ -28,11 +25,15 @@ export const ClientBarItem = ({ instance }: Props) => {
 
   return (
     <>
-      <div className={cn} ref={refs.setReference}>
+      <div
+        className={cn}
+        ref={refs.setReference}
+        onClick={() => setClientStore({ selectedInstance: instance.id })}
+      >
         <SvgIconConnection className="connection-icon" />
         <p>{instance.name}</p>
       </div>
-      {active && (
+      {instance.connected && (
         <div
           className="client-bar-active-item-bar"
           ref={refs.setFloating}

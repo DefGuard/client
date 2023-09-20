@@ -39,6 +39,9 @@ const en = {
       close: 'Close',
       reset: 'Reset',
     },
+    messages: {
+      error: 'Unexpected error occurred!',
+    },
   },
   components: {
     adminInfo: {
@@ -50,7 +53,7 @@ const en = {
       title: 'Locations',
       sideBar: {
         instances: 'Instances',
-        addInstance: 'Add Instance',
+        addInstance: 'Enter token',
         copyright: {
           copyright: `Copyright © 2023`,
           appVersion: 'Application version: {version:string}',
@@ -90,7 +93,10 @@ const en = {
       },
       modals: {
         addInstanceModal: {
-          title: 'Add instance',
+          titles: {
+            addInstance: 'Enter token',
+            addDevice: 'Add device',
+          },
           messages: {
             success: {
               add: 'Instance added',
@@ -99,12 +105,19 @@ const en = {
             error: 'Operation failed, check url and token.',
           },
           form: {
+            submit: {
+              submitToken: 'Submit token',
+              addDevice: 'Add device',
+            },
             fields: {
               token: {
                 label: 'Token',
               },
               url: {
                 label: 'Proxy URL',
+              },
+              name: {
+                label: 'Name',
               },
             },
           },
@@ -179,6 +192,16 @@ If you have any questions, please consult your assigned admin.All necessary info
           },
         },
         deviceSetup: {
+          desktopSetup: {
+            title: 'Configure this device',
+            controls: {
+              create: 'Configure device',
+              success: 'Device is configured',
+            },
+            messages: {
+              deviceConfigured: 'Device is configured',
+            },
+          },
           optionalMessage: `* This step is OPTIONAL. You can skip it if you wish. This can be configured later in defguard.`,
           cards: {
             device: {

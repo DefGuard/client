@@ -16,6 +16,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
 import { useApi } from '../../../../../../shared/hooks/api/useApi';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
@@ -36,6 +37,8 @@ const saveConfig = async (
 
 export const DekstopSetup = () => {
   const { LL } = useI18nContext();
+  const toaster = useToaster();
+  const stepLL = LL.pages.enrollment.steps.deviceSetup;
   const {
     enrollment: { createDevice, activateUser },
   } = useApi();
@@ -45,12 +48,14 @@ export const DekstopSetup = () => {
     state.userPassword,
   ]);
   const setEnrollmentStore = useEnrollmentStore((state) => state.setState);
+  const next = useEnrollmentStore((state) => state.nextStep);
   const [isLoading, setIsLoading] = useState(false);
 
   const { isLoading: loadingUserActivation, mutateAsync: mutateUserActivation } =
     useMutation({
       mutationFn: activateUser,
       onError: (e) => {
+        toaster.error(LL.common.messages.error());
         console.error(e);
       },
     });
@@ -88,20 +93,15 @@ export const DekstopSetup = () => {
       password: userPassword,
       phone_number: userInfo.phone_number,
     }).then(() => {
-      console.log('User activated');
       setIsLoading(true);
       saveConfig(privateKey, deviceResponse)
         .then(() => {
-          console.log('config saved');
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });
+          toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
+          next();
         })
         .catch((e) => {
-          console.log('Failed to save config');
-          console.log({
-            privateKey,
-            deviceResponse,
-          });
           setIsLoading(false);
           console.error(e);
         });
@@ -110,7 +110,7 @@ export const DekstopSetup = () => {
 
   return (
     <Card id="desktop-device-setup">
-      <h3>{LL.pages.enrollment.steps.deviceSetup.cards.device.title()}</h3>
+      <h3>{stepLL.desktopSetup.title()}</h3>
       <form onSubmit={handleSubmit(handleValidSubmit)}>
         <FormInput
           controller={{ control, name: 'name' }}
@@ -120,8 +120,12 @@ export const DekstopSetup = () => {
         <Button
           type="submit"
           size={ButtonSize.LARGE}
-          styleVariant={ButtonStyleVariant.PRIMARY}
-          text={LL.pages.enrollment.steps.deviceSetup.cards.device.create.submit()}
+          styleVariant={deviceName ? ButtonStyleVariant.SAVE : ButtonStyleVariant.PRIMARY}
+          text={
+            deviceName
+              ? stepLL.desktopSetup.controls.success()
+              : stepLL.desktopSetup.controls.create()
+          }
           disabled={!isUndefined(deviceName)}
           loading={isLoading || loadingUserActivation || loadingCreateDevice}
         />
