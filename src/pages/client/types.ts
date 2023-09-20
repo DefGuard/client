@@ -1,13 +1,17 @@
 export type DefguardInstance = {
-  id: string;
+  id: number;
+  uuid: string;
   name: string;
   url: string;
-  locations: DefguardLocation[];
 };
 
 export type DefguardLocation = {
-  id: string;
-  ip: string;
+  id: number;
+  instance_id: number;
+  network_id: number;
   name: string;
-  connected: boolean;
+  address: string;
+  pubkey: string;
+  endpoint: string;
+  allowed_ips: string;
 };

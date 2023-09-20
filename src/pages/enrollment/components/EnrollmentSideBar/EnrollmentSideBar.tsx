@@ -1,13 +1,12 @@
 import './style.scss';
 
-import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
+import { getVersion } from '@tauri-apps/api/app';
 import classNames from 'classnames';
 import { useEffect, useMemo, useState } from 'react';
 import { LocalizedString } from 'typesafe-i18n';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Divider } from '../../../../shared/defguard-ui/components/Layout/Divider/Divider.tsx';
-import { useApi } from '../../../../shared/hooks/api/useApi.tsx';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { AdminInfo } from '../AdminInfo/AdminInfo';
 import { TimeLeft } from '../TimeLeft/TimeLeft';
