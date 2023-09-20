@@ -6,7 +6,6 @@ import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { DefguardInstance, DefguardLocation } from '../../../../types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
-import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
@@ -30,10 +29,11 @@ type GridItemProps = {
 
 const GridItem = ({ location }: GridItemProps) => {
   const { LL } = useI18nContext();
+  const active = false;
   const cn = classNames(
     'grid-item',
     {
-      active: location.connected,
+      active: active,
     },
     'no-info',
   );
