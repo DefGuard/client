@@ -5,26 +5,21 @@ use crate::{database::DbPool, error::Error};
 
 #[derive(FromRow)]
 pub struct Connection {
-    id: Option<i64>,
-    location_id: i64,
-    connected_from: String,
-    start: NaiveDateTime,
-    end: NaiveDateTime,
+    pub id: Option<i64>,
+    pub location_id: i64,
+    pub connected_from: String,
+    pub start: NaiveDateTime,
+    pub end: Option<NaiveDateTime>,
 }
 
 impl Connection {
-    pub fn new(
-        location_id: i64,
-        connected_from: String,
-        start: NaiveDateTime,
-        end: NaiveDateTime,
-    ) -> Self {
+    pub fn new(location_id: i64, connected_from: String, start: NaiveDateTime) -> Self {
         Connection {
             id: None,
             location_id,
             connected_from,
             start,
-            end,
+            end: None,
         }
     }
 
