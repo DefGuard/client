@@ -13,13 +13,13 @@ type Props = {
 
 export const LocationCardTitle = ({ location }: Props) => {
   const cn = classNames('location-card-title', {
-    active: location.connected,
+    active: false,
   });
   return (
     <div className={cn}>
       <SvgIconConnection />
       <span className="location-name">{location.name}</span>
-      <Badge text={location.ip} styleVariant={BadgeStyleVariant.STANDARD} />
+      <Badge text={location.address} styleVariant={BadgeStyleVariant.STANDARD} />
     </div>
   );
 };

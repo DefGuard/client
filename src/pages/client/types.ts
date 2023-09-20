@@ -3,6 +3,7 @@ export type DefguardInstance = {
   uuid: string;
   name: string;
   url: string;
+  connected: boolean;
 };
 
 export type DefguardLocation = {
