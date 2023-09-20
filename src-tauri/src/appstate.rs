@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::database::{Connection, DbPool, Location};
+use crate::database::{Connection, DbPool};
 
 #[derive(Default)]
 pub struct AppState {
