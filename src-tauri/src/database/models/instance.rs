@@ -42,3 +42,12 @@ impl Instance {
         Ok(instances)
     }
 }
+
+#[derive(FromRow, Debug, Serialize, Deserialize)]
+pub struct InstanceInfo {
+    pub id: Option<i64>,
+    pub name: String,
+    pub uuid: String,
+    pub url: String,
+    pub connected: bool,
+}
