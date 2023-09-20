@@ -81,6 +81,9 @@
         & > p {
           color: var(--text-body-primary);
         }
+      }
+
+      &.connected {
         & > .connection-icon {
           path {
             stroke: var(--surface-positive-primary);

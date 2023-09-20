@@ -114,6 +114,12 @@ type RootTranslation = {
 			 */
 			reset: string
 		}
+		messages: {
+			/**
+			 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​!
+			 */
+			error: string
+		}
 	}
 	components: {
 		adminInfo: {
@@ -135,7 +141,7 @@ type RootTranslation = {
 				 */
 				instances: string
 				/**
-				 * A​d​d​ ​I​n​s​t​a​n​c​e
+				 * E​n​t​e​r​ ​t​o​k​e​n
 				 */
 				addInstance: string
 				copyright: {
@@ -228,10 +234,16 @@ type RootTranslation = {
 			}
 			modals: {
 				addInstanceModal: {
-					/**
-					 * A​d​d​ ​i​n​s​t​a​n​c​e
-					 */
-					title: string
+					titles: {
+						/**
+						 * E​n​t​e​r​ ​t​o​k​e​n
+						 */
+						addInstance: string
+						/**
+						 * A​d​d​ ​d​e​v​i​c​e
+						 */
+						addDevice: string
+					}
 					messages: {
 						success: {
 							/**
@@ -249,6 +261,16 @@ type RootTranslation = {
 						error: string
 					}
 					form: {
+						submit: {
+							/**
+							 * S​u​b​m​i​t​ ​t​o​k​e​n
+							 */
+							submitToken: string
+							/**
+							 * A​d​d​ ​d​e​v​i​c​e
+							 */
+							addDevice: string
+						}
 						fields: {
 							token: {
 								/**
@@ -259,6 +281,12 @@ type RootTranslation = {
 							url: {
 								/**
 								 * P​r​o​x​y​ ​U​R​L
+								 */
+								label: string
+							}
+							name: {
+								/**
+								 * N​a​m​e
 								 */
 								label: string
 							}
@@ -402,6 +430,28 @@ type RootTranslation = {
 					}
 				}
 				deviceSetup: {
+					desktopSetup: {
+						/**
+						 * C​o​n​f​i​g​u​r​e​ ​t​h​i​s​ ​d​e​v​i​c​e
+						 */
+						title: string
+						controls: {
+							/**
+							 * C​o​n​f​i​g​u​r​e​ ​d​e​v​i​c​e
+							 */
+							create: string
+							/**
+							 * D​e​v​i​c​e​ ​i​s​ ​c​o​n​f​i​g​u​r​e​d
+							 */
+							success: string
+						}
+						messages: {
+							/**
+							 * D​e​v​i​c​e​ ​i​s​ ​c​o​n​f​i​g​u​r​e​d
+							 */
+							deviceConfigured: string
+						}
+					}
 					/**
 					 * *​ ​T​h​i​s​ ​s​t​e​p​ ​i​s​ ​O​P​T​I​O​N​A​L​.​ ​Y​o​u​ ​c​a​n​ ​s​k​i​p​ ​i​t​ ​i​f​ ​y​o​u​ ​w​i​s​h​.​ ​T​h​i​s​ ​c​a​n​ ​b​e​ ​c​o​n​f​i​g​u​r​e​d​ ​l​a​t​e​r​ ​i​n​ ​d​e​f​g​u​a​r​d​.
 					 */
@@ -707,6 +757,12 @@ export type TranslationFunctions = {
 			 */
 			reset: () => LocalizedString
 		}
+		messages: {
+			/**
+			 * Unexpected error occurred!
+			 */
+			error: () => LocalizedString
+		}
 	}
 	components: {
 		adminInfo: {
@@ -728,7 +784,7 @@ export type TranslationFunctions = {
 				 */
 				instances: () => LocalizedString
 				/**
-				 * Add Instance
+				 * Enter token
 				 */
 				addInstance: () => LocalizedString
 				copyright: {
@@ -820,10 +876,16 @@ export type TranslationFunctions = {
 			}
 			modals: {
 				addInstanceModal: {
-					/**
-					 * Add instance
-					 */
-					title: () => LocalizedString
+					titles: {
+						/**
+						 * Enter token
+						 */
+						addInstance: () => LocalizedString
+						/**
+						 * Add device
+						 */
+						addDevice: () => LocalizedString
+					}
 					messages: {
 						success: {
 							/**
@@ -841,6 +903,16 @@ export type TranslationFunctions = {
 						error: () => LocalizedString
 					}
 					form: {
+						submit: {
+							/**
+							 * Submit token
+							 */
+							submitToken: () => LocalizedString
+							/**
+							 * Add device
+							 */
+							addDevice: () => LocalizedString
+						}
 						fields: {
 							token: {
 								/**
@@ -851,6 +923,12 @@ export type TranslationFunctions = {
 							url: {
 								/**
 								 * Proxy URL
+								 */
+								label: () => LocalizedString
+							}
+							name: {
+								/**
+								 * Name
 								 */
 								label: () => LocalizedString
 							}
@@ -992,6 +1070,28 @@ export type TranslationFunctions = {
 					}
 				}
 				deviceSetup: {
+					desktopSetup: {
+						/**
+						 * Configure this device
+						 */
+						title: () => LocalizedString
+						controls: {
+							/**
+							 * Configure device
+							 */
+							create: () => LocalizedString
+							/**
+							 * Device is configured
+							 */
+							success: () => LocalizedString
+						}
+						messages: {
+							/**
+							 * Device is configured
+							 */
+							deviceConfigured: () => LocalizedString
+						}
+					}
 					/**
 					 * * This step is OPTIONAL. You can skip it if you wish. This can be configured later in defguard.
 					 */
