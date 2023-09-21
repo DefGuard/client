@@ -18,7 +18,7 @@ pub async fn setup_interface(location: Location, pool: &DbPool) -> Result<(), Er
     address_interface(&location.name, &IpAddrMask::from_str(&location.address)?)?;
     let api = WGApi::new(location.name.clone(), false);
     let mut host = api.read_host()?;
-    if let Some(keys) = WireguardKeys::find_by_location_id(pool, location.instance_id).await? {
+    if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
         let private_key: Key = Key::from_str(&keys.prvkey).unwrap();
         host.private_key = Some(private_key);

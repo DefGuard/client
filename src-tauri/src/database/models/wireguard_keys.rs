@@ -36,15 +36,15 @@ impl WireguardKeys {
         self.id = Some(result.id);
         Ok(())
     }
-    pub async fn find_by_location_id(
+    pub async fn find_by_instance_id(
         pool: &DbPool,
-        location_id: i64,
+        instance_id: i64,
     ) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
             "SELECT id \"id?\", instance_id, pubkey, prvkey \
             FROM wireguard_keys WHERE instance_id = $1;",
-            location_id
+            instance_id
         )
         .fetch_optional(pool)
         .await
