@@ -4,6 +4,7 @@ export type DefguardInstance = {
   name: string;
   url: string;
   connected: boolean;
+  pubkey: string;
 };
 
 export type DefguardLocation = {
@@ -12,7 +13,6 @@ export type DefguardLocation = {
   network_id: number;
   name: string;
   address: string;
-  pubkey: string;
   endpoint: string;
   allowed_ips: string;
 };

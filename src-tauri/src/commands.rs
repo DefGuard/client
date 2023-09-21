@@ -179,12 +179,17 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
+        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
+            .await
+            .map_err(|err| err.to_string())?
+            .unwrap();
         instance_info.push(InstanceInfo {
             id: instance.id,
             uuid: instance.uuid.clone(),
             name: instance.name.clone(),
             url: instance.url.clone(),
             connected,
+            pubkey: keys.pubkey,
         })
     }
     Ok(instance_info)
@@ -199,7 +204,6 @@ pub struct LocationInfo {
     pub address: String,
     pub endpoint: String,
     pub active: bool,
-    pub pubkey: String,
 }
 
 #[tauri::command(async)]
@@ -218,10 +222,6 @@ pub async fn all_locations(
         .map(|con| con.location_id)
         .collect();
     let mut location_info = vec![];
-    let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance_id)
-        .await
-        .map_err(|err| err.to_string())?
-        .unwrap();
     for location in locations {
         let info = LocationInfo {
             id: location.id.unwrap(),
@@ -230,7 +230,6 @@ pub async fn all_locations(
             address: location.address,
             endpoint: location.endpoint,
             active: active_locations_ids.contains(&location.id.unwrap()),
-            pubkey: keys.pubkey.clone(),
         };
         location_info.push(info);
     }

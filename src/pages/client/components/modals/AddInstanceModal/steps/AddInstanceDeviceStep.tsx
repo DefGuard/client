@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api';
 import { useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -18,6 +19,7 @@ import {
   CreateDeviceResponse,
 } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
+import { clientQueryKeys } from '../../../../query';
 import { useAddInstanceModal } from '../hooks/useAddInstanceModal';
 
 type FormFields = {
@@ -34,6 +36,7 @@ export const AddInstanceDeviceStep = () => {
   const toaster = useToaster();
   const close = useAddInstanceModal((state) => state.close);
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const [proxyUrl] = useAddInstanceModal((state) => [state.proxyUrl], shallow);
 
@@ -78,6 +81,8 @@ export const AddInstanceDeviceStep = () => {
             .then(() => {
               setIsLoading(false);
               toaster.success(componentLL.messages.success.add());
+              queryClient.invalidateQueries([clientQueryKeys.getInstances]);
+              queryClient.invalidateQueries([clientQueryKeys.getLocations]);
               close();
             })
             .catch((e) => {
