@@ -71,19 +71,28 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn disconnect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), String> {
-    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id)
+pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<(), String> {
+    let state = handle.state::<AppState>();
+    if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())?
     {
         delete_interface(&location.name).map_err(|err| err.to_string())?;
-        if let Some(mut connection) = app_state.find_and_remove_connection(location_id) {
+        if let Some(mut connection) = state.find_and_remove_connection(location_id) {
             connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
             connection
-                .save(&app_state.get_pool())
+                .save(&state.get_pool())
                 .await
                 .map_err(|err| err.to_string())?;
         }
+        handle
+            .emit_all(
+                "connection-changed",
+                Payload {
+                    message: "Created new connection".into(),
+                },
+            )
+            .unwrap();
     }
     Ok(())
 }
