@@ -22,7 +22,7 @@ serde = { version = "1.0", features = ["derive"] }
 sqlx = { version = "0.7.1", features = ["chrono", "sqlite", "runtime-tokio", "uuid", "macros"] }
 dirs = "5.0.1"
 thiserror = "1.0.48"
-chrono = "0.4.30"
+chrono = { version = "0.4", features = ["serde"] }
 wireguard_rs = { path = "wireguard-rs"}
 base64 = "0.21.4"
 x25519-dalek = { version = "2", features = [
