@@ -45,5 +45,3 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
 
     Ok(())
 }
-
-

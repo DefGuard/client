@@ -1,51 +1,75 @@
 use crate::{
-    database::{models::instance::InstanceInfo, Connection, Instance, Location, WireguardKeys},
-    error::Error,
+    database::{
+        models::{instance::InstanceInfo, location::peer_to_location_stats},
+        Connection, Instance, Location, WireguardKeys,
+    },
     utils::setup_interface,
     AppState,
 };
-use std::thread;
+use chrono::Utc;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
-use tauri::State;
-use wireguard_rs::{wgapi::WGApi, netlink::delete_interface};
+use tauri::{State, Manager};
+use tokio;
+use wireguard_rs::{netlink::delete_interface, wgapi::WGApi};
 
 // Create new wireguard interface
 #[tauri::command(async)]
-pub async fn connect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), Error> {
-    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
-        setup_interface(&location, &app_state.get_pool()).await?;
-        let address = local_ip()?;
+pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), String> {
+    let state = handle.state::<AppState>();
+    if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())?
+    {
+        setup_interface(&location, &state.get_pool())
+            .await
+            .map_err(|err| err.to_string())?;
+        let address = local_ip().map_err(|err| err.to_string())?;
         let connection = Connection::new(location_id, address.to_string());
-        app_state
+        state
             .active_connections
             .lock()
             .unwrap()
             .push(connection);
         // Spawn stats threads
-        thread::spawn(|| {
-          let api = WGApi::new(location.name, false);
-          loop {
-            match api.read_host() {
-              Ok(host) => {
-                let peers = host.peers;
-                for peer in peers {
-
+        let api = WGApi::new(location.name, false);
+        tokio::spawn(async move {
+            let state = handle.state::<AppState>();
+            loop {
+                match api.read_host() {
+                    Ok(host) => {
+                        let peers = host.peers;
+                        for (_, peer) in peers {
+                            let mut location_stats =
+                                peer_to_location_stats(&peer, &state.get_pool())
+                                    .await
+                                    .map_err(|err| err.to_string())
+                                    .unwrap();
+                            let _ = location_stats.save(&state.get_pool()).await;
+                        }
+                    }
+                    Err(e) => println!("error: {}", e),
                 }
-                
-              },
-              Err(e) => println!("error: {}", e)
             }
-          }
         });
-
     }
     Ok(())
 }
 
-pub async fn disconnect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), Error> {
-    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
-        delete_interface(&location.name)?;
+#[tauri::command]
+pub async fn disconnect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())?
+    {
+        delete_interface(&location.name).map_err(|err| err.to_string())?;
+        if let Some(mut connection) = app_state.find_and_remove_connection(location_id) {
+            connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
+            connection
+                .save(&app_state.get_pool())
+                .await
+                .map_err(|err| err.to_string())?;
+        }
     }
     Ok(())
 }
