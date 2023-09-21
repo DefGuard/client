@@ -13,7 +13,7 @@ use crate::{
 
 // TODO: Learn how to run tauri app with sudo permissions to setup interface
 /// Setup client interface
-pub async fn setup_interface(location: Location, pool: &DbPool) -> Result<(), Error> {
+pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
     create_interface(&location.name)?;
     address_interface(&location.name, &IpAddrMask::from_str(&location.address)?)?;
     let api = WGApi::new(location.name.clone(), false);
