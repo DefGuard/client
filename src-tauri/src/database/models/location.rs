@@ -19,7 +19,7 @@ pub struct Location {
     pub allowed_ips: String,
 }
 
-#[derive(FromRow)]
+#[derive(FromRow, Serialize)]
 pub struct LocationStats {
     id: Option<i64>,
     location_id: i64,
