@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use sqlx::{query, FromRow};
 
 use crate::{database::DbPool, error::Error};
@@ -13,7 +13,8 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(location_id: i64, connected_from: String, start: NaiveDateTime) -> Self {
+    pub fn new(location_id: i64, connected_from: String) -> Self {
+        let start = Utc::now().naive_utc(); // Get the current time as NaiveDateTime in UTC
         Connection {
             id: None,
             location_id,

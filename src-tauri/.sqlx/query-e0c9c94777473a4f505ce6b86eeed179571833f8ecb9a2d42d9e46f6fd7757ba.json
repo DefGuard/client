@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n            i.id, \n            i.uuid, \n            i.name, \n            i.url,\n            CASE WHEN EXISTS (\n                SELECT c.id FROM connection c\n                INNER JOIN location l ON l.id = c.location_id\n                WHERE l.instance_id = i.id AND c.end IS NULL\n            ) THEN true ELSE false END AS \"connected: _\"\n            FROM instance i",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "uuid",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "url",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "connected: _",
+        "ordinal": 4,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "e0c9c94777473a4f505ce6b86eeed179571833f8ecb9a2d42d9e46f6fd7757ba"
+}
