@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE instance SET name = $1, uuid = $2, url = $3 WHERE id = $4;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "807d90d55c57bf87c224a5d69357c90d16faf6c96ef650e6bc8d4e5e193e0855"
+}
