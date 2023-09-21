@@ -29,6 +29,9 @@ pub async fn connect(location_id: i64, app_state: State<'_, AppState>) -> Result
             match api.read_host() {
               Ok(host) => {
                 let peers = host.peers;
+                for peer in peers {
+
+                }
                 
               },
               Err(e) => println!("error: {}", e)
