@@ -1,9 +1,10 @@
 use chrono::{NaiveDateTime, Utc};
+use serde::Serialize;
 use sqlx::{query, FromRow};
 
 use crate::{database::DbPool, error::Error};
 
-#[derive(FromRow)]
+#[derive(FromRow, Debug, Serialize)]
 pub struct Connection {
     pub id: Option<i64>,
     pub location_id: i64,

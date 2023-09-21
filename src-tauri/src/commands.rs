@@ -11,7 +11,13 @@ use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use tokio;
+use tokio::time::{sleep, Duration};
 use wireguard_rs::{netlink::delete_interface, wgapi::WGApi};
+
+#[derive(Clone, serde::Serialize)]
+struct Payload {
+    message: String,
+}
 
 // Create new wireguard interface
 #[tauri::command(async)]
@@ -21,12 +27,22 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
         .await
         .map_err(|err| err.to_string())?
     {
+        println!("Location: {:#?}", location);
         setup_interface(&location, &state.get_pool())
             .await
             .map_err(|err| err.to_string())?;
         let address = local_ip().map_err(|err| err.to_string())?;
         let connection = Connection::new(location_id, address.to_string());
         state.active_connections.lock().unwrap().push(connection);
+        println!("{:#?}", state.active_connections.lock().unwrap());
+        handle
+            .emit_all(
+                "connection-changed",
+                Payload {
+                    message: "Created new connection".into(),
+                },
+            )
+            .unwrap();
         // Spawn stats threads
         let api = WGApi::new(location.name, false);
         tokio::spawn(async move {
@@ -41,11 +57,13 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                     .await
                                     .map_err(|err| err.to_string())
                                     .unwrap();
+                            println!("{:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
                         }
                     }
                     Err(e) => println!("error: {}", e),
                 }
+                sleep(Duration::from_secs(20)).await;
             }
         });
     }

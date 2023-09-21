@@ -17,6 +17,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
     create_interface(&location.name)?;
     address_interface(&location.name, &IpAddrMask::from_str(&location.address)?)?;
     let api = WGApi::new(location.name.clone(), false);
+
     let mut host = api.read_host()?;
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
@@ -32,6 +33,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
             .split(',')
             .map(str::to_string)
             .collect();
+
         for allowed_ip in allowed_ips {
             let addr = IpAddrMask::from_str(&allowed_ip)?;
             peer.allowed_ips.push(addr);
@@ -41,6 +43,9 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 .args(["-4", "route", "add", &allowed_ip, "dev", &location.name])
                 .output()?;
         }
+
+        api.write_host(&host)?;
+        api.write_peer(&peer)?;
     };
 
     Ok(())
