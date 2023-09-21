@@ -1,7 +1,7 @@
 use crate::{
     database::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
-        Connection, Instance, Location, WireguardKeys,
+        Connection, Instance, Location, LocationStats, WireguardKeys,
     },
     utils::setup_interface,
     AppState,
@@ -9,7 +9,7 @@ use crate::{
 use chrono::Utc;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
-use tauri::{State, Manager};
+use tauri::{Manager, State};
 use tokio;
 use wireguard_rs::{netlink::delete_interface, wgapi::WGApi};
 
@@ -26,11 +26,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             .map_err(|err| err.to_string())?;
         let address = local_ip().map_err(|err| err.to_string())?;
         let connection = Connection::new(location_id, address.to_string());
-        state
-            .active_connections
-            .lock()
-            .unwrap()
-            .push(connection);
+        state.active_connections.lock().unwrap().push(connection);
         // Spawn stats threads
         let api = WGApi::new(location.name, false);
         tokio::spawn(async move {
@@ -286,4 +282,13 @@ pub async fn update_instance(
     } else {
         Err("Instance not found".into())
     }
+}
+#[tauri::command]
+pub async fn location_stats(
+    location_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<Vec<LocationStats>, String> {
+    LocationStats::all_by_location_id(&app_state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())
 }

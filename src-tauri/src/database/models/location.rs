@@ -208,4 +208,18 @@ impl LocationStats {
         self.id = Some(result.id);
         Ok(())
     }
+    pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+        let stats = query_as!(
+            LocationStats,
+            r#"
+            SELECT id, location_id, upload, download, last_handshake, collected_at
+            FROM location_stats
+            WHERE location_id = $1
+            "#,
+            location_id
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(stats)
+    }
 }

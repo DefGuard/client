@@ -25,7 +25,7 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
 
 pub use models::{
     connection::Connection,
-    instance::Instance,
+    instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
     wireguard_keys::WireguardKeys,
 };
