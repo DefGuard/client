@@ -199,6 +199,7 @@ pub struct LocationInfo {
     pub address: String,
     pub endpoint: String,
     pub active: bool,
+    pub pubkey: String,
 }
 
 #[tauri::command(async)]
@@ -217,6 +218,10 @@ pub async fn all_locations(
         .map(|con| con.location_id)
         .collect();
     let mut location_info = vec![];
+    let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance_id)
+        .await
+        .map_err(|err| err.to_string())?
+        .unwrap();
     for location in locations {
         let info = LocationInfo {
             id: location.id.unwrap(),
@@ -225,6 +230,7 @@ pub async fn all_locations(
             address: location.address,
             endpoint: location.endpoint,
             active: active_locations_ids.contains(&location.id.unwrap()),
+            pubkey: keys.pubkey.clone(),
         };
         location_info.push(info);
     }
