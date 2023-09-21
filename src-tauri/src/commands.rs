@@ -1,9 +1,10 @@
 use crate::{
-    database::{models::instance::InstanceInfo, Instance, Location, WireguardKeys},
+    database::{models::instance::InstanceInfo, Connection, Instance, Location, WireguardKeys},
     error::Error,
     utils::setup_interface,
     AppState,
 };
+use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use wireguard_rs::netlink::delete_interface;
@@ -13,6 +14,13 @@ use wireguard_rs::netlink::delete_interface;
 pub async fn connect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), Error> {
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         setup_interface(location, &app_state.get_pool()).await?;
+        let address = local_ip()?;
+        let connection = Connection::new(location_id, address.to_string());
+        app_state
+            .active_connections
+            .lock()
+            .unwrap()
+            .push(connection);
     }
     Ok(())
 }
@@ -117,6 +125,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             .map_err(|err| err.to_string())?;
         let connection_ids: Vec<i64> = app_state
             .active_connections
+            .lock()
+            .unwrap()
             .iter()
             .map(|connection| connection.location_id)
             .collect();
@@ -138,12 +148,44 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     Ok(instance_info)
 }
 
+#[derive(Serialize)]
+pub struct LocationInfo {
+    pub id: i64,
+    pub instance_id: i64,
+    // Native id of network from defguard
+    pub name: String,
+    pub address: String,
+    pub endpoint: String,
+    pub active: bool,
+}
+
 #[tauri::command(async)]
 pub async fn all_locations(
     instance_id: i64,
     app_state: State<'_, AppState>,
-) -> Result<Vec<Location>, String> {
-    Location::find_by_instance_id(&app_state.get_pool(), instance_id)
+) -> Result<Vec<LocationInfo>, String> {
+    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id)
         .await
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+    let active_locations_ids: Vec<i64> = app_state
+        .active_connections
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|con| con.location_id)
+        .collect();
+    let mut location_info = vec![];
+    for location in locations {
+        let info = LocationInfo {
+            id: location.id.unwrap(),
+            instance_id: location.instance_id,
+            name: location.name,
+            address: location.address,
+            endpoint: location.endpoint,
+            active: active_locations_ids.contains(&location.id.unwrap()),
+        };
+        location_info.push(info);
+    }
+
+    Ok(location_info)
 }

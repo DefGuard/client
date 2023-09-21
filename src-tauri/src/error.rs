@@ -1,6 +1,7 @@
 use std::net::AddrParseError;
 
 use base64;
+use local_ip_address::Error as LocalIpError;
 use sqlx;
 use thiserror::Error;
 use wireguard_rs::{error::WireguardError, IpAddrParseError};
@@ -23,4 +24,6 @@ pub enum Error {
     IpAddrMask(#[from] IpAddrParseError),
     #[error("IP address/mask error")]
     AddrParse(#[from] AddrParseError),
+    #[error("Local Ip Error")]
+    LocalIpError(#[from] LocalIpError),
 }

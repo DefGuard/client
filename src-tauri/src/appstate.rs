@@ -5,7 +5,7 @@ use crate::database::{Connection, DbPool};
 #[derive(Default)]
 pub struct AppState {
     pub db: Mutex<Option<DbPool>>,
-    pub active_connections: Vec<Connection>,
+    pub active_connections: Mutex<Vec<Connection>>,
 }
 impl AppState {
     pub fn get_pool(&self) -> DbPool {
