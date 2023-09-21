@@ -81,22 +81,44 @@ impl Location {
     where
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
-        let result = query!(
-            "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, network_id) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7) \
-            RETURNING id;
-            ",
-            self.instance_id,
-            self.name,
-            self.address,
-            self.pubkey,
-            self.endpoint,
-            self.allowed_ips,
-            self.network_id,
-        )
-        .fetch_one(executor)
-        .await?;
-        self.id = Some(result.id);
+        match self.id {
+            None => {
+                // Insert a new record when there is no ID
+                let result = query!(
+                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, network_id) \
+                VALUES ($1, $2, $3, $4, $5, $6, $7) \
+                RETURNING id;",
+                self.instance_id,
+                self.name,
+                self.address,
+                self.pubkey,
+                self.endpoint,
+                self.allowed_ips,
+                self.network_id,
+            )
+            .fetch_one(executor)
+            .await?;
+                self.id = Some(result.id);
+            }
+            Some(id) => {
+                // Update the existing record when there is an ID
+                query!(
+                "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, network_id = $7 \
+                WHERE id = $8;",
+                self.instance_id,
+                self.name,
+                self.address,
+                self.pubkey,
+                self.endpoint,
+                self.allowed_ips,
+                self.network_id,
+                id,
+            )
+            .execute(executor)
+            .await?;
+            }
+        }
+
         Ok(())
     }
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
@@ -130,6 +152,24 @@ impl Location {
             pubkey
         )
         .fetch_one(pool)
+        .await
+    }
+
+    pub async fn find_by_native_id<'e, E>(
+        executor: E,
+        instance_id: i64,
+    ) -> Result<Option<Self>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        query_as!(
+            Self,
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            FROM location WHERE network_id = $1;",
+            instance_id
+        )
+        .fetch_optional(executor)
+
         .await
     }
 }
