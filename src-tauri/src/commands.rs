@@ -51,10 +51,10 @@ pub struct DeviceConfig {
     pub allowed_ips: String,
 }
 
-pub fn device_config_to_location(device_config: DeviceConfig) -> Location {
+pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location {
     Location {
         id: None,
-        instance_id: device_config.network_id,
+        instance_id,
         network_id: device_config.network_id,
         name: device_config.network_name,
         address: device_config.assigned_ip, // Transforming assigned_ip to address
@@ -103,7 +103,7 @@ pub async fn save_device_config(
         .await
         .map_err(|err| err.to_string())?;
     for location in response.configs {
-        let mut new_location = device_config_to_location(location);
+        let mut new_location = device_config_to_location(location, instance.id.unwrap());
         new_location
             .save(&mut *transaction)
             .await
@@ -193,4 +193,55 @@ pub async fn all_locations(
     }
 
     Ok(location_info)
+}
+#[tauri::command(async)]
+pub async fn update_instance(
+    instance_id: i64,
+    response: CreateDeviceResponse,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let instance = Instance::find_by_id(&app_state.get_pool(), instance_id)
+        .await
+        .map_err(|err| err.to_string())?;
+    if let Some(mut instance) = instance {
+        let mut transaction = app_state
+            .get_pool()
+            .begin()
+            .await
+            .map_err(|err| err.to_string())?;
+        instance.name = response.instance.name;
+        instance.url = response.instance.url;
+        instance
+            .save(&mut *transaction)
+            .await
+            .map_err(|err| err.to_string())?;
+
+        for location in response.configs {
+            let mut new_location = device_config_to_location(location, instance_id);
+            let old_location =
+                Location::find_by_native_id(&mut *transaction, new_location.network_id)
+                    .await
+                    .map_err(|err| err.to_string())?;
+            if let Some(mut old_location) = old_location {
+                old_location.name = new_location.name;
+                old_location.address = new_location.address;
+                old_location.pubkey = new_location.pubkey;
+                old_location.endpoint = new_location.endpoint;
+                old_location.allowed_ips = new_location.allowed_ips;
+                old_location
+                    .save(&mut *transaction)
+                    .await
+                    .map_err(|err| err.to_string())?;
+            } else {
+                new_location
+                    .save(&mut *transaction)
+                    .await
+                    .map_err(|err| err.to_string())?;
+            }
+        }
+        transaction.commit().await.map_err(|err| err.to_string())?;
+        Ok(())
+    } else {
+        Err("Instance not found".into())
+    }
 }
