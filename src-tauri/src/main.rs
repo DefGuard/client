@@ -12,7 +12,7 @@ use tauri::{Manager, State};
 
 use tauri::SystemTrayEvent;
 mod tray;
-use crate::commands::{all_instances, all_locations, connect, disconnect, save_device_config};
+use crate::commands::{all_instances, all_locations, connect, disconnect, save_device_config, location_stats};
 use crate::tray::create_tray_menu;
 
 #[derive(Clone, serde::Serialize)]
@@ -34,6 +34,7 @@ fn main() {
             all_instances,
             connect,
             disconnect,
+            location_stats,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, location_id, upload, download, last_handshake, collected_at\n            FROM location_stats\n            WHERE location_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "location_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "upload",
+        "ordinal": 2,
+        "type_info": "Int64"
+      },
+      {
+        "name": "download",
+        "ordinal": 3,
+        "type_info": "Int64"
+      },
+      {
+        "name": "last_handshake",
+        "ordinal": 4,
+        "type_info": "Int64"
+      },
+      {
+        "name": "collected_at",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cb7af9d124e73a075dcdb336b79cbdda1ce0ef7bb17946eead21fb5029f42735"
+}

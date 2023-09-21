@@ -1,7 +1,7 @@
 use crate::{
     database::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
-        Connection, Instance, Location, WireguardKeys,
+        Connection, Instance, Location, LocationStats, WireguardKeys,
     },
     utils::setup_interface,
     AppState,
@@ -300,4 +300,13 @@ pub async fn update_instance(
     } else {
         Err("Instance not found".into())
     }
+}
+#[tauri::command]
+pub async fn location_stats(
+    location_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<Vec<LocationStats>, String> {
+    LocationStats::all_by_location_id(&app_state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())
 }
