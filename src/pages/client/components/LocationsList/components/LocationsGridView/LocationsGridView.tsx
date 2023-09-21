@@ -29,11 +29,10 @@ type GridItemProps = {
 
 const GridItem = ({ location }: GridItemProps) => {
   const { LL } = useI18nContext();
-  const active = false;
   const cn = classNames(
     'grid-item',
     {
-      active: active,
+      active: location.active,
     },
     'no-info',
   );

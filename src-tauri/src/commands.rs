@@ -221,8 +221,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
 #[derive(Serialize)]
 pub struct LocationInfo {
     pub id: i64,
-    pub instance_id: i64,
     // Native id of network from defguard
+    pub instance_id: i64,
     pub name: String,
     pub address: String,
     pub endpoint: String,

@@ -26,16 +26,14 @@ export const LocationCardConnectButton = ({ location }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const { LL } = useI18nContext();
 
-  const active = false;
-
   const cn = classNames('location-card-connect-button', {
-    connected: active,
+    connected: location.active,
   });
 
   const handleClick = async () => {
     setIsLoading(true);
     try {
-      if (active) {
+      if (location.active) {
         await disconnect({ locationId: location.id });
       } else {
         await connect({ locationId: location.id });
@@ -52,12 +50,12 @@ export const LocationCardConnectButton = ({ location }: Props) => {
     <Button
       onClick={handleClick}
       className={cn}
-      icon={active ? <SvgIconX /> : <SvgIconCheckmarkSmall />}
+      icon={location.active ? <SvgIconX /> : <SvgIconCheckmarkSmall />}
       size={ButtonSize.SMALL}
       styleVariant={ButtonStyleVariant.STANDARD}
       loading={isLoading}
       text={
-        active
+        location.active
           ? LL.pages.client.controls.disconnect()
           : LL.pages.client.controls.connect()
       }
