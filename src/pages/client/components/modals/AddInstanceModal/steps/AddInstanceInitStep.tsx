@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import dayjs from 'dayjs';
+import { isUndefined } from 'lodash-es';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +17,7 @@ import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/us
 import { EnrollmentStartResponse } from '../../../../../../shared/hooks/api/types';
 import { routes } from '../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../enrollment/hooks/store/useEnrollmentStore';
+import { clientApi } from '../../../../clientAPI/clientApi';
 import { useAddInstanceModal } from '../hooks/useAddInstanceModal';
 
 type FormFields = {
@@ -93,13 +95,29 @@ export const AddInstanceModalInitStep = () => {
           setModalState({ loading: false });
           return;
         }
-        res.json().then((r: EnrollmentStartResponse) => {
-          setModalState({ loading: false });
+        res.json().then(async (r: EnrollmentStartResponse) => {
+          // get client registered instances
+          const clientInstances = await clientApi.getInstances();
+          const instance = clientInstances.find((i) => i.uuid === r.instance.id);
           let proxy_api_url = import.meta.env.DEV ? '' : values.url;
           if (proxy_api_url[proxy_api_url.length - 1] === '/') {
             proxy_api_url = proxy_api_url.slice(0, -1);
           }
           proxy_api_url = proxy_api_url + '/api/v1';
+          setModalState({ loading: false });
+
+          if (instance) {
+            // update already registered instance instead
+            const instanceInfo = await fetch(`${proxy_api_url}/enrollment/network_info`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                pubKey: instance.pubkey,
+              }),
+            });
+            return;
+          }
+          // register new instance
           // is user in need of full enrollment ?
           if (r.user.is_active) {
             //no, only create new device for desktop client

@@ -4,6 +4,7 @@ import { shallow } from 'zustand/shallow';
 import { useI18nContext } from '../../../../../i18n/i18n-react';
 import { ModalWithTitle } from '../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
 import { useAddInstanceModal } from './hooks/useAddInstanceModal';
+import { AddInstanceDeviceStep } from './steps/AddInstanceDeviceStep';
 import { AddInstanceModalInitStep } from './steps/AddInstanceInitStep';
 
 export const AddInstanceModal = () => {
@@ -45,4 +46,7 @@ export const AddInstanceModal = () => {
   );
 };
 
-const steps: ReactNode[] = [<AddInstanceModalInitStep key={0} />];
+const steps: ReactNode[] = [
+  <AddInstanceModalInitStep key={0} />,
+  <AddInstanceDeviceStep key={1} />,
+];
