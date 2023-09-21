@@ -1,8 +1,10 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
+use std::time::SystemTime;
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 
 use crate::{database::DbPool, error::Error};
 use serde::{Deserialize, Serialize};
+use wireguard_rs::Peer;
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct Location {
@@ -25,6 +27,20 @@ pub struct LocationStats {
     download: i64,
     last_handshake: i64,
     collected_at: NaiveDateTime,
+}
+
+fn peer_to_location_stats(peer: &Peer) -> LocationStats {
+    LocationStats {
+        id: None, // Set to None or your desired default value
+        location_id: 0, // Set to the appropriate location_id value
+        upload: peer.tx_bytes as i64,
+        download: peer.rx_bytes as i64,
+        last_handshake: peer.last_handshake.map_or(0, |ts| {
+                ts.duration_since(SystemTime::UNIX_EPOCH)
+                    .map_or(0, |duration| duration.as_secs() as i64)
+            }),
+        collected_at: Utc::now().naive_utc(),
+    }
 }
 
 impl Location {
@@ -105,7 +121,26 @@ impl Location {
         .fetch_all(pool)
         .await
     }
+    pub async fn find_by_public_key(
+        pool: &DbPool,
+        pubkey: &str,
+    ) -> Result<Vec<Self>, SqlxError> {
+        query_as!(
+            Self,
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            FROM location WHERE pubkey = $1;",
+            pubkey
+        )
+        .fetch_all(pool)
+        .await
+    }
 }
+
+impl From<Peer> for LocationStats {
+  fn from(value: Peer) -> Self {
+    todo!()
+  }
+} 
 
 impl LocationStats {
     pub fn new(

@@ -4,16 +4,17 @@ use crate::{
     utils::setup_interface,
     AppState,
 };
+use std::thread;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use tauri::State;
-use wireguard_rs::netlink::delete_interface;
+use wireguard_rs::{wgapi::WGApi, netlink::delete_interface};
 
 // Create new wireguard interface
 #[tauri::command(async)]
 pub async fn connect(location_id: i64, app_state: State<'_, AppState>) -> Result<(), Error> {
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
-        setup_interface(location, &app_state.get_pool()).await?;
+        setup_interface(&location, &app_state.get_pool()).await?;
         let address = local_ip()?;
         let connection = Connection::new(location_id, address.to_string());
         app_state
@@ -21,6 +22,20 @@ pub async fn connect(location_id: i64, app_state: State<'_, AppState>) -> Result
             .lock()
             .unwrap()
             .push(connection);
+        // Spawn stats threads
+        thread::spawn(|| {
+          let api = WGApi::new(location.name, false);
+          loop {
+            match api.read_host() {
+              Ok(host) => {
+                let peers = host.peers;
+                
+              },
+              Err(e) => println!("error: {}", e)
+            }
+          }
+        });
+
     }
     Ok(())
 }
