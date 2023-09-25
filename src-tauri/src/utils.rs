@@ -43,9 +43,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 .args(["-4", "route", "add", &allowed_ip, "dev", &location.name])
                 .output()?;
         }
-
         api.write_host(&host)?;
-        api.write_peer(&peer)?;
     };
 
     Ok(())

@@ -1,6 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use sqlx::{query, FromRow};
+use sqlx::{query, query_as, FromRow};
 
 use crate::{database::DbPool, error::Error};
 
@@ -39,5 +39,19 @@ impl Connection {
         .await?;
         self.id = Some(result.id);
         Ok(())
+    }
+    pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+        let connections = query_as!(
+            Connection,
+            r#"
+            SELECT id, location_id, connected_from, start, end 
+            FROM connection
+            WHERE location_id = $1
+            "#,
+            location_id
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(connections)
     }
 }
