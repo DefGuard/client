@@ -12,7 +12,9 @@ use tauri::{Manager, State};
 
 use tauri::SystemTrayEvent;
 mod tray;
-use crate::commands::{all_instances, all_locations, connect, disconnect, save_device_config, location_stats};
+use crate::commands::{
+    all_instances, all_locations, connect, disconnect, location_stats, save_device_config,
+};
 use crate::tray::create_tray_menu;
 
 #[derive(Clone, serde::Serialize)]

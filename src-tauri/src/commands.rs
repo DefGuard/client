@@ -27,7 +27,6 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
         .await
         .map_err(|err| err.to_string())?
     {
-        println!("Location: {:#?}", location);
         setup_interface(&location, &state.get_pool())
             .await
             .map_err(|err| err.to_string())?;
@@ -57,7 +56,6 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                     .await
                                     .map_err(|err| err.to_string())
                                     .unwrap();
-                            println!("{:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
                         }
                     }
@@ -316,6 +314,16 @@ pub async fn location_stats(
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationStats>, String> {
     LocationStats::all_by_location_id(&app_state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn all_connections(
+    location_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<Vec<Connection>, String> {
+    Connection::all_by_location_id(&app_state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())
 }

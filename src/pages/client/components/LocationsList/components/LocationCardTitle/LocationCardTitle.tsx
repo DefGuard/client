@@ -13,7 +13,7 @@ type Props = {
 
 export const LocationCardTitle = ({ location }: Props) => {
   const cn = classNames('location-card-title', {
-    active: false,
+    active: location.active,
   });
   return (
     <div className={cn}>
