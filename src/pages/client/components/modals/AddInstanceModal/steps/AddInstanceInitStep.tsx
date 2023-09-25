@@ -112,7 +112,7 @@ export const AddInstanceModalInitStep = () => {
               method: 'POST',
               headers,
               body: JSON.stringify({
-                pubKey: instance.pubkey,
+                pubkey: instance.pubkey,
               }),
             });
             return;
