@@ -161,7 +161,7 @@ pub async fn save_device_config(
         .save(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
-    let mut keys = WireguardKeys::new(instance.id.unwrap(), private_key, response.device.pubkey);
+    let mut keys = WireguardKeys::new(instance.id.unwrap(), response.device.pubkey, private_key);
     keys.save(&mut *transaction)
         .await
         .map_err(|err| err.to_string())?;
