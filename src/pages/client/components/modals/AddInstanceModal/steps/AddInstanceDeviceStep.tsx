@@ -74,8 +74,6 @@ export const AddInstanceDeviceStep = () => {
         method: 'POST',
       }).then((r) => {
         if (!r.ok) {
-          console.log(r.status);
-          console.log(r.data);
           setIsLoading(false);
           toaster.error(LL.common.messages.error());
           throw Error('Failed to create device');

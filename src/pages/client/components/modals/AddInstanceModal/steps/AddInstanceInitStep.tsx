@@ -61,9 +61,9 @@ export const AddInstanceModalInitStep = () => {
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';
-      /*if (import.meta.env.DEV) {
+      if (import.meta.env.DEV) {
         return endpoint;
-      }*/
+      }
       let base: string;
       if (values.url[values.url.length - 1] === '/') {
         base = values.url.slice(0, -1);
@@ -91,7 +91,6 @@ export const AddInstanceModalInitStep = () => {
       body: Body.json(data),
     })
       .then(async (res: Response<EnrollmentStartResponse>) => {
-        console.log(res.headers);
         const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
           toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
