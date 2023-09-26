@@ -1,27 +1,63 @@
-import axios, { AxiosResponse } from 'axios';
+import { Body, fetch } from '@tauri-apps/api/http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import { UseApi } from './types';
 
-const unpackRequest = <T,>(res: AxiosResponse<T>): T => res.data;
-
 export const useApi = (): UseApi => {
-  const url = useEnrollmentStore((state) => state.proxy_url);
+  const [proxyUrl, cookie] = useEnrollmentStore((state) => [
+    state.proxy_url,
+    state.cookie,
+  ]);
 
-  const client = axios.create({
-    baseURL: url,
-  });
+  const startEnrollment: UseApi['enrollment']['start'] = async (data) => {
+    const response = await fetch(`${proxyUrl}/enrollment/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      },
+      body: Body.json(data),
+    });
+    return response;
+  };
 
-  const startEnrollment: UseApi['enrollment']['start'] = (data) =>
-    client.post('/enrollment/start', data).then(unpackRequest);
+  const activateUser: UseApi['enrollment']['activateUser'] = async (data) => {
+    const response = await fetch(`${proxyUrl}/enrollment/activate_user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      },
+      body: Body.json(data),
+    });
 
-  const activateUser: UseApi['enrollment']['activateUser'] = (data) =>
-    client.post('/enrollment/activate_user', data).then(unpackRequest);
+    return response;
+  };
 
-  const createDevice: UseApi['enrollment']['createDevice'] = (data) =>
-    client.post('/enrollment/create_device', data).then(unpackRequest);
+  const createDevice: UseApi['enrollment']['createDevice'] = async (data) => {
+    const response = await fetch(`${proxyUrl}/enrollment/create_device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      },
+      body: Body.json(data),
+    });
 
-  const getAppInfo: UseApi['getAppInfo'] = () => client.get('/info').then(unpackRequest);
+    return response;
+  };
+
+  const getAppInfo: UseApi['getAppInfo'] = async () => {
+    const response = await fetch(`${proxyUrl}/info`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      },
+    });
+
+    return response;
+  };
 
   return {
     enrollment: {

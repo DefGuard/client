@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Body, fetch, Response } from '@tauri-apps/api/http';
 import dayjs from 'dayjs';
 import { isUndefined } from 'lodash-es';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import { fetch, Body, Response } from '@tauri-apps/api/http';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
@@ -85,13 +85,14 @@ export const AddInstanceModalInitStep = () => {
 
     setModalState({ loading: true });
 
-
     fetch(endpointUrl, {
       method: 'POST',
       headers,
       body: Body.json(data),
     })
       .then(async (res: Response<EnrollmentStartResponse>) => {
+        console.log(res.headers);
+        const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
           toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
           setModalState({ loading: false });
@@ -110,6 +111,7 @@ export const AddInstanceModalInitStep = () => {
 
         if (instance) {
           // update already registered instance instead
+          headers['Cookie'] = authCookie;
           const instanceInfo = await fetch(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
@@ -125,6 +127,7 @@ export const AddInstanceModalInitStep = () => {
           //no, only create new device for desktop client
           nextStep({
             proxyUrl: proxy_api_url,
+            cookie: authCookie,
           });
         } else {
           // yes, enroll the user
@@ -137,6 +140,7 @@ export const AddInstanceModalInitStep = () => {
             proxy_url: proxy_api_url,
             sessionEnd,
             sessionStart,
+            cookie: authCookie,
           });
           closeModal();
           navigate(routes.enrollment, { replace: true });

@@ -89,12 +89,14 @@ export const DekstopSetup = () => {
       name: values.name,
       pubkey: publicKey,
     });
+    console.log('chuj', deviceResponse.data);
     mutateUserActivation({
       password: userPassword,
       phone_number: userInfo.phone_number,
     }).then(() => {
       setIsLoading(true);
-      saveConfig(privateKey, deviceResponse)
+      console.log(deviceResponse);
+      saveConfig(privateKey, deviceResponse.data as CreateDeviceResponse)
         .then(() => {
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });

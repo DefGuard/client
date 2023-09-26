@@ -22,6 +22,7 @@ const defaultValues: StoreValues = {
   deviceName: undefined,
   vpnOptional: undefined,
   userPassword: undefined,
+  cookie: undefined,
   nextSubject: new Subject<void>(),
 };
 
@@ -91,6 +92,7 @@ type StoreValues = {
   // Markdown content for final step card
   endContent?: string;
   deviceName?: string;
+  cookie?: string;
 };
 
 type StoreMethods = {

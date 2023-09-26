@@ -1,3 +1,5 @@
+import { Response } from '@tauri-apps/api/http';
+
 import { DefguardInstance } from '../../../pages/client/types';
 
 export type EmptyApiResponse = Record<string, never>;
@@ -64,6 +66,11 @@ export type DeviceConfig = {
 export type CreateDeviceResponse = {
   device: Device;
   configs: DeviceConfig[];
+  instance: {
+    id: string;
+    name: string;
+    url: string;
+  };
 };
 
 export type AppInfo = {
@@ -72,9 +79,9 @@ export type AppInfo = {
 
 export type UseApi = {
   enrollment: {
-    start: (data: EnrollmentStartRequest) => Promise<EnrollmentStartResponse>;
-    activateUser: (data: ActivateUserRequest) => Promise<EmptyApiResponse>;
-    createDevice: (data: CreateDeviceRequest) => Promise<CreateDeviceResponse>;
+    start: (data: EnrollmentStartRequest) => Promise<Response<unknown>>;
+    activateUser: (data: ActivateUserRequest) => Promise<Response<unknown>>;
+    createDevice: (data: CreateDeviceRequest) => Promise<Response<unknown>>;
   };
-  getAppInfo: () => Promise<AppInfo>;
+  getAppInfo: () => Promise<Response<unknown>>;
 };

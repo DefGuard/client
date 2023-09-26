@@ -5,6 +5,7 @@ const defaultValues: StoreValues = {
   loading: false,
   step: 0,
   proxyUrl: undefined,
+  cookie: undefined,
 };
 
 export const useAddInstanceModal = createWithEqualityFn<Store>(
@@ -26,6 +27,7 @@ type StoreValues = {
   loading: boolean;
   step: number;
   proxyUrl?: string;
+  cookie?: string;
 };
 
 type StoreMethods = {
