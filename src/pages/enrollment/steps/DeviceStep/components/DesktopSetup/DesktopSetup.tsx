@@ -18,9 +18,9 @@ import {
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
-import { useApi } from '../../../../../../shared/hooks/api/useApi';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
+import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
 
 type FormFields = {
   name: string;
@@ -41,7 +41,7 @@ export const DekstopSetup = () => {
   const stepLL = LL.pages.enrollment.steps.deviceSetup;
   const {
     enrollment: { createDevice, activateUser },
-  } = useApi();
+  } = useEnrollmentApi();
   const deviceName = useEnrollmentStore((state) => state.deviceName);
   const [userInfo, userPassword] = useEnrollmentStore((state) => [
     state.userInfo,
@@ -94,7 +94,7 @@ export const DekstopSetup = () => {
       phone_number: userInfo.phone_number,
     }).then(() => {
       setIsLoading(true);
-      saveConfig(privateKey, deviceResponse)
+      saveConfig(privateKey, deviceResponse.data as CreateDeviceResponse)
         .then(() => {
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });

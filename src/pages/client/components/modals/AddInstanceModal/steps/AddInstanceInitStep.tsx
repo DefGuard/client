@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Body, fetch, Response } from '@tauri-apps/api/http';
 import dayjs from 'dayjs';
 import { isUndefined } from 'lodash-es';
 import { useMemo } from 'react';
@@ -78,68 +79,71 @@ export const AddInstanceModalInitStep = () => {
       'Content-Type': 'application/json',
     };
 
-    const data = JSON.stringify({
+    const data = {
       token: values.token,
-    });
+    };
 
     setModalState({ loading: true });
 
     fetch(endpointUrl, {
       method: 'POST',
       headers,
-      body: data,
+      body: Body.json(data),
     })
-      .then((res) => {
+      .then(async (res: Response<EnrollmentStartResponse>) => {
+        const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
           toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
           setModalState({ loading: false });
           return;
         }
-        res.json().then(async (r: EnrollmentStartResponse) => {
-          // get client registered instances
-          const clientInstances = await clientApi.getInstances();
-          const instance = clientInstances.find((i) => i.uuid === r.instance.id);
-          let proxy_api_url = import.meta.env.DEV ? '' : values.url;
-          if (proxy_api_url[proxy_api_url.length - 1] === '/') {
-            proxy_api_url = proxy_api_url.slice(0, -1);
-          }
-          proxy_api_url = proxy_api_url + '/api/v1';
-          setModalState({ loading: false });
+        const r = res.data;
+        // get client registered instances
+        const clientInstances = await clientApi.getInstances();
+        const instance = clientInstances.find((i) => i.uuid === r.instance.id);
+        let proxy_api_url = values.url;
+        if (proxy_api_url[proxy_api_url.length - 1] === '/') {
+          proxy_api_url = proxy_api_url.slice(0, -1);
+        }
+        proxy_api_url = proxy_api_url + '/api/v1';
+        setModalState({ loading: false });
 
-          if (instance) {
-            // update already registered instance instead
-            const instanceInfo = await fetch(`${proxy_api_url}/enrollment/network_info`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                pubkey: instance.pubkey,
-              }),
-            });
-            return;
-          }
-          // register new instance
-          // is user in need of full enrollment ?
-          if (r.user.is_active) {
-            //no, only create new device for desktop client
-            nextStep({
-              proxyUrl: proxy_api_url,
-            });
-          } else {
-            // yes, enroll the user
-            const sessionEnd = dayjs.unix(r.deadline_timestamp).utc().local().format();
-            const sessionStart = dayjs().local().format();
-            initEnrollment({
-              userInfo: r.user,
-              adminInfo: r.admin,
-              endContent: r.final_page_content,
-              proxy_url: proxy_api_url,
-              sessionEnd,
-              sessionStart,
-            });
-            closeModal();
-            navigate(routes.enrollment, { replace: true });
-          }
-        });
+        if (instance) {
+          // update already registered instance instead
+          headers['Cookie'] = authCookie;
+          const instanceInfo = await fetch(`${proxy_api_url}/enrollment/network_info`, {
+            method: 'POST',
+            headers,
+            body: Body.json({
+              pubkey: instance.pubkey,
+            }),
+          });
+          return;
+        }
+        // register new instance
+        // is user in need of full enrollment ?
+        if (r.user.is_active) {
+          //no, only create new device for desktop client
+          nextStep({
+            proxyUrl: proxy_api_url,
+            cookie: authCookie,
+          });
+        } else {
+          // yes, enroll the user
+          const sessionEnd = dayjs.unix(r.deadline_timestamp).utc().local().format();
+          const sessionStart = dayjs().local().format();
+          initEnrollment({
+            userInfo: r.user,
+            adminInfo: r.admin,
+            endContent: r.final_page_content,
+            proxy_url: proxy_api_url,
+            sessionEnd,
+            sessionStart,
+            cookie: authCookie,
+          });
+          closeModal();
+          navigate(routes.enrollment, { replace: true });
+        }
       })
       .catch((e) => {
         toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
