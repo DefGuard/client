@@ -1,9 +1,9 @@
 import { Body, fetch } from '@tauri-apps/api/http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
-import { UseApi } from './types';
+import { UseApi } from '../../../shared/hooks/api/types';
 
-export const useApi = (): UseApi => {
+export const useEnrollmentApi = (): UseApi => {
   const [proxyUrl, cookie] = useEnrollmentStore((state) => [
     state.proxy_url,
     state.cookie,

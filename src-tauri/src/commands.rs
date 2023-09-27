@@ -3,7 +3,7 @@ use crate::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
         Connection, Instance, Location, LocationStats, WireguardKeys,
     },
-    utils::setup_interface,
+    utils::{remove_whitespace, setup_interface},
     AppState,
 };
 use chrono::Utc;
@@ -43,7 +43,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             )
             .unwrap();
         // Spawn stats threads
-        let api = WGApi::new(location.name, false);
+        let api = WGApi::new(remove_whitespace(&location.name), false);
         tokio::spawn(async move {
             let state = handle.state::<AppState>();
             loop {
@@ -75,7 +75,7 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
         .await
         .map_err(|err| err.to_string())?
     {
-        delete_interface(&location.name).map_err(|err| err.to_string())?;
+        delete_interface(&remove_whitespace(&location.name)).map_err(|err| err.to_string())?;
         if let Some(mut connection) = state.find_and_remove_connection(location_id) {
             connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
             connection

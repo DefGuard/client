@@ -14,9 +14,10 @@ use crate::{
 // TODO: Learn how to run tauri app with sudo permissions to setup interface
 /// Setup client interface
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
-    create_interface(&location.name)?;
-    address_interface(&location.name, &IpAddrMask::from_str(&location.address)?)?;
-    let api = WGApi::new(location.name.clone(), false);
+    let interface_name = remove_whitespace(&location.name);
+    create_interface(&interface_name)?;
+    address_interface(&interface_name, &IpAddrMask::from_str(&location.address)?)?;
+    let api = WGApi::new(interface_name.clone(), false);
 
     let mut host = api.read_host()?;
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
@@ -33,18 +34,34 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
             .split(',')
             .map(str::to_string)
             .collect();
-
         for allowed_ip in allowed_ips {
-            let addr = IpAddrMask::from_str(&allowed_ip)?;
-            peer.allowed_ips.push(addr);
-            // TODO: Handle other OS than linux
-            // Add a route for the allowed IP using the `ip -4 route add` command
-            std::process::Command::new("ip")
-                .args(["-4", "route", "add", &allowed_ip, "dev", &location.name])
-                .output()?;
+            match IpAddrMask::from_str(&allowed_ip) {
+                Ok(addr) => {
+                    peer.allowed_ips.push(addr);
+                    // TODO: Handle other OS than linux
+                    // Add a route for the allowed IP using the `ip -4 route add` command
+                    if let Err(err) = std::process::Command::new("ip")
+                        .args(["-4", "route", "add", &allowed_ip, "dev", &interface_name])
+                        .output()
+                    {
+                        // Handle the error if the ip command fails
+                        eprintln!("Error adding route for {}: {}", allowed_ip, err);
+                    }
+                }
+                Err(err) => {
+                    // Handle the error from IpAddrMask::from_str, if needed
+                    eprintln!("Error parsing IP address {}: {}", allowed_ip, err);
+                    // Continue to the next iteration of the loop
+                    continue;
+                }
+            }
         }
         api.write_host(&host)?;
+        api.write_peer(&peer)?;
     };
 
     Ok(())
+}
+pub fn remove_whitespace(s: &str) -> String {
+    s.chars().filter(|c| !c.is_whitespace()).collect()
 }
