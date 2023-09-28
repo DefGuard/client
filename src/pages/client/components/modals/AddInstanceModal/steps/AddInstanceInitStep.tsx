@@ -115,7 +115,6 @@ export const AddInstanceModalInitStep = () => {
               pubkey: instance.pubkey,
             }),
           }).then(async (res) => {
-            console.log('here', res.data);
             invoke<void>('update_instance', {
               instanceId: instance.id,
               response: res.data,
