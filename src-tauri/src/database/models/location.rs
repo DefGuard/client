@@ -32,8 +32,8 @@ pub struct LocationStats {
 pub async fn peer_to_location_stats(peer: &Peer, pool: &DbPool) -> Result<LocationStats, Error> {
     let location = Location::find_by_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
-        id: None,                          // Set to None or your desired default value
-        location_id: location.id.unwrap(), // Set to the appropriate location_id value
+        id: None,
+        location_id: location.id.unwrap(),
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
         last_handshake: peer.last_handshake.map_or(0, |ts| {
@@ -212,7 +212,7 @@ impl LocationStats {
         let stats = query_as!(
             LocationStats,
             r#"
-            SELECT id, location_id, upload, download, last_handshake, collected_at
+            SELECT id, location_id, upload, download, last_handshake, collected_at as "collected_at: _"
             FROM location_stats
             WHERE location_id = $1
             "#,

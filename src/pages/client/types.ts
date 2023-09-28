@@ -16,3 +16,9 @@ export type DefguardLocation = {
   // connected
   active: boolean;
 };
+
+export interface LocationStats {
+  collected_at: number;
+  download: number;
+  upload: number;
+}

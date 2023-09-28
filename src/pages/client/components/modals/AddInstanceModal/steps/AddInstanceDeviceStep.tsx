@@ -79,6 +79,8 @@ export const AddInstanceDeviceStep = () => {
           throw Error('Failed to create device');
         }
         const deviceResp = r.data as CreateDeviceResponse;
+        console.log(publicKey, privateKey);
+        console.log(deviceResp);
         invoke('save_device_config', {
           privateKey: privateKey,
           response: deviceResp,

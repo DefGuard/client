@@ -22,7 +22,7 @@ export const LocationCardInfo = ({ location }: Props) => {
       </div>
       <div className="location-card-info-ip">
         <label>{localLL.assignedIp()}:</label>
-        <p>Placeholder</p>
+        <p>{location.address}</p>
       </div>
     </>
   );

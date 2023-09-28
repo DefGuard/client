@@ -56,12 +56,16 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                     .await
                                     .map_err(|err| err.to_string())
                                     .unwrap();
+                            println!("{:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
                         }
                     }
-                    Err(e) => println!("error: {}", e),
+                    Err(e) => {
+                        println!("Unexpected error quitting thread error: {}", e);
+                        break
+                    }
                 }
-                sleep(Duration::from_secs(20)).await;
+                sleep(Duration::from_secs(5)).await;
             }
         });
     }

@@ -2,6 +2,7 @@ use crate::{database::DbPool, error::Error};
 use sqlx::{query, query_as, Error as SqlxError};
 
 // User key pair
+#[derive(Debug)]
 pub struct WireguardKeys {
     pub id: Option<i64>,
     pub instance_id: i64,

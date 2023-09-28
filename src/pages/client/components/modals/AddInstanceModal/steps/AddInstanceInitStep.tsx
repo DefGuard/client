@@ -61,9 +61,6 @@ export const AddInstanceModalInitStep = () => {
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';
-      if (import.meta.env.DEV) {
-        return endpoint;
-      }
       let base: string;
       if (values.url[values.url.length - 1] === '/') {
         base = values.url.slice(0, -1);
@@ -84,6 +81,7 @@ export const AddInstanceModalInitStep = () => {
     };
 
     setModalState({ loading: true });
+    console.log(endpointUrl);
 
     fetch(endpointUrl, {
       method: 'POST',
@@ -105,6 +103,7 @@ export const AddInstanceModalInitStep = () => {
         if (proxy_api_url[proxy_api_url.length - 1] === '/') {
           proxy_api_url = proxy_api_url.slice(0, -1);
         }
+        console.log(proxy_api_url);
         proxy_api_url = proxy_api_url + '/api/v1';
         setModalState({ loading: false });
 

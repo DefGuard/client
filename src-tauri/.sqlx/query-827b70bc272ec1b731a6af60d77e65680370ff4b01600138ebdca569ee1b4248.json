@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id, location_id, upload, download, last_handshake, collected_at\n            FROM location_stats\n            WHERE location_id = $1\n            ",
+  "query": "\n            SELECT id, location_id, connected_from, start, end\n            FROM connection\n            WHERE location_id = $1\n            ORDER BY end DESC\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -14,23 +14,18 @@
         "type_info": "Int64"
       },
       {
-        "name": "upload",
+        "name": "connected_from",
         "ordinal": 2,
-        "type_info": "Int64"
+        "type_info": "Text"
       },
       {
-        "name": "download",
+        "name": "start",
         "ordinal": 3,
-        "type_info": "Int64"
+        "type_info": "Datetime"
       },
       {
-        "name": "last_handshake",
+        "name": "end",
         "ordinal": 4,
-        "type_info": "Int64"
-      },
-      {
-        "name": "collected_at",
-        "ordinal": 5,
         "type_info": "Datetime"
       }
     ],
@@ -42,9 +37,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "cb7af9d124e73a075dcdb336b79cbdda1ce0ef7bb17946eead21fb5029f42735"
+  "hash": "827b70bc272ec1b731a6af60d77e65680370ff4b01600138ebdca569ee1b4248"
 }

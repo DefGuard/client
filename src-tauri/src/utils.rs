@@ -56,8 +56,9 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 }
             }
         }
-        api.write_host(&host)?;
-        api.write_peer(&peer)?;
+        println!("{:#?}", peer);
+        api.write_host(&host).expect("Error writing host");
+        api.write_peer(&peer).expect("Error writing peer");
     };
 
     Ok(())
