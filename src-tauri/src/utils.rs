@@ -15,8 +15,11 @@ use crate::{
 /// Setup client interface
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
     let interface_name = remove_whitespace(&location.name);
+    debug!("Creating interface: {}", interface_name);
     create_interface(&interface_name)?;
+    info!("Created interface: {}", interface_name);
     address_interface(&interface_name, &IpAddrMask::from_str(&location.address)?)?;
+    info!("Adressed interface: {}", interface_name);
     let api = WGApi::new(interface_name.clone(), false);
 
     let mut host = api.read_host()?;
@@ -35,6 +38,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
             .split(',')
             .map(str::to_string)
             .collect();
+        debug!("Routing allowed ips");
         for allowed_ip in allowed_ips {
             match IpAddrMask::from_str(&allowed_ip) {
                 Ok(addr) => {
@@ -58,9 +62,9 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 }
             }
         }
-        println!("{:#?}", peer);
         api.write_host(&host)?;
         api.write_peer(&peer)?;
+        info!("created peer {:#?}", peer);
     };
 
     Ok(())

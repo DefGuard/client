@@ -27,6 +27,10 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
         .await
         .map_err(|err| err.to_string())?
     {
+        debug!(
+            "Creating new interface connection for location: {}",
+            location.name
+        );
         setup_interface(&location, &state.get_pool())
             .await
             .map_err(|err| err.to_string())?;
@@ -56,12 +60,11 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                     .await
                                     .map_err(|err| err.to_string())
                                     .unwrap();
-                            println!("{:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
                         }
                     }
-                    Err(e) => {
-                        println!("Unexpected error quitting thread error: {}", e);
+                    Err(_) => {
+                        debug!("Stopped stats thread for location: {}", location.name);
                         break;
                     }
                 }
@@ -107,7 +110,7 @@ pub struct Device {
     pub created_at: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DeviceConfig {
     pub network_id: i64,
     pub network_name: String,
@@ -130,7 +133,7 @@ pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) 
         allowed_ips: device_config.allowed_ips,
     }
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct InstanceResponse {
     // uuid
     pub id: String,
@@ -138,7 +141,7 @@ pub struct InstanceResponse {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateDeviceResponse {
     instance: InstanceResponse,
     configs: Vec<DeviceConfig>,
@@ -151,6 +154,7 @@ pub async fn save_device_config(
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
+    debug!("Received device configuration: {:#?}", response);
     let mut transaction = app_state
         .get_pool()
         .begin()
@@ -177,6 +181,7 @@ pub async fn save_device_config(
             .map_err(|err| err.to_string())?;
     }
     transaction.commit().await.map_err(|err| err.to_string())?;
+    info!("Instance created");
     Ok(())
 }
 

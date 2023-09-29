@@ -9,6 +9,7 @@ pub mod utils;
 
 use appstate::AppState;
 use tauri::{Manager, State};
+use tauri_plugin_log::LogTarget;
 
 use tauri::SystemTrayEvent;
 mod tray;
@@ -23,6 +24,12 @@ struct Payload {
     args: Vec<String>,
     cwd: String,
 }
+
+#[macro_use]
+extern crate log;
+
+// Specify log targets
+const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
 
 // TODO: Refactor later
 #[allow(clippy::single_match)]
@@ -88,15 +95,23 @@ fn main() {
             app.emit_all("single-instance", Payload { args: argv, cwd })
                 .unwrap();
         }))
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .targets(LOG_TARGETS)
+                .build(),
+        )
         .manage(AppState::default())
         .setup(|app| {
             let handle = app.handle();
             tauri::async_runtime::spawn(async move {
+                debug!("Initializing database connection");
                 let app_state: State<AppState> = handle.state();
                 let db = database::init_db(&handle)
                     .await
-                    .expect("Database initialize failed");
+                    .expect("Database initialization failed");
                 *app_state.db.lock().unwrap() = Some(db);
+                info!("Database initialization completed");
+                info!("Starting main app thread.")
             });
             Ok(())
         })
