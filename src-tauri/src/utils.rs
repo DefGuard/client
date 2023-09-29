@@ -26,7 +26,8 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
         host.private_key = Some(private_key);
         let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
         let mut peer = Peer::new(peer_key);
-        let endpoint: SocketAddr = location.endpoint.parse()?;
+        println!("{}", location.endpoint);
+        let endpoint: SocketAddr = location.endpoint.parse().unwrap();
         peer.endpoint = Some(endpoint);
         peer.persistent_keepalive_interval = Some(25);
         let allowed_ips: Vec<String> = location
@@ -49,6 +50,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                     }
                 }
                 Err(err) => {
+                    println!("here2");
                     // Handle the error from IpAddrMask::from_str, if needed
                     eprintln!("Error parsing IP address {}: {}", allowed_ip, err);
                     // Continue to the next iteration of the loop
@@ -57,8 +59,8 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
             }
         }
         println!("{:#?}", peer);
-        api.write_host(&host).expect("Error writing host");
-        api.write_peer(&peer).expect("Error writing peer");
+        api.write_host(&host)?;
+        api.write_peer(&peer)?;
     };
 
     Ok(())

@@ -62,10 +62,10 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                     }
                     Err(e) => {
                         println!("Unexpected error quitting thread error: {}", e);
-                        break
+                        break;
                     }
                 }
-                sleep(Duration::from_secs(5)).await;
+                sleep(Duration::from_secs(60)).await;
             }
         });
     }
@@ -330,4 +330,20 @@ pub async fn all_connections(
     Connection::all_by_location_id(&app_state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn last_connection(
+    location_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<Connection, String> {
+    if let Some(connection) = Connection::latest_by_location_id(&app_state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())?
+    {
+        println!("Returning connection: {:#?}", connection);
+        Ok(connection)
+    } else {
+        Err("No connections for this device".into())
+    }
 }
