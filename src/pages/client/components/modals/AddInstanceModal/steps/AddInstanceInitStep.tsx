@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -84,8 +85,6 @@ export const AddInstanceModalInitStep = () => {
     };
 
     setModalState({ loading: true });
-    console.log(endpointUrl);
-
     fetch<EnrollmentStartResponse>(endpointUrl, {
       method: 'POST',
       headers,
@@ -96,6 +95,8 @@ export const AddInstanceModalInitStep = () => {
         if (!res.ok) {
           toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
           setModalState({ loading: false });
+          error(res.data);
+          error(res.status);
           return;
         }
         const r = res.data;
@@ -128,9 +129,10 @@ export const AddInstanceModalInitStep = () => {
                   LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
                 );
                 closeModal();
+                info('Configured device');
               })
               .catch((e) => {
-                console.error(e);
+                error(e);
                 toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
               });
           });
@@ -163,7 +165,7 @@ export const AddInstanceModalInitStep = () => {
       .catch((e) => {
         toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
         setModalState({ loading: false });
-        console.error(e);
+        error(e);
       });
   };
 

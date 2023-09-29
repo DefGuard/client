@@ -3,9 +3,9 @@ import { sortBy } from 'lodash-es';
 import { useMemo } from 'react';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
-import { ColorsRGB } from '../../../../shared/constants';
 import { NetworkSpeed } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/NetworkSpeed';
 import { NetworkDirection } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/types';
+import { useTheme } from '../../../../shared/defguard-ui/hooks/theme/useTheme';
 import { LocationStats } from '../../types';
 
 interface LocationUsageProps {
@@ -46,6 +46,7 @@ export const LocationUsageChart = ({
 }: LocationUsageProps) => {
   const [totalUpload, totalDownload] = useMemo(() => totalUploadDownload(data), [data]);
   const getFormattedData = useMemo(() => parseStatsForCharts(data), [data]);
+  const { colors } = useTheme();
   return (
     <div className="location-usage">
       <div className="summary">
@@ -72,8 +73,8 @@ export const LocationUsageChart = ({
             type="number"
             height={heightX}
             width={width}
-            axisLine={{ stroke: ColorsRGB.GrayBorder }}
-            tickLine={{ stroke: ColorsRGB.Transparent }}
+            axisLine={{ stroke: colors.surfaceDefaultModal }}
+            tickLine={{ stroke: colors.surfaceDefaultModal }}
             hide={hideX}
             padding={{ left: 0, right: 0 }}
             tick={{ fontSize: 10, color: '#000000' }}
@@ -86,8 +87,8 @@ export const LocationUsageChart = ({
             domain={['dataMin', 'dataMax']}
             padding={{ top: 0, bottom: 0 }}
           />
-          <Bar dataKey="download" fill={ColorsRGB.Primary} />
-          <Bar dataKey="upload" fill={ColorsRGB.Error} />
+          <Bar dataKey="download" fill={colors.surfaceMainPrimary} />
+          <Bar dataKey="upload" fill={colors.textAlert} />
         </BarChart>
       </ResponsiveContainer>
     </div>

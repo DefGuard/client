@@ -12,6 +12,7 @@ import { LocationsList } from './components/LocationsList/LocationsList';
 import { AddInstanceModal } from './components/modals/AddInstanceModal/AddInstanceModal';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
+import { error, info } from 'tauri-plugin-log-api';
 
 const { getInstances } = clientApi;
 
@@ -33,6 +34,10 @@ export const ClientPage = () => {
     refetchOnWindowFocus: false,
     onSuccess: (res) => {
       setInstances(res);
+      info('Retrieved instances');
+    },
+    onError: (err) => {
+      error(String(err));
     },
   });
 
