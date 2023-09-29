@@ -1,9 +1,7 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use wireguard_rs::{
-    netlink::{address_interface, create_interface},
-    wgapi::WGApi,
-    IpAddrMask, Key, Peer,
+    wgapi::WGApi, InterfaceConfiguration, IpAddrMask, Key, Peer, WireguardInterfaceApi,
 };
 
 use crate::{
@@ -16,18 +14,10 @@ use crate::{
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
     let interface_name = remove_whitespace(&location.name);
     debug!("Creating interface: {}", interface_name);
-    create_interface(&interface_name)?;
-    info!("Created interface: {}", interface_name);
-    address_interface(&interface_name, &IpAddrMask::from_str(&location.address)?)?;
-    info!("Adressed interface: {}", interface_name);
+    let api = WGApi::new(interface_name.clone(), false)?;
 
-    let api = WGApi::new(interface_name.clone(), false);
-
-    let mut host = api.read_host()?;
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
-        let private_key: Key = Key::from_str(&keys.prvkey).unwrap();
-        host.private_key = Some(private_key);
         let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
         let mut peer = Peer::new(peer_key);
         println!("{}", location.endpoint);
@@ -62,12 +52,21 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 }
             }
         }
-        api.write_host(&host)?;
-        api.write_peer(&peer)?;
-        info!("created peer {:#?}", peer);
-    };
+        if let Some((address, port)) = location.endpoint.split_once(":") {
+            let interface_config = InterfaceConfiguration {
+                name: interface_name.clone(),
+                prvkey: keys.prvkey,
+                address: address.into(),
+                port: port.parse().unwrap(),
+                peers: vec![peer],
+            };
+            info!("created interface {:#?}", interface_config);
+        };
 
-    Ok(())
+        return Ok(());
+    } else {
+        return Err(Error::IpAddrMask());
+    }
 }
 pub fn remove_whitespace(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()

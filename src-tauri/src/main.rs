@@ -14,7 +14,8 @@ use tauri_plugin_log::LogTarget;
 use tauri::SystemTrayEvent;
 mod tray;
 use crate::commands::{
-    all_instances, all_locations, connect, disconnect, location_stats, save_device_config, update_instance, last_connection,
+    all_instances, all_locations, connect, disconnect, last_connection, location_stats,
+    save_device_config, update_instance,
 };
 use crate::tray::create_tray_menu;
 
