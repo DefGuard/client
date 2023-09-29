@@ -13,7 +13,7 @@ use tauri::{Manager, State};
 use tauri::SystemTrayEvent;
 mod tray;
 use crate::commands::{
-    all_instances, all_locations, connect, disconnect, location_stats, save_device_config,
+    all_instances, all_locations, connect, disconnect, location_stats, save_device_config, update_instance
 };
 use crate::tray::create_tray_menu;
 
@@ -36,6 +36,7 @@ fn main() {
             all_instances,
             connect,
             disconnect,
+            update_instance,
             location_stats,
         ])
         .on_window_event(|event| match event.event() {

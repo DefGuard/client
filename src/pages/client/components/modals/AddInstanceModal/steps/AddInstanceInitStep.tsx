@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Body, fetch, Response } from '@tauri-apps/api/http';
+import { invoke } from '@tauri-apps/api/tauri';
 import dayjs from 'dayjs';
-import { isUndefined } from 'lodash-es';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -61,9 +61,6 @@ export const AddInstanceModalInitStep = () => {
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';
-      if (import.meta.env.DEV) {
-        return endpoint;
-      }
       let base: string;
       if (values.url[values.url.length - 1] === '/') {
         base = values.url.slice(0, -1);
@@ -75,7 +72,7 @@ export const AddInstanceModalInitStep = () => {
 
     const endpointUrl = url();
 
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
@@ -85,7 +82,7 @@ export const AddInstanceModalInitStep = () => {
 
     setModalState({ loading: true });
 
-    fetch(endpointUrl, {
+    fetch<EnrollmentStartResponse>(endpointUrl, {
       method: 'POST',
       headers,
       body: Body.json(data),
@@ -111,14 +108,28 @@ export const AddInstanceModalInitStep = () => {
         if (instance) {
           // update already registered instance instead
           headers['Cookie'] = authCookie;
-          const instanceInfo = await fetch(`${proxy_api_url}/enrollment/network_info`, {
+          fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
             body: Body.json({
               pubkey: instance.pubkey,
             }),
+          }).then(async (res) => {
+            invoke<void>('update_instance', {
+              instanceId: instance.id,
+              response: res.data,
+            })
+              .then(() => {
+                toaster.success(
+                  LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
+                );
+                closeModal();
+              })
+              .catch((e) => {
+                console.error(e);
+                toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
+              });
           });
-          return;
         }
         // register new instance
         // is user in need of full enrollment ?
