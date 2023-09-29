@@ -46,7 +46,6 @@ export const LocationUsageChart = ({
 }: LocationUsageProps) => {
   const [totalUpload, totalDownload] = useMemo(() => totalUploadDownload(data), [data]);
   const getFormattedData = useMemo(() => parseStatsForCharts(data), [data]);
-
   return (
     <div className="location-usage">
       <div className="summary">
@@ -74,10 +73,10 @@ export const LocationUsageChart = ({
             height={heightX}
             width={width}
             axisLine={{ stroke: ColorsRGB.GrayBorder }}
-            tickLine={{ stroke: ColorsRGB.GrayBorder }}
+            tickLine={{ stroke: ColorsRGB.Transparent }}
             hide={hideX}
             padding={{ left: 0, right: 0 }}
-            tick={{ fontSize: 10, color: ColorsRGB.GrayLight }}
+            tick={{ fontSize: 10, color: '#000000' }}
             tickFormatter={formatXTick}
             domain={['dataMin', 'dataMax']}
             interval={'preserveStartEnd'}

@@ -41,7 +41,7 @@ const GridItem = ({ location }: GridItemProps) => {
     },
     'no-info',
   );
-const { getLocationStats, getLastConnection } = clientApi;
+  const { getLocationStats, getLastConnection } = clientApi;
 
   const { data: connection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, location.id as number],
@@ -63,10 +63,17 @@ const { getLocationStats, getLastConnection } = clientApi;
       </div>
       {connection ? (
         <>
-        <div className="info">
-          <LocationCardInfo location={location} connection={connection} />
-        </div>
-        {locationStats ? <LocationUsageChart height={22} data={locationStats} /> : null}
+          <div className="info">
+            <LocationCardInfo location={location} connection={connection} />
+          </div>
+          {locationStats ? (
+            <LocationUsageChart
+              heightX={20}
+              height={50}
+              hideX={false}
+              data={locationStats}
+            />
+          ) : null}
         </>
       ) : (
         <p className="no-data">{LL.pages.client.locationNoData()}</p>

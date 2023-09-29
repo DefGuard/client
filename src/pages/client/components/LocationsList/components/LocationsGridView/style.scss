@@ -36,11 +36,12 @@
       display: flex;
       flex-direction: column;
       gap: 2;
+      height: 50px;
+      width: 100%;
       margin: auto;
       & > .summary {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 15px;
       }
     }
 
