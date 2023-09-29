@@ -1,12 +1,12 @@
 import dayjs from 'dayjs';
-import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-
-import { ColorsRGB } from '../../../../shared/constants';
-import { LocationStats } from '../../types';
 import { sortBy } from 'lodash-es';
 import { useMemo } from 'react';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+
+import { ColorsRGB } from '../../../../shared/constants';
 import { NetworkSpeed } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/NetworkSpeed';
 import { NetworkDirection } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/types';
+import { LocationStats } from '../../types';
 
 interface LocationUsageProps {
   data: LocationStats[];

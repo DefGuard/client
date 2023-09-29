@@ -1,17 +1,17 @@
 import './style.scss';
 
+import { useQuery } from '@tanstack/react-query';
 import classNames from 'classnames';
 
-import { useQuery } from '@tanstack/react-query';
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
-import { DefguardInstance, DefguardLocation, Connection } from '../../../../types';
-import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
-import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
-import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
-import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../query';
+import { Connection, DefguardInstance, DefguardLocation } from '../../../../types';
+import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
+import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
+import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
+import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
   instanceId: DefguardInstance['id'];

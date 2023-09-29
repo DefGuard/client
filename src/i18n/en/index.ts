@@ -77,6 +77,8 @@ const en = {
         lastConnected: 'Last connected',
         connectedFrom: 'Connected from',
         assignedIp: 'Assigned IP',
+        active: 'Active',
+        neverConnected: 'Never connected',
       },
       locationNoData:
         'This device was never connected to this location, connect to view statistics and information about connection',

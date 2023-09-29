@@ -18,7 +18,7 @@ import { DefguardLocation } from '../../../../types';
 const { connect, disconnect } = clientApi;
 
 type Props = {
-  location: DefguardLocation;
+  location?: DefguardLocation;
 };
 
 export const LocationCardConnectButton = ({ location }: Props) => {
@@ -27,18 +27,20 @@ export const LocationCardConnectButton = ({ location }: Props) => {
   const { LL } = useI18nContext();
 
   const cn = classNames('location-card-connect-button', {
-    connected: location.active,
+    connected: location?.active,
   });
 
   const handleClick = async () => {
     setIsLoading(true);
     try {
-      if (location.active) {
-        await disconnect({ locationId: location.id });
-      } else {
-        await connect({ locationId: location.id });
+      if (location) {
+        if (location?.active) {
+          await disconnect({ locationId: location.id });
+        } else {
+          await connect({ locationId: location?.id });
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     } catch (e) {
       setIsLoading(false);
       toaster.error(LL.common.messages.error());
@@ -50,12 +52,12 @@ export const LocationCardConnectButton = ({ location }: Props) => {
     <Button
       onClick={handleClick}
       className={cn}
-      icon={location.active ? <SvgIconX /> : <SvgIconCheckmarkSmall />}
+      icon={location?.active ? <SvgIconX /> : <SvgIconCheckmarkSmall />}
       size={ButtonSize.SMALL}
       styleVariant={ButtonStyleVariant.STANDARD}
       loading={isLoading}
       text={
-        location.active
+        location?.active
           ? LL.pages.client.controls.disconnect()
           : LL.pages.client.controls.connect()
       }

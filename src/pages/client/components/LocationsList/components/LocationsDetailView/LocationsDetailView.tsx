@@ -22,7 +22,7 @@ type Props = {
 
 const { getLocationStats, getLastConnection } = clientApi;
 
-export const LocationsDetailView = ({ instanceId, locations }: Props) => {
+export const LocationsDetailView = ({ locations }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
 
   const { data: locationStats } = useQuery({
@@ -51,9 +51,6 @@ export const LocationsDetailView = ({ instanceId, locations }: Props) => {
     locations: DefguardLocation[],
     id: number,
   ): DefguardLocation | undefined => locations.find((location) => location.id === id);
-
-  console.log(locationStats);
-  console.log(connection);
 
   return (
     <div id="locations-detail-view">

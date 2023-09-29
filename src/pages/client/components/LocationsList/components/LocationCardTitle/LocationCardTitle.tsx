@@ -8,18 +8,18 @@ import SvgIconConnection from '../../../../../../shared/defguard-ui/components/s
 import { DefguardLocation } from '../../../../types';
 
 type Props = {
-  location: DefguardLocation;
+  location?: DefguardLocation;
 };
 
 export const LocationCardTitle = ({ location }: Props) => {
   const cn = classNames('location-card-title', {
-    active: location.active,
+    active: location?.active,
   });
   return (
     <div className={cn}>
       <SvgIconConnection />
-      <span className="location-name">{location.name}</span>
-      <Badge text={location.address} styleVariant={BadgeStyleVariant.STANDARD} />
+      <span className="location-name">{location?.name}</span>
+      <Badge text={location?.address || ''} styleVariant={BadgeStyleVariant.STANDARD} />
     </div>
   );
 };
