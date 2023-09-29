@@ -31,6 +31,8 @@ export const LocationsList = ({ layoutType }: Props) => {
 
     listen('connection-changed', () => {
       queryClient.invalidateQueries([clientQueryKeys.getLocations]);
+      queryClient.invalidateQueries([clientQueryKeys.getConnections]);
+      queryClient.invalidateQueries([clientQueryKeys.getLocationStats]);
       queryClient.invalidateQueries([clientQueryKeys.getInstances]);
     }).then((c) => {
       cleanup = c;

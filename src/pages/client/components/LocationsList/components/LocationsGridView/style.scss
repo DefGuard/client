@@ -32,6 +32,17 @@
       align-items: flex-start;
       justify-content: space-between;
     }
+    & > .location-usage {
+      display: flex;
+      flex-direction: column;
+      gap: 2;
+      margin: auto;
+      & > .summary {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+    }
 
     & > .no-data {
       width: 100%;

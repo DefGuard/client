@@ -2,20 +2,27 @@
 
 #locations-detail-view {
   & > .card {
+    & > h2 {
+      @include typography(app-welcome-1);
+      color: var(--text-body-primary);
+    }
+    padding: 2rem 2rem;
     & > .header {
       display: flex;
-      padding: 2rem 2rem;
-      justify-content: space-between; /* or justify-content: space-around; for equal space around */
+      justify-content: space-between;
     }
     border-top-left-radius: 0;
     height: 800px;
+    width: 90%;
     & > .location-usage {
       display: flex;
+      flex-direction: column;
+      padding-top: 2rem;
       margin: auto;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      width: 100%;
+      & > .summary {
+        display: flex;
+        justify-content: space-between;
+      }
     }
   }
 

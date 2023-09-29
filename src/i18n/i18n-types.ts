@@ -194,6 +194,10 @@ type RootTranslation = {
 				 */
 				lastConnected: string
 				/**
+				 * C​o​n​n​e​c​t​e​d​ ​f​r​o​m
+				 */
+				connectedFrom: string
+				/**
 				 * A​s​s​i​g​n​e​d​ ​I​P
 				 */
 				assignedIp: string
@@ -835,6 +839,10 @@ export type TranslationFunctions = {
 				 * Last connected
 				 */
 				lastConnected: () => LocalizedString
+				/**
+				 * Connected from
+				 */
+				connectedFrom: () => LocalizedString
 				/**
 				 * Assigned IP
 				 */

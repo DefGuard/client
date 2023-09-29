@@ -23,10 +23,14 @@ const disconnect = async (data: ConnectionRequest): Promise<void> =>
 const getLocationStats = async (data: ConnectionRequest): Promise<LocationStats[]> =>
   invoke('location_stats', data);
 
+const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
+  invoke('last_connection', data);
+
 export const clientApi = {
   getInstances,
   getLocations,
   connect,
   disconnect,
   getLocationStats,
+  getLastConnection,
 };

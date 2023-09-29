@@ -13,13 +13,14 @@ import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageCha
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
+import { LocationConnectionHistory } from '../LocationConnectionHistory/LocationConnectionHistory';
 
 type Props = {
   instanceId: DefguardInstance['id'];
   locations: DefguardLocation[];
 };
 
-const { getLocationStats } = clientApi;
+const { getLocationStats, getLastConnection } = clientApi;
 
 export const LocationsDetailView = ({ instanceId, locations }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
@@ -27,6 +28,11 @@ export const LocationsDetailView = ({ instanceId, locations }: Props) => {
   const { data: locationStats } = useQuery({
     queryKey: [clientQueryKeys.getLocationStats, activeLocationId as number],
     queryFn: () => getLocationStats({ locationId: activeLocationId as number }),
+    enabled: !!activeLocationId,
+  });
+  const { data: connection } = useQuery({
+    queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
+    queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
   });
 
@@ -46,18 +52,25 @@ export const LocationsDetailView = ({ instanceId, locations }: Props) => {
     id: number,
   ): DefguardLocation | undefined => locations.find((location) => location.id === id);
 
+  console.log(locationStats);
+  console.log(connection);
+
   return (
     <div id="locations-detail-view">
       <CardTabs tabs={tabs} />
       <Card className="detail-card" hideMobile shaded>
         <div className="header">
           <LocationCardTitle location={findLocationById(locations, activeLocationId)} />
-          <LocationCardInfo location={findLocationById(locations, activeLocationId)} />
+          <LocationCardInfo
+            location={findLocationById(locations, activeLocationId)}
+            connection={connection}
+          />
           <LocationCardConnectButton
             location={findLocationById(locations, activeLocationId)}
           />
         </div>
-        {locationStats ? <LocationUsageChart data={locationStats} /> : null}
+        {locationStats ? <LocationUsageChart height={200} data={locationStats} /> : null}
+        <LocationConnectionHistory />
       </Card>
     </div>
   );

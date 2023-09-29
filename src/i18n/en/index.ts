@@ -75,6 +75,7 @@ const en = {
       connectionLabels: {
         lastConnectedFrom: 'Last connected from',
         lastConnected: 'Last connected',
+        connectedFrom: 'Connected from',
         assignedIp: 'Assigned IP',
       },
       locationNoData:

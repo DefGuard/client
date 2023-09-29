@@ -12,10 +12,16 @@
     display: flex;
     flex-flow: row;
     margin-bottom: 60px;
+    align-items: center;
 
     & > h1 {
       @include typography(app-title);
       color: var(--text-body-primary);
+      margin-right: 30px;
+    }
+    .select-container {
+      height: 40px;
+      width: 134px;
     }
   }
 }
