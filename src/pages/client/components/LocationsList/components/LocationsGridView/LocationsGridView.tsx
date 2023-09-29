@@ -7,7 +7,7 @@ import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../query';
-import { Connection, DefguardInstance, DefguardLocation } from '../../../../types';
+import { DefguardInstance, DefguardLocation } from '../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';

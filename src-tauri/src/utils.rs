@@ -20,6 +20,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
     info!("Created interface: {}", interface_name);
     address_interface(&interface_name, &IpAddrMask::from_str(&location.address)?)?;
     info!("Adressed interface: {}", interface_name);
+
     let api = WGApi::new(interface_name.clone(), false);
 
     let mut host = api.read_host()?;
@@ -54,9 +55,8 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                     }
                 }
                 Err(err) => {
-                    println!("here2");
                     // Handle the error from IpAddrMask::from_str, if needed
-                    eprintln!("Error parsing IP address {}: {}", allowed_ip, err);
+                    error!("Error parsing IP address {}: {}", allowed_ip, err);
                     // Continue to the next iteration of the loop
                     continue;
                 }

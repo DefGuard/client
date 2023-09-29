@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Body, fetch, Response } from '@tauri-apps/api/http';
+import { invoke } from '@tauri-apps/api/tauri';
 import dayjs from 'dayjs';
-import { isUndefined } from 'lodash-es';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,10 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import { EnrollmentStartResponse } from '../../../../../../shared/hooks/api/types';
+import {
+  CreateDeviceResponse,
+  EnrollmentStartResponse,
+} from '../../../../../../shared/hooks/api/types';
 import { routes } from '../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../clientAPI/clientApi';
@@ -72,7 +75,7 @@ export const AddInstanceModalInitStep = () => {
 
     const endpointUrl = url();
 
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
@@ -83,7 +86,7 @@ export const AddInstanceModalInitStep = () => {
     setModalState({ loading: true });
     console.log(endpointUrl);
 
-    fetch(endpointUrl, {
+    fetch<EnrollmentStartResponse>(endpointUrl, {
       method: 'POST',
       headers,
       body: Body.json(data),
@@ -103,21 +106,34 @@ export const AddInstanceModalInitStep = () => {
         if (proxy_api_url[proxy_api_url.length - 1] === '/') {
           proxy_api_url = proxy_api_url.slice(0, -1);
         }
-        console.log(proxy_api_url);
         proxy_api_url = proxy_api_url + '/api/v1';
         setModalState({ loading: false });
 
         if (instance) {
           // update already registered instance instead
           headers['Cookie'] = authCookie;
-          const instanceInfo = await fetch(`${proxy_api_url}/enrollment/network_info`, {
+          fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
             body: Body.json({
               pubkey: instance.pubkey,
             }),
+          }).then(async (res) => {
+            invoke<void>('update_instance', {
+              instanceId: instance.id,
+              response: res.data,
+            })
+              .then(() => {
+                toaster.success(
+                  LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
+                );
+                closeModal();
+              })
+              .catch((e) => {
+                console.error(e);
+                toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
+              });
           });
-          return;
         }
         // register new instance
         // is user in need of full enrollment ?
