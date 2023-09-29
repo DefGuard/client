@@ -15,8 +15,12 @@ use crate::{
 /// Setup client interface
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
     let interface_name = remove_whitespace(&location.name);
+    debug!("Creating interface: {}", interface_name);
     create_interface(&interface_name)?;
+    info!("Created interface: {}", interface_name);
     address_interface(&interface_name, &IpAddrMask::from_str(&location.address)?)?;
+    info!("Adressed interface: {}", interface_name);
+
     let api = WGApi::new(interface_name.clone(), false);
 
     let mut host = api.read_host()?;
@@ -26,7 +30,8 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
         host.private_key = Some(private_key);
         let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
         let mut peer = Peer::new(peer_key);
-        let endpoint: SocketAddr = location.endpoint.parse()?;
+        println!("{}", location.endpoint);
+        let endpoint: SocketAddr = location.endpoint.parse().unwrap();
         peer.endpoint = Some(endpoint);
         peer.persistent_keepalive_interval = Some(25);
         let allowed_ips: Vec<String> = location
@@ -34,6 +39,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
             .split(',')
             .map(str::to_string)
             .collect();
+        debug!("Routing allowed ips");
         for allowed_ip in allowed_ips {
             match IpAddrMask::from_str(&allowed_ip) {
                 Ok(addr) => {
@@ -50,7 +56,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 }
                 Err(err) => {
                     // Handle the error from IpAddrMask::from_str, if needed
-                    eprintln!("Error parsing IP address {}: {}", allowed_ip, err);
+                    error!("Error parsing IP address {}: {}", allowed_ip, err);
                     // Continue to the next iteration of the loop
                     continue;
                 }
@@ -58,6 +64,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
         }
         api.write_host(&host)?;
         api.write_peer(&peer)?;
+        info!("created peer {:#?}", peer);
     };
 
     Ok(())

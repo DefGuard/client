@@ -54,4 +54,23 @@ impl Connection {
         .await?;
         Ok(connections)
     }
+    pub async fn latest_by_location_id(
+        pool: &DbPool,
+        location_id: i64,
+    ) -> Result<Option<Self>, Error> {
+        let connection = query_as!(
+            Connection,
+            r#"
+            SELECT id, location_id, connected_from, start, end
+            FROM connection
+            WHERE location_id = $1
+            ORDER BY end DESC
+            LIMIT 1
+            "#,
+            location_id
+        )
+        .fetch_optional(pool)
+        .await?;
+        Ok(connection)
+    }
 }

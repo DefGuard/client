@@ -194,9 +194,21 @@ type RootTranslation = {
 				 */
 				lastConnected: string
 				/**
+				 * C​o​n​n​e​c​t​e​d​ ​f​r​o​m
+				 */
+				connectedFrom: string
+				/**
 				 * A​s​s​i​g​n​e​d​ ​I​P
 				 */
 				assignedIp: string
+				/**
+				 * A​c​t​i​v​e
+				 */
+				active: string
+				/**
+				 * N​e​v​e​r​ ​c​o​n​n​e​c​t​e​d
+				 */
+				neverConnected: string
 			}
 			/**
 			 * T​h​i​s​ ​d​e​v​i​c​e​ ​w​a​s​ ​n​e​v​e​r​ ​c​o​n​n​e​c​t​e​d​ ​t​o​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​,​ ​c​o​n​n​e​c​t​ ​t​o​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​a​n​d​ ​i​n​f​o​r​m​a​t​i​o​n​ ​a​b​o​u​t​ ​c​o​n​n​e​c​t​i​o​n
@@ -836,9 +848,21 @@ export type TranslationFunctions = {
 				 */
 				lastConnected: () => LocalizedString
 				/**
+				 * Connected from
+				 */
+				connectedFrom: () => LocalizedString
+				/**
 				 * Assigned IP
 				 */
 				assignedIp: () => LocalizedString
+				/**
+				 * Active
+				 */
+				active: () => LocalizedString
+				/**
+				 * Never connected
+				 */
+				neverConnected: () => LocalizedString
 			}
 			/**
 			 * This device was never connected to this location, connect to view statistics and information about connection

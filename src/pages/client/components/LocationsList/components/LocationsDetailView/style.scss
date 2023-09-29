@@ -1,12 +1,30 @@
 @use '@scssutils' as *;
 
-#locations-grid-view {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(445px, 1fr));
-  grid-auto-rows: auto;
-  gap: 50px;
-  justify-content: start;
-  align-content: start;
+#locations-detail-view {
+  & > .card {
+    & > h2 {
+      @include typography(app-welcome-1);
+      color: var(--text-body-primary);
+    }
+    padding: 2rem 2rem;
+    & > .header {
+      display: flex;
+      justify-content: space-between;
+    }
+    border-top-left-radius: 0;
+    height: 800px;
+    width: 90%;
+    & > .location-usage {
+      display: flex;
+      flex-direction: column;
+      padding-top: 2rem;
+      margin: auto;
+      & > .summary {
+        display: flex;
+        justify-content: space-between;
+      }
+    }
+  }
 
   & > .grid-item {
     box-sizing: border-box;
@@ -31,18 +49,6 @@
       flex-flow: row;
       align-items: flex-start;
       justify-content: space-between;
-    }
-    & > .location-usage {
-      display: flex;
-      flex-direction: column;
-      gap: 2;
-      height: 50px;
-      width: 100%;
-      margin: auto;
-      & > .summary {
-        display: flex;
-        justify-content: space-between;
-      }
     }
 
     & > .no-data {

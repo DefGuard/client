@@ -5,11 +5,15 @@ import { useEffect } from 'react';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
+import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 
 const { getLocations } = clientApi;
 
-export const LocationsList = () => {
+type Props = {
+  layoutType: string;
+};
+export const LocationsList = ({ layoutType }: Props) => {
   const selectedInstance = useClientStore((state) => state.selectedInstance);
 
   const queryClient = useQueryClient();
@@ -27,6 +31,8 @@ export const LocationsList = () => {
 
     listen('connection-changed', () => {
       queryClient.invalidateQueries([clientQueryKeys.getLocations]);
+      queryClient.invalidateQueries([clientQueryKeys.getConnections]);
+      queryClient.invalidateQueries([clientQueryKeys.getLocationStats]);
       queryClient.invalidateQueries([clientQueryKeys.getInstances]);
     }).then((c) => {
       cleanup = c;
@@ -42,7 +48,11 @@ export const LocationsList = () => {
 
   return (
     <>
-      <LocationsGridView locations={locations} instanceId={selectedInstance} />
+      {layoutType === 'GRID' ? (
+        <LocationsGridView locations={locations} instanceId={selectedInstance} />
+      ) : (
+        <LocationsDetailView locations={locations} instanceId={selectedInstance} />
+      )}
     </>
   );
 };

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api';
 import { Body, fetch } from '@tauri-apps/api/http';
 import { useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import { error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -76,6 +77,7 @@ export const AddInstanceDeviceStep = () => {
         if (!r.ok) {
           setIsLoading(false);
           toaster.error(LL.common.messages.error());
+          error('Failed to create device check enrollment and defguard logs');
           throw Error('Failed to create device');
         }
         const deviceResp = r.data as CreateDeviceResponse;
@@ -88,12 +90,14 @@ export const AddInstanceDeviceStep = () => {
             toaster.success(componentLL.messages.success.add());
             queryClient.invalidateQueries([clientQueryKeys.getInstances]);
             queryClient.invalidateQueries([clientQueryKeys.getLocations]);
+            info('Config saved');
             close();
           })
           .catch((e) => {
             toaster.error(LL.common.messages.error());
             setIsLoading(false);
             close();
+            error(e);
             console.error(e);
           });
       });

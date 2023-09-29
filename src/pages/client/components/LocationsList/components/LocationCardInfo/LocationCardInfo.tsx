@@ -1,28 +1,39 @@
 import './style.scss';
 
+import dayjs from 'dayjs';
+
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
-import { DefguardLocation } from '../../../../types';
+import { Connection, DefguardLocation } from '../../../../types';
 
 type Props = {
-  location: DefguardLocation;
+  location?: DefguardLocation;
+  connection?: Connection;
 };
 
-export const LocationCardInfo = ({ location }: Props) => {
+export const LocationCardInfo = ({ location, connection }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.connectionLabels;
   return (
     <>
       <div className="location-card-info-from">
-        <label>{localLL.lastConnectedFrom()}:</label>
-        <p>placeholder host ip</p>
+        <label>
+          {location?.active ? localLL.connectedFrom() : localLL.lastConnectedFrom()}:
+        </label>
+        <p>{connection ? connection.connected_from : 'Never connected'}</p>
       </div>
       <div className="location-card-info-connected">
         <label>{localLL.lastConnected()}:</label>
-        <p>placeholder</p>
+        <p>
+          {location?.active
+            ? localLL.active()
+            : connection
+            ? dayjs.utc(connection.end).local().format('DD-MM-YYYY')
+            : localLL.neverConnected()}
+        </p>
       </div>
       <div className="location-card-info-ip">
         <label>{localLL.assignedIp()}:</label>
-        <p>Placeholder</p>
+        <p>{location?.address}</p>
       </div>
     </>
   );
