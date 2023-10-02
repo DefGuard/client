@@ -37,6 +37,7 @@ tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", br
 local-ip-address = "0.5.5"
 tokio = { version = "1.32", features = ["full"] }
 log = "0.4.20"
+rand = "0.8.5"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

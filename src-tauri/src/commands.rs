@@ -37,7 +37,10 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
         let address = local_ip().map_err(|err| err.to_string())?;
         let connection = Connection::new(location_id, address.to_string());
         state.active_connections.lock().unwrap().push(connection);
-        debug!("Active connections: {:#?}", state.active_connections.lock().unwrap());
+        debug!(
+            "Active connections: {:#?}",
+            state.active_connections.lock().unwrap()
+        );
         handle
             .emit_all(
                 "connection-changed",
@@ -61,11 +64,21 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                     .await
                                     .map_err(|err| err.to_string())
                                     .unwrap();
+                            debug!("Saving location stats: {:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
+                            debug!("Saved location stats: {:#?}", location_stats);
                         }
                     }
-                    Err(_) => {
-                        debug!("Stopped stats thread for location: {}", location.name);
+                    Err(e) => {
+                        error!(
+                            "Error {} while reading data for interface: {}",
+                            e, location.name
+                        );
+                        debug!(
+                            "Stopped stats thread for location: {}. Error: {}",
+                            location.name,
+                            e.to_string()
+                        );
                         break;
                     }
                 }

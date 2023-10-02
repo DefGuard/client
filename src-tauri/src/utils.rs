@@ -14,6 +14,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
     let interface_name = remove_whitespace(&location.name);
     debug!("Creating interface: {}", interface_name);
     let api = WGApi::new(interface_name.clone(), false)?;
+    api.create_interface()?;
 
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
@@ -49,24 +50,34 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                 }
             }
         }
-        if let Some((address, port)) = location.endpoint.split_once(':') {
+        if let Some(port) = find_random_free_port() {
             let interface_config = InterfaceConfiguration {
                 name: interface_name.clone(),
                 prvkey: keys.prvkey,
-                address: address.into(),
-                port: port.parse().unwrap(),
-                peers: vec![peer],
+                address: location.address.clone(),
+                port: port.into(),
+                peers: vec![peer.clone()],
             };
             debug!("Creating interface {:#?}", interface_config);
-            api.configure_interface(&interface_config)?;
-            info!("created interface {:#?}", interface_config);
-            Ok(())
+            if let Err(err) = api.configure_interface(&interface_config) {
+                error!("Failed to configure interface: {}", err.to_string());
+                Err(Error::InternalError)
+            } else {
+                if let Err(err) = api.configure_peer(&peer) {
+                    error!("Failed to configure peer: {}", err.to_string());
+                    return Err(Error::InternalError);
+                }
+                info!("created interface {:#?}", interface_config);
+                Ok(())
+            }
         } else {
-            error!("Failed to parse location endpoint: {}", location.endpoint);
+            error!("Error finding free port");
             Err(Error::InternalError)
         }
     } else {
         error!("No keys found for instance: {}", location.instance_id);
+        error!("Removing interface: {}", location.name);
+        api.remove_interface()?;
         Err(Error::InternalError)
     }
 }
@@ -97,4 +108,31 @@ fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Erro
         ])
         .output()?;
     Ok(())
+}
+
+use std::net::TcpListener;
+
+fn find_random_free_port() -> Option<u16> {
+    const MAX_PORT: u16 = 65535;
+    const MIN_PORT: u16 = 6000;
+
+    // Create a TcpListener to check for port availability
+    for _ in 0..(MAX_PORT - MIN_PORT + 1) {
+        let port = rand::random::<u16>() % (MAX_PORT - MIN_PORT) + MIN_PORT;
+        if is_port_free(port) {
+            return Some(port);
+        }
+    }
+
+    None // No free port found in the specified range
+}
+
+fn is_port_free(port: u16) -> bool {
+    if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", port)) {
+        // Port is available; close the listener
+        drop(listener);
+        true
+    } else {
+        false
+    }
 }
