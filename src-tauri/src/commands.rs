@@ -1,7 +1,7 @@
 use crate::{
     database::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
-        Connection, Instance, Location, LocationStats, WireguardKeys,
+        Connection, Instance, Location, LocationStats, WireguardKeys, ConnectionInfo,
     },
     utils::{remove_whitespace, setup_interface},
     AppState,
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use tokio;
 use tokio::time::{sleep, Duration};
-use wireguard_rs::{netlink::delete_interface, wgapi::WGApi, WireguardInterfaceApi};
+use defguard_wireguard_rs::{netlink::delete_interface, WGApi, WireguardInterfaceApi};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -50,6 +50,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             )
             .unwrap();
         // Spawn stats threads
+        // TODO: Move to seperate function later
         let api =
             WGApi::new(remove_whitespace(&location.name), false).map_err(|e| e.to_string())?;
         tokio::spawn(async move {
@@ -347,8 +348,8 @@ pub async fn location_stats(
 pub async fn all_connections(
     location_id: i64,
     app_state: State<'_, AppState>,
-) -> Result<Vec<Connection>, String> {
-    Connection::all_by_location_id(&app_state.get_pool(), location_id)
+) -> Result<Vec<ConnectionInfo>, String> {
+    ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())
 }

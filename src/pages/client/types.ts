@@ -27,6 +27,8 @@ export type Connection = {
   id: number;
   location_id: number;
   connected_from: string;
-  start: number;
-  end: number;
+  start: string;
+  end: string;
+  upload?: number;
+  download?: number;
 };

@@ -41,7 +41,7 @@ export const LocationUsageChart = ({
   height = 300,
   width = 900,
   hideX = false,
-  barSize = 2,
+  barSize = 10,
   heightX = 50,
 }: LocationUsageProps) => {
   const [totalUpload, totalDownload] = useMemo(() => totalUploadDownload(data), [data]);
@@ -80,15 +80,15 @@ export const LocationUsageChart = ({
             tick={{ fontSize: 10, color: '#000000' }}
             tickFormatter={formatXTick}
             domain={['dataMin', 'dataMax']}
-            interval={'preserveStartEnd'}
+            interval={'preserveEnd'}
           />
           <YAxis
             hide={true}
             domain={['dataMin', 'dataMax']}
             padding={{ top: 0, bottom: 0 }}
           />
-          <Bar dataKey="download" fill={colors.surfaceMainPrimary} />
-          <Bar dataKey="upload" fill={colors.textAlert} />
+          <Bar barSize={barSize} dataKey="download" fill={colors.surfaceMainPrimary} />
+          <Bar barSize={barSize} dataKey="upload" fill={colors.textAlert} />
         </BarChart>
       </ResponsiveContainer>
     </div>

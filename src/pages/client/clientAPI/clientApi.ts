@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api';
 
-import { DefguardInstance, DefguardLocation, LocationStats } from '../types';
+import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '../types';
 
 const getInstances = async (): Promise<DefguardInstance[]> => invoke('all_instances');
 
@@ -26,6 +26,9 @@ const getLocationStats = async (data: ConnectionRequest): Promise<LocationStats[
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
   invoke('last_connection', data);
 
+const getConnectionHistory = async (data: ConnectionRequest): Promise<Connection[]> =>
+  invoke('all_connections', data);
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -33,4 +36,5 @@ export const clientApi = {
   disconnect,
   getLocationStats,
   getLastConnection,
+  getConnectionHistory,
 };

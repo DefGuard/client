@@ -23,7 +23,6 @@ sqlx = { version = "0.7.1", features = ["chrono", "sqlite", "runtime-tokio", "uu
 dirs = "5.0.1"
 thiserror = "1.0.48"
 chrono = { version = "0.4", features = ["serde"] }
-wireguard_rs = { path = "wireguard-rs"}
 base64 = "0.21.4"
 x25519-dalek = { version = "2", features = [
     "getrandom",
@@ -38,6 +37,7 @@ local-ip-address = "0.5.5"
 tokio = { version = "1.32", features = ["full"] }
 log = "0.4.20"
 rand = "0.8.5"
+defguard_wireguard_rs = "0.2.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

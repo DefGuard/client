@@ -1,10 +1,10 @@
 use std::net::AddrParseError;
 
 use base64;
+use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
 use local_ip_address::Error as LocalIpError;
 use sqlx;
 use thiserror::Error;
-use wireguard_rs::{error::WireguardInterfaceError, IpAddrParseError};
 
 #[derive(Debug, Error)]
 pub enum Error {
