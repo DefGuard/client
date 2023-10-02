@@ -270,12 +270,6 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
-
-[[package]]
-name = "base64"
 version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ba43ea6f343b788c8764558649e08df62f86c6ef251fdaeb1ffd010a9ae50a2"
@@ -789,6 +783,7 @@ dependencies = [
  "log",
  "prost",
  "prost-build",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "sqlx",
@@ -2420,7 +2415,18 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset 0.7.1",
- "pin-utils",
+]
+
+[[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.4.0",
+ "cfg-if",
+ "libc",
+ "memoffset 0.9.0",
 ]
 
 [[package]]
@@ -5251,16 +5257,16 @@ dependencies = [
 name = "wireguard_rs"
 version = "0.1.0"
 dependencies = [
- "base64 0.20.0",
+ "base64 0.21.4",
  "log",
  "netlink-packet-core",
  "netlink-packet-generic",
  "netlink-packet-route",
+ "netlink-packet-utils",
  "netlink-packet-wireguard",
  "netlink-sys",
- "nix",
+ "nix 0.27.1",
  "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -5349,7 +5355,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2769203cd13a0c6015d515be729c526d041e9cf2c0cc478d57faee85f40c6dcd"
 dependencies = [
- "nix",
+ "nix 0.26.4",
  "winapi",
 ]
 
@@ -5377,7 +5383,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "hex",
- "nix",
+ "nix 0.26.4",
  "once_cell",
  "ordered-stream",
  "rand 0.8.5",

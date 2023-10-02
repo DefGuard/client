@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use tokio;
 use tokio::time::{sleep, Duration};
-use wireguard_rs::{netlink::delete_interface, wgapi::WGApi};
+use wireguard_rs::{netlink::delete_interface, wgapi::WGApi, WireguardInterfaceApi};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -37,7 +37,10 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
         let address = local_ip().map_err(|err| err.to_string())?;
         let connection = Connection::new(location_id, address.to_string());
         state.active_connections.lock().unwrap().push(connection);
-        println!("{:#?}", state.active_connections.lock().unwrap());
+        debug!(
+            "Active connections: {:#?}",
+            state.active_connections.lock().unwrap()
+        );
         handle
             .emit_all(
                 "connection-changed",
@@ -47,11 +50,12 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             )
             .unwrap();
         // Spawn stats threads
-        let api = WGApi::new(remove_whitespace(&location.name), false);
+        let api =
+            WGApi::new(remove_whitespace(&location.name), false).map_err(|e| e.to_string())?;
         tokio::spawn(async move {
             let state = handle.state::<AppState>();
             loop {
-                match api.read_host() {
+                match api.read_interface_data() {
                     Ok(host) => {
                         let peers = host.peers;
                         for (_, peer) in peers {
@@ -60,11 +64,21 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                     .await
                                     .map_err(|err| err.to_string())
                                     .unwrap();
+                            debug!("Saving location stats: {:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
+                            debug!("Saved location stats: {:#?}", location_stats);
                         }
                     }
-                    Err(_) => {
-                        debug!("Stopped stats thread for location: {}", location.name);
+                    Err(e) => {
+                        error!(
+                            "Error {} while reading data for interface: {}",
+                            e, location.name
+                        );
+                        debug!(
+                            "Stopped stats thread for location: {}. Error: {}",
+                            location.name,
+                            e.to_string()
+                        );
                         break;
                     }
                 }
@@ -181,7 +195,7 @@ pub async fn save_device_config(
             .map_err(|err| err.to_string())?;
     }
     transaction.commit().await.map_err(|err| err.to_string())?;
-    info!("Instance created");
+    info!("Instance created.");
     Ok(())
 }
 
@@ -272,6 +286,7 @@ pub async fn update_instance(
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
+    debug!("Received following response: {:#?}", response);
     let instance = Instance::find_by_id(&app_state.get_pool(), instance_id)
         .await
         .map_err(|err| err.to_string())?;
@@ -312,6 +327,7 @@ pub async fn update_instance(
             }
         }
         transaction.commit().await.map_err(|err| err.to_string())?;
+        info!("Updated instance.");
         Ok(())
     } else {
         Err("Instance not found".into())
@@ -346,9 +362,10 @@ pub async fn last_connection(
         .await
         .map_err(|err| err.to_string())?
     {
-        println!("Returning connection: {:#?}", connection);
+        debug!("Returning last connection: {:#?}", connection);
         Ok(connection)
     } else {
+        error!("No connections for location: {}", location_id);
         Err("No connections for this device".into())
     }
 }
