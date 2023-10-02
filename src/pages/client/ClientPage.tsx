@@ -25,7 +25,7 @@ export const ClientPage = () => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client;
   const setInstances = useClientStore((state) => state.setInstances);
-  const [layoutType, setLayoutType] = useState(LayoutType.DETAIL);
+  const [layoutType, setLayoutType] = useState(LayoutType.GRID);
 
   useQuery({
     queryKey: [clientQueryKeys.getInstances],
