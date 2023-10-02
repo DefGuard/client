@@ -26,4 +26,6 @@ pub enum Error {
     AddrParse(#[from] AddrParseError),
     #[error("Local Ip Error")]
     LocalIpError(#[from] LocalIpError),
+    #[error("Internal error")]
+    InternalError,
 }
