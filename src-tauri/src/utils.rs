@@ -1,4 +1,7 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::{
+    net::{SocketAddr, TcpListener},
+    str::FromStr,
+};
 
 use wireguard_rs::{
     wgapi::WGApi, InterfaceConfiguration, IpAddrMask, Key, Peer, WireguardInterfaceApi,
@@ -12,8 +15,9 @@ use crate::{
 /// Setup client interface
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
     let interface_name = remove_whitespace(&location.name);
-    debug!("Creating interface: {}", interface_name);
-    let api = WGApi::new(interface_name.clone(), false)?;
+    debug!("Creating new interface: {}", interface_name);
+    let api = create_api(&interface_name)?;
+
     api.create_interface()?;
 
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
@@ -110,8 +114,6 @@ fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Erro
     Ok(())
 }
 
-use std::net::TcpListener;
-
 fn find_random_free_port() -> Option<u16> {
     const MAX_PORT: u16 = 65535;
     const MIN_PORT: u16 = 6000;
@@ -135,4 +137,9 @@ fn is_port_free(port: u16) -> bool {
     } else {
         false
     }
+}
+
+pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
+    let is_macos = cfg!(target_os = "macos");
+    Ok(WGApi::new(interface_name.to_string(), is_macos)?)
 }
