@@ -1,4 +1,4 @@
-name: 'test-pr'
+name: 'Build'
 
 on:
   push:
@@ -73,6 +73,6 @@ jobs:
         with:
           name: macos
           path: |
-            src-tauri/target/release/bundle/*.dmg
-            src-tauri/target/release/bundle/*.app
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/app/*.app
           retention-days: 1
