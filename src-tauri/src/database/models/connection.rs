@@ -98,7 +98,7 @@ impl ConnectionInfo {
               c.start as "start!",
               c.end as "end!",
               COALESCE((
-                  SELECT SUM(CAST(ls.upload AS INTEGER))
+                  SELECT SUM(COALESCE(ls.upload, 0))
                   FROM location_stats AS ls
                   WHERE ls.location_id = c.location_id
                   AND ls.collected_at >= c.start
