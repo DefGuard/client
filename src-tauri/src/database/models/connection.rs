@@ -118,7 +118,6 @@ impl ConnectionInfo {
         .fetch_all(pool)
         .await?;
 
-
         Ok(connections)
     }
 }

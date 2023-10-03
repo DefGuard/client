@@ -4,13 +4,15 @@ use std::{
 };
 
 use defguard_wireguard_rs::{
-    WGApi, InterfaceConfiguration, net::IpAddrMask, key::Key, host::Peer, WireguardInterfaceApi,
+    host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 
 use crate::{
     database::{DbPool, Location, WireguardKeys},
     error::Error,
 };
+
+pub static IS_MACOS: bool = cfg!(target_os = "macos");
 
 /// Setup client interface
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
@@ -140,6 +142,5 @@ fn is_port_free(port: u16) -> bool {
 }
 
 pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
-    let is_macos = cfg!(target_os = "macos");
-    Ok(WGApi::new(interface_name.to_string(), is_macos)?)
+    Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }

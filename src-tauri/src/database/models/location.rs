@@ -3,8 +3,8 @@ use sqlx::{query, query_as, Error as SqlxError, FromRow};
 use std::time::SystemTime;
 
 use crate::{database::DbPool, error::Error};
-use serde::{Deserialize, Serialize};
 use defguard_wireguard_rs::host::Peer;
+use serde::{Deserialize, Serialize};
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct Location {
