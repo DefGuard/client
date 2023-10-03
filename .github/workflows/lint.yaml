@@ -1,48 +1,48 @@
-#name: 'lint'
+name: 'lint'
 
-#on:
-  #push:
-    #branches:
-      #- main
-      #- dev
+on:
+  push:
+    branches:
+      - main
+      - dev
 
-  #pull_request:
-    #branches:
-      #- main
-      #- dev
+  pull_request:
+    branches:
+      - main
+      - dev
 
-#jobs:
-  #lint-web:
-    #runs-on: self-hosted
+jobs:
+  lint-web:
+    runs-on: self-hosted
 
-    #steps:
-      #- uses: actions/checkout@v4
-        #with:
-          #submodules: 'recursive'
-      #- uses: actions/setup-node@v3
-        #with:
-          #node-version: '20'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
 
-      #- uses: pnpm/action-setup@v2
-        #with:
-          #version: 8
-          #run_install: false
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
 
-      #- name: Get pnpm store directory
-        #shell: bash
-        #run: |
-          #echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      #- uses: actions/cache@v3
-        #name: Setup pnpm cache
-        #with:
-          #path: ${{ env.STORE_PATH }}
-          #key: ${{ runner.os }}-pnpm-lint-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          #restore-keys: |
-            #${{ runner.os }}-pnpm-lint-store-
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-lint-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-lint-store-
 
-      #- name: Install deps
-        #run: pnpm install --frozen-lockfile
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
 
-      #- name: Lint
-        #run: pnpm lint
+      - name: Lint
+        run: pnpm lint
