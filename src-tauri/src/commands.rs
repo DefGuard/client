@@ -50,9 +50,9 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             )
             .unwrap();
         // Spawn stats threads
-        // TODO: Move to seperate function later
+
         let api =
-            WGApi::new(remove_whitespace(&location.name), false).map_err(|e| e.to_string())?;
+            WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
         tokio::spawn(async move {
             let state = handle.state::<AppState>();
             loop {
