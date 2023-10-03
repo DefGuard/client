@@ -71,7 +71,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
           />
         </div>
         {locationStats ? (
-          <LocationUsageChart height={200} barSize={2} data={locationStats} />
+          <LocationUsageChart height={200} barSize={4} data={locationStats} />
         ) : null}
         {connectionHistory ? (
           <LocationConnectionHistory connections={connectionHistory} />

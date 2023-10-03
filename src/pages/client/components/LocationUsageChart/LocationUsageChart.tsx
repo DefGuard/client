@@ -1,7 +1,14 @@
 import dayjs from 'dayjs';
 import { sortBy } from 'lodash-es';
 import { useMemo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  ComposedChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import { NetworkSpeed } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/NetworkSpeed';
 import { NetworkDirection } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/types';
@@ -14,6 +21,7 @@ interface LocationUsageProps {
   height?: number;
   hideX?: boolean;
   barSize?: number;
+  barGap?: number;
   heightX?: number;
 }
 
@@ -41,7 +49,8 @@ export const LocationUsageChart = ({
   height = 300,
   width = 900,
   hideX = false,
-  barSize = 10,
+  barSize = 5,
+  barGap = 2,
   heightX = 50,
 }: LocationUsageProps) => {
   const [totalUpload, totalDownload] = useMemo(() => totalUploadDownload(data), [data]);
@@ -60,12 +69,10 @@ export const LocationUsageChart = ({
       </div>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart
-          height={height}
-          width={width}
           data={getFormattedData}
           margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
-          barGap={2}
           barSize={barSize}
+          barGap={barGap}
         >
           <XAxis
             dataKey="collected_at"
@@ -87,8 +94,8 @@ export const LocationUsageChart = ({
             domain={['dataMin', 'dataMax']}
             padding={{ top: 0, bottom: 0 }}
           />
-          <Bar barSize={barSize} dataKey="download" fill={colors.surfaceMainPrimary} />
-          <Bar barSize={barSize} dataKey="upload" fill={colors.textAlert} />
+          <Bar dataKey="download" fill={colors.surfaceMainPrimary} />
+          <Bar dataKey="upload" fill={colors.textAlert} />
         </BarChart>
       </ResponsiveContainer>
     </div>
