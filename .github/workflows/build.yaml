@@ -52,8 +52,8 @@ jobs:
       - name: install linux deps
         if: matrix.platform == 'Linux'
         run: |
-          apt-get update
-          apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,5 +74,5 @@ jobs:
           name: macos
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/app/*.app
+            src-tauri/target/release/bundle/macos/*.app
           retention-days: 1
