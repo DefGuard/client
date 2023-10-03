@@ -66,11 +66,7 @@ export type DeviceConfig = {
 export type CreateDeviceResponse = {
   device: Device;
   configs: DeviceConfig[];
-  instance: {
-    id: string;
-    name: string;
-    url: string;
-  };
+  instance: DefguardInstance;
 };
 
 export type AppInfo = {
