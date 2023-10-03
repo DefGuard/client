@@ -1,18 +1,18 @@
 use crate::{
     database::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
-        Connection, Instance, Location, LocationStats, WireguardKeys, ConnectionInfo,
+        Connection, ConnectionInfo, Instance, Location, LocationStats, WireguardKeys,
     },
-    utils::{remove_whitespace, setup_interface},
+    utils::{remove_whitespace, setup_interface, IS_MACOS},
     AppState,
 };
 use chrono::Utc;
+use defguard_wireguard_rs::{WGApi, WireguardInterfaceApi};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use tokio;
 use tokio::time::{sleep, Duration};
-use defguard_wireguard_rs::{netlink::delete_interface, WGApi, WireguardInterfaceApi};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -50,9 +50,9 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             )
             .unwrap();
         // Spawn stats threads
-        // TODO: Move to seperate function later
+
         let api =
-            WGApi::new(remove_whitespace(&location.name), false).map_err(|e| e.to_string())?;
+            WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
         tokio::spawn(async move {
             let state = handle.state::<AppState>();
             loop {
@@ -97,7 +97,9 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
         .await
         .map_err(|err| err.to_string())?
     {
-        delete_interface(&remove_whitespace(&location.name)).map_err(|err| err.to_string())?;
+        let api =
+            WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
+        api.remove_interface().map_err(|err| err.to_string())?;
         if let Some(mut connection) = state.find_and_remove_connection(location_id) {
             connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
             connection
