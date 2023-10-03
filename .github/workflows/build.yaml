@@ -12,14 +12,13 @@ on:
       - dev
 
 jobs:
-  test-tauri:
+  build:
     strategy:
       fail-fast: false
       matrix:
         platform: [macOS, Linux]
 
     runs-on: ${{ matrix.platform }}
-    container: rust:1.72
     steps:
       - uses: actions/checkout@v4
         with:
