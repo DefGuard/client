@@ -70,7 +70,6 @@ const GridItem = ({ location }: GridItemProps) => {
             <LocationUsageChart
               heightX={20}
               height={50}
-              barGap={8}
               hideX={false}
               data={locationStats}
             />
