@@ -16,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
 
-    runs-on: self-hosted
+    runs-on: Linux
+    container: rust:1.72
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,8 +50,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: install system deps
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          apt-get update
+          apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

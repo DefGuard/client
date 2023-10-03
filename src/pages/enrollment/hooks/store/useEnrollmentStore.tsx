@@ -3,12 +3,7 @@ import { Subject } from 'rxjs';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import {
-  AdminInfo,
-  Device,
-  DeviceConfig,
-  UserInfo,
-} from '../../../../shared/hooks/api/types';
+import { AdminInfo, UserInfo } from '../../../../shared/hooks/api/types';
 
 const defaultValues: StoreValues = {
   // assume default dev

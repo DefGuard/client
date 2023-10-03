@@ -20,7 +20,7 @@ type Props = {
   locations: DefguardLocation[];
 };
 
-const { getLocationStats, getLastConnection } = clientApi;
+const { getLocationStats, getLastConnection, getConnectionHistory } = clientApi;
 
 export const LocationsDetailView = ({ locations }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
@@ -33,6 +33,11 @@ export const LocationsDetailView = ({ locations }: Props) => {
   const { data: connection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
+    enabled: !!activeLocationId,
+  });
+  const { data: connectionHistory } = useQuery({
+    queryKey: [clientQueryKeys.getConnectionHistory, activeLocationId as number],
+    queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
   });
 
@@ -51,7 +56,6 @@ export const LocationsDetailView = ({ locations }: Props) => {
     locations: DefguardLocation[],
     id: number,
   ): DefguardLocation | undefined => locations.find((location) => location.id === id);
-
   return (
     <div id="locations-detail-view">
       <CardTabs tabs={tabs} />
@@ -66,8 +70,12 @@ export const LocationsDetailView = ({ locations }: Props) => {
             location={findLocationById(locations, activeLocationId)}
           />
         </div>
-        {locationStats ? <LocationUsageChart height={200} data={locationStats} /> : null}
-        <LocationConnectionHistory />
+        {locationStats ? (
+          <LocationUsageChart height={200} barSize={4} data={locationStats} />
+        ) : null}
+        {connectionHistory ? (
+          <LocationConnectionHistory connections={connectionHistory} />
+        ) : null}
       </Card>
     </div>
   );

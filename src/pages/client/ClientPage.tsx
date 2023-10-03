@@ -2,6 +2,7 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { error, info } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../i18n/i18n-react';
 import { Select } from '../../shared/defguard-ui/components/Layout/Select/Select';
@@ -12,7 +13,6 @@ import { LocationsList } from './components/LocationsList/LocationsList';
 import { AddInstanceModal } from './components/modals/AddInstanceModal/AddInstanceModal';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
-import { error, info } from 'tauri-plugin-log-api';
 
 const { getInstances } = clientApi;
 
@@ -25,7 +25,7 @@ export const ClientPage = () => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client;
   const setInstances = useClientStore((state) => state.setInstances);
-  const [layoutType, setLayoutType] = useState(LayoutType.GRID); // Initialize with GRID layout
+  const [layoutType, setLayoutType] = useState(LayoutType.GRID);
 
   useQuery({
     queryKey: [clientQueryKeys.getInstances],

@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 use crate::{database::DbPool, error::Error};
 use serde::{Deserialize, Serialize};
-use wireguard_rs::Peer;
+use defguard_wireguard_rs::host::Peer;
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct Location {

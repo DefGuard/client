@@ -74,3 +74,51 @@ impl Connection {
         Ok(connection)
     }
 }
+
+#[derive(FromRow, Debug, Serialize)]
+pub struct ConnectionInfo {
+    pub id: i64,
+    pub location_id: i64,
+    pub connected_from: String,
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime,
+    pub upload: Option<i32>,
+    pub download: Option<i32>,
+}
+
+impl ConnectionInfo {
+    pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+        let connections = query_as!(
+            ConnectionInfo,
+            r#"
+          SELECT
+              c.id as "id!",
+              c.location_id as "location_id!",
+              c.connected_from as "connected_from!",
+              c.start as "start!",
+              c.end as "end!",
+              COALESCE((
+                  SELECT SUM(COALESCE(ls.upload, 0))
+                  FROM location_stats AS ls
+                  WHERE ls.location_id = c.location_id
+                  AND ls.collected_at >= c.start
+                  AND ls.collected_at <= c.end
+              ), 0) as "upload: _",
+              COALESCE((
+                  SELECT SUM(COALESCE(ls.download, 0))
+                  FROM location_stats AS ls
+                  WHERE ls.location_id = c.location_id
+                  AND ls.collected_at >= c.start
+                  AND ls.collected_at <= c.end
+              ), 0) as "download: _"
+            FROM connection AS c WHERE location_id = $1;
+            "#,
+            location_id,
+        )
+        .fetch_all(pool)
+        .await?;
+
+
+        Ok(connections)
+    }
+}

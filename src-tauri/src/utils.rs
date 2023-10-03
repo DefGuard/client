@@ -3,8 +3,8 @@ use std::{
     str::FromStr,
 };
 
-use wireguard_rs::{
-    wgapi::WGApi, InterfaceConfiguration, IpAddrMask, Key, Peer, WireguardInterfaceApi,
+use defguard_wireguard_rs::{
+    WGApi, InterfaceConfiguration, net::IpAddrMask, key::Key, host::Peer, WireguardInterfaceApi,
 };
 
 use crate::{
