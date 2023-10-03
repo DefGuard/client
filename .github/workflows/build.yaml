@@ -15,8 +15,10 @@ jobs:
   test-tauri:
     strategy:
       fail-fast: false
+      matrix:
+        platform: [macOS, Linux]
 
-    runs-on: Linux
+    runs-on: ${{ matrix.platform }}
     container: rust:1.72
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +50,8 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
       - uses: dtolnay/rust-toolchain@stable
-      - name: install system deps
+      - name: install linux deps
+        if: matrix.platform == 'Linux'
         run: |
           apt-get update
           apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
@@ -57,9 +60,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/upload-artifact@v3
+        if: matrix.platform == 'Linux'
         with:
           name: linux
           path: |
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 1
+
+      - name: Upload macOS artifacts
+        if: matrix.platform == 'macOS'
+        uses: actions/upload-artifact@v2
+        with:
+          name: macos
+          path: |
+            src-tauri/target/release/bundle/*.dmg
+            src-tauri/target/release/bundle/*.app
           retention-days: 1
