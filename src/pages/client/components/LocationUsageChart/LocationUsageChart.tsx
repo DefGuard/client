@@ -1,14 +1,7 @@
 import dayjs from 'dayjs';
 import { sortBy } from 'lodash-es';
 import { useMemo } from 'react';
-import {
-  Bar,
-  BarChart,
-  ComposedChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
 import { NetworkSpeed } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/NetworkSpeed';
 import { NetworkDirection } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/types';
