@@ -37,7 +37,7 @@ export const ClientPage = () => {
       info('Retrieved all instances');
     },
     onError: (err) => {
-      error(String(err));
+      error(`Error retrieving instances: ${String(err)}`);
     },
   });
 

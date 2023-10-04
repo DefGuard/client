@@ -90,6 +90,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
 
 #[tauri::command]
 pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<(), String> {
+    debug!("Disconnecting location with id: {}", location_id);
     let state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
@@ -97,13 +98,17 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
     {
         let api =
             WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
+        debug!("Removing interface");
         api.remove_interface().map_err(|err| err.to_string())?;
+        debug!("Removed interface");
         if let Some(mut connection) = state.find_and_remove_connection(location_id) {
+            debug!("Saving connection: {:#?}", connection);
             connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
             connection
                 .save(&state.get_pool())
                 .await
                 .map_err(|err| err.to_string())?;
+            debug!("Saved connection: {:#?}", connection);
         }
         handle
             .emit_all(
@@ -197,7 +202,11 @@ pub async fn save_device_config(
     }
     transaction.commit().await.map_err(|err| err.to_string())?;
     info!("Instance created.");
-    debug!("Saved following instance: {:#?}", instance);
+    debug!("Created following instance: {:#?}", instance);
+    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
+        .await
+        .map_err(|err| err.to_string())?;
+    debug!("Created following locations: {:#?}", locations);
     Ok(())
 }
 
