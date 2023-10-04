@@ -382,6 +382,10 @@ pub async fn active_connection(
     handle: tauri::AppHandle,
 ) -> Result<Option<Connection>, String> {
     let state = handle.state::<AppState>();
+    debug!(
+        "Retrieving active connection for location with id: {}",
+        location_id
+    );
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())?
