@@ -29,7 +29,7 @@ struct Payload {
 extern crate log;
 
 // Specify log targets
-const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
+const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTarget::Webview];
 
 // TODO: Refactor later
 #[allow(clippy::single_match)]
