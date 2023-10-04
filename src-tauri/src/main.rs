@@ -29,7 +29,7 @@ struct Payload {
 extern crate log;
 
 // Specify log targets
-const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
+const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTarget::Webview];
 
 // TODO: Refactor later
 #[allow(clippy::single_match)]
@@ -114,7 +114,8 @@ fn main() {
                     .expect("Database initialization failed");
                 *app_state.db.lock().unwrap() = Some(db);
                 info!("Database initialization completed");
-                info!("Starting main app thread.")
+                info!("Starting main app thread.");
+                let _ = database::info(&app_state.get_pool()).await;
             });
             Ok(())
         })

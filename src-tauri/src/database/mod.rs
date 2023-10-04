@@ -21,15 +21,37 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
             db_path.to_string_lossy()
         );
         fs::File::create(&db_path)?;
-        info!("Database file succesfully created.")
+        info!(
+            "Database file succesfully created at: {}",
+            db_path.to_string_lossy()
+        );
     } else {
-        info!("Database exists skipping creating database.")
+        info!(
+            "Database exists skipping creating database. Database path: {}",
+            db_path.to_string_lossy()
+        );
     }
+    debug!("Connecting to database: {}", db_path.to_string_lossy());
     let pool = DbPool::connect(&format!("sqlite://{}", db_path.to_str().unwrap())).await?;
     debug!("Running migrations.");
     sqlx::migrate!().run(&pool).await?;
     info!("Applied migrations.");
     Ok(pool)
+}
+
+pub async fn info(pool: &DbPool) -> Result<(), Error> {
+    debug!("Following locations and instances are saved.");
+    let instances = Instance::all(pool).await?;
+    debug!(
+        "All instances found in database during start: {:#?}",
+        instances
+    );
+    let locations = Location::all(pool).await?;
+    debug!(
+        "All locations found in database during start: {:#?}",
+        locations
+    );
+    Ok(())
 }
 
 pub use models::{

@@ -41,6 +41,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             "Active connections: {:#?}",
             state.active_connections.lock().unwrap()
         );
+        debug!("Sending event connection-changed.");
         handle
             .emit_all(
                 "connection-changed",
@@ -89,6 +90,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
 
 #[tauri::command]
 pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<(), String> {
+    debug!("Disconnecting location with id: {}", location_id);
     let state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
@@ -96,13 +98,17 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
     {
         let api =
             WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
+        debug!("Removing interface");
         api.remove_interface().map_err(|err| err.to_string())?;
+        debug!("Removed interface");
         if let Some(mut connection) = state.find_and_remove_connection(location_id) {
+            debug!("Saving connection: {:#?}", connection);
             connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
             connection
                 .save(&state.get_pool())
                 .await
                 .map_err(|err| err.to_string())?;
+            debug!("Saved connection: {:#?}", connection);
         }
         handle
             .emit_all(
@@ -196,16 +202,24 @@ pub async fn save_device_config(
     }
     transaction.commit().await.map_err(|err| err.to_string())?;
     info!("Instance created.");
+    debug!("Created following instance: {:#?}", instance);
+    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
+        .await
+        .map_err(|err| err.to_string())?;
+    debug!("Created following locations: {:#?}", locations);
     Ok(())
 }
 
 #[tauri::command(async)]
 pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo>, String> {
+    debug!("Retrieving all instances.");
     let instances = Instance::all(&app_state.get_pool())
         .await
         .map_err(|err| err.to_string())?;
+    debug!("Found following instances: {:#?}", instances);
     let mut instance_info: Vec<InstanceInfo> = vec![];
     for instance in &instances {
+        debug!("Checking if instance: {:#?} is active", instance.uuid);
         let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
             .await
             .map_err(|err| err.to_string())?;
@@ -234,12 +248,13 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             url: instance.url.clone(),
             connected,
             pubkey: keys.pubkey,
-        })
+        });
     }
+    info!("Returning following instances: {:#?}", instance_info);
     Ok(instance_info)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct LocationInfo {
     pub id: i64,
     // Native id of network from defguard
@@ -255,6 +270,7 @@ pub async fn all_locations(
     instance_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, String> {
+    debug!("Retrieving all locations");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id)
         .await
         .map_err(|err| err.to_string())?;
@@ -267,6 +283,7 @@ pub async fn all_locations(
         .collect();
     let mut location_info = vec![];
     for location in locations {
+        debug!("Checking if location: {:#?} is active", location.name);
         let info = LocationInfo {
             id: location.id.unwrap(),
             instance_id: location.instance_id,
@@ -277,6 +294,7 @@ pub async fn all_locations(
         };
         location_info.push(info);
     }
+    debug!("Returning all locations: {:#?}", location_info);
 
     Ok(location_info)
 }
@@ -327,7 +345,7 @@ pub async fn update_instance(
             }
         }
         transaction.commit().await.map_err(|err| err.to_string())?;
-        info!("Updated instance.");
+        info!("Updated instance with id: {}.", instance_id);
         Ok(())
     } else {
         Err("Instance not found".into())
@@ -348,9 +366,15 @@ pub async fn all_connections(
     location_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<ConnectionInfo>, String> {
-    ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
+    debug!("Retrieving all conections.");
+    let connections = ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
         .await
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+    debug!(
+        "Returning all connections for location with id: {}, {:#?} ",
+        location_id, connections
+    );
+    Ok(connections)
 }
 #[tauri::command]
 pub async fn active_connection(
@@ -358,6 +382,10 @@ pub async fn active_connection(
     handle: tauri::AppHandle,
 ) -> Result<Option<Connection>, String> {
     let state = handle.state::<AppState>();
+    debug!(
+        "Retrieving active connection for location with id: {}",
+        location_id
+    );
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())?

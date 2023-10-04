@@ -2,7 +2,7 @@ use crate::{database::DbPool, error::Error};
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow};
 
-#[derive(FromRow, Serialize, Deserialize)]
+#[derive(FromRow, Serialize, Deserialize, Debug)]
 pub struct Instance {
     pub id: Option<i64>,
     pub name: String,
