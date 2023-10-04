@@ -21,9 +21,12 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
             db_path.to_string_lossy()
         );
         fs::File::create(&db_path)?;
-        info!("Database file succesfully created.")
+        info!(
+            "Database file succesfully created at: {}",
+            db_path.to_string_lossy()
+        );
     } else {
-        info!("Database exists skipping creating database.")
+        info!("Database exists skipping creating database.");
     }
     let pool = DbPool::connect(&format!("sqlite://{}", db_path.to_str().unwrap())).await?;
     debug!("Running migrations.");
