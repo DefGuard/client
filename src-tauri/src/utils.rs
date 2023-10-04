@@ -15,7 +15,7 @@ use crate::{
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 
 /// Setup client interface
-pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), Error> {
+pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi, Error> {
     let interface_name = remove_whitespace(&location.name);
     debug!("Creating new interface: {}", interface_name);
     let api = create_api(&interface_name)?;
@@ -74,7 +74,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<(), E
                     return Err(Error::InternalError);
                 }
                 info!("created interface {:#?}", interface_config);
-                Ok(())
+                Ok(api)
             }
         } else {
             error!("Error finding free port");

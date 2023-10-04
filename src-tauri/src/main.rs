@@ -14,8 +14,8 @@ use tauri_plugin_log::LogTarget;
 use tauri::SystemTrayEvent;
 mod tray;
 use crate::commands::{
-    all_connections, all_instances, all_locations, connect, disconnect, last_connection,
-    location_stats, save_device_config, update_instance,
+    active_connection, all_connections, all_instances, all_locations, connect, disconnect,
+    last_connection, location_stats, save_device_config, update_instance,
 };
 use crate::tray::create_tray_menu;
 
@@ -47,7 +47,8 @@ fn main() {
             update_instance,
             location_stats,
             all_connections,
-            last_connection
+            last_connection,
+            active_connection,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {

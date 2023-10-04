@@ -25,4 +25,18 @@ impl AppState {
             None // Connection not found
         }
     }
+    pub fn find_connection(&self, location_id: i64) -> Option<Connection> {
+        let connections = self.active_connections.lock().unwrap();
+
+        if let Some(connection) = connections
+            .iter()
+            .find(|conn| conn.location_id == location_id)
+        {
+            // 'connection' now contains the first element with the specified location_id
+            Some(connection.to_owned())
+        } else {
+            error!("Element with location_id {} not found.", location_id);
+            None
+        }
+    }
 }

@@ -20,6 +20,11 @@ type Props = {
   locations: DefguardLocation[];
 };
 
+const findLocationById = (
+  locations: DefguardLocation[],
+  id: number,
+): DefguardLocation | undefined => locations.find((location) => location.id === id);
+
 const { getLocationStats, getLastConnection, getConnectionHistory } = clientApi;
 
 export const LocationsDetailView = ({ locations }: Props) => {
@@ -30,14 +35,15 @@ export const LocationsDetailView = ({ locations }: Props) => {
     queryFn: () => getLocationStats({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
   });
-  const { data: connection } = useQuery({
-    queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
-    queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
-    enabled: !!activeLocationId,
-  });
+
   const { data: connectionHistory } = useQuery({
     queryKey: [clientQueryKeys.getConnectionHistory, activeLocationId as number],
     queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
+    enabled: !!activeLocationId,
+  });
+  const { data: lastConnection } = useQuery({
+    queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
+    queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
   });
 
@@ -52,10 +58,6 @@ export const LocationsDetailView = ({ locations }: Props) => {
     [locations, activeLocationId],
   );
 
-  const findLocationById = (
-    locations: DefguardLocation[],
-    id: number,
-  ): DefguardLocation | undefined => locations.find((location) => location.id === id);
   return (
     <div id="locations-detail-view">
       <CardTabs tabs={tabs} />
@@ -64,7 +66,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
           <LocationCardTitle location={findLocationById(locations, activeLocationId)} />
           <LocationCardInfo
             location={findLocationById(locations, activeLocationId)}
-            connection={connection}
+            connection={lastConnection}
           />
           <LocationCardConnectButton
             location={findLocationById(locations, activeLocationId)}

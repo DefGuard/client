@@ -29,6 +29,9 @@ const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =
 const getConnectionHistory = async (data: ConnectionRequest): Promise<Connection[]> =>
   invoke('all_connections', data);
 
+const getActiveConnection = async (data: ConnectionRequest): Promise<Connection> =>
+  invoke('active_connection', data);
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -37,4 +40,5 @@ export const clientApi = {
   getLocationStats,
   getLastConnection,
   getConnectionHistory,
+  getActiveConnection,
 };

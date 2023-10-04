@@ -1,8 +1,11 @@
 import './style.scss';
 
+import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
+import { clientApi } from '../../../../clientAPI/clientApi';
+import { clientQueryKeys } from '../../../../query';
 import { Connection, DefguardLocation } from '../../../../types';
 
 type Props = {
@@ -10,16 +13,29 @@ type Props = {
   connection?: Connection;
 };
 
+const { getActiveConnection } = clientApi;
+
 export const LocationCardInfo = ({ location, connection }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.connectionLabels;
+
+  const { data: activeConnection } = useQuery({
+    queryKey: [clientQueryKeys.getActiveConnection, location?.id as number],
+    queryFn: () => getActiveConnection({ locationId: location?.id as number }),
+    enabled: location?.active,
+  });
+
   return (
     <>
       <div className="location-card-info-from">
         <label>
           {location?.active ? localLL.connectedFrom() : localLL.lastConnectedFrom()}:
         </label>
-        <p>{connection ? connection.connected_from : 'Never connected'}</p>
+        {location?.active ? (
+          <p>{activeConnection?.connected_from}</p>
+        ) : (
+          <p>{connection ? connection.connected_from : localLL.neverConnected()}</p>
+        )}
       </div>
       <div className="location-card-info-connected">
         <label>{localLL.lastConnected()}:</label>
