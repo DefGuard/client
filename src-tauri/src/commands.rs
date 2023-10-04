@@ -219,7 +219,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     debug!("Found following instances: {:#?}", instances);
     let mut instance_info: Vec<InstanceInfo> = vec![];
     for instance in &instances {
-        debug!("Checking if instance: {:#?} is active", instances);
+        debug!("Checking if instance: {:#?} is active", instance.uuid);
         let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
             .await
             .map_err(|err| err.to_string())?;
@@ -283,7 +283,7 @@ pub async fn all_locations(
         .collect();
     let mut location_info = vec![];
     for location in locations {
-        debug!("Checking if location: {:#?} is active", location);
+        debug!("Checking if location: {:#?} is active", location.name);
         let info = LocationInfo {
             id: location.id.unwrap(),
             instance_id: location.instance_id,

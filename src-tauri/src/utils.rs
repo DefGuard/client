@@ -141,6 +141,7 @@ fn is_port_free(port: u16) -> bool {
     }
 }
 
+/// Create new api object
 pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }
