@@ -26,8 +26,12 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
             db_path.to_string_lossy()
         );
     } else {
-        info!("Database exists skipping creating database.");
+        info!(
+            "Database exists skipping creating database. Database path: {}",
+            db_path.to_string_lossy()
+        );
     }
+    debug!("Connecting to database: {}", db_path.to_string_lossy());
     let pool = DbPool::connect(&format!("sqlite://{}", db_path.to_str().unwrap())).await?;
     debug!("Running migrations.");
     sqlx::migrate!().run(&pool).await?;
