@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
+import { debug } from 'tauri-plugin-log-api';
 
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
@@ -47,6 +48,7 @@ export const LocationsList = ({ layoutType }: Props) => {
 
   // TODO: add loader or another placeholder view pointing to opening enter token modal if no instances are found / present
   if (!selectedInstance || !locations) return null;
+  debug(`Selected instance: ${JSON.stringify(selectedInstance)}`);
 
   return (
     <>

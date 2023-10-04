@@ -34,10 +34,10 @@ export const ClientPage = () => {
     refetchOnWindowFocus: false,
     onSuccess: (res) => {
       setInstances(res);
-      info('Retrieved instances');
+      info('Retrieved all instances');
     },
     onError: (err) => {
-      error(String(err));
+      error(`Error retrieving instances: ${String(err)}`);
     },
   });
 

@@ -114,7 +114,8 @@ fn main() {
                     .expect("Database initialization failed");
                 *app_state.db.lock().unwrap() = Some(db);
                 info!("Database initialization completed");
-                info!("Starting main app thread.")
+                info!("Starting main app thread.");
+                let _ = database::info(&app_state.get_pool()).await;
             });
             Ok(())
         })
