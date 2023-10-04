@@ -4,6 +4,10 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './components/App/App';
 import { ToastManager } from './shared/defguard-ui/components/Layout/ToastManager/ToastManager';
+import { attachConsole } from 'tauri-plugin-log-api';
+
+// Attach console for logging
+attachConsole();
 
 const queryClient = new QueryClient();
 
