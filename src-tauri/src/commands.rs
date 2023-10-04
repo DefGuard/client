@@ -31,7 +31,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             "Creating new interface connection for location: {}",
             location.name
         );
-        setup_interface(&location, &state.get_pool())
+        let api = setup_interface(&location, &state.get_pool())
             .await
             .map_err(|err| err.to_string())?;
         let address = local_ip().map_err(|err| err.to_string())?;
@@ -50,9 +50,6 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             )
             .unwrap();
         // Spawn stats threads
-
-        let api =
-            WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
         tokio::spawn(async move {
             let state = handle.state::<AppState>();
             loop {
@@ -354,6 +351,26 @@ pub async fn all_connections(
     ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())
+}
+#[tauri::command]
+pub async fn active_connection(
+    location_id: i64,
+    handle: tauri::AppHandle,
+) -> Result<Option<Connection>, String> {
+    let state = handle.state::<AppState>();
+    if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
+        .await
+        .map_err(|err| err.to_string())?
+    {
+        debug!(
+            "Returning active connection: {:#?}",
+            state.find_connection(location.id.unwrap())
+        );
+        Ok(state.find_connection(location.id.unwrap()))
+    } else {
+        error!("Location with id: {} not found.", location_id);
+        Err("Location not found".into())
+    }
 }
 
 #[tauri::command]

@@ -43,7 +43,7 @@ const GridItem = ({ location }: GridItemProps) => {
   );
   const { getLocationStats, getLastConnection } = clientApi;
 
-  const { data: connection } = useQuery({
+  const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, location.id as number],
     queryFn: () => getLastConnection({ locationId: location.id as number }),
     enabled: !!location.id,
@@ -54,17 +54,16 @@ const GridItem = ({ location }: GridItemProps) => {
     enabled: !!location.id,
   });
 
-  console.log(connection);
   return (
     <Card className={cn}>
       <div className="top">
         <LocationCardTitle location={location} />
         <LocationCardConnectButton location={location} />
       </div>
-      {connection ? (
+      {lastConnection || location.active ? (
         <>
           <div className="info">
-            <LocationCardInfo location={location} connection={connection} />
+            <LocationCardInfo location={location} connection={lastConnection} />
           </div>
           {locationStats ? (
             <LocationUsageChart

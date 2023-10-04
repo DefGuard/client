@@ -4,7 +4,7 @@ use sqlx::{query, query_as, FromRow};
 
 use crate::{database::DbPool, error::Error};
 
-#[derive(FromRow, Debug, Serialize)]
+#[derive(FromRow, Debug, Serialize, Clone)]
 pub struct Connection {
     pub id: Option<i64>,
     pub location_id: i64,
