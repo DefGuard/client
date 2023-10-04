@@ -13,6 +13,7 @@ import { LocationsList } from './components/LocationsList/LocationsList';
 import { AddInstanceModal } from './components/modals/AddInstanceModal/AddInstanceModal';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
+import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 
 const { getInstances } = clientApi;
 
@@ -77,6 +78,7 @@ export const ClientPage = () => {
               setLayoutType(selectedValue);
             }}
           />
+          <StatsFilterSelect />
         </header>
         <LocationsList layoutType={layoutType} />
       </section>
