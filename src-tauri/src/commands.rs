@@ -270,7 +270,7 @@ pub async fn all_locations(
     instance_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, String> {
-    debug!("Retrieving all locations");
+    debug!("Retrieving all locations.");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id)
         .await
         .map_err(|err| err.to_string())?;
@@ -345,7 +345,7 @@ pub async fn update_instance(
             }
         }
         transaction.commit().await.map_err(|err| err.to_string())?;
-        info!("Updated instance with id: {}.", instance_id);
+        debug!("Updated instance with id: {}.", instance_id);
         Ok(())
     } else {
         Err("Instance not found".into())
