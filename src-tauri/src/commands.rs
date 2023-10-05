@@ -270,7 +270,7 @@ pub async fn all_locations(
     instance_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, String> {
-    return Err("Chuj".into());
+    debug!("Retrieving all locations.");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id)
         .await
         .map_err(|err| err.to_string())?;
