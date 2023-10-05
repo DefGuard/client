@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -57,13 +58,16 @@ export const DekstopSetup = () => {
       onError: (e) => {
         toaster.error(LL.common.messages.error());
         console.error(e);
+        error(String(e));
       },
     });
 
   const { isLoading: loadingCreateDevice, mutateAsync: createDeviceMutation } =
     useMutation({
       mutationFn: createDevice,
-      onError: () => {},
+      onError: (e) => {
+        error(String(e));
+      },
     });
 
   const schema = useMemo(
@@ -104,6 +108,7 @@ export const DekstopSetup = () => {
         .catch((e) => {
           setIsLoading(false);
           console.error(e);
+          error(e);
         });
     });
   };

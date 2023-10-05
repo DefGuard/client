@@ -9,7 +9,7 @@ type GetLocationsRequest = {
 };
 
 const getLocations = async (data: GetLocationsRequest): Promise<DefguardLocation[]> =>
-  invoke('all_locations', data);
+  invoke<DefguardLocation[]>('all_locations', data);
 
 type ConnectionRequest = {
   locationId: number;

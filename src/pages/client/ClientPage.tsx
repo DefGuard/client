@@ -30,8 +30,6 @@ export const ClientPage = () => {
   useQuery({
     queryKey: [clientQueryKeys.getInstances],
     queryFn: getInstances,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
     onSuccess: (res) => {
       setInstances(res);
       info('Retrieved all instances');
