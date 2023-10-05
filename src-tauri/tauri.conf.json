@@ -18,9 +18,6 @@
 
     "allowlist": {
       "all": false,
-      "path": {
-        "all": true
-      },
       "window": {
         "all": true
       },
