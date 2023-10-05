@@ -1,5 +1,6 @@
 use std::{
     net::{SocketAddr, TcpListener},
+    panic::Location as ErrorLocation,
     str::FromStr,
 };
 
@@ -17,17 +18,22 @@ pub static IS_MACOS: bool = cfg!(target_os = "macos");
 /// Setup client interface
 pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi, Error> {
     let interface_name = remove_whitespace(&location.name);
-    debug!("Creating new interface: {}", interface_name);
-    let api = create_api(&interface_name)?;
+    debug!(
+        "Creating new interface: {} for location: {:#?}",
+        interface_name, location
+    );
+    let api = create_api(&interface_name).log()?;
 
-    api.create_interface()?;
+    api.create_interface().log()?;
 
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
-        let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
+        debug!("Decoding location public key.");
+        let peer_key: Key = Key::from_str("fewfwe").log()?;
         let mut peer = Peer::new(peer_key);
         debug!("Creating interface for location: {:#?}", location);
-        let endpoint: SocketAddr = location.endpoint.parse().unwrap();
+        debug!("Setting up location endpoint: {}", location.endpoint);
+        let endpoint: SocketAddr = location.endpoint.parse().log()?;
         peer.endpoint = Some(endpoint);
         peer.persistent_keepalive_interval = Some(25);
         let allowed_ips: Vec<String> = location
@@ -83,7 +89,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
     } else {
         error!("No keys found for instance: {}", location.instance_id);
         error!("Removing interface: {}", location.name);
-        api.remove_interface()?;
+        api.remove_interface().log()?;
         Err(Error::InternalError)
     }
 }
@@ -144,4 +150,22 @@ fn is_port_free(port: u16) -> bool {
 /// Create new api object
 pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
+}
+
+pub trait LogExt {
+    fn log(self) -> Self;
+}
+/// Trait to know when mapped error failed and how
+/// example use failing_function().log()?;
+impl<T, E> LogExt for Result<T, E>
+where
+    E: std::fmt::Display,
+{
+    #[track_caller]
+    fn log(self) -> Self {
+        if let Err(e) = &self {
+            error!("Error '{e}' originated in :{}", &ErrorLocation::caller());
+        }
+        self
+    }
 }

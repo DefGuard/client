@@ -3,7 +3,7 @@ use crate::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
         Connection, ConnectionInfo, Instance, Location, LocationStats, WireguardKeys,
     },
-    utils::{remove_whitespace, setup_interface, IS_MACOS},
+    utils::{remove_whitespace, setup_interface, LogExt, IS_MACOS},
     AppState,
 };
 use chrono::Utc;
@@ -25,7 +25,8 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
     let state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
-        .map_err(|err| err.to_string())?
+        .map_err(|err| err.to_string())
+        .log()?
     {
         debug!(
             "Creating new interface connection for location: {}",
@@ -33,8 +34,9 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
         );
         let api = setup_interface(&location, &state.get_pool())
             .await
-            .map_err(|err| err.to_string())?;
-        let address = local_ip().map_err(|err| err.to_string())?;
+            .map_err(|err| err.to_string())
+            .log()?;
+        let address = local_ip().map_err(|err| err.to_string()).log()?;
         let connection = Connection::new(location_id, address.to_string());
         state.active_connections.lock().unwrap().push(connection);
         debug!(
@@ -62,6 +64,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
                                 peer_to_location_stats(&peer, &state.get_pool())
                                     .await
                                     .map_err(|err| err.to_string())
+                                    .log()
                                     .unwrap();
                             debug!("Saving location stats: {:#?}", location_stats);
                             let _ = location_stats.save(&state.get_pool()).await;
@@ -94,12 +97,16 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
     let state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id)
         .await
-        .map_err(|err| err.to_string())?
+        .map_err(|err| err.to_string())
+        .log()?
     {
-        let api =
-            WGApi::new(remove_whitespace(&location.name), IS_MACOS).map_err(|e| e.to_string())?;
+        let api = WGApi::new(remove_whitespace(&location.name), IS_MACOS)
+            .map_err(|e| e.to_string())
+            .log()?;
         debug!("Removing interface");
-        api.remove_interface().map_err(|err| err.to_string())?;
+        api.remove_interface()
+            .map_err(|err| err.to_string())
+            .log()?;
         debug!("Removed interface");
         if let Some(mut connection) = state.find_and_remove_connection(location_id) {
             debug!("Saving connection: {:#?}", connection);
@@ -107,7 +114,8 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
             connection
                 .save(&state.get_pool())
                 .await
-                .map_err(|err| err.to_string())?;
+                .map_err(|err| err.to_string())
+                .log()?;
             debug!("Saved connection: {:#?}", connection);
         }
         handle
@@ -179,7 +187,8 @@ pub async fn save_device_config(
         .get_pool()
         .begin()
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())
+        .log()?;
     let mut instance = Instance::new(
         response.instance.name,
         response.instance.id,
@@ -188,7 +197,8 @@ pub async fn save_device_config(
     instance
         .save(&mut *transaction)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())
+        .log()?;
     let mut keys = WireguardKeys::new(instance.id.unwrap(), response.device.pubkey, private_key);
     keys.save(&mut *transaction)
         .await
@@ -198,14 +208,20 @@ pub async fn save_device_config(
         new_location
             .save(&mut *transaction)
             .await
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| err.to_string())
+            .log()?;
     }
-    transaction.commit().await.map_err(|err| err.to_string())?;
+    transaction
+        .commit()
+        .await
+        .map_err(|err| err.to_string())
+        .log()?;
     info!("Instance created.");
     debug!("Created following instance: {:#?}", instance);
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())
+        .log()?;
     debug!("Created following locations: {:#?}", locations);
     Ok(())
 }
@@ -215,14 +231,16 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     debug!("Retrieving all instances.");
     let instances = Instance::all(&app_state.get_pool())
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())
+        .log()?;
     debug!("Found following instances: {:#?}", instances);
     let mut instance_info: Vec<InstanceInfo> = vec![];
     for instance in &instances {
         debug!("Checking if instance: {:#?} is active", instance.uuid);
         let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
             .await
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| err.to_string())
+            .log()?;
         let connection_ids: Vec<i64> = app_state
             .active_connections
             .lock()
@@ -239,7 +257,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
         let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
             .await
-            .map_err(|err| err.to_string())?
+            .map_err(|err| err.to_string())
+            .log()?
             .unwrap();
         instance_info.push(InstanceInfo {
             id: instance.id,
@@ -273,7 +292,8 @@ pub async fn all_locations(
     debug!("Retrieving all locations");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id)
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())
+        .log()?;
     let active_locations_ids: Vec<i64> = app_state
         .active_connections
         .lock()
@@ -307,13 +327,15 @@ pub async fn update_instance(
     debug!("Received following response: {:#?}", response);
     let instance = Instance::find_by_id(&app_state.get_pool(), instance_id)
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())
+        .log()?;
     if let Some(mut instance) = instance {
         let mut transaction = app_state
             .get_pool()
             .begin()
             .await
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| err.to_string())
+            .log()?;
         instance.name = response.instance.name;
         instance.url = response.instance.url;
         instance
@@ -326,7 +348,8 @@ pub async fn update_instance(
             let old_location =
                 Location::find_by_native_id(&mut *transaction, new_location.network_id)
                     .await
-                    .map_err(|err| err.to_string())?;
+                    .map_err(|err| err.to_string())
+                    .log()?;
             if let Some(mut old_location) = old_location {
                 old_location.name = new_location.name;
                 old_location.address = new_location.address;
@@ -336,15 +359,21 @@ pub async fn update_instance(
                 old_location
                     .save(&mut *transaction)
                     .await
-                    .map_err(|err| err.to_string())?;
+                    .map_err(|err| err.to_string())
+                    .log()?;
             } else {
                 new_location
                     .save(&mut *transaction)
                     .await
-                    .map_err(|err| err.to_string())?;
+                    .map_err(|err| err.to_string())
+                    .log()?;
             }
         }
-        transaction.commit().await.map_err(|err| err.to_string())?;
+        transaction
+            .commit()
+            .await
+            .map_err(|err| err.to_string())
+            .log()?;
         info!("Updated instance with id: {}.", instance_id);
         Ok(())
     } else {
@@ -359,6 +388,7 @@ pub async fn location_stats(
     LocationStats::all_by_location_id(&app_state.get_pool(), location_id)
         .await
         .map_err(|err| err.to_string())
+        .log()
 }
 
 #[tauri::command]
@@ -369,7 +399,8 @@ pub async fn all_connections(
     debug!("Retrieving all conections.");
     let connections = ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
         .await
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())
+        .log()?;
     debug!(
         "Returning all connections for location with id: {}, {:#?} ",
         location_id, connections
