@@ -54,6 +54,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
                     Ok(host) => {
                         let peers = host.peers;
                         for (_, peer) in peers {
+                            // TODO: refactor
                             let mut location_stats =
                                 peer_to_location_stats(&peer, &state.get_pool())
                                     .await
