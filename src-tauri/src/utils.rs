@@ -28,14 +28,15 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
 
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         // TODO: handle unwrap
-        debug!("Decoding location public key.");
-        let peer_key: Key = Key::from_str("fewfwe").log()?;
+        debug!("Decoding location public key: {}.", location.pubkey);
+        let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
         let mut peer = Peer::new(peer_key);
-        debug!("Creating interface for location: {:#?}", location);
-        debug!("Setting up location endpoint: {}", location.endpoint);
+        debug!("Parsing location endpoint: {}", location.endpoint);
         let endpoint: SocketAddr = location.endpoint.parse().log()?;
         peer.endpoint = Some(endpoint);
         peer.persistent_keepalive_interval = Some(25);
+
+        debug!("Parsing location allowed ips: {}", location.allowed_ips);
         let allowed_ips: Vec<String> = location
             .allowed_ips
             .split(',')
@@ -46,12 +47,12 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
             match IpAddrMask::from_str(&allowed_ip) {
                 Ok(addr) => {
                     peer.allowed_ips.push(addr);
-                    // TODO: Handle windows later
+                    // TODO: Handle windows when wireguard_rs adds support
                     // Add a route for the allowed IP using the `ip -4 route add` command
                     if let Err(err) = add_route(&allowed_ip, &interface_name) {
                         error!("Error adding route for {}: {}", allowed_ip, err);
                     } else {
-                        info!("Added route for {}", allowed_ip);
+                        debug!("Added route for {}", allowed_ip);
                     }
                 }
                 Err(err) => {
