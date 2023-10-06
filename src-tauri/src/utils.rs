@@ -9,24 +9,27 @@ use defguard_wireguard_rs::{
 };
 
 use crate::{
-    database::{DbPool, Location, WireguardKeys},
+    database::{ActiveConnection, DbPool, Location, WireguardKeys},
     error::Error,
 };
 
-pub static IS_MACOS: bool = cfg!(target_os = "macos");
+pub static IS_MACOS: bool = true;
 
 /// Setup client interface
-pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi, Error> {
-    let interface_name = remove_whitespace(&location.name);
+pub async fn setup_interface(
+    location: &Location,
+    interface_name: &str,
+    pool: &DbPool,
+) -> Result<WGApi, Error> {
     debug!(
         "Creating new interface: {} for location: {:#?}",
         interface_name, location
     );
-    let api = create_api(&interface_name).log()?;
-
-    api.create_interface().log()?;
 
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
+        let api = create_api(&interface_name).log()?;
+
+        api.create_interface().log()?;
         // TODO: handle unwrap
         debug!("Decoding location public key: {}.", location.pubkey);
         let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
@@ -65,7 +68,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
         }
         if let Some(port) = find_random_free_port() {
             let interface_config = InterfaceConfiguration {
-                name: interface_name.clone(),
+                name: interface_name.into(),
                 prvkey: keys.prvkey,
                 address: location.address.clone(),
                 port: port.into(),
@@ -89,8 +92,6 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
         }
     } else {
         error!("No keys found for instance: {}", location.instance_id);
-        error!("Removing interface: {}", location.name);
-        api.remove_interface().log()?;
         Err(Error::InternalError)
     }
 }
@@ -138,6 +139,31 @@ fn find_random_free_port() -> Option<u16> {
     None // No free port found in the specified range
 }
 
+/// Returns interface name for location
+pub fn get_interface_name(
+    location: &Location,
+    active_connections: Vec<ActiveConnection>,
+) -> String {
+    let active_interfaces: Vec<String> = active_connections
+        .iter()
+        .map(|con| con.interface_name)
+        .collect();
+    match IS_MACOS {
+        true => {
+            let mut counter = 3;
+            let mut interface_name = format!("utun{}", counter);
+
+            while active_interfaces.contains(&interface_name) {
+                counter += 1;
+                interface_name = format!("utun{}", counter);
+            }
+
+            return interface_name;
+        }
+        false => remove_whitespace(&location.name),
+    }
+}
+
 fn is_port_free(port: u16) -> bool {
     if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", port)) {
         // Port is available; close the listener
@@ -168,5 +194,34 @@ where
             error!("Error '{e}' originated in :{}", &ErrorLocation::caller());
         }
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Location;
+    use chrono::Utc;
+
+    #[test]
+    fn test_macos_existing_interfaces() {
+        let location = Location {
+            id: None,
+            instance_id: 1,
+            network_id: 2,
+            name: "Example Location".to_string(),
+            address: "123 Main St".to_string(),
+            pubkey: "public_key_here".to_string(),
+            endpoint: "endpoint_here".to_string(),
+            allowed_ips: "allowed_ips_here".to_string(),
+        };
+        let active_connections = vec![ActiveConnection {
+            location_id: 1,
+            start: Utc::now().naive_utc(),
+            connected_from: "Test".to_string(),
+            interface_name: "utun3".to_string(),
+        }];
+
+        assert_eq!(get_interface_name(&location, active_connections), "utun4");
     }
 }

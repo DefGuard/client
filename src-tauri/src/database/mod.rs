@@ -63,7 +63,7 @@ pub async fn info(pool: &DbPool) -> Result<(), Error> {
 }
 
 pub use models::{
-    connection::{Connection, ConnectionInfo},
+    connection::{ActiveConnection, Connection, ConnectionInfo},
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
     wireguard_keys::WireguardKeys,

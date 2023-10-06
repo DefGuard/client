@@ -1,9 +1,10 @@
 use crate::{
     database::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
-        Connection, ConnectionInfo, Instance, Location, LocationStats, WireguardKeys,
+        ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats,
+        WireguardKeys,
     },
-    utils::{remove_whitespace, setup_interface, LogError, IS_MACOS},
+    utils::{get_interface_name, remove_whitespace, setup_interface, LogError, IS_MACOS},
     AppState,
 };
 use chrono::Utc;
@@ -32,12 +33,13 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), S
             "Creating new interface connection for location: {}",
             location.name
         );
-        let api = setup_interface(&location, &state.get_pool())
+        let interface_name = get_interface_name(&location, state.get_connections());
+        let api = setup_interface(&location, &interface_name, &state.get_pool())
             .await
             .map_err(|err| err.to_string())
             .log()?;
         let address = local_ip().map_err(|err| err.to_string()).log()?;
-        let connection = Connection::new(location_id, address.to_string());
+        let connection = ActiveConnection::new(location_id, address.to_string(), interface_name);
         state.active_connections.lock().unwrap().push(connection);
         debug!(
             "Active connections: {:#?}",
@@ -100,6 +102,7 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
         .map_err(|err| err.to_string())
         .log()?
     {
+      let interface_name: String = state.get_connections().iter().map(|conn| con.loca)
         let api = WGApi::new(remove_whitespace(&location.name), IS_MACOS)
             .map_err(|e| e.to_string())
             .log()?;
@@ -108,9 +111,9 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
             .map_err(|err| err.to_string())
             .log()?;
         debug!("Removed interface");
-        if let Some(mut connection) = state.find_and_remove_connection(location_id) {
+        if let Some(connection) = state.find_and_remove_connection(location_id) {
             debug!("Saving connection: {:#?}", connection);
-            connection.end = Some(Utc::now().naive_utc()); // Get the current time as NaiveDateTime in UTC
+            let mut connection: Connection = connection.into();
             connection
                 .save(&state.get_pool())
                 .await
@@ -411,7 +414,7 @@ pub async fn all_connections(
 pub async fn active_connection(
     location_id: i64,
     handle: tauri::AppHandle,
-) -> Result<Option<Connection>, String> {
+) -> Result<Option<ActiveConnection>, String> {
     let state = handle.state::<AppState>();
     debug!(
         "Retrieving active connection for location with id: {}",
