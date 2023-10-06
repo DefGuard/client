@@ -111,6 +111,7 @@ impl ConnectionInfo {
     }
 }
 
+/// Connections stored in memory after creating interface
 #[derive(Debug, Serialize, Clone)]
 pub struct ActiveConnection {
     pub location_id: i64,
@@ -120,7 +121,7 @@ pub struct ActiveConnection {
 }
 impl ActiveConnection {
     pub fn new(location_id: i64, connected_from: String, interface_name: String) -> Self {
-        let start = Utc::now().naive_utc(); // Get the current time as NaiveDateTime in UTC
+        let start = Utc::now().naive_utc();
         Self {
             location_id,
             connected_from,
@@ -133,7 +134,7 @@ impl ActiveConnection {
 impl From<ActiveConnection> for Connection {
     fn from(active_connection: ActiveConnection) -> Self {
         Connection {
-            id: None, // Assuming you want to set it to None for new conversions
+            id: None,
             location_id: active_connection.location_id,
             connected_from: active_connection.connected_from,
             start: active_connection.start,
