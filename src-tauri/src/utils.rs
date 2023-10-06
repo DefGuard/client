@@ -1,6 +1,5 @@
 use std::{
     net::{SocketAddr, TcpListener},
-    panic::Location as ErrorLocation,
     str::FromStr,
 };
 
@@ -9,11 +8,16 @@ use defguard_wireguard_rs::{
 };
 
 use crate::{
-    database::{ActiveConnection, DbPool, Location, WireguardKeys},
+    database::{
+        models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
+    },
     error::Error,
+    AppState,
 };
+use tauri::Manager;
+use tokio::time::{sleep, Duration};
 
-pub static IS_MACOS: bool = true;
+pub static IS_MACOS: bool = cfg!(target_os = "macos");
 
 /// Setup client interface
 pub async fn setup_interface(
@@ -21,21 +25,17 @@ pub async fn setup_interface(
     interface_name: &str,
     pool: &DbPool,
 ) -> Result<WGApi, Error> {
-    debug!(
-        "Creating new interface: {} for location: {:#?}",
-        interface_name, location
-    );
-
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
-        let api = create_api(&interface_name).log()?;
+        debug!("Creating api for interface: '{}'", interface_name);
+        let api = create_api(&interface_name)?;
 
-        api.create_interface().log()?;
+        api.create_interface()?;
         // TODO: handle unwrap
         debug!("Decoding location public key: {}.", location.pubkey);
         let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
         let mut peer = Peer::new(peer_key);
         debug!("Parsing location endpoint: {}", location.endpoint);
-        let endpoint: SocketAddr = location.endpoint.parse().log()?;
+        let endpoint: SocketAddr = location.endpoint.parse()?;
         peer.endpoint = Some(endpoint);
         peer.persistent_keepalive_interval = Some(25);
 
@@ -145,7 +145,7 @@ pub fn get_interface_name(
     active_connections: Vec<ActiveConnection>,
 ) -> String {
     let active_interfaces: Vec<String> = active_connections
-        .iter()
+        .into_iter()
         .map(|con| con.interface_name)
         .collect();
     match IS_MACOS {
@@ -179,24 +179,6 @@ pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }
 
-pub trait LogError {
-    fn log(self) -> Self;
-}
-/// Trait to know when mapped error failed and how
-/// example use failing_function().log()?;
-impl<T, E> LogError for Result<T, E>
-where
-    E: std::fmt::Display,
-{
-    #[track_caller]
-    fn log(self) -> Self {
-        if let Err(e) = &self {
-            error!("Error '{e}' originated in :{}", &ErrorLocation::caller());
-        }
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,4 +206,43 @@ mod tests {
 
         assert_eq!(get_interface_name(&location, active_connections), "utun4");
     }
+}
+
+pub async fn spawn_stats_thread(
+    handle: tauri::AppHandle,
+    location: Location,
+    api: WGApi, // Replace with your actual type
+) {
+    tokio::spawn(async move {
+        let state = handle.state::<AppState>();
+        loop {
+            debug!("Reading interface data");
+            match api.read_interface_data() {
+                Ok(host) => {
+                    let peers = host.peers;
+                    for (_, peer) in peers {
+                        let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
+                            .await
+                            .unwrap();
+                        debug!("Saving location stats: {:#?}", location_stats);
+                        let _ = location_stats.save(&state.get_pool()).await;
+                        debug!("Saved location stats: {:#?}", location_stats);
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Error {} while reading data for interface: {}",
+                        e, location.name
+                    );
+                    debug!(
+                        "Stopped stats thread for location: {}. Error: {}",
+                        location.name,
+                        e.to_string()
+                    );
+                    break;
+                }
+            }
+            sleep(Duration::from_secs(60)).await;
+        }
+    });
 }

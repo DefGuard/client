@@ -1,5 +1,4 @@
 use chrono::{NaiveDateTime, Utc};
-use defguard_wireguard_rs::WGApi;
 use serde::Serialize;
 use sqlx::{query, query_as, FromRow};
 
@@ -15,17 +14,6 @@ pub struct Connection {
 }
 
 impl Connection {
-    //pub fn new(location_id: i64, connected_from: String) -> Self {
-    //let start = Utc::now().naive_utc(); // Get the current time as NaiveDateTime in UTC
-    //Connection {
-    //id: None,
-    //location_id,
-    //connected_from,
-    //start,
-    //end: None,
-    //}
-    //}
-
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         let result = query!(
             "INSERT INTO connection (location_id, connected_from, start, end) \
