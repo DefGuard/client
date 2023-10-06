@@ -4,10 +4,10 @@ use crate::{
         Location, LocationStats, WireguardKeys,
     },
     error::Error,
-    utils::{get_interface_name, setup_interface, spawn_stats_thread, IS_MACOS},
+    utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
     AppState,
 };
-use defguard_wireguard_rs::{WGApi, WireguardInterfaceApi};
+use defguard_wireguard_rs::WireguardInterfaceApi;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
@@ -36,14 +36,12 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
             state.active_connections.lock().unwrap()
         );
         debug!("Sending event connection-changed.");
-        handle
-            .emit_all(
-                "connection-changed",
-                Payload {
-                    message: "Created new connection".into(),
-                },
-            )
-            .unwrap();
+        handle.emit_all(
+            "connection-changed",
+            Payload {
+                message: "Created new connection".into(),
+            },
+        )?;
         // Spawn stats threads
         debug!("Spawning stats thread");
         let _ = spawn_stats_thread(handle, location, api).await;
@@ -59,21 +57,19 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
     if let Some(connection) = state.find_and_remove_connection(location_id) {
         debug!("Found active connection: {:#?}", connection);
         debug!("Creating api to remove interface");
-        let api = WGApi::new(connection.interface_name.clone(), IS_MACOS)?;
+        let api = create_api(&connection.interface_name)?;
         api.remove_interface()?;
         debug!("Removed interface");
         debug!("Saving connection: {:#?}", connection);
         let mut connection: Connection = connection.into();
         connection.save(&state.get_pool()).await?;
         debug!("Saved connection: {:#?}", connection);
-        handle
-            .emit_all(
-                "connection-changed",
-                Payload {
-                    message: "Created new connection".into(),
-                },
-            )
-            .unwrap();
+        handle.emit_all(
+            "connection-changed",
+            Payload {
+                message: "Created new connection".into(),
+            },
+        )?;
         Ok(())
     } else {
         error!("Connection for location with id: {} not found", location_id);

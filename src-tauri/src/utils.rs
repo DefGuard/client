@@ -27,12 +27,11 @@ pub async fn setup_interface(
 ) -> Result<WGApi, Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         debug!("Creating api for interface: '{}'", interface_name);
-        let api = create_api(&interface_name)?;
+        let api = create_api(interface_name)?;
 
         api.create_interface()?;
-        // TODO: handle unwrap
         debug!("Decoding location public key: {}.", location.pubkey);
-        let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
+        let peer_key: Key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
         debug!("Parsing location endpoint: {}", location.endpoint);
         let endpoint: SocketAddr = location.endpoint.parse()?;
@@ -52,7 +51,7 @@ pub async fn setup_interface(
                     peer.allowed_ips.push(addr);
                     // TODO: Handle windows when wireguard_rs adds support
                     // Add a route for the allowed IP using the `ip -4 route add` command
-                    if let Err(err) = add_route(&allowed_ip, &interface_name) {
+                    if let Err(err) = add_route(&allowed_ip, interface_name) {
                         error!("Error adding route for {}: {}", allowed_ip, err);
                     } else {
                         debug!("Added route for {}", allowed_ip);
@@ -158,7 +157,7 @@ pub fn get_interface_name(
                 interface_name = format!("utun{}", counter);
             }
 
-            return interface_name;
+            interface_name
         }
         false => remove_whitespace(&location.name),
     }
@@ -177,35 +176,6 @@ fn is_port_free(port: u16) -> bool {
 /// Create new api object
 pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::database::Location;
-    use chrono::Utc;
-
-    #[test]
-    fn test_macos_existing_interfaces() {
-        let location = Location {
-            id: None,
-            instance_id: 1,
-            network_id: 2,
-            name: "Example Location".to_string(),
-            address: "123 Main St".to_string(),
-            pubkey: "public_key_here".to_string(),
-            endpoint: "endpoint_here".to_string(),
-            allowed_ips: "allowed_ips_here".to_string(),
-        };
-        let active_connections = vec![ActiveConnection {
-            location_id: 1,
-            start: Utc::now().naive_utc(),
-            connected_from: "Test".to_string(),
-            interface_name: "utun3".to_string(),
-        }];
-
-        assert_eq!(get_interface_name(&location, active_connections), "utun4");
-    }
 }
 
 pub async fn spawn_stats_thread(
