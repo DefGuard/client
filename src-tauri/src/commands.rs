@@ -3,7 +3,7 @@ use crate::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
         Connection, ConnectionInfo, Instance, Location, LocationStats, WireguardKeys,
     },
-    utils::{remove_whitespace, setup_interface, LogExt, IS_MACOS},
+    utils::{remove_whitespace, setup_interface, LogError, IS_MACOS},
     AppState,
 };
 use chrono::Utc;

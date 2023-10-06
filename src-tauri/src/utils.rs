@@ -153,12 +153,12 @@ pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }
 
-pub trait LogExt {
+pub trait LogError {
     fn log(self) -> Self;
 }
 /// Trait to know when mapped error failed and how
 /// example use failing_function().log()?;
-impl<T, E> LogExt for Result<T, E>
+impl<T, E> LogError for Result<T, E>
 where
     E: std::fmt::Display,
 {

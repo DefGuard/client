@@ -1,6 +1,6 @@
 pub mod models;
 
-use crate::utils::LogExt;
+use crate::utils::LogError;
 use std::fs;
 use tauri::AppHandle;
 
