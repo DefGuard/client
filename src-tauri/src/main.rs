@@ -116,7 +116,7 @@ fn main() {
                 info!("Database initialization completed");
                 info!("Starting main app thread.");
                 let result = database::info(&app_state.get_pool()).await;
-                info!("database info result: {:#?}", result);
+                info!("Database info result: {:#?}", result);
             });
             Ok(())
         })
