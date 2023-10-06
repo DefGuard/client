@@ -102,16 +102,10 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
         .map_err(|err| err.to_string())
         .log()?
     {
-      let interface_name: String = state.get_connections().iter().map(|conn| con.loca)
-        let api = WGApi::new(remove_whitespace(&location.name), IS_MACOS)
-            .map_err(|e| e.to_string())
-            .log()?;
-        debug!("Removing interface");
-        api.remove_interface()
-            .map_err(|err| err.to_string())
-            .log()?;
         debug!("Removed interface");
         if let Some(connection) = state.find_and_remove_connection(location_id) {
+            let api = WGApi::new(connection.interface_name, IS_MACOS);
+            api.remove_interface().await?;
             debug!("Saving connection: {:#?}", connection);
             let mut connection: Connection = connection.into();
             connection
@@ -238,19 +232,19 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .log()?;
     debug!("Found following instances: {:#?}", instances);
     let mut instance_info: Vec<InstanceInfo> = vec![];
+    let connection_ids: Vec<i64> = app_state
+        .active_connections
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|connection| connection.location_id)
+        .collect();
     for instance in &instances {
         debug!("Checking if instance: {:#?} is active", instance.uuid);
         let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
             .await
             .map_err(|err| err.to_string())
             .log()?;
-        let connection_ids: Vec<i64> = app_state
-            .active_connections
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|connection| connection.location_id)
-            .collect();
         let location_ids: Vec<i64> = locations
             .iter()
             .map(|location| location.id.unwrap())
