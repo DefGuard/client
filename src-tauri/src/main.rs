@@ -5,21 +5,22 @@ pub mod appstate;
 pub mod commands;
 pub mod database;
 pub mod error;
+mod tray;
 pub mod utils;
 
 use appstate::AppState;
-use tauri::{Manager, State, api::process, Env};
+use tauri::{api::process, Env, Manager, State, SystemTrayEvent};
 use tauri_plugin_log::LogTarget;
 
-use tauri::SystemTrayEvent;
-mod tray;
-use crate::commands::{
-    active_connection, all_connections, all_instances, all_locations, connect, disconnect,
-    last_connection, location_stats, save_device_config, update_instance,
+use crate::{
+    commands::{
+        active_connection, all_connections, all_instances, all_locations, connect, disconnect,
+        last_connection, location_stats, save_device_config, update_instance,
+    },
+    tray::create_tray_menu,
 };
-use crate::tray::create_tray_menu;
-use utils::IS_MACOS;
 use std::env;
+use utils::IS_MACOS;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -36,14 +37,21 @@ const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTa
 // TODO: Refactor later
 #[allow(clippy::single_match)]
 fn main() {
-if IS_MACOS {
-    let current_bin_path = process::current_binary(&Env::default()).expect("Failed to get current binary path");
-    let current_bin_dir = current_bin_path.parent().expect("Failed to get current binary directory");
-    debug!("Current binary dir: {current_bin_dir:?}");
-    let current_path = env::var("PATH").unwrap();
-    debug!("Current PATH: {current_path:?}");
-    env::set_var("PATH", format!{"{current_path}:{}", current_bin_dir.to_str().unwrap()})
-}
+    // add bundled `wireguard-go` binary to PATH
+    if IS_MACOS {
+        debug!("Adding bundled wireguard-go binary to PATH");
+        let current_bin_path =
+            process::current_binary(&Env::default()).expect("Failed to get current binary path");
+        let current_bin_dir = current_bin_path
+            .parent()
+            .expect("Failed to get current binary directory");
+        let current_path = env::var("PATH").expect("Failed to get current PATH variable");
+        env::set_var(
+            "PATH",
+            format! {"{current_path}:{}", current_bin_dir.to_str().unwrap()},
+        );
+        debug!("Added binary dir {current_bin_dir:?} to PATH");
+    }
 
     let tray_menu = create_tray_menu();
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
