@@ -32,6 +32,8 @@ pub enum Error {
     Datetime,
     #[error("Object not found")]
     NotFound,
+    #[error("Tauri error: {0}")]
+    Tauri(#[from] tauri::Error),
 }
 
 // we must manually implement serde::Serialize

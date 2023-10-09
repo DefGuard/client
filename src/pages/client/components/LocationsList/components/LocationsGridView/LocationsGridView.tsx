@@ -6,7 +6,9 @@ import { error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { getStatsFilterValue } from '../../../../../../shared/utils/getStatsFilterValue';
 import { clientApi } from '../../../../clientAPI/clientApi';
+import { useClientStore } from '../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../query';
 import { DefguardInstance, DefguardLocation } from '../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
@@ -44,6 +46,8 @@ const GridItem = ({ location }: GridItemProps) => {
   );
   const { getLocationStats, getLastConnection } = clientApi;
 
+  const statsFilter = useClientStore((state) => state.statsFilter);
+
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, location.id as number],
     queryFn: () => getLastConnection({ locationId: location.id as number }),
@@ -54,7 +58,11 @@ const GridItem = ({ location }: GridItemProps) => {
   });
   const { data: locationStats } = useQuery({
     queryKey: [clientQueryKeys.getLocationStats, location.id as number],
-    queryFn: () => getLocationStats({ locationId: location.id as number }),
+    queryFn: () =>
+      getLocationStats({
+        locationId: location.id as number,
+        from: getStatsFilterValue(statsFilter),
+      }),
     enabled: !!location.id,
     onError: (e) => {
       error(`Error retrieving location stats: ${String(e)}`);

@@ -11,9 +11,9 @@ import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
 import { LocationsList } from './components/LocationsList/LocationsList';
 import { AddInstanceModal } from './components/modals/AddInstanceModal/AddInstanceModal';
+import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
-import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 
 const { getInstances } = clientApi;
 
