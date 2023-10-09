@@ -1,17 +1,20 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use crate::database::{Connection, DbPool};
+use crate::database::{ActiveConnection, DbPool};
 
 #[derive(Default)]
 pub struct AppState {
-    pub db: Mutex<Option<DbPool>>,
-    pub active_connections: Mutex<Vec<Connection>>,
+    pub db: Arc<Mutex<Option<DbPool>>>,
+    pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
 }
 impl AppState {
     pub fn get_pool(&self) -> DbPool {
         self.db.lock().unwrap().as_ref().cloned().unwrap()
     }
-    pub fn find_and_remove_connection(&self, location_id: i64) -> Option<Connection> {
+    pub fn get_connections(&self) -> Vec<ActiveConnection> {
+        self.active_connections.lock().unwrap().clone()
+    }
+    pub fn find_and_remove_connection(&self, location_id: i64) -> Option<ActiveConnection> {
         debug!(
             "Removing active connection for location with id: {}",
             location_id
@@ -33,7 +36,7 @@ impl AppState {
             None // Connection not found
         }
     }
-    pub fn find_connection(&self, location_id: i64) -> Option<Connection> {
+    pub fn find_connection(&self, location_id: i64) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().unwrap();
         debug!("Checking for active connection with location id: {location_id} in active connections: {:#?}", connections);
 

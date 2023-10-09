@@ -14,6 +14,10 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
         .path_resolver()
         .app_data_dir()
         .ok_or(Error::Config)?;
+    // Create app data directory if it doesnt exist
+    debug!("Creating app data dir at: {}", app_dir.to_string_lossy());
+    fs::create_dir_all(&app_dir)?;
+    info!("Created app data dir at: {}", app_dir.to_string_lossy());
     let db_path = app_dir.join(DB_NAME);
     if !db_path.exists() {
         debug!(
@@ -55,7 +59,7 @@ pub async fn info(pool: &DbPool) -> Result<(), Error> {
 }
 
 pub use models::{
-    connection::{Connection, ConnectionInfo},
+    connection::{ActiveConnection, Connection, ConnectionInfo},
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
     wireguard_keys::WireguardKeys,

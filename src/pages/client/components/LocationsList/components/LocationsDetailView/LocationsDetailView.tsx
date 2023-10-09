@@ -2,6 +2,7 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { error } from 'tauri-plugin-log-api';
 
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { CardTabs } from '../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
@@ -34,17 +35,26 @@ export const LocationsDetailView = ({ locations }: Props) => {
     queryKey: [clientQueryKeys.getLocationStats, activeLocationId as number],
     queryFn: () => getLocationStats({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
+    onError: (e) => {
+      error(`Error retrieving location stats: ${e}`);
+    },
   });
 
   const { data: connectionHistory } = useQuery({
     queryKey: [clientQueryKeys.getConnectionHistory, activeLocationId as number],
     queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
+    onError: (e) => {
+      error(`Error retrieving connection history: ${e}`);
+    },
   });
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
+    onError: (e) => {
+      error(`Error retrieving last connection: ${e}`);
+    },
   });
 
   const tabs = useMemo(

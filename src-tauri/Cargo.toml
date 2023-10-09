@@ -30,6 +30,7 @@ x25519-dalek = { version = "2", features = [
 ] }
 prost = "0.11"
 
+# FIXME: Remove devtools before release
 tauri = { version = "1.4.1", features = [ "http-all", "window-all", "system-tray", "devtools"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }

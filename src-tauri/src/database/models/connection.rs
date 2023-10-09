@@ -10,21 +10,10 @@ pub struct Connection {
     pub location_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,
-    pub end: Option<NaiveDateTime>,
+    pub end: NaiveDateTime,
 }
 
 impl Connection {
-    pub fn new(location_id: i64, connected_from: String) -> Self {
-        let start = Utc::now().naive_utc(); // Get the current time as NaiveDateTime in UTC
-        Connection {
-            id: None,
-            location_id,
-            connected_from,
-            start,
-            end: None,
-        }
-    }
-
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         let result = query!(
             "INSERT INTO connection (location_id, connected_from, start, end) \
@@ -119,5 +108,37 @@ impl ConnectionInfo {
         .await?;
 
         Ok(connections)
+    }
+}
+
+/// Connections stored in memory after creating interface
+#[derive(Debug, Serialize, Clone)]
+pub struct ActiveConnection {
+    pub location_id: i64,
+    pub connected_from: String,
+    pub start: NaiveDateTime,
+    pub interface_name: String,
+}
+impl ActiveConnection {
+    pub fn new(location_id: i64, connected_from: String, interface_name: String) -> Self {
+        let start = Utc::now().naive_utc();
+        Self {
+            location_id,
+            connected_from,
+            start,
+            interface_name,
+        }
+    }
+}
+
+impl From<ActiveConnection> for Connection {
+    fn from(active_connection: ActiveConnection) -> Self {
+        Connection {
+            id: None,
+            location_id: active_connection.location_id,
+            connected_from: active_connection.connected_from,
+            start: active_connection.start,
+            end: Utc::now().naive_utc(),
+        }
     }
 }

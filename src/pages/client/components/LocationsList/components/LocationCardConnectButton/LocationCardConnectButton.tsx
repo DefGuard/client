@@ -2,6 +2,7 @@ import './style.scss';
 
 import classNames from 'classnames';
 import { useState } from 'react';
+import { error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import SvgIconCheckmarkSmall from '../../../../../../shared/components/svg/IconCheckmarkSmall';
@@ -44,6 +45,7 @@ export const LocationCardConnectButton = ({ location }: Props) => {
     } catch (e) {
       setIsLoading(false);
       toaster.error(LL.common.messages.error());
+      error(`Error handling interface: ${e}`);
       console.error(e);
     }
   };
