@@ -1,4 +1,6 @@
+use std::str::FromStr;
 use crate::{
+  error::Error,
     database::{
         models::{instance::InstanceInfo, location::peer_to_location_stats},
         Connection, ConnectionInfo, Instance, Location, LocationStats, WireguardKeys,
@@ -6,7 +8,7 @@ use crate::{
     utils::{remove_whitespace, setup_interface, IS_MACOS},
     AppState,
 };
-use chrono::Utc;
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use defguard_wireguard_rs::{WGApi, WireguardInterfaceApi};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
@@ -351,12 +353,54 @@ pub async fn update_instance(
         Err("Instance not found".into())
     }
 }
+#[derive(Deserialize)]
+pub struct QueryFrom {
+    from: Option<String>,
+}
+
+impl QueryFrom {
+    /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
+    fn parse_timestamp(&self) -> Result<DateTime<Utc>, Error> {
+        Ok(match &self.from {
+            Some(from) => DateTime::<Utc>::from_str(from).map_err(|_| Error::Datetime)?,
+            None => Utc::now() - Duration::hours(1),
+        })
+    }
+}
+
+pub enum DateTimeAggregation {
+    Hour,
+    Minute,
+}
+
+impl DateTimeAggregation {
+    /// Returns database format string for given aggregation variant
+    fn fstring(&self) -> &str {
+        match self {
+            Self::Hour => "%Y-%m-%d %H",
+            Self::Minute => "%M",
+        }
+    }
+}
+fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
+    // Use hourly aggregation for longer periods
+    let aggregation = match Utc::now().naive_utc() - from {
+        duration if duration >= Duration::hours(6) => Ok(DateTimeAggregation::Hour),
+        duration if duration < Duration::zero() => Err(Error::InternalError),
+        _ => Ok(DateTimeAggregation::Minute),
+    }?;
+    Ok(aggregation)
+}
+
 #[tauri::command]
 pub async fn location_stats(
     location_id: i64,
+    query_from: QueryFrom,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationStats>, String> {
-    LocationStats::all_by_location_id(&app_state.get_pool(), location_id)
+    let from = query_from.parse_timestamp()?.naive_utc();
+    let aggregation = get_aggregation(from)?;
+    LocationStats::all_by_location_id(&app_state.get_pool(), location_id, from, aggregation)
         .await
         .map_err(|err| err.to_string())
 }

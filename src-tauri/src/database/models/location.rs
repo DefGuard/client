@@ -174,6 +174,7 @@ impl Location {
     }
 }
 
+
 impl LocationStats {
     pub fn new(
         location_id: i64,
@@ -208,15 +209,24 @@ impl LocationStats {
         self.id = Some(result.id);
         Ok(())
     }
-    pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+    pub async fn all_by_location_id(
+        pool: &DbPool,
+        location_id: i64,
+        from: &NaiveDateTime,
+        aggregation: &DateTimeAggregation,
+    ) -> Result<Vec<Self>, Error> {
         let stats = query_as!(
             LocationStats,
             r#"
-            SELECT id, location_id, upload, download, last_handshake, collected_at as "collected_at: _"
+            SELECT id, location_id, upload, download,
+            last_handshake, strftime($1, collected_at) as "collected_at: _"
             FROM location_stats
-            WHERE location_id = $1
+            WHERE location_id = $2
+            AND collected_at >= $3
             "#,
-            location_id
+            location_id,
+            aggregation,
+            from
         )
         .fetch_all(pool)
         .await?;
