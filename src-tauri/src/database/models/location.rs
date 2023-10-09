@@ -214,7 +214,7 @@ impl LocationStats {
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
     ) -> Result<Vec<Self>, Error> {
-      let aggregation = aggregation.fstring();
+        let aggregation = aggregation.fstring();
         let stats = query_as!(
             LocationStats,
             r#"
