@@ -83,6 +83,7 @@ const GridItem = ({ location }: GridItemProps) => {
           {locationStats ? (
             <LocationUsageChart
               heightX={20}
+              width={400}
               height={50}
               hideX={false}
               data={locationStats}

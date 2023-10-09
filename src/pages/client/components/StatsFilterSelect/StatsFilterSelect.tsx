@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { Select } from '../../../../shared/defguard-ui/components/Layout/Select/Select';
@@ -6,10 +7,12 @@ import {
   SelectSelectedValue,
 } from '../../../../shared/defguard-ui/components/Layout/Select/types';
 import { useClientStore } from '../../hooks/useClientStore';
+import { clientQueryKeys } from '../../query';
 
 export const StatsFilterSelect = () => {
   const filterValue = useClientStore((state) => state.statsFilter);
   const setClientStore = useClientStore((state) => state.setState);
+  const queryClient = useQueryClient();
 
   const renderSelected = useCallback((selected: number): SelectSelectedValue => {
     return {
@@ -23,7 +26,10 @@ export const StatsFilterSelect = () => {
       renderSelected={renderSelected}
       options={selectOptions}
       selected={filterValue}
-      onChangeSingle={(res) => setClientStore({ statsFilter: res })}
+      onChangeSingle={(res) => {
+        queryClient.invalidateQueries([clientQueryKeys.getLocationStats]);
+        setClientStore({ statsFilter: res });
+      }}
     />
   );
 };

@@ -278,19 +278,13 @@ pub async fn update_instance(
         Err(Error::NotFound)
     }
 }
-#[derive(Deserialize)]
-pub struct QueryFrom {
-    from: Option<String>,
-}
 
-impl QueryFrom {
-    /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
-    fn parse_timestamp(&self) -> Result<DateTime<Utc>, Error> {
-        Ok(match &self.from {
-            Some(from) => DateTime::<Utc>::from_str(from).map_err(|_| Error::Datetime)?,
-            None => Utc::now() - Duration::hours(1),
-        })
-    }
+  /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
+fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
+      Ok(match from {
+          Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
+          None => Utc::now() - Duration::hours(1),
+      })
 }
 
 pub enum DateTimeAggregation {
@@ -302,8 +296,8 @@ impl DateTimeAggregation {
     /// Returns database format string for given aggregation variant
     pub fn fstring(&self) -> String {
         match self {
-            Self::Hour => "%Y-%m-%d %H".into(),
-            Self::Minute => "%M".into(),
+            Self::Hour => "%Y-%m-%d %H:00:00".into(),
+            Self::Minute => "%Y-%m-%d %H:%M:00".into(),
         }
     }
 }
@@ -321,10 +315,10 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
 #[tauri::command]
 pub async fn location_stats(
     location_id: i64,
-    from: QueryFrom,
+    from: Option<String>,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationStats>, Error> {
-    let from = from.parse_timestamp()?.naive_utc();
+    let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
     LocationStats::all_by_location_id(&app_state.get_pool(), location_id, &from, &aggregation).await
 }

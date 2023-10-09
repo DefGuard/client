@@ -223,6 +223,10 @@ impl LocationStats {
             FROM location_stats
             WHERE location_id = $2
             AND collected_at >= $3
+            GROUP BY
+              collected_at
+            ORDER BY
+              collected_at;
             "#,
             aggregation,
             location_id,

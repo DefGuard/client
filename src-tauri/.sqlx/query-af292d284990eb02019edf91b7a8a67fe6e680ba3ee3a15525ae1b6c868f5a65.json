@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id, location_id, upload, download,\n            last_handshake, strftime($1, collected_at) as \"collected_at!: NaiveDateTime\"\n            FROM location_stats\n            WHERE location_id = $2\n            AND collected_at >= $3\n            ",
+  "query": "\n            SELECT id, location_id, upload, download,\n            last_handshake, strftime($1, collected_at) as \"collected_at!: NaiveDateTime\"\n            FROM location_stats\n            WHERE location_id = $2\n            AND collected_at >= $3\n            GROUP BY\n              collected_at\n            ORDER BY\n              collected_at;\n            ",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       true
     ]
   },
-  "hash": "e54387494fbf1be0acf6db10601f0d70805e1a6e3301ea6f84770237f49f587a"
+  "hash": "af292d284990eb02019edf91b7a8a67fe6e680ba3ee3a15525ae1b6c868f5a65"
 }
