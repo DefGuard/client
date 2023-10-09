@@ -4,14 +4,6 @@
       "externalBin": [
         "binaries/wireguard-go"
       ]
-    },
-    "allowlist": {
-      "shell": {
-        "sidecar": true,
-        "scope": [
-          { "name": "binaries/wireguard-go", "sidecar": true }
-        ]
-      }
     }
   }
 }
