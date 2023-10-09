@@ -12,6 +12,16 @@ on:
       - dev
 
 jobs:
+  build-wireguard-go:
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: WireGuard/wireguard-go
+          ref: master
+      - name: Build wireguard-go binary
+        run: make
+
   build:
     strategy:
       fail-fast: false
