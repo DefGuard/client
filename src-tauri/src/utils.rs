@@ -8,27 +8,31 @@ use defguard_wireguard_rs::{
 };
 
 use crate::{
-    database::{DbPool, Location, WireguardKeys},
+    database::{
+        models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
+    },
     error::Error,
+    AppState,
 };
+use tauri::Manager;
+use tokio::time::{sleep, Duration};
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
+pub static STATS_PERIOD: u64 = 60;
 
 /// Setup client interface
-pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi, Error> {
-    let interface_name = remove_whitespace(&location.name);
-    debug!(
-        "Creating new interface: {} for location: {:#?}",
-        interface_name, location
-    );
-    let api = create_api(&interface_name)?;
-
-    api.create_interface()?;
-
+pub async fn setup_interface(
+    location: &Location,
+    interface_name: &str,
+    pool: &DbPool,
+) -> Result<WGApi, Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
-        // TODO: handle unwrap
+        debug!("Creating api for interface: '{}'", interface_name);
+        let api = create_api(interface_name)?;
+
+        api.create_interface()?;
         debug!("Decoding location public key: {}.", location.pubkey);
-        let peer_key: Key = Key::from_str(&location.pubkey).unwrap();
+        let peer_key: Key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
         debug!("Parsing location endpoint: {}", location.endpoint);
         let endpoint: SocketAddr = location.endpoint.parse()?;
@@ -48,7 +52,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
                     peer.allowed_ips.push(addr);
                     // TODO: Handle windows when wireguard_rs adds support
                     // Add a route for the allowed IP using the `ip -4 route add` command
-                    if let Err(err) = add_route(&allowed_ip, &interface_name) {
+                    if let Err(err) = add_route(&allowed_ip, interface_name) {
                         error!("Error adding route for {}: {}", allowed_ip, err);
                     } else {
                         debug!("Added route for {}", allowed_ip);
@@ -64,7 +68,7 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
         }
         if let Some(port) = find_random_free_port() {
             let interface_config = InterfaceConfiguration {
-                name: interface_name.clone(),
+                name: interface_name.into(),
                 prvkey: keys.prvkey,
                 address: location.address.clone(),
                 port: port.into(),
@@ -88,8 +92,6 @@ pub async fn setup_interface(location: &Location, pool: &DbPool) -> Result<WGApi
         }
     } else {
         error!("No keys found for instance: {}", location.instance_id);
-        error!("Removing interface: {}", location.name);
-        api.remove_interface()?;
         Err(Error::InternalError)
     }
 }
@@ -137,6 +139,31 @@ fn find_random_free_port() -> Option<u16> {
     None // No free port found in the specified range
 }
 
+/// Returns interface name for location
+pub fn get_interface_name(
+    location: &Location,
+    active_connections: Vec<ActiveConnection>,
+) -> String {
+    let active_interfaces: Vec<String> = active_connections
+        .into_iter()
+        .map(|con| con.interface_name)
+        .collect();
+    match IS_MACOS {
+        true => {
+            let mut counter = 3;
+            let mut interface_name = format!("utun{}", counter);
+
+            while active_interfaces.contains(&interface_name) {
+                counter += 1;
+                interface_name = format!("utun{}", counter);
+            }
+
+            interface_name
+        }
+        false => remove_whitespace(&location.name),
+    }
+}
+
 fn is_port_free(port: u16) -> bool {
     if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", port)) {
         // Port is available; close the listener
@@ -150,4 +177,43 @@ fn is_port_free(port: u16) -> bool {
 /// Create new api object
 pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
+}
+
+pub async fn spawn_stats_thread(
+    handle: tauri::AppHandle,
+    location: Location,
+    api: WGApi, // Replace with your actual type
+) {
+    tokio::spawn(async move {
+        let state = handle.state::<AppState>();
+        loop {
+            debug!("Reading interface data");
+            match api.read_interface_data() {
+                Ok(host) => {
+                    let peers = host.peers;
+                    for (_, peer) in peers {
+                        let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
+                            .await
+                            .unwrap();
+                        debug!("Saving location stats: {:#?}", location_stats);
+                        let _ = location_stats.save(&state.get_pool()).await;
+                        debug!("Saved location stats: {:#?}", location_stats);
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Error {} while reading data for interface: {}",
+                        e, location.name
+                    );
+                    debug!(
+                        "Stopped stats thread for location: {}. Error: {}",
+                        location.name,
+                        e.to_string()
+                    );
+                    break;
+                }
+            }
+            sleep(Duration::from_secs(STATS_PERIOD)).await;
+        }
+    });
 }
