@@ -35,7 +35,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
   const statsFilter = useClientStore((state) => state.statsFilter);
 
   const { data: locationStats } = useQuery({
-    queryKey: [clientQueryKeys.getLocationStats, activeLocationId as number],
+    queryKey: [clientQueryKeys.getLocationStats, activeLocationId as number, statsFilter],
     queryFn: () =>
       getLocationStats({
         locationId: activeLocationId as number,

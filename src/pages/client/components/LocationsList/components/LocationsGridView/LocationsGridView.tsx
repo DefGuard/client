@@ -57,7 +57,7 @@ const GridItem = ({ location }: GridItemProps) => {
     },
   });
   const { data: locationStats } = useQuery({
-    queryKey: [clientQueryKeys.getLocationStats, location.id as number],
+    queryKey: [clientQueryKeys.getLocationStats, location.id as number, statsFilter],
     queryFn: () =>
       getLocationStats({
         locationId: location.id as number,
