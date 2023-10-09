@@ -18,6 +18,7 @@ use tauri::Manager;
 use tokio::time::{sleep, Duration};
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
+pub static STATS_PERIOD: u64 = 60;
 
 /// Setup client interface
 pub async fn setup_interface(
@@ -212,7 +213,7 @@ pub async fn spawn_stats_thread(
                     break;
                 }
             }
-            sleep(Duration::from_secs(60)).await;
+            sleep(Duration::from_secs(STATS_PERIOD)).await;
         }
     });
 }
