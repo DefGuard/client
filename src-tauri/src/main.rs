@@ -8,7 +8,7 @@ pub mod error;
 pub mod utils;
 
 use appstate::AppState;
-use tauri::{Manager, State};
+use tauri::{Manager, State, api::process, Env};
 use tauri_plugin_log::LogTarget;
 
 use tauri::SystemTrayEvent;
@@ -18,6 +18,8 @@ use crate::commands::{
     last_connection, location_stats, save_device_config, update_instance,
 };
 use crate::tray::create_tray_menu;
+use utils::IS_MACOS;
+use std::env;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -34,6 +36,15 @@ const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTa
 // TODO: Refactor later
 #[allow(clippy::single_match)]
 fn main() {
+if IS_MACOS {
+    let current_bin_path = process::current_binary(&Env::default()).expect("Failed to get current binary path");
+    let current_bin_dir = current_bin_path.parent().expect("Failed to get current binary directory");
+    debug!("Current binary dir: {current_bin_dir:?}");
+    let current_path = env::var("PATH").unwrap();
+    debug!("Current PATH: {current_path:?}");
+    env::set_var("PATH", format!{"{current_path}:{}", current_bin_dir.to_str().unwrap()})
+}
+
     let tray_menu = create_tray_menu();
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
 
