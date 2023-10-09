@@ -2,7 +2,7 @@ use chrono::{NaiveDateTime, Utc};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 use std::time::SystemTime;
 
-use crate::{database::DbPool, error::Error};
+use crate::{commands::DateTimeAggregation, database::DbPool, error::Error};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 
@@ -174,7 +174,6 @@ impl Location {
     }
 }
 
-
 impl LocationStats {
     pub fn new(
         location_id: i64,
@@ -215,17 +214,18 @@ impl LocationStats {
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
     ) -> Result<Vec<Self>, Error> {
+      let aggregation = aggregation.fstring();
         let stats = query_as!(
             LocationStats,
             r#"
             SELECT id, location_id, upload, download,
-            last_handshake, strftime($1, collected_at) as "collected_at: _"
+            last_handshake, strftime($1, collected_at) as "collected_at!: NaiveDateTime"
             FROM location_stats
             WHERE location_id = $2
             AND collected_at >= $3
             "#,
-            location_id,
             aggregation,
+            location_id,
             from
         )
         .fetch_all(pool)

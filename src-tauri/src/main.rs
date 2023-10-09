@@ -28,8 +28,8 @@ struct Payload {
 #[macro_use]
 extern crate log;
 
-// Specify log targets
-const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
+// FIXME: remove Webview on release Specify log targets
+const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTarget::Webview];
 
 // TODO: Refactor later
 #[allow(clippy::single_match)]
@@ -115,7 +115,8 @@ fn main() {
                 *app_state.db.lock().unwrap() = Some(db);
                 info!("Database initialization completed");
                 info!("Starting main app thread.");
-                let _ = database::info(&app_state.get_pool()).await;
+                let result = database::info(&app_state.get_pool()).await;
+                info!("Database info result: {:#?}", result);
             });
             Ok(())
         })
