@@ -28,6 +28,8 @@ pub enum Error {
     LocalIpError(#[from] LocalIpError),
     #[error("Internal error")]
     InternalError,
+    #[error("Failed to parse timestamp")]
+    Datetime,
     #[error("Object not found")]
     NotFound,
     #[error("Tauri error: {0}")]

@@ -7,9 +7,11 @@ use crate::{
     utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
     AppState,
 };
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use defguard_wireguard_rs::WireguardInterfaceApi;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use tauri::{Manager, State};
 
 #[derive(Clone, serde::Serialize)]
@@ -276,12 +278,49 @@ pub async fn update_instance(
         Err(Error::NotFound)
     }
 }
+
+  /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
+fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
+      Ok(match from {
+          Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
+          None => Utc::now() - Duration::hours(1),
+      })
+}
+
+pub enum DateTimeAggregation {
+    Hour,
+    Minute,
+}
+
+impl DateTimeAggregation {
+    /// Returns database format string for given aggregation variant
+    pub fn fstring(&self) -> String {
+        match self {
+            Self::Hour => "%Y-%m-%d %H:00:00".into(),
+            Self::Minute => "%Y-%m-%d %H:%M:00".into(),
+        }
+    }
+}
+
+fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
+    // Use hourly aggregation for longer periods
+    let aggregation = match Utc::now().naive_utc() - from {
+        duration if duration >= Duration::hours(6) => Ok(DateTimeAggregation::Hour),
+        duration if duration < Duration::zero() => Err(Error::InternalError),
+        _ => Ok(DateTimeAggregation::Minute),
+    }?;
+    Ok(aggregation)
+}
+
 #[tauri::command]
 pub async fn location_stats(
     location_id: i64,
+    from: Option<String>,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationStats>, Error> {
-    LocationStats::all_by_location_id(&app_state.get_pool(), location_id).await
+    let from = parse_timestamp(from)?.naive_utc();
+    let aggregation = get_aggregation(from)?;
+    LocationStats::all_by_location_id(&app_state.get_pool(), location_id, &from, &aggregation).await
 }
 
 #[tauri::command]
