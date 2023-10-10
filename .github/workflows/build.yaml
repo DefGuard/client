@@ -83,6 +83,10 @@ jobs:
           name: wireguard-go
           path: src-tauri/binaries/wireguard-go-x86_64-apple-darwin
 
+      - name: Make wireguard-go binary executable
+        if: matrix.platform == 'macOS'
+        run: chmod +x src-tauri/binaries/wireguard-go-x86_64-apple-darwin
+
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
