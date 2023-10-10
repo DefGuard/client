@@ -83,10 +83,6 @@ jobs:
           name: wireguard-go
           path: src-tauri/binaries/wireguard-go-x86_64-apple-darwin
 
-      - name: Make wireguard-go binary executable
-        if: matrix.platform == 'macOS'
-        run: chmod +x src-tauri/binaries/wireguard-go-x86_64-apple-darwin
-
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
@@ -107,9 +103,13 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 1
 
+      - name: Make sure wireguard-go binary is executable
+        if: matrix.platform == 'macOS'
+        run: chmod +x src-tauri/target/release/bundle/macos/Defguard.app/Contents/MacOS/wireguard-go
+
       - name: 'Tar files'
         if: matrix.platform == 'macOS'
-        run: tar -cvf macos.tar src-tauri/target/release/bundle
+        run: tar -cvf macos.tar -C src-tauri/target/release/bundle .
 
       - name: Upload macOS artifacts
         if: matrix.platform == 'macOS'
