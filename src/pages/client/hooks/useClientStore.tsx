@@ -7,6 +7,7 @@ import { DefguardInstance } from '../types';
 const defaultValues: StoreValues = {
   instances: [],
   selectedInstance: undefined,
+  statsFilter: 1,
 };
 
 export const useClientStore = createWithEqualityFn<Store>(
@@ -28,6 +29,7 @@ type Store = StoreValues & StoreMethods;
 type StoreValues = {
   instances: DefguardInstance[];
   selectedInstance?: DefguardInstance['id'];
+  statsFilter: number;
 };
 
 type StoreMethods = {

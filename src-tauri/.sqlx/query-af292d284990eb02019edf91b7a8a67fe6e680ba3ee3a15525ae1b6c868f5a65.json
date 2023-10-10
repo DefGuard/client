@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id, location_id, upload, download, last_handshake, collected_at as \"collected_at: _\"\n            FROM location_stats\n            WHERE location_id = $1\n            ",
+  "query": "\n            SELECT id, location_id, upload, download,\n            last_handshake, strftime($1, collected_at) as \"collected_at!: NaiveDateTime\"\n            FROM location_stats\n            WHERE location_id = $2\n            AND collected_at >= $3\n            GROUP BY\n              collected_at\n            ORDER BY\n              collected_at;\n            ",
   "describe": {
     "columns": [
       {
@@ -29,13 +29,13 @@
         "type_info": "Int64"
       },
       {
-        "name": "collected_at: _",
+        "name": "collected_at!: NaiveDateTime",
         "ordinal": 5,
-        "type_info": "Datetime"
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 3
     },
     "nullable": [
       false,
@@ -43,8 +43,8 @@
       false,
       false,
       false,
-      false
+      true
     ]
   },
-  "hash": "11cf4e78002243610918571f79ead5f08daf083a59f77ba96f7642f545ce1d10"
+  "hash": "af292d284990eb02019edf91b7a8a67fe6e680ba3ee3a15525ae1b6c868f5a65"
 }

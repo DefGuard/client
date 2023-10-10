@@ -16,18 +16,20 @@ pub enum Error {
     Database(#[from] sqlx::Error),
     #[error("Migrate error: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
-    #[error("Wireguard error")]
+    #[error("Wireguard error: {0}")]
     WireguardError(#[from] WireguardInterfaceError),
-    #[error("WireGuard key error")]
+    #[error("WireGuard key error: {0}")]
     KeyDecode(#[from] base64::DecodeError),
-    #[error("IP address/mask error")]
+    #[error("IP address/mask error: {0}")]
     IpAddrMask(#[from] IpAddrParseError),
-    #[error("IP address/mask error")]
+    #[error("IP address parse error: {0}")]
     AddrParse(#[from] AddrParseError),
-    #[error("Local Ip Error")]
+    #[error("Local Ip Error: {0}")]
     LocalIpError(#[from] LocalIpError),
     #[error("Internal error")]
     InternalError,
+    #[error("Failed to parse timestamp")]
+    Datetime,
     #[error("Object not found")]
     NotFound,
     #[error("Tauri error: {0}")]

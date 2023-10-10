@@ -60,7 +60,7 @@ export const LocationUsageChart = ({
           <NetworkSpeed speedValue={totalUpload} direction={NetworkDirection.UPLOAD} />
         </>
       </div>
-      <ResponsiveContainer width="100%" height={height}>
+      <ResponsiveContainer width="95%" height={height}>
         <BarChart
           data={getFormattedData}
           margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
