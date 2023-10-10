@@ -107,12 +107,14 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 1
 
+      - name: 'Tar files'
+        if: matrix.platform == 'macOS'
+        run: tar -cvf macos.tar src-tauri/target/release/bundle
+
       - name: Upload macOS artifacts
         if: matrix.platform == 'macOS'
         uses: actions/upload-artifact@v3
         with:
-          name: macos
-          path: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
+          name: macos.tar
+          path: macos.tar
           retention-days: 1
