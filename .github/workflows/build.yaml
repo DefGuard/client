@@ -92,7 +92,8 @@ jobs:
         if: matrix.platform == 'macOS'
         run: chmod +x src-tauri/target/release/bundle/macos/Defguard.app/Contents/MacOS/wireguard-go
 
-      - name: 'Tar files'
+      - name: Tar macOS files
+        if: matrix.platform == 'macOS'
         run: tar -cvf bundle.tar -C src-tauri/target/release/bundle .
 
       - name: Upload macOS artifacts
@@ -102,6 +103,12 @@ jobs:
           name: macos.tar
           path: bundle.tar
           retention-days: 1
+
+      - name: Tar Linux files
+        if: matrix.platform == 'Linux'
+        run: |
+          cd src-tauri/target/release/bundle
+          find -name '*.AppImage' -o -name '*.deb' | tar -cvf bundle.tar --files-from=-
 
       - name: Upload Linux artifacts
         if: matrix.platform == 'Linux'
