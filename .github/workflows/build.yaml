@@ -88,27 +88,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/upload-artifact@v3
-        if: matrix.platform == 'Linux'
-        with:
-          name: linux
-          path: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/appimage/*.AppImage
-          retention-days: 1
-
       - name: Make sure wireguard-go binary is executable
         if: matrix.platform == 'macOS'
         run: chmod +x src-tauri/target/release/bundle/macos/Defguard.app/Contents/MacOS/wireguard-go
 
       - name: 'Tar files'
-        if: matrix.platform == 'macOS'
-        run: tar -cvf macos.tar -C src-tauri/target/release/bundle .
+        run: tar -cvf bundle.tar -C src-tauri/target/release/bundle .
 
       - name: Upload macOS artifacts
         if: matrix.platform == 'macOS'
         uses: actions/upload-artifact@v3
         with:
           name: macos.tar
-          path: macos.tar
+          path: bundle.tar
+          retention-days: 1
+
+      - name: Upload Linux artifacts
+        if: matrix.platform == 'Linux'
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux.tar
+          path: bundle.tar
           retention-days: 1
