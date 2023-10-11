@@ -106,9 +106,7 @@ jobs:
 
       - name: Tar Linux files
         if: matrix.platform == 'Linux'
-        run: |
-          cd src-tauri/target/release/bundle
-          find -name '*.AppImage' -o -name '*.deb' | tar -cvf bundle.tar --files-from=-
+        run: find 'src-tauri/target/release/bundle' -name '*.AppImage' -printf '%P\0' -o -name '*.deb' -printf '%P\0' | tar --null -C 'src-tauri/target/release/bundle' -cvf bundle.tar --files-from=-
 
       - name: Upload Linux artifacts
         if: matrix.platform == 'Linux'
