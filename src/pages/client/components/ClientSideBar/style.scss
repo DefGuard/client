@@ -11,6 +11,9 @@
   width: 270px;
   background-color: var(--surface-nav-bg);
   border-right: 1px solid var(--border-primary);
+  @include media-breakpoint-down(lg) {
+    width: 120px;
+  }
 
   & > .logo {
     display: flex;
@@ -28,6 +31,10 @@
     align-items: flex-start;
     justify-content: flex-start;
     box-sizing: border-box;
+    @include media-breakpoint-down(lg) {
+      justify-content: center;
+      margin: auto;
+    }
 
     @media (min-height: 600px) {
       padding-top: 70px;

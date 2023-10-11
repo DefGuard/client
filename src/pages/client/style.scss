@@ -6,6 +6,9 @@
   padding: 64px 75px 64px calc(75px + 270px);
   min-height: 100vh;
   background-color: var(--surface-frame-bg);
+  @include media-breakpoint-down(lg) {
+    padding: 64px 15px 64px calc(75px + 100px);
+  }
 
   & > header {
     width: 100%;
