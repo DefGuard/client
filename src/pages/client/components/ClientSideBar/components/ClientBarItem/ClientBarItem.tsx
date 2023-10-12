@@ -32,6 +32,10 @@ export const ClientBarItem = ({ instance }: Props) => {
       >
         <SvgIconConnection className="connection-icon" />
         <p>{instance.name}</p>
+        <div className="instance-shorted">
+          <SvgIconConnection className="connection-icon" />
+          <p>{instance.name[0]}</p>
+        </div>
       </div>
       {instance.connected && (
         <div

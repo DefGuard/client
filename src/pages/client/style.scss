@@ -3,28 +3,59 @@
 #client-page {
   width: 100%;
   box-sizing: border-box;
-  padding: 64px 75px 64px calc(75px + 270px);
   min-height: 100vh;
   background-color: var(--surface-frame-bg);
-  @include media-breakpoint-down(lg) {
-    padding: 64px 15px 64px calc(75px + 100px);
+
+  padding: 30px 20px 30px calc(20px + 70px);
+
+  @include media-breakpoint-up(lg) {
+    padding: 64px 75px 64px calc(75px + 270px);
   }
 
   & > header {
     width: 100%;
     display: flex;
-    flex-flow: row;
-    margin-bottom: 60px;
+    flex-flow: row wrap;
     align-items: center;
+    column-gap: 30px;
+    row-gap: 25px;
+    padding-bottom: 30px;
+
+    @include media-breakpoint-up(lg) {
+      padding-bottom: 60px;
+    }
 
     & > h1 {
       @include typography(app-title);
       color: var(--text-body-primary);
-      margin-right: 30px;
     }
+
+    .options {
+      display: flex;
+      flex-flow: row nowrap;
+      align-self: center;
+      justify-content: flex-start;
+      column-gap: 20px;
+    }
+
     .select-container {
       height: 40px;
       width: 134px;
     }
+  }
+
+  a,
+  span,
+  p,
+  div,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  img,
+  svg {
+    user-select: none;
   }
 }

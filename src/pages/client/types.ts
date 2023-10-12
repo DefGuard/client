@@ -32,3 +32,8 @@ export type Connection = {
   upload?: number;
   download?: number;
 };
+
+export enum ClientView {
+  GRID = 0,
+  DETAIL = 1,
+}

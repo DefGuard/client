@@ -1,13 +1,14 @@
 import { isUndefined } from 'lodash-es';
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { DefguardInstance } from '../types';
+import { ClientView, DefguardInstance } from '../types';
 
 // eslint-disable-next-line
 const defaultValues: StoreValues = {
   instances: [],
   selectedInstance: undefined,
   statsFilter: 1,
+  selectedView: ClientView.GRID,
 };
 
 export const useClientStore = createWithEqualityFn<Store>(
@@ -28,8 +29,9 @@ type Store = StoreValues & StoreMethods;
 
 type StoreValues = {
   instances: DefguardInstance[];
-  selectedInstance?: DefguardInstance['id'];
+  selectedView: ClientView;
   statsFilter: number;
+  selectedInstance?: DefguardInstance['id'];
 };
 
 type StoreMethods = {

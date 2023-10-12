@@ -78,8 +78,8 @@
         "closable": true,
         "title": "Defguard",
         "width": 992,
-        "minWidth": 992,
-        "minHeight": 720
+        "minWidth": 360,
+        "minHeight": 450
       }
     ]
   }

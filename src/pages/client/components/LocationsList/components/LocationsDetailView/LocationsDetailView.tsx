@@ -78,7 +78,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
   return (
     <div id="locations-detail-view">
       <CardTabs tabs={tabs} />
-      <Card className="detail-card" hideMobile shaded>
+      <Card className="detail-card">
         <div className="header">
           <LocationCardTitle location={findLocationById(locations, activeLocationId)} />
           <LocationCardInfo
