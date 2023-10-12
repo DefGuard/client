@@ -6,16 +6,16 @@ import { error } from 'tauri-plugin-log-api';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
+import { ClientView } from '../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 
 const { getLocations } = clientApi;
 
-type Props = {
-  layoutType: string;
-};
-export const LocationsList = ({ layoutType }: Props) => {
+export const LocationsList = () => {
   const selectedInstance = useClientStore((state) => state.selectedInstance);
+
+  const selectedView = useClientStore((state) => state.selectedView);
 
   const queryClient = useQueryClient();
 
@@ -52,9 +52,10 @@ export const LocationsList = ({ layoutType }: Props) => {
 
   return (
     <>
-      {layoutType === 'GRID' ? (
+      {selectedView === ClientView.GRID && (
         <LocationsGridView locations={locations} instanceId={selectedInstance} />
-      ) : (
+      )}
+      {selectedView === ClientView.DETAIL && (
         <LocationsDetailView locations={locations} instanceId={selectedInstance} />
       )}
     </>

@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
+import SvgDefguadNavLogoCollapsed from '../../../../shared/components/svg/DefguardLogoCollapsed';
 import SvgDefguardLogoIcon from '../../../../shared/components/svg/DefguardLogoIcon';
 import SvgDefguardLogoText from '../../../../shared/components/svg/DefguardLogoText';
 import SvgIconNavConnections from '../../../../shared/components/svg/IconNavConnections';
@@ -16,12 +17,15 @@ export const ClientSideBar = () => {
 
   return (
     <div id="client-page-side">
-      <div className="logo">
+      <div className="logo-desktop">
         <SvgDefguardLogoIcon />
         <SvgDefguardLogoText />
       </div>
+      <div className="logo-mobile">
+        <SvgDefguadNavLogoCollapsed />
+      </div>
       <div className="items">
-        <div className="client-bar-item active">
+        <div className="client-bar-item active" id="instances-nav-label">
           <SvgIconNavConnections />
           <p>{LL.pages.client.sideBar.instances()}</p>
         </div>
@@ -38,7 +42,11 @@ const AddInstance = () => {
   const { LL } = useI18nContext();
   const openAddInstanceModal = useAddInstanceModal((state) => state.open);
   return (
-    <div className="client-bar-item clickable" onClick={() => openAddInstanceModal()}>
+    <div
+      id="add-instance"
+      className="client-bar-item clickable"
+      onClick={() => openAddInstanceModal()}
+    >
       <IconContainer>
         <SvgIconPlus />
       </IconContainer>

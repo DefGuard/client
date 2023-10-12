@@ -2,11 +2,18 @@
 
 #locations-grid-view {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(445px, 1fr));
+  grid-template-columns: repeat(auto-fill, 445px);
   grid-auto-rows: auto;
-  gap: 50px;
-  justify-content: start;
-  align-content: start;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  gap: 20px;
+
+  @include media-breakpoint-up(lg) {
+    justify-content: start;
+    align-content: start;
+    gap: 50px;
+  }
 
   & > .grid-item {
     box-sizing: border-box;
