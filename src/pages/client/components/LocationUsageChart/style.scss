@@ -1,0 +1,21 @@
+@use '@scssutils' as *;
+
+.location-usage {
+  display: grid;
+  grid-template-rows: auto auto;
+  grid-template-columns: 1fr;
+  width: 100%;
+  row-gap: 8px;
+
+  & > .summary {
+    grid-row: 1;
+    grid-column: 1;
+    width: 100%;
+  }
+
+  & > .chart-wrapper {
+    grid-row: 2;
+    grid-column: 1;
+    width: 100%;
+  }
+}

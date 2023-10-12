@@ -1,7 +1,10 @@
+import './style.scss';
+
 import dayjs from 'dayjs';
 import { sortBy } from 'lodash-es';
 import { useMemo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import AutoSizer from 'react-virtualized-auto-sizer';
+import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 
 import { NetworkSpeed } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/NetworkSpeed';
 import { NetworkDirection } from '../../../../shared/defguard-ui/components/Layout/NetworkSpeed/types';
@@ -10,8 +13,6 @@ import { LocationStats } from '../../types';
 
 interface LocationUsageProps {
   data: LocationStats[];
-  width?: number;
-  height?: number;
   hideX?: boolean;
   barSize?: number;
   barGap?: number;
@@ -39,8 +40,6 @@ const totalUploadDownload = (data: LocationStats[]): number[] => {
 
 export const LocationUsageChart = ({
   data,
-  height = 300,
-  width = 900,
   hideX = false,
   barSize = 5,
   barGap = 2,
@@ -49,6 +48,9 @@ export const LocationUsageChart = ({
   const [totalUpload, totalDownload] = useMemo(() => totalUploadDownload(data), [data]);
   const getFormattedData = useMemo(() => parseStatsForCharts(data), [data]);
   const { colors } = useTheme();
+
+  if (!data.length) return null;
+
   return (
     <div className="location-usage">
       <div className="summary">
@@ -60,37 +62,41 @@ export const LocationUsageChart = ({
           <NetworkSpeed speedValue={totalUpload} direction={NetworkDirection.UPLOAD} />
         </>
       </div>
-      <ResponsiveContainer width="95%" height={height}>
-        <BarChart
-          data={getFormattedData}
-          margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
-          barSize={barSize}
-          barGap={barGap}
-        >
-          <XAxis
-            dataKey="collected_at"
-            scale="time"
-            type="number"
-            height={heightX}
-            width={width}
-            axisLine={{ stroke: colors.surfaceDefaultModal }}
-            tickLine={{ stroke: colors.surfaceDefaultModal }}
-            hide={hideX}
-            padding={{ left: 0, right: 0 }}
-            tick={{ fontSize: 10, color: '#000000' }}
-            tickFormatter={formatXTick}
-            domain={['dataMin', 'dataMax']}
-            interval={'preserveEnd'}
-          />
-          <YAxis
-            hide={true}
-            domain={['dataMin', 'dataMax']}
-            padding={{ top: 0, bottom: 0 }}
-          />
-          <Bar dataKey="download" fill={colors.surfaceMainPrimary} />
-          <Bar dataKey="upload" fill={colors.textAlert} />
-        </BarChart>
-      </ResponsiveContainer>
+      <AutoSizer>
+        {(size) => (
+          <BarChart
+            width={size.width}
+            height={size.height}
+            data={getFormattedData}
+            margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
+            barSize={barSize}
+            barGap={barGap}
+          >
+            <XAxis
+              dataKey="collected_at"
+              scale="time"
+              type="number"
+              height={heightX}
+              width={size.width}
+              axisLine={{ stroke: colors.surfaceDefaultModal }}
+              tickLine={{ stroke: colors.surfaceDefaultModal }}
+              hide={hideX}
+              padding={{ left: 0, right: 0 }}
+              tick={{ fontSize: 10, color: '#000000' }}
+              tickFormatter={formatXTick}
+              domain={['dataMin', 'dataMax']}
+              interval={'preserveEnd'}
+            />
+            <YAxis
+              hide={true}
+              domain={['dataMin', 'dataMax']}
+              padding={{ top: 0, bottom: 0 }}
+            />
+            <Bar dataKey="download" fill={colors.surfaceMainPrimary} />
+            <Bar dataKey="upload" fill={colors.textAlert} />
+          </BarChart>
+        )}
+      </AutoSizer>
     </div>
   );
 };

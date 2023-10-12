@@ -2,7 +2,9 @@
 
 @mixin list-layout {
   display: inline-grid;
-  grid-template-columns: minmax(180px, 25%) repeat(3, 1fr) auto; // Adjust for larger screens.
+  grid-template-columns: minmax(180px, 25%) repeat(3, 1fr) auto;
+
+  // Adjust for larger screens.
 
   & > * {
     grid-row: 1;
@@ -11,18 +13,35 @@
 
 #locations-detail-view {
   & > .card {
-    & > h2 {
-      @include typography(app-welcome-1);
-      color: var(--text-body-primary);
+    display: flex;
+    flex-flow: column;
+    row-gap: 20px;
+    padding: 20px;
+    min-height: 50vh;
+    border-top-left-radius: 0;
+
+    @include media-breakpoint-up(lg) {
+      min-height: 600px;
     }
-    padding: 2rem 2rem;
+
     & > .header {
       display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      row-gap: 20px;
+    }
+
+    & > .info {
+      display: flex;
+      flex-flow: row wrap;
+      column-gap: 10px;
+      row-gap: 20px;
+      align-items: center;
       justify-content: space-between;
     }
-    border-top-left-radius: 0;
-    height: 800px;
-    width: 90%;
+
     & > .location-usage {
       display: flex;
       flex-direction: column;

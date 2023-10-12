@@ -3,7 +3,9 @@ import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { error } from 'tauri-plugin-log-api';
+import { useBreakpoint } from 'use-breakpoint';
 
+import { deviceBreakpoints } from '../../../../../../shared/constants';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { CardTabs } from '../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
@@ -31,6 +33,7 @@ const findLocationById = (
 const { getLocationStats, getLastConnection, getConnectionHistory } = clientApi;
 
 export const LocationsDetailView = ({ locations }: Props) => {
+  const { breakpoint } = useBreakpoint(deviceBreakpoints);
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
   const statsFilter = useClientStore((state) => state.statsFilter);
 
@@ -81,18 +84,28 @@ export const LocationsDetailView = ({ locations }: Props) => {
       <Card className="detail-card">
         <div className="header">
           <LocationCardTitle location={findLocationById(locations, activeLocationId)} />
-          <LocationCardInfo
-            location={findLocationById(locations, activeLocationId)}
-            connection={lastConnection}
-          />
+          {breakpoint === 'desktop' && (
+            <LocationCardInfo
+              location={findLocationById(locations, activeLocationId)}
+              connection={lastConnection}
+            />
+          )}
           <LocationCardConnectButton
             location={findLocationById(locations, activeLocationId)}
           />
         </div>
-        {locationStats ? (
-          <LocationUsageChart height={200} barSize={4} data={locationStats} />
+        {breakpoint !== 'desktop' && (
+          <div className="info">
+            <LocationCardInfo
+              location={findLocationById(locations, activeLocationId)}
+              connection={lastConnection}
+            />
+          </div>
+        )}
+        {locationStats && locationStats.length ? (
+          <LocationUsageChart barSize={4} data={locationStats} />
         ) : null}
-        {connectionHistory ? (
+        {connectionHistory && connectionHistory.length ? (
           <LocationConnectionHistory connections={connectionHistory} />
         ) : null}
       </Card>
