@@ -8,11 +8,11 @@ use defguard_wireguard_rs::{
 };
 
 use crate::{
+    appstate::AppState,
     database::{
         models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
     },
     error::Error,
-    AppState,
 };
 use tauri::Manager;
 use tokio::time::{sleep, Duration};

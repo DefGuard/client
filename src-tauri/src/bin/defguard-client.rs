@@ -1,26 +1,23 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-pub mod appstate;
-pub mod commands;
-pub mod database;
-pub mod error;
-mod tray;
-pub mod utils;
-
-use appstate::AppState;
 use tauri::{api::process, Env, Manager, State, SystemTrayEvent};
 use tauri_plugin_log::LogTarget;
 
-use crate::{
+use defguard_client::{
+    __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
+    __cmd__connect, __cmd__disconnect, __cmd__last_connection, __cmd__location_stats,
+    __cmd__save_device_config, __cmd__update_instance,
+    appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, connect, disconnect,
         last_connection, location_stats, save_device_config, update_instance,
     },
+    database,
     tray::create_tray_menu,
+    utils::IS_MACOS,
 };
 use std::env;
-use utils::IS_MACOS;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {

@@ -1,11 +1,11 @@
 use crate::{
+    appstate::AppState,
     database::{
         models::instance::InstanceInfo, ActiveConnection, Connection, ConnectionInfo, Instance,
         Location, LocationStats, WireguardKeys,
     },
     error::Error,
     utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
-    AppState,
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use defguard_wireguard_rs::WireguardInterfaceApi;
@@ -279,12 +279,12 @@ pub async fn update_instance(
     }
 }
 
-  /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
+/// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
 fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
-      Ok(match from {
-          Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
-          None => Utc::now() - Duration::hours(1),
-      })
+    Ok(match from {
+        Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
+        None => Utc::now() - Duration::hours(1),
+    })
 }
 
 pub enum DateTimeAggregation {
