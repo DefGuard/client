@@ -7,17 +7,18 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use defguard_wireguard_rs::host::Host;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 use serde::Deserialize;
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use defguard_wireguard_rs::host::Host;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{debug, info, info_span, Level};
 
-const HTTP_PORT: u16 = 54127;
+pub const DAEMON_HTTP_PORT: u16 = 54127;
+pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
@@ -76,7 +77,7 @@ pub async fn run_server() -> anyhow::Result<()> {
         );
 
     // run server
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), HTTP_PORT);
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), DAEMON_HTTP_PORT);
     info!("Listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -136,5 +137,4 @@ async fn read_interface_data(Path(ifname): Path<String>) -> ApiResult<Json<Host>
 
     let host = wgapi.read_interface_data();
     unimplemented!()
-
 }

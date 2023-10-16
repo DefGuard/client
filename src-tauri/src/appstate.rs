@@ -1,11 +1,12 @@
-use std::sync::{Arc, Mutex};
-
 use crate::database::{ActiveConnection, DbPool};
+use reqwest::Client;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub struct AppState {
     pub db: Arc<Mutex<Option<DbPool>>>,
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
+    pub client: Client,
 }
 impl AppState {
     pub fn get_pool(&self) -> DbPool {

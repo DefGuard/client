@@ -5,6 +5,7 @@ use crate::{
         Location, LocationStats, WireguardKeys,
     },
     error::Error,
+    service::DAEMON_BASE_URL,
     utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
@@ -29,7 +30,13 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
             location.name
         );
         let interface_name = get_interface_name(&location, state.get_connections());
-        let api = setup_interface(&location, &interface_name, &state.get_pool()).await?;
+        setup_interface(
+            &location,
+            &interface_name,
+            &state.get_pool(),
+            state.client.clone(),
+        )
+        .await?;
         let address = local_ip()?;
         let connection = ActiveConnection::new(location_id, address.to_string(), interface_name);
         state.active_connections.lock().unwrap().push(connection);
@@ -45,8 +52,8 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
             },
         )?;
         // Spawn stats threads
-        debug!("Spawning stats thread");
-        let _ = spawn_stats_thread(handle, location, api).await;
+        // debug!("Spawning stats thread");
+        // let _ = spawn_stats_thread(handle, location, api).await;
     }
     Ok(())
 }
@@ -58,9 +65,18 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
 
     if let Some(connection) = state.find_and_remove_connection(location_id) {
         debug!("Found active connection: {:#?}", connection);
-        debug!("Creating api to remove interface");
-        let api = create_api(&connection.interface_name)?;
-        api.remove_interface()?;
+        let ifname = &connection.interface_name;
+        debug!("Removing interface");
+        if let Err(error) = state
+            .client
+            .delete(format!("{DAEMON_BASE_URL}/interface/{ifname}"))
+            .send()
+            .await?
+            .error_for_status()
+        {
+            error!("Failed to remove interface: {error}");
+            return Err(Error::InternalError);
+        }
         debug!("Removed interface");
         debug!("Saving connection: {:#?}", connection);
         let mut connection: Connection = connection.into();

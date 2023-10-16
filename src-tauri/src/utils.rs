@@ -6,6 +6,7 @@ use std::{
 use defguard_wireguard_rs::{
     host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
+use reqwest::Client;
 
 use crate::{
     appstate::AppState,
@@ -13,6 +14,7 @@ use crate::{
         models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
     },
     error::Error,
+    service::DAEMON_BASE_URL,
 };
 use tauri::Manager;
 use tokio::time::{sleep, Duration};
@@ -25,12 +27,9 @@ pub async fn setup_interface(
     location: &Location,
     interface_name: &str,
     pool: &DbPool,
-) -> Result<WGApi, Error> {
+    client: Client,
+) -> Result<(), Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
-        debug!("Creating api for interface: '{}'", interface_name);
-        let api = create_api(interface_name)?;
-
-        api.create_interface()?;
         debug!("Decoding location public key: {}.", location.pubkey);
         let peer_key: Key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
@@ -75,16 +74,18 @@ pub async fn setup_interface(
                 peers: vec![peer.clone()],
             };
             debug!("Creating interface {:#?}", interface_config);
-            if let Err(err) = api.configure_interface(&interface_config) {
-                error!("Failed to configure interface: {}", err.to_string());
+            if let Err(error) = client
+                .post(format!("{DAEMON_BASE_URL}/interface"))
+                .json(&interface_config)
+                .send()
+                .await?
+                .error_for_status()
+            {
+                error!("Failed to create interface: {error}");
                 Err(Error::InternalError)
             } else {
-                if let Err(err) = api.configure_peer(&peer) {
-                    error!("Failed to configure peer: {}", err.to_string());
-                    return Err(Error::InternalError);
-                }
-                info!("created interface {:#?}", interface_config);
-                Ok(api)
+                info!("Created interface {:#?}", interface_config);
+                Ok(())
             }
         } else {
             error!("Error finding free port");
