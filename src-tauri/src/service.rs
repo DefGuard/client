@@ -1,11 +1,11 @@
 use crate::utils::IS_MACOS;
 use anyhow::Context;
-use axum::extract::Path;
+use axum::extract::{FromRequest, Path};
 use axum::{
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
+    Router,
 };
 use defguard_wireguard_rs::host::Host;
 use defguard_wireguard_rs::{
@@ -14,6 +14,7 @@ use defguard_wireguard_rs::{
 use serde::Deserialize;
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use axum::extract::rejection::JsonRejection;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{debug, info, info_span, Level};
 
@@ -43,11 +44,30 @@ impl IntoResponse for ApiError {
             ),
         };
 
-        let body = Json(json!({
+        let body = axum::Json(json!({
             "error": error_message,
         }));
 
         (status, body).into_response()
+    }
+}
+
+// create an extractor that internally uses `axum::Json` but has a custom rejection
+#[derive(FromRequest)]
+#[from_request(via(axum::Json), rejection(ApiError))]
+pub struct Json<T>(T);
+
+// We implement `From<JsonRejection> for ApiError`
+impl From<JsonRejection> for ApiError {
+    fn from(rejection: JsonRejection) -> Self {
+        println!("rejection: {rejection}");
+        let code = match rejection {
+            JsonRejection::JsonDataError(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            JsonRejection::JsonSyntaxError(_) => StatusCode::BAD_REQUEST,
+            JsonRejection::MissingJsonContentType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        Self::Unexpected(rejection.to_string())
     }
 }
 
@@ -130,11 +150,11 @@ async fn remove_interface(Path(ifname): Path<String>) -> ApiResult<()> {
     Ok(())
 }
 
-async fn read_interface_data(Path(ifname): Path<String>) -> ApiResult<Json<Host>> {
+async fn read_interface_data(Path(ifname): Path<String>) {
     info!("Reading interface data for {ifname}");
     // setup WireGuard API
-    let wgapi = WGApi::new(ifname, IS_MACOS)?;
-
-    let host = wgapi.read_interface_data();
+    // let wgapi = WGApi::new(ifname, IS_MACOS)?;
+    //
+    // let host = wgapi.read_interface_data();
     unimplemented!()
 }
