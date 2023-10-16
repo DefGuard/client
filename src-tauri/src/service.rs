@@ -1,9 +1,10 @@
 use crate::utils::IS_MACOS;
 use anyhow::Context;
+use axum::extract::Path;
 use axum::{
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
-    routing::{delete, get, post},
+    routing::{get, post},
     Json, Router,
 };
 use defguard_wireguard_rs::{
@@ -12,6 +13,7 @@ use defguard_wireguard_rs::{
 use serde::Deserialize;
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use defguard_wireguard_rs::host::Host;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{debug, info, info_span, Level};
 
@@ -56,8 +58,10 @@ pub async fn run_server() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(healthcheck))
         .route("/interface", post(create_interface))
-        .route("/interface", delete(remove_interface))
-        .route("/interface", get(read_interface_data))
+        .route(
+            "/interface/:ifname",
+            get(read_interface_data).delete(remove_interface),
+        )
         .fallback(handler_404)
         .layer(
             TraceLayer::new_for_http()
@@ -114,13 +118,7 @@ async fn create_interface(Json(req): Json<CreateInterfaceRequest>) -> ApiResult<
     Ok(())
 }
 
-#[derive(Deserialize)]
-struct RemoveInterfaceRequest {
-    interface_name: String,
-}
-
-async fn remove_interface(Json(req): Json<RemoveInterfaceRequest>) -> ApiResult<()> {
-    let ifname = req.interface_name;
+async fn remove_interface(Path(ifname): Path<String>) -> ApiResult<()> {
     info!("Removing interface {ifname}");
     // setup WireGuard API
     let wgapi = WGApi::new(ifname, IS_MACOS)?;
@@ -131,6 +129,12 @@ async fn remove_interface(Json(req): Json<RemoveInterfaceRequest>) -> ApiResult<
     Ok(())
 }
 
-async fn read_interface_data() {
+async fn read_interface_data(Path(ifname): Path<String>) -> ApiResult<Json<Host>> {
+    info!("Reading interface data for {ifname}");
+    // setup WireGuard API
+    let wgapi = WGApi::new(ifname, IS_MACOS)?;
+
+    let host = wgapi.read_interface_data();
     unimplemented!()
+
 }
