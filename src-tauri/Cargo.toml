@@ -18,7 +18,7 @@ prost-build = { version = "0.11" }
 
 [dependencies]
 anyhow = "1.0.75"
-axum = "0.6"
+axum = { version = "0.6", features = ["macros"] }
 base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
 defguard_wireguard_rs = "0.2"

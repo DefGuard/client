@@ -1,22 +1,51 @@
+use crate::utils::IS_MACOS;
 use anyhow::Context;
 use axum::{
     http::{Request, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Router,
+    Json, Router,
 };
+use defguard_wireguard_rs::{
+    error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+};
+use serde::Deserialize;
+use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower_http::trace::{self, TraceLayer};
 use tracing::{debug, info, info_span, Level};
 
 const HTTP_PORT: u16 = 54127;
 
-async fn healthcheck() -> &'static str {
-    "I'm alive!"
+pub type ApiResult<T> = Result<T, ApiError>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum ApiError {
+    #[error(transparent)]
+    WireguardError(#[from] WireguardInterfaceError),
+    #[error("Unexpected error: {0}")]
+    Unexpected(String),
+    #[error("Bad request: {0}")]
+    BadRequest(String),
 }
 
-async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "not found")
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        error!("{}", self);
+        let (status, error_message) = match self {
+            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+        }));
+
+        (status, body).into_response()
+    }
 }
 
 pub async fn run_server() -> anyhow::Result<()> {
@@ -51,12 +80,55 @@ pub async fn run_server() -> anyhow::Result<()> {
         .context("Error running HTTP server")
 }
 
-async fn create_interface() {
-    unimplemented!()
+async fn healthcheck() -> &'static str {
+    "I'm alive!"
 }
 
-async fn remove_interface() {
-    unimplemented!()
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "not found")
+}
+
+#[derive(Deserialize)]
+struct CreateInterfaceRequest {
+    interface_name: String,
+    interface_config: InterfaceConfiguration,
+}
+
+async fn create_interface(Json(req): Json<CreateInterfaceRequest>) -> ApiResult<()> {
+    let ifname = req.interface_name;
+    info!("Creating interface {ifname}");
+    // setup WireGuard API
+    let wgapi = WGApi::new(ifname.clone(), IS_MACOS)?;
+
+    // create new interface
+    debug!("Creating new interface {ifname}");
+    wgapi.create_interface()?;
+
+    // configure interface
+    debug!(
+        "Configuring new interface {ifname} with configuration: {:?}",
+        req.interface_config
+    );
+    wgapi.configure_interface(&req.interface_config)?;
+
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct RemoveInterfaceRequest {
+    interface_name: String,
+}
+
+async fn remove_interface(Json(req): Json<RemoveInterfaceRequest>) -> ApiResult<()> {
+    let ifname = req.interface_name;
+    info!("Removing interface {ifname}");
+    // setup WireGuard API
+    let wgapi = WGApi::new(ifname, IS_MACOS)?;
+
+    // remove interface
+    wgapi.remove_interface()?;
+
+    Ok(())
 }
 
 async fn read_interface_data() {
