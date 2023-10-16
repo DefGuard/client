@@ -2,7 +2,7 @@ use anyhow::Context;
 use axum::{
     http::{Request, StatusCode},
     response::IntoResponse,
-    routing::get,
+    routing::{delete, get, post},
     Router,
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -26,6 +26,9 @@ pub async fn run_server() -> anyhow::Result<()> {
     debug!("Setting up API server");
     let app = Router::new()
         .route("/health", get(healthcheck))
+        .route("/interface", post(create_interface))
+        .route("/interface", delete(remove_interface))
+        .route("/interface", get(read_interface_data))
         .fallback(handler_404)
         .layer(
             TraceLayer::new_for_http()
@@ -46,4 +49,16 @@ pub async fn run_server() -> anyhow::Result<()> {
         .serve(app.into_make_service())
         .await
         .context("Error running HTTP server")
+}
+
+async fn create_interface() {
+    unimplemented!()
+}
+
+async fn remove_interface() {
+    unimplemented!()
+}
+
+async fn read_interface_data() {
+    unimplemented!()
 }
