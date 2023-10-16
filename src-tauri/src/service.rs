@@ -1,20 +1,18 @@
 use crate::utils::IS_MACOS;
 use anyhow::Context;
-use axum::extract::{FromRequest, Path};
+use axum::extract::Path;
 use axum::{
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 use defguard_wireguard_rs::host::Host;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
-use serde::Deserialize;
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use axum::extract::rejection::JsonRejection;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{debug, info, info_span, Level};
 
@@ -44,30 +42,11 @@ impl IntoResponse for ApiError {
             ),
         };
 
-        let body = axum::Json(json!({
+        let body = Json(json!({
             "error": error_message,
         }));
 
         (status, body).into_response()
-    }
-}
-
-// create an extractor that internally uses `axum::Json` but has a custom rejection
-#[derive(FromRequest)]
-#[from_request(via(axum::Json), rejection(ApiError))]
-pub struct Json<T>(T);
-
-// We implement `From<JsonRejection> for ApiError`
-impl From<JsonRejection> for ApiError {
-    fn from(rejection: JsonRejection) -> Self {
-        println!("rejection: {rejection:?}");
-        let code = match rejection {
-            JsonRejection::JsonDataError(_) => StatusCode::UNPROCESSABLE_ENTITY,
-            JsonRejection::JsonSyntaxError(_) => StatusCode::BAD_REQUEST,
-            JsonRejection::MissingJsonContentType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        Self::Unexpected(rejection.to_string())
     }
 }
 
