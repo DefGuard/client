@@ -60,7 +60,7 @@ pub struct Json<T>(T);
 // We implement `From<JsonRejection> for ApiError`
 impl From<JsonRejection> for ApiError {
     fn from(rejection: JsonRejection) -> Self {
-        println!("rejection: {rejection}");
+        println!("rejection: {rejection:?}");
         let code = match rejection {
             JsonRejection::JsonDataError(_) => StatusCode::UNPROCESSABLE_ENTITY,
             JsonRejection::JsonSyntaxError(_) => StatusCode::BAD_REQUEST,
