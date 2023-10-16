@@ -113,14 +113,8 @@ async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "not found")
 }
 
-#[derive(Deserialize)]
-struct CreateInterfaceRequest {
-    interface_name: String,
-    interface_config: InterfaceConfiguration,
-}
-
-async fn create_interface(Json(req): Json<CreateInterfaceRequest>) -> ApiResult<()> {
-    let ifname = req.interface_name;
+async fn create_interface(Json(req): Json<InterfaceConfiguration>) -> ApiResult<()> {
+    let ifname = req.name.clone();
     info!("Creating interface {ifname}");
     // setup WireGuard API
     let wgapi = WGApi::new(ifname.clone(), IS_MACOS)?;
@@ -132,9 +126,9 @@ async fn create_interface(Json(req): Json<CreateInterfaceRequest>) -> ApiResult<
     // configure interface
     debug!(
         "Configuring new interface {ifname} with configuration: {:?}",
-        req.interface_config
+        req
     );
-    wgapi.configure_interface(&req.interface_config)?;
+    wgapi.configure_interface(&req)?;
 
     Ok(())
 }
