@@ -37,7 +37,8 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
         )
         .await?;
         let address = local_ip()?;
-        let connection = ActiveConnection::new(location_id, address.to_string(), interface_name);
+        let connection =
+            ActiveConnection::new(location_id, address.to_string(), interface_name.clone());
         state.active_connections.lock().unwrap().push(connection);
         debug!(
             "Active connections: {:#?}",
@@ -51,8 +52,8 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
             },
         )?;
         // Spawn stats threads
-        // debug!("Spawning stats thread");
-        // let _ = spawn_stats_thread(handle, location, api).await;
+        debug!("Spawning stats thread");
+        spawn_stats_thread(handle, interface_name).await;
     }
     Ok(())
 }

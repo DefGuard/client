@@ -3,9 +3,7 @@ use std::{
     str::FromStr,
 };
 
-use defguard_wireguard_rs::{
-    host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
-};
+use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi};
 
 use crate::{
     appstate::AppState,
@@ -15,10 +13,11 @@ use crate::{
     error::Error,
     service::proto::{
         desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
+        ReadInterfaceDataRequest,
     },
 };
 use tauri::Manager;
-use tokio::time::{sleep, Duration};
+use tonic::codegen::tokio_stream::StreamExt;
 use tonic::transport::Channel;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
@@ -179,19 +178,29 @@ pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }
 
-pub async fn spawn_stats_thread(
-    handle: tauri::AppHandle,
-    location: Location,
-    api: WGApi, // Replace with your actual type
-) {
+pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String) {
     tokio::spawn(async move {
         let state = handle.state::<AppState>();
-        loop {
-            debug!("Reading interface data");
-            match api.read_interface_data() {
-                Ok(host) => {
-                    let peers = host.peers;
-                    for (_, peer) in peers {
+        let mut client = state.client.clone();
+        let request = ReadInterfaceDataRequest {
+            interface_name: interface_name.clone(),
+        };
+        let mut stream = client
+            .read_interface_data(request)
+            .await
+            .expect("Failed to connect to interface stats stream")
+            .into_inner();
+
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(interface_data) => {
+                    debug!("Received interface data update: {interface_data:?}");
+                    let peers: Vec<Peer> = interface_data
+                        .peers
+                        .into_iter()
+                        .map(|peer| peer.into())
+                        .collect();
+                    for peer in peers {
                         let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
                             .await
                             .unwrap();
@@ -200,20 +209,11 @@ pub async fn spawn_stats_thread(
                         debug!("Saved location stats: {:#?}", location_stats);
                     }
                 }
-                Err(e) => {
-                    error!(
-                        "Error {} while reading data for interface: {}",
-                        e, location.name
-                    );
-                    debug!(
-                        "Stopped stats thread for location: {}. Error: {}",
-                        location.name,
-                        e.to_string()
-                    );
-                    break;
+                Err(err) => {
+                    error!("Failed to receive interface data update: {err}")
                 }
             }
-            sleep(Duration::from_secs(STATS_PERIOD)).await;
         }
+        warn!("Interface data stream disconnected");
     });
 }
