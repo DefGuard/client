@@ -13,8 +13,8 @@ rust-version = "1.60"
 
 [build-dependencies]
 tauri-build = { version = "1.4.0", features = [] }
-tonic-build = { version = "0.9" }
-prost-build = { version = "0.11" }
+tonic-build = { version = "0.10" }
+prost-build = { version = "0.12" }
 
 [dependencies]
 anyhow = "1.0.75"
@@ -25,7 +25,7 @@ defguard_wireguard_rs = "0.2"
 dirs = "5.0"
 local-ip-address = "0.5"
 log = "0.4"
-prost = "0.11"
+prost = "0.12"
 rand = "0.8"
 reqwest = { version = "0.11", features = ["json"] }
 serde_json = "1.0"

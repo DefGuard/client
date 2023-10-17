@@ -7,127 +7,150 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use defguard_wireguard_rs::host::Host;
+use defguard_wireguard_rs::host::{Host, Peer};
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
-use serde_json::json;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use tower_http::trace::{self, TraceLayer};
-use tracing::{debug, info, info_span, Level};
+use std::pin::Pin;
+use tonic::codegen::tokio_stream::Stream;
+use tonic::transport::{Channel, Endpoint, Server};
+use tonic::Status;
+use tracing::{debug, info};
+
+pub mod proto {
+    tonic::include_proto!("client");
+}
+
+use proto::{
+    desktop_daemon_service_client::DesktopDaemonServiceClient,
+    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+    CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+};
 
 pub const DAEMON_HTTP_PORT: u16 = 54127;
 pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
-pub type ApiResult<T> = Result<T, ApiError>;
+pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
+    debug!("Setting up gRPC client");
+    let endpoint = Endpoint::from_shared(DAEMON_BASE_URL)?;
+    let channel = endpoint.connect_lazy();
+    let client = DesktopDaemonServiceClient::new(channel);
+    Ok(client)
+}
 
 #[derive(thiserror::Error, Debug)]
-pub enum ApiError {
+pub enum DaemonError {
     #[error(transparent)]
     WireguardError(#[from] WireguardInterfaceError),
     #[error("Unexpected error: {0}")]
     Unexpected(String),
-    #[error("Bad request: {0}")]
-    BadRequest(String),
+    #[error(transparent)]
+    TransportError(#[from] tonic::transport::Error),
 }
 
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        error!("{}", self);
-        let (status, error_message) = match self {
-            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
-            _ => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error".to_string(),
-            ),
-        };
+#[derive(Default)]
+pub struct DaemonService {}
 
-        let body = Json(json!({
-            "error": error_message,
-        }));
+type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-        (status, body).into_response()
+#[tonic::async_trait]
+impl DesktopDaemonService for DaemonService {
+    async fn create_interface(
+        &self,
+        request: tonic::Request<CreateInterfaceRequest>,
+    ) -> Result<tonic::Response<()>, Status> {
+        todo!()
+    }
+
+    async fn remove_interface(
+        &self,
+        request: tonic::Request<RemoveInterfaceRequest>,
+    ) -> Result<tonic::Response<()>, Status> {
+        todo!()
+    }
+
+    type ReadInterfaceDataStream = InterfaceDataStream;
+
+    async fn read_interface_data(
+        &self,
+        request: tonic::Request<ReadInterfaceDataRequest>,
+    ) -> Result<tonic::Response<Self::ReadInterfaceDataStream>, Status> {
+        todo!()
     }
 }
 
 pub async fn run_server() -> anyhow::Result<()> {
-    info!("Starting Defguard interface management daemon");
+    info!("Starting defguard interface management daemon");
 
-    // build application
-    debug!("Setting up API server");
-    let app = Router::new()
-        .route("/health", get(healthcheck))
-        .route("/interface", post(create_interface))
-        .route(
-            "/interface/:ifname",
-            get(read_interface_data).delete(remove_interface),
-        )
-        .fallback(handler_404)
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|request: &Request<_>| {
-                    info_span!(
-                        "http_request",
-                        method = ?request.method(),
-                        path = ?request.uri(),
-                    )
-                })
-                .on_response(trace::DefaultOnResponse::new().level(Level::DEBUG)),
-        );
+    let addr = format!("127.0.0.1:{DAEMON_HTTP_PORT}")
+        .parse()
+        .context("Failed to parse gRPC address")?;
+    let daemon_service = DaemonService::default();
 
-    // run server
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), DAEMON_HTTP_PORT);
-    info!("Listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .context("Error running HTTP server")
-}
+    info!("defguard daemon listening on ");
 
-async fn healthcheck() -> &'static str {
-    "I'm alive!"
-}
-
-async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "not found")
-}
-
-async fn create_interface(Json(req): Json<InterfaceConfiguration>) -> ApiResult<()> {
-    let ifname = req.name.clone();
-    info!("Creating interface {ifname}");
-    // setup WireGuard API
-    let wgapi = WGApi::new(ifname.clone(), IS_MACOS)?;
-
-    // create new interface
-    debug!("Creating new interface {ifname}");
-    wgapi.create_interface()?;
-
-    // configure interface
-    debug!(
-        "Configuring new interface {ifname} with configuration: {:?}",
-        req
-    );
-    wgapi.configure_interface(&req)?;
+    Server::builder()
+        .add_service(DesktopDaemonServiceServer::new(daemon_service))
+        .serve(addr)
+        .await?;
 
     Ok(())
 }
 
-async fn remove_interface(Path(ifname): Path<String>) -> ApiResult<()> {
-    info!("Removing interface {ifname}");
-    // setup WireGuard API
-    let wgapi = WGApi::new(ifname, IS_MACOS)?;
+// async fn create_interface(Json(req): Json<InterfaceConfiguration>) -> ApiResult<()> {
+//     let ifname = req.name.clone();
+//     info!("Creating interface {ifname}");
+//     // setup WireGuard API
+//     let wgapi = WGApi::new(ifname.clone(), IS_MACOS)?;
+//
+//     // create new interface
+//     debug!("Creating new interface {ifname}");
+//     wgapi.create_interface()?;
+//
+//     // configure interface
+//     debug!(
+//         "Configuring new interface {ifname} with configuration: {:?}",
+//         req
+//     );
+//     wgapi.configure_interface(&req)?;
+//
+//     Ok(())
+// }
+//
+// async fn remove_interface(Path(ifname): Path<String>) -> ApiResult<()> {
+//     info!("Removing interface {ifname}");
+//     // setup WireGuard API
+//     let wgapi = WGApi::new(ifname, IS_MACOS)?;
+//
+//     // remove interface
+//     wgapi.remove_interface()?;
+//
+//     Ok(())
+// }
+//
+// async fn read_interface_data(Path(ifname): Path<String>) {
+//     info!("Reading interface data for {ifname}");
+//     // setup WireGuard API
+//     // let wgapi = WGApi::new(ifname, IS_MACOS)?;
+//     //
+//     // let host = wgapi.read_interface_data();
+//     unimplemented!()
+// }
 
-    // remove interface
-    wgapi.remove_interface()?;
-
-    Ok(())
+impl From<InterfaceConfiguration> for proto::InterfaceConfig {
+    fn from(config: InterfaceConfiguration) -> Self {
+        Self {
+            name: config.name,
+            prvkey: config.prvkey,
+            address: config.address,
+            port: config.port,
+            peers: config.peers.into_iter().map(|peer| peer.into()).collect(),
+        }
+    }
 }
 
-async fn read_interface_data(Path(ifname): Path<String>) {
-    info!("Reading interface data for {ifname}");
-    // setup WireGuard API
-    // let wgapi = WGApi::new(ifname, IS_MACOS)?;
-    //
-    // let host = wgapi.read_interface_data();
-    unimplemented!()
+impl From<Peer> for proto::Peer {
+    fn from(value: Peer) -> Self {
+        todo!()
+    }
 }

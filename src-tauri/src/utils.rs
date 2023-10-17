@@ -14,10 +14,16 @@ use crate::{
         models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
     },
     error::Error,
-    service::DAEMON_BASE_URL,
+    service::{
+        proto::{
+            desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
+        },
+        DAEMON_BASE_URL,
+    },
 };
 use tauri::Manager;
 use tokio::time::{sleep, Duration};
+use tonic::transport::Channel;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 pub static STATS_PERIOD: u64 = 60;
@@ -27,7 +33,7 @@ pub async fn setup_interface(
     location: &Location,
     interface_name: &str,
     pool: &DbPool,
-    client: Client,
+    mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
         debug!("Decoding location public key: {}.", location.pubkey);
@@ -74,13 +80,10 @@ pub async fn setup_interface(
                 peers: vec![peer.clone()],
             };
             debug!("Creating interface {:#?}", interface_config);
-            if let Err(error) = client
-                .post(format!("{DAEMON_BASE_URL}/interface"))
-                .json(&interface_config)
-                .send()
-                .await?
-                .error_for_status()
-            {
+            let request = CreateInterfaceRequest {
+                config: Some(interface_config.clone().into()),
+            };
+            if let Err(error) = client.create_interface(request).await {
                 error!("Failed to create interface: {error}");
                 Err(Error::InternalError)
             } else {

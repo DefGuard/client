@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // run API server
+    // run gRPC server
     run_server().await?;
 
     Ok(())

@@ -5,7 +5,7 @@ use crate::{
         Location, LocationStats, WireguardKeys,
     },
     error::Error,
-    service::DAEMON_BASE_URL,
+    service::proto::RemoveInterfaceRequest,
     utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
@@ -65,15 +65,12 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
 
     if let Some(connection) = state.find_and_remove_connection(location_id) {
         debug!("Found active connection: {:#?}", connection);
-        let ifname = &connection.interface_name;
         debug!("Removing interface");
-        if let Err(error) = state
-            .client
-            .delete(format!("{DAEMON_BASE_URL}/interface/{ifname}"))
-            .send()
-            .await?
-            .error_for_status()
-        {
+        let mut client = state.client.clone();
+        let request = RemoveInterfaceRequest {
+            interface_name: connection.interface_name.clone(),
+        };
+        if let Err(error) = client.remove_interface(request).await {
             error!("Failed to remove interface: {error}");
             return Err(Error::InternalError);
         }

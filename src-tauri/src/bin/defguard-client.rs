@@ -55,7 +55,7 @@ fn main() {
     let tray_menu = create_tray_menu();
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
 
-    // TODO: check that service daemon is running at startup
+    let appstate = AppState::new();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -123,7 +123,7 @@ fn main() {
                 .targets(LOG_TARGETS)
                 .build(),
         )
-        .manage(AppState::default())
+        .manage(appstate)
         .setup(|app| {
             let handle = app.handle();
             tauri::async_runtime::spawn(async move {
