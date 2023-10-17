@@ -18,7 +18,6 @@ prost-build = { version = "0.12" }
 
 [dependencies]
 anyhow = "1.0.75"
-axum = { version = "0.6", features = ["macros"] }
 base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
 defguard_wireguard_rs = "0.2"
@@ -43,7 +42,6 @@ tauri = { version = "1.4", features = [ "http-all", "window-all", "system-tray",
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-tower-http = { version = "0.4", features = ["fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
