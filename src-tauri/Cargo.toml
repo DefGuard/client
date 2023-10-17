@@ -20,7 +20,7 @@ prost-build = { version = "0.12" }
 anyhow = "1.0.75"
 base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
-defguard_wireguard_rs = "0.2"
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "fix_interface_configuration" }
 dirs = "5.0"
 local-ip-address = "0.5"
 log = "0.4"
