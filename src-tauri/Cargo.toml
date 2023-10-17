@@ -32,6 +32,7 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 sqlx = { version = "0.7", features = ["chrono", "sqlite", "runtime-tokio", "uuid", "macros"] }
 thiserror = "1.0"
+tonic = "0.10"
 x25519-dalek = { version = "2", features = [
     "getrandom",
     "static_secrets",
