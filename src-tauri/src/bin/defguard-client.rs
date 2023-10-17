@@ -35,7 +35,8 @@ const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTa
 
 // TODO: Refactor later
 #[allow(clippy::single_match)]
-fn main() {
+#[tokio::main]
+async fn main() {
     // add bundled `wireguard-go` binary to PATH
     if IS_MACOS {
         debug!("Adding bundled wireguard-go binary to PATH");
