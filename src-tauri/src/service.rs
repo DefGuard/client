@@ -1,11 +1,13 @@
 use crate::utils::IS_MACOS;
 use anyhow::Context;
+use std::ops::Add;
 
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, host::Peer, InterfaceConfiguration, WGApi,
     WireguardInterfaceApi,
 };
 use std::pin::Pin;
+use std::time::{Duration, UNIX_EPOCH};
 use tonic::{
     codegen::tokio_stream::Stream,
     transport::{Channel, Endpoint, Server},
@@ -177,12 +179,54 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
 
 impl From<Peer> for proto::Peer {
     fn from(peer: Peer) -> Self {
-        todo!()
+        Self {
+            public_key: peer.public_key.to_lower_hex(),
+            preshared_key: peer.preshared_key.map(|key| key.to_lower_hex()),
+            protocol_version: peer.protocol_version,
+            endpoint: peer.endpoint.map(|addr| addr.to_string()),
+            last_handshake: peer.last_handshake.map(|time| {
+                time.duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+            }),
+            tx_bytes: peer.tx_bytes,
+            rx_bytes: peer.rx_bytes,
+            persistent_keepalive_interval: peer
+                .persistent_keepalive_interval
+                .map(|interval| interval as u32),
+            allowed_ips: peer
+                .allowed_ips
+                .into_iter()
+                .map(|addr| addr.to_string())
+                .collect(),
+        }
     }
 }
 
 impl From<proto::Peer> for Peer {
     fn from(peer: proto::Peer) -> Self {
-        todo!()
+        Self {
+            public_key: peer.public_key.parse().expect("Failed to parse public key"),
+            preshared_key: peer
+                .preshared_key
+                .map(|key| key.parse().expect("Failed to parse preshared key")),
+            protocol_version: peer.protocol_version,
+            endpoint: peer
+                .endpoint
+                .map(|addr| addr.parse().expect("Failed to parse endpoint address")),
+            last_handshake: peer
+                .last_handshake
+                .map(|timestamp| UNIX_EPOCH.add(Duration::from_secs(timestamp))),
+            tx_bytes: peer.tx_bytes,
+            rx_bytes: peer.rx_bytes,
+            persistent_keepalive_interval: peer
+                .persistent_keepalive_interval
+                .map(|interval| interval as u16),
+            allowed_ips: peer
+                .allowed_ips
+                .into_iter()
+                .map(|addr| addr.parse().expect("Failed to parse allowed IP"))
+                .collect(),
+        }
     }
 }
