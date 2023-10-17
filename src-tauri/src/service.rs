@@ -2,6 +2,7 @@ use crate::utils::IS_MACOS;
 use anyhow::Context;
 use std::ops::Add;
 
+use defguard_wireguard_rs::host::Host;
 use defguard_wireguard_rs::key::Key;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, host::Peer, InterfaceConfiguration, WGApi,
@@ -9,6 +10,9 @@ use defguard_wireguard_rs::{
 };
 use std::pin::Pin;
 use std::time::{Duration, UNIX_EPOCH};
+use tokio::sync::mpsc;
+use tokio::time::interval;
+use tonic::codegen::tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     codegen::tokio_stream::Stream,
     transport::{Channel, Endpoint, Server},
@@ -28,6 +32,7 @@ use proto::{
 
 pub const DAEMON_HTTP_PORT: u16 = 54127;
 pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
+const STATS_PERIOD: u64 = 60;
 
 pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
     debug!("Setting up gRPC client");
@@ -130,9 +135,39 @@ impl DesktopDaemonService for DaemonService {
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
         let ifname = request.interface_name;
-        // setup WireGuard API
-        let wgapi = setup_wgapi(ifname.clone())?;
-        todo!()
+        info!("Starting interface data stream for {ifname}");
+
+        let (tx, rx) = mpsc::channel(64);
+        tokio::spawn(async move {
+            info!("Spawning stats thread for interface {ifname}");
+            // setup WireGuard API
+            let wgapi =
+                setup_wgapi(ifname.clone()).expect("Failed to initialize WireGuard interface API");
+            let period = Duration::from_secs(STATS_PERIOD);
+            let mut interval = interval(period);
+
+            loop {
+                // wait till next iteration
+                interval.tick().await;
+                debug!("Sending interface stats update");
+                match wgapi.read_interface_data() {
+                    Ok(host) => {
+                        if let Err(err) = tx.send(Result::<_, Status>::Ok(host.into())).await {
+                            error!("Failed to send interface stats update: {err}");
+                            break;
+                        }
+                    }
+                    Err(err) => error!("Failed to retrieve WireGuard interface stats {}", err),
+                }
+                debug!("Finished sending interface stats update");
+            }
+            warn!("Client disconnected from interface stats stream");
+        });
+
+        let output_stream = ReceiverStream::new(rx);
+        Ok(Response::new(
+            Box::pin(output_stream) as Self::ReadInterfaceDataStream
+        ))
     }
 }
 
@@ -228,6 +263,15 @@ impl From<proto::Peer> for Peer {
                 .into_iter()
                 .map(|addr| addr.parse().expect("Failed to parse allowed IP"))
                 .collect(),
+        }
+    }
+}
+
+impl From<Host> for InterfaceData {
+    fn from(host: Host) -> Self {
+        Self {
+            listen_port: host.listen_port as u32,
+            peers: host.peers.into_values().map(|peer| peer.into()).collect(),
         }
     }
 }
