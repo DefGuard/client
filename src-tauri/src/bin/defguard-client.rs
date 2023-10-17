@@ -55,8 +55,6 @@ fn main() {
     let tray_menu = create_tray_menu();
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
 
-    let appstate = AppState::new();
-
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
@@ -123,7 +121,7 @@ fn main() {
                 .targets(LOG_TARGETS)
                 .build(),
         )
-        .manage(appstate)
+        .manage(AppState::default())
         .setup(|app| {
             let handle = app.handle();
             tauri::async_runtime::spawn(async move {

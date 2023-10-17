@@ -1,6 +1,7 @@
-use crate::database::{ActiveConnection, DbPool};
-use crate::service::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
-use crate::service::setup_client;
+use crate::{
+    database::{ActiveConnection, DbPool},
+    service::{proto::desktop_daemon_service_client::DesktopDaemonServiceClient, setup_client},
+};
 use std::sync::{Arc, Mutex};
 use tonic::transport::Channel;
 
@@ -9,6 +10,13 @@ pub struct AppState {
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
     pub client: DesktopDaemonServiceClient<Channel>,
 }
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AppState {
     pub fn new() -> Self {
         let client = setup_client().expect("Failed to setup gRPC client");

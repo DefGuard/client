@@ -1,20 +1,16 @@
 use crate::utils::IS_MACOS;
 use anyhow::Context;
-use axum::extract::Path;
-use axum::{
-    http::{Request, StatusCode},
-    response::{IntoResponse, Response},
-    routing::{get, post},
-    Json, Router,
-};
-use defguard_wireguard_rs::host::{Host, Peer};
+
 use defguard_wireguard_rs::{
-    error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+    error::WireguardInterfaceError, host::Peer, InterfaceConfiguration, WGApi,
+    WireguardInterfaceApi,
 };
 use std::pin::Pin;
-use tonic::codegen::tokio_stream::Stream;
-use tonic::transport::{Channel, Endpoint, Server};
-use tonic::Status;
+use tonic::{
+    codegen::tokio_stream::Stream,
+    transport::{Channel, Endpoint, Server},
+    Code, Response, Status,
+};
 use tracing::{debug, info};
 
 pub mod proto {
@@ -53,20 +49,74 @@ pub struct DaemonService {}
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
+fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
+    let wgapi = WGApi::new(ifname.clone(), IS_MACOS).map_err(|err| {
+        let msg = format!("Failed to setup WireGuard API: {err}");
+        error!("{msg}");
+        Status::new(Code::Internal, msg)
+    })?;
+    Ok(wgapi)
+}
+
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
     async fn create_interface(
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
-    ) -> Result<tonic::Response<()>, Status> {
-        todo!()
+    ) -> Result<Response<()>, Status> {
+        let request = request.into_inner();
+        let config: InterfaceConfiguration = request
+            .config
+            .ok_or(Status::new(
+                Code::InvalidArgument,
+                "Missing interface config in request",
+            ))?
+            .into();
+        let ifname = config.name.clone();
+        info!("Creating interface {ifname}");
+        // setup WireGuard API
+        let wgapi = setup_wgapi(ifname.clone())?;
+
+        // create new interface
+        debug!("Creating new interface {ifname}");
+        wgapi.create_interface().map_err(|err| {
+            let msg = format!("Failed to create WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+
+        // configure interface
+        debug!(
+            "Configuring new interface {ifname} with configuration: {:?}",
+            config
+        );
+        wgapi.configure_interface(&config).map_err(|err| {
+            let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+
+        Ok(Response::new(()))
     }
 
     async fn remove_interface(
         &self,
         request: tonic::Request<RemoveInterfaceRequest>,
-    ) -> Result<tonic::Response<()>, Status> {
-        todo!()
+    ) -> Result<Response<()>, Status> {
+        let request = request.into_inner();
+        let ifname = request.interface_name;
+        info!("Removing interface {ifname}");
+        // setup WireGuard API
+        let wgapi = setup_wgapi(ifname.clone())?;
+
+        // remove interface
+        wgapi.remove_interface().map_err(|err| {
+            let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+
+        Ok(Response::new(()))
     }
 
     type ReadInterfaceDataStream = InterfaceDataStream;
@@ -74,7 +124,11 @@ impl DesktopDaemonService for DaemonService {
     async fn read_interface_data(
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
-    ) -> Result<tonic::Response<Self::ReadInterfaceDataStream>, Status> {
+    ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
+        let request = request.into_inner();
+        let ifname = request.interface_name;
+        // setup WireGuard API
+        let wgapi = setup_wgapi(ifname.clone())?;
         todo!()
     }
 }
@@ -97,46 +151,6 @@ pub async fn run_server() -> anyhow::Result<()> {
     Ok(())
 }
 
-// async fn create_interface(Json(req): Json<InterfaceConfiguration>) -> ApiResult<()> {
-//     let ifname = req.name.clone();
-//     info!("Creating interface {ifname}");
-//     // setup WireGuard API
-//     let wgapi = WGApi::new(ifname.clone(), IS_MACOS)?;
-//
-//     // create new interface
-//     debug!("Creating new interface {ifname}");
-//     wgapi.create_interface()?;
-//
-//     // configure interface
-//     debug!(
-//         "Configuring new interface {ifname} with configuration: {:?}",
-//         req
-//     );
-//     wgapi.configure_interface(&req)?;
-//
-//     Ok(())
-// }
-//
-// async fn remove_interface(Path(ifname): Path<String>) -> ApiResult<()> {
-//     info!("Removing interface {ifname}");
-//     // setup WireGuard API
-//     let wgapi = WGApi::new(ifname, IS_MACOS)?;
-//
-//     // remove interface
-//     wgapi.remove_interface()?;
-//
-//     Ok(())
-// }
-//
-// async fn read_interface_data(Path(ifname): Path<String>) {
-//     info!("Reading interface data for {ifname}");
-//     // setup WireGuard API
-//     // let wgapi = WGApi::new(ifname, IS_MACOS)?;
-//     //
-//     // let host = wgapi.read_interface_data();
-//     unimplemented!()
-// }
-
 impl From<InterfaceConfiguration> for proto::InterfaceConfig {
     fn from(config: InterfaceConfiguration) -> Self {
         Self {
@@ -149,8 +163,26 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
     }
 }
 
+impl From<proto::InterfaceConfig> for InterfaceConfiguration {
+    fn from(config: proto::InterfaceConfig) -> Self {
+        Self {
+            name: config.name,
+            prvkey: config.prvkey,
+            address: config.address,
+            port: config.port,
+            peers: config.peers.into_iter().map(|peer| peer.into()).collect(),
+        }
+    }
+}
+
 impl From<Peer> for proto::Peer {
-    fn from(value: Peer) -> Self {
+    fn from(peer: Peer) -> Self {
+        todo!()
+    }
+}
+
+impl From<proto::Peer> for Peer {
+    fn from(peer: proto::Peer) -> Self {
         todo!()
     }
 }

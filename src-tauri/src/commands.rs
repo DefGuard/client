@@ -6,10 +6,9 @@ use crate::{
     },
     error::Error,
     service::proto::RemoveInterfaceRequest,
-    utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
+    utils::{get_interface_name, setup_interface, spawn_stats_thread},
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use defguard_wireguard_rs::WireguardInterfaceApi;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

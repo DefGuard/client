@@ -6,7 +6,6 @@ use std::{
 use defguard_wireguard_rs::{
     host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
-use reqwest::Client;
 
 use crate::{
     appstate::AppState,
@@ -14,11 +13,8 @@ use crate::{
         models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
     },
     error::Error,
-    service::{
-        proto::{
-            desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
-        },
-        DAEMON_BASE_URL,
+    service::proto::{
+        desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
     },
 };
 use tauri::Manager;
