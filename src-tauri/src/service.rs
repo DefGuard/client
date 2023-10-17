@@ -141,7 +141,7 @@ pub async fn run_server() -> anyhow::Result<()> {
         .context("Failed to parse gRPC address")?;
     let daemon_service = DaemonService::default();
 
-    info!("defguard daemon listening on ");
+    info!("defguard daemon listening on {addr}");
 
     Server::builder()
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
