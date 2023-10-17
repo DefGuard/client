@@ -2,6 +2,7 @@ use crate::utils::IS_MACOS;
 use anyhow::Context;
 use std::ops::Add;
 
+use defguard_wireguard_rs::key::Key;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, host::Peer, InterfaceConfiguration, WGApi,
     WireguardInterfaceApi,
@@ -206,10 +207,10 @@ impl From<Peer> for proto::Peer {
 impl From<proto::Peer> for Peer {
     fn from(peer: proto::Peer) -> Self {
         Self {
-            public_key: peer.public_key.parse().expect("Failed to parse public key"),
+            public_key: Key::decode(peer.public_key).expect("Failed to parse public key"),
             preshared_key: peer
                 .preshared_key
-                .map(|key| key.parse().expect("Failed to parse preshared key")),
+                .map(|key| Key::decode(key).expect("Failed to parse preshared key")),
             protocol_version: peer.protocol_version,
             endpoint: peer
                 .endpoint
@@ -228,5 +229,35 @@ impl From<proto::Peer> for Peer {
                 .map(|addr| addr.parse().expect("Failed to parse allowed IP"))
                 .collect(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use defguard_wireguard_rs::{key::Key, net::IpAddrMask};
+    use std::str::FromStr;
+    use std::time::SystemTime;
+    use x25519_dalek::{EphemeralSecret, PublicKey};
+
+    #[test]
+    fn convert_peer() {
+        let secret = EphemeralSecret::random();
+        let key = PublicKey::from(&secret);
+        let peer_key: Key = key.as_ref().try_into().unwrap();
+        let mut base_peer = Peer::new(peer_key);
+        let addr = IpAddrMask::from_str("10.20.30.2/32").unwrap();
+        base_peer.allowed_ips.push(addr);
+        base_peer.last_handshake = Some(SystemTime::UNIX_EPOCH); // workaround since ns are lost in conversion
+        base_peer.protocol_version = Some(3);
+        base_peer.endpoint = Some("127.0.0.1:8080".parse().unwrap());
+        base_peer.tx_bytes = 100;
+        base_peer.rx_bytes = 200;
+
+        let proto_peer: proto::Peer = base_peer.clone().into();
+
+        let converted_peer: Peer = proto_peer.into();
+
+        assert_eq!(base_peer, converted_peer)
     }
 }
