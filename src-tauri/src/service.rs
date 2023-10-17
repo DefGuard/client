@@ -157,7 +157,10 @@ impl DesktopDaemonService for DaemonService {
                             break;
                         }
                     }
-                    Err(err) => error!("Failed to retrieve WireGuard interface stats {}", err),
+                    Err(err) => {
+                        error!("Failed to retrieve WireGuard interface stats {}", err);
+                        break;
+                    }
                 }
                 debug!("Finished sending interface stats update");
             }
