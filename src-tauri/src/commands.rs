@@ -109,6 +109,7 @@ pub struct DeviceConfig {
     pub assigned_ip: String,
     pub pubkey: String,
     pub allowed_ips: String,
+    pub dns: Option<String>,
 }
 
 pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location {
@@ -121,6 +122,7 @@ pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) 
         pubkey: device_config.pubkey,
         endpoint: device_config.endpoint,
         allowed_ips: device_config.allowed_ips,
+        dns: device_config.dns,
     }
 }
 #[derive(Serialize, Deserialize, Debug)]
