@@ -1,3 +1,5 @@
+pub mod utils;
+
 use crate::utils::IS_MACOS;
 use anyhow::Context;
 use std::ops::Add;
@@ -13,19 +15,15 @@ use std::time::{Duration, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio::time::interval;
 use tonic::codegen::tokio_stream::wrappers::ReceiverStream;
-use tonic::{
-    codegen::tokio_stream::Stream,
-    transport::{Channel, Endpoint, Server},
-    Code, Response, Status,
-};
+use tonic::{codegen::tokio_stream::Stream, transport::Server, Code, Response, Status};
 use tracing::{debug, info};
 
 pub mod proto {
     tonic::include_proto!("client");
 }
 
+use crate::service::utils::configure_routing;
 use proto::{
-    desktop_daemon_service_client::DesktopDaemonServiceClient,
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
@@ -33,14 +31,6 @@ use proto::{
 pub const DAEMON_HTTP_PORT: u16 = 54127;
 pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
 const STATS_PERIOD: u64 = 60;
-
-pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
-    debug!("Setting up gRPC client");
-    let endpoint = Endpoint::from_shared(DAEMON_BASE_URL)?;
-    let channel = endpoint.connect_lazy();
-    let client = DesktopDaemonServiceClient::new(channel);
-    Ok(client)
-}
 
 #[derive(thiserror::Error, Debug)]
 pub enum DaemonError {
@@ -100,6 +90,13 @@ impl DesktopDaemonService for DaemonService {
         );
         wgapi.configure_interface(&config).map_err(|err| {
             let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+
+        // configure routing
+        configure_routing(request.allowed_ips, &ifname).map_err(|err| {
+            let msg = format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;

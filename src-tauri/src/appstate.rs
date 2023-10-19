@@ -1,6 +1,6 @@
 use crate::{
     database::{ActiveConnection, DbPool},
-    service::{proto::desktop_daemon_service_client::DesktopDaemonServiceClient, setup_client},
+    service::{proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client},
 };
 use std::sync::{Arc, Mutex};
 use tonic::transport::Channel;

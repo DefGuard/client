@@ -31,9 +31,11 @@ pub async fn setup_interface(
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
+        // prepare peer config
         debug!("Decoding location public key: {}.", location.pubkey);
         let peer_key: Key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
+
         debug!("Parsing location endpoint: {}", location.endpoint);
         let endpoint: SocketAddr = location.endpoint.parse()?;
         peer.endpoint = Some(endpoint);
@@ -45,18 +47,10 @@ pub async fn setup_interface(
             .split(',')
             .map(str::to_string)
             .collect();
-        debug!("Routing allowed ips");
-        for allowed_ip in allowed_ips {
-            match IpAddrMask::from_str(&allowed_ip) {
+        for allowed_ip in &allowed_ips {
+            match IpAddrMask::from_str(allowed_ip) {
                 Ok(addr) => {
                     peer.allowed_ips.push(addr);
-                    // TODO: Handle windows when wireguard_rs adds support
-                    // Add a route for the allowed IP using the `ip -4 route add` command
-                    if let Err(err) = add_route(&allowed_ip, interface_name) {
-                        error!("Error adding route for {}: {}", allowed_ip, err);
-                    } else {
-                        debug!("Added route for {}", allowed_ip);
-                    }
                 }
                 Err(err) => {
                     // Handle the error from IpAddrMask::from_str, if needed
@@ -66,6 +60,8 @@ pub async fn setup_interface(
                 }
             }
         }
+
+        // request interface configuration
         if let Some(port) = find_random_free_port() {
             let interface_config = InterfaceConfiguration {
                 name: interface_name.into(),
@@ -77,6 +73,8 @@ pub async fn setup_interface(
             debug!("Creating interface {:#?}", interface_config);
             let request = CreateInterfaceRequest {
                 config: Some(interface_config.clone().into()),
+                allowed_ips,
+                dns: location.dns.clone(),
             };
             if let Err(error) = client.create_interface(request).await {
                 error!("Failed to create interface: {error}");
@@ -98,29 +96,6 @@ pub async fn setup_interface(
 /// Helper function to remove whitespace from location name
 pub fn remove_whitespace(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()
-}
-
-#[cfg(target_os = "linux")]
-fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Error> {
-    std::process::Command::new("ip")
-        .args(["-4", "route", "add", allowed_ip, "dev", interface_name])
-        .output()?;
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Error> {
-    std::process::Command::new("route")
-        .args([
-            "-n",
-            "add",
-            "-net",
-            allowed_ip,
-            "-interface",
-            interface_name,
-        ])
-        .output()?;
-    Ok(())
 }
 
 fn find_random_free_port() -> Option<u16> {
