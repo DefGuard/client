@@ -39,7 +39,9 @@ jobs:
       matrix:
         platform: [Linux]
 
-    runs-on: [self-hosted, ${{ matrix.platform }}]
+    runs-on:
+      - self-hosted
+      - ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
