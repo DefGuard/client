@@ -1,5 +1,4 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tauri_build::build();
     // compiling protos using path on build time
     let mut config = prost_build::Config::new();
     // enable optional fields
@@ -11,5 +10,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &["proto/client/client.proto"],
         &["proto/client"],
     )?;
+
+    tauri_build::build();
+
     Ok(())
 }

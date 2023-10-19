@@ -115,3 +115,15 @@ jobs:
           name: linux.tar
           path: bundle.tar
           retention-days: 1
+
+      - name: Tar service binary
+        if: matrix.platform == 'Linux'
+        run: tar -cvf service.tar 'src-tauri/target/release/defguard-service'
+
+      - name: Upload service binary
+        if: matrix.platform == 'Linux'
+        uses: actions/upload-artifact@v3
+        with:
+          name: service.tar
+          path: service.tar
+          retention-days: 1
