@@ -28,12 +28,12 @@ jobs:
         working-directory: ./src-tauri
 
     steps:
-      - name: Debug
-        run: echo ${{ github.ref_name }}
       - name: Checkout
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Debug
+        run: echo ${{ github.ref_name }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
       - name: Install protoc
