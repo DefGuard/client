@@ -84,7 +84,7 @@ jobs:
         run: |
           PB_REL='https://github.com/protocolbuffers/protobuf/releases'
           PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
-          unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local      
+          sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local      
 
       - name: Download wireguard-go binary
         if: matrix.platform == 'macOS'
