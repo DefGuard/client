@@ -37,9 +37,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macOS, Linux]
+        platform: [Linux]
 
-    runs-on: ${{ matrix.platform }}
+    runs-on: [self-hosted, ${{ matrix.platform }}]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,7 +74,7 @@ jobs:
         if: matrix.platform == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev protobuf-compiler
 
       - name: Download wireguard-go binary
         if: matrix.platform == 'macOS'
