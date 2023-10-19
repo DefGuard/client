@@ -7,7 +7,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "Defguard",
+    "productName": "defguard-client",
     "version": "0.1.0"
   },
   "tauri": {
@@ -32,7 +32,12 @@
       "category": "Utility",
       "copyright": "teonite",
       "deb": {
-        "depends": []
+        "files": {
+          "/usr/sbin/defguard-service": "target/release/defguard-service",
+          "/usr/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service",
+          "../control/rules": "../resources-linux/rules",
+          "../control/postinst": "../resources-linux/postinst"
+        }
       },
       "externalBin": [],
       "icon": [

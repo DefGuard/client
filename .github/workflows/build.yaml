@@ -98,20 +98,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Write package version
-        run: |
-          VERSION=$(cargo pkgid | cut -d "@" -f2)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Copy service binary to package
-        if: matrix.platform == 'Linux'
-        working-directory: ./src-tauri/target/release
-        run: |
-          PACKAGE_DIR="bundle/deb/defguard-client_${VERSION}_amd64"
-          mkdir -p "${PACKAGE_DIR}/usr/sbin"
-          cp defguard-service "${PACKAGE_DIR}/usr/sbin/defguard-service"
-
       - name: Make sure wireguard-go binary is executable
         if: matrix.platform == 'macOS'
         run: chmod +x src-tauri/target/release/bundle/macos/Defguard.app/Contents/MacOS/wireguard-go
