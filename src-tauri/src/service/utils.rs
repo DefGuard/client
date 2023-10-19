@@ -1,8 +1,5 @@
-use crate::{
-    service::{
-        proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DaemonError,
-        DAEMON_BASE_URL,
-    },
+use crate::service::{
+    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DaemonError, DAEMON_BASE_URL,
 };
 use tonic::transport::channel::{Channel, Endpoint};
 use tracing::debug;
@@ -16,11 +13,11 @@ pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError
 }
 
 /// Adds routing for allowed_ips
-pub fn configure_routing(allowed_ips: Vec<String>, interface_name: &str) -> Result<(), DaemonError> {
-    info!(
-        "Configuring routing for allowed ips: {:?}",
-        allowed_ips
-    );
+pub fn configure_routing(
+    allowed_ips: Vec<String>,
+    interface_name: &str,
+) -> Result<(), DaemonError> {
+    info!("Configuring routing for allowed ips: {:?}", allowed_ips);
     for allowed_ip in allowed_ips {
         // TODO: Handle windows when wireguard_rs adds support
         // Add a route for the allowed IP using the `ip -4 route add` command

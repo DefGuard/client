@@ -96,7 +96,8 @@ impl DesktopDaemonService for DaemonService {
 
         // configure routing
         configure_routing(request.allowed_ips, &ifname).map_err(|err| {
-            let msg = format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
+            let msg =
+                format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
