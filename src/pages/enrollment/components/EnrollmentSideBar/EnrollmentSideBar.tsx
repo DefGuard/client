@@ -16,6 +16,11 @@ export const EnrollmentSideBar = () => {
 
   const vpnOptional = useEnrollmentStore((state) => state.vpnOptional);
 
+  const [currentStep, stepsMax] = useEnrollmentStore((state) => [
+    state.step,
+    state.stepsMax,
+  ]);
+
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
 
   const steps = useMemo((): LocalizedString[] => {
@@ -52,8 +57,13 @@ export const EnrollmentSideBar = () => {
           <Step text={text} index={index} key={index} />
         ))}
       </div>
-      <TimeLeft />
-      <Divider />
+      {currentStep !== stepsMax && (
+        <>
+          <TimeLeft />
+          <Divider />
+        </>
+      )}
+      {currentStep === stepsMax && <Divider className="push" />}
       <AdminInfo />
       <Divider />
       <div className="copyright">
