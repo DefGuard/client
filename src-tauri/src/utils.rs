@@ -3,19 +3,22 @@ use std::{
     str::FromStr,
 };
 
-use defguard_wireguard_rs::{
-    host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
-};
+use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi};
 
 use crate::{
+    appstate::AppState,
     database::{
         models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
     },
     error::Error,
-    AppState,
+    service::proto::{
+        desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
+        ReadInterfaceDataRequest,
+    },
 };
 use tauri::Manager;
-use tokio::time::{sleep, Duration};
+use tonic::codegen::tokio_stream::StreamExt;
+use tonic::transport::Channel;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 pub static STATS_PERIOD: u64 = 60;
@@ -25,15 +28,14 @@ pub async fn setup_interface(
     location: &Location,
     interface_name: &str,
     pool: &DbPool,
-) -> Result<WGApi, Error> {
+    mut client: DesktopDaemonServiceClient<Channel>,
+) -> Result<(), Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
-        debug!("Creating api for interface: '{}'", interface_name);
-        let api = create_api(interface_name)?;
-
-        api.create_interface()?;
+        // prepare peer config
         debug!("Decoding location public key: {}.", location.pubkey);
         let peer_key: Key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
+
         debug!("Parsing location endpoint: {}", location.endpoint);
         let endpoint: SocketAddr = location.endpoint.parse()?;
         peer.endpoint = Some(endpoint);
@@ -45,18 +47,10 @@ pub async fn setup_interface(
             .split(',')
             .map(str::to_string)
             .collect();
-        debug!("Routing allowed ips");
-        for allowed_ip in allowed_ips {
-            match IpAddrMask::from_str(&allowed_ip) {
+        for allowed_ip in &allowed_ips {
+            match IpAddrMask::from_str(allowed_ip) {
                 Ok(addr) => {
                     peer.allowed_ips.push(addr);
-                    // TODO: Handle windows when wireguard_rs adds support
-                    // Add a route for the allowed IP using the `ip -4 route add` command
-                    if let Err(err) = add_route(&allowed_ip, interface_name) {
-                        error!("Error adding route for {}: {}", allowed_ip, err);
-                    } else {
-                        debug!("Added route for {}", allowed_ip);
-                    }
                 }
                 Err(err) => {
                     // Handle the error from IpAddrMask::from_str, if needed
@@ -66,6 +60,8 @@ pub async fn setup_interface(
                 }
             }
         }
+
+        // request interface configuration
         if let Some(port) = find_random_free_port() {
             let interface_config = InterfaceConfiguration {
                 name: interface_name.into(),
@@ -75,16 +71,17 @@ pub async fn setup_interface(
                 peers: vec![peer.clone()],
             };
             debug!("Creating interface {:#?}", interface_config);
-            if let Err(err) = api.configure_interface(&interface_config) {
-                error!("Failed to configure interface: {}", err.to_string());
+            let request = CreateInterfaceRequest {
+                config: Some(interface_config.clone().into()),
+                allowed_ips,
+                dns: location.dns.clone(),
+            };
+            if let Err(error) = client.create_interface(request).await {
+                error!("Failed to create interface: {error}");
                 Err(Error::InternalError)
             } else {
-                if let Err(err) = api.configure_peer(&peer) {
-                    error!("Failed to configure peer: {}", err.to_string());
-                    return Err(Error::InternalError);
-                }
-                info!("created interface {:#?}", interface_config);
-                Ok(api)
+                info!("Created interface {:#?}", interface_config);
+                Ok(())
             }
         } else {
             error!("Error finding free port");
@@ -99,29 +96,6 @@ pub async fn setup_interface(
 /// Helper function to remove whitespace from location name
 pub fn remove_whitespace(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()
-}
-
-#[cfg(target_os = "linux")]
-fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Error> {
-    std::process::Command::new("ip")
-        .args(["-4", "route", "add", allowed_ip, "dev", interface_name])
-        .output()?;
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Error> {
-    std::process::Command::new("route")
-        .args([
-            "-n",
-            "add",
-            "-net",
-            allowed_ip,
-            "-interface",
-            interface_name,
-        ])
-        .output()?;
-    Ok(())
 }
 
 fn find_random_free_port() -> Option<u16> {
@@ -179,19 +153,29 @@ pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
     Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }
 
-pub async fn spawn_stats_thread(
-    handle: tauri::AppHandle,
-    location: Location,
-    api: WGApi, // Replace with your actual type
-) {
+pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String) {
     tokio::spawn(async move {
         let state = handle.state::<AppState>();
-        loop {
-            debug!("Reading interface data");
-            match api.read_interface_data() {
-                Ok(host) => {
-                    let peers = host.peers;
-                    for (_, peer) in peers {
+        let mut client = state.client.clone();
+        let request = ReadInterfaceDataRequest {
+            interface_name: interface_name.clone(),
+        };
+        let mut stream = client
+            .read_interface_data(request)
+            .await
+            .expect("Failed to connect to interface stats stream")
+            .into_inner();
+
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(interface_data) => {
+                    debug!("Received interface data update: {interface_data:?}");
+                    let peers: Vec<Peer> = interface_data
+                        .peers
+                        .into_iter()
+                        .map(|peer| peer.into())
+                        .collect();
+                    for peer in peers {
                         let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
                             .await
                             .unwrap();
@@ -200,20 +184,11 @@ pub async fn spawn_stats_thread(
                         debug!("Saved location stats: {:#?}", location_stats);
                     }
                 }
-                Err(e) => {
-                    error!(
-                        "Error {} while reading data for interface: {}",
-                        e, location.name
-                    );
-                    debug!(
-                        "Stopped stats thread for location: {}. Error: {}",
-                        location.name,
-                        e.to_string()
-                    );
-                    break;
+                Err(err) => {
+                    error!("Failed to receive interface data update: {err}")
                 }
             }
-            sleep(Duration::from_secs(STATS_PERIOD)).await;
         }
+        warn!("Interface data stream disconnected");
     });
 }

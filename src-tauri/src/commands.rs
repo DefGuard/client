@@ -1,14 +1,14 @@
 use crate::{
+    appstate::AppState,
     database::{
         models::instance::InstanceInfo, ActiveConnection, Connection, ConnectionInfo, Instance,
         Location, LocationStats, WireguardKeys,
     },
     error::Error,
-    utils::{create_api, get_interface_name, setup_interface, spawn_stats_thread},
-    AppState,
+    service::proto::RemoveInterfaceRequest,
+    utils::{get_interface_name, setup_interface, spawn_stats_thread},
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use defguard_wireguard_rs::WireguardInterfaceApi;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -29,9 +29,16 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
             location.name
         );
         let interface_name = get_interface_name(&location, state.get_connections());
-        let api = setup_interface(&location, &interface_name, &state.get_pool()).await?;
+        setup_interface(
+            &location,
+            &interface_name,
+            &state.get_pool(),
+            state.client.clone(),
+        )
+        .await?;
         let address = local_ip()?;
-        let connection = ActiveConnection::new(location_id, address.to_string(), interface_name);
+        let connection =
+            ActiveConnection::new(location_id, address.to_string(), interface_name.clone());
         state.active_connections.lock().unwrap().push(connection);
         debug!(
             "Active connections: {:#?}",
@@ -46,7 +53,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
         )?;
         // Spawn stats threads
         debug!("Spawning stats thread");
-        let _ = spawn_stats_thread(handle, location, api).await;
+        spawn_stats_thread(handle, interface_name).await;
     }
     Ok(())
 }
@@ -58,9 +65,15 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
 
     if let Some(connection) = state.find_and_remove_connection(location_id) {
         debug!("Found active connection: {:#?}", connection);
-        debug!("Creating api to remove interface");
-        let api = create_api(&connection.interface_name)?;
-        api.remove_interface()?;
+        debug!("Removing interface");
+        let mut client = state.client.clone();
+        let request = RemoveInterfaceRequest {
+            interface_name: connection.interface_name.clone(),
+        };
+        if let Err(error) = client.remove_interface(request).await {
+            error!("Failed to remove interface: {error}");
+            return Err(Error::InternalError);
+        }
         debug!("Removed interface");
         debug!("Saving connection: {:#?}", connection);
         let mut connection: Connection = connection.into();
@@ -96,6 +109,7 @@ pub struct DeviceConfig {
     pub assigned_ip: String,
     pub pubkey: String,
     pub allowed_ips: String,
+    pub dns: Option<String>,
 }
 
 pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location {
@@ -108,6 +122,7 @@ pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) 
         pubkey: device_config.pubkey,
         endpoint: device_config.endpoint,
         allowed_ips: device_config.allowed_ips,
+        dns: device_config.dns,
     }
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -279,12 +294,12 @@ pub async fn update_instance(
     }
 }
 
-  /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
+/// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
 fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
-      Ok(match from {
-          Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
-          None => Utc::now() - Duration::hours(1),
-      })
+    Ok(match from {
+        Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
+        None => Utc::now() - Duration::hours(1),
+    })
 }
 
 pub enum DateTimeAggregation {

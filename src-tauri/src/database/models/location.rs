@@ -17,6 +17,7 @@ pub struct Location {
     pub pubkey: String,
     pub endpoint: String,
     pub allowed_ips: String,
+    pub dns: Option<String>,
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
@@ -45,6 +46,7 @@ pub async fn peer_to_location_stats(peer: &Peer, pool: &DbPool) -> Result<Locati
 }
 
 impl Location {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         instance_id: i64,
         network_id: i64,
@@ -53,6 +55,7 @@ impl Location {
         pubkey: String,
         endpoint: String,
         allowed_ips: String,
+        dns: Option<String>,
     ) -> Self {
         Location {
             id: None,
@@ -63,13 +66,14 @@ impl Location {
             pubkey,
             endpoint,
             allowed_ips,
+            dns,
         }
     }
 
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let locations = query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
         FROM location;"
         )
         .fetch_all(pool)
@@ -85,8 +89,8 @@ impl Location {
             None => {
                 // Insert a new record when there is no ID
                 let result = query!(
-                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, network_id) \
-                VALUES ($1, $2, $3, $4, $5, $6, $7) \
+                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id) \
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
                 RETURNING id;",
                 self.instance_id,
                 self.name,
@@ -94,6 +98,7 @@ impl Location {
                 self.pubkey,
                 self.endpoint,
                 self.allowed_ips,
+                    self.dns,
                 self.network_id,
             )
             .fetch_one(executor)
@@ -103,14 +108,15 @@ impl Location {
             Some(id) => {
                 // Update the existing record when there is an ID
                 query!(
-                "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, network_id = $7 \
-                WHERE id = $8;",
+                "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
+                network_id = $8 WHERE id = $9;",
                 self.instance_id,
                 self.name,
                 self.address,
                 self.pubkey,
                 self.endpoint,
                 self.allowed_ips,
+                    self.dns,
                 self.network_id,
                 id,
             )
@@ -124,7 +130,7 @@ impl Location {
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
             FROM location WHERE id = $1;",
             location_id
         )
@@ -137,7 +143,7 @@ impl Location {
     ) -> Result<Vec<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
             FROM location WHERE instance_id = $1;",
             instance_id
         )
@@ -147,7 +153,7 @@ impl Location {
     pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
             FROM location WHERE pubkey = $1;",
             pubkey
         )
@@ -164,7 +170,7 @@ impl Location {
     {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
             FROM location WHERE network_id = $1;",
             instance_id
         )

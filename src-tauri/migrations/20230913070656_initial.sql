@@ -13,6 +13,7 @@ CREATE TABLE location (
   pubkey TEXT NOT NULL,
   endpoint TEXT NOT NULL,
   allowed_ips TEXT NOT NULL,
+  dns TEXT,
   FOREIGN KEY (instance_id) REFERENCES instance(id)
 );
 
