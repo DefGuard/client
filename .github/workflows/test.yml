@@ -36,8 +36,17 @@ jobs:
         run: echo ${{ github.ref_name }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
-      - name: Install protoc
-        run: apt-get update && apt-get -y install protobuf-compiler
+      - name: install linux deps
+        if: matrix.platform == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
+      - name: install protobuf compiler
+        if: matrix.platform == 'Linux'
+        run: |
+          PB_REL='https://github.com/protocolbuffers/protobuf/releases'
+          PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
+          sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local
       - name: Check format
         run: |
           rustup component add rustfmt
