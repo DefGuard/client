@@ -1,0 +1,2 @@
+systemctl stop defguard-service
+systemctl disable defguard-service

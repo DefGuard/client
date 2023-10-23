@@ -36,7 +36,9 @@
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/usr/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service",
           "../control/rules": "../resources-linux/rules",
-          "../control/postinst": "../resources-linux/postinst"
+          "../control/postinst": "../resources-linux/postinst",
+          "../control/prerm": "../resources-linux/prerm",
+          "../control/postrm": "../resources-linux/postrm"
         }
       },
       "externalBin": [],
