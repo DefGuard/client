@@ -61,7 +61,7 @@ jobs:
 
       - name: Write release version
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
