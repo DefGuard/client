@@ -1,7 +1,7 @@
 import './style.scss';
 
 import dayjs from 'dayjs';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBreakpoint } from 'use-breakpoint';
 import { shallow } from 'zustand/shallow';
@@ -31,6 +31,7 @@ import { PasswordStep } from './steps/PasswordStep/PasswordStep';
 import { WelcomeStep } from './steps/WelcomeStep/WelcomeStep';
 
 export const EnrollmentPage = () => {
+  const enrollmentFinished = useRef(false);
   const navigate = useNavigate();
   const { LL } = useI18nContext();
   const { breakpoint } = useBreakpoint(deviceBreakpoints);
@@ -55,23 +56,31 @@ export const EnrollmentPage = () => {
   }, [setEnrollmentState, stepsMax]);
 
   useEffect(() => {
-    if (sessionEnd) {
-      const endDay = dayjs(sessionEnd);
-      const diff = endDay.diff(dayjs(), 'millisecond');
-      if (diff > 0) {
-        const timeout = setTimeout(() => {
+    if (!enrollmentFinished.current) {
+      if (sessionEnd) {
+        const endDay = dayjs(sessionEnd);
+        const diff = endDay.diff(dayjs(), 'millisecond');
+        if (diff > 0) {
+          const timeout = setTimeout(() => {
+            if (!enrollmentFinished.current) {
+              navigate(routes.timeout, { replace: true });
+            }
+          }, diff);
+          return () => {
+            clearTimeout(timeout);
+          };
+        } else {
           navigate(routes.timeout, { replace: true });
-        }, diff);
-        return () => {
-          clearTimeout(timeout);
-        };
+        }
       } else {
         navigate(routes.timeout, { replace: true });
       }
-    } else {
-      navigate(routes.timeout, { replace: true });
     }
   }, [sessionEnd, navigate, reset]);
+
+  useEffect(() => {
+    enrollmentFinished.current = stepsMax === currentStep;
+  }, [currentStep, stepsMax]);
 
   return (
     <PageContainer id="enrollment">
