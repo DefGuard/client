@@ -155,7 +155,7 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Rename client binary
-        run: mv target/release/defguard-client defguard-client-linux-x86_64-${{ github.ref_name }}
+        run: mv src-tauri/target/release/defguard-client defguard-client-linux-x86_64-${{ github.ref_name }}
 
       - name: Tar client binary
         uses: a7ul/tar-action@v1.1.0
@@ -177,7 +177,7 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Rename daemon binary
-        run: mv target/release/defguard-service defguard-service-linux-x86_64-${{ github.ref_name }}
+        run: mv src-tauri/target/release/defguard-service defguard-service-linux-x86_64-${{ github.ref_name }}
 
       - name: Tar daemon binary
         uses: a7ul/tar-action@v1.1.0
