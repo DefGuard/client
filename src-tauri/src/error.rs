@@ -34,8 +34,6 @@ pub enum Error {
     NotFound,
     #[error("Tauri error: {0}")]
     Tauri(#[from] tauri::Error),
-    #[error("HTTP client error: {0}")]
-    HttpError(#[from] reqwest::Error),
 }
 
 // we must manually implement serde::Serialize
