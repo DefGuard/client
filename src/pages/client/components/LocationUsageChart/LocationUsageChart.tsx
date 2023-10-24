@@ -41,7 +41,7 @@ const totalUploadDownload = (data: LocationStats[]): number[] => {
 export const LocationUsageChart = ({
   data,
   hideX = false,
-  barSize = 5,
+  barSize = 2,
   barGap = 2,
   heightX = 50,
 }: LocationUsageProps) => {
@@ -54,13 +54,8 @@ export const LocationUsageChart = ({
   return (
     <div className="location-usage">
       <div className="summary">
-        <>
-          <NetworkSpeed
-            speedValue={totalDownload}
-            direction={NetworkDirection.DOWNLOAD}
-          />
-          <NetworkSpeed speedValue={totalUpload} direction={NetworkDirection.UPLOAD} />
-        </>
+        <NetworkSpeed speedValue={totalDownload} direction={NetworkDirection.DOWNLOAD} />
+        <NetworkSpeed speedValue={totalUpload} direction={NetworkDirection.UPLOAD} />
       </div>
       <AutoSizer>
         {(size) => (
@@ -82,7 +77,12 @@ export const LocationUsageChart = ({
               tickLine={{ stroke: colors.surfaceDefaultModal }}
               hide={hideX}
               padding={{ left: 0, right: 0 }}
-              tick={{ fontSize: 10, color: '#000000' }}
+              tick={{
+                fontSize: 12,
+                color: '#222',
+                fontWeight: 500,
+                fontFamily: 'Roboto',
+              }}
               tickFormatter={formatXTick}
               domain={['dataMin', 'dataMax']}
               interval={'preserveEnd'}

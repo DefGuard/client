@@ -1,7 +1,8 @@
 import byteSize from 'byte-size';
+import classNames from 'classnames';
 import dayjs from 'dayjs';
-import { floor } from 'lodash-es';
-import { useMemo } from 'react';
+import { floor, isUndefined } from 'lodash-es';
+import { ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import {
@@ -33,6 +34,7 @@ const getDuration = (start: string, end: string): string => {
 export const LocationConnectionHistory = ({ connections }: Props) => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client.detailView.history.headers;
+  const connectionsLength = useRef(0);
   const listHeaders = useMemo((): ListHeader[] => {
     return [
       {
@@ -69,8 +71,8 @@ export const LocationConnectionHistory = ({ connections }: Props) => {
         key: 'date',
         render: (connection: Connection) => (
           <span className="date">
-            {`${dayjs.utc(connection.start).local().format('DD.MM.YYYY')} : 
-            ${dayjs.utc(connection.start).local().format('HH.mm')} - 
+            {`${dayjs.utc(connection.start).local().format('DD.MM.YYYY')} :
+            ${dayjs.utc(connection.start).local().format('HH.mm')} -
             ${dayjs.utc(connection.end).local().format('HH.mm')} `}
           </span>
         ),
@@ -106,25 +108,46 @@ export const LocationConnectionHistory = ({ connections }: Props) => {
     return allCells;
   }, []);
 
+  const rowRender = useCallback(
+    (data: Connection, index?: number): ReactNode => {
+      return (
+        <div
+          className={classNames('custom-row', {
+            last: !isUndefined(index) && index === connectionsLength.current,
+          })}
+          data-index={index}
+        >
+          {listCells.map((cell, cellIndex) => (
+            <div className={`cell-${cellIndex}`} key={cellIndex}>
+              {cell.render(data)}
+            </div>
+          ))}
+        </div>
+      );
+    },
+    [listCells],
+  );
+
   const getListPadding = useMemo(() => {
     return {
-      left: 20,
-      right: 20,
+      left: 25,
+      right: 25,
     };
   }, []);
+
+  useEffect(() => {
+    connectionsLength.current = connections.length;
+  }, [connections]);
 
   return (
     <VirtualizedList
       className="connections-list"
-      rowSize={70}
+      rowSize={40}
       data={connections}
       headers={listHeaders}
       cells={listCells}
-      headerPadding={{
-        left: 15,
-        right: 15,
-      }}
       padding={getListPadding}
+      customRowRender={rowRender}
     />
   );
 };

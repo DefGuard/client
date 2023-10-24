@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import classNames from 'classnames';
 import { error } from 'tauri-plugin-log-api';
 
-import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { getStatsFilterValue } from '../../../../../../shared/utils/getStatsFilterValue';
 import { clientApi } from '../../../../clientAPI/clientApi';
@@ -83,7 +82,7 @@ const GridItem = ({ location }: GridItemProps) => {
           </div>
         )}
       {locationStats && locationStats.length > 0 && (
-        <LocationUsageChart heightX={20} hideX={false} data={locationStats} />
+        <LocationUsageChart heightX={20} hideX={true} data={locationStats} />
       )}
       {(!locationStats || locationStats.length === 0) && <LocationCardNoData />}
     </Card>

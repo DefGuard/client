@@ -108,7 +108,10 @@ export const LocationsDetailView = ({ locations }: Props) => {
           <LocationUsageChart barSize={4} data={locationStats} />
         ) : null}
         {connectionHistory && connectionHistory.length ? (
-          <LocationConnectionHistory connections={connectionHistory} />
+          <>
+            <h2>Connection History</h2>
+            <LocationConnectionHistory connections={connectionHistory} />
+          </>
         ) : null}
         {(!locationStats || locationStats.length === 0) && <LocationCardNoData />}
       </Card>
