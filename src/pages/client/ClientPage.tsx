@@ -20,6 +20,7 @@ export const ClientPage = () => {
   const pageLL = LL.pages.client;
   const setInstances = useClientStore((state) => state.setInstances);
 
+  //FIXME: Remore logs once bug causing no instances in listing is found and fixed
   useQuery({
     queryKey: [clientQueryKeys.getInstances],
     queryFn: getInstances,
@@ -28,6 +29,12 @@ export const ClientPage = () => {
     onSuccess: (res) => {
       setInstances(res);
       info('Retrieved all instances');
+      if (res.length) {
+        console.log(`FOUND INSTANCES COUNT : ${res.length}`);
+        console.log(`FOUND INSTANCES : ${res.map((i) => i.name).join(' ')}`);
+      } else {
+        console.warn('NO INSTANCES RECEIVED FROM TAURI BACKEND');
+      }
     },
     onError: (err) => {
       error(`Error retrieving instances: ${String(err)}`);

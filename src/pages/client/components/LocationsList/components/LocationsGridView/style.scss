@@ -52,15 +52,10 @@
       }
     }
 
-    & > .no-data {
+    & > .location-no-data {
+      padding-top: 32px;
+      height: max-content;
       width: 100%;
-      display: block;
-      text-align: center;
-      margin-top: 42px;
-
-      @include typography(app-button-xl);
-
-      color: var(--text-body-primary);
     }
   }
 }

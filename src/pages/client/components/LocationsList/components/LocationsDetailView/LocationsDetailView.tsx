@@ -17,6 +17,7 @@ import { DefguardInstance, DefguardLocation } from '../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
+import { LocationCardNoData } from '../LocationCardNoData/LocationCardNoData';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 import { LocationConnectionHistory } from '../LocationConnectionHistory/LocationConnectionHistory';
 
@@ -58,6 +59,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
       error(`Error retrieving connection history: ${e}`);
     },
   });
+
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
@@ -108,6 +110,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
         {connectionHistory && connectionHistory.length ? (
           <LocationConnectionHistory connections={connectionHistory} />
         ) : null}
+        {(!locationStats || locationStats.length === 0) && <LocationCardNoData />}
       </Card>
     </div>
   );

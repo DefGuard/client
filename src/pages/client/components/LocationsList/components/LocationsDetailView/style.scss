@@ -19,6 +19,8 @@
     padding: 20px;
     min-height: 50vh;
     border-top-left-radius: 0;
+    overflow: hidden;
+    max-height: none;
 
     @include media-breakpoint-up(lg) {
       min-height: 600px;
@@ -40,6 +42,14 @@
       row-gap: 20px;
       align-items: center;
       justify-content: space-between;
+    }
+
+    .location-no-data {
+      flex-grow: 1;
+
+      & > * {
+        max-width: 400px;
+      }
     }
 
     & > .location-usage {

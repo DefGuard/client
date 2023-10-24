@@ -14,6 +14,7 @@ import { DefguardInstance, DefguardLocation } from '../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
+import { LocationCardNoData } from '../LocationCardNoData/LocationCardNoData';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
@@ -36,7 +37,6 @@ type GridItemProps = {
 };
 
 const GridItem = ({ location }: GridItemProps) => {
-  const { LL } = useI18nContext();
   const cn = classNames(
     'grid-item',
     {
@@ -75,25 +75,17 @@ const GridItem = ({ location }: GridItemProps) => {
         <LocationCardTitle location={location} />
         <LocationCardConnectButton location={location} />
       </div>
-      {lastConnection || location.active ? (
-        <>
+      {locationStats &&
+        locationStats.length > 0 &&
+        (lastConnection || location.active) && (
           <div className="info">
             <LocationCardInfo location={location} connection={lastConnection} />
           </div>
-          {locationStats ? (
-            <LocationUsageChart
-              heightX={20}
-              width={400}
-              height={50}
-              hideX={false}
-              data={locationStats}
-            />
-          ) : null}
-        </>
-      ) : (
-        <p className="no-data">{LL.pages.client.locationNoData()}</p>
+        )}
+      {locationStats && locationStats.length > 0 && (
+        <LocationUsageChart heightX={20} hideX={false} data={locationStats} />
       )}
-      <div className="stats"></div>
+      {(!locationStats || locationStats.length === 0) && <LocationCardNoData />}
     </Card>
   );
 };
