@@ -1,0 +1,25 @@
+@use '@scssutils' as *;
+
+.location-no-data {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: 3px;
+
+  & > p {
+    width: 100%;
+    &:nth-child(1) {
+      @include typography(app-body-1);
+      color: var(--text-body-primary);
+      text-align: center;
+    }
+    &:nth-child(2) {
+      @include typography(app-input);
+      color: var(--text-button-primary);
+      text-align: center;
+    }
+  }
+}

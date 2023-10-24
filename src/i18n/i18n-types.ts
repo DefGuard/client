@@ -210,10 +210,16 @@ type RootTranslation = {
 				 */
 				neverConnected: string
 			}
-			/**
-			 * T​h​i​s​ ​d​e​v​i​c​e​ ​w​a​s​ ​n​e​v​e​r​ ​c​o​n​n​e​c​t​e​d​ ​t​o​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​,​ ​c​o​n​n​e​c​t​ ​t​o​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​a​n​d​ ​i​n​f​o​r​m​a​t​i​o​n​ ​a​b​o​u​t​ ​c​o​n​n​e​c​t​i​o​n
-			 */
-			locationNoData: string
+			locationNoData: {
+				/**
+				 * N​e​v​e​r​ ​C​o​n​n​e​c​t​e​d
+				 */
+				title: string
+				/**
+				 * T​h​i​s​ ​d​e​v​i​c​e​ ​w​a​s​ ​n​e​v​e​r​ ​c​o​n​n​e​c​t​e​d​ ​t​o​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​,​ ​c​o​n​n​e​c​t​ ​t​o​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​a​n​d​ ​i​n​f​o​r​m​a​t​i​o​n​ ​a​b​o​u​t​ ​c​o​n​n​e​c​t​i​o​n
+				 */
+				content: string
+			}
 			detailView: {
 				history: {
 					/**
@@ -864,10 +870,16 @@ export type TranslationFunctions = {
 				 */
 				neverConnected: () => LocalizedString
 			}
-			/**
-			 * This device was never connected to this location, connect to view statistics and information about connection
-			 */
-			locationNoData: () => LocalizedString
+			locationNoData: {
+				/**
+				 * Never Connected
+				 */
+				title: () => LocalizedString
+				/**
+				 * This device was never connected to this location, connect to view statistics and information about connection
+				 */
+				content: () => LocalizedString
+			}
 			detailView: {
 				history: {
 					/**

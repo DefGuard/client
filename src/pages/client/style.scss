@@ -5,6 +5,7 @@
   box-sizing: border-box;
   min-height: 100vh;
   background-color: var(--surface-frame-bg);
+  overflow: auto;
 
   padding: 30px 20px 30px calc(20px + 70px);
 
