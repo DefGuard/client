@@ -2,9 +2,7 @@
 
 @mixin list-layout {
   display: inline-grid;
-  grid-template-columns: minmax(180px, 25%) repeat(3, 1fr) auto;
-
-  // Adjust for larger screens.
+  grid-template-columns: 1.5fr repeat(4, 1fr);
 
   & > * {
     grid-row: 1;
@@ -16,7 +14,7 @@
     display: flex;
     flex-flow: column;
     row-gap: 20px;
-    padding: 20px;
+    padding: 20px 0;
     min-height: 50vh;
     border-top-left-radius: 0;
     overflow: hidden;
@@ -33,6 +31,15 @@
       justify-content: space-between;
       width: 100%;
       row-gap: 20px;
+      box-sizing: border-box;
+      padding: 0 20px;
+    }
+
+    & > h2 {
+      @include typography(app-body-1);
+      width: 100%;
+      box-sizing: border-box;
+      padding: 20px 20px 0;
     }
 
     & > .info {
@@ -42,6 +49,8 @@
       row-gap: 20px;
       align-items: center;
       justify-content: space-between;
+      box-sizing: border-box;
+      padding: 0 20px;
     }
 
     .location-no-data {
@@ -53,18 +62,13 @@
     }
 
     & > .location-usage {
-      display: flex;
-      flex-direction: column;
-      padding-top: 2rem;
-      margin: auto;
-      & > .summary {
-        display: flex;
-        justify-content: space-between;
-      }
+      box-sizing: border-box;
+      padding: 0 20px;
+      height: clamp(100px, 400px, 25vh);
     }
 
     & > .connections-list {
-      height: 450px;
+      height: 400px;
       @include media-breakpoint-up(lg) {
         grid-template-rows: 28px 1fr;
       }
@@ -86,21 +90,23 @@
         }
       }
 
-      .default-row {
+      .custom-row {
         @include list-layout;
 
         align-items: center;
         grid-template-rows: 1fr;
-        height: 60px;
+        height: 20px;
         cursor: pointer;
+        width: 100%;
+        box-sizing: border-box;
 
-        .upload,
-        .download,
-        .date,
-        .connected-from,
-        .duration {
-          @include typography(app-side-bar);
+        span {
+          @include typography(app-button-xl);
           color: var(--text-body-primary);
+        }
+
+        .date {
+          @include typography(app-strap);
         }
       }
     }

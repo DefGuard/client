@@ -1,5 +1,6 @@
+import './style.scss';
+
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
-import "./style.scss";
 
 export const LocationCardNoData = () => {
   const { LL } = useI18nContext();
