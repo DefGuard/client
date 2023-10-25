@@ -50,9 +50,9 @@ export const AddInstanceModalInitStep = () => {
         url: z
           .string()
           .trim()
-          .nonempty(LL.form.errors.required())
+          .min(1, LL.form.errors.required())
           .url(LL.form.errors.invalid()),
-        token: z.string().trim().nonempty(LL.form.errors.required()),
+        token: z.string().trim().min(1, LL.form.errors.required()),
       }),
     [LL.form.errors],
   );
@@ -95,8 +95,8 @@ export const AddInstanceModalInitStep = () => {
         if (!res.ok) {
           toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
           setModalState({ loading: false });
-          error(res.data);
-          error(res.status);
+          error(JSON.stringify(res.data));
+          error(JSON.stringify(res.status));
           return;
         }
         const r = res.data;

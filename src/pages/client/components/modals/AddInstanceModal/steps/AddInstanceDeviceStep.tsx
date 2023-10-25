@@ -46,7 +46,7 @@ export const AddInstanceDeviceStep = () => {
   );
 
   const schema = useMemo(
-    () => z.object({ name: z.string().trim().nonempty(LL.form.errors.required()) }),
+    () => z.object({ name: z.string().trim().min(1, LL.form.errors.required()) }),
     [LL.form.errors],
   );
 

@@ -192,3 +192,20 @@ pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String
         warn!("Interface data stream disconnected");
     });
 }
+
+// gets targets that will be allowed by logger, this will be empty if not provided
+pub fn load_log_targets() -> Vec<String> {
+    match std::env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
+        Ok(targets) => {
+            if !targets.is_empty() {
+                return targets
+                    .split(',')
+                    .filter(|t| !t.is_empty())
+                    .map(|t| t.to_string())
+                    .collect();
+            }
+            vec![]
+        }
+        Err(_) => vec![],
+    }
+}

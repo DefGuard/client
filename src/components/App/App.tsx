@@ -12,6 +12,7 @@ import updateLocale from 'dayjs/plugin/updateLocale';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useState } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { debug } from 'tauri-plugin-log-api';
 import { localStorageDetector } from 'typesafe-i18n/detectors';
 
 import TypesafeI18n from '../../i18n/i18n-react';
@@ -59,7 +60,11 @@ export const App = () => {
   const [wasLoaded, setWasLoaded] = useState(false);
 
   useEffect(() => {
-    loadLocaleAsync(detectedLocale).then(() => setWasLoaded(true));
+    debug('Loading locales');
+    loadLocaleAsync(detectedLocale).then(() => {
+      setWasLoaded(true);
+      debug(`Locale ${detectedLocale} loaded.`);
+    });
     dayjs.locale(detectedLocale);
   }, []);
 

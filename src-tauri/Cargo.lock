@@ -866,6 +866,7 @@ dependencies = [
  "chrono",
  "defguard_wireguard_rs",
  "dirs",
+ "lazy_static",
  "local-ip-address",
  "log",
  "prost",

@@ -1,7 +1,7 @@
 import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
-import { error, info } from 'tauri-plugin-log-api';
+import { debug, error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../i18n/i18n-react';
 import { clientApi } from './clientAPI/clientApi';
@@ -20,21 +20,21 @@ export const ClientPage = () => {
   const pageLL = LL.pages.client;
   const setInstances = useClientStore((state) => state.setInstances);
 
-  //FIXME: Remore logs once bug causing no instances in listing is found and fixed
   useQuery({
     queryKey: [clientQueryKeys.getInstances],
     queryFn: getInstances,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+    retry: (retryCount) => {
+      error(`Retrieving instances failed ${retryCount} times.`);
+      if (retryCount > 5) {
+        return false;
+      }
+      return true;
+    },
     onSuccess: (res) => {
       setInstances(res);
-      info('Retrieved all instances');
-      if (res.length) {
-        console.log(`FOUND INSTANCES COUNT : ${res.length}`);
-        console.log(`FOUND INSTANCES : ${res.map((i) => i.name).join(' ')}`);
-      } else {
-        console.warn('NO INSTANCES RECEIVED FROM TAURI BACKEND');
-      }
+      debug(`Retrieved ${res.length} instances`);
     },
     onError: (err) => {
       error(`Error retrieving instances: ${String(err)}`);

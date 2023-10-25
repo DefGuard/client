@@ -60,11 +60,12 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
 
 #[tauri::command]
 pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<(), Error> {
-    debug!("Disconnecting location with id: {}", location_id);
+    debug!("Disconnecting location {}", location_id);
     let state = handle.state::<AppState>();
 
     if let Some(connection) = state.find_and_remove_connection(location_id) {
-        debug!("Found active connection: {:#?}", connection);
+        debug!("Found active connection");
+        trace!("Connection: {:#?}", connection);
         debug!("Removing interface");
         let mut client = state.client.clone();
         let request = RemoveInterfaceRequest {
@@ -75,16 +76,19 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
             return Err(Error::InternalError);
         }
         debug!("Removed interface");
-        debug!("Saving connection: {:#?}", connection);
+        debug!("Saving connection");
+        trace!("Connection: {:#?}", connection);
         let mut connection: Connection = connection.into();
         connection.save(&state.get_pool()).await?;
-        debug!("Saved connection: {:#?}", connection);
+        debug!("Connection saved");
+        trace!("Saved connection: {:#?}", connection);
         handle.emit_all(
             "connection-changed",
             Payload {
                 message: "Created new connection".into(),
             },
         )?;
+        info!("Location {} disconnected", connection.location_id);
         Ok(())
     } else {
         error!("Connection for location with id: {} not found", location_id);
@@ -165,10 +169,10 @@ pub async fn save_device_config(
     }
     transaction.commit().await?;
     info!("Instance created.");
-    debug!("Created following instance: {:#?}", instance);
+    trace!("Created following instance: {:#?}", instance);
     let locations =
         Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
-    debug!("Created following locations: {:#?}", locations);
+    trace!("Created following locations: {:#?}", locations);
     Ok(())
 }
 
@@ -177,7 +181,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     debug!("Retrieving all instances.");
 
     let instances = Instance::all(&app_state.get_pool()).await?;
-    debug!("Found following instances: {:#?}", instances);
+    debug!("Found intances({})", instances.len());
+    trace!("Instances found: {:#?}", instances);
     let mut instance_info: Vec<InstanceInfo> = vec![];
     let connection_ids: Vec<i64> = app_state
         .active_connections
@@ -187,8 +192,6 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .map(|connection| connection.location_id)
         .collect();
     for instance in &instances {
-        debug!("Checking if instance: {:#?} is active", instance.uuid);
-
         let locations =
             Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
         let location_ids: Vec<i64> = locations
@@ -210,7 +213,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             pubkey: keys.pubkey,
         });
     }
-    info!("Returning following instances: {:#?}", instance_info);
+    info!("Instances retrieved({})", instance_info.len());
+    trace!("Returning following instances: {:#?}", instance_info);
     Ok(instance_info)
 }
 
@@ -241,7 +245,6 @@ pub async fn all_locations(
         .collect();
     let mut location_info = vec![];
     for location in locations {
-        debug!("Checking if location: {:#?} is active", location.name);
         let info = LocationInfo {
             id: location.id.unwrap(),
             instance_id: location.instance_id,
@@ -252,7 +255,12 @@ pub async fn all_locations(
         };
         location_info.push(info);
     }
-    debug!("Returning all locations: {:#?}", location_info);
+    debug!(
+        "Returning {} locations for instance {}",
+        location_info.len(),
+        instance_id
+    );
+    trace!("Locations returned:\n{:#?}", location_info);
 
     Ok(location_info)
 }
@@ -262,7 +270,8 @@ pub async fn update_instance(
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
 ) -> Result<(), Error> {
-    debug!("Received following response: {:#?}", response);
+    debug!("Received update_instance command");
+    trace!("Processing following response:\n {:#?}", response);
 
     let instance = Instance::find_by_id(&app_state.get_pool(), instance_id).await?;
     if let Some(mut instance) = instance {
@@ -287,7 +296,7 @@ pub async fn update_instance(
             }
         }
         transaction.commit().await?;
-        info!("Updated instance with id: {}.", instance_id);
+        info!("Instance {} updated", instance_id);
         Ok(())
     } else {
         Err(Error::NotFound)
@@ -333,6 +342,7 @@ pub async fn location_stats(
     from: Option<String>,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationStats>, Error> {
+    trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
     LocationStats::all_by_location_id(&app_state.get_pool(), location_id, &from, &aggregation).await
@@ -343,16 +353,14 @@ pub async fn all_connections(
     location_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<ConnectionInfo>, Error> {
-    debug!("Retrieving all conections.");
-
+    debug!("Retrieving connections for location {}", location_id);
     let connections =
         ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id).await?;
-    debug!(
-        "Returning all connections for location with id: {}, {:#?} ",
-        location_id, connections
-    );
+    debug!("Connections received, returning.");
+    trace!("Connections found:\n{:#?}", connections);
     Ok(connections)
 }
+
 #[tauri::command]
 pub async fn active_connection(
     location_id: i64,
@@ -364,11 +372,14 @@ pub async fn active_connection(
         location_id
     );
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
-        debug!(
-            "Returning active connection: {:#?}",
-            state.find_connection(location.id.unwrap())
-        );
-        Ok(state.find_connection(location.id.unwrap()))
+        debug!("Location found");
+        let connection = state.find_connection(location.id.unwrap());
+        if connection.is_some() {
+            debug!("Active connection found");
+        }
+        trace!("Connection:\n{:#?}", connection);
+        debug!("Connection returned");
+        Ok(connection)
     } else {
         error!("Location with id: {} not found.", location_id);
         Err(Error::NotFound)
@@ -380,10 +391,13 @@ pub async fn last_connection(
     location_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Connection, Error> {
+    debug!("Retrieving last connection for location {}", location_id);
     if let Some(connection) =
         Connection::latest_by_location_id(&app_state.get_pool(), location_id).await?
     {
-        debug!("Returning last connection: {:#?}", connection);
+        debug!("Connection found");
+        trace!("Connection:\n{:#?}", connection);
+        debug!("Connection returned");
         Ok(connection)
     } else {
         error!("No connections for location: {}", location_id);
