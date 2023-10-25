@@ -1,4 +1,3 @@
-
 export type GetLocationsRequest = {
   instanceId: number;
 };
