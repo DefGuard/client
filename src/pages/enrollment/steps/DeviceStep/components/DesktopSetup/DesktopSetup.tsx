@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { error } from 'tauri-plugin-log-api';
+import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -97,9 +97,12 @@ export const DekstopSetup = () => {
       password: userPassword,
       phone_number: userInfo.phone_number,
     }).then(() => {
+      info('User activated');
       setIsLoading(true);
+      debug('Invoking save_device_config');
       saveConfig(privateKey, deviceResponse.data as CreateDeviceResponse)
         .then(() => {
+          debug('Config saved');
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });
           toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
@@ -107,8 +110,8 @@ export const DekstopSetup = () => {
         })
         .catch((e) => {
           setIsLoading(false);
+          error(`Invoke failed:\n ${JSON.stringify(e)}`);
           console.error(e);
-          error(e);
         });
     });
   };

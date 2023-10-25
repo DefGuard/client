@@ -3,6 +3,7 @@ import './style.scss';
 import dayjs from 'dayjs';
 import { ReactNode, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { debug, error } from 'tauri-plugin-log-api';
 import { useBreakpoint } from 'use-breakpoint';
 import { shallow } from 'zustand/shallow';
 
@@ -63,6 +64,7 @@ export const EnrollmentPage = () => {
         if (diff > 0) {
           const timeout = setTimeout(() => {
             if (!enrollmentFinished.current) {
+              debug('Enrollment session time ended, navigatig to timeout page.');
               navigate(routes.timeout, { replace: true });
             }
           }, diff);
@@ -70,9 +72,11 @@ export const EnrollmentPage = () => {
             clearTimeout(timeout);
           };
         } else {
+          debug('Enrollment session time ended, navigatig to timeout page.');
           navigate(routes.timeout, { replace: true });
         }
       } else {
+        error('Seesion end time not found, navigating to timeout page.');
         navigate(routes.timeout, { replace: true });
       }
     }
