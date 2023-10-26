@@ -37,3 +37,9 @@ export enum ClientView {
   GRID = 0,
   DETAIL = 1,
 }
+
+export enum TauriEventKey {
+  SINGLE_INSTANCE = 'single-instance',
+  CONNECTION_CHANGED = 'connection-changed',
+  INSTANCE_UPDATE = 'instance-update',
+}

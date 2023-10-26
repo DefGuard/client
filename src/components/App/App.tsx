@@ -1,7 +1,9 @@
 import 'dayjs/locale/en';
-import '../../shared/scss/index.scss';
 import '../../shared/defguard-ui/scss/index.scss';
+import '../../shared/scss/index.scss';
 
+import { QueryClient } from '@tanstack/query-core';
+import { QueryClientProvider } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
 import duration from 'dayjs/plugin/duration';
@@ -21,6 +23,7 @@ import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { ClientPage } from '../../pages/client/ClientPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
+import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
 import { routes } from '../../shared/routes';
 
 dayjs.extend(duration);
@@ -30,6 +33,8 @@ dayjs.extend(relativeTime);
 dayjs.extend(localeData);
 dayjs.extend(updateLocale);
 dayjs.extend(timezone);
+
+const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
   {
@@ -72,7 +77,10 @@ export const App = () => {
 
   return (
     <TypesafeI18n locale={detectedLocale}>
-      <RouterProvider router={router} />
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+      <ToastManager />
     </TypesafeI18n>
   );
 };

@@ -1,7 +1,9 @@
 import './style.scss';
 
-import { useQuery } from '@tanstack/react-query';
-import { debug, error } from 'tauri-plugin-log-api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { event } from '@tauri-apps/api';
+import { UnlistenFn } from '@tauri-apps/api/event';
+import { useEffect } from 'react';
 
 import { useI18nContext } from '../../i18n/i18n-react';
 import { clientApi } from './clientAPI/clientApi';
@@ -12,34 +14,68 @@ import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSel
 import { StatsLayoutSelect } from './components/StatsLayoutSelect/StatsLayoutSelect';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
+import { TauriEventKey } from './types';
 
 const { getInstances } = clientApi;
 
 export const ClientPage = () => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client;
+  const queryClient = useQueryClient();
   const setInstances = useClientStore((state) => state.setInstances);
-
-  useQuery({
-    queryKey: [clientQueryKeys.getInstances],
+  const { data: instances } = useQuery({
     queryFn: getInstances,
+    queryKey: [clientQueryKeys.getInstances],
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    retry: (retryCount) => {
-      error(`Retrieving instances failed ${retryCount} times.`);
-      if (retryCount > 5) {
-        return false;
-      }
-      return true;
-    },
-    onSuccess: (res) => {
-      setInstances(res);
-      debug(`Retrieved ${res.length} instances`);
-    },
-    onError: (err) => {
-      error(`Error retrieving instances: ${String(err)}`);
-    },
+    refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    let instances_sub: UnlistenFn;
+    let connection_sub: UnlistenFn;
+
+    event
+      .listen(TauriEventKey.INSTANCE_UPDATE, () => {
+        const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+        queryClient.invalidateQueries({
+          predicate: (query) => invalidate.includes(query.queryKey[0] as string),
+        });
+      })
+      .then((cleanup) => {
+        instances_sub = cleanup;
+      });
+
+    event
+      .listen(TauriEventKey.CONNECTION_CHANGED, () => {
+        const invalidate = [
+          clientQueryKeys.getLocations,
+          clientQueryKeys.getConnections,
+          clientQueryKeys.getActiveConnection,
+          clientQueryKeys.getConnectionHistory,
+          clientQueryKeys.getLocationStats,
+          clientQueryKeys.getInstances,
+        ];
+        queryClient.invalidateQueries({
+          predicate: (query) => invalidate.includes(query.queryKey[0] as string),
+        });
+      })
+      .then((cleanup) => {
+        connection_sub = cleanup;
+      });
+
+    return () => {
+      instances_sub?.();
+      connection_sub?.();
+    };
+  }, [queryClient]);
+
+  // update store
+  useEffect(() => {
+    if (instances) {
+      setInstances(instances);
+    }
+  }, [instances, setInstances]);
 
   return (
     <>

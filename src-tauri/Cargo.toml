@@ -12,7 +12,7 @@ rust-version = "1.60"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.4.0", features = [] }
+tauri-build = { version = "1.5.0", features = [] }
 tonic-build = { version = "0.10" }
 prost-build = { version = "0.12" }
 
@@ -37,7 +37,7 @@ x25519-dalek = { version = "2", features = [
 ] }
 
 # FIXME: Remove devtools before release
-tauri = { version = "1.4", features = [ "http-all", "window-all", "system-tray", "devtools", "native-tls-vendored"] }
+tauri = { version = "1.5.2", features = [ "http-all", "window-all", "system-tray", "devtools", "native-tls-vendored"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

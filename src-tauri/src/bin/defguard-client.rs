@@ -4,7 +4,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use lazy_static::lazy_static;
-use log::LevelFilter;
+use log::{Level, LevelFilter};
 use tauri::{api::process, Env, Manager, State, SystemTrayEvent};
 use tauri_plugin_log::LogTarget;
 
@@ -132,6 +132,9 @@ async fn main() {
                 .targets(LOG_TARGETS)
                 .level(log_level)
                 .filter(|metadata| {
+                    if metadata.level() == Level::Error {
+                        return true;
+                    }
                     if !LOG_INCLUDES.is_empty() {
                         for target in LOG_INCLUDES.iter() {
                             if metadata.target().contains(target) {

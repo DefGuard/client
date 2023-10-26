@@ -1,8 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { error } from 'tauri-plugin-log-api';
 
+import { useI18nContext } from '../../../../i18n/i18n-react';
+import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
@@ -13,39 +13,24 @@ import { LocationsGridView } from './components/LocationsGridView/LocationsGridV
 const { getLocations } = clientApi;
 
 export const LocationsList = () => {
+  const { LL } = useI18nContext();
   const selectedInstance = useClientStore((state) => state.selectedInstance);
 
   const selectedView = useClientStore((state) => state.selectedView);
 
-  const queryClient = useQueryClient();
+  const toaster = useToaster();
 
-  const { data: locations } = useQuery({
+  const { data: locations, isError } = useQuery({
     queryKey: [clientQueryKeys.getLocations, selectedInstance as number],
     queryFn: () => getLocations({ instanceId: selectedInstance as number }),
     enabled: !!selectedInstance,
-    onError: (e) => error(`Error retrieving locations: ${String(e)}`),
   });
 
-  // listen to connection changes
-  // TODO: move to main page component
   useEffect(() => {
-    let cleanup: UnlistenFn | undefined;
-
-    listen('connection-changed', () => {
-      queryClient.invalidateQueries([clientQueryKeys.getLocations]);
-      queryClient.invalidateQueries([clientQueryKeys.getConnections]);
-      queryClient.invalidateQueries([clientQueryKeys.getActiveConnection]);
-      queryClient.invalidateQueries([clientQueryKeys.getConnectionHistory]);
-      queryClient.invalidateQueries([clientQueryKeys.getLocationStats]);
-      queryClient.invalidateQueries([clientQueryKeys.getInstances]);
-    }).then((c) => {
-      cleanup = c;
-    });
-
-    return () => {
-      cleanup?.();
-    };
-  }, [queryClient]);
+    if (isError) {
+      toaster.error(LL.common.messages.error());
+    }
+  }, [isError, toaster, LL.common.messages]);
 
   // TODO: add loader or another placeholder view pointing to opening enter token modal if no instances are found / present
   if (!selectedInstance || !locations) return null;

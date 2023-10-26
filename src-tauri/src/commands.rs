@@ -149,6 +149,7 @@ pub async fn save_device_config(
     private_key: String,
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
+    handle: tauri::AppHandle,
 ) -> Result<(), Error> {
     debug!("Received device configuration: {:#?}", response);
 
@@ -173,6 +174,7 @@ pub async fn save_device_config(
     let locations =
         Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
     trace!("Created following locations: {:#?}", locations);
+    handle.emit_all("instance-update", ())?;
     Ok(())
 }
 

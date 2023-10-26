@@ -2,7 +2,6 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import classNames from 'classnames';
-import { error } from 'tauri-plugin-log-api';
 
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { getStatsFilterValue } from '../../../../../../shared/utils/getStatsFilterValue';
@@ -51,9 +50,6 @@ const GridItem = ({ location }: GridItemProps) => {
     queryKey: [clientQueryKeys.getConnections, location.id as number],
     queryFn: () => getLastConnection({ locationId: location.id as number }),
     enabled: !!location.id,
-    onError: (e) => {
-      error(`Error retrieving last connection: ${String(e)}`);
-    },
   });
   const { data: locationStats } = useQuery({
     queryKey: [clientQueryKeys.getLocationStats, location.id as number, statsFilter],
@@ -63,9 +59,6 @@ const GridItem = ({ location }: GridItemProps) => {
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,
-    onError: (e) => {
-      error(`Error retrieving location stats: ${String(e)}`);
-    },
   });
 
   return (

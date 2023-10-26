@@ -1,8 +1,7 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api/tauri';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -20,23 +19,19 @@ import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Car
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
+import { clientApi } from '../../../../../client/clientAPI/clientApi';
+import { clientQueryKeys } from '../../../../../client/query';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
+
+const { saveConfig } = clientApi;
 
 type FormFields = {
   name: string;
 };
 
-const saveConfig = async (
-  privateKey: string,
-  response: CreateDeviceResponse,
-): Promise<void> =>
-  invoke<void>('save_device_config', {
-    privateKey: privateKey,
-    response,
-  });
-
 export const DekstopSetup = () => {
+  const queryClient = useQueryClient();
   const { LL } = useI18nContext();
   const toaster = useToaster();
   const stepLL = LL.pages.enrollment.steps.deviceSetup;
@@ -73,7 +68,7 @@ export const DekstopSetup = () => {
   const schema = useMemo(
     () =>
       z.object({
-        name: z.string().trim().nonempty(LL.form.errors.required()),
+        name: z.string().trim().min(1, LL.form.errors.required()),
       }),
     [LL.form.errors],
   );
@@ -100,18 +95,21 @@ export const DekstopSetup = () => {
       info('User activated');
       setIsLoading(true);
       debug('Invoking save_device_config');
-      saveConfig(privateKey, deviceResponse.data as CreateDeviceResponse)
+      saveConfig({
+        privateKey,
+        response: deviceResponse.data as CreateDeviceResponse,
+      })
         .then(() => {
           debug('Config saved');
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });
           toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
+          queryClient.invalidateQueries([clientQueryKeys.getInstances]);
+          queryClient.invalidateQueries([clientQueryKeys.getLocations]);
           next();
         })
-        .catch((e) => {
+        .catch(() => {
           setIsLoading(false);
-          error(`Invoke failed:\n ${JSON.stringify(e)}`);
-          console.error(e);
         });
     });
   };
