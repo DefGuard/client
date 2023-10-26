@@ -392,17 +392,11 @@ pub async fn active_connection(
 pub async fn last_connection(
     location_id: i64,
     app_state: State<'_, AppState>,
-) -> Result<Connection, Error> {
+) -> Result<Option<Connection>, Error> {
     debug!("Retrieving last connection for location {}", location_id);
-    if let Some(connection) =
-        Connection::latest_by_location_id(&app_state.get_pool(), location_id).await?
-    {
-        debug!("Connection found");
-        trace!("Connection:\n{:#?}", connection);
-        debug!("Connection returned");
-        Ok(connection)
-    } else {
-        error!("No connections for location: {}", location_id);
-        Err(Error::NotFound)
+    let connection = Connection::latest_by_location_id(&app_state.get_pool(), location_id).await?;
+    if connection.is_some() {
+        trace!("Connection found");
     }
+    Ok(connection)
 }
