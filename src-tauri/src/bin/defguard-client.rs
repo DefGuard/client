@@ -3,6 +3,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use lazy_static::lazy_static;
+use log::{Level, LevelFilter};
 use tauri::{api::process, Env, Manager, State, SystemTrayEvent};
 use tauri_plugin_log::LogTarget;
 
@@ -17,9 +19,9 @@ use defguard_client::{
     },
     database,
     tray::create_tray_menu,
-    utils::IS_MACOS,
+    utils::{load_log_targets, IS_MACOS},
 };
-use std::env;
+use std::{env, str::FromStr};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -30,8 +32,12 @@ struct Payload {
 #[macro_use]
 extern crate log;
 
-// FIXME: remove Webview on release Specify log targets
-const LOG_TARGETS: [LogTarget; 3] = [LogTarget::Stdout, LogTarget::LogDir, LogTarget::Webview];
+// for tauri log plugin
+const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
+
+lazy_static! {
+    static ref LOG_INCLUDES: Vec<String> = load_log_targets();
+}
 
 // TODO: Refactor later
 #[allow(clippy::single_match)]
@@ -55,6 +61,10 @@ async fn main() {
 
     let tray_menu = create_tray_menu();
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
+
+    let log_level =
+        LevelFilter::from_str(&std::env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
+            .unwrap_or(LevelFilter::Info);
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -120,6 +130,21 @@ async fn main() {
         .plugin(
             tauri_plugin_log::Builder::default()
                 .targets(LOG_TARGETS)
+                .level(log_level)
+                .filter(|metadata| {
+                    if metadata.level() == Level::Error {
+                        return true;
+                    }
+                    if !LOG_INCLUDES.is_empty() {
+                        for target in LOG_INCLUDES.iter() {
+                            if metadata.target().contains(target) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                    true
+                })
                 .build(),
         )
         .manage(AppState::default())

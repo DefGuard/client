@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { error, info } from 'tauri-plugin-log-api';
+import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -50,9 +50,9 @@ export const AddInstanceModalInitStep = () => {
         url: z
           .string()
           .trim()
-          .nonempty(LL.form.errors.required())
+          .min(1, LL.form.errors.required())
           .url(LL.form.errors.invalid()),
-        token: z.string().trim().nonempty(LL.form.errors.required()),
+        token: z.string().trim().min(1, LL.form.errors.required()),
       }),
     [LL.form.errors],
   );
@@ -63,6 +63,7 @@ export const AddInstanceModalInitStep = () => {
   });
 
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
+    debug('Sending token to proxy');
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';
       let base: string;
@@ -95,10 +96,11 @@ export const AddInstanceModalInitStep = () => {
         if (!res.ok) {
           toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
           setModalState({ loading: false });
-          error(res.data);
-          error(res.status);
+          error(JSON.stringify(res.data));
+          error(JSON.stringify(res.status));
           return;
         }
+        debug('Response received with status OK');
         const r = res.data;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
@@ -111,6 +113,7 @@ export const AddInstanceModalInitStep = () => {
         setModalState({ loading: false });
 
         if (instance) {
+          debug('Instance already exists, fetching update');
           // update already registered instance instead
           headers['Cookie'] = authCookie;
           fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
@@ -141,12 +144,14 @@ export const AddInstanceModalInitStep = () => {
         // is user in need of full enrollment ?
         if (r.user.is_active) {
           //no, only create new device for desktop client
+          debug('User already active, adding device only.');
           nextStep({
             proxyUrl: proxy_api_url,
             cookie: authCookie,
           });
         } else {
           // yes, enroll the user
+          debug('User is not active. Starting enrollment.');
           const sessionEnd = dayjs.unix(r.deadline_timestamp).utc().local().format();
           const sessionStart = dayjs().local().format();
           initEnrollment({

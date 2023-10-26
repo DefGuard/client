@@ -44,17 +44,15 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
 }
 
 pub async fn info(pool: &DbPool) -> Result<(), Error> {
-    debug!("Following locations and instances are saved.");
     let instances = Instance::all(pool).await?;
-    debug!(
-        "All instances found in database during start: {:#?}",
-        instances
-    );
     let locations = Location::all(pool).await?;
     debug!(
-        "All locations found in database during start: {:#?}",
-        locations
+        "Found {} locations in {} instances",
+        locations.len(),
+        instances.len()
     );
+    trace!("Instances Found:\n {:#?}", instances);
+    trace!("Locations Found:\n {:#?}", locations);
     Ok(())
 }
 

@@ -1,41 +1,63 @@
 import { invoke } from '@tauri-apps/api';
+import { InvokeArgs } from '@tauri-apps/api/tauri';
+import pTimeout from 'p-timeout';
+import { debug, error, trace } from 'tauri-plugin-log-api';
 
 import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '../types';
+import {
+  ConnectionRequest,
+  GetLocationsRequest,
+  SaveConfigRequest,
+  StatsRequest,
+  TauriCommandKey,
+} from './types';
 
-const getInstances = async (): Promise<DefguardInstance[]> => invoke('all_instances');
+// Streamlines logging for invokes
+async function invokeWrapper<T>(
+  command: TauriCommandKey,
+  args?: InvokeArgs,
+  timeout: number = 5000,
+): Promise<T> {
+  debug(`Invoking command '${command}'`);
+  try {
+    const res = await pTimeout(invoke<T>(command, args), {
+      milliseconds: timeout,
+    });
+    debug(`Invoke ${command} completed`);
+    trace(`${command} completed with data: ${JSON.stringify(res)}`);
+    return res;
+  } catch (e) {
+    error(`Invoking ${command} FAILED\n${JSON.stringify(e)}`);
+    return Promise.reject(e);
+  }
+}
 
-type GetLocationsRequest = {
-  instanceId: number;
-};
+const saveConfig = async (data: SaveConfigRequest): Promise<void> =>
+  invokeWrapper('save_device_config', data);
+
+const getInstances = async (): Promise<DefguardInstance[]> =>
+  invokeWrapper('all_instances');
 
 const getLocations = async (data: GetLocationsRequest): Promise<DefguardLocation[]> =>
-  invoke('all_locations', data);
+  invokeWrapper('all_locations', data);
 
-type ConnectionRequest = {
-  locationId: number;
-};
-
-type StatsRequest = {
-  locationId: number;
-  from?: string;
-};
-
-const connect = async (data: ConnectionRequest): Promise<void> => invoke('connect', data);
+const connect = async (data: ConnectionRequest): Promise<void> =>
+  invokeWrapper('connect', data);
 
 const disconnect = async (data: ConnectionRequest): Promise<void> =>
-  invoke('disconnect', data);
+  invokeWrapper('disconnect', data);
 
 const getLocationStats = async (data: StatsRequest): Promise<LocationStats[]> =>
-  invoke('location_stats', data);
+  invokeWrapper('location_stats', data);
 
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
-  invoke('last_connection', data);
+  invokeWrapper('last_connection', data);
 
 const getConnectionHistory = async (data: ConnectionRequest): Promise<Connection[]> =>
-  invoke('all_connections', data);
+  invokeWrapper('all_connections', data);
 
 const getActiveConnection = async (data: ConnectionRequest): Promise<Connection> =>
-  invoke('active_connection', data);
+  invokeWrapper('active_connection', data);
 
 export const clientApi = {
   getInstances,
@@ -46,4 +68,5 @@ export const clientApi = {
   getLastConnection,
   getConnectionHistory,
   getActiveConnection,
+  saveConfig,
 };

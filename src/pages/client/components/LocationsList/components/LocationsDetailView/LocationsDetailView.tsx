@@ -2,7 +2,6 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { error } from 'tauri-plugin-log-api';
 import { useBreakpoint } from 'use-breakpoint';
 
 import { deviceBreakpoints } from '../../../../../../shared/constants';
@@ -46,27 +45,18 @@ export const LocationsDetailView = ({ locations }: Props) => {
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!activeLocationId,
-    onError: (e) => {
-      error(`Error retrieving location stats: ${e}`);
-    },
   });
 
   const { data: connectionHistory } = useQuery({
     queryKey: [clientQueryKeys.getConnectionHistory, activeLocationId as number],
     queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
-    onError: (e) => {
-      error(`Error retrieving connection history: ${e}`);
-    },
   });
 
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
-    onError: (e) => {
-      error(`Error retrieving last connection: ${e}`);
-    },
   });
 
   const tabs = useMemo(

@@ -73,6 +73,7 @@ export type AppInfo = {
   version: string;
 };
 
+// FIXME: strong types
 export type UseApi = {
   enrollment: {
     start: (data: EnrollmentStartRequest) => Promise<Response<unknown>>;

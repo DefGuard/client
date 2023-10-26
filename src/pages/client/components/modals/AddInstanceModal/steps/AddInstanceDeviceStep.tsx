@@ -1,10 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueryClient } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api';
 import { Body, fetch } from '@tauri-apps/api/http';
 import { useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { error, info } from 'tauri-plugin-log-api';
+import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -21,8 +19,10 @@ import {
   CreateDeviceResponse,
 } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
-import { clientQueryKeys } from '../../../../query';
+import { clientApi } from '../../../../clientAPI/clientApi';
 import { useAddInstanceModal } from '../hooks/useAddInstanceModal';
+
+const { saveConfig } = clientApi;
 
 type FormFields = {
   name: string;
@@ -38,7 +38,6 @@ export const AddInstanceDeviceStep = () => {
   const toaster = useToaster();
   const close = useAddInstanceModal((state) => state.close);
   const [isLoading, setIsLoading] = useState(false);
-  const queryClient = useQueryClient();
 
   const [proxyUrl, cookie] = useAddInstanceModal(
     (state) => [state.proxyUrl, state.cookie],
@@ -46,7 +45,7 @@ export const AddInstanceDeviceStep = () => {
   );
 
   const schema = useMemo(
-    () => z.object({ name: z.string().trim().nonempty(LL.form.errors.required()) }),
+    () => z.object({ name: z.string().trim().min(1, LL.form.errors.required()) }),
     [LL.form.errors],
   );
 
@@ -81,24 +80,19 @@ export const AddInstanceDeviceStep = () => {
           throw Error('Failed to create device');
         }
         const deviceResp = r.data as CreateDeviceResponse;
-        invoke('save_device_config', {
+        saveConfig({
           privateKey: privateKey,
           response: deviceResp,
         })
           .then(() => {
             setIsLoading(false);
             toaster.success(componentLL.messages.success.add());
-            queryClient.invalidateQueries([clientQueryKeys.getInstances]);
-            queryClient.invalidateQueries([clientQueryKeys.getLocations]);
-            info('Config saved');
             close();
           })
-          .catch((e) => {
+          .catch(() => {
             toaster.error(LL.common.messages.error());
             setIsLoading(false);
             close();
-            error(e);
-            console.error(e);
           });
       });
     } catch (e) {
