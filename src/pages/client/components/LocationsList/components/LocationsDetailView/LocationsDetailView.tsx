@@ -45,18 +45,21 @@ export const LocationsDetailView = ({ locations }: Props) => {
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!activeLocationId,
+    refetchInterval: 60 * 1000,
   });
 
   const { data: connectionHistory } = useQuery({
     queryKey: [clientQueryKeys.getConnectionHistory, activeLocationId as number],
     queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
+    refetchInterval: 60 * 1000,
   });
 
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
+    refetchInterval: 60 * 1000,
   });
 
   const tabs = useMemo(
