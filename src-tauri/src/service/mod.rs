@@ -28,9 +28,12 @@ use proto::{
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
 
+use self::config::Config;
+
+pub mod config;
+
 pub const DAEMON_HTTP_PORT: u16 = 54127;
 pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
-const STATS_PERIOD: u64 = 60;
 
 #[derive(thiserror::Error, Debug)]
 pub enum DaemonError {
@@ -43,7 +46,17 @@ pub enum DaemonError {
 }
 
 #[derive(Default)]
-pub struct DaemonService {}
+pub struct DaemonService {
+    stats_period: u64,
+}
+
+impl DaemonService {
+    pub fn new(config: Config) -> Self {
+        Self {
+            stats_period: config.stats_period,
+        }
+    }
+}
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
@@ -135,13 +148,14 @@ impl DesktopDaemonService for DaemonService {
         let ifname = request.interface_name;
         info!("Starting interface data stream for {ifname}");
 
+        let stats_period = self.stats_period;
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(async move {
             info!("Spawning stats thread for interface {ifname}");
             // setup WireGuard API
             let wgapi =
                 setup_wgapi(ifname.clone()).expect("Failed to initialize WireGuard interface API");
-            let period = Duration::from_secs(STATS_PERIOD);
+            let period = Duration::from_secs(stats_period);
             let mut interval = interval(period);
 
             loop {
@@ -172,13 +186,13 @@ impl DesktopDaemonService for DaemonService {
     }
 }
 
-pub async fn run_server() -> anyhow::Result<()> {
+pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("Starting defguard interface management daemon");
 
     let addr = format!("127.0.0.1:{DAEMON_HTTP_PORT}")
         .parse()
         .context("Failed to parse gRPC address")?;
-    let daemon_service = DaemonService::default();
+    let daemon_service = DaemonService::new(config);
 
     info!("defguard daemon listening on {addr}");
 

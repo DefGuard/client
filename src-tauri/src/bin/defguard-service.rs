@@ -3,7 +3,8 @@
 //! This binary is meant to run as a daemon with root privileges
 //! and communicate with the desktop client over HTTP.
 
-use defguard_client::service::run_server;
+use clap::Parser;
+use defguard_client::service::{config::Config, run_server};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -18,8 +19,11 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // parse config
+    let config = Config::parse();
+
     // run gRPC server
-    run_server().await?;
+    run_server(config).await?;
 
     Ok(())
 }
