@@ -127,6 +127,7 @@ impl Location {
 
         Ok(())
     }
+
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
@@ -137,6 +138,7 @@ impl Location {
         .fetch_optional(pool)
         .await
     }
+
     pub async fn find_by_instance_id(
         pool: &DbPool,
         instance_id: i64,
@@ -150,6 +152,7 @@ impl Location {
         .fetch_all(pool)
         .await
     }
+
     pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Self,
@@ -214,6 +217,7 @@ impl LocationStats {
         self.id = Some(result.id);
         Ok(())
     }
+
     pub async fn all_by_location_id(
         pool: &DbPool,
         location_id: i64,
