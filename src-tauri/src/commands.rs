@@ -331,7 +331,7 @@ impl DateTimeAggregation {
 fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     // Use hourly aggregation for longer periods
     let aggregation = match Utc::now().naive_utc() - from {
-        duration if duration >= Duration::hours(6) => Ok(DateTimeAggregation::Hour),
+        duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
         duration if duration < Duration::zero() => Err(Error::InternalError),
         _ => Ok(DateTimeAggregation::Minute),
     }?;

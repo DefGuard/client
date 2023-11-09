@@ -127,6 +127,7 @@ impl Location {
 
         Ok(())
     }
+
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
@@ -137,6 +138,7 @@ impl Location {
         .fetch_optional(pool)
         .await
     }
+
     pub async fn find_by_instance_id(
         pool: &DbPool,
         instance_id: i64,
@@ -150,6 +152,7 @@ impl Location {
         .fetch_all(pool)
         .await
     }
+
     pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Self,
@@ -214,6 +217,7 @@ impl LocationStats {
         self.id = Some(result.id);
         Ok(())
     }
+
     pub async fn all_by_location_id(
         pool: &DbPool,
         location_id: i64,
@@ -224,15 +228,27 @@ impl LocationStats {
         let stats = query_as!(
             LocationStats,
             r#"
-            SELECT id, location_id, upload, download,
-            last_handshake, strftime($1, collected_at) as "collected_at!: NaiveDateTime"
-            FROM location_stats
+            WITH cte AS (
+                SELECT 
+                    id, location_id, 
+                    COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) as upload, 
+                    COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) as download, 
+                    last_handshake, strftime($1, collected_at) as collected_at
+                FROM location_stats
+                ORDER BY collected_at
+	            LIMIT -1 OFFSET 1
+            )
+            SELECT 
+                id, location_id, 
+            	SUM(MAX(upload, 0)) as "upload!: i64", 
+            	SUM(MAX(download, 0)) as "download!: i64", 
+            	last_handshake, 
+            	collected_at as "collected_at!: NaiveDateTime"
+            FROM cte
             WHERE location_id = $2
             AND collected_at >= $3
-            GROUP BY
-              collected_at
-            ORDER BY
-              collected_at;
+            GROUP BY collected_at
+            ORDER BY collected_at;
             "#,
             aggregation,
             location_id,
