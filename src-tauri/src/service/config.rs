@@ -1,7 +1,7 @@
 use clap::Parser;
 
 #[derive(Debug, Parser, Clone)]
-#[clap(about = "Defguard VPN gateway service")]
+#[clap(about = "Defguard VPN client interface management service")]
 #[command(version)]
 pub struct Config {
     /// Defines how often (in seconds) interface statistics are sent to Defguard client
