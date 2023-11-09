@@ -21,6 +21,8 @@ import TypesafeI18n from '../../i18n/i18n-react';
 import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { ClientPage } from '../../pages/client/ClientPage';
+import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstancePage/ClientAddInstnacePage';
+import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
@@ -39,23 +41,38 @@ const queryClient = new QueryClient();
 const router = createBrowserRouter([
   {
     index: true,
-    element: <Navigate to={routes.client} />,
+    element: <Navigate to={routes.client.base} />,
   },
   {
-    path: routes.timeout,
+    path: '/timeout',
     element: <SessionTimeoutPage />,
   },
   {
-    path: routes.enrollment,
+    path: '/enrollment',
     element: <EnrollmentPage />,
   },
   {
-    path: routes.client,
+    path: '/client',
     element: <ClientPage />,
+    children: [
+      {
+        path: '/client/',
+        index: true,
+        element: <ClientInstancePage />,
+      },
+      {
+        path: '/client/add-instance',
+        element: <ClientAddInstancePage />,
+      },
+      {
+        path: '/client/*',
+        element: <Navigate to={routes.client.base} />,
+      },
+    ],
   },
   {
     path: '/*',
-    element: <Navigate to={routes.client} replace />,
+    element: <Navigate to={routes.client.base} replace />,
   },
 ]);
 

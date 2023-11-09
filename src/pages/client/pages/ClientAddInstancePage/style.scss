@@ -1,0 +1,56 @@
+@use '@scssutils' as *;
+
+#add-instnace-page {
+  h1 {
+    @include typography(app-title);
+    color: var(--text-body-primary);
+  }
+
+  h2 {
+    @include typography(app-body-1);
+    color: var(--text-body-primary);
+  }
+
+  form {
+    & > * {
+      width: 100%;
+    }
+
+    .controls {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: center;
+      .btn {
+        width: 100%;
+        max-width: 200px;
+      }
+    }
+  }
+
+  & > header {
+    width: 100%;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding-bottom: 15px;
+
+    & > h1 {
+      text-align: left;
+    }
+  }
+
+  & > .content {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    row-gap: 50px;
+    column-gap: 50px;
+    & > * {
+      width: 100%;
+      max-width: 700px;
+    }
+  }
+}

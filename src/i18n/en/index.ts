@@ -50,83 +50,103 @@ const en = {
   },
   pages: {
     client: {
-      title: 'Locations',
+      pages: {
+        instancePage: {
+          title: 'Locations',
+          controls: {
+            connect: 'Connect',
+            disconnect: 'Disconnect',
+          },
+          header: {
+            title: 'Locations',
+            filters: {
+              views: {
+                grid: 'Grid View',
+                detail: 'Detail View',
+              },
+            },
+          },
+          connectionLabels: {
+            lastConnectedFrom: 'Last connected from',
+            lastConnected: 'Last connected',
+            connectedFrom: 'Connected from',
+            assignedIp: 'Assigned IP',
+            active: 'Active',
+            neverConnected: 'Never connected',
+          },
+          locationNoData: {
+            title: 'Never Connected',
+            content:
+              'This device was never connected to this location, connect to view statistics and information about connection',
+          },
+          detailView: {
+            history: {
+              title: 'Connection history',
+              headers: {
+                date: 'Date',
+                duration: 'Duration',
+                connectedFrom: 'Connected from',
+                upload: 'Upload',
+                download: 'Download',
+              },
+            },
+          },
+        },
+        addInstancePage: {
+          title: 'Add Instance',
+          forms: {
+            initInstance: {
+              title: 'Please provide Instance URL and token',
+              labels: {
+                url: 'Instance URL',
+                token: 'Token',
+              },
+              submit: 'Add Instance',
+            },
+            device: {
+              title: 'Name this device',
+              labels: {
+                name: 'Name',
+              },
+              submit: 'Finish',
+              messages: {
+                addSuccess: 'Device added',
+              },
+            },
+          },
+          guide: {
+            title: 'Adding Instances and connecting to VPN locations',
+            subTitle:
+              'In order to activate this device and access all VPN locations, you must provide the URL to your defguard instance and enter the activation token.',
+            card: {
+              title: 'You can obtain the token by',
+              content: `
+                <p>1. Invoking Remote Desktop activation process yourself</p>
+                <div>
+                <p>
+                If you have access to your defguard instance (either you are at home/office where defguard is accessible), go to defguard -> your profile -> "Add device" and choose: Activate Defguard Client. Then select if you wish to have the token sent to you by email or just copy it from defguard.
+                </p>
+                </div>
+                <p>2. Activating remotely by your administrator</p>
+                <div>
+                <p>
+                If you do not have access to defguard - please contact your administrator (in your onboarding message/email there were the admin contact details) and ask for Remote desktop activation - best to send you the activation email, from which you can copy the instance URL & token.
+                </p>
+                </div>
+                <p>
+                For more help, please visit defguard help (https://defguard.gitbook.io/)
+                </p>
+              `,
+            },
+          },
+        },
+      },
       sideBar: {
         instances: 'Instances',
-        addInstance: 'Enter token',
+        addInstance: 'Add Instance',
         copyright: {
           copyright: `Copyright © 2023`,
           appVersion: 'Application version: {version:string}',
-        },
-      },
-      controls: {
-        connect: 'Connect',
-        disconnect: 'Disconnect',
-      },
-      header: {
-        title: 'Locations',
-        filters: {
-          views: {
-            grid: 'Grid View',
-            detail: 'Detail View',
-          },
-        },
-      },
-      connectionLabels: {
-        lastConnectedFrom: 'Last connected from',
-        lastConnected: 'Last connected',
-        connectedFrom: 'Connected from',
-        assignedIp: 'Assigned IP',
-        active: 'Active',
-        neverConnected: 'Never connected',
-      },
-      locationNoData: {
-        title: 'Never Connected',
-        content:
-          'This device was never connected to this location, connect to view statistics and information about connection',
-      },
-      detailView: {
-        history: {
-          title: 'Connection history',
-          headers: {
-            date: 'Date',
-            duration: 'Duration',
-            connectedFrom: 'Connected from',
-            upload: 'Upload',
-            download: 'Download',
-          },
-        },
-      },
-      modals: {
-        addInstanceModal: {
-          titles: {
-            addInstance: 'Enter token',
-            addDevice: 'Add device',
-          },
-          messages: {
-            success: {
-              add: 'Instance added',
-              update: 'Instance information updated',
-            },
-            error: 'Operation failed, check url and token.',
-          },
-          form: {
-            submit: {
-              submitToken: 'Submit token',
-              addDevice: 'Add device',
-            },
-            fields: {
-              token: {
-                label: 'Token',
-              },
-              url: {
-                label: 'Proxy URL',
-              },
-              name: {
-                label: 'Name',
-              },
-            },
-          },
         },
       },
     },
