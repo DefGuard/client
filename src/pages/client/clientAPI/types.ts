@@ -1,4 +1,5 @@
 import { CreateDeviceResponse } from '../../../shared/hooks/api/types';
+import { DefguardInstance, DefguardLocation } from '../types';
 
 export type GetLocationsRequest = {
   instanceId: number;
@@ -16,6 +17,11 @@ export type StatsRequest = {
 export type SaveConfigRequest = {
   privateKey: string;
   response: CreateDeviceResponse;
+};
+
+export type SaveDeviceConfigResponse = {
+  instance: DefguardInstance;
+  locations: DefguardLocation[];
 };
 
 export type TauriCommandKey =

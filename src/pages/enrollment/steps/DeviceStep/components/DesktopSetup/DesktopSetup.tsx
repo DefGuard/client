@@ -47,17 +47,18 @@ export const DekstopSetup = () => {
   const next = useEnrollmentStore((state) => state.nextStep);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { isLoading: loadingUserActivation, mutateAsync: mutateUserActivation } =
-    useMutation({
+  const { mutateAsync: mutateUserActivation, isPending: activationPending } = useMutation(
+    {
       mutationFn: activateUser,
       onError: (e) => {
         toaster.error(LL.common.messages.error());
         console.error(e);
         error(String(e));
       },
-    });
+    },
+  );
 
-  const { isLoading: loadingCreateDevice, mutateAsync: createDeviceMutation } =
+  const { mutateAsync: createDeviceMutation, isPending: createDevicePending } =
     useMutation({
       mutationFn: createDevice,
       onError: (e) => {
@@ -104,8 +105,12 @@ export const DekstopSetup = () => {
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });
           toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
-          queryClient.invalidateQueries([clientQueryKeys.getInstances]);
-          queryClient.invalidateQueries([clientQueryKeys.getLocations]);
+          const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+          invalidate.forEach((key) => {
+            queryClient.invalidateQueries({
+              queryKey: [key],
+            });
+          });
           next();
         })
         .catch(() => {
@@ -133,7 +138,7 @@ export const DekstopSetup = () => {
               : stepLL.desktopSetup.controls.create()
           }
           disabled={!isUndefined(deviceName)}
-          loading={isLoading || loadingUserActivation || loadingCreateDevice}
+          loading={isLoading || activationPending || createDevicePending}
         />
       </form>
     </Card>

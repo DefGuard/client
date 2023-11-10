@@ -1,0 +1,35 @@
+@use '@scssutils' as *;
+
+#client-instance-page {
+  & > header {
+    width: 100%;
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    column-gap: 30px;
+    row-gap: 25px;
+    padding-bottom: 30px;
+
+    @include media-breakpoint-up(lg) {
+      padding-bottom: 60px;
+    }
+
+    & > h1 {
+      @include typography(app-title);
+      color: var(--text-body-primary);
+    }
+
+    .options {
+      display: flex;
+      flex-flow: row nowrap;
+      align-self: center;
+      justify-content: flex-start;
+      column-gap: 20px;
+    }
+
+    .select-container {
+      height: 40px;
+      width: 134px;
+    }
+  }
+}

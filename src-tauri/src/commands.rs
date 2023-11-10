@@ -144,13 +144,19 @@ pub struct CreateDeviceResponse {
     device: Device,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SaveDeviceConfigResponse {
+    locations: Vec<Location>,
+    instance: Instance,
+}
+
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
     handle: tauri::AppHandle,
-) -> Result<(), Error> {
+) -> Result<SaveDeviceConfigResponse, Error> {
     debug!("Received device configuration: {:#?}", response);
 
     let mut transaction = app_state.get_pool().begin().await?;
@@ -175,7 +181,11 @@ pub async fn save_device_config(
         Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
     trace!("Created following locations: {:#?}", locations);
     handle.emit_all("instance-update", ())?;
-    Ok(())
+    let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
+        locations,
+        instance,
+    };
+    Ok(res)
 }
 
 #[tauri::command(async)]

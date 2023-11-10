@@ -8,6 +8,7 @@ import {
   ConnectionRequest,
   GetLocationsRequest,
   SaveConfigRequest,
+  SaveDeviceConfigResponse,
   StatsRequest,
   TauriCommandKey,
 } from './types';
@@ -32,7 +33,7 @@ async function invokeWrapper<T>(
   }
 }
 
-const saveConfig = async (data: SaveConfigRequest): Promise<void> =>
+const saveConfig = async (data: SaveConfigRequest): Promise<SaveDeviceConfigResponse> =>
   invokeWrapper('save_device_config', data);
 
 const getInstances = async (): Promise<DefguardInstance[]> =>
