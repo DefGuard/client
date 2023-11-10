@@ -1,7 +1,7 @@
 import './style.scss';
 
 import { useEffect } from 'react';
-import { ReactMarkdown } from 'react-markdown/lib/react-markdown';
+import Markdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import rehypeSanitize from 'rehype-sanitize';
 
@@ -33,7 +33,7 @@ export const FinishStep = () => {
       <h3>{LL.pages.enrollment.steps.finish.title()}</h3>
       <div className="content">
         {endContent && endContent.length > 0 && (
-          <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{endContent}</ReactMarkdown>
+          <Markdown rehypePlugins={[rehypeSanitize]}>{endContent}</Markdown>
         )}
       </div>
     </Card>
