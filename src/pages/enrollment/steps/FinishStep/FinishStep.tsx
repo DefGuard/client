@@ -20,7 +20,7 @@ export const FinishStep = () => {
 
   useEffect(() => {
     const sub = nextSubject.subscribe(() => {
-      navigate(routes.client, { replace: true });
+      navigate(routes.client.base, { replace: true });
     });
     return () => {
       sub.unsubscribe();

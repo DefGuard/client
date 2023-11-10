@@ -102,7 +102,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       .then(async (res: Response<EnrollmentStartResponse>) => {
         const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
-          toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
+          toaster.error(LL.common.messages.error());
           setIsLoading(false);
           error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
@@ -145,7 +145,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
               })
               .catch((e) => {
                 error(e);
-                toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
+                toaster.error(LL.common.messages.error());
               });
           });
         }
@@ -176,7 +176,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
       })
       .catch((e) => {
-        toaster.error(LL.pages.client.modals.addInstanceModal.messages.error());
+        toaster.error(LL.common.messages.error());
         setIsLoading(false);
         error(e);
       });

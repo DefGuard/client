@@ -29,11 +29,7 @@ export type EnrollmentStartResponse = {
   deadline_timestamp: number;
   final_page_content: string;
   vpn_setup_optional: boolean;
-  instance: {
-    id: string;
-    name: string;
-    url: string;
-  };
+  instance: EnrollmentInstanceInfo;
 };
 
 export type ActivateUserRequest = {
@@ -73,12 +69,33 @@ export type AppInfo = {
   version: string;
 };
 
+export type EnrollmentAdminInfo = {
+  name: string;
+  email: string;
+  phone_number?: string;
+};
+
+export type EnrollmentInitialUserInfo = {
+  first_name: string;
+  last_name: string;
+  login: string;
+  email: string;
+  phone_number?: string;
+  is_active: boolean;
+};
+
+export type EnrollmentInstanceInfo = {
+  id: string;
+  name: string;
+  url: string;
+};
+
 // FIXME: strong types
 export type UseApi = {
   enrollment: {
-    start: (data: EnrollmentStartRequest) => Promise<Response<unknown>>;
-    activateUser: (data: ActivateUserRequest) => Promise<Response<unknown>>;
-    createDevice: (data: CreateDeviceRequest) => Promise<Response<unknown>>;
+    start: (data: EnrollmentStartRequest) => Promise<Response<EnrollmentStartResponse>>;
+    activateUser: (data: ActivateUserRequest) => Promise<Response<EmptyApiResponse>>;
+    createDevice: (data: CreateDeviceRequest) => Promise<Response<CreateDeviceResponse>>;
   };
-  getAppInfo: () => Promise<Response<unknown>>;
+  getAppInfo: () => Promise<Response<AppInfo>>;
 };

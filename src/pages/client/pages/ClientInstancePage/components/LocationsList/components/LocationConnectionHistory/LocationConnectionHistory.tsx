@@ -94,14 +94,14 @@ export const LocationConnectionHistory = ({ connections }: Props) => {
       {
         key: 'upload',
         render: (connection: Connection) => (
-          <span className="upload">{`${byteSize(connection.upload)}`}</span>
+          <span className="upload">{`${byteSize(connection.upload ?? 0)}`}</span>
         ),
       },
 
       {
         key: 'download',
         render: (connection: Connection) => (
-          <span className="download">{`${byteSize(connection.download)}`}</span>
+          <span className="download">{`${byteSize(connection.download ?? 0)}`}</span>
         ),
       },
     ];

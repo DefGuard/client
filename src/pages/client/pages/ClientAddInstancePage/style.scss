@@ -1,6 +1,6 @@
 @use '@scssutils' as *;
 
-#add-instnace-page {
+#client-add-instnace-page {
   h1 {
     @include typography(app-title);
     color: var(--text-body-primary);
@@ -45,12 +45,34 @@
     display: flex;
     flex-flow: row wrap;
     align-items: flex-start;
-    justify-content: flex-start;
+    justify-content: center;
     row-gap: 50px;
     column-gap: 50px;
+
+    @include media-breakpoint-up(xxl) {
+      justify-content: flex-start;
+    }
+
     & > * {
       width: 100%;
       max-width: 700px;
+    }
+
+    & > .card {
+      box-sizing: border-box;
+      padding: 32px 64px;
+      & > h2 {
+        width: 100%;
+        text-align: center;
+        padding-bottom: 42px;
+      }
+      form > .controls {
+        padding-top: 42px;
+
+        .btn {
+          height: 47px;
+        }
+      }
     }
   }
 }

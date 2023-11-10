@@ -1,3 +1,5 @@
+import './style.scss';
+
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { AddInstanceFormCard } from './components/AddInstanceFormCard/AddInstanceFormCard';
 import { AddInstanceGuide } from './components/AddInstanceGuide/AddInstanceGuide';
