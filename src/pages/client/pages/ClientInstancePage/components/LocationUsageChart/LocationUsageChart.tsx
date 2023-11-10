@@ -12,6 +12,13 @@ import { useTheme } from '../../../../../../shared/defguard-ui/hooks/theme/useTh
 import { LocationStats } from '../../../../types';
 import { LocationUsageChartType } from './types';
 
+type ChartBoxSpacing = {
+  top?: number;
+  bottom?: number;
+  left?: number;
+  right?: number;
+};
+
 interface LocationUsageProps {
   data: LocationStats[];
   type: LocationUsageChartType;
@@ -19,6 +26,8 @@ interface LocationUsageProps {
   barSize?: number;
   barGap?: number;
   heightX?: number;
+  margin?: ChartBoxSpacing;
+  padding?: ChartBoxSpacing;
 }
 
 const parseStatsForCharts = (data: LocationStats[]): LocationStats[] => {
@@ -47,10 +56,32 @@ export const LocationUsageChart = ({
   barGap = 2,
   heightX = 50,
   type,
+  margin,
+  padding,
 }: LocationUsageProps) => {
   const [totalUpload, totalDownload] = useMemo(() => totalUploadDownload(data), [data]);
   const getFormattedData = useMemo(() => parseStatsForCharts(data), [data]);
   const { colors } = useTheme();
+
+  const getMargin = useMemo((): ChartBoxSpacing => {
+    const defaultMargin: ChartBoxSpacing = {
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    };
+    return margin ?? defaultMargin;
+  }, [margin]);
+
+  const getPadding = useMemo((): ChartBoxSpacing => {
+    const defaultPadding: ChartBoxSpacing = {
+      bottom: 0,
+      right: 0,
+      left: 0,
+      top: 0,
+    };
+    return padding ?? defaultPadding;
+  }, [padding]);
 
   if (!data.length) return null;
 
@@ -67,7 +98,7 @@ export const LocationUsageChart = ({
               width={size.width}
               height={size.height}
               data={getFormattedData}
-              margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
+              margin={getMargin}
               barSize={barSize}
               barGap={barGap}
             >
@@ -80,7 +111,7 @@ export const LocationUsageChart = ({
                 axisLine={{ stroke: colors.surfaceDefaultModal }}
                 tickLine={{ stroke: colors.surfaceDefaultModal }}
                 hide={hideX}
-                padding={{ left: 0, right: 0 }}
+                padding={getPadding}
                 tick={{
                   fontSize: 12,
                   color: '#222',
@@ -110,7 +141,7 @@ export const LocationUsageChart = ({
               width={size.width}
               height={size.height}
               data={getFormattedData}
-              margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
+              margin={getMargin}
             >
               <XAxis
                 dataKey="collected_at"
@@ -121,7 +152,7 @@ export const LocationUsageChart = ({
                 axisLine={{ stroke: colors.surfaceDefaultModal }}
                 tickLine={{ stroke: colors.surfaceDefaultModal }}
                 hide={hideX}
-                padding={{ left: 0, right: 0 }}
+                padding={getPadding}
                 tick={{
                   fontSize: 12,
                   color: '#222',
@@ -130,15 +161,25 @@ export const LocationUsageChart = ({
                 }}
                 tickFormatter={formatXTick}
                 domain={['dataMin', 'dataMax']}
-                interval={'preserveEnd'}
+                interval={'equidistantPreserveStart'}
               />
               <YAxis
                 hide={true}
                 domain={['dataMin', 'dataMax']}
                 padding={{ top: 0, bottom: 0 }}
               />
-              <Line dataKey="download" stroke={colors.surfaceMainPrimary} />
-              <Line dataKey="upload" stroke={colors.textAlert} />
+              <Line
+                dataKey="download"
+                stroke={colors.surfaceMainPrimary}
+                strokeWidth={1}
+                dot={false}
+              />
+              <Line
+                dataKey="upload"
+                stroke={colors.textAlert}
+                strokeWidth={1}
+                dot={false}
+              />
             </LineChart>
           )}
         </AutoSizer>
