@@ -100,9 +100,9 @@ export const LocationsDetailView = ({ locations }: Props) => {
         )}
         {locationStats && locationStats.length ? (
           <LocationUsageChart
-            barSize={4}
             data={locationStats}
             type={LocationUsageChartType.LINE}
+            margin={{ left: 20, right: 20 }}
           />
         ) : null}
         {connectionHistory && connectionHistory.length ? (
