@@ -45,7 +45,7 @@
     "@stablelib/x25519": "^1.0.3",
     "@tanstack/query-core": "^4.33.0",
     "@tanstack/react-virtual": "3.0.0-beta.54",
-    "axios": "^1.5.0",
+    "axios": "^1.6.0",
     "byte-size": "^8.1.1",
     "classnames": "^2.3.2",
     "clipboardy": "^3.0.0",
