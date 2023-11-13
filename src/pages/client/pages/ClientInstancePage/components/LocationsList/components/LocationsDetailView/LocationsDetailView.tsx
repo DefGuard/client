@@ -17,7 +17,8 @@ import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageCha
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
-import { LocationCardNoData } from '../LocationCardNoData/LocationCardNoData';
+import { LocationCardNeverConnected } from '../LocationCardNeverConnected/LocationCardNeverConnected';
+import { LocationCardNoStats } from '../LocationCardNoStats/LocationCardNoStats';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 import { LocationConnectionHistory } from '../LocationConnectionHistory/LocationConnectionHistory';
 
@@ -46,21 +47,21 @@ export const LocationsDetailView = ({ locations }: Props) => {
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!activeLocationId,
-    refetchInterval: 60 * 1000,
+    refetchInterval: 10 * 1000,
   });
 
   const { data: connectionHistory } = useQuery({
     queryKey: [clientQueryKeys.getConnectionHistory, activeLocationId as number],
     queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
-    refetchInterval: 60 * 1000,
+    refetchInterval: 10 * 1000,
   });
 
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, activeLocationId as number],
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
-    refetchInterval: 60 * 1000,
+    refetchInterval: 10 * 1000,
   });
 
   const tabs = useMemo(
@@ -74,21 +75,21 @@ export const LocationsDetailView = ({ locations }: Props) => {
     [locations, activeLocationId],
   );
 
+  const activeLocation = useMemo(
+    (): DefguardLocation | undefined => findLocationById(locations, activeLocationId),
+    [locations, activeLocationId],
+  );
+
   return (
     <div id="locations-detail-view">
       <CardTabs tabs={tabs} />
       <Card className="detail-card">
         <div className="header">
-          <LocationCardTitle location={findLocationById(locations, activeLocationId)} />
+          <LocationCardTitle location={activeLocation} />
           {breakpoint === 'desktop' && (
-            <LocationCardInfo
-              location={findLocationById(locations, activeLocationId)}
-              connection={lastConnection}
-            />
+            <LocationCardInfo location={activeLocation} connection={lastConnection} />
           )}
-          <LocationCardConnectButton
-            location={findLocationById(locations, activeLocationId)}
-          />
+          <LocationCardConnectButton location={activeLocation} />
         </div>
         {breakpoint !== 'desktop' && (
           <div className="info">
@@ -98,20 +99,26 @@ export const LocationsDetailView = ({ locations }: Props) => {
             />
           </div>
         )}
-        {locationStats && locationStats.length ? (
+        {locationStats && locationStats.length > 0 && (
           <LocationUsageChart
             data={locationStats}
             type={LocationUsageChartType.LINE}
             margin={{ left: 20, right: 20 }}
           />
-        ) : null}
+        )}
+        {(!locationStats || locationStats.length == 0) &&
+          ((connectionHistory && connectionHistory.length) || activeLocation?.active) && (
+            <LocationCardNoStats />
+          )}
         {connectionHistory && connectionHistory.length ? (
           <>
             <h2>Connection History</h2>
             <LocationConnectionHistory connections={connectionHistory} />
           </>
         ) : null}
-        {(!locationStats || locationStats.length === 0) && <LocationCardNoData />}
+        {(!connectionHistory || connectionHistory.length === 0) && (
+          <LocationCardNeverConnected />
+        )}
       </Card>
     </div>
   );

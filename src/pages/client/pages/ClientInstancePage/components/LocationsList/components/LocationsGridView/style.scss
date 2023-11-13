@@ -53,7 +53,8 @@
       }
     }
 
-    & > .location-no-data {
+    & > .location-no-connections,
+    & > .locaton-no-stats {
       padding-top: 32px;
       height: max-content;
       width: 100%;

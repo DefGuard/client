@@ -19,6 +19,7 @@ async function invokeWrapper<T>(
   args?: InvokeArgs,
   timeout: number = 5000,
 ): Promise<T> {
+  console.log(`Invoking command ${command}`);
   debug(`Invoking command '${command}'`);
   try {
     const res = await pTimeout(invoke<T>(command, args), {
