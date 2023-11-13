@@ -53,12 +53,17 @@
       padding: 0 20px;
     }
 
-    .location-no-data {
+    .location-no-connections,
+    .location-no-stats {
       flex-grow: 1;
 
       & > * {
         max-width: 400px;
       }
+    }
+
+    & > .location-no-stats {
+      padding-top: 50px;
     }
 
     & > .location-usage {

@@ -13,7 +13,8 @@ import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageCha
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
-import { LocationCardNoData } from '../LocationCardNoData/LocationCardNoData';
+import { LocationCardNeverConnected } from '../LocationCardNeverConnected/LocationCardNeverConnected';
+import { LocationCardNoStats } from '../LocationCardNoStats/LocationCardNoStats';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
@@ -68,13 +69,12 @@ const GridItem = ({ location }: GridItemProps) => {
         <LocationCardTitle location={location} />
         <LocationCardConnectButton location={location} />
       </div>
-      {locationStats &&
-        locationStats.length > 0 &&
-        (lastConnection || location.active) && (
-          <div className="info">
-            <LocationCardInfo location={location} connection={lastConnection} />
-          </div>
-        )}
+      {lastConnection && location && (
+        <div className="info">
+          <LocationCardInfo location={location} connection={lastConnection} />
+        </div>
+      )}
+      {!lastConnection && <LocationCardNeverConnected />}
       {locationStats && locationStats.length > 0 && (
         <LocationUsageChart
           heightX={20}
@@ -83,7 +83,8 @@ const GridItem = ({ location }: GridItemProps) => {
           type={LocationUsageChartType.BAR}
         />
       )}
-      {(!locationStats || locationStats.length === 0) && <LocationCardNoData />}
+      {(!locationStats || !locationStats.length) &&
+        (lastConnection || location.active) && <LocationCardNoStats />}
     </Card>
   );
 };

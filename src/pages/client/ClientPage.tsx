@@ -29,9 +29,11 @@ export const ClientPage = () => {
 
     listen(TauriEventKey.INSTANCE_UPDATE, () => {
       const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
-      queryClient.invalidateQueries({
-        predicate: (query) => invalidate.includes(query.queryKey[0] as string),
-      });
+      invalidate.forEach((key) =>
+        queryClient.invalidateQueries({
+          queryKey: [key],
+        }),
+      );
     }).then((cleanup) => {
       subs.push(cleanup);
     });
@@ -45,9 +47,11 @@ export const ClientPage = () => {
         clientQueryKeys.getLocationStats,
         clientQueryKeys.getInstances,
       ];
-      queryClient.invalidateQueries({
-        predicate: (query) => invalidate.includes(query.queryKey[0] as string),
-      });
+      invalidate.forEach((key) =>
+        queryClient.invalidateQueries({
+          queryKey: [key],
+        }),
+      );
     }).then((cleanup) => {
       subs.push(cleanup);
     });

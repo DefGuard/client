@@ -74,10 +74,15 @@ const en = {
             active: 'Active',
             neverConnected: 'Never connected',
           },
-          locationNoData: {
+          locationNeverConnected: {
             title: 'Never Connected',
             content:
               'This device was never connected to this location, connect to view statistics and information about connection',
+          },
+          LocationNoStats: {
+            title: 'No stats',
+            content:
+              'This device has no stats for this location in specified time period. Connect to location and wait for client to gather statistics.',
           },
           detailView: {
             history: {

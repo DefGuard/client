@@ -191,13 +191,23 @@ type RootTranslation = {
 						 */
 						neverConnected: string
 					}
-					locationNoData: {
+					locationNeverConnected: {
 						/**
 						 * N​e​v​e​r​ ​C​o​n​n​e​c​t​e​d
 						 */
 						title: string
 						/**
 						 * T​h​i​s​ ​d​e​v​i​c​e​ ​w​a​s​ ​n​e​v​e​r​ ​c​o​n​n​e​c​t​e​d​ ​t​o​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​,​ ​c​o​n​n​e​c​t​ ​t​o​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​a​n​d​ ​i​n​f​o​r​m​a​t​i​o​n​ ​a​b​o​u​t​ ​c​o​n​n​e​c​t​i​o​n
+						 */
+						content: string
+					}
+					LocationNoStats: {
+						/**
+						 * N​o​ ​s​t​a​t​s
+						 */
+						title: string
+						/**
+						 * T​h​i​s​ ​d​e​v​i​c​e​ ​h​a​s​ ​n​o​ ​s​t​a​t​s​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​ ​i​n​ ​s​p​e​c​i​f​i​e​d​ ​t​i​m​e​ ​p​e​r​i​o​d​.​ ​C​o​n​n​e​c​t​ ​t​o​ ​l​o​c​a​t​i​o​n​ ​a​n​d​ ​w​a​i​t​ ​f​o​r​ ​c​l​i​e​n​t​ ​t​o​ ​g​a​t​h​e​r​ ​s​t​a​t​i​s​t​i​c​s​.
 						 */
 						content: string
 					}
@@ -880,13 +890,23 @@ export type TranslationFunctions = {
 						 */
 						neverConnected: () => LocalizedString
 					}
-					locationNoData: {
+					locationNeverConnected: {
 						/**
 						 * Never Connected
 						 */
 						title: () => LocalizedString
 						/**
 						 * This device was never connected to this location, connect to view statistics and information about connection
+						 */
+						content: () => LocalizedString
+					}
+					LocationNoStats: {
+						/**
+						 * No stats
+						 */
+						title: () => LocalizedString
+						/**
+						 * This device has no stats for this location in specified time period. Connect to location and wait for client to gather statistics.
 						 */
 						content: () => LocalizedString
 					}
