@@ -28,8 +28,4 @@ ln -s ${PRODUCT_HOME}/${DAEMON_PROPERTY_FILE} /Library/LaunchDaemons/${DAEMON_PR
 sudo launchctl load /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
 sudo launchctl start ${DAEMON_NAME}
 
-# Add app shortcut to /Applications
-# rm -rf /Applications/${APP_BUNDLE}
-# ln -s ${PRODUCT_HOME}/${APP_BUNDLE} /Applications/${DEST_APP_BUNDLE}
-
 echo "Post installation process finished"
