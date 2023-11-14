@@ -1,0 +1,12 @@
+{
+    "tauri": {
+        "bundle": {
+            "externalBin": [
+                "resources-macos/binaries/*"
+            ],
+            "resources": [
+                "resources-macos/resources/*"
+              ]
+        }
+    }
+}

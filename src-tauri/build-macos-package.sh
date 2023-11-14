@@ -20,10 +20,10 @@ pkgbuild \
     --identifier net.defguard \
     --root ${APP_ROOT} \
     --component-plist ${TARGET_DIRECTORY}/macos/defguard-client.plist \
-    --install-location "/Applications" \
+    --install-location "/Applications/defguard-client.app" \
+    --scripts "./resources-macos/scripts" \
     "${PACKAGE_PATH}"
 
 productbuild \
-    --resources "./resources-macos/resources" \
     --package "${PACKAGE_PATH}" \
     "${TARGET_DIRECTORY}/macos/product/defguard.pkg"
