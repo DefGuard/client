@@ -1,9 +1,12 @@
 {
-  "tauri": {
-    "bundle": {
-      "externalBin": [
-        "binaries/wireguard-go"
-      ]
+    "tauri": {
+        "bundle": {
+            "externalBin": [
+                "resources-macos/binaries/*"
+            ],
+            "resources": [
+                "resources-macos/resources/*"
+              ]
+        }
     }
-  }
 }
