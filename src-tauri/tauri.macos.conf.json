@@ -1,9 +1,0 @@
-{
-  "tauri": {
-    "bundle": {
-      "externalBin": [
-        "binaries/wireguard-go"
-      ]
-    }
-  }
-}

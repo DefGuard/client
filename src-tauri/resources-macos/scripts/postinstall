@@ -1,0 +1,35 @@
+#!/bin/bash
+
+SERVICE_BINARY=defguard-service
+DAEMON_PROPERTY_FILE=net.defguard.plist
+WIREGUARD_GO_BINARY=wireguard-go
+DAEMON_NAME=net.defguard
+APP_BUNDLE=defguard-client.app
+DEST_APP_BUNDLE=defguard.app
+
+# Parameters
+PRODUCT_HOME=/Library/__PRODUCT__/__VERSION__
+
+echo "Post installation process started"
+
+[ -d /usr/local/bin ] || mkdir /usr/local/bin
+
+# Add wireguard-go shortcut to /usr/local/bin
+rm -f /usr/local/bin/${WIREGUARD_GO_BINARY}
+ln -s ${PRODUCT_HOME}/${WIREGUARD_GO_BINARY} /usr/local/bin/${WIREGUARD_GO_BINARY}
+
+# Add service shortcut to /usr/local/bin
+rm -f /usr/local/bin/${SERVICE_BINARY}
+ln -s ${PRODUCT_HOME}/${SERVICE_BINARY} /usr/local/bin/${SERVICE_BINARY}
+
+# Launch daemon
+rm -f /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
+ln -s ${PRODUCT_HOME}/${DAEMON_PROPERTY_FILE} /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
+sudo launchctl load /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
+sudo launchctl start ${DAEMON_NAME}
+
+# Add app shortcut to /Applications
+# rm -rf /Applications/${APP_BUNDLE}
+# ln -s ${PRODUCT_HOME}/${APP_BUNDLE} /Applications/${DEST_APP_BUNDLE}
+
+echo "Post installation process finished"
