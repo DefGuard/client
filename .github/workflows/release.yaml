@@ -122,7 +122,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        args: --target ${{ matrix.target }}
+        with:
+          args: --target ${{ matrix.target }}
 
 #      - name: Make sure wireguard-go binary is executable
 #        if: matrix.platform == 'macOS'
