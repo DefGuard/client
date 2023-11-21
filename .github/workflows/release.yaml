@@ -148,11 +148,6 @@ jobs:
     needs:
       - create-release
 
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x86_64-apple-darwin, aarch64-apple-darwin]
-
     runs-on:
       - self-hosted
       - macOS
@@ -194,19 +189,48 @@ jobs:
         run: pnpm install --frozen-lockfile
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: install protobuf compiler
-        if: matrix.platform == 'macOS'
+      - name: Install protobuf compiler
         run: |
           brew install protobuf
 
-      - name: install ARM target
-        if: matrix.platform == 'macOS'
+      - name: Install ARM target
         run: |
           rustup target add aarch64-apple-darwin
 
-      - name: Build packages
+      - name: Build x86_64-apple-darwin
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target ${{ matrix.target }}
+          args: --target x86_64-apple-darwin
+
+      - name: Build aarch64-apple-darwin
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target aarch64-apple-darwin
+
+      - name: Build products
+        run: bash build-macos-package.sh
+
+      - name: Upload product aarch64-apple-darwin
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/aarch64-apple-darwin/product/defguard-aarch64-apple-darwin.pkg
+          asset_name: defguard-aarch64-apple-darwin-${{ env.VERSION }}.pkg
+          asset_content_type: application/octet-stream
+
+      - name: Upload product x86_64-apple-darwin
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/x86_64-apple-darwin/product/defguard-x86_64-apple-darwin.pkg
+          asset_name: defguard-x86_64-apple-darwin-${{ env.VERSION }}.pkg
+          asset_content_type: application/octet-stream
+

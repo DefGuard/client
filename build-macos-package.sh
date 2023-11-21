@@ -2,7 +2,7 @@
 
 set -e
 
-TARGET_DIRECTORY="./target"
+TARGET_DIRECTORY="./src-tauri/target"
 
 build() {
     ARCHITECTURE=$1
@@ -25,7 +25,7 @@ build() {
         --root ${APP_ROOT} \
         --component-plist ${TARGET_DIRECTORY}/${ARCHITECTURE}/defguard-client.plist \
         --install-location "/Applications/defguard-client.app" \
-        --scripts "./resources-macos/scripts" \
+        --scripts "./src-tauri/resources-macos/scripts" \
         "${PACKAGE_PATH}"
 
     productbuild \
