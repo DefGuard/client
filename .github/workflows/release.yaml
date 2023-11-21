@@ -48,7 +48,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [Linux]
+        platform: [Linux, macOS]
+        include:
+          - target: x86_64-apple-darwin
+            platform: macOS
+          - target: aarch64-apple-darwin
+            platform: macOS
+          - target: x86_64-unknown-linux-gnu
+            platform: Linux
 
     runs-on:
       - self-hosted
@@ -115,6 +122,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        args: --target ${{ matrix.target }}
 
 #      - name: Make sure wireguard-go binary is executable
 #        if: matrix.platform == 'macOS'

@@ -17,7 +17,6 @@ rm -f /usr/local/bin/${WIREGUARD_GO_BINARY}
 
 # Remove service shortcut at /usr/local/bin
 rm -f /usr/local/bin/${SERVICE_BINARY}
-ln -s ${PRODUCT_HOME}/${SERVICE_BINARY} /usr/local/bin/${SERVICE_BINARY}
 
 # Remove daemon
 launchctl stop ${DAEMON_NAME}
