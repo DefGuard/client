@@ -48,14 +48,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [Linux, macOS]
+        # platform: [Linux, macOS]
+        platform: [macOS]
         include:
           - target: x86_64-apple-darwin
             platform: macOS
           - target: aarch64-apple-darwin
             platform: macOS
-          - target: x86_64-unknown-linux-gnu
-            platform: Linux
+          # - target: x86_64-unknown-linux-gnu
+          #   platform: Linux
 
     runs-on:
       - self-hosted
@@ -111,7 +112,12 @@ jobs:
           PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
           sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local      
 
-      - name: install arm target
+      - name: install protobuf compiler
+        if: matrix.platform == 'macOS'
+        run: |
+          brew install protobuf
+
+      - name: install ARM target
         if: matrix.platform == 'macOS'
         run: |
           rustup target add aarch64-apple-darwin
