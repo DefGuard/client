@@ -111,6 +111,11 @@ jobs:
           PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
           sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local      
 
+      - name: install arm target
+        if: matrix.platform == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin
+
 #      - name: Download wireguard-go binary
 #        if: matrix.platform == 'macOS'
 #        uses: actions/download-artifact@v3
