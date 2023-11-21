@@ -1,4 +1,4 @@
-name: 'Build app & create release'
+name: "Build app & create release"
 
 on:
   push:
@@ -6,26 +6,6 @@ on:
       - v*.*.*
 
 jobs:
-#  build-wireguard-go:
-#    runs-on: [self-hosted, macOS]
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          repository: WireGuard/wireguard-go
-#          ref: master
-#          fetch-depth: 0
-#      - name: Set up Go
-#        uses: actions/setup-go@v4
-#        with:
-#          go-version: '1.20'
-#      - name: Build wireguard-go binary
-#        run: make
-#      - name: Upload binary artifact
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: wireguard-go
-#          path: wireguard-go
-
   create-release:
     name: create-release
     runs-on: self-hosted
@@ -40,32 +20,18 @@ jobs:
           draft: true
           generate_release_notes: true
 
-  build-app:
+  build-linux:
     needs:
       - create-release
-#      - build-wireguard-go
-
-    strategy:
-      fail-fast: false
-      matrix:
-        # platform: [Linux, macOS]
-        platform: [macOS]
-        include:
-          - target: x86_64-apple-darwin
-            platform: macOS
-          - target: aarch64-apple-darwin
-            platform: macOS
-          # - target: x86_64-unknown-linux-gnu
-          #   platform: Linux
 
     runs-on:
       - self-hosted
-      - ${{ matrix.platform }}
+      - Linux
 
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
 
       - name: Write release version
         run: |
@@ -75,7 +41,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: "20"
 
       - uses: pnpm/action-setup@v2
         with:
@@ -100,60 +66,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: install linux deps
-        if: matrix.platform == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
 
       - name: install protobuf compiler
-        if: matrix.platform == 'Linux'
         run: |
           PB_REL='https://github.com/protocolbuffers/protobuf/releases'
           PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
-          sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local      
-
-      - name: install protobuf compiler
-        if: matrix.platform == 'macOS'
-        run: |
-          brew install protobuf
-
-      - name: install ARM target
-        if: matrix.platform == 'macOS'
-        run: |
-          rustup target add aarch64-apple-darwin
-
-#      - name: Download wireguard-go binary
-#        if: matrix.platform == 'macOS'
-#        uses: actions/download-artifact@v3
-#        with:
-#          name: wireguard-go
-#          path: src-tauri/binaries/wireguard-go-x86_64-apple-darwin
+          sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local
 
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: --target ${{ matrix.target }}
-
-#      - name: Make sure wireguard-go binary is executable
-#        if: matrix.platform == 'macOS'
-#        run: chmod +x src-tauri/target/release/bundle/macos/Defguard.app/Contents/MacOS/wireguard-go
-#
-#      - name: Tar macOS files
-#        if: matrix.platform == 'macOS'
-#        run: tar -cvf bundle.tar -C src-tauri/target/release/bundle .
-#
-#      - name: Upload macOS artifacts
-#        if: matrix.platform == 'macOS'
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: macos.tar
-#          path: bundle.tar
-#          retention-days: 1
 
       - name: Upload DEB
-        if: matrix.platform == 'Linux'
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -186,7 +114,6 @@ jobs:
           outPath: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
 
       - name: Upload client archive
-        if: matrix.platform == 'Linux'
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -208,7 +135,6 @@ jobs:
           outPath: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
 
       - name: Upload daemon archive
-        if: matrix.platform == 'Linux'
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -217,3 +143,70 @@ jobs:
           asset_path: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
           asset_name: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
+
+  build-macos:
+    needs:
+      - create-release
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-apple-darwin, aarch64-apple-darwin]
+
+    runs-on:
+      - self-hosted
+      - macOS
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: install protobuf compiler
+        if: matrix.platform == 'macOS'
+        run: |
+          brew install protobuf
+
+      - name: install ARM target
+        if: matrix.platform == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin
+
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target ${{ matrix.target }}
