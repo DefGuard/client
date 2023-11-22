@@ -213,7 +213,7 @@ jobs:
 
       - name: Build products
         run: |
-          security -v unlock-keychain -p "${{ secrets.KeychainPassword }}" /Users/admin/Library/Keychains/login.keychain
+          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
           bash build-macos-package.sh "${{ secrets.DEVELOPER_ID_INSTALLER }}"
 
       - name: Upload product aarch64-apple-darwin
