@@ -2,6 +2,8 @@
 
 set -e
 
+DEVELOPER_ID_INSTALLER=$1
+
 TARGET_DIRECTORY="./src-tauri/target"
 
 build() {
@@ -32,10 +34,10 @@ build() {
         --package "${PACKAGE_PATH}" \
         "${TARGET_DIRECTORY}/${ARCHITECTURE}/product/defguard-${ARCHITECTURE}.pkg"
 
-    # productsign \
-    #     --sign "Developer ID Installer: ${APPLE_DEVELOPER_CERTIFICATE_ID}" \
-    #     "${TARGET_DIRECTORY}/${ARCHITECTURE}/product/defguard-${ARCHITECTURE}.pkg" \
-    #     "${TARGET_DIRECTORY}/${ARCHITECTURE}/product-signed/defguard-${ARCHITECTURE}.pkg"
+    productsign \
+        --sign "Developer ID Installer: ${DEVELOPER_ID_INSTALLER}" \
+        "${TARGET_DIRECTORY}/${ARCHITECTURE}/product/defguard-${ARCHITECTURE}.pkg" \
+        "${TARGET_DIRECTORY}/${ARCHITECTURE}/product-signed/defguard-${ARCHITECTURE}.pkg"
 }
 
 build aarch64-apple-darwin

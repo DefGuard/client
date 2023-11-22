@@ -212,7 +212,7 @@ jobs:
           args: --target aarch64-apple-darwin
 
       - name: Build products
-        run: bash build-macos-package.sh
+        run: bash build-macos-package.sh ${{ secrets.DEVELOPER_ID_INSTALLER }}
 
       - name: Upload product aarch64-apple-darwin
         uses: actions/upload-release-asset@v1.0.2
@@ -220,7 +220,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/aarch64-apple-darwin/product/defguard-aarch64-apple-darwin.pkg
+          asset_path: src-tauri/target/aarch64-apple-darwin/product-signed/defguard-aarch64-apple-darwin.pkg
           asset_name: defguard-aarch64-apple-darwin-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
 
@@ -230,7 +230,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/x86_64-apple-darwin/product/defguard-x86_64-apple-darwin.pkg
+          asset_path: src-tauri/target/x86_64-apple-darwin/product-signed/defguard-x86_64-apple-darwin.pkg
           asset_name: defguard-x86_64-apple-darwin-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
 
