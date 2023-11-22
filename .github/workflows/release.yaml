@@ -212,7 +212,7 @@ jobs:
           args: --target aarch64-apple-darwin
 
       - name: Build products
-        run: bash build-macos-package.sh ${{ secrets.DEVELOPER_ID_INSTALLER }}
+        run: bash build-macos-package.sh "${{ secrets.DEVELOPER_ID_INSTALLER }}"
 
       - name: Upload product aarch64-apple-darwin
         uses: actions/upload-release-asset@v1.0.2
