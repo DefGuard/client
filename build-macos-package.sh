@@ -36,6 +36,7 @@ build() {
 
     productsign \
         --sign "Developer ID Installer: ${DEVELOPER_ID_INSTALLER}" \
+        --keychain /Users/admin/Library/Keychains/login.keychain \
         "${TARGET_DIRECTORY}/${ARCHITECTURE}/product/defguard-${ARCHITECTURE}.pkg" \
         "${TARGET_DIRECTORY}/${ARCHITECTURE}/product-signed/defguard-${ARCHITECTURE}.pkg"
 }
