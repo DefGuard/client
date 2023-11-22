@@ -148,6 +148,11 @@ jobs:
     needs:
       - create-release
 
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+
     runs-on:
       - self-hosted
       - macOS
@@ -202,37 +207,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target x86_64-apple-darwin
+          args: --target ${{ matrix.target }}
 
-      - name: Build aarch64-apple-darwin
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: --target aarch64-apple-darwin
-
-      - name: Build products
+      - name: Build product
         run: |
           security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
-          bash build-macos-package.sh "${{ secrets.DEVELOPER_ID_INSTALLER }}"
+          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "${{ secrets.DEVELOPER_ID_INSTALLER }}" /Users/admin/Library/Keychains/login.keychain
 
-      - name: Upload product aarch64-apple-darwin
+      - name: Upload product
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/aarch64-apple-darwin/product-signed/defguard-aarch64-apple-darwin.pkg
-          asset_name: defguard-aarch64-apple-darwin-${{ env.VERSION }}.pkg
+          asset_path: src-tauri/target/${{ matrix.target }}/product/defguard.pkg
+          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
-
-      - name: Upload product x86_64-apple-darwin
+      
+      - name: Upload signed product
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/x86_64-apple-darwin/product-signed/defguard-x86_64-apple-darwin.pkg
-          asset_name: defguard-x86_64-apple-darwin-${{ env.VERSION }}.pkg
+          asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}-signed.pkg
           asset_content_type: application/octet-stream
-

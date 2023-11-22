@@ -2,44 +2,38 @@
 
 set -e
 
-DEVELOPER_ID_INSTALLER=$1
+TARGET_DIRECTORY=$1
+SCRIPTS_DIRECTORY=$2
+DEVELOPER_ID_INSTALLER=$3
+KEYCHAIN=$4
 
-TARGET_DIRECTORY="./src-tauri/target"
+mkdir -p "${TARGET_DIRECTORY}/package"
+mkdir -p "${TARGET_DIRECTORY}/product"
+mkdir -p "${TARGET_DIRECTORY}/product-signed"
 
-build() {
-    ARCHITECTURE=$1
+APP_ROOT="${TARGET_DIRECTORY}/release/bundle/macos/defguard-client.app"
 
-    mkdir -p "${TARGET_DIRECTORY}/${ARCHITECTURE}/package"
-    mkdir -p "${TARGET_DIRECTORY}/${ARCHITECTURE}/product"
-    mkdir -p "${TARGET_DIRECTORY}/${ARCHITECTURE}/product-signed"
+pkgbuild \
+    --analyze \
+    --root ${APP_ROOT} \
+    "${TARGET_DIRECTORY}/defguard-client.plist"
+    
+PACKAGE_PATH="${TARGET_DIRECTORY}/package/defguard.pkg"
 
-    APP_ROOT="${TARGET_DIRECTORY}/${ARCHITECTURE}/release/bundle/macos/defguard-client.app"
+pkgbuild \
+    --identifier net.defguard \
+    --root ${APP_ROOT} \
+    --component-plist ${TARGET_DIRECTORY}/defguard-client.plist \
+    --install-location "/Applications/defguard-client.app" \
+    --scripts ${SCRIPTS_DIRECTORY} \
+    "${PACKAGE_PATH}"
 
-    pkgbuild \
-        --analyze \
-        --root ${APP_ROOT} \
-        "${TARGET_DIRECTORY}/${ARCHITECTURE}/defguard-client.plist"
-        
-    PACKAGE_PATH="${TARGET_DIRECTORY}/${ARCHITECTURE}/package/defguard-${ARCHITECTURE}.pkg"
+productbuild \
+    --package "${PACKAGE_PATH}" \
+    "${TARGET_DIRECTORY}/product/defguard.pkg"
 
-    pkgbuild \
-        --identifier net.defguard \
-        --root ${APP_ROOT} \
-        --component-plist ${TARGET_DIRECTORY}/${ARCHITECTURE}/defguard-client.plist \
-        --install-location "/Applications/defguard-client.app" \
-        --scripts "./src-tauri/resources-macos/scripts" \
-        "${PACKAGE_PATH}"
-
-    productbuild \
-        --package "${PACKAGE_PATH}" \
-        "${TARGET_DIRECTORY}/${ARCHITECTURE}/product/defguard-${ARCHITECTURE}.pkg"
-
-    productsign \
-        --sign "Developer ID Installer: ${DEVELOPER_ID_INSTALLER}" \
-        --keychain /Users/admin/Library/Keychains/login.keychain \
-        "${TARGET_DIRECTORY}/${ARCHITECTURE}/product/defguard-${ARCHITECTURE}.pkg" \
-        "${TARGET_DIRECTORY}/${ARCHITECTURE}/product-signed/defguard-${ARCHITECTURE}.pkg"
-}
-
-build aarch64-apple-darwin
-build x86_64-apple-darwin
+productsign \
+    --sign "Developer ID Installer: ${DEVELOPER_ID_INSTALLER}" \
+    --keychain ${KEYCHAIN} \
+    "${TARGET_DIRECTORY}/product/defguard.pkg" \
+    "${TARGET_DIRECTORY}/product-signed/defguard.pkg"
