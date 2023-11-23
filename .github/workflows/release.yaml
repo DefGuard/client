@@ -245,6 +245,9 @@ jobs:
           name: wireguard-go-${{ matrix.target }}
           path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
 
+      - name: Make sure wireguard-go binary is executable
+        run: chmod +x src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
+
       - name: Unlock keychain
         run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
 
