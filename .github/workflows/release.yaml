@@ -209,10 +209,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: TEONITE (6WD6W6WQNV)"
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_ID: "admin@teonite.com"
           APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: "6WD6W6WQNV"
-          APPLE_SIGNING_IDENTITY: "Developer ID Application: TEONITE (6WD6W6WQNV)"
         with:
           args: --target ${{ matrix.target }}
 
