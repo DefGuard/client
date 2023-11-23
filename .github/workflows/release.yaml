@@ -6,6 +6,42 @@ on:
       - v*.*.*
 
 jobs:
+  build-wireguard-go:
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [arm64, amd64]
+    
+    runs-on: [self-hosted, macOS]
+    
+    steps:
+     - uses: actions/checkout@v4
+       with:
+         repository: WireGuard/wireguard-go
+         ref: master
+         fetch-depth: 0
+     - name: Set up Go
+       uses: actions/setup-go@v4
+       with:
+         go-version: '1.20'
+     - name: Build wireguard-go binary
+       run: make
+       env:
+        GOOS: darwin
+        GOARCH: ${{ matrix.architecture }}
+     - name: Upload binary artifact arm64
+       if: matrix.architecture == 'arm64'
+       uses: actions/upload-artifact@v3
+       with:
+         name: wireguard-go-aarch64-apple-darwin
+         path: wireguard-go
+     - name: Upload binary artifact amd64
+       if: matrix.architecture == 'amd64'
+       uses: actions/upload-artifact@v3
+       with:
+         name: wireguard-go-x86_64-apple-darwin
+         path: wireguard-go
+
   create-release:
     name: create-release
     runs-on: self-hosted
@@ -147,6 +183,7 @@ jobs:
   build-macos:
     needs:
       - create-release
+      - build-wireguard-go
 
     strategy:
       fail-fast: false
@@ -201,6 +238,12 @@ jobs:
       - name: Install ARM target
         run: |
           rustup target add aarch64-apple-darwin
+
+      - name: Download wireguard-go binary
+        uses: actions/download-artifact@v3
+        with:
+          name: wireguard-go-${{ matrix.target }}
+          path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
 
       - name: Unlock keychain
         run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
