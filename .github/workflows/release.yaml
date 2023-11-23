@@ -216,7 +216,7 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: "6WD6W6WQNV"
         with:
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} -v
 
       - name: Build installation package
         run: |
