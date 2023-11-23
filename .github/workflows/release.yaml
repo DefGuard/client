@@ -216,8 +216,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - uses: actions/cache@v3
         name: Setup pnpm cache
@@ -232,12 +231,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install protobuf compiler
-        run: |
-          brew install protobuf
+        run: brew install protobuf
 
       - name: Install ARM target
-        run: |
-          rustup target add aarch64-apple-darwin
+        run: rustup target add aarch64-apple-darwin
 
       - name: Download wireguard-go binary
         uses: actions/download-artifact@v3
@@ -273,16 +270,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/${{ matrix.target }}/product/defguard.pkg
-          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
-          asset_content_type: application/octet-stream
-      
-      - name: Upload signed installation package
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}-signed.pkg
+          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
