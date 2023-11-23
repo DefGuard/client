@@ -202,6 +202,9 @@ jobs:
         run: |
           rustup target add aarch64-apple-darwin
 
+      - name: Unlock keychain
+        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
+
       - name: Build app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -215,7 +218,6 @@ jobs:
 
       - name: Build installation package
         run: |
-          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
           bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "Developer ID Installer: TEONITE (6WD6W6WQNV)" /Users/admin/Library/Keychains/login.keychain
           xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
           xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
