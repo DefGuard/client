@@ -13,6 +13,8 @@ mkdir -p "${TARGET_DIRECTORY}/product-signed"
 
 APP_ROOT="${TARGET_DIRECTORY}/release/bundle/macos/defguard-client.app"
 
+chmod -R 755 ${APP_ROOT}
+
 pkgbuild \
     --analyze \
     --root ${APP_ROOT} \
