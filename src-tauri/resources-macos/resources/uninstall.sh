@@ -28,4 +28,3 @@ pkgutil --forget ${PACKAGE_ID} > /dev/null 2>&1
 rm -rf /Applications/defguard-client.app
 
 echo "Application uninstall process finished"
-exit 0

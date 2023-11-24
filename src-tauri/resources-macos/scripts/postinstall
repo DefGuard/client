@@ -14,13 +14,13 @@ echo "Post installation process started"
 mkdir -p /usr/local/bin
 
 # Add wireguard-go shortcut to /usr/local/bin
-ln -s ${BINARY_PATH}/${WIREGUARD_GO_BINARY} /usr/local/bin/${WIREGUARD_GO_BINARY}
+ln -sf ${BINARY_PATH}/${WIREGUARD_GO_BINARY} /usr/local/bin/${WIREGUARD_GO_BINARY}
 
 # Add service shortcut to /usr/local/bin
-ln -s ${BINARY_PATH}/${SERVICE_BINARY} /usr/local/bin/${SERVICE_BINARY}
+ln -sf ${BINARY_PATH}/${SERVICE_BINARY} /usr/local/bin/${SERVICE_BINARY}
 
 # Launch daemon
-ln -s ${RESOURCES_PATH}/${DAEMON_PROPERTY_FILE} /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
+ln -sf ${RESOURCES_PATH}/${DAEMON_PROPERTY_FILE} /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
 sudo launchctl load /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
 sudo launchctl start ${DAEMON_NAME}
 
