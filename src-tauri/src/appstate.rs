@@ -63,7 +63,7 @@ impl AppState {
     }
 
     pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
-        for connection in self.active_connections.lock().unwrap().clone() {
+        for connection in self.get_connections() {
             debug!("Found active connection");
             trace!("Connection: {:#?}", connection);
             debug!("Removing interface");
