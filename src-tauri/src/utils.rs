@@ -132,7 +132,7 @@ pub fn get_interface_name(
                 interface_name = format!("utun{}", counter);
             }
 
-            debug!("Found interface {}", interface_name);
+            debug!("Found interface {interface_name}");
 
             interface_name
         }
