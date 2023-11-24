@@ -94,7 +94,7 @@ async fn main() {
                     tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on(async {
                             let _ = app_state.close_all_connections().await;
-                            std::process::exit(0x0);
+                            std::process::exit(0);
                         });
                     });
                 }
