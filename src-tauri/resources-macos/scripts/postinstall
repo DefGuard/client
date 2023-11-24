@@ -11,7 +11,7 @@ RESOURCES_PATH=${PRODUCT_HOME}/Contents/Resources/resources-macos/resources
 
 echo "Post installation process started"
 
-[ -d /usr/local/bin ] || mkdir /usr/local/bin
+mkdir -p /usr/local/bin
 
 # Add wireguard-go shortcut to /usr/local/bin
 ln -s ${BINARY_PATH}/${WIREGUARD_GO_BINARY} /usr/local/bin/${WIREGUARD_GO_BINARY}
