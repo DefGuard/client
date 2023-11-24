@@ -1,7 +1,11 @@
 use crate::{
-    database::{ActiveConnection, DbPool},
+    database::{ActiveConnection, Connection, DbPool},
+    error::Error,
     service::{
-        proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
+        proto::{
+            desktop_daemon_service_client::DesktopDaemonServiceClient, RemoveInterfaceRequest,
+        },
+        utils::setup_client,
     },
 };
 use std::sync::{Arc, Mutex};
@@ -56,6 +60,31 @@ impl AppState {
         } else {
             None // Connection not found
         }
+    }
+
+    pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
+        for connection in self.active_connections.lock().unwrap().clone() {
+            debug!("Found active connection");
+            trace!("Connection: {:#?}", connection);
+            debug!("Removing interface");
+            let mut client = self.client.clone();
+            let request = RemoveInterfaceRequest {
+                interface_name: connection.interface_name.clone(),
+            };
+            if let Err(error) = client.remove_interface(request).await {
+                error!("Failed to remove interface: {error}");
+                return Err(Error::InternalError);
+            }
+            debug!("Removed interface");
+            debug!("Saving connection");
+            trace!("Connection: {:#?}", connection);
+            let mut connection: Connection = connection.into();
+            connection.save(&self.get_pool()).await?;
+            debug!("Connection saved");
+            trace!("Saved connection: {:#?}", connection);
+            info!("Location {} disconnected", connection.location_id);
+        }
+        Ok(())
     }
     pub fn find_connection(&self, location_id: i64) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().unwrap();

@@ -54,6 +54,9 @@ fn add_route(allowed_ip: &str, interface_name: &str) -> Result<(), std::io::Erro
 }
 
 /// Adds DNS config for interface
-pub fn configure_dns() -> Result<(), DaemonError> {
-    todo!()
+pub fn configure_dns(interface_name: &str) -> Result<(), std::io::Error> {
+    std::process::Command::new("resolvconf")
+        .args(["-a", interface_name, "-m", "0", "-x"])
+        .output()?;
+    Ok(())
 }
