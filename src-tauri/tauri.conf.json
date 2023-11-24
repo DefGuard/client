@@ -60,7 +60,7 @@
       },
       "resources": [],
       "shortDescription": "",
-      "targets": "all",
+      "targets": ["deb", "app"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",

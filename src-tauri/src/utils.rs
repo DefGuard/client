@@ -124,13 +124,15 @@ pub fn get_interface_name(
         .collect();
     match IS_MACOS {
         true => {
-            let mut counter = 3;
+            let mut counter = 5;
             let mut interface_name = format!("utun{}", counter);
 
             while active_interfaces.contains(&interface_name) {
                 counter += 1;
                 interface_name = format!("utun{}", counter);
             }
+
+            debug!("Found interface {interface_name}");
 
             interface_name
         }
