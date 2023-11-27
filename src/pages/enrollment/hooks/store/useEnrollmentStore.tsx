@@ -3,19 +3,21 @@ import { Subject } from 'rxjs';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import {
-  AdminInfo,
-  Device,
-  DeviceConfig,
-  UserInfo,
-} from '../../../../shared/hooks/api/types';
+import { AdminInfo, UserInfo } from '../../../../shared/hooks/api/types';
 
 const defaultValues: StoreValues = {
+  // assume default dev
+  proxy_url: '/api/v1/',
   loading: false,
   step: 0,
   stepsMax: 4,
+  sessionStart: undefined,
   sessionEnd: undefined,
   userInfo: undefined,
+  deviceName: undefined,
+  vpnOptional: undefined,
+  userPassword: undefined,
+  cookie: undefined,
   nextSubject: new Subject<void>(),
 };
 
@@ -26,7 +28,7 @@ const persistKeys: Array<keyof StoreValues> = [
   'sessionEnd',
   'sessionStart',
   'adminInfo',
-  'deviceState',
+  'deviceName',
   'endContent',
   'vpnOptional',
 ];
@@ -75,6 +77,7 @@ type StoreValues = {
   stepsMax: number;
   nextSubject: Subject<void>;
   // Date
+  proxy_url: string;
   sessionStart?: string;
   sessionEnd?: string;
   userInfo?: UserInfo;
@@ -83,10 +86,8 @@ type StoreValues = {
   vpnOptional?: boolean;
   // Markdown content for final step card
   endContent?: string;
-  deviceState?: {
-    device?: Device;
-    configs?: DeviceConfig[];
-  };
+  deviceName?: string;
+  cookie?: string;
 };
 
 type StoreMethods = {

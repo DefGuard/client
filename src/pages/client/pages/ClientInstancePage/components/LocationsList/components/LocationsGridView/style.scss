@@ -1,0 +1,63 @@
+@use '@scssutils' as *;
+
+#locations-grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 445px);
+  grid-auto-rows: auto;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  gap: 20px;
+
+  @include media-breakpoint-up(lg) {
+    justify-content: start;
+    align-content: start;
+    gap: 50px;
+  }
+
+  & > .grid-item {
+    box-sizing: border-box;
+    padding: 20px 25px;
+    min-height: 245px;
+
+    & > .top {
+      width: 100%;
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: flex-start;
+
+      & > .btn {
+        margin-left: auto;
+        height: 40px;
+      }
+    }
+
+    & > .info {
+      margin: 32px 0;
+      display: flex;
+      flex-flow: row;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    & > .location-usage {
+      display: flex;
+      flex-direction: column;
+      gap: 2;
+      height: 20px;
+      width: 100%;
+      margin: auto;
+      & > .summary {
+        display: flex;
+        justify-content: space-between;
+      }
+    }
+
+    & > .location-no-connections,
+    & > .locaton-no-stats {
+      padding-top: 32px;
+      height: max-content;
+      width: 100%;
+    }
+  }
+}

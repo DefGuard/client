@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id FROM location WHERE network_id = $1;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id?",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "instance_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "address",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "pubkey",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "endpoint",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "allowed_ips",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "dns",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "network_id",
+        "ordinal": 8,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "6b4a1b0c79e98b1df54897dd278c10b260e389b9314cb03a995fd916ea513284"
+}

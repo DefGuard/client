@@ -101,6 +101,24 @@ type RootTranslation = {
 			 * S​u​b​m​i​t
 			 */
 			submit: string
+			/**
+			 * C​a​n​c​e​l
+			 */
+			cancel: string
+			/**
+			 * C​l​o​s​e
+			 */
+			close: string
+			/**
+			 * R​e​s​e​t
+			 */
+			reset: string
+		}
+		messages: {
+			/**
+			 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​!
+			 */
+			error: string
 		}
 	}
 	components: {
@@ -112,6 +130,227 @@ type RootTranslation = {
 		}
 	}
 	pages: {
+		client: {
+			pages: {
+				instancePage: {
+					/**
+					 * L​o​c​a​t​i​o​n​s
+					 */
+					title: string
+					controls: {
+						/**
+						 * C​o​n​n​e​c​t
+						 */
+						connect: string
+						/**
+						 * D​i​s​c​o​n​n​e​c​t
+						 */
+						disconnect: string
+					}
+					header: {
+						/**
+						 * L​o​c​a​t​i​o​n​s
+						 */
+						title: string
+						filters: {
+							views: {
+								/**
+								 * G​r​i​d​ ​V​i​e​w
+								 */
+								grid: string
+								/**
+								 * D​e​t​a​i​l​ ​V​i​e​w
+								 */
+								detail: string
+							}
+						}
+					}
+					connectionLabels: {
+						/**
+						 * L​a​s​t​ ​c​o​n​n​e​c​t​e​d​ ​f​r​o​m
+						 */
+						lastConnectedFrom: string
+						/**
+						 * L​a​s​t​ ​c​o​n​n​e​c​t​e​d
+						 */
+						lastConnected: string
+						/**
+						 * C​o​n​n​e​c​t​e​d​ ​f​r​o​m
+						 */
+						connectedFrom: string
+						/**
+						 * A​s​s​i​g​n​e​d​ ​I​P
+						 */
+						assignedIp: string
+						/**
+						 * A​c​t​i​v​e
+						 */
+						active: string
+						/**
+						 * N​e​v​e​r​ ​c​o​n​n​e​c​t​e​d
+						 */
+						neverConnected: string
+					}
+					locationNeverConnected: {
+						/**
+						 * N​e​v​e​r​ ​C​o​n​n​e​c​t​e​d
+						 */
+						title: string
+						/**
+						 * T​h​i​s​ ​d​e​v​i​c​e​ ​w​a​s​ ​n​e​v​e​r​ ​c​o​n​n​e​c​t​e​d​ ​t​o​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​,​ ​c​o​n​n​e​c​t​ ​t​o​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​a​n​d​ ​i​n​f​o​r​m​a​t​i​o​n​ ​a​b​o​u​t​ ​c​o​n​n​e​c​t​i​o​n
+						 */
+						content: string
+					}
+					LocationNoStats: {
+						/**
+						 * N​o​ ​s​t​a​t​s
+						 */
+						title: string
+						/**
+						 * T​h​i​s​ ​d​e​v​i​c​e​ ​h​a​s​ ​n​o​ ​s​t​a​t​s​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​ ​i​n​ ​s​p​e​c​i​f​i​e​d​ ​t​i​m​e​ ​p​e​r​i​o​d​.​ ​C​o​n​n​e​c​t​ ​t​o​ ​l​o​c​a​t​i​o​n​ ​a​n​d​ ​w​a​i​t​ ​f​o​r​ ​c​l​i​e​n​t​ ​t​o​ ​g​a​t​h​e​r​ ​s​t​a​t​i​s​t​i​c​s​.
+						 */
+						content: string
+					}
+					detailView: {
+						history: {
+							/**
+							 * C​o​n​n​e​c​t​i​o​n​ ​h​i​s​t​o​r​y
+							 */
+							title: string
+							headers: {
+								/**
+								 * D​a​t​e
+								 */
+								date: string
+								/**
+								 * D​u​r​a​t​i​o​n
+								 */
+								duration: string
+								/**
+								 * C​o​n​n​e​c​t​e​d​ ​f​r​o​m
+								 */
+								connectedFrom: string
+								/**
+								 * U​p​l​o​a​d
+								 */
+								upload: string
+								/**
+								 * D​o​w​n​l​o​a​d
+								 */
+								download: string
+							}
+						}
+					}
+				}
+				addInstancePage: {
+					/**
+					 * A​d​d​ ​I​n​s​t​a​n​c​e
+					 */
+					title: string
+					forms: {
+						initInstance: {
+							/**
+							 * P​l​e​a​s​e​ ​p​r​o​v​i​d​e​ ​I​n​s​t​a​n​c​e​ ​U​R​L​ ​a​n​d​ ​t​o​k​e​n
+							 */
+							title: string
+							labels: {
+								/**
+								 * I​n​s​t​a​n​c​e​ ​U​R​L
+								 */
+								url: string
+								/**
+								 * T​o​k​e​n
+								 */
+								token: string
+							}
+							/**
+							 * A​d​d​ ​I​n​s​t​a​n​c​e
+							 */
+							submit: string
+						}
+						device: {
+							/**
+							 * N​a​m​e​ ​t​h​i​s​ ​d​e​v​i​c​e
+							 */
+							title: string
+							labels: {
+								/**
+								 * N​a​m​e
+								 */
+								name: string
+							}
+							/**
+							 * F​i​n​i​s​h
+							 */
+							submit: string
+							messages: {
+								/**
+								 * D​e​v​i​c​e​ ​a​d​d​e​d
+								 */
+								addSuccess: string
+							}
+						}
+					}
+					guide: {
+						/**
+						 * A​d​d​i​n​g​ ​I​n​s​t​a​n​c​e​s​ ​a​n​d​ ​c​o​n​n​e​c​t​i​n​g​ ​t​o​ ​V​P​N​ ​l​o​c​a​t​i​o​n​s
+						 */
+						title: string
+						/**
+						 * I​n​ ​o​r​d​e​r​ ​t​o​ ​a​c​t​i​v​a​t​e​ ​t​h​i​s​ ​d​e​v​i​c​e​ ​a​n​d​ ​a​c​c​e​s​s​ ​a​l​l​ ​V​P​N​ ​l​o​c​a​t​i​o​n​s​,​ ​y​o​u​ ​m​u​s​t​ ​p​r​o​v​i​d​e​ ​t​h​e​ ​U​R​L​ ​t​o​ ​y​o​u​r​ ​d​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​a​n​d​ ​e​n​t​e​r​ ​t​h​e​ ​a​c​t​i​v​a​t​i​o​n​ ​t​o​k​e​n​.
+						 */
+						subTitle: string
+						card: {
+							/**
+							 * Y​o​u​ ​c​a​n​ ​o​b​t​a​i​n​ ​t​h​e​ ​t​o​k​e​n​ ​b​y
+							 */
+							title: string
+							/**
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​1​.​ ​I​n​v​o​k​i​n​g​ ​R​e​m​o​t​e​ ​D​e​s​k​t​o​p​ ​a​c​t​i​v​a​t​i​o​n​ ​p​r​o​c​e​s​s​ ​y​o​u​r​s​e​l​f​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​I​f​ ​y​o​u​ ​h​a​v​e​ ​a​c​c​e​s​s​ ​t​o​ ​y​o​u​r​ ​d​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​(​e​i​t​h​e​r​ ​y​o​u​ ​a​r​e​ ​a​t​ ​h​o​m​e​/​o​f​f​i​c​e​ ​w​h​e​r​e​ ​d​e​f​g​u​a​r​d​ ​i​s​ ​a​c​c​e​s​s​i​b​l​e​)​,​ ​g​o​ ​t​o​ ​d​e​f​g​u​a​r​d​ ​-​>​ ​y​o​u​r​ ​p​r​o​f​i​l​e​ ​-​>​ ​"​A​d​d​ ​d​e​v​i​c​e​"​ ​a​n​d​ ​c​h​o​o​s​e​:​ ​A​c​t​i​v​a​t​e​ ​D​e​f​g​u​a​r​d​ ​C​l​i​e​n​t​.​ ​T​h​e​n​ ​s​e​l​e​c​t​ ​i​f​ ​y​o​u​ ​w​i​s​h​ ​t​o​ ​h​a​v​e​ ​t​h​e​ ​t​o​k​e​n​ ​s​e​n​t​ ​t​o​ ​y​o​u​ ​b​y​ ​e​m​a​i​l​ ​o​r​ ​j​u​s​t​ ​c​o​p​y​ ​i​t​ ​f​r​o​m​ ​d​e​f​g​u​a​r​d​.​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​2​.​ ​A​c​t​i​v​a​t​i​n​g​ ​r​e​m​o​t​e​l​y​ ​b​y​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​I​f​ ​y​o​u​ ​d​o​ ​n​o​t​ ​h​a​v​e​ ​a​c​c​e​s​s​ ​t​o​ ​d​e​f​g​u​a​r​d​ ​-​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​(​i​n​ ​y​o​u​r​ ​o​n​b​o​a​r​d​i​n​g​ ​m​e​s​s​a​g​e​/​e​m​a​i​l​ ​t​h​e​r​e​ ​w​e​r​e​ ​t​h​e​ ​a​d​m​i​n​ ​c​o​n​t​a​c​t​ ​d​e​t​a​i​l​s​)​ ​a​n​d​ ​a​s​k​ ​f​o​r​ ​R​e​m​o​t​e​ ​d​e​s​k​t​o​p​ ​a​c​t​i​v​a​t​i​o​n​ ​-​ ​b​e​s​t​ ​t​o​ ​s​e​n​d​ ​y​o​u​ ​t​h​e​ ​a​c​t​i​v​a​t​i​o​n​ ​e​m​a​i​l​,​ ​f​r​o​m​ ​w​h​i​c​h​ ​y​o​u​ ​c​a​n​ ​c​o​p​y​ ​t​h​e​ ​i​n​s​t​a​n​c​e​ ​U​R​L​ ​&​ ​t​o​k​e​n​.​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
+							 */
+							content: string
+						}
+					}
+				}
+			}
+			sideBar: {
+				/**
+				 * I​n​s​t​a​n​c​e​s
+				 */
+				instances: string
+				/**
+				 * A​d​d​ ​I​n​s​t​a​n​c​e
+				 */
+				addInstance: string
+				copyright: {
+					/**
+					 * C​o​p​y​r​i​g​h​t​ ​©​ ​2​0​2​3
+					 */
+					copyright: string
+					/**
+					 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n​:​ ​{​v​e​r​s​i​o​n​}
+					 * @param {string} version
+					 */
+					appVersion: RequiredParams<'version'>
+				}
+			}
+		}
 		enrollment: {
 			sideBar: {
 				/**
@@ -247,6 +486,28 @@ type RootTranslation = {
 					}
 				}
 				deviceSetup: {
+					desktopSetup: {
+						/**
+						 * C​o​n​f​i​g​u​r​e​ ​t​h​i​s​ ​d​e​v​i​c​e
+						 */
+						title: string
+						controls: {
+							/**
+							 * C​o​n​f​i​g​u​r​e​ ​d​e​v​i​c​e
+							 */
+							create: string
+							/**
+							 * D​e​v​i​c​e​ ​i​s​ ​c​o​n​f​i​g​u​r​e​d
+							 */
+							success: string
+						}
+						messages: {
+							/**
+							 * D​e​v​i​c​e​ ​i​s​ ​c​o​n​f​i​g​u​r​e​d
+							 */
+							deviceConfigured: string
+						}
+					}
 					/**
 					 * *​ ​T​h​i​s​ ​s​t​e​p​ ​i​s​ ​O​P​T​I​O​N​A​L​.​ ​Y​o​u​ ​c​a​n​ ​s​k​i​p​ ​i​t​ ​i​f​ ​y​o​u​ ​w​i​s​h​.​ ​T​h​i​s​ ​c​a​n​ ​b​e​ ​c​o​n​f​i​g​u​r​e​d​ ​l​a​t​e​r​ ​i​n​ ​d​e​f​g​u​a​r​d​.
 					 */
@@ -539,6 +800,24 @@ export type TranslationFunctions = {
 			 * Submit
 			 */
 			submit: () => LocalizedString
+			/**
+			 * Cancel
+			 */
+			cancel: () => LocalizedString
+			/**
+			 * Close
+			 */
+			close: () => LocalizedString
+			/**
+			 * Reset
+			 */
+			reset: () => LocalizedString
+		}
+		messages: {
+			/**
+			 * Unexpected error occurred!
+			 */
+			error: () => LocalizedString
 		}
 	}
 	components: {
@@ -550,6 +829,226 @@ export type TranslationFunctions = {
 		}
 	}
 	pages: {
+		client: {
+			pages: {
+				instancePage: {
+					/**
+					 * Locations
+					 */
+					title: () => LocalizedString
+					controls: {
+						/**
+						 * Connect
+						 */
+						connect: () => LocalizedString
+						/**
+						 * Disconnect
+						 */
+						disconnect: () => LocalizedString
+					}
+					header: {
+						/**
+						 * Locations
+						 */
+						title: () => LocalizedString
+						filters: {
+							views: {
+								/**
+								 * Grid View
+								 */
+								grid: () => LocalizedString
+								/**
+								 * Detail View
+								 */
+								detail: () => LocalizedString
+							}
+						}
+					}
+					connectionLabels: {
+						/**
+						 * Last connected from
+						 */
+						lastConnectedFrom: () => LocalizedString
+						/**
+						 * Last connected
+						 */
+						lastConnected: () => LocalizedString
+						/**
+						 * Connected from
+						 */
+						connectedFrom: () => LocalizedString
+						/**
+						 * Assigned IP
+						 */
+						assignedIp: () => LocalizedString
+						/**
+						 * Active
+						 */
+						active: () => LocalizedString
+						/**
+						 * Never connected
+						 */
+						neverConnected: () => LocalizedString
+					}
+					locationNeverConnected: {
+						/**
+						 * Never Connected
+						 */
+						title: () => LocalizedString
+						/**
+						 * This device was never connected to this location, connect to view statistics and information about connection
+						 */
+						content: () => LocalizedString
+					}
+					LocationNoStats: {
+						/**
+						 * No stats
+						 */
+						title: () => LocalizedString
+						/**
+						 * This device has no stats for this location in specified time period. Connect to location and wait for client to gather statistics.
+						 */
+						content: () => LocalizedString
+					}
+					detailView: {
+						history: {
+							/**
+							 * Connection history
+							 */
+							title: () => LocalizedString
+							headers: {
+								/**
+								 * Date
+								 */
+								date: () => LocalizedString
+								/**
+								 * Duration
+								 */
+								duration: () => LocalizedString
+								/**
+								 * Connected from
+								 */
+								connectedFrom: () => LocalizedString
+								/**
+								 * Upload
+								 */
+								upload: () => LocalizedString
+								/**
+								 * Download
+								 */
+								download: () => LocalizedString
+							}
+						}
+					}
+				}
+				addInstancePage: {
+					/**
+					 * Add Instance
+					 */
+					title: () => LocalizedString
+					forms: {
+						initInstance: {
+							/**
+							 * Please provide Instance URL and token
+							 */
+							title: () => LocalizedString
+							labels: {
+								/**
+								 * Instance URL
+								 */
+								url: () => LocalizedString
+								/**
+								 * Token
+								 */
+								token: () => LocalizedString
+							}
+							/**
+							 * Add Instance
+							 */
+							submit: () => LocalizedString
+						}
+						device: {
+							/**
+							 * Name this device
+							 */
+							title: () => LocalizedString
+							labels: {
+								/**
+								 * Name
+								 */
+								name: () => LocalizedString
+							}
+							/**
+							 * Finish
+							 */
+							submit: () => LocalizedString
+							messages: {
+								/**
+								 * Device added
+								 */
+								addSuccess: () => LocalizedString
+							}
+						}
+					}
+					guide: {
+						/**
+						 * Adding Instances and connecting to VPN locations
+						 */
+						title: () => LocalizedString
+						/**
+						 * In order to activate this device and access all VPN locations, you must provide the URL to your defguard instance and enter the activation token.
+						 */
+						subTitle: () => LocalizedString
+						card: {
+							/**
+							 * You can obtain the token by
+							 */
+							title: () => LocalizedString
+							/**
+							 * 
+						                <p>1. Invoking Remote Desktop activation process yourself</p>
+						                <div>
+						                <p>
+						                If you have access to your defguard instance (either you are at home/office where defguard is accessible), go to defguard -> your profile -> "Add device" and choose: Activate Defguard Client. Then select if you wish to have the token sent to you by email or just copy it from defguard.
+						                </p>
+						                </div>
+						                <p>2. Activating remotely by your administrator</p>
+						                <div>
+						                <p>
+						                If you do not have access to defguard - please contact your administrator (in your onboarding message/email there were the admin contact details) and ask for Remote desktop activation - best to send you the activation email, from which you can copy the instance URL & token.
+						                </p>
+						                </div>
+						                <p>
+						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                </p>
+						              
+							 */
+							content: () => LocalizedString
+						}
+					}
+				}
+			}
+			sideBar: {
+				/**
+				 * Instances
+				 */
+				instances: () => LocalizedString
+				/**
+				 * Add Instance
+				 */
+				addInstance: () => LocalizedString
+				copyright: {
+					/**
+					 * Copyright © 2023
+					 */
+					copyright: () => LocalizedString
+					/**
+					 * Application version: {version}
+					 */
+					appVersion: (arg: { version: string }) => LocalizedString
+				}
+			}
+		}
 		enrollment: {
 			sideBar: {
 				/**
@@ -683,6 +1182,28 @@ export type TranslationFunctions = {
 					}
 				}
 				deviceSetup: {
+					desktopSetup: {
+						/**
+						 * Configure this device
+						 */
+						title: () => LocalizedString
+						controls: {
+							/**
+							 * Configure device
+							 */
+							create: () => LocalizedString
+							/**
+							 * Device is configured
+							 */
+							success: () => LocalizedString
+						}
+						messages: {
+							/**
+							 * Device is configured
+							 */
+							deviceConfigured: () => LocalizedString
+						}
+					}
 					/**
 					 * * This step is OPTIONAL. You can skip it if you wish. This can be configured later in defguard.
 					 */

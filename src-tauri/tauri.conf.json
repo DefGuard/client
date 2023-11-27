@@ -7,19 +7,39 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "Defguard",
+    "productName": "defguard-client",
     "version": "0.1.0"
   },
   "tauri": {
+    "systemTray": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": false
+    },
+
     "allowlist": {
-      "all": false
+      "all": false,
+      "window": {
+        "all": true
+      },
+      "http": {
+        "all": true,
+        "request": true,
+        "scope": ["https://**", "http://**"]
+      }
     },
     "bundle": {
       "active": true,
       "category": "Utility",
       "copyright": "teonite",
       "deb": {
-        "depends": []
+        "files": {
+          "/usr/sbin/defguard-service": "target/release/defguard-service",
+          "/usr/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service",
+          "../control/rules": "../resources-linux/rules",
+          "../control/postinst": "../resources-linux/postinst",
+          "../control/prerm": "../resources-linux/prerm",
+          "../control/postrm": "../resources-linux/postrm"
+        }
       },
       "externalBin": [],
       "icon": [
@@ -40,7 +60,7 @@
       },
       "resources": [],
       "shortDescription": "",
-      "targets": "all",
+      "targets": ["deb", "app"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
@@ -58,15 +78,15 @@
         "fullscreen": false,
         "center": true,
         "maximized": true,
-        "height": 600,
+        "height": 720,
         "resizable": true,
         "maximizable": true,
         "minimizable": true,
         "closable": true,
         "title": "Defguard",
         "width": 992,
-        "minWidth": 992,
-        "minHeight": 600
+        "minWidth": 650,
+        "minHeight": 450
       }
     ]
   }

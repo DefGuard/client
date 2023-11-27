@@ -36,7 +36,7 @@ export const PasswordStep = () => {
       z
         .object({
           password: passwordValidator(LL),
-          repeat: z.string().nonempty(LL.form.errors.required()),
+          repeat: z.string().min(1, LL.form.errors.required()),
         })
         .refine((values) => values.password === values.repeat, {
           message: pageLL.form.fields.repeat.errors.matching(),

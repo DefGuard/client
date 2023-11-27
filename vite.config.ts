@@ -5,22 +5,16 @@ import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [react()],
   clearScreen: false,
   server: {
     strictPort: true,
     port: 3000,
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8080/',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
   },
   resolve: {
     alias: {
-      '@scssutils': path.resolve(__dirname, '/src/shared/defguard-ui/scss/helpers'),
+      '@scssutils': path.resolve('./src/shared/defguard-ui/scss/helpers'),
     },
   },
   css: {

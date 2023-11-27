@@ -46,7 +46,7 @@ export const SessionTimeoutPage = () => {
             />
           }
           text={LL.pages.sessionTimeout.controls.back()}
-          onClick={() => navigate(routes.token, { replace: true })}
+          onClick={() => navigate(routes.client.base, { replace: true })}
         />
         <Button
           size={ButtonSize.LARGE}

@@ -1,22 +1,21 @@
-# Defguard client frontend
+# Defguard desktop client
+
+Desktop client for managing connection via instance of defguard. Built with tauri and React.js
 
 ## Development
 
-### Install pnpm
-```bash
-npm i -g pnpm
-```
-### Install dependencies
+### Tauri requirements
+
+Make sure to install prerequisites from [tauri](https://tauri.app/v1/guides/getting-started/prerequisites/).
+
+### Install pnpm and node deps
+
 ```bash
 pnpm install
 ```
-### Start dev server
-```bash
-pnpm dev
-```
 
-## Building
-### After installing deps
+### Dev server command
+
 ```bash
-pnpm build
+pnpm tauri dev
 ```

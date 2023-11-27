@@ -1,3 +1,6 @@
 [submodule "src/shared/defguard-ui"]
 	path = src/shared/defguard-ui
 	url = ../ui.git
+[submodule "src-tauri/proto"]
+	path = src-tauri/proto
+	url = ../proto.git

@@ -1,0 +1,25 @@
+@use '@scssutils' as *;
+
+.location-usage {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+  width: 100%;
+  row-gap: 8px;
+
+  & > .summary {
+    grid-row: 1;
+    grid-column: 1;
+    width: 100%;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  & > .chart-wrapper {
+    grid-row: 2;
+    grid-column: 1;
+    width: 100%;
+  }
+}

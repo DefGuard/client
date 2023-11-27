@@ -1,8 +1,9 @@
 import './style.scss';
 
 import dayjs from 'dayjs';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { debug, error } from 'tauri-plugin-log-api';
 import { useBreakpoint } from 'use-breakpoint';
 import { shallow } from 'zustand/shallow';
 
@@ -31,6 +32,7 @@ import { PasswordStep } from './steps/PasswordStep/PasswordStep';
 import { WelcomeStep } from './steps/WelcomeStep/WelcomeStep';
 
 export const EnrollmentPage = () => {
+  const enrollmentFinished = useRef(false);
   const navigate = useNavigate();
   const { LL } = useI18nContext();
   const { breakpoint } = useBreakpoint(deviceBreakpoints);
@@ -55,54 +57,63 @@ export const EnrollmentPage = () => {
   }, [setEnrollmentState, stepsMax]);
 
   useEffect(() => {
-    if (sessionEnd) {
-      const endDay = dayjs(sessionEnd);
-      const diff = endDay.diff(dayjs(), 'millisecond');
-      if (diff > 0) {
-        const timeout = setTimeout(() => {
+    if (!enrollmentFinished.current) {
+      if (sessionEnd) {
+        const endDay = dayjs(sessionEnd);
+        const diff = endDay.diff(dayjs(), 'millisecond');
+        if (diff > 0) {
+          const timeout = setTimeout(() => {
+            if (!enrollmentFinished.current) {
+              debug('Enrollment session time ended, navigatig to timeout page.');
+              navigate(routes.timeout, { replace: true });
+            }
+          }, diff);
+          return () => {
+            clearTimeout(timeout);
+          };
+        } else {
+          debug('Enrollment session time ended, navigatig to timeout page.');
           navigate(routes.timeout, { replace: true });
-        }, diff);
-        return () => {
-          clearTimeout(timeout);
-        };
+        }
       } else {
+        error('Seesion end time not found, navigating to timeout page.');
         navigate(routes.timeout, { replace: true });
       }
-    } else {
-      navigate(routes.timeout, { replace: true });
     }
   }, [sessionEnd, navigate, reset]);
+
+  useEffect(() => {
+    enrollmentFinished.current = stepsMax === currentStep;
+  }, [currentStep, stepsMax]);
 
   return (
     <PageContainer id="enrollment">
       <EnrollmentSideBar />
       <LogoContainer />
-      {currentStep !== 4 && (
-        <EnrollmentStepControls>
-          <Button
-            text={LL.common.controls.back()}
-            size={controlsSize}
-            styleVariant={ButtonStyleVariant.STANDARD}
-            onClick={() => back()}
-            disabled={(steps[currentStep].backDisabled ?? false) || loading}
-            icon={
-              <ArrowSingle
-                size={ArrowSingleSize.SMALL}
-                direction={ArrowSingleDirection.LEFT}
-              />
-            }
-          />
-          <Button
-            data-testid="enrollment-next"
-            loading={loading}
-            text={LL.common.controls.next()}
-            size={controlsSize}
-            styleVariant={ButtonStyleVariant.PRIMARY}
-            onClick={() => nextSubject.next()}
-            rightIcon={<ArrowSingle size={ArrowSingleSize.SMALL} />}
-          />
-        </EnrollmentStepControls>
-      )}
+      <EnrollmentStepControls>
+        <Button
+          text={LL.common.controls.back()}
+          size={controlsSize}
+          styleVariant={ButtonStyleVariant.STANDARD}
+          onClick={() => back()}
+          disabled={(steps[currentStep].backDisabled ?? false) || loading}
+          icon={
+            <ArrowSingle
+              size={ArrowSingleSize.SMALL}
+              direction={ArrowSingleDirection.LEFT}
+            />
+          }
+        />
+        <Button
+          data-testid="enrollment-next"
+          loading={loading}
+          text={LL.common.controls.next()}
+          size={controlsSize}
+          styleVariant={ButtonStyleVariant.PRIMARY}
+          onClick={() => nextSubject.next()}
+          rightIcon={<ArrowSingle size={ArrowSingleSize.SMALL} />}
+        />
+      </EnrollmentStepControls>
       {steps[currentStep].step ?? null}
     </PageContainer>
   );

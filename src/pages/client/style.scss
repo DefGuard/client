@@ -1,0 +1,30 @@
+@use '@scssutils' as *;
+
+.client-page {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background-color: var(--surface-frame-bg);
+  overflow: auto;
+
+  padding: 30px 20px 30px calc(20px + 70px);
+
+  @include media-breakpoint-up(lg) {
+    padding: 64px 75px 64px calc(75px + 270px);
+  }
+
+  a,
+  span,
+  p,
+  div,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  img,
+  svg {
+    user-select: none;
+  }
+}

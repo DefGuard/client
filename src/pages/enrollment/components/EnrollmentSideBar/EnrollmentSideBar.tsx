@@ -1,12 +1,12 @@
 import './style.scss';
 
+import { getVersion } from '@tauri-apps/api/app';
 import classNames from 'classnames';
 import { useEffect, useMemo, useState } from 'react';
 import { LocalizedString } from 'typesafe-i18n';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Divider } from '../../../../shared/defguard-ui/components/Layout/Divider/Divider.tsx';
-import { useApi } from '../../../../shared/hooks/api/useApi.tsx';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { AdminInfo } from '../AdminInfo/AdminInfo';
 import { TimeLeft } from '../TimeLeft/TimeLeft';
@@ -16,21 +16,12 @@ export const EnrollmentSideBar = () => {
 
   const vpnOptional = useEnrollmentStore((state) => state.vpnOptional);
 
-  // fetch app version
-  const { getAppInfo } = useApi();
+  const [currentStep, stepsMax] = useEnrollmentStore((state) => [
+    state.step,
+    state.stepsMax,
+  ]);
+
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!appVersion) {
-      getAppInfo()
-        .then((res) => {
-          setAppVersion(res.version);
-        })
-        .catch((err) => {
-          console.error('Failed to fetch app info: ', err);
-        });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const steps = useMemo((): LocalizedString[] => {
     const steps = LL.pages.enrollment.sideBar.steps;
@@ -44,6 +35,17 @@ export const EnrollmentSideBar = () => {
     ];
   }, [LL.pages.enrollment.sideBar.steps, vpnOptional]);
 
+  useEffect(() => {
+    const getAppVersion = async () => {
+      const version = await getVersion().catch(() => {
+        return '';
+      });
+      setAppVersion(version);
+    };
+
+    getAppVersion();
+  }, []);
+
   return (
     <div id="enrollment-side-bar">
       <div className="title">
@@ -55,8 +57,13 @@ export const EnrollmentSideBar = () => {
           <Step text={text} index={index} key={index} />
         ))}
       </div>
-      <TimeLeft />
-      <Divider />
+      {currentStep !== stepsMax && (
+        <>
+          <TimeLeft />
+          <Divider />
+        </>
+      )}
+      {currentStep === stepsMax && <Divider className="push" />}
       <AdminInfo />
       <Divider />
       <div className="copyright">
