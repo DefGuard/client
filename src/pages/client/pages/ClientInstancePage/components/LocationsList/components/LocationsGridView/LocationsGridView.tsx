@@ -15,6 +15,7 @@ import { LocationCardConnectButton } from '../LocationCardConnectButton/Location
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
 import { LocationCardNeverConnected } from '../LocationCardNeverConnected/LocationCardNeverConnected';
 import { LocationCardNoStats } from '../LocationCardNoStats/LocationCardNoStats';
+import { LocationCardRoute } from '../LocationCardRoute/LocationCardRoute';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
@@ -68,6 +69,9 @@ const GridItem = ({ location }: GridItemProps) => {
       <div className="top">
         <LocationCardTitle location={location} />
         <LocationCardConnectButton location={location} />
+      </div>
+      <div className="route">
+        <LocationCardRoute location={location} />
       </div>
       {lastConnection && location && (
         <div className="info">

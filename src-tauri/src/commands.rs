@@ -127,6 +127,7 @@ pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) 
         endpoint: device_config.endpoint,
         allowed_ips: device_config.allowed_ips,
         dns: device_config.dns,
+        route_all_traffic: false,
     }
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -239,6 +240,7 @@ pub struct LocationInfo {
     pub address: String,
     pub endpoint: String,
     pub active: bool,
+    pub route_all_traffic: bool,
 }
 
 #[tauri::command(async)]
@@ -264,6 +266,7 @@ pub async fn all_locations(
             address: location.address,
             endpoint: location.endpoint,
             active: active_locations_ids.contains(&location.id.unwrap()),
+            route_all_traffic: location.route_all_traffic,
         };
         location_info.push(info);
     }
@@ -409,4 +412,28 @@ pub async fn last_connection(
         trace!("Connection found");
     }
     Ok(connection)
+}
+
+#[tauri::command]
+pub async fn update_location_routing(
+    location_id: i64,
+    route_all_traffic: bool,
+    handle: tauri::AppHandle,
+) -> Result<Location, Error> {
+    let app_state = handle.state::<AppState>();
+    debug!("Updating location routing {}", location_id);
+    if let Some(mut location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
+        location.route_all_traffic = route_all_traffic;
+        location.save(&app_state.get_pool()).await?;
+        handle.emit_all(
+            "location-update",
+            Payload {
+                message: "Location routing updated".into(),
+            },
+        )?;
+        Ok(location)
+    } else {
+        error!("Location with id: {} not found.", location_id);
+        Err(Error::NotFound)
+    }
 }

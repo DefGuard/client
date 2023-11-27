@@ -7,6 +7,7 @@ import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '.
 import {
   ConnectionRequest,
   GetLocationsRequest,
+  RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
   StatsRequest,
@@ -61,6 +62,9 @@ const getConnectionHistory = async (data: ConnectionRequest): Promise<Connection
 const getActiveConnection = async (data: ConnectionRequest): Promise<Connection> =>
   invokeWrapper('active_connection', data);
 
+const updateLocationRouting = async (data: RoutingRequest): Promise<Connection> =>
+  invokeWrapper('update_location_routing', data);
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -71,4 +75,5 @@ export const clientApi = {
   getConnectionHistory,
   getActiveConnection,
   saveConfig,
+  updateLocationRouting,
 };

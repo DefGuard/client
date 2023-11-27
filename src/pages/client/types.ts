@@ -15,6 +15,7 @@ export type DefguardLocation = {
   endpoint: string;
   // connected
   active: boolean;
+  route_all_traffic: boolean;
 };
 
 export type LocationStats = {
@@ -42,4 +43,5 @@ export enum TauriEventKey {
   SINGLE_INSTANCE = 'single-instance',
   CONNECTION_CHANGED = 'connection-changed',
   INSTANCE_UPDATE = 'instance-update',
+  LOCATION_UPDATE = 'location-update',
 }

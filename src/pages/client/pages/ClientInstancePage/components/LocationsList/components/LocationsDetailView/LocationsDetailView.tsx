@@ -19,6 +19,7 @@ import { LocationCardConnectButton } from '../LocationCardConnectButton/Location
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
 import { LocationCardNeverConnected } from '../LocationCardNeverConnected/LocationCardNeverConnected';
 import { LocationCardNoStats } from '../LocationCardNoStats/LocationCardNoStats';
+import { LocationCardRoute } from '../LocationCardRoute/LocationCardRoute';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 import { LocationConnectionHistory } from '../LocationConnectionHistory/LocationConnectionHistory';
 
@@ -89,6 +90,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
           {breakpoint === 'desktop' && (
             <LocationCardInfo location={activeLocation} connection={lastConnection} />
           )}
+          <LocationCardRoute location={activeLocation} />
           <LocationCardConnectButton location={activeLocation} />
         </div>
         {breakpoint !== 'desktop' && (

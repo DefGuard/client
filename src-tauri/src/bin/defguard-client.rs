@@ -11,11 +11,12 @@ use tauri_plugin_log::LogTarget;
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__connect, __cmd__disconnect, __cmd__last_connection, __cmd__location_stats,
-    __cmd__save_device_config, __cmd__update_instance,
+    __cmd__save_device_config, __cmd__update_instance, __cmd__update_location_routing,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, connect, disconnect,
         last_connection, location_stats, save_device_config, update_instance,
+        update_location_routing,
     },
     database,
     tray::create_tray_menu,
@@ -78,6 +79,7 @@ async fn main() {
             all_connections,
             last_connection,
             active_connection,
+            update_location_routing,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {

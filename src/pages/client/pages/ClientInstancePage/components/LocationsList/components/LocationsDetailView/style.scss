@@ -33,6 +33,16 @@
       row-gap: 20px;
       box-sizing: border-box;
       padding: 0 20px;
+      & > .toggle {
+        align-items: center;
+        width: 395px;
+        & > .toggle-option {
+          span {
+            @include typography(app-button-s);
+          }
+          height: 32px;
+        }
+      }
     }
 
     & > h2 {

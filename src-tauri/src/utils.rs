@@ -22,6 +22,7 @@ use tonic::transport::Channel;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 pub static STATS_PERIOD: u64 = 60;
+pub static DEFAULT_ROUTE: &str = "0.0.0.0/0";
 
 /// Setup client interface
 pub async fn setup_interface(
@@ -42,11 +43,17 @@ pub async fn setup_interface(
         peer.persistent_keepalive_interval = Some(25);
 
         debug!("Parsing location allowed ips: {}", location.allowed_ips);
-        let allowed_ips: Vec<String> = location
-            .allowed_ips
-            .split(',')
-            .map(str::to_string)
-            .collect();
+        let allowed_ips: Vec<String> = if location.route_all_traffic {
+            debug!("Using all traffic routing: {DEFAULT_ROUTE}");
+            vec![DEFAULT_ROUTE.into()]
+        } else {
+            debug!("Using predefined location traffic");
+            location
+                .allowed_ips
+                .split(',')
+                .map(str::to_string)
+                .collect()
+        };
         for allowed_ip in &allowed_ips {
             match IpAddrMask::from_str(allowed_ip) {
                 Ok(addr) => {

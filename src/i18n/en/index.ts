@@ -56,6 +56,8 @@ const en = {
           controls: {
             connect: 'Connect',
             disconnect: 'Disconnect',
+            predefinedTraffic: 'Predefined Location traffic',
+            allTraffic: 'All traffic',
           },
           header: {
             title: 'Locations',

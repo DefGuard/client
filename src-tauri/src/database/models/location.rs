@@ -18,6 +18,7 @@ pub struct Location {
     pub endpoint: String,
     pub allowed_ips: String,
     pub dns: Option<String>,
+    pub route_all_traffic: bool,
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
@@ -67,13 +68,14 @@ impl Location {
             endpoint,
             allowed_ips,
             dns,
+            route_all_traffic: false,
         }
     }
 
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let locations = query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
         FROM location;"
         )
         .fetch_all(pool)
@@ -89,8 +91,8 @@ impl Location {
             None => {
                 // Insert a new record when there is no ID
                 let result = query!(
-                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id) \
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic) \
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
                 RETURNING id;",
                 self.instance_id,
                 self.name,
@@ -98,8 +100,9 @@ impl Location {
                 self.pubkey,
                 self.endpoint,
                 self.allowed_ips,
-                    self.dns,
+                self.dns,
                 self.network_id,
+                self.route_all_traffic,
             )
             .fetch_one(executor)
             .await?;
@@ -109,15 +112,16 @@ impl Location {
                 // Update the existing record when there is an ID
                 query!(
                 "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
-                network_id = $8 WHERE id = $9;",
+                network_id = $8, route_all_traffic = $9 WHERE id = $10;",
                 self.instance_id,
                 self.name,
                 self.address,
                 self.pubkey,
                 self.endpoint,
                 self.allowed_ips,
-                    self.dns,
+                self.dns,
                 self.network_id,
+                self.route_all_traffic,
                 id,
             )
             .execute(executor)
@@ -131,7 +135,7 @@ impl Location {
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
             FROM location WHERE id = $1;",
             location_id
         )
@@ -145,7 +149,7 @@ impl Location {
     ) -> Result<Vec<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
             FROM location WHERE instance_id = $1;",
             instance_id
         )
@@ -156,7 +160,7 @@ impl Location {
     pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
             FROM location WHERE pubkey = $1;",
             pubkey
         )
@@ -173,7 +177,7 @@ impl Location {
     {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
             FROM location WHERE network_id = $1;",
             instance_id
         )

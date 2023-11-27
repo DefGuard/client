@@ -38,6 +38,17 @@ export const ClientPage = () => {
       subs.push(cleanup);
     });
 
+    listen(TauriEventKey.LOCATION_UPDATE, () => {
+      const invalidate = [clientQueryKeys.getLocations];
+      invalidate.forEach((key) =>
+        queryClient.invalidateQueries({
+          queryKey: [key],
+        }),
+      );
+    }).then((cleanup) => {
+      subs.push(cleanup);
+    });
+
     listen(TauriEventKey.CONNECTION_CHANGED, () => {
       const invalidate = [
         clientQueryKeys.getLocations,
