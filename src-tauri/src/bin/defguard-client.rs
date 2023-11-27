@@ -15,7 +15,8 @@ use defguard_client::{
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, connect, disconnect,
-        last_connection, location_stats, save_device_config, update_instance, update_location_routing,
+        last_connection, location_stats, save_device_config, update_instance,
+        update_location_routing,
     },
     database,
     tray::create_tray_menu,
