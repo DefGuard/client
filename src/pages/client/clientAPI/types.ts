@@ -7,6 +7,7 @@ export type GetLocationsRequest = {
 
 export type ConnectionRequest = {
   locationId: number;
+  useDefaultRoute?: boolean;
 };
 
 export type StatsRequest = {

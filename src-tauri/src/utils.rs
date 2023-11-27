@@ -22,12 +22,14 @@ use tonic::transport::Channel;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 pub static STATS_PERIOD: u64 = 60;
+pub static DEFAULT_ROUTE: &str = "0.0.0.0/0";
 
 /// Setup client interface
 pub async fn setup_interface(
     location: &Location,
     interface_name: &str,
     pool: &DbPool,
+    use_default_route: bool,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
@@ -42,11 +44,17 @@ pub async fn setup_interface(
         peer.persistent_keepalive_interval = Some(25);
 
         debug!("Parsing location allowed ips: {}", location.allowed_ips);
-        let allowed_ips: Vec<String> = location
-            .allowed_ips
-            .split(',')
-            .map(str::to_string)
-            .collect();
+        let allowed_ips: Vec<String> = if use_default_route {
+            info!("Using all traffic routing: {DEFAULT_ROUTE}");
+            vec![DEFAULT_ROUTE.into()]
+        } else {
+            info!("Using predefined location traffic");
+            location
+                .allowed_ips
+                .split(',')
+                .map(str::to_string)
+                .collect()
+        };
         for allowed_ip in &allowed_ips {
             match IpAddrMask::from_str(allowed_ip) {
                 Ok(addr) => {

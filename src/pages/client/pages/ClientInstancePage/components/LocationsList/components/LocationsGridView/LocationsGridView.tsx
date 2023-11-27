@@ -2,19 +2,21 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import classNames from 'classnames';
+import { useState } from 'react';
 
 import { Card } from '../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { getStatsFilterValue } from '../../../../../../../../shared/utils/getStatsFilterValue';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import { DefguardInstance, DefguardLocation, RouteOption } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
 import { LocationCardInfo } from '../LocationCardInfo/LocationCardInfo';
 import { LocationCardNeverConnected } from '../LocationCardNeverConnected/LocationCardNeverConnected';
 import { LocationCardNoStats } from '../LocationCardNoStats/LocationCardNoStats';
+import { LocationCardRoute } from '../LocationCardRoute/LocationCardRoute';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
@@ -47,6 +49,7 @@ const GridItem = ({ location }: GridItemProps) => {
   const { getLocationStats, getLastConnection } = clientApi;
 
   const statsFilter = useClientStore((state) => state.statsFilter);
+  const [routeOption, setRouteOption] = useState(RouteOption.PREDEFINED_TRAFFIC);
 
   const { data: lastConnection } = useQuery({
     queryKey: [clientQueryKeys.getConnections, location.id as number],
@@ -67,7 +70,18 @@ const GridItem = ({ location }: GridItemProps) => {
     <Card className={cn}>
       <div className="top">
         <LocationCardTitle location={location} />
-        <LocationCardConnectButton location={location} />
+        <LocationCardConnectButton
+          location={location}
+          routeOption={Boolean(routeOption)}
+        />
+      </div>
+      <div className="route">
+        <LocationCardRoute
+          location={location}
+          selected={routeOption}
+          setSelected={(v) => setRouteOption(v)}
+          onChange={(v) => setRouteOption(v)}
+        />
       </div>
       {lastConnection && location && (
         <div className="info">

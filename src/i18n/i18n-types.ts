@@ -146,6 +146,14 @@ type RootTranslation = {
 						 * D​i​s​c​o​n​n​e​c​t
 						 */
 						disconnect: string
+						/**
+						 * P​r​e​d​e​f​i​n​e​d​ ​L​o​c​a​t​i​o​n​ ​t​r​a​f​f​i​c
+						 */
+						predefinedTraffic: string
+						/**
+						 * A​l​l​ ​t​r​a​f​f​i​c
+						 */
+						allTraffic: string
 					}
 					header: {
 						/**
@@ -845,6 +853,14 @@ export type TranslationFunctions = {
 						 * Disconnect
 						 */
 						disconnect: () => LocalizedString
+						/**
+						 * Predefined Location traffic
+						 */
+						predefinedTraffic: () => LocalizedString
+						/**
+						 * All traffic
+						 */
+						allTraffic: () => LocalizedString
 					}
 					header: {
 						/**

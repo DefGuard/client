@@ -20,9 +20,10 @@ const { connect, disconnect } = clientApi;
 
 type Props = {
   location?: DefguardLocation;
+  routeOption?: boolean;
 };
 
-export const LocationCardConnectButton = ({ location }: Props) => {
+export const LocationCardConnectButton = ({ location, routeOption = false }: Props) => {
   const toaster = useToaster();
   const [isLoading, setIsLoading] = useState(false);
   const { LL } = useI18nContext();
@@ -38,7 +39,10 @@ export const LocationCardConnectButton = ({ location }: Props) => {
         if (location?.active) {
           await disconnect({ locationId: location.id });
         } else {
-          await connect({ locationId: location?.id });
+          await connect({
+            locationId: location?.id,
+            useDefaultRoute: routeOption,
+          });
         }
         setIsLoading(false);
       }

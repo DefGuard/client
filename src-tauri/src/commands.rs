@@ -21,8 +21,13 @@ struct Payload {
 
 // Create new wireguard interface
 #[tauri::command(async)]
-pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), Error> {
+pub async fn connect(
+    location_id: i64,
+    use_default_route: bool,
+    handle: tauri::AppHandle,
+) -> Result<(), Error> {
     let state = handle.state::<AppState>();
+    debug!("Default route: {use_default_route}");
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
         debug!(
             "Creating new interface connection for location: {}",
@@ -33,6 +38,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
             &location,
             &interface_name,
             &state.get_pool(),
+            use_default_route,
             state.client.clone(),
         )
         .await?;

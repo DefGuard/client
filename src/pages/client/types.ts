@@ -43,3 +43,8 @@ export enum TauriEventKey {
   CONNECTION_CHANGED = 'connection-changed',
   INSTANCE_UPDATE = 'instance-update',
 }
+
+export enum RouteOption {
+  PREDEFINED_TRAFFIC,
+  ALL_TRAFFIC,
+}

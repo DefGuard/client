@@ -18,7 +18,7 @@
   & > .grid-item {
     box-sizing: border-box;
     padding: 20px 25px;
-    min-height: 245px;
+    min-height: 275px;
 
     & > .top {
       width: 100%;
@@ -29,6 +29,14 @@
       & > .btn {
         margin-left: auto;
         height: 40px;
+      }
+    }
+    & > .route {
+      margin: 32px 0;
+      height: 32px;
+      justify-content: space-between;
+      .toggle-option {
+        height: 32px;
       }
     }
 
