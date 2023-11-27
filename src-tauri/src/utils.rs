@@ -29,7 +29,6 @@ pub async fn setup_interface(
     location: &Location,
     interface_name: &str,
     pool: &DbPool,
-    use_default_route: bool,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
     if let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? {
@@ -44,11 +43,11 @@ pub async fn setup_interface(
         peer.persistent_keepalive_interval = Some(25);
 
         debug!("Parsing location allowed ips: {}", location.allowed_ips);
-        let allowed_ips: Vec<String> = if use_default_route {
-            info!("Using all traffic routing: {DEFAULT_ROUTE}");
+        let allowed_ips: Vec<String> = if location.route_all_traffic {
+            debug!("Using all traffic routing: {DEFAULT_ROUTE}");
             vec![DEFAULT_ROUTE.into()]
         } else {
-            info!("Using predefined location traffic");
+            debug!("Using predefined location traffic");
             location
                 .allowed_ips
                 .split(',')

@@ -1,27 +1,41 @@
 import { useMemo } from 'react';
+import { error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
 import { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
-import { DefguardLocation, RouteOption } from '../../../../../../types';
+import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { DefguardLocation } from '../../../../../../types';
 
 type Props = {
   location?: DefguardLocation;
-  onChange: (v: number) => void;
-  selected: number;
 };
+const { updateLocationRouting } = clientApi;
 
-export const LocationCardRoute = ({ location, onChange, selected }: Props) => {
+export const LocationCardRoute = ({ location }: Props) => {
+  const handleChange = async (value: boolean) => {
+    try {
+      if (location) {
+        await updateLocationRouting({
+          locationId: location?.id,
+          routeAllTraffic: value,
+        });
+      }
+    } catch (e) {
+      error(`Error handling routing: ${e}`);
+      console.error(e);
+    }
+  };
   const { LL } = useI18nContext();
   const toggleOptions = useMemo(() => {
     const res: ToggleOption<number>[] = [
       {
         text: LL.pages.client.pages.instancePage.controls.predefinedTraffic(),
-        value: RouteOption.PREDEFINED_TRAFFIC,
+        value: 0,
       },
       {
         text: LL.pages.client.pages.instancePage.controls.allTraffic(),
-        value: RouteOption.ALL_TRAFFIC,
+        value: 1,
       },
     ];
     return res;
@@ -30,9 +44,9 @@ export const LocationCardRoute = ({ location, onChange, selected }: Props) => {
   return (
     <Toggle
       options={toggleOptions}
-      selected={selected}
+      selected={Number(location?.route_all_traffic)}
       disabled={location?.active}
-      onChange={(v) => onChange(v)}
+      onChange={(v) => handleChange(Boolean(v))}
     />
   );
 };

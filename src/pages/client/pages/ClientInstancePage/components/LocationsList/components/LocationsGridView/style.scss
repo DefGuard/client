@@ -36,6 +36,9 @@
       height: 32px;
       justify-content: space-between;
       .toggle-option {
+        span {
+          @include typography(app-button-s);
+        }
         height: 32px;
       }
     }

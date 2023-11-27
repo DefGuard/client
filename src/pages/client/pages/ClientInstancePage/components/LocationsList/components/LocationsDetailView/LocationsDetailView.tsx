@@ -12,7 +12,7 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { DefguardInstance, DefguardLocation, RouteOption } from '../../../../../../types';
+import { DefguardInstance, DefguardLocation } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -64,7 +64,6 @@ export const LocationsDetailView = ({ locations }: Props) => {
     enabled: !!activeLocationId,
     refetchInterval: 10 * 1000,
   });
-  const [routeOption, setRouteOption] = useState(RouteOption.PREDEFINED_TRAFFIC);
 
   const tabs = useMemo(
     (): CardTabsData[] =>
@@ -91,13 +90,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
           {breakpoint === 'desktop' && (
             <LocationCardInfo location={activeLocation} connection={lastConnection} />
           )}
-          {breakpoint === 'desktop' && (
-            <LocationCardRoute
-              location={activeLocation}
-              selected={routeOption}
-              onChange={(v) => setRouteOption(v)}
-            />
-          )}
+          <LocationCardRoute location={activeLocation} />
           <LocationCardConnectButton location={activeLocation} />
         </div>
         {breakpoint !== 'desktop' && (

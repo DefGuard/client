@@ -7,7 +7,11 @@ export type GetLocationsRequest = {
 
 export type ConnectionRequest = {
   locationId: number;
-  useDefaultRoute?: boolean;
+};
+
+export type RoutingRequest = {
+  locationId: number;
+  routeAllTraffic?: boolean;
 };
 
 export type StatsRequest = {
@@ -34,4 +38,5 @@ export type TauriCommandKey =
   | 'last_connection'
   | 'all_connections'
   | 'active_connection'
-  | 'save_device_config';
+  | 'save_device_config'
+  | 'update_location_routing';

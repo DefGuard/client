@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id FROM location WHERE id = $1;",
+  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic FROM location WHERE network_id = $1;",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,11 @@
         "name": "network_id",
         "ordinal": 8,
         "type_info": "Int64"
+      },
+      {
+        "name": "route_all_traffic",
+        "ordinal": 9,
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -61,8 +66,9 @@
       false,
       false,
       true,
+      false,
       false
     ]
   },
-  "hash": "c462c912fc1f6141058b25382d75ae4c511c7e0c2f1bd8d8bb0babdc27216469"
+  "hash": "8159b0d79bc84fcbb69059973d3150f8e55473aa836723604812927003fc50bd"
 }
