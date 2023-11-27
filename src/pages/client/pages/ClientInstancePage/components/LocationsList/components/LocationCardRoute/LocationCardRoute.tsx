@@ -46,7 +46,11 @@ export const LocationCardRoute = ({ location }: Props) => {
       options={toggleOptions}
       selected={Number(location?.route_all_traffic)}
       disabled={location?.active}
-      onChange={(v) => handleChange(Boolean(v))}
+      onChange={(v) => {
+        if (!location?.active) {
+          handleChange(Boolean(v));
+        }
+      }}
     />
   );
 };
