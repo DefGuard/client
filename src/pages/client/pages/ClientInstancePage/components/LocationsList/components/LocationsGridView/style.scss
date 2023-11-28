@@ -37,7 +37,7 @@
       flex-flow: column;
       row-gap: 8px;
       justify-content: space-between;
-      margin-top: 20px;
+      padding-top: 20px;
       .top {
         display: flex;
         flex-flow: row nowrap;
@@ -57,20 +57,21 @@
     }
 
     & > .info {
-      margin: 32px 0;
       display: flex;
       flex-flow: row;
       align-items: flex-start;
       justify-content: space-between;
+      padding-top: 20px;
     }
 
     & > .location-usage {
       display: flex;
       flex-direction: column;
       gap: 2;
-      height: 20px;
       width: 100%;
       margin: auto;
+      padding: 20px 0;
+
       & > .summary {
         display: flex;
         justify-content: space-between;
