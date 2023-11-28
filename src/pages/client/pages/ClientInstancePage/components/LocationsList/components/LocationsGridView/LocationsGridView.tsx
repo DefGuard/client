@@ -2,8 +2,12 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import classNames from 'classnames';
+import parser from 'html-react-parser';
 
+import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { Helper } from '../../../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
+import { Label } from '../../../../../../../../shared/defguard-ui/components/Layout/Label/Label';
 import { getStatsFilterValue } from '../../../../../../../../shared/utils/getStatsFilterValue';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
@@ -38,6 +42,7 @@ type GridItemProps = {
 };
 
 const GridItem = ({ location }: GridItemProps) => {
+  const { LL } = useI18nContext();
   const cn = classNames(
     'grid-item',
     {
@@ -62,6 +67,9 @@ const GridItem = ({ location }: GridItemProps) => {
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10 * 1000,
   });
 
   return (
@@ -71,6 +79,30 @@ const GridItem = ({ location }: GridItemProps) => {
         <LocationCardConnectButton location={location} />
       </div>
       <div className="route">
+        <div className="top">
+          <Label>{LL.pages.client.pages.instancePage.controls.traffic.label()}</Label>
+          <Helper
+            initialPlacement="right"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" width={12} height={12} fill="none">
+                <path
+                  style={{
+                    fill: 'var(--surface-icon-primary)',
+                  }}
+                  d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12Z"
+                />
+                <path
+                  style={{
+                    fill: 'var(--surface-icon-secondary)',
+                  }}
+                  d="M6.667 5.333a.667.667 0 0 0-1.334 0v3.334a.667.667 0 0 0 1.334 0V5.333ZM6.667 3.333a.667.667 0 1 0-1.334 0 .667.667 0 0 0 1.334 0Z"
+                />
+              </svg>
+            }
+          >
+            {parser(LL.pages.client.pages.instancePage.controls.traffic.helper())}
+          </Helper>
+        </div>
         <LocationCardRoute location={location} />
       </div>
       {lastConnection && location && (
@@ -78,7 +110,7 @@ const GridItem = ({ location }: GridItemProps) => {
           <LocationCardInfo location={location} connection={lastConnection} />
         </div>
       )}
-      {!lastConnection && <LocationCardNeverConnected />}
+      {!lastConnection && !location.active && <LocationCardNeverConnected />}
       {locationStats && locationStats.length > 0 && (
         <LocationUsageChart
           heightX={20}
