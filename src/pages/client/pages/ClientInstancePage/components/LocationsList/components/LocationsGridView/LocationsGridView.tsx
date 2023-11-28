@@ -110,7 +110,7 @@ const GridItem = ({ location }: GridItemProps) => {
           <LocationCardInfo location={location} connection={lastConnection} />
         </div>
       )}
-      {!lastConnection && <LocationCardNeverConnected />}
+      {!lastConnection && !location.active && <LocationCardNeverConnected />}
       {locationStats && locationStats.length > 0 && (
         <LocationUsageChart
           heightX={20}
