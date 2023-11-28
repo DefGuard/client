@@ -64,6 +64,7 @@ impl Connection {
     }
 }
 
+/// Historical connection
 #[derive(FromRow, Debug, Serialize)]
 pub struct ConnectionInfo {
     pub id: i64,
@@ -77,32 +78,38 @@ pub struct ConnectionInfo {
 
 impl ConnectionInfo {
     pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+        // Because we store interface information for given timestamp select last upload and download
+        // before connection ended
         let connections = query_as!(
             ConnectionInfo,
             r#"
-          SELECT
-              c.id as "id!",
-              c.location_id as "location_id!",
-              c.connected_from as "connected_from!",
-              c.start as "start!",
-              c.end as "end!",
-              COALESCE((
-                  SELECT SUM(COALESCE(ls.upload, 0))
-                  FROM location_stats AS ls
-                  WHERE ls.location_id = c.location_id
-                  AND ls.collected_at >= c.start
-                  AND ls.collected_at <= c.end
-              ), 0) as "upload: _",
-              COALESCE((
-                  SELECT SUM(COALESCE(ls.download, 0))
-                  FROM location_stats AS ls
-                  WHERE ls.location_id = c.location_id
-                  AND ls.collected_at >= c.start
-                  AND ls.collected_at <= c.end
-              ), 0) as "download: _"
-            FROM connection AS c WHERE location_id = $1;
+              SELECT
+                  c.id as "id!",
+                  c.location_id as "location_id!",
+                  c.connected_from as "connected_from!",
+                  c.start as "start!",
+                  c.end as "end!",
+                  COALESCE((
+                      SELECT ls.upload
+                      FROM location_stats AS ls
+                      WHERE ls.location_id = c.location_id
+                      AND ls.collected_at >= c.start
+                      AND ls.collected_at <= c.end
+                      ORDER BY ls.collected_at DESC
+                      LIMIT 1
+                  ), 0) as "upload: _",
+                  COALESCE((
+                      SELECT ls.download
+                      FROM location_stats AS ls
+                      WHERE ls.location_id = c.location_id
+                      AND ls.collected_at >= c.start
+                      AND ls.collected_at <= c.end
+                      ORDER BY ls.collected_at DESC
+                      LIMIT 1
+                  ), 0) as "download: _"
+              FROM connection AS c WHERE location_id = $1;
             "#,
-            location_id,
+            location_id
         )
         .fetch_all(pool)
         .await?;
