@@ -56,8 +56,12 @@ const en = {
           controls: {
             connect: 'Connect',
             disconnect: 'Disconnect',
-            predefinedTraffic: 'Predefined Location traffic',
-            allTraffic: 'All traffic',
+            traffic: {
+              predefinedTraffic: 'Predefined traffic',
+              allTraffic: 'All traffic',
+              label: 'Allowed traffic',
+              helper: `<p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>`,
+            },
           },
           header: {
             title: 'Locations',

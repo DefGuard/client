@@ -32,14 +32,17 @@
       }
     }
     & > .route {
-      margin: 32px 0;
-      height: 32px;
+      width: 100%;
+      display: flex;
+      flex-flow: column;
+      row-gap: 8px;
       justify-content: space-between;
-      .toggle-option {
-        span {
-          @include typography(app-button-s);
-        }
-        height: 32px;
+      margin-top: 20px;
+      .top {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        justify-content: flex-start;
       }
     }
 

@@ -33,14 +33,16 @@
       row-gap: 20px;
       box-sizing: border-box;
       padding: 0 20px;
-      & > .toggle {
-        align-items: center;
-        width: 395px;
-        & > .toggle-option {
-          span {
-            @include typography(app-button-s);
+
+      .route {
+        .controls {
+          position: relative;
+
+          .helper {
+            position: absolute;
+            top: -10px;
+            right: -20px;
           }
-          height: 32px;
         }
       }
     }
@@ -61,6 +63,22 @@
       justify-content: space-between;
       box-sizing: border-box;
       padding: 0 20px;
+    }
+
+    & > .route {
+      display: flex;
+      flex-flow: column;
+      row-gap: 8px;
+      box-sizing: border-box;
+      padding: 0 20px;
+
+      .top {
+        display: flex;
+        flex-flow: row nowrap;
+        column-gap: 0;
+        align-items: center;
+        justify-content: flex-start;
+      }
     }
 
     .location-no-connections,

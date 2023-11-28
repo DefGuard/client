@@ -1,0 +1,14 @@
+@use '@scssutils' as *;
+
+.location-traffic-toggle {
+  height: 32px;
+
+  .toggle-option {
+    height: 32px;
+
+    span {
+      @include typography(app-button-s);
+      text-align: left;
+    }
+  }
+}

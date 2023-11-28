@@ -1,3 +1,5 @@
+import './style.scss';
+
 import { useMemo } from 'react';
 import { error } from 'tauri-plugin-log-api';
 
@@ -26,15 +28,16 @@ export const LocationCardRoute = ({ location }: Props) => {
       console.error(e);
     }
   };
+
   const { LL } = useI18nContext();
   const toggleOptions = useMemo(() => {
     const res: ToggleOption<number>[] = [
       {
-        text: LL.pages.client.pages.instancePage.controls.predefinedTraffic(),
+        text: LL.pages.client.pages.instancePage.controls.traffic.predefinedTraffic(),
         value: 0,
       },
       {
-        text: LL.pages.client.pages.instancePage.controls.allTraffic(),
+        text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),
         value: 1,
       },
     ];
@@ -43,6 +46,7 @@ export const LocationCardRoute = ({ location }: Props) => {
 
   return (
     <Toggle
+      className="location-traffic-toggle"
       options={toggleOptions}
       selected={Number(location?.route_all_traffic)}
       disabled={location?.active}
