@@ -336,7 +336,7 @@ impl DateTimeAggregation {
     pub fn fstring(&self) -> String {
         match self {
             Self::Hour => "%Y-%m-%d %H:00:00".into(),
-            Self::Minute => "%Y-%m-%d %H:%M:00".into(),
+            Self::Minute => "%Y-%m-%d %H:%M:%S".into(),
         }
     }
 }
