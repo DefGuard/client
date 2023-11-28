@@ -146,14 +146,24 @@ type RootTranslation = {
 						 * D​i​s​c​o​n​n​e​c​t
 						 */
 						disconnect: string
-						/**
-						 * P​r​e​d​e​f​i​n​e​d​ ​L​o​c​a​t​i​o​n​ ​t​r​a​f​f​i​c
-						 */
-						predefinedTraffic: string
-						/**
-						 * A​l​l​ ​t​r​a​f​f​i​c
-						 */
-						allTraffic: string
+						traffic: {
+							/**
+							 * P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c
+							 */
+							predefinedTraffic: string
+							/**
+							 * A​l​l​ ​t​r​a​f​f​i​c
+							 */
+							allTraffic: string
+							/**
+							 * A​l​l​o​w​e​d​ ​t​r​a​f​f​i​c
+							 */
+							label: string
+							/**
+							 * <​p​>​A​l​l​o​w​e​d​ ​t​r​a​f​f​i​c​:​<​/​b​r​>​ ​O​n​l​y​ ​t​r​a​f​i​c​ ​t​h​a​t​ ​w​a​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​.​<​/​p​>
+							 */
+							helper: string
+						}
 					}
 					header: {
 						/**
@@ -853,14 +863,24 @@ export type TranslationFunctions = {
 						 * Disconnect
 						 */
 						disconnect: () => LocalizedString
-						/**
-						 * Predefined Location traffic
-						 */
-						predefinedTraffic: () => LocalizedString
-						/**
-						 * All traffic
-						 */
-						allTraffic: () => LocalizedString
+						traffic: {
+							/**
+							 * Predefined traffic
+							 */
+							predefinedTraffic: () => LocalizedString
+							/**
+							 * All traffic
+							 */
+							allTraffic: () => LocalizedString
+							/**
+							 * Allowed traffic
+							 */
+							label: () => LocalizedString
+							/**
+							 * <p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>
+							 */
+							helper: () => LocalizedString
+						}
 					}
 					header: {
 						/**

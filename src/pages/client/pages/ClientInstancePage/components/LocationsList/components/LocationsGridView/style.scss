@@ -32,32 +32,46 @@
       }
     }
     & > .route {
-      margin: 32px 0;
-      height: 32px;
+      width: 100%;
+      display: flex;
+      flex-flow: column;
+      row-gap: 8px;
       justify-content: space-between;
-      .toggle-option {
-        span {
-          @include typography(app-button-s);
+      padding-top: 20px;
+      .top {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        justify-content: flex-start;
+      }
+      .toggle {
+        .toggle-option {
+          height: 32px;
+
+          span {
+            text-align: left;
+            @include typography(app-button-s);
+          }
         }
-        height: 32px;
       }
     }
 
     & > .info {
-      margin: 32px 0;
       display: flex;
       flex-flow: row;
       align-items: flex-start;
       justify-content: space-between;
+      padding-top: 20px;
     }
 
     & > .location-usage {
       display: flex;
       flex-direction: column;
       gap: 2;
-      height: 20px;
       width: 100%;
       margin: auto;
+      padding: 20px 0;
+
       & > .summary {
         display: flex;
         justify-content: space-between;

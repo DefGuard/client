@@ -1,13 +1,17 @@
 import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
+import parse from 'html-react-parser';
 import { useMemo, useState } from 'react';
 import { useBreakpoint } from 'use-breakpoint';
 
+import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { deviceBreakpoints } from '../../../../../../../../shared/constants';
 import { Card } from '../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
+import { Helper } from '../../../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
+import { Label } from '../../../../../../../../shared/defguard-ui/components/Layout/Label/Label';
 import { getStatsFilterValue } from '../../../../../../../../shared/utils/getStatsFilterValue';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
@@ -36,7 +40,9 @@ const findLocationById = (
 const { getLocationStats, getLastConnection, getConnectionHistory } = clientApi;
 
 export const LocationsDetailView = ({ locations }: Props) => {
-  const { breakpoint } = useBreakpoint(deviceBreakpoints);
+  const { LL } = useI18nContext();
+  const localLL = LL.pages.client.pages.instancePage;
+  const { breakpoint } = useBreakpoint({ ...deviceBreakpoints, desktop: 1300 });
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
   const statsFilter = useClientStore((state) => state.statsFilter);
 
@@ -49,6 +55,8 @@ export const LocationsDetailView = ({ locations }: Props) => {
       }),
     enabled: !!activeLocationId,
     refetchInterval: 10 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const { data: connectionHistory } = useQuery({
@@ -56,6 +64,8 @@ export const LocationsDetailView = ({ locations }: Props) => {
     queryFn: () => getConnectionHistory({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
     refetchInterval: 10 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const { data: lastConnection } = useQuery({
@@ -63,6 +73,8 @@ export const LocationsDetailView = ({ locations }: Props) => {
     queryFn: () => getLastConnection({ locationId: activeLocationId as number }),
     enabled: !!activeLocationId,
     refetchInterval: 10 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const tabs = useMemo(
@@ -90,7 +102,28 @@ export const LocationsDetailView = ({ locations }: Props) => {
           {breakpoint === 'desktop' && (
             <LocationCardInfo location={activeLocation} connection={lastConnection} />
           )}
-          <LocationCardRoute location={activeLocation} />
+          {breakpoint === 'desktop' && (
+            <div className="route">
+              {!activeLocation?.active && (
+                <div className="controls">
+                  <Helper initialPlacement="left">
+                    {parse(localLL.controls.traffic.helper())}
+                  </Helper>
+                  <LocationCardRoute location={activeLocation} />
+                </div>
+              )}
+              {activeLocation?.active && (
+                <>
+                  <Label>{localLL.controls.traffic.label()}</Label>
+                  <p>
+                    {activeLocation.route_all_traffic
+                      ? localLL.controls.traffic.allTraffic()
+                      : localLL.controls.traffic.predefinedTraffic()}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
           <LocationCardConnectButton location={activeLocation} />
         </div>
         {breakpoint !== 'desktop' && (
@@ -99,6 +132,40 @@ export const LocationsDetailView = ({ locations }: Props) => {
               location={findLocationById(locations, activeLocationId)}
               connection={lastConnection}
             />
+          </div>
+        )}
+        {breakpoint !== 'desktop' && (
+          <div className="route">
+            <div className="top">
+              <Label>{localLL.controls.traffic.label()}</Label>
+              <Helper
+                initialPlacement="right"
+                icon={
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width={12}
+                    height={12}
+                    fill="none"
+                  >
+                    <path
+                      style={{
+                        fill: 'var(--surface-icon-primary)',
+                      }}
+                      d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12Z"
+                    />
+                    <path
+                      style={{
+                        fill: 'var(--surface-icon-secondary)',
+                      }}
+                      d="M6.667 5.333a.667.667 0 0 0-1.334 0v3.334a.667.667 0 0 0 1.334 0V5.333ZM6.667 3.333a.667.667 0 1 0-1.334 0 .667.667 0 0 0 1.334 0Z"
+                    />
+                  </svg>
+                }
+              >
+                {parse(LL.pages.client.pages.instancePage.controls.traffic.helper())}
+              </Helper>
+            </div>
+            <LocationCardRoute location={activeLocation} />
           </div>
         )}
         {locationStats && locationStats.length > 0 && (
@@ -118,7 +185,8 @@ export const LocationsDetailView = ({ locations }: Props) => {
             <LocationConnectionHistory connections={connectionHistory} />
           </>
         ) : null}
-        {(!connectionHistory || connectionHistory.length === 0) && (
+        {(!connectionHistory ||
+          (connectionHistory.length === 0 && !activeLocation?.active)) && (
           <LocationCardNeverConnected />
         )}
       </Card>
