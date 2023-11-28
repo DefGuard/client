@@ -44,6 +44,16 @@
         align-items: center;
         justify-content: flex-start;
       }
+      .toggle {
+        .toggle-option {
+          height: 32px;
+
+          span {
+            text-align: left;
+            @include typography(app-button-s);
+          }
+        }
+      }
     }
 
     & > .info {

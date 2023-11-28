@@ -47,6 +47,17 @@
       }
     }
 
+    .toggle {
+      .toggle-option {
+        height: 32px;
+
+        span {
+          text-align: left;
+          @include typography(app-button-s);
+        }
+      }
+    }
+
     & > h2 {
       @include typography(app-body-1);
       width: 100%;
