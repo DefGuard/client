@@ -12,7 +12,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -21,17 +21,20 @@ struct Payload {
 
 // Create new WireGuard interface
 #[tauri::command(async)]
-pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), Error> {
+pub async fn connect(location_id: i64, handle: AppHandle) -> Result<(), Error> {
     let state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
         debug!(
             "Creating new interface connection for location: {}",
             location.name
         );
-        let interface_name = get_interface_name(&location, state.get_connections());
+        #[cfg(target_os = "macos")]
+        let interface_name = get_interface_name();
+        #[cfg(not(target_os = "macos"))]
+        let interface_name = get_interface_name(&location);
         setup_interface(
             &location,
-            &interface_name,
+            interface_name.clone(),
             &state.get_pool(),
             state.client.clone(),
         )
@@ -59,7 +62,7 @@ pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), E
 }
 
 #[tauri::command]
-pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<(), Error> {
+pub async fn disconnect(location_id: i64, handle: AppHandle) -> Result<(), Error> {
     debug!("Disconnecting location {}", location_id);
     let state = handle.state::<AppState>();
 
@@ -116,6 +119,7 @@ pub struct DeviceConfig {
     pub dns: Option<String>,
 }
 
+#[must_use]
 pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location {
     Location {
         id: None,
@@ -156,7 +160,7 @@ pub async fn save_device_config(
     private_key: String,
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
-    handle: tauri::AppHandle,
+    handle: AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
     debug!("Received device configuration: {response:#?}");
 
@@ -205,16 +209,18 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .map(|connection| connection.location_id)
         .collect();
     for instance in &instances {
-        let locations =
-            Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
+        let Some(instancd_id) = instance.id else {
+            continue;
+        };
+        let locations = Location::find_by_instance_id(&app_state.get_pool(), instancd_id).await?;
         let location_ids: Vec<i64> = locations
             .iter()
-            .map(|location| location.id.unwrap())
+            .filter_map(|location| location.id)
             .collect();
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap())
+        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instancd_id)
             .await?
             .unwrap();
         instance_info.push(InstanceInfo {
@@ -333,11 +339,13 @@ pub enum DateTimeAggregation {
 
 impl DateTimeAggregation {
     /// Returns database format string for given aggregation variant
+    #[must_use]
     pub fn fstring(&self) -> String {
         match self {
-            Self::Hour => "%Y-%m-%d %H:00:00".into(),
-            Self::Minute => "%Y-%m-%d %H:%M:%S".into(),
+            Self::Hour => "%Y-%m-%d %H:00:00",
+            Self::Minute => "%Y-%m-%d %H:%M:%S",
         }
+        .into()
     }
 }
 
@@ -379,7 +387,7 @@ pub async fn all_connections(
 #[tauri::command]
 pub async fn active_connection(
     location_id: i64,
-    handle: tauri::AppHandle,
+    handle: AppHandle,
 ) -> Result<Option<ActiveConnection>, Error> {
     let state = handle.state::<AppState>();
     debug!("Retrieving active connection for location with id: {location_id}");
@@ -415,7 +423,7 @@ pub async fn last_connection(
 pub async fn update_location_routing(
     location_id: i64,
     route_all_traffic: bool,
-    handle: tauri::AppHandle,
+    handle: AppHandle,
 ) -> Result<Location, Error> {
     let app_state = handle.state::<AppState>();
     debug!("Updating location routing {}", location_id);

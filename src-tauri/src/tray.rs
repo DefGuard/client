@@ -1,5 +1,6 @@
 use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem};
 
+#[must_use]
 pub fn create_tray_menu() -> SystemTrayMenu {
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
     let show = CustomMenuItem::new("show".to_string(), "Show");

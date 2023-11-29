@@ -3,15 +3,13 @@ use std::{
     str::FromStr,
 };
 
-use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi};
+use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use tauri::Manager;
 use tonic::{codegen::tokio_stream::StreamExt, transport::Channel};
 
 use crate::{
     appstate::AppState,
-    database::{
-        models::location::peer_to_location_stats, ActiveConnection, DbPool, Location, WireguardKeys,
-    },
+    database::{models::location::peer_to_location_stats, DbPool, Location, WireguardKeys},
     error::Error,
     service::proto::{
         desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
@@ -26,7 +24,7 @@ pub static DEFAULT_ROUTE: &str = "0.0.0.0/0";
 /// Setup client interface
 pub async fn setup_interface(
     location: &Location,
-    interface_name: &str,
+    interface_name: String,
     pool: &DbPool,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
@@ -70,7 +68,7 @@ pub async fn setup_interface(
         // request interface configuration
         if let Some(port) = find_random_free_port() {
             let interface_config = InterfaceConfiguration {
-                name: interface_name.into(),
+                name: interface_name,
                 prvkey: keys.prvkey,
                 address: location.address.clone(),
                 port: port.into(),
@@ -100,6 +98,7 @@ pub async fn setup_interface(
 }
 
 /// Helper function to remove whitespace from location name
+#[must_use]
 pub fn remove_whitespace(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()
 }
@@ -109,7 +108,7 @@ fn find_random_free_port() -> Option<u16> {
     const MIN_PORT: u16 = 6000;
 
     // Create a TcpListener to check for port availability
-    for _ in 0..(MAX_PORT - MIN_PORT + 1) {
+    for _ in 0..=(MAX_PORT - MIN_PORT) {
         let port = rand::random::<u16>() % (MAX_PORT - MIN_PORT) + MIN_PORT;
         if is_port_free(port) {
             return Some(port);
@@ -119,31 +118,32 @@ fn find_random_free_port() -> Option<u16> {
     None // No free port found in the specified range
 }
 
-/// Returns interface name for location
-pub fn get_interface_name(
-    location: &Location,
-    active_connections: Vec<ActiveConnection>,
-) -> String {
-    let active_interfaces: Vec<String> = active_connections
-        .into_iter()
-        .map(|con| con.interface_name)
-        .collect();
-    match IS_MACOS {
-        true => {
-            let mut counter = 5;
-            let mut interface_name = format!("utun{counter}");
-
-            while active_interfaces.contains(&interface_name) {
-                counter += 1;
-                interface_name = format!("utun{counter}");
+#[cfg(target_os = "macos")]
+/// Find next available `utun` interface.
+#[must_use]
+pub fn get_interface_name() -> String {
+    let mut index = 0;
+    if let Ok(interfaces) = nix::net::if_::if_nameindex() {
+        while index < u32::MAX {
+            let ifname = format!("utun{index}");
+            if interfaces
+                .iter()
+                .any(|interface| interface.name().to_string_lossy() == ifname)
+            {
+                index += 1;
+            } else {
+                return ifname;
             }
-
-            debug!("Found interface {interface_name}");
-
-            interface_name
         }
-        false => remove_whitespace(&location.name),
     }
+
+    "utun0".into()
+}
+#[cfg(not(target_os = "macos"))]
+/// Returns interface name for location
+#[must_use]
+pub fn get_interface_name(location: &Location) -> String {
+    remove_whitespace(&location.name);
 }
 
 fn is_port_free(port: u16) -> bool {
@@ -155,11 +155,6 @@ fn is_port_free(port: u16) -> bool {
     } else {
         false
     }
-}
-
-/// Create new api object
-pub fn create_api(interface_name: &str) -> Result<WGApi, Error> {
-    Ok(WGApi::new(interface_name.to_string(), IS_MACOS)?)
 }
 
 pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String) {
@@ -179,11 +174,8 @@ pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String
             match item {
                 Ok(interface_data) => {
                     debug!("Received interface data update: {interface_data:?}");
-                    let peers: Vec<Peer> = interface_data
-                        .peers
-                        .into_iter()
-                        .map(|peer| peer.into())
-                        .collect();
+                    let peers: Vec<Peer> =
+                        interface_data.peers.into_iter().map(Into::into).collect();
                     for peer in peers {
                         let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
                             .await
@@ -194,7 +186,7 @@ pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String
                     }
                 }
                 Err(err) => {
-                    error!("Failed to receive interface data update: {err}")
+                    error!("Failed to receive interface data update: {err}");
                 }
             }
         }
@@ -203,6 +195,7 @@ pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String
 }
 
 // gets targets that will be allowed by logger, this will be empty if not provided
+#[must_use]
 pub fn load_log_targets() -> Vec<String> {
     match std::env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
         Ok(targets) => {
@@ -210,7 +203,7 @@ pub fn load_log_targets() -> Vec<String> {
                 return targets
                     .split(',')
                     .filter(|t| !t.is_empty())
-                    .map(|t| t.to_string())
+                    .map(ToString::to_string)
                     .collect();
             }
             Vec::new()

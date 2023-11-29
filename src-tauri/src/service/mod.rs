@@ -51,7 +51,8 @@ pub struct DaemonService {
 }
 
 impl DaemonService {
-    pub fn new(config: Config) -> Self {
+    #[must_use]
+    pub fn new(config: &Config) -> Self {
         Self {
             stats_period: config.stats_period,
         }
@@ -187,7 +188,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("Starting defguard interface management daemon");
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
-    let daemon_service = DaemonService::new(config);
+    let daemon_service = DaemonService::new(&config);
 
     info!("defguard daemon listening on {addr}");
 
@@ -206,7 +207,7 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
             prvkey: config.prvkey,
             address: config.address,
             port: config.port,
-            peers: config.peers.into_iter().map(|peer| peer.into()).collect(),
+            peers: config.peers.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -218,7 +219,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             prvkey: config.prvkey,
             address: config.address,
             port: config.port,
-            peers: config.peers.into_iter().map(|peer| peer.into()).collect(),
+            peers: config.peers.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -281,7 +282,7 @@ impl From<Host> for InterfaceData {
     fn from(host: Host) -> Self {
         Self {
             listen_port: host.listen_port as u32,
-            peers: host.peers.into_values().map(|peer| peer.into()).collect(),
+            peers: host.peers.into_values().map(Into::into).collect(),
         }
     }
 }

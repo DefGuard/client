@@ -1030,6 +1030,7 @@ dependencies = [
  "lazy_static",
  "local-ip-address",
  "log",
+ "nix 0.27.1",
  "prost",
  "prost-build",
  "rand 0.8.5",
@@ -1052,7 +1053,7 @@ dependencies = [
 [[package]]
 name = "defguard_wireguard_rs"
 version = "0.3.0"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?branch=main#d40df5c4e598918253682c42c4aa189d0ec2499a"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?tag=v0.3.0#7034b708e199eb9893bbca0bbdf24bdc910a3773"
 dependencies = [
  "base64 0.21.5",
  "libc",
@@ -4696,7 +4697,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-log"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#3f7c4ddc967c377874d9f09cdb88bc0a79ea13e1"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#9b2e9ab6c9b853a861292c69770458e5409992c0"
 dependencies = [
  "byte-unit",
  "fern",
@@ -4711,7 +4712,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-single-instance"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#3f7c4ddc967c377874d9f09cdb88bc0a79ea13e1"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#9b2e9ab6c9b853a861292c69770458e5409992c0"
 dependencies = [
  "log",
  "serde",

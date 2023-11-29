@@ -48,6 +48,7 @@ pub async fn peer_to_location_stats(peer: &Peer, pool: &DbPool) -> Result<Locati
 
 impl Location {
     #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub fn new(
         instance_id: i64,
         network_id: i64,
@@ -188,6 +189,7 @@ impl Location {
 }
 
 impl LocationStats {
+    #[must_use]
     pub fn new(
         location_id: i64,
         upload: i64,

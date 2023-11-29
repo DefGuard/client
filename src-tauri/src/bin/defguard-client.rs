@@ -20,7 +20,7 @@ use defguard_client::{
     },
     database,
     tray::create_tray_menu,
-    utils::{load_log_targets, IS_MACOS},
+    utils::load_log_targets,
 };
 use std::{env, str::FromStr};
 
@@ -45,7 +45,8 @@ lazy_static! {
 #[tokio::main]
 async fn main() {
     // add bundled `wireguard-go` binary to PATH
-    if IS_MACOS {
+    #[cfg(target_os = "macos")]
+    {
         debug!("Adding bundled wireguard-go binary to PATH");
         let current_bin_path =
             process::current_binary(&Env::default()).expect("Failed to get current binary path");

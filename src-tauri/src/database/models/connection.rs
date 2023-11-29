@@ -29,6 +29,7 @@ impl Connection {
         self.id = Some(result.id);
         Ok(())
     }
+
     pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
         let connections = query_as!(
             Connection,
@@ -43,6 +44,7 @@ impl Connection {
         .await?;
         Ok(connections)
     }
+
     pub async fn latest_by_location_id(
         pool: &DbPool,
         location_id: i64,
@@ -128,6 +130,7 @@ pub struct ActiveConnection {
     pub interface_name: String,
 }
 impl ActiveConnection {
+    #[must_use]
     pub fn new(location_id: i64, connected_from: String, interface_name: String) -> Self {
         let start = Utc::now().naive_utc();
         Self {
