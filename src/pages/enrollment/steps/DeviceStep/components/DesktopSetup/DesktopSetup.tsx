@@ -30,7 +30,7 @@ type FormFields = {
   name: string;
 };
 
-export const DekstopSetup = () => {
+export const DesktopSetup = () => {
   const queryClient = useQueryClient();
   const { LL } = useI18nContext();
   const toaster = useToaster();
