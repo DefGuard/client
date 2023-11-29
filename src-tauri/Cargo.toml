@@ -2,22 +2,20 @@
 name = "defguard-client"
 version = "0.1.0"
 description = "Defguard desktop client"
-authors = ["filipslezaklab@gmail.com"]
-license = ""
-repository = ""
+license = "Apache-2.0"
+homepage = "https://github.com/DefGuard/client"
+repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
 edition = "2021"
 rust-version = "1.60"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [build-dependencies]
-tauri-build = { version = "1.5.0", features = [] }
+tauri-build = { version = "1.5" }
 tonic-build = { version = "0.10" }
 prost-build = { version = "0.12" }
 
 [dependencies]
-anyhow = "1.0.75"
+anyhow = "1.0"
 base64 = "0.21"
 clap = { version = "4.4", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -53,5 +51,5 @@ lazy_static = "1.4.0"
 custom-protocol = [ "tauri/custom-protocol" ]
 
 [dev-dependencies]
-tokio = { version = "1.32", features = ["full"] }
+tokio = { version = "1.34", features = ["full"] }
 sqlx = { version = "0.7", features = ["sqlite"] }

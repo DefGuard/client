@@ -19,7 +19,7 @@ struct Payload {
     message: String,
 }
 
-// Create new wireguard interface
+// Create new WireGuard interface
 #[tauri::command(async)]
 pub async fn connect(location_id: i64, handle: tauri::AppHandle) -> Result<(), Error> {
     let state = handle.state::<AppState>();
@@ -81,7 +81,7 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
         let mut connection: Connection = connection.into();
         connection.save(&state.get_pool()).await?;
         debug!("Connection saved");
-        trace!("Saved connection: {:#?}", connection);
+        trace!("Saved connection: {connection:#?}");
         handle.emit_all(
             "connection-changed",
             Payload {
@@ -91,7 +91,7 @@ pub async fn disconnect(location_id: i64, handle: tauri::AppHandle) -> Result<()
         info!("Location {} disconnected", connection.location_id);
         Ok(())
     } else {
-        error!("Connection for location with id: {} not found", location_id);
+        error!("Connection for location with id: {location_id} not found");
         Err(Error::NotFound)
     }
 }
@@ -158,7 +158,7 @@ pub async fn save_device_config(
     app_state: State<'_, AppState>,
     handle: tauri::AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
-    debug!("Received device configuration: {:#?}", response);
+    debug!("Received device configuration: {response:#?}");
 
     let mut transaction = app_state.get_pool().begin().await?;
     let mut instance = Instance::new(
@@ -177,10 +177,10 @@ pub async fn save_device_config(
     }
     transaction.commit().await?;
     info!("Instance created.");
-    trace!("Created following instance: {:#?}", instance);
+    trace!("Created following instance: {instance:#?}");
     let locations =
         Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
-    trace!("Created following locations: {:#?}", locations);
+    trace!("Created following locations: {locations:#?}");
     handle.emit_all("instance-update", ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
@@ -195,7 +195,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
 
     let instances = Instance::all(&app_state.get_pool()).await?;
     debug!("Found intances({})", instances.len());
-    trace!("Instances found: {:#?}", instances);
+    trace!("Instances found: {instances:#?}");
     let mut instance_info: Vec<InstanceInfo> = vec![];
     let connection_ids: Vec<i64> = app_state
         .active_connections
@@ -227,7 +227,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         });
     }
     info!("Instances retrieved({})", instance_info.len());
-    trace!("Returning following instances: {:#?}", instance_info);
+    trace!("Returning following instances: {instance_info:#?}");
     Ok(instance_info)
 }
 
@@ -275,7 +275,7 @@ pub async fn all_locations(
         location_info.len(),
         instance_id
     );
-    trace!("Locations returned:\n{:#?}", location_info);
+    trace!("Locations returned:\n{location_info:#?}");
 
     Ok(location_info)
 }
@@ -286,7 +286,7 @@ pub async fn update_instance(
     app_state: State<'_, AppState>,
 ) -> Result<(), Error> {
     debug!("Received update_instance command");
-    trace!("Processing following response:\n {:#?}", response);
+    trace!("Processing following response:\n {response:#?}");
 
     let instance = Instance::find_by_id(&app_state.get_pool(), instance_id).await?;
     if let Some(mut instance) = instance {
@@ -368,7 +368,7 @@ pub async fn all_connections(
     location_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<ConnectionInfo>, Error> {
-    debug!("Retrieving connections for location {}", location_id);
+    debug!("Retrieving connections for location {location_id}");
     let connections =
         ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id).await?;
     debug!("Connections received, returning.");
@@ -382,10 +382,7 @@ pub async fn active_connection(
     handle: tauri::AppHandle,
 ) -> Result<Option<ActiveConnection>, Error> {
     let state = handle.state::<AppState>();
-    debug!(
-        "Retrieving active connection for location with id: {}",
-        location_id
-    );
+    debug!("Retrieving active connection for location with id: {location_id}");
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
         debug!("Location found");
         let connection = state.find_connection(location.id.unwrap());
@@ -406,7 +403,7 @@ pub async fn last_connection(
     location_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Option<Connection>, Error> {
-    debug!("Retrieving last connection for location {}", location_id);
+    debug!("Retrieving last connection for location {location_id}");
     let connection = Connection::latest_by_location_id(&app_state.get_pool(), location_id).await?;
     if connection.is_some() {
         trace!("Connection found");
