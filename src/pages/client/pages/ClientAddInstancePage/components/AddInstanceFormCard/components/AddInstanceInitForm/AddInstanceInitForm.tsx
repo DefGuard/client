@@ -26,10 +26,10 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { AddInstnaceInitResponse } from '../../types';
+import { AddInstanceInitResponse } from '../../types';
 
 type Props = {
-  nextStep: (data: AddInstnaceInitResponse) => void;
+  nextStep: (data: AddInstanceInitResponse) => void;
 };
 
 type FormFields = {
@@ -157,6 +157,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           nextStep({
             url: proxy_api_url,
             cookie: authCookie,
+            device_names: r.user.device_names,
           });
         } else {
           // yes, enroll the user

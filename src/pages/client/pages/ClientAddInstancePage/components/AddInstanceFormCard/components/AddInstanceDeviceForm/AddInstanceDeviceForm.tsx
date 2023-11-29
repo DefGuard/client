@@ -24,12 +24,12 @@ import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { AddInstnaceInitResponse } from '../../types';
+import { AddInstanceInitResponse } from '../../types';
 
 const { saveConfig } = clientApi;
 
 type Props = {
-  response: AddInstnaceInitResponse;
+  response: AddInstanceInitResponse;
 };
 
 type FormFields = {
