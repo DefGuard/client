@@ -3,11 +3,11 @@ import { useState } from 'react';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { AddInstanceDeviceForm } from './components/AddInstanceDeviceForm/AddInstanceDeviceForm';
 import { AddInstanceInitForm } from './components/AddInstanceInitForm/AddInstanceInitForm';
-import { AddInstnaceInitResponse } from './types';
+import { AddInstanceInitResponse } from './types';
 
 export const AddInstanceFormCard = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [response, setResponse] = useState<AddInstnaceInitResponse | undefined>(
+  const [response, setResponse] = useState<AddInstanceInitResponse | undefined>(
     undefined,
   );
   return (

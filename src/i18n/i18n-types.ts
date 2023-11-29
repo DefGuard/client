@@ -85,6 +85,10 @@ type RootTranslation = {
 			 * A​t​ ​l​e​a​s​t​ ​o​n​e​ ​u​p​p​e​r​ ​c​a​s​e​ ​c​h​a​r​a​c​t​e​r
 			 */
 			oneUpper: string
+			/**
+			 * D​e​v​i​c​e​ ​w​i​t​h​ ​t​h​i​s​ ​n​a​m​e​ ​a​l​r​e​a​d​y​ ​e​x​i​s​t​s
+			 */
+			duplicatedName: string
 		}
 	}
 	common: {
@@ -802,6 +806,10 @@ export type TranslationFunctions = {
 			 * At least one upper case character
 			 */
 			oneUpper: () => LocalizedString
+			/**
+			 * Device with this name already exists
+			 */
+			duplicatedName: () => LocalizedString
 		}
 	}
 	common: {

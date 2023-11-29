@@ -17,6 +17,7 @@ export type UserInfo = {
   email: string;
   is_active: boolean;
   phone_number: string;
+  device_names: string[];
 };
 
 export type EnrollmentStartRequest = {
