@@ -80,6 +80,7 @@ impl ConnectionInfo {
     pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
         // Because we store interface information for given timestamp select last upload and download
         // before connection ended
+        // FIXME: Optimize query
         let connections = query_as!(
             ConnectionInfo,
             r#"
