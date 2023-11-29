@@ -22,7 +22,6 @@ pub mod proto {
     tonic::include_proto!("client");
 }
 
-use crate::service::utils::configure_routing;
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
@@ -107,8 +106,10 @@ impl DesktopDaemonService for DaemonService {
             Status::new(Code::Internal, msg)
         })?;
 
-        // configure routing
-        configure_routing(request.allowed_ips, &ifname).map_err(|err| {
+        debug!(
+            "Configuring new interface {ifname} routing"
+        );
+        wgapi.configure_peer_routing(&config.peers).map_err(|err| {
             let msg =
                 format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
             error!("{msg}");
