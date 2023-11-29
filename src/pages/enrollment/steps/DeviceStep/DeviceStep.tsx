@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
-import { DekstopSetup } from './components/DesktopSetup/DesktopSetup';
+import { DesktopSetup } from './components/DesktopSetup/DesktopSetup';
 
 export const DeviceStep = () => {
   const deviceName = useEnrollmentStore((state) => state.deviceName);
@@ -35,7 +35,7 @@ export const DeviceStep = () => {
   return (
     <div id="enrollment-device-step" className={cn}>
       <div className="cards">
-        <DekstopSetup />
+        <DesktopSetup />
       </div>
     </div>
   );
