@@ -77,9 +77,12 @@
         justify-content: space-between;
       }
     }
-
-    & > .location-no-connections,
-    & > .locaton-no-stats {
+    .location-no-stats {
+      padding-top: 32px;
+      height: max-content;
+      width: 100%;
+    }
+    .location-no-connections {
       padding-top: 32px;
       height: max-content;
       width: 100%;
