@@ -28,6 +28,7 @@ const en = {
       },
       oneLower: 'At least one lower case character',
       oneUpper: 'At least one upper case character',
+      duplicatedName: 'Device with this name already exists',
     },
   },
   common: {

@@ -48,11 +48,20 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  const { url: proxyUrl, cookie } = response;
+  const { url: proxyUrl, cookie, device_names } = response;
 
   const schema = useMemo(
-    () => z.object({ name: z.string().trim().min(1, LL.form.errors.required()) }),
-    [LL.form.errors],
+    () =>
+      z.object({
+        name: z
+          .string()
+          .trim()
+          .min(1, LL.form.errors.required())
+          .refine((val) => !device_names.includes(val), {
+            message: LL.form.errors.duplicatedName(),
+          }),
+      }),
+    [LL.form.errors, device_names],
   );
 
   const { control, handleSubmit } = useForm<FormFields>({
