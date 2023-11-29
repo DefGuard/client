@@ -24,7 +24,7 @@ use tonic::{
 };
 use tracing::{debug, info};
 
-use self::{config::Config, utils::configure_routing};
+use self::config::Config;
 use crate::utils::IS_MACOS;
 
 use proto::{
@@ -105,7 +105,8 @@ impl DesktopDaemonService for DaemonService {
         })?;
 
         // configure routing
-        configure_routing(request.allowed_ips, ifname).map_err(|err| {
+        debug!("Configuring interface {ifname} routing");
+        wgapi.configure_peer_routing(&config.peers).map_err(|err| {
             let msg =
                 format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
             error!("{msg}");
