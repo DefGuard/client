@@ -1,40 +1,41 @@
-pub mod utils;
-
-use crate::utils::IS_MACOS;
-use anyhow::Context;
-use std::ops::Add;
-
-use defguard_wireguard_rs::host::Host;
-use defguard_wireguard_rs::key::Key;
-use defguard_wireguard_rs::{
-    error::WireguardInterfaceError, host::Peer, InterfaceConfiguration, WGApi,
-    WireguardInterfaceApi,
-};
-use std::pin::Pin;
-use std::time::{Duration, UNIX_EPOCH};
-use tokio::sync::mpsc;
-use tokio::time::interval;
-use tonic::codegen::tokio_stream::wrappers::ReceiverStream;
-use tonic::{codegen::tokio_stream::Stream, transport::Server, Code, Response, Status};
-use tracing::{debug, info};
-
+pub mod config;
 pub mod proto {
     tonic::include_proto!("client");
 }
+pub mod utils;
+
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::Add,
+    pin::Pin,
+    time::{Duration, UNIX_EPOCH},
+};
+
+use defguard_wireguard_rs::{
+    error::WireguardInterfaceError, host::Host, host::Peer, key::Key, InterfaceConfiguration,
+    WGApi, WireguardInterfaceApi,
+};
+use thiserror::Error;
+use tokio::{sync::mpsc, time::interval};
+use tonic::{
+    codegen::tokio_stream::{wrappers::ReceiverStream, Stream},
+    transport::Server,
+    Code, Response, Status,
+};
+use tracing::{debug, info};
+
+use self::config::Config;
+use crate::utils::IS_MACOS;
 
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
 
-use self::config::Config;
-
-pub mod config;
-
-pub const DAEMON_HTTP_PORT: u16 = 54127;
+const DAEMON_HTTP_PORT: u16 = 54127;
 pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub enum DaemonError {
     #[error(transparent)]
     WireguardError(#[from] WireguardInterfaceError),
@@ -60,7 +61,7 @@ impl DaemonService {
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
 fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
-    let wgapi = WGApi::new(ifname.clone(), IS_MACOS).map_err(|err| {
+    let wgapi = WGApi::new(ifname, IS_MACOS).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
@@ -82,7 +83,7 @@ impl DesktopDaemonService for DaemonService {
                 "Missing interface config in request",
             ))?
             .into();
-        let ifname = config.name.clone();
+        let ifname = &config.name;
         info!("Creating interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
@@ -96,19 +97,15 @@ impl DesktopDaemonService for DaemonService {
         })?;
 
         // configure interface
-        debug!(
-            "Configuring new interface {ifname} with configuration: {:?}",
-            config
-        );
+        debug!("Configuring new interface {ifname} with configuration: {config:?}");
         wgapi.configure_interface(&config).map_err(|err| {
             let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
 
-        debug!(
-            "Configuring new interface {ifname} routing"
-        );
+        // configure routing
+        debug!("Configuring interface {ifname} routing");
         wgapi.configure_peer_routing(&config.peers).map_err(|err| {
             let msg =
                 format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
@@ -171,7 +168,7 @@ impl DesktopDaemonService for DaemonService {
                         }
                     }
                     Err(err) => {
-                        error!("Failed to retrieve WireGuard interface stats {}", err);
+                        error!("Failed to retrieve WireGuard interface stats {err}");
                         break;
                     }
                 }
@@ -190,9 +187,7 @@ impl DesktopDaemonService for DaemonService {
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("Starting defguard interface management daemon");
 
-    let addr = format!("127.0.0.1:{DAEMON_HTTP_PORT}")
-        .parse()
-        .context("Failed to parse gRPC address")?;
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let daemon_service = DaemonService::new(config);
 
     info!("defguard daemon listening on {addr}");
@@ -296,8 +291,7 @@ impl From<Host> for InterfaceData {
 mod tests {
     use super::*;
     use defguard_wireguard_rs::{key::Key, net::IpAddrMask};
-    use std::str::FromStr;
-    use std::time::SystemTime;
+    use std::{str::FromStr, time::SystemTime};
     use x25519_dalek::{EphemeralSecret, PublicKey};
 
     #[test]

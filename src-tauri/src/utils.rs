@@ -1,9 +1,11 @@
 use std::{
-    net::{SocketAddr, TcpListener},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     str::FromStr,
 };
 
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WGApi};
+use tauri::Manager;
+use tonic::{codegen::tokio_stream::StreamExt, transport::Channel};
 
 use crate::{
     appstate::AppState,
@@ -16,9 +18,6 @@ use crate::{
         ReadInterfaceDataRequest,
     },
 };
-use tauri::Manager;
-use tonic::codegen::tokio_stream::StreamExt;
-use tonic::transport::Channel;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 pub static STATS_PERIOD: u64 = 60;
@@ -61,7 +60,7 @@ pub async fn setup_interface(
                 }
                 Err(err) => {
                     // Handle the error from IpAddrMask::from_str, if needed
-                    error!("Error parsing IP address {}: {}", allowed_ip, err);
+                    error!("Error parsing IP address {allowed_ip}: {err}");
                     // Continue to the next iteration of the loop
                     continue;
                 }
@@ -77,7 +76,7 @@ pub async fn setup_interface(
                 port: port.into(),
                 peers: vec![peer.clone()],
             };
-            debug!("Creating interface {:#?}", interface_config);
+            debug!("Creating interface {interface_config:#?}");
             let request = CreateInterfaceRequest {
                 config: Some(interface_config.clone().into()),
                 allowed_ips,
@@ -87,7 +86,7 @@ pub async fn setup_interface(
                 error!("Failed to create interface: {error}");
                 Err(Error::InternalError)
             } else {
-                info!("Created interface {:#?}", interface_config);
+                info!("Created interface {interface_config:#?}");
                 Ok(())
             }
         } else {
@@ -132,11 +131,11 @@ pub fn get_interface_name(
     match IS_MACOS {
         true => {
             let mut counter = 5;
-            let mut interface_name = format!("utun{}", counter);
+            let mut interface_name = format!("utun{counter}");
 
             while active_interfaces.contains(&interface_name) {
                 counter += 1;
-                interface_name = format!("utun{}", counter);
+                interface_name = format!("utun{counter}");
             }
 
             debug!("Found interface {interface_name}");
@@ -148,7 +147,8 @@ pub fn get_interface_name(
 }
 
 fn is_port_free(port: u16) -> bool {
-    if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", port)) {
+    if let Ok(listener) = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
+    {
         // Port is available; close the listener
         drop(listener);
         true
@@ -188,9 +188,9 @@ pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String
                         let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
                             .await
                             .unwrap();
-                        debug!("Saving location stats: {:#?}", location_stats);
+                        debug!("Saving location stats: {location_stats:#?}");
                         let _ = location_stats.save(&state.get_pool()).await;
-                        debug!("Saved location stats: {:#?}", location_stats);
+                        debug!("Saved location stats: {location_stats:#?}");
                     }
                 }
                 Err(err) => {
@@ -213,8 +213,8 @@ pub fn load_log_targets() -> Vec<String> {
                     .map(|t| t.to_string())
                     .collect();
             }
-            vec![]
+            Vec::new()
         }
-        Err(_) => vec![],
+        Err(_) => Vec::new(),
     }
 }

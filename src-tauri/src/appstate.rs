@@ -1,3 +1,7 @@
+use std::sync::{Arc, Mutex};
+
+use tonic::transport::Channel;
+
 use crate::{
     database::{ActiveConnection, Connection, DbPool},
     error::Error,
@@ -8,8 +12,6 @@ use crate::{
         utils::setup_client,
     },
 };
-use std::sync::{Arc, Mutex};
-use tonic::transport::Channel;
 
 pub struct AppState {
     pub db: Arc<Mutex<Option<DbPool>>>,
@@ -40,10 +42,7 @@ impl AppState {
         self.active_connections.lock().unwrap().clone()
     }
     pub fn find_and_remove_connection(&self, location_id: i64) -> Option<ActiveConnection> {
-        debug!(
-            "Removing active connection for location with id: {}",
-            location_id
-        );
+        debug!("Removing active connection for location with id: {location_id}");
         let mut connections = self.active_connections.lock().unwrap();
 
         if let Some(index) = connections
@@ -52,10 +51,7 @@ impl AppState {
         {
             // Found a connection with the specified location_id
             let removed_connection = connections.remove(index);
-            info!(
-                "Removed connection from active connections: {:#?}",
-                removed_connection
-            );
+            info!("Removed connection from active connections: {removed_connection:#?}");
             Some(removed_connection)
         } else {
             None // Connection not found
@@ -65,7 +61,7 @@ impl AppState {
     pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
         for connection in self.get_connections() {
             debug!("Found active connection");
-            trace!("Connection: {:#?}", connection);
+            trace!("Connection: {connection:#?}");
             debug!("Removing interface");
             let mut client = self.client.clone();
             let request = RemoveInterfaceRequest {
@@ -77,28 +73,28 @@ impl AppState {
             }
             debug!("Removed interface");
             debug!("Saving connection");
-            trace!("Connection: {:#?}", connection);
+            trace!("Connection: {connection:#?}");
             let mut connection: Connection = connection.into();
             connection.save(&self.get_pool()).await?;
             debug!("Connection saved");
-            trace!("Saved connection: {:#?}", connection);
+            trace!("Saved connection: {connection:#?}");
             info!("Location {} disconnected", connection.location_id);
         }
         Ok(())
     }
     pub fn find_connection(&self, location_id: i64) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().unwrap();
-        debug!("Checking for active connection with location id: {location_id} in active connections: {:#?}", connections);
+        debug!("Checking for active connection with location id: {location_id} in active connections: {connections:#?}");
 
         if let Some(connection) = connections
             .iter()
             .find(|conn| conn.location_id == location_id)
         {
             // 'connection' now contains the first element with the specified location_id
-            debug!("Found connection: {:#?}", connection);
+            debug!("Found connection: {connection:#?}");
             Some(connection.to_owned())
         } else {
-            error!("Element with location_id {} not found.", location_id);
+            error!("Element with location_id {location_id} not found.");
             None
         }
     }

@@ -1,8 +1,9 @@
+use tonic::transport::channel::{Channel, Endpoint};
+use tracing::debug;
+
 use crate::service::{
     proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DaemonError, DAEMON_BASE_URL,
 };
-use tonic::transport::channel::{Channel, Endpoint};
-use tracing::debug;
 
 pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
     debug!("Setting up gRPC client");
