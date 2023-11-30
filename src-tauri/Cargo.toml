@@ -10,7 +10,7 @@ edition = "2021"
 rust-version = "1.60"
 
 [build-dependencies]
-tauri-build = { version = "1.5" }
+tauri-build = { version = "1.5", features = [] }
 tonic-build = { version = "0.10" }
 prost-build = { version = "0.12" }
 

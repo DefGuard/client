@@ -1,7 +1,9 @@
 import { autoUpdate, useFloating } from '@floating-ui/react';
 import classNames from 'classnames';
+import { useMatch, useNavigate } from 'react-router-dom';
 
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
+import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { DefguardInstance } from '../../../../types';
 
@@ -10,6 +12,8 @@ type Props = {
 };
 
 export const ClientBarItem = ({ instance }: Props) => {
+  const instancePage = useMatch('/client/');
+  const navigate = useNavigate();
   const setClientStore = useClientStore((state) => state.setState);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
   const cn = classNames('client-bar-item', 'clickable', {
@@ -28,7 +32,12 @@ export const ClientBarItem = ({ instance }: Props) => {
       <div
         className={cn}
         ref={refs.setReference}
-        onClick={() => setClientStore({ selectedInstance: instance.id })}
+        onClick={() => {
+          setClientStore({ selectedInstance: instance.id });
+          if (!instancePage) {
+            navigate(routes.client.base, { replace: true });
+          }
+        }}
       >
         <SvgIconConnection className="connection-icon" />
         <p>{instance.name}</p>
