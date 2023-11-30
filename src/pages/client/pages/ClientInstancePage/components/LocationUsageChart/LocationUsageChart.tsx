@@ -84,7 +84,6 @@ export const LocationUsageChart = ({
   }, [padding]);
 
   if (!data.length) return null;
-
   return (
     <div className="location-usage">
       <div className="summary">
@@ -153,6 +152,7 @@ export const LocationUsageChart = ({
                 tickLine={{ stroke: colors.surfaceDefaultModal }}
                 hide={hideX}
                 padding={getPadding}
+                dx={3}
                 tick={{
                   fontSize: 12,
                   color: '#222',
@@ -188,4 +188,6 @@ export const LocationUsageChart = ({
   );
 };
 
-const formatXTick = (tickData: number) => dayjs.utc(tickData).local().format('HH:mm');
+// FIXME: hack with spaces to avoid tick overlapping
+const formatXTick = (tickData: number) =>
+  dayjs.utc(tickData).local().format('HH:mm:ss  ');

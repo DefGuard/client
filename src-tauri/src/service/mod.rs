@@ -114,6 +114,20 @@ impl DesktopDaemonService for DaemonService {
             Status::new(Code::Internal, msg)
         })?;
 
+        // Configure dns
+        debug!("Configuring DNS for interface {ifname}");
+        let dns: Vec<IpAddr> = request
+            .dns
+            .into_iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+
+        wgapi.configure_dns(&dns).map_err(|err| {
+            let msg = format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+
         Ok(Response::new(()))
     }
 
