@@ -3,6 +3,7 @@ export const routes = {
   main: '/',
   client: {
     base: '/client',
+    instancePage: '/client/',
     addInstance: '/client/add-instance',
   },
   enrollment: '/enrollment',
