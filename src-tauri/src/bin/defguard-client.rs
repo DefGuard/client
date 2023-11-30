@@ -5,6 +5,8 @@
 
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
+#[cfg(target_os = "macos")]
+use tauri::{api::process, Env};
 use tauri::{Manager, State, SystemTrayEvent};
 use tauri_plugin_log::LogTarget;
 
