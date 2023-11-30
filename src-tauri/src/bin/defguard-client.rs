@@ -5,7 +5,7 @@
 
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
-use tauri::{api::process, Env, Manager, State, SystemTrayEvent};
+use tauri::{Manager, State, SystemTrayEvent};
 use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
