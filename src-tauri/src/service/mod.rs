@@ -123,7 +123,7 @@ impl DesktopDaemonService for DaemonService {
             .collect();
 
         wgapi.configure_dns(&dns).map_err(|err| {
-            let msg = format!("Failed to configure dns for WireGuard interface {ifname}: {err}");
+            let msg = format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
