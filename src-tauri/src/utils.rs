@@ -139,11 +139,12 @@ pub fn get_interface_name() -> String {
 
     "utun0".into()
 }
+
 #[cfg(not(target_os = "macos"))]
 /// Returns interface name for location
 #[must_use]
 pub fn get_interface_name(location: &Location) -> String {
-    remove_whitespace(&location.name);
+    remove_whitespace(location.name)
 }
 
 fn is_port_free(port: u16) -> bool {

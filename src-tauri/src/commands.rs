@@ -209,10 +209,10 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .map(|connection| connection.location_id)
         .collect();
     for instance in &instances {
-        let Some(instancd_id) = instance.id else {
+        let Some(instance_id) = instance.id else {
             continue;
         };
-        let locations = Location::find_by_instance_id(&app_state.get_pool(), instancd_id).await?;
+        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
         let location_ids: Vec<i64> = locations
             .iter()
             .filter_map(|location| location.id)
@@ -220,7 +220,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instancd_id)
+        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance_id)
             .await?
             .unwrap();
         instance_info.push(InstanceInfo {
@@ -334,7 +334,7 @@ fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
 
 pub enum DateTimeAggregation {
     Hour,
-    Minute,
+    Second,
 }
 
 impl DateTimeAggregation {
@@ -343,7 +343,7 @@ impl DateTimeAggregation {
     pub fn fstring(&self) -> String {
         match self {
             Self::Hour => "%Y-%m-%d %H:00:00",
-            Self::Minute => "%Y-%m-%d %H:%M:%S",
+            Self::Second => "%Y-%m-%d %H:%M:%S",
         }
         .into()
     }
@@ -354,7 +354,7 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
         duration if duration < Duration::zero() => Err(Error::InternalError),
-        _ => Ok(DateTimeAggregation::Minute),
+        _ => Ok(DateTimeAggregation::Second),
     }?;
     Ok(aggregation)
 }
