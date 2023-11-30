@@ -11,6 +11,7 @@ pub struct Instance {
 }
 
 impl Instance {
+    #[must_use]
     pub fn new(name: String, uuid: String, url: String) -> Self {
         Instance {
             id: None,
@@ -59,6 +60,7 @@ impl Instance {
             .await?;
         Ok(instances)
     }
+
     pub async fn find_by_id(pool: &DbPool, id: i64) -> Result<Option<Self>, Error> {
         let instance = query_as!(
             Self,

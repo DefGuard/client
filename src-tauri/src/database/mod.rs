@@ -1,12 +1,14 @@
 pub mod models;
 
 use std::fs;
+
 use tauri::AppHandle;
+
+use crate::error::Error;
 
 const DB_NAME: &str = "defguard.db";
 
 pub type DbPool = sqlx::SqlitePool;
-use crate::error::Error;
 
 // Check if a database file exists, and create one if it does not.
 pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
@@ -19,7 +21,12 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
     fs::create_dir_all(&app_dir)?;
     info!("Created app data dir at: {}", app_dir.to_string_lossy());
     let db_path = app_dir.join(DB_NAME);
-    if !db_path.exists() {
+    if db_path.exists() {
+        info!(
+            "Database exists skipping creating database. Database path: {}",
+            db_path.to_string_lossy()
+        );
+    } else {
         debug!(
             "Database not found creating database file at: {}",
             db_path.to_string_lossy()
@@ -27,11 +34,6 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
         fs::File::create(&db_path)?;
         info!(
             "Database file succesfully created at: {}",
-            db_path.to_string_lossy()
-        );
-    } else {
-        info!(
-            "Database exists skipping creating database. Database path: {}",
             db_path.to_string_lossy()
         );
     }
@@ -51,8 +53,8 @@ pub async fn info(pool: &DbPool) -> Result<(), Error> {
         locations.len(),
         instances.len()
     );
-    trace!("Instances Found:\n {:#?}", instances);
-    trace!("Locations Found:\n {:#?}", locations);
+    trace!("Instances Found:\n {instances:#?}");
+    trace!("Locations Found:\n {locations:#?}");
     Ok(())
 }
 

@@ -26,6 +26,7 @@ impl Default for AppState {
 }
 
 impl AppState {
+    #[must_use]
     pub fn new() -> Self {
         let client = setup_client().expect("Failed to setup gRPC client");
         AppState {

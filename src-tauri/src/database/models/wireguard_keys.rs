@@ -11,6 +11,7 @@ pub struct WireguardKeys {
 }
 
 impl WireguardKeys {
+    #[must_use]
     pub fn new(instance_id: i64, pubkey: String, prvkey: String) -> Self {
         WireguardKeys {
             id: None,
@@ -19,6 +20,7 @@ impl WireguardKeys {
             prvkey,
         }
     }
+
     pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
     where
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
@@ -37,6 +39,7 @@ impl WireguardKeys {
         self.id = Some(result.id);
         Ok(())
     }
+
     pub async fn find_by_instance_id(
         pool: &DbPool,
         instance_id: i64,
