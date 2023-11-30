@@ -115,7 +115,7 @@ impl DesktopDaemonService for DaemonService {
         })?;
 
         // Configure dns
-        debug!("Configuring interface {ifname} dns");
+        debug!("Configuring DNS for interface {ifname}");
         let dns: Vec<IpAddr> = request
             .dns
             .into_iter()
