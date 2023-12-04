@@ -43,8 +43,8 @@ export const LocationCardInfo = ({ location, connection }: Props) => {
           {location?.active
             ? localLL.active()
             : connection
-            ? dayjs.utc(connection.end).local().format('DD-MM-YYYY')
-            : localLL.neverConnected()}
+              ? dayjs.utc(connection.end).local().format('DD-MM-YYYY')
+              : localLL.neverConnected()}
         </p>
       </div>
       <div className="location-card-info-ip">
