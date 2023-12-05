@@ -110,7 +110,8 @@ impl ConnectionInfo {
                       ORDER BY ls.collected_at DESC
                       LIMIT 1
                   ), 0) as "download: _"
-              FROM connection AS c WHERE location_id = $1;
+              FROM connection AS c WHERE location_id = $1
+              ORDER BY start DESC;
             "#,
             location_id
         )
