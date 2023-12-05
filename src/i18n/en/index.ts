@@ -61,7 +61,7 @@ const en = {
               predefinedTraffic: 'Predefined traffic',
               allTraffic: 'All traffic',
               label: 'Allowed traffic',
-              helper: `<p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>`,
+              helper: `<p>Allowed traffic:</br> Only traffic that was defined by Admin for this location.</p>`,
             },
           },
           header: {
