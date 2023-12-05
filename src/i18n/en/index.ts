@@ -61,7 +61,11 @@ const en = {
               predefinedTraffic: 'Predefined traffic',
               allTraffic: 'All traffic',
               label: 'Allowed traffic',
-              helper: `<p>Allowed traffic:</br> Only traffic that was defined by Admin for this location.</p>`,
+              helper: `
+                <p>
+                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+                  <b>All traffic</b> - route ALL your network traffic through this VPN location
+                </p>`,
             },
           },
           header: {
