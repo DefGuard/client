@@ -62,8 +62,8 @@ impl DaemonService {
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
 fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
-    let wgapi = WGApi::new(ifname, IS_MACOS).map_err(|err| {
-        let msg = format!("Failed to setup WireGuard API: {err}");
+    let wgapi = WGApi::new(ifname.clone(), IS_MACOS).map_err(|err| {
+        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
@@ -166,30 +166,32 @@ impl DesktopDaemonService for DaemonService {
         tokio::spawn(async move {
             info!("Spawning stats thread for interface {ifname}");
             // setup WireGuard API
-            let wgapi =
-                setup_wgapi(ifname.clone()).expect("Failed to initialize WireGuard interface API");
+            let error_msg = format!("Failed to initialize WireGuard API for interface {ifname}");
+            let wgapi = setup_wgapi(ifname.clone()).expect(&error_msg);
             let period = Duration::from_secs(stats_period);
             let mut interval = interval(period);
 
             loop {
                 // wait till next iteration
                 interval.tick().await;
-                debug!("Sending interface stats update");
+                debug!("Sending stats update for interface {ifname}");
                 match wgapi.read_interface_data() {
                     Ok(host) => {
                         if let Err(err) = tx.send(Result::<_, Status>::Ok(host.into())).await {
-                            error!("Failed to send interface stats update: {err}");
+                            error!(
+                                "Failed to send stats update for interface {ifname}. Error: {err}"
+                            );
                             break;
                         }
                     }
                     Err(err) => {
-                        error!("Failed to retrieve WireGuard interface stats {err}");
+                        error!("Failed to retrieve stats for WireGuard interface {ifname}. Error: {err}");
                         break;
                     }
                 }
-                debug!("Finished sending interface stats update");
+                debug!("Finished sending stats update for interface {ifname}");
             }
-            warn!("Client disconnected from interface stats stream");
+            warn!("Client disconnected from stats update stream for interface {ifname}");
         });
 
         let output_stream = ReceiverStream::new(rx);
