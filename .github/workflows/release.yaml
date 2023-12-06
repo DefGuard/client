@@ -99,6 +99,7 @@ jobs:
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: install linux deps
@@ -128,7 +129,6 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Upload AppImage
-        if: matrix.platform == 'Linux'
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
