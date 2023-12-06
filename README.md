@@ -1,6 +1,15 @@
-# Defguard desktop client
+ <p align="center">
+    <img src="docs/header.png" alt="defguard">
+ </p>
 
-Desktop client for managing connection via instance of defguard. Built with tauri and React.js
+# defguard desktop client
+
+Desktop client for managing VPN connections to [defguard](https://github.com/DefGuard/defguard) locations. Built with [tauri](https://tauri.app/) and [React.js](https://react.dev/)
+
+![defguard desktop client](https://github.com/DefGuard/docs/blob/docs/releases/0.8/Defguard-Desktop-Client.png?raw=true)
+
+
+To learn more about the system see our [documentation](https://defguard.gitbook.io).
 
 ## Development
 
