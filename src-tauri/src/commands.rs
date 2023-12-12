@@ -11,6 +11,7 @@ use crate::{
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
+use sqlx::query_scalar;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager, State};
 
@@ -240,7 +241,6 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
 #[derive(Serialize, Debug)]
 pub struct LocationInfo {
     pub id: i64,
-    // Native id of network from defguard
     pub instance_id: i64,
     pub name: String,
     pub address: String,
@@ -285,6 +285,68 @@ pub async fn all_locations(
 
     Ok(location_info)
 }
+
+#[derive(Serialize, Debug)]
+pub struct LocationInterfaceDetails {
+    pub location_id: i64,
+    // client interface config
+    pub name: String,    // interface name generated from location name
+    pub pubkey: String,  // own pubkey of client interface
+    pub address: String, // IP within WireGuard network assigned to the client
+    pub dns: Option<String>,
+    pub listen_port: u16,
+    // peer config
+    pub peer_pubkey: String,
+    pub peer_endpoint: String,
+    pub allowed_ips: String,
+    pub persistent_keepalive: u16,
+    pub last_handshake: i64,
+}
+
+#[tauri::command(async)]
+pub async fn location_interface_details(
+    location_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<LocationInterfaceDetails, Error> {
+    debug!("Fetching location details for location ID {location_id}");
+    let pool = app_state.get_pool();
+    if let Some(location) = Location::find_by_id(&pool, location_id).await? {
+        debug!("Fetching WireGuard keys for location {}", location.name);
+        let keys = WireguardKeys::find_by_instance_id(&pool, location.instance_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let peer_pubkey = keys.pubkey;
+
+        // generate interface name
+        let name = get_interface_name(&location);
+
+        let last_handshake = query_scalar!(
+            "SELECT last_handshake FROM location_stats \
+        WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1",
+            location_id
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        Ok(LocationInterfaceDetails {
+            location_id,
+            name,
+            pubkey: location.pubkey,
+            address: location.address,
+            dns: location.dns,
+            listen_port: 0, // FIXME: get port somehow
+            peer_pubkey,
+            peer_endpoint: location.endpoint,
+            allowed_ips: location.allowed_ips,
+            persistent_keepalive: 0, // FIXME: get keepalive somehow
+            last_handshake,
+        })
+    } else {
+        error!("Location ID {location_id} not found");
+        Err(Error::NotFound)
+    }
+}
+
 #[tauri::command(async)]
 pub async fn update_instance(
     instance_id: i64,
