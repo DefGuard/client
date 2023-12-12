@@ -11,7 +11,7 @@ use crate::{
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
-use sqlx::query_scalar;
+use sqlx::query;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager, State};
 
@@ -294,12 +294,12 @@ pub struct LocationInterfaceDetails {
     pub pubkey: String,  // own pubkey of client interface
     pub address: String, // IP within WireGuard network assigned to the client
     pub dns: Option<String>,
-    pub listen_port: u16,
+    pub listen_port: u32,
     // peer config
     pub peer_pubkey: String,
     pub peer_endpoint: String,
     pub allowed_ips: String,
-    pub persistent_keepalive: u16,
+    pub persistent_keepalive_interval: Option<u16>,
     pub last_handshake: i64,
 }
 
@@ -323,9 +323,13 @@ pub async fn location_interface_details(
         #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&location);
 
-        let last_handshake = query_scalar!(
-            "SELECT last_handshake FROM location_stats \
-        WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1",
+        let result = query!(
+            r#"
+            SELECT last_handshake, listen_port as "listen_port!: u32",
+              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
+            FROM location_stats
+            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1
+            "#,
             location_id
         )
         .fetch_one(&pool)
@@ -337,12 +341,12 @@ pub async fn location_interface_details(
             pubkey: location.pubkey,
             address: location.address,
             dns: location.dns,
-            listen_port: 0, // FIXME: get port somehow
+            listen_port: result.listen_port,
             peer_pubkey,
             peer_endpoint: location.endpoint,
             allowed_ips: location.allowed_ips,
-            persistent_keepalive: 0, // FIXME: get keepalive somehow
-            last_handshake,
+            persistent_keepalive_interval: result.persistent_keepalive_interval,
+            last_handshake: result.last_handshake,
         })
     } else {
         error!("Location ID {location_id} not found");
