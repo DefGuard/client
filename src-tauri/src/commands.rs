@@ -318,7 +318,10 @@ pub async fn location_interface_details(
         let peer_pubkey = keys.pubkey;
 
         // generate interface name
-        let name = get_interface_name(&location);
+        #[cfg(target_os = "macos")]
+        let interface_name = get_interface_name();
+        #[cfg(not(target_os = "macos"))]
+        let interface_name = get_interface_name(&location);
 
         let last_handshake = query_scalar!(
             "SELECT last_handshake FROM location_stats \
@@ -330,7 +333,7 @@ pub async fn location_interface_details(
 
         Ok(LocationInterfaceDetails {
             location_id,
-            name,
+            name: interface_name,
             pubkey: location.pubkey,
             address: location.address,
             dns: location.dns,
