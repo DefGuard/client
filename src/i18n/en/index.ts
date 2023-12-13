@@ -52,6 +52,23 @@ const en = {
   pages: {
     client: {
       pages: {
+        settingsPage: {
+          title: 'Settings',
+          tabs: {
+            global: {
+              tray: {
+                title: 'System tray',
+                label: 'Monochrome tray icon'
+              },
+              logging: {
+                title: 'Logging threshold',
+              },
+              theme: {
+                title: 'Theme',
+              }
+            }
+          },
+        },
         instancePage: {
           title: 'Locations',
           controls: {

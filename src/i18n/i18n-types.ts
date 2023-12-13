@@ -136,6 +136,38 @@ type RootTranslation = {
 	pages: {
 		client: {
 			pages: {
+				settingsPage: {
+					/**
+					 * S​e​t​t​i​n​g​s
+					 */
+					title: string
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * S​y​s​t​e​m​ ​t​r​a​y
+								 */
+								title: string
+								/**
+								 * M​o​n​o​c​h​r​o​m​e​ ​t​r​a​y​ ​i​c​o​n
+								 */
+								label: string
+							}
+							logging: {
+								/**
+								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
+								 */
+								title: string
+							}
+							theme: {
+								/**
+								 * T​h​e​m​e
+								 */
+								title: string
+							}
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * L​o​c​a​t​i​o​n​s
@@ -164,7 +196,11 @@ type RootTranslation = {
 							 */
 							label: string
 							/**
-							 * <​p​>​A​l​l​o​w​e​d​ ​t​r​a​f​f​i​c​:​<​/​b​r​>​ ​O​n​l​y​ ​t​r​a​f​i​c​ ​t​h​a​t​ ​w​a​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​.​<​/​p​>
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​ ​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​A​l​l​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​A​L​L​ ​y​o​u​r​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>
 							 */
 							helper: string
 						}
@@ -857,6 +893,38 @@ export type TranslationFunctions = {
 	pages: {
 		client: {
 			pages: {
+				settingsPage: {
+					/**
+					 * Settings
+					 */
+					title: () => LocalizedString
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * System tray
+								 */
+								title: () => LocalizedString
+								/**
+								 * Monochrome tray icon
+								 */
+								label: () => LocalizedString
+							}
+							logging: {
+								/**
+								 * Logging threshold
+								 */
+								title: () => LocalizedString
+							}
+							theme: {
+								/**
+								 * Theme
+								 */
+								title: () => LocalizedString
+							}
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * Locations
@@ -885,7 +953,11 @@ export type TranslationFunctions = {
 							 */
 							label: () => LocalizedString
 							/**
-							 * <p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>
+							 * 
+						                <p>
+						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+						                  <b>All traffic</b> - route ALL your network traffic through this VPN location
+						                </p>
 							 */
 							helper: () => LocalizedString
 						}

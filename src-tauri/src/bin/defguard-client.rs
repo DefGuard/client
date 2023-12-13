@@ -5,6 +5,7 @@
 
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
+use struct_patch::Patch;
 #[cfg(target_os = "macos")]
 use tauri::{api::process, Env};
 use tauri::{Manager, State, SystemTrayEvent};
@@ -16,12 +17,16 @@ use defguard_client::{
     __cmd__save_device_config, __cmd__update_instance, __cmd__update_location_routing,
     appstate::AppState,
     commands::{
-        active_connection, all_connections, all_instances, all_locations, connect, disconnect,
-        last_connection, location_stats, save_device_config, update_instance,
+        __cmd__get_settings, active_connection, all_connections, all_instances, all_locations,
+        connect, disconnect, last_connection, location_stats, save_device_config, update_instance,
         update_location_routing,
     },
-    database,
-    tray::create_tray_menu,
+    database::{
+        self,
+        models::settings::{Settings, SettingsPatch},
+    },
+    events::{handle_config_change_event, AppEvent},
+    tray::{configure_tray_icon, create_tray_menu},
     utils::load_log_targets,
 };
 use std::{env, str::FromStr};
@@ -83,6 +88,7 @@ async fn main() {
             last_connection,
             active_connection,
             update_location_routing,
+            get_settings,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -167,11 +173,17 @@ async fn main() {
                 let db = database::init_db(&handle)
                     .await
                     .expect("Database initialization failed");
+                let settings = Settings::get(&db).await?;
                 *app_state.db.lock().unwrap() = Some(db);
                 info!("Database initialization completed");
                 info!("Starting main app thread.");
                 let result = database::info(&app_state.get_pool()).await;
                 info!("Database info result: {:#?}", result);
+                // configure tray
+                configure_tray_icon(&handle, &settings.tray_icon_theme);
+            });
+            app.listen_global(AppEvent::ConfigChange.as_ref(), |event| {
+                handle_config_change_event(event, &handle);
             });
             Ok(())
         })

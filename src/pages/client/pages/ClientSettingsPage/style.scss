@@ -1,0 +1,23 @@
+@use '@scssutils' as *;
+
+#client-settings-page {
+  h1 {
+    @include typography(app-title);
+    color: var(--text-body-primary);
+  }
+
+  & > header {
+    padding-bottom: 60px;
+  }
+
+  h2 {
+    @include typography(app-body-1);
+    color: var(--text-body-primary);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-align: left;
+  }
+}

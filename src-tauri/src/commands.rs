@@ -2,7 +2,7 @@ use crate::{
     appstate::AppState,
     database::{
         models::instance::InstanceInfo, ActiveConnection, Connection, ConnectionInfo, Instance,
-        Location, LocationStats, WireguardKeys,
+        Location, LocationStats, Settings, WireguardKeys,
     },
     error::Error,
     service::proto::RemoveInterfaceRequest,
@@ -441,4 +441,11 @@ pub async fn update_location_routing(
         error!("Location with id: {} not found.", location_id);
         Err(Error::NotFound)
     }
+}
+
+#[tauri::command]
+pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
+    let app_state = handle.state::<AppState>();
+    let settings = Settings::get(&app_state.get_pool()).await?;
+    Ok(settings)
 }
