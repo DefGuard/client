@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use defguard_client::utils::get_service_log_dir;
 use notify_debouncer_mini::{new_debouncer, notify::*};
 use std::fs;
@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
+use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, info, Level};
 use defguard_client::database::info;
@@ -17,6 +18,20 @@ fn main() {
     let mut log_watcher = ServiceLogWatcher::new("TestNet".into());
 
     log_watcher.run();
+}
+
+#[derive(Debug, Deserialize)]
+struct LogLine {
+  timestamp: DateTime<Utc>,
+  level: String,
+  target: String,
+  fields: LogLineFields,
+}
+
+#[derive(Debug, Deserialize)]
+struct LogLineFields {
+  message: String,
+  interface_name: Option<String>,
 }
 
 struct ServiceLogWatcher {
@@ -72,10 +87,11 @@ impl ServiceLogWatcher {
         // check if latest file changed
         if latest_log_file.is_some() && latest_log_file != self.current_log_file {
             self.current_log_file = latest_log_file;
+            // reset read position
             self.current_position = 0;
         }
 
-        // if changed read and parse whole content of new file
+        // read and parse file from last position
         if let Some(log_file) = &self.current_log_file {
           let file = File::open(log_file).unwrap();
           let size = file.metadata().unwrap().len();
@@ -85,6 +101,7 @@ impl ServiceLogWatcher {
               let line = line.unwrap();
               self.parse_log_line(line);
           }
+          // update read position to end of file
           self.current_position = size;
         }
 
@@ -93,11 +110,12 @@ impl ServiceLogWatcher {
     }
 
     fn parse_log_line(&self, line: String) {
-      let json_value = serde_json::from_str::<Value>(&line).expect("LogRocket: error serializing to JSON");
-      info!("Line: {json_value:?}");
+      let log_line = serde_json::from_str::<LogLine>(&line).expect("LogRocket: error serializing to JSON");
+      info!("Line: {log_line:?}");
     }
 
     fn get_latest_log_file(&self) -> Option<PathBuf> {
+        debug!("Getting latest log file");
         let entries = fs::read_dir(&self.log_dir).unwrap();
 
         let mut latest_log = None;
@@ -121,9 +139,11 @@ impl ServiceLogWatcher {
 }
 
 fn extract_timestamp(filename: &str) -> Option<SystemTime> {
+    debug!("Extracting timestamp from log file name: {filename}");
+    // we know that the date is always in the last 10 characters
     let split_pos = filename.char_indices().nth_back(9).unwrap().0;
     let timestamp = &filename[split_pos..];
-    debug!("Timestamp: {timestamp}");
+    // parse and convert to `SystemTime`
     let timestamp = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d")
         .unwrap()
         .and_time(NaiveTime::default())
