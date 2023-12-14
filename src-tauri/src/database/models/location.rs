@@ -29,9 +29,15 @@ pub struct LocationStats {
     download: i64,
     last_handshake: i64,
     collected_at: NaiveDateTime,
+    listen_port: u32,
+    persistent_keepalive_interval: Option<u16>,
 }
 
-pub async fn peer_to_location_stats(peer: &Peer, pool: &DbPool) -> Result<LocationStats, Error> {
+pub async fn peer_to_location_stats(
+    peer: &Peer,
+    listen_port: u32,
+    pool: &DbPool,
+) -> Result<LocationStats, Error> {
     let location = Location::find_by_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
         id: None,
@@ -43,6 +49,8 @@ pub async fn peer_to_location_stats(peer: &Peer, pool: &DbPool) -> Result<Locati
                 .map_or(0, |duration| duration.as_secs() as i64)
         }),
         collected_at: Utc::now().naive_utc(),
+        listen_port,
+        persistent_keepalive_interval: peer.persistent_keepalive_interval,
     })
 }
 
@@ -196,6 +204,8 @@ impl LocationStats {
         download: i64,
         last_handshake: i64,
         collected_at: NaiveDateTime,
+        listen_port: u32,
+        persistent_keepalive_interval: Option<u16>,
     ) -> Self {
         LocationStats {
             id: None,
@@ -204,19 +214,23 @@ impl LocationStats {
             download,
             last_handshake,
             collected_at,
+            listen_port,
+            persistent_keepalive_interval,
         }
     }
 
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         let result = query!(
-            "INSERT INTO location_stats (location_id, upload, download, last_handshake, collected_at) \
-            VALUES ($1, $2, $3, $4, $5) \
+            "INSERT INTO location_stats (location_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7) \
             RETURNING id;",
             self.location_id,
             self.upload,
             self.download,
             self.last_handshake,
             self.collected_at,
+            self.listen_port,
+            self.persistent_keepalive_interval,
         )
         .fetch_one(pool)
         .await?;
@@ -235,21 +249,23 @@ impl LocationStats {
             LocationStats,
             r#"
             WITH cte AS (
-                SELECT 
-                    id, location_id, 
-                    COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) as upload, 
-                    COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) as download, 
-                    last_handshake, strftime($1, collected_at) as collected_at
+                SELECT
+                    id, location_id,
+                    COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) as upload,
+                    COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) as download,
+                    last_handshake, strftime($1, collected_at) as collected_at, listen_port, persistent_keepalive_interval
                 FROM location_stats
                 ORDER BY collected_at
 	            LIMIT -1 OFFSET 1
             )
-            SELECT 
-                id, location_id, 
-            	SUM(MAX(upload, 0)) as "upload!: i64", 
-            	SUM(MAX(download, 0)) as "download!: i64", 
-            	last_handshake, 
-            	collected_at as "collected_at!: NaiveDateTime"
+            SELECT
+                id, location_id,
+            	SUM(MAX(upload, 0)) as "upload!: i64",
+            	SUM(MAX(download, 0)) as "download!: i64",
+            	last_handshake,
+            	collected_at as "collected_at!: NaiveDateTime",
+            	listen_port as "listen_port!: u32",
+            	persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
             FROM cte
             WHERE location_id = $2
             AND collected_at >= $3
