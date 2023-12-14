@@ -45,7 +45,7 @@ pub enum DaemonError {
     TransportError(#[from] tonic::transport::Error),
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DaemonService {
     stats_period: u64,
 }
@@ -72,6 +72,7 @@ fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
 
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
+    #[tracing::instrument]
     async fn create_interface(
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
@@ -131,6 +132,7 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
+    #[tracing::instrument]
     async fn remove_interface(
         &self,
         request: tonic::Request<RemoveInterfaceRequest>,
@@ -153,6 +155,7 @@ impl DesktopDaemonService for DaemonService {
 
     type ReadInterfaceDataStream = InterfaceDataStream;
 
+    #[tracing::instrument]
     async fn read_interface_data(
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
@@ -210,6 +213,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("defguard daemon listening on {addr}");
 
     Server::builder()
+        .trace_fn(|_| tracing::info_span!("defguard_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
         .serve(addr)
         .await?;
