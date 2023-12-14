@@ -72,7 +72,7 @@ fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
 
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     async fn create_interface(
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
@@ -132,7 +132,7 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     async fn remove_interface(
         &self,
         request: tonic::Request<RemoveInterfaceRequest>,
@@ -155,7 +155,7 @@ impl DesktopDaemonService for DaemonService {
 
     type ReadInterfaceDataStream = InterfaceDataStream;
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     async fn read_interface_data(
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
