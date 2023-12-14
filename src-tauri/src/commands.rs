@@ -457,9 +457,9 @@ pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
 pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
     let app_state = handle.state::<AppState>();
     let pool = &app_state.get_pool();
-    let mut settings = Settings::get(&pool).await?;
+    let mut settings = Settings::get(pool).await?;
     settings.apply(data);
-    settings.save(&pool).await?;
+    settings.save(pool).await?;
     configure_tray_icon(&handle, &settings.tray_icon_theme)?;
     Ok(settings)
 }
