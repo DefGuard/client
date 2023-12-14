@@ -67,7 +67,7 @@ const ThemeSelect = () => {
       if (option) {
         return {
           key: option.key,
-          displayValue: option.value,
+          displayValue: option.label,
         };
       }
       return {

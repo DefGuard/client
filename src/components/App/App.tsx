@@ -29,6 +29,7 @@ import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
+import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 
 dayjs.extend(duration);
@@ -124,7 +125,9 @@ export const App = () => {
   return (
     <TypesafeI18n locale={detectedLocale}>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <ThemeProvider>
+          <RouterProvider router={router} />
+        </ThemeProvider>
       </QueryClientProvider>
       <ToastManager />
     </TypesafeI18n>
