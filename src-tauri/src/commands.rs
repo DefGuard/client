@@ -1,3 +1,4 @@
+use crate::service::log_watcher::{LogWatcherError, ServiceLogWatcher};
 use crate::{
     appstate::AppState,
     database::{
@@ -13,7 +14,9 @@ use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use sqlx::query;
 use std::str::FromStr;
+use tauri::async_runtime::TokioJoinHandle;
 use tauri::{AppHandle, Manager, State};
+use tracing::Level;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -277,9 +280,8 @@ pub async fn all_locations(
         location_info.push(info);
     }
     debug!(
-        "Returning {} locations for instance {}",
+        "Returning {} locations for instance {instance_id}",
         location_info.len(),
-        instance_id
     );
     trace!("Locations returned:\n{location_info:#?}");
 
@@ -386,7 +388,7 @@ pub async fn update_instance(
             }
         }
         transaction.commit().await?;
-        info!("Instance {} updated", instance_id);
+        info!("Instance {instance_id} updated");
         Ok(())
     } else {
         Err(Error::NotFound)
@@ -394,7 +396,7 @@ pub async fn update_instance(
 }
 
 /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
-fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
+pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
     Ok(match from {
         Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
         None => Utc::now() - Duration::hours(1),
@@ -470,7 +472,7 @@ pub async fn active_connection(
         debug!("Connection returned");
         Ok(connection)
     } else {
-        error!("Location with id: {} not found.", location_id);
+        error!("Location with id: {location_id} not found.");
         Err(Error::NotFound)
     }
 }
@@ -495,7 +497,7 @@ pub async fn update_location_routing(
     handle: AppHandle,
 ) -> Result<Location, Error> {
     let app_state = handle.state::<AppState>();
-    debug!("Updating location routing {}", location_id);
+    debug!("Updating location routing {location_id}");
     if let Some(mut location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         location.route_all_traffic = route_all_traffic;
         location.save(&app_state.get_pool()).await?;
@@ -507,7 +509,44 @@ pub async fn update_location_routing(
         )?;
         Ok(location)
     } else {
-        error!("Location with id: {} not found.", location_id);
+        error!("Location with id: {location_id} not found.");
+        Err(Error::NotFound)
+    }
+}
+
+/// Starts a log watcher in a separate thread
+///
+/// The watcher parses `defguard-service` log files and extracts logs relevant
+/// to the WireGuard interface for a given location.
+/// Logs are then transmitted to the frontend by using `tauri` `Events`.
+/// Returned value is the name of an event topic to monitor.
+#[tauri::command]
+pub async fn get_interface_logs(
+    location_id: i64,
+    from: Option<String>,
+    handle: AppHandle,
+) -> Result<String, Error> {
+    debug!("Starting log watcher for location {location_id}");
+    let app_state = handle.state::<AppState>();
+    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
+        // parse `from` timestamp
+        let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
+        // TODO: fetch configured log level from DB
+        let log_level = Level::DEBUG;
+        let interface_name = get_interface_name(&location);
+        let event_topic = format!("log-update-{interface_name}");
+        // explicitly clone before topic is moved into the closure
+        let topic_clone = event_topic.clone();
+        let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
+            let mut log_watcher =
+                ServiceLogWatcher::new(handle, topic_clone, interface_name, log_level, from);
+            log_watcher.run()?;
+            Ok(())
+        });
+        // TODO: store handle/oneshot channel to manually stop watcher thread
+        Ok(event_topic)
+    } else {
+        error!("Location with id: {location_id} not found.");
         Err(Error::NotFound)
     }
 }
