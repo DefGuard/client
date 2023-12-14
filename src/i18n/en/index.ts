@@ -79,10 +79,10 @@ const en = {
                 title: 'Theme',
                 options: {
                   light: 'Light',
-                  dark: 'Dark'
-                }
-              }
-            }
+                  dark: 'Dark',
+                },
+              },
+            },
           },
         },
         instancePage: {
