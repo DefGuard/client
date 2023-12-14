@@ -1,75 +1,129 @@
 use chrono::{NaiveDate, NaiveTime};
 use defguard_client::utils::get_service_log_dir;
 use notify_debouncer_mini::{new_debouncer, notify::*};
-use sqlx::types::uuid::timestamp;
 use std::fs;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Seek};
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
+use serde_json::Value;
+use tracing::{debug, info, Level};
+use defguard_client::database::info;
 
 fn main() {
-    println!("Starting log watcher");
+  tracing_subscriber::fmt().with_max_level(Level::DEBUG).init();
+    info!("Starting log watcher");
 
-    // get log file directory
-    let log_dir = get_service_log_dir();
+    let mut log_watcher = ServiceLogWatcher::new("TestNet".into());
 
-    println!("Log dir: {log_dir:?}");
-
-    // setup debouncer
-    let (tx, rx) = std::sync::mpsc::channel();
-    let mut debouncer = new_debouncer(Duration::from_secs(2), tx).unwrap();
-
-    debouncer
-        .watcher()
-        .watch(&log_dir, RecursiveMode::Recursive)
-        .unwrap();
-
-    // watch for changes in service log directory
-    for result in rx {
-        match result {
-            Ok(_events) => {
-                // get latest log file
-                let latest_log = get_latest_log_file(log_dir);
-                println!("found latest log file: {latest_log:?}");
-
-                // check if latest file changes
-                todo!();
-
-                // if changed read and parse whole content of new file
-                todo!();
-
-                // if not changed read only the changed part
-                todo!();
-            }
-            Err(error) => println!("Error {error:?}"),
-        }
-    }
+    log_watcher.run();
 }
 
-fn get_latest_log_file(path: PathBuf) -> Option<PathBuf> {
-    let entries = fs::read_dir(path).unwrap();
+struct ServiceLogWatcher {
+    interface_name: String,
+    log_dir: PathBuf,
+    current_log_file: Option<PathBuf>,
+    current_position: u64,
+}
 
-    let mut latest_log = None;
-    let mut latest_time = SystemTime::UNIX_EPOCH;
-    for entry in entries {
-        if let Ok(entry) = entry {
-            // skip directories
-            if entry.metadata().unwrap().is_file() {
-                let filename = entry.file_name().to_string_lossy().into_owned();
-                if let Some(timestamp) = extract_timestamp(&filename) {
-                    if timestamp > latest_time {
-                        latest_time = timestamp;
-                        latest_log = Some(entry.path());
+impl ServiceLogWatcher {
+    #[must_use]
+    fn new(interface_name: String) -> Self {
+        // get log file directory
+        let log_dir = get_service_log_dir();
+        info!("Log dir: {log_dir:?}");
+        Self {
+            interface_name,
+            log_dir,
+            current_log_file: None,
+            current_position: 0,
+        }
+    }
+
+    #[must_use]
+    fn run(&mut self) {
+        // setup debouncer
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut debouncer = new_debouncer(Duration::from_secs(2), tx).unwrap();
+
+        debouncer
+            .watcher()
+            .watch(&self.log_dir, RecursiveMode::Recursive)
+            .unwrap();
+
+        // parse log dir initially before watching for changes
+        self.parse_log_dir();
+
+        for result in rx {
+            match result {
+                Ok(_events) => {
+                    self.parse_log_dir();
+                }
+                Err(error) => println!("Error {error:?}"),
+            }
+        }
+    }
+
+    fn parse_log_dir(&mut self) {
+        // get latest log file
+        let latest_log_file = self.get_latest_log_file();
+        info!("found latest log file: {latest_log_file:?}");
+
+        // check if latest file changed
+        if latest_log_file.is_some() && latest_log_file != self.current_log_file {
+            self.current_log_file = latest_log_file;
+            self.current_position = 0;
+        }
+
+        // if changed read and parse whole content of new file
+        if let Some(log_file) = &self.current_log_file {
+          let file = File::open(log_file).unwrap();
+          let size = file.metadata().unwrap().len();
+          let mut reader = BufReader::new(file);
+          reader.seek_relative(self.current_position as i64).unwrap();
+          for line in reader.lines() {
+              let line = line.unwrap();
+              self.parse_log_line(line);
+          }
+          self.current_position = size;
+        }
+
+        // if not changed read only the changed part
+        todo!();
+    }
+
+    fn parse_log_line(&self, line: String) {
+      let json_value = serde_json::from_str::<Value>(&line).expect("LogRocket: error serializing to JSON");
+      info!("Line: {json_value:?}");
+    }
+
+    fn get_latest_log_file(&self) -> Option<PathBuf> {
+        let entries = fs::read_dir(&self.log_dir).unwrap();
+
+        let mut latest_log = None;
+        let mut latest_time = SystemTime::UNIX_EPOCH;
+        for entry in entries {
+            if let Ok(entry) = entry {
+                // skip directories
+                if entry.metadata().unwrap().is_file() {
+                    let filename = entry.file_name().to_string_lossy().into_owned();
+                    if let Some(timestamp) = extract_timestamp(&filename) {
+                        if timestamp > latest_time {
+                            latest_time = timestamp;
+                            latest_log = Some(entry.path());
+                        }
                     }
                 }
             }
         }
+        latest_log
     }
-    latest_log
 }
 
 fn extract_timestamp(filename: &str) -> Option<SystemTime> {
-    let split_pos = filename.char_indices().nth_back(10).unwrap().0;
+    let split_pos = filename.char_indices().nth_back(9).unwrap().0;
     let timestamp = &filename[split_pos..];
+    debug!("Timestamp: {timestamp}");
     let timestamp = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d")
         .unwrap()
         .and_time(NaiveTime::default())
