@@ -14,16 +14,16 @@ pub enum AppEvent {
     ConfigChange,
 }
 
-pub fn handle_config_change_event(event: Event, app: &AppHandle) {
+pub fn handle_config_change_event(event: Event, app: &'static AppHandle) {
     let payload = event.payload();
     if let Some(payload_str) = payload {
         if let Ok(settings_patch) = serde_json::from_str::<SettingsPatch>(payload_str) {
+            let app_state: State<AppState> = app.state();
+            let pool = app_state.get_pool();
             tauri::async_runtime::spawn(async move {
-                let app_state: State<AppState> = app.state();
-                let pool = app_state.get_pool();
                 if let Ok(mut settigs) = Settings::get(&pool).await {
                     settigs.apply(settings_patch);
-                    settigs.save(&pool).await;
+                    settigs.save(&pool).await.ok();
                     // reconfigure app
                     configure_tray_icon(&app, &settigs.tray_icon_theme);
                 }

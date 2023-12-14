@@ -5,7 +5,6 @@
 
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
-use struct_patch::Patch;
 #[cfg(target_os = "macos")]
 use tauri::{api::process, Env};
 use tauri::{Manager, State, SystemTrayEvent};
@@ -13,18 +12,16 @@ use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
-    __cmd__connect, __cmd__disconnect, __cmd__last_connection, __cmd__location_stats,
-    __cmd__save_device_config, __cmd__update_instance, __cmd__update_location_routing,
+    __cmd__connect, __cmd__disconnect, __cmd__get_settings, __cmd__last_connection,
+    __cmd__location_stats, __cmd__save_device_config, __cmd__update_instance,
+    __cmd__update_location_routing,
     appstate::AppState,
     commands::{
-        __cmd__get_settings, active_connection, all_connections, all_instances, all_locations,
-        connect, disconnect, last_connection, location_stats, save_device_config, update_instance,
+        active_connection, all_connections, all_instances, all_locations, connect, disconnect,
+        get_settings, last_connection, location_stats, save_device_config, update_instance,
         update_location_routing,
     },
-    database::{
-        self,
-        models::settings::{Settings, SettingsPatch},
-    },
+    database::{self, models::settings::Settings},
     events::{handle_config_change_event, AppEvent},
     tray::{configure_tray_icon, create_tray_menu},
     utils::load_log_targets,
@@ -173,14 +170,15 @@ async fn main() {
                 let db = database::init_db(&handle)
                     .await
                     .expect("Database initialization failed");
-                let settings = Settings::get(&db).await?;
                 *app_state.db.lock().unwrap() = Some(db);
                 info!("Database initialization completed");
                 info!("Starting main app thread.");
                 let result = database::info(&app_state.get_pool()).await;
                 info!("Database info result: {:#?}", result);
                 // configure tray
-                configure_tray_icon(&handle, &settings.tray_icon_theme);
+                if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
+                    configure_tray_icon(&handle, &settings.tray_icon_theme);
+                }
             });
             app.listen_global(AppEvent::ConfigChange.as_ref(), |event| {
                 handle_config_change_event(event, &handle);
