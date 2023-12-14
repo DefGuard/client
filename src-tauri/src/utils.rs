@@ -1,5 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
+    path::PathBuf,
     str::FromStr,
 };
 
@@ -215,4 +216,18 @@ pub fn load_log_targets() -> Vec<String> {
         }
         Err(_) => Vec::new(),
     }
+}
+
+// helper function to get log file directory outside the context of tauri app
+// assumes the package identifier is `net.defguard`
+// based on https://docs.rs/tauri/latest/src/tauri/api/path.rs.html#561-574
+pub fn get_log_dir() -> Option<PathBuf> {
+    let bundle_identifier = "net.defguard";
+    #[cfg(target_os = "macos")]
+    let path = dirs::home_dir().map(|dir| dir.join("Library/Logs").join(bundle_identifier));
+
+    #[cfg(not(target_os = "macos"))]
+    let path = dirs::config_dir().map(|dir| dir.join(bundle_identifier).join("logs"));
+
+    path
 }
