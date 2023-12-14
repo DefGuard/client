@@ -1,17 +1,20 @@
 use crate::{
     appstate::AppState,
     database::{
-        models::instance::InstanceInfo, ActiveConnection, Connection, ConnectionInfo, Instance,
-        Location, LocationStats, Settings, WireguardKeys,
+        models::{instance::InstanceInfo, settings::SettingsPatch},
+        ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
+        WireguardKeys,
     },
     error::Error,
     service::proto::RemoveInterfaceRequest,
+    tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Clone, serde::Serialize)]
@@ -447,5 +450,16 @@ pub async fn update_location_routing(
 pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
     let app_state = handle.state::<AppState>();
     let settings = Settings::get(&app_state.get_pool()).await?;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
+    let app_state = handle.state::<AppState>();
+    let pool = &app_state.get_pool();
+    let mut settings = Settings::get(&pool).await?;
+    settings.apply(data);
+    settings.save(&pool).await?;
+    configure_tray_icon(&handle, &settings.tray_icon_theme)?;
     Ok(settings)
 }

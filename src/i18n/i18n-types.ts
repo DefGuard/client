@@ -149,21 +149,67 @@ type RootTranslation = {
 								 */
 								title: string
 								/**
-								 * M​o​n​o​c​h​r​o​m​e​ ​t​r​a​y​ ​i​c​o​n
+								 * T​r​a​y​ ​i​c​o​n​ ​t​h​e​m​e
 								 */
 								label: string
+								options: {
+									/**
+									 * C​o​l​o​r
+									 */
+									color: string
+									/**
+									 * W​h​i​t​e
+									 */
+									white: string
+									/**
+									 * B​l​a​c​k
+									 */
+									black: string
+									/**
+									 * G​r​a​y
+									 */
+									gray: string
+								}
 							}
 							logging: {
 								/**
 								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
 								 */
 								title: string
+								options: {
+									/**
+									 * E​r​r​o​r
+									 */
+									error: string
+									/**
+									 * I​n​f​o
+									 */
+									info: string
+									/**
+									 * D​e​b​u​g
+									 */
+									debug: string
+									/**
+									 * T​r​a​c​e
+									 */
+									trace: string
+								}
 							}
 							theme: {
 								/**
 								 * T​h​e​m​e
 								 */
 								title: string
+								options: {
+									/**
+									 * L​i​g​h​t
+									 */
+									light: string
+									/**
+									 * D​a​r​k
+									 */
+									dark: string
+								}
 							}
 						}
 					}
@@ -396,6 +442,10 @@ type RootTranslation = {
 				 * A​d​d​ ​I​n​s​t​a​n​c​e
 				 */
 				addInstance: string
+				/**
+				 * S​e​t​t​i​n​g​s
+				 */
+				settings: string
 				copyright: {
 					/**
 					 * C​o​p​y​r​i​g​h​t​ ​©​ ​2​0​2​3
@@ -906,21 +956,67 @@ export type TranslationFunctions = {
 								 */
 								title: () => LocalizedString
 								/**
-								 * Monochrome tray icon
+								 * Tray icon theme
 								 */
 								label: () => LocalizedString
+								options: {
+									/**
+									 * Color
+									 */
+									color: () => LocalizedString
+									/**
+									 * White
+									 */
+									white: () => LocalizedString
+									/**
+									 * Black
+									 */
+									black: () => LocalizedString
+									/**
+									 * Gray
+									 */
+									gray: () => LocalizedString
+								}
 							}
 							logging: {
 								/**
 								 * Logging threshold
 								 */
 								title: () => LocalizedString
+								options: {
+									/**
+									 * Error
+									 */
+									error: () => LocalizedString
+									/**
+									 * Info
+									 */
+									info: () => LocalizedString
+									/**
+									 * Debug
+									 */
+									debug: () => LocalizedString
+									/**
+									 * Trace
+									 */
+									trace: () => LocalizedString
+								}
 							}
 							theme: {
 								/**
 								 * Theme
 								 */
 								title: () => LocalizedString
+								options: {
+									/**
+									 * Light
+									 */
+									light: () => LocalizedString
+									/**
+									 * Dark
+									 */
+									dark: () => LocalizedString
+								}
 							}
 						}
 					}
@@ -1153,6 +1249,10 @@ export type TranslationFunctions = {
 				 * Add Instance
 				 */
 				addInstance: () => LocalizedString
+				/**
+				 * Settings
+				 */
+				settings: () => LocalizedString
 				copyright: {
 					/**
 					 * Copyright © 2023

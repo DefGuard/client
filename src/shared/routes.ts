@@ -5,6 +5,7 @@ export const routes = {
     base: '/client',
     instancePage: '/client/',
     addInstance: '/client/add-instance',
+    settings: '/client/settings',
   },
   enrollment: '/enrollment',
   timeout: '/timeout',

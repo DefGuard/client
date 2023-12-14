@@ -77,7 +77,7 @@ impl Settings {
             self.log_level,
             self.tray_icon_theme
         )
-        .fetch_one(pool)
+        .execute(pool)
         .await?;
         Ok(())
     }
@@ -86,7 +86,7 @@ impl Settings {
     pub async fn init_defaults(pool: &DbPool) -> Result<(), Error> {
         let current_config = query!(
             r#"
-            SELECT * FROM settings WHERE id == 1;
+            SELECT * FROM settings WHERE id = 1;
         "#
         )
         .fetch_optional(pool)

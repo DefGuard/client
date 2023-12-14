@@ -1,3 +1,5 @@
+import './style.scss';
+
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { GlobalSettingsTab } from './components/GlobalSettingsTab/GlobalSettingsTab';

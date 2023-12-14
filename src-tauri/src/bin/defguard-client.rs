@@ -14,15 +14,14 @@ use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__connect, __cmd__disconnect, __cmd__get_settings, __cmd__last_connection,
     __cmd__location_stats, __cmd__save_device_config, __cmd__update_instance,
-    __cmd__update_location_routing,
+    __cmd__update_location_routing, __cmd__update_settings,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, connect, disconnect,
         get_settings, last_connection, location_stats, save_device_config, update_instance,
-        update_location_routing,
+        update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings},
-    events::{handle_config_change_event, AppEvent},
     tray::{configure_tray_icon, create_tray_menu},
     utils::load_log_targets,
 };
@@ -86,6 +85,7 @@ async fn main() {
             active_connection,
             update_location_routing,
             get_settings,
+            update_settings,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -177,11 +177,8 @@ async fn main() {
                 info!("Database info result: {:#?}", result);
                 // configure tray
                 if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
-                    configure_tray_icon(&handle, &settings.tray_icon_theme);
+                    configure_tray_icon(&handle, &settings.tray_icon_theme).unwrap();
                 }
-            });
-            app.listen_global(AppEvent::ConfigChange.as_ref(), |event| {
-                handle_config_change_event(event, &handle);
             });
             Ok(())
         })
