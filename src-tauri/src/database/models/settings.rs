@@ -102,7 +102,7 @@ impl Settings {
                 };
                 query!(
                     r#"
-                INSERT INTO settings (log_level, theme, monochrome_tray_icon)
+                INSERT INTO settings (log_level, theme, tray_icon_theme)
                 VALUES ($1, $2, $3);
             "#,
                     default_settings.log_level,

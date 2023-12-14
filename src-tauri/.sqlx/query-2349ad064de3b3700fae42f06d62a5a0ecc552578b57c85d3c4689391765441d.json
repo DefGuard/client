@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO settings (log_level, theme, tray_icon_theme)\n                VALUES ($1, $2, $3);\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "2349ad064de3b3700fae42f06d62a5a0ecc552578b57c85d3c4689391765441d"
+}
