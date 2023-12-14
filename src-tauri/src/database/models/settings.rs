@@ -109,7 +109,7 @@ impl Settings {
                     default_settings.theme,
                     default_settings.tray_icon_theme,
                 )
-                .fetch_one(pool)
+                .execute(pool)
                 .await?;
                 Ok(())
             }
