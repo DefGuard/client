@@ -22,7 +22,7 @@ use tonic::{
     transport::Server,
     Code, Response, Status,
 };
-use tracing::{debug, info};
+use tracing::{debug, info, info_span};
 
 use self::config::Config;
 use crate::utils::IS_MACOS;
@@ -72,7 +72,6 @@ fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
 
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
-    #[tracing::instrument(skip(self))]
     async fn create_interface(
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
@@ -86,6 +85,7 @@ impl DesktopDaemonService for DaemonService {
             ))?
             .into();
         let ifname = &config.name;
+        let _span = info_span!("create_interface", interface_name = &ifname).entered();
         info!("Creating interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
@@ -132,13 +132,13 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[tracing::instrument(skip(self))]
     async fn remove_interface(
         &self,
         request: tonic::Request<RemoveInterfaceRequest>,
     ) -> Result<Response<()>, Status> {
         let request = request.into_inner();
         let ifname = request.interface_name;
+        let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         info!("Removing interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
@@ -155,13 +155,13 @@ impl DesktopDaemonService for DaemonService {
 
     type ReadInterfaceDataStream = InterfaceDataStream;
 
-    #[tracing::instrument(skip(self))]
     async fn read_interface_data(
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
         let ifname = request.interface_name;
+        let _span = info_span!("read_interface_data", interface_name = &ifname).entered();
         info!("Starting interface data stream for {ifname}");
 
         let stats_period = self.stats_period;
