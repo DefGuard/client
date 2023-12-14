@@ -5,6 +5,7 @@
 
 use clap::Parser;
 use defguard_client::service::{config::Config, run_server};
+use defguard_client::utils::get_log_dir;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
@@ -16,7 +17,9 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
 
     // prepare log file appender
-    let file_appender = tracing_appender::rolling::daily("/var/log", "defguard-service.log");
+    let log_dir = get_log_dir().expect("Failed to determine log directory");
+    let log_dir = log_dir.join("defguard-service");
+    let file_appender = tracing_appender::rolling::daily(log_dir, "defguard-service.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     // prepare log level filter for stdout
