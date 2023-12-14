@@ -5,7 +5,7 @@
 use crate::utils::get_service_log_dir;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{
     fs::{read_dir, File},
@@ -13,16 +13,21 @@ use std::{
     path::PathBuf,
     time::{Duration, SystemTime},
 };
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use thiserror::Error;
 use tracing::Level;
 
 #[derive(Error, Debug)]
-pub enum LogWatcherError {}
+pub enum LogWatcherError {
+  #[error(transparent)]
+  TauriError(#[from] tauri::Error),
+  #[error(transparent)]
+  SerdeJsonError(#[from] serde_json::Error)
+}
 
 /// Represents a single line in log file
 #[serde_as]
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct LogLine {
     timestamp: DateTime<Utc>,
     #[serde_as(as = "DisplayFromStr")]
@@ -31,7 +36,7 @@ struct LogLine {
     fields: LogLineFields,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct LogLineFields {
     message: String,
     interface_name: Option<String>,
@@ -83,12 +88,12 @@ impl ServiceLogWatcher {
             .unwrap();
 
         // parse log dir initially before watching for changes
-        self.parse_log_dir();
+        self.parse_log_dir()?;
 
         for result in rx {
             match result {
                 Ok(_events) => {
-                    self.parse_log_dir();
+                    self.parse_log_dir()?;
                 }
                 Err(error) => println!("Error {error:?}"),
             }
@@ -96,7 +101,7 @@ impl ServiceLogWatcher {
         Ok(())
     }
 
-    fn parse_log_dir(&mut self) {
+    fn parse_log_dir(&mut self) -> Result<(), LogWatcherError>{
         // get latest log file
         let latest_log_file = self.get_latest_log_file();
         info!("found latest log file: {latest_log_file:?}");
@@ -114,10 +119,16 @@ impl ServiceLogWatcher {
             let size = file.metadata().unwrap().len();
             let mut reader = BufReader::new(file);
             reader.seek_relative(self.current_position as i64).unwrap();
+            let mut parsed_lines = Vec::new();
             for line in reader.lines() {
                 let line = line.unwrap();
-                self.parse_log_line(line);
+                if let Some(parsed_line) = self.parse_log_line(line)? {
+                    parsed_lines.push(parsed_line);
+                }
             }
+            // emit event with all relevant log lines
+            self.handle.emit_all(&self.event_topic, parsed_lines)?;
+
             // update read position to end of file
             self.current_position = size;
         }
@@ -126,10 +137,29 @@ impl ServiceLogWatcher {
         todo!();
     }
 
-    fn parse_log_line(&self, line: String) {
-        let log_line =
-            serde_json::from_str::<LogLine>(&line).expect("LogRocket: error serializing to JSON");
-        info!("Line: {log_line:?}");
+    fn parse_log_line(&self, line: String) -> Result<Option<LogLine>, LogWatcherError> {
+        debug!("Parsing log line: {line}");
+        let log_line = serde_json::from_str::<LogLine>(&line)?;
+        debug!("Parsed log line into: {log_line:?}");
+
+        // filter by log level
+        if log_line.level < self.log_level {
+            return Ok(None);
+        }
+
+        // publish all log lines with a matching interface name or with no interface name specified
+        if let Some(interface_name) = &log_line.fields.interface_name {
+            if interface_name != &self.interface_name {
+                return Ok(None);
+            }
+        }
+
+        // filter by log level
+        if log_line.level < self.log_level {
+            return Ok(None);
+        }
+
+        Ok(Some(log_line))
     }
 
     fn get_latest_log_file(&self) -> Option<PathBuf> {
