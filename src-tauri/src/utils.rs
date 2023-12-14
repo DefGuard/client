@@ -218,16 +218,14 @@ pub fn load_log_targets() -> Vec<String> {
     }
 }
 
-// helper function to get log file directory outside the context of tauri app
-// assumes the package identifier is `net.defguard`
-// based on https://docs.rs/tauri/latest/src/tauri/api/path.rs.html#561-574
-pub fn get_log_dir() -> Option<PathBuf> {
-    let bundle_identifier = "net.defguard";
-    #[cfg(target_os = "macos")]
-    let path = dirs::home_dir().map(|dir| dir.join("Library/Logs").join(bundle_identifier));
+// helper function to get log file directory for the defguard-service daemon
+pub fn get_service_log_dir() -> PathBuf {
+    // FIXME: find out what's a shared log dir on Windows
+    #[cfg(target_os = "windows")]
+    unimplemented!();
 
-    #[cfg(not(target_os = "macos"))]
-    let path = dirs::config_dir().map(|dir| dir.join(bundle_identifier).join("logs"));
+    #[cfg(not(target_os = "windows"))]
+    let path = PathBuf::from("/var/log/defguard-service");
 
     path
 }
