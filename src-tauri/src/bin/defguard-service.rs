@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         .with_filter(filter);
     let json_file_layer = fmt::layer()
         .json()
-        .with_writer(non_blocking.with_max_level(tracing::Level::TRACE));
+        .with_writer(non_blocking.with_max_level(tracing::Level::DEBUG));
 
     // initialize tracing subscriber
     tracing_subscriber::registry()
