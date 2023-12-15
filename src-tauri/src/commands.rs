@@ -532,3 +532,40 @@ pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<S
     configure_tray_icon(&handle, &settings.tray_icon_theme)?;
     Ok(settings)
 }
+
+#[tauri::command]
+pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), Error> {
+    debug!("Deleting instance {}", instance_id);
+    let app_state = handle.state::<AppState>();
+    let mut client = app_state.client.clone();
+    let pool = &app_state.get_pool();
+    if let Some(instance) = Instance::find_by_id(pool, instance_id).await? {
+        let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
+        if !instance_locations.is_empty() {
+            for location in instance_locations.iter() {
+                if let Some(location_id) = location.id {
+                    if let Some(connection) = app_state.find_and_remove_connection(location_id) {
+                        debug!(
+                            "Found active connection for location({}), closing...",
+                            &location_id
+                        );
+                        let request = RemoveInterfaceRequest {
+                            interface_name: connection.interface_name.clone(),
+                        };
+                        client
+                            .remove_interface(request)
+                            .await
+                            .map_err(|_| Error::InternalError)?;
+                        debug!("Connection closed and interface removed");
+                    }
+                }
+            }
+        }
+        instance.delete(pool).await?;
+    } else {
+        error!("Instance {} not found", instance_id);
+        return Err(Error::NotFound);
+    }
+    info!("Instance {}, deleted", instance_id);
+    Ok(())
+}

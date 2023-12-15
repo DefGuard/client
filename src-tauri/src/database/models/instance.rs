@@ -71,6 +71,23 @@ impl Instance {
         .await?;
         Ok(instance)
     }
+
+    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
+        query!("DELETE FROM instance WHERE id = $1", &id)
+            .execute()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
+        match self.id {
+            Some(id) => {
+                Instance::delete_by_id(pool, id).await?;
+                Ok(())
+            }
+            None => Err(Error::NotFound),
+        }
+    }
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
