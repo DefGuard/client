@@ -1,0 +1,21 @@
+@use '@scssutils' as *;
+
+#global-settings-tab {
+  display: flex;
+  flex-flow: column;
+  align-items: flex-start;
+  justify-items: flex-start;
+  row-gap: 32px;
+
+  & > section {
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
+    justify-items: flex-start;
+    row-gap: 20px;
+  }
+
+  .select-container {
+    min-width: 250px;
+  }
+}
