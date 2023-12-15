@@ -1,6 +1,8 @@
-use tauri::{AppHandle, CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem};
+use tauri::{
+    AppHandle, CustomMenuItem, Manager, State, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+};
 
-use crate::{database::TrayIconTheme, error::Error};
+use crate::{appstate::AppState, database::TrayIconTheme, error::Error};
 
 #[must_use]
 pub fn create_tray_menu() -> SystemTrayMenu {
@@ -12,6 +14,57 @@ pub fn create_tray_menu() -> SystemTrayMenu {
         .add_item(hide)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(main_window) = app.get_window("main") {
+        if main_window
+            .is_minimized()
+            .expect("Failed to check minimization state")
+        {
+            main_window
+                .unminimize()
+                .expect("Failed to unminimize main window.");
+        } else if !main_window
+            .is_visible()
+            .expect("Failed to check main window visibility")
+        {
+            main_window.show().expect("Failed to show main window.");
+        }
+    }
+}
+
+// handle tray actions
+pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
+    match event {
+        SystemTrayEvent::LeftClick { .. } => {
+            show_main_window(app);
+        }
+        SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+            "quit" => {
+                let app_state: State<AppState> = app.state();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let _ = app_state.close_all_connections().await;
+                        std::process::exit(0);
+                    });
+                });
+            }
+            "show" => show_main_window(app),
+            "hide" => {
+                if let Some(main_window) = app.get_window("main") {
+                    if main_window
+                        .is_visible()
+                        .expect("Failed to check main window visibility")
+                    {
+                        main_window.hide().expect("Failed to hide main window");
+                    }
+                }
+            }
+            _ => {}
+        },
+        _ => {}
+    }
 }
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(), Error> {
