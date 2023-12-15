@@ -136,6 +136,84 @@ type RootTranslation = {
 	pages: {
 		client: {
 			pages: {
+				settingsPage: {
+					/**
+					 * S​e​t​t​i​n​g​s
+					 */
+					title: string
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * S​y​s​t​e​m​ ​t​r​a​y
+								 */
+								title: string
+								/**
+								 * T​r​a​y​ ​i​c​o​n​ ​t​h​e​m​e
+								 */
+								label: string
+								options: {
+									/**
+									 * C​o​l​o​r
+									 */
+									color: string
+									/**
+									 * W​h​i​t​e
+									 */
+									white: string
+									/**
+									 * B​l​a​c​k
+									 */
+									black: string
+									/**
+									 * G​r​a​y
+									 */
+									gray: string
+								}
+							}
+							logging: {
+								/**
+								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
+								 */
+								title: string
+								options: {
+									/**
+									 * E​r​r​o​r
+									 */
+									error: string
+									/**
+									 * I​n​f​o
+									 */
+									info: string
+									/**
+									 * D​e​b​u​g
+									 */
+									debug: string
+									/**
+									 * T​r​a​c​e
+									 */
+									trace: string
+								}
+							}
+							theme: {
+								/**
+								 * T​h​e​m​e
+								 */
+								title: string
+								options: {
+									/**
+									 * L​i​g​h​t
+									 */
+									light: string
+									/**
+									 * D​a​r​k
+									 */
+									dark: string
+								}
+							}
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * L​o​c​a​t​i​o​n​s
@@ -164,7 +242,11 @@ type RootTranslation = {
 							 */
 							label: string
 							/**
-							 * <​p​>​A​l​l​o​w​e​d​ ​t​r​a​f​f​i​c​:​<​/​b​r​>​ ​O​n​l​y​ ​t​r​a​f​i​c​ ​t​h​a​t​ ​w​a​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​.​<​/​p​>
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​ ​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​A​l​l​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​A​L​L​ ​y​o​u​r​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>
 							 */
 							helper: string
 						}
@@ -360,6 +442,10 @@ type RootTranslation = {
 				 * A​d​d​ ​I​n​s​t​a​n​c​e
 				 */
 				addInstance: string
+				/**
+				 * S​e​t​t​i​n​g​s
+				 */
+				settings: string
 				copyright: {
 					/**
 					 * C​o​p​y​r​i​g​h​t​ ​©​ ​2​0​2​3
@@ -857,6 +943,84 @@ export type TranslationFunctions = {
 	pages: {
 		client: {
 			pages: {
+				settingsPage: {
+					/**
+					 * Settings
+					 */
+					title: () => LocalizedString
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * System tray
+								 */
+								title: () => LocalizedString
+								/**
+								 * Tray icon theme
+								 */
+								label: () => LocalizedString
+								options: {
+									/**
+									 * Color
+									 */
+									color: () => LocalizedString
+									/**
+									 * White
+									 */
+									white: () => LocalizedString
+									/**
+									 * Black
+									 */
+									black: () => LocalizedString
+									/**
+									 * Gray
+									 */
+									gray: () => LocalizedString
+								}
+							}
+							logging: {
+								/**
+								 * Logging threshold
+								 */
+								title: () => LocalizedString
+								options: {
+									/**
+									 * Error
+									 */
+									error: () => LocalizedString
+									/**
+									 * Info
+									 */
+									info: () => LocalizedString
+									/**
+									 * Debug
+									 */
+									debug: () => LocalizedString
+									/**
+									 * Trace
+									 */
+									trace: () => LocalizedString
+								}
+							}
+							theme: {
+								/**
+								 * Theme
+								 */
+								title: () => LocalizedString
+								options: {
+									/**
+									 * Light
+									 */
+									light: () => LocalizedString
+									/**
+									 * Dark
+									 */
+									dark: () => LocalizedString
+								}
+							}
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * Locations
@@ -885,7 +1049,11 @@ export type TranslationFunctions = {
 							 */
 							label: () => LocalizedString
 							/**
-							 * <p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>
+							 * 
+						                <p>
+						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+						                  <b>All traffic</b> - route ALL your network traffic through this VPN location
+						                </p>
 							 */
 							helper: () => LocalizedString
 						}
@@ -1081,6 +1249,10 @@ export type TranslationFunctions = {
 				 * Add Instance
 				 */
 				addInstance: () => LocalizedString
+				/**
+				 * Settings
+				 */
+				settings: () => LocalizedString
 				copyright: {
 					/**
 					 * Copyright © 2023

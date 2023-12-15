@@ -1,3 +1,4 @@
+import { ThemeKey } from '../../../shared/defguard-ui/hooks/theme/types';
 import { CreateDeviceResponse } from '../../../shared/hooks/api/types';
 import { DefguardInstance, DefguardLocation } from '../types';
 
@@ -29,6 +30,16 @@ export type SaveDeviceConfigResponse = {
   locations: DefguardLocation[];
 };
 
+export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
+
+export type LogLevel = 'error' | 'info' | 'debug' | 'trace';
+
+export type Settings = {
+  theme: ThemeKey;
+  log_level: LogLevel;
+  tray_icon_theme: TrayIconTheme;
+};
+
 export type TauriCommandKey =
   | 'all_instances'
   | 'all_locations'
@@ -41,4 +52,6 @@ export type TauriCommandKey =
   | 'all_connections'
   | 'active_connection'
   | 'save_device_config'
-  | 'update_location_routing';
+  | 'update_location_routing'
+  | 'get_settings'
+  | 'update_settings';

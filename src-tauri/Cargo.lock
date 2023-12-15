@@ -1046,6 +1046,8 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sqlx",
+ "struct-patch",
+ "strum",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
@@ -2211,6 +2213,15 @@ dependencies = [
  "equivalent",
  "hashbrown 0.14.3",
  "serde",
+]
+
+[[package]]
+name = "infer"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f178e61cdbfe084aa75a2f4f7a25a5bb09701a47ae1753608f194b15783c937a"
+dependencies = [
+ "cfb",
 ]
 
 [[package]]
@@ -4548,6 +4559,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
+name = "struct-patch"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c52ef523e89b3172242bbabefd8a92493ae5571224c29ed2f00185c39b395c2"
+dependencies = [
+ "struct-patch-derive",
+]
+
+[[package]]
+name = "struct-patch-derive"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f14a349c27ebe59faba22f933c9c734d428da7231e88a247e9d8c61eea964ddb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.39",
+]
+
+[[package]]
+name = "strum"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
+dependencies = [
+ "strum_macros",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.39",
+]
+
+[[package]]
 name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4725,9 +4778,11 @@ dependencies = [
  "heck 0.4.1",
  "http",
  "ignore",
+ "infer 0.9.0",
  "objc",
  "once_cell",
  "percent-encoding",
+ "png",
  "rand 0.8.5",
  "raw-window-handle",
  "reqwest",
@@ -4892,7 +4947,7 @@ dependencies = [
  "glob",
  "heck 0.4.1",
  "html5ever 0.26.0",
- "infer",
+ "infer 0.13.0",
  "json-patch",
  "kuchikiki",
  "log",
