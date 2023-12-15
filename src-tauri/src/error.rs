@@ -36,6 +36,8 @@ pub enum Error {
     Tauri(#[from] tauri::Error),
     #[error("Failed to parse str to enum")]
     StrumError(#[from] strum::ParseError),
+    #[error("Required resource not found {0}")]
+    ResourceNotFound(String),
 }
 
 // we must manually implement serde::Serialize

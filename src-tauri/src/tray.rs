@@ -15,24 +15,21 @@ pub fn create_tray_menu() -> SystemTrayMenu {
 }
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(), Error> {
-    let icon_path = match theme {
-        TrayIconTheme::Black => app
-            .path_resolver()
-            .resolve_resource("resources/icons/tray-32x32-black.png"),
-        TrayIconTheme::Color => app
-            .path_resolver()
-            .resolve_resource("resources/icons/tray-32x32-color.png"),
-        TrayIconTheme::Gray => app
-            .path_resolver()
-            .resolve_resource("resources/icons/tray-32x32-gray.png"),
-        TrayIconTheme::White => app
-            .path_resolver()
-            .resolve_resource("resources/icons/tray-32x32-white.png"),
+    let resource_str = format!("resources/icons/tray-32x32-{}.png", theme.as_ref());
+    debug!("Tray icon loading from {:?}", &resource_str);
+    match app.path_resolver().resolve_resource(&resource_str) {
+        Some(icon_path) => {
+            let icon = tauri::Icon::File(icon_path);
+            app.tray_handle().set_icon(icon)?;
+            debug!("Tray icon changed");
+            Ok(())
+        }
+        None => {
+            error!(
+                "Loading tray icon resource {} failed! Resource not resolved.",
+                &resource_str
+            );
+            Err(Error::ResourceNotFound(resource_str))
+        }
     }
-    .unwrap();
-    debug!("Tray icon loading from {:?}", icon_path.to_str());
-    let icon = tauri::Icon::File(icon_path);
-    app.tray_handle().set_icon(icon)?;
-    debug!("Tray icon changed");
-    Ok(())
 }

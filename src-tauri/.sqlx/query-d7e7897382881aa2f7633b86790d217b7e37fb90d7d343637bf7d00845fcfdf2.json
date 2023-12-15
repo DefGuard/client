@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT * FROM settings WHERE id = 1\n        ",
+  "query": "SELECT * FROM settings WHERE id = 1;",
   "describe": {
     "columns": [
       {
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "46d87d57181275ebdaf378cf39b1f22728549672f9c721c515adedf4b16abe4b"
+  "hash": "d7e7897382881aa2f7633b86790d217b7e37fb90d7d343637bf7d00845fcfdf2"
 }
