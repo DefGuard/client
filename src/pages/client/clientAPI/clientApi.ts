@@ -53,6 +53,14 @@ const disconnect = async (data: ConnectionRequest): Promise<void> =>
 const getLocationStats = async (data: StatsRequest): Promise<LocationStats[]> =>
   invokeWrapper('location_stats', data);
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getLocationInterfaceLogs = async (data: any): Promise<string> =>
+  invokeWrapper('get_interface_logs', data);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stopLocationInterfaceLogs = async (data: any): Promise<void> =>
+  invokeWrapper('stop_interface_logs', data);
+
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
   invokeWrapper('last_connection', data);
 
@@ -71,6 +79,8 @@ export const clientApi = {
   connect,
   disconnect,
   getLocationStats,
+  getLocationInterfaceLogs,
+  stopLocationInterfaceLogs,
   getLastConnection,
   getConnectionHistory,
   getActiveConnection,

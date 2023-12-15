@@ -19,10 +19,10 @@ use tracing::Level;
 
 #[derive(Error, Debug)]
 pub enum LogWatcherError {
-  #[error(transparent)]
-  TauriError(#[from] tauri::Error),
-  #[error(transparent)]
-  SerdeJsonError(#[from] serde_json::Error)
+    #[error(transparent)]
+    TauriError(#[from] tauri::Error),
+    #[error(transparent)]
+    SerdeJsonError(#[from] serde_json::Error),
 }
 
 /// Represents a single line in log file
@@ -101,7 +101,7 @@ impl ServiceLogWatcher {
         Ok(())
     }
 
-    fn parse_log_dir(&mut self) -> Result<(), LogWatcherError>{
+    fn parse_log_dir(&mut self) -> Result<(), LogWatcherError> {
         // get latest log file
         let latest_log_file = self.get_latest_log_file();
         info!("found latest log file: {latest_log_file:?}");
@@ -127,14 +127,14 @@ impl ServiceLogWatcher {
                 }
             }
             // emit event with all relevant log lines
-            self.handle.emit_all(&self.event_topic, parsed_lines)?;
+            if !parsed_lines.is_empty() {
+                self.handle.emit_all(&self.event_topic, parsed_lines)?;
+            }
 
             // update read position to end of file
             self.current_position = size;
         }
-
-        // if not changed read only the changed part
-        todo!();
+        Ok(())
     }
 
     fn parse_log_line(&self, line: String) -> Result<Option<LogLine>, LogWatcherError> {

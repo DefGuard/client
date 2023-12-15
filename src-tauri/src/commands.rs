@@ -532,7 +532,7 @@ pub async fn get_interface_logs(
         // parse `from` timestamp
         let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
         // TODO: fetch configured log level from DB
-        let log_level = Level::DEBUG;
+        let log_level = Level::INFO;
         let interface_name = get_interface_name(&location);
         let event_topic = format!("log-update-{interface_name}");
         // explicitly clone before topic is moved into the closure
@@ -549,4 +549,14 @@ pub async fn get_interface_logs(
         error!("Location with id: {location_id} not found.");
         Err(Error::NotFound)
     }
+}
+
+/// Stops the log watcher thread
+#[tauri::command]
+pub async fn stop_interface_logs(
+    location_id: i64,
+    from: Option<String>,
+    handle: AppHandle,
+) -> Result<String, Error> {
+    unimplemented!()
 }

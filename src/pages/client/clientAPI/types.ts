@@ -35,6 +35,8 @@ export type TauriCommandKey =
   | 'connect'
   | 'disconnect'
   | 'location_stats'
+  | 'get_interface_logs'
+  | 'stop_interface_logs'
   | 'last_connection'
   | 'all_connections'
   | 'active_connection'

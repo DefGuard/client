@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
+import { Event, listen } from '@tauri-apps/api/event';
 import parse from 'html-react-parser';
 import { useMemo, useState } from 'react';
 import { useBreakpoint } from 'use-breakpoint';
@@ -37,7 +38,13 @@ const findLocationById = (
   id: number,
 ): DefguardLocation | undefined => locations.find((location) => location.id === id);
 
-const { getLocationStats, getLastConnection, getConnectionHistory } = clientApi;
+const {
+  getLocationStats,
+  getLastConnection,
+  getConnectionHistory,
+  getLocationInterfaceLogs,
+  stopLocationInterfaceLogs,
+} = clientApi;
 
 export const LocationsDetailView = ({ locations }: Props) => {
   const { LL } = useI18nContext();
@@ -45,6 +52,9 @@ export const LocationsDetailView = ({ locations }: Props) => {
   const { breakpoint } = useBreakpoint({ ...deviceBreakpoints, desktop: 1300 });
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
   const statsFilter = useClientStore((state) => state.statsFilter);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [logs, setLogs] = useState<any[]>([]);
 
   const { data: locationStats } = useQuery({
     queryKey: [clientQueryKeys.getLocationStats, activeLocationId as number, statsFilter],
@@ -92,6 +102,20 @@ export const LocationsDetailView = ({ locations }: Props) => {
     (): DefguardLocation | undefined => findLocationById(locations, activeLocationId),
     [locations, activeLocationId],
   );
+
+  const handleStartLogs = async () => {
+    getLocationInterfaceLogs({ locationId: activeLocationId }).then((eventTopic) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      listen(eventTopic, (event: Event<any[]>) => {
+        const newLogs = [...logs, ...event.payload];
+        setLogs(newLogs);
+      });
+    });
+  };
+
+  const handleStopLogs = async () => {
+    await stopLocationInterfaceLogs({ locationId: activeLocationId });
+  };
 
   return (
     <div id="locations-detail-view">
@@ -189,6 +213,18 @@ export const LocationsDetailView = ({ locations }: Props) => {
           (connectionHistory.length === 0 && !activeLocation?.active)) && (
           <LocationCardNeverConnected />
         )}
+        <div style={{ height: '200px', overflowY: 'scroll' }}>
+          {logs.map((logLine) => (
+            <>
+              <span
+                key={logLine.timestamp}
+              >{`${logLine.timestamp} ${logLine.level} ${logLine.fields.message}`}</span>
+              <br />
+            </>
+          ))}
+        </div>
+        <button onClick={handleStartLogs}>Start logs</button>
+        <button onClick={handleStopLogs}>Stop logs</button>
       </Card>
     </div>
   );
