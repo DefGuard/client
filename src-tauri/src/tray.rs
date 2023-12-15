@@ -18,18 +18,16 @@ pub fn create_tray_menu() -> SystemTrayMenu {
 
 fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_window("main") {
-        if main_window
-            .is_minimized()
-            .expect("Failed to check minimization state")
-        {
-            main_window
-                .unminimize()
-                .expect("Failed to unminimize main window.");
-        } else if !main_window
-            .is_visible()
-            .expect("Failed to check main window visibility")
-        {
-            main_window.show().expect("Failed to show main window.");
+        // if this fails tauri has a problem
+        let minimized = main_window.is_minimizable().unwrap();
+        let visible = main_window.is_visible().unwrap();
+        if minimized {
+            main_window.unminimize().unwrap();
+            main_window.set_focus().unwrap();
+        }
+        if !visible {
+            main_window.show().unwrap();
+            main_window.set_focus().unwrap();
         }
     }
 }
@@ -38,7 +36,14 @@ fn show_main_window(app: &AppHandle) {
 pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
     match event {
         SystemTrayEvent::LeftClick { .. } => {
-            show_main_window(app);
+            if let Some(main_window) = app.get_window("main") {
+                let visibility = main_window.is_visible().unwrap();
+                if visibility {
+                    main_window.hide().unwrap();
+                } else {
+                    show_main_window(app);
+                }
+            }
         }
         SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
             "quit" => {
