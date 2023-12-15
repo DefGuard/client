@@ -31,6 +31,12 @@
     @include media-breakpoint-up(lg) {
       display: flex;
     }
+
+    :nth-child(2) {
+      path {
+        fill: var(--text-body-primary);
+      }
+    }
   }
 
   & > .logo-mobile {
