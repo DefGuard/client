@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, FromRow, Type};
 use struct_patch::Patch;
 use strum::{AsRefStr, EnumString};
-use tauri::{AppHandle, Manager, Theme};
 
 use crate::{database::DbPool, error::Error};
 
@@ -86,13 +85,10 @@ impl Settings {
             debug!("No settings found on app init.");
             let mut init_theme = SettingsTheme::Light;
             // check what system theme is currently in use and default to it.
-            match dark_light::detect() {
-                dark_light::Mode::Dark => {
-                    debug!("Detected system theme dark, init theme ajusted.");
-                    init_theme = SettingsTheme::Dark;
-                }
-                _ => {}
-            }
+            if dark_light::detect() == dark_light::Mode::Dark {
+                debug!("Detected system theme dark, init theme ajusted.");
+                init_theme = SettingsTheme::Dark;
+            };
             let default_settings = Settings {
                 id: None,
                 log_level: SettingsLogLevel::Info,
