@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, FromRow, Type};
 use struct_patch::Patch;
 use strum::{AsRefStr, EnumString};
+use tauri::{AppHandle, Manager, Theme};
 
 use crate::{database::DbPool, error::Error};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type, EnumString)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type, EnumString, AsRefStr)]
 #[sqlx(type_name = "theme", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -82,10 +83,20 @@ impl Settings {
             .fetch_optional(pool)
             .await?;
         if current_config.is_none() {
+            debug!("No settings found on app init.");
+            let mut init_theme = SettingsTheme::Light;
+            // check what system theme is currently in use and default to it.
+            match dark_light::detect() {
+                dark_light::Mode::Dark => {
+                    debug!("Detected system theme dark, init theme ajusted.");
+                    init_theme = SettingsTheme::Dark;
+                }
+                _ => {}
+            }
             let default_settings = Settings {
                 id: None,
                 log_level: SettingsLogLevel::Info,
-                theme: SettingsTheme::Light,
+                theme: init_theme,
                 tray_icon_theme: TrayIconTheme::Color,
             };
             query!(
