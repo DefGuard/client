@@ -52,6 +52,39 @@ const en = {
   pages: {
     client: {
       pages: {
+        settingsPage: {
+          title: 'Settings',
+          tabs: {
+            global: {
+              tray: {
+                title: 'System tray',
+                label: 'Tray icon theme',
+                options: {
+                  color: 'Color',
+                  white: 'White',
+                  black: 'Black',
+                  gray: 'Gray',
+                },
+              },
+              logging: {
+                title: 'Logging threshold',
+                options: {
+                  error: 'Error',
+                  info: 'Info',
+                  debug: 'Debug',
+                  trace: 'Trace',
+                },
+              },
+              theme: {
+                title: 'Theme',
+                options: {
+                  light: 'Light',
+                  dark: 'Dark',
+                },
+              },
+            },
+          },
+        },
         instancePage: {
           title: 'Locations',
           controls: {
@@ -160,6 +193,7 @@ const en = {
       sideBar: {
         instances: 'Instances',
         addInstance: 'Add Instance',
+        settings: 'Settings',
         copyright: {
           copyright: `Copyright © 2023`,
           appVersion: 'Application version: {version:string}',

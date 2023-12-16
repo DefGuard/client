@@ -2,9 +2,10 @@ import { isUndefined } from 'lodash-es';
 import { createWithEqualityFn } from 'zustand/traditional';
 
 import { clientApi } from '../clientAPI/clientApi';
+import { Settings } from '../clientAPI/types';
 import { ClientView, DefguardInstance } from '../types';
 
-const { getInstances } = clientApi;
+const { getInstances, updateSettings } = clientApi;
 
 // eslint-disable-next-line
 const defaultValues: StoreValues = {
@@ -12,6 +13,11 @@ const defaultValues: StoreValues = {
   selectedInstance: undefined,
   statsFilter: 1,
   selectedView: ClientView.GRID,
+  settings: {
+    log_level: 'error',
+    theme: 'light',
+    tray_icon_theme: 'color',
+  },
 };
 
 export const useClientStore = createWithEqualityFn<Store>(
@@ -38,6 +44,10 @@ export const useClientStore = createWithEqualityFn<Store>(
       }
       set({ instances: res, selectedInstance: selected });
     },
+    updateSettings: async (data) => {
+      const res = await updateSettings(data);
+      set({ settings: res });
+    },
   }),
   Object.is,
 );
@@ -48,6 +58,7 @@ type StoreValues = {
   instances: DefguardInstance[];
   selectedView: ClientView;
   statsFilter: number;
+  settings: Settings;
   selectedInstance?: DefguardInstance['id'];
 };
 
@@ -55,4 +66,5 @@ type StoreMethods = {
   setState: (values: Partial<StoreValues>) => void;
   setInstances: (instances: DefguardInstance[]) => void;
   updateInstances: () => Promise<void>;
+  updateSettings: (data: Partial<Settings>) => Promise<void>;
 };

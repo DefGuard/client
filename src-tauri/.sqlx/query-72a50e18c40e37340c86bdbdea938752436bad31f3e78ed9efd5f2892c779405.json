@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE settings SET theme = $1, log_level = $2, tray_icon_theme = $3 WHERE id = 1;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "72a50e18c40e37340c86bdbdea938752436bad31f3e78ed9efd5f2892c779405"
+}
