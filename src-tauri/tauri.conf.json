@@ -60,11 +60,16 @@
       },
       "resources": [],
       "shortDescription": "",
-      "targets": ["deb", "app", "appimage"],
+      "targets": ["deb", "app", "appimage", "msi"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "",
+        "wix": {
+          "template": "./resources-windows/main.wxs",
+          "fragmentPaths": ["./resources-windows/service-fragment.wxs"],
+          "componentRefs": ["DefGuardServiceFragment"]
+        }
       }
     },
     "security": {

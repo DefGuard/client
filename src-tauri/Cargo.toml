@@ -5,7 +5,6 @@ description = "Defguard desktop client"
 license = "Apache-2.0"
 homepage = "https://github.com/DefGuard/client"
 repository = "https://github.com/DefGuard/client"
-default-run = "defguard-client"
 edition = "2021"
 rust-version = "1.60"
 
@@ -19,7 +18,7 @@ anyhow = "1.0"
 base64 = "0.21"
 clap = { version = "4.4", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "main" }
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "8-add-windows-support-for-defguard-client" }
 dirs = "5.0"
 local-ip-address = "0.5"
 log = "0.4"

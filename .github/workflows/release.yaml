@@ -273,3 +273,66 @@ jobs:
           asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
           asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
+
+  build-windows:
+    needs:
+      - create-release
+
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          asset_content_type: application/octet-stream
+        
