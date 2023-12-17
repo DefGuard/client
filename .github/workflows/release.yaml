@@ -287,8 +287,10 @@ jobs:
 
       - name: Write release version
         run: |
-          $env:VERSION=echo ($env:GITHUB_REF_NAME#v -Split "-")[0]
+          $env:VERSION=echo ($env:GITHUB_REF_NAME -Split "-")[0]#v
+          # $env:VERSION=echo ($env:GITHUB_REF_NAME#v -Split "-")[0]
           # $env:VERSION=$(echo ${$env:GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          # VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $env:VERSION
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
 
