@@ -5,12 +5,15 @@
   position: fixed;
   inset: 0;
   height: 100%;
-  max-height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
   width: 70px;
   background-color: var(--surface-nav-bg);
   border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-flow: column;
 
   @include media-breakpoint-up(lg) {
     width: 270px;
@@ -52,6 +55,8 @@
 
   & > .items {
     display: flex;
+    flex-grow: 1;
+    flex-shrink: 0;
     flex-flow: column;
     align-items: flex-start;
     justify-content: flex-start;
@@ -199,6 +204,10 @@
       @include media-breakpoint-up(lg) {
         display: grid;
       }
+    }
+
+    #settings-nav-item {
+      margin-top: auto;
     }
 
     #add-instance {
