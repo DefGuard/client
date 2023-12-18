@@ -1,6 +1,8 @@
 //! Log watcher for observing and parsing `defguard-service` log files
 //!
-//! This is meant to allow passing relevant logs from `defguard-service` daemon to the client GUI.
+//! This is meant to handle passing relevant logs from `defguard-service` daemon to the client GUI.
+//! The watcher monitors a given directory for any changes. Whenever a change is detected
+//! it parses the log files and sends logs relevant to a specified interface to the fronted.
 
 use crate::utils::get_service_log_dir;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
@@ -77,6 +79,9 @@ impl ServiceLogWatcher {
         }
     }
 
+    /// Run the log watcher
+    ///
+    /// Setup a directory watcher with a 2 second debounce and parse the log dir on each change.
     pub fn run(&mut self) -> Result<(), LogWatcherError> {
         // setup debouncer
         let (tx, rx) = std::sync::mpsc::channel();
@@ -101,6 +106,13 @@ impl ServiceLogWatcher {
         Ok(())
     }
 
+    /// Parse the log file directory
+    ///
+    /// Analyzing the directory consists of finding the latest log file,
+    /// parsing log lines and emitting tauri events whenever relevant logs are found.
+    /// Current log file and latest read position are stored between runs
+    /// so only new log lines are sent to the frontend whenever a change in
+    /// the directory is detected.
     fn parse_log_dir(&mut self) -> Result<(), LogWatcherError> {
         // get latest log file
         let latest_log_file = self.get_latest_log_file();
@@ -137,6 +149,10 @@ impl ServiceLogWatcher {
         Ok(())
     }
 
+    /// Parse a service log line
+    ///
+    /// Deserializes the log line into a known struct and checks if the line is relevant
+    /// to the specified interface. Also performs filtering by log level and optional timestamp.
     fn parse_log_line(&self, line: String) -> Result<Option<LogLine>, LogWatcherError> {
         debug!("Parsing log line: {line}");
         let log_line = serde_json::from_str::<LogLine>(&line)?;
@@ -164,6 +180,10 @@ impl ServiceLogWatcher {
         Ok(Some(log_line))
     }
 
+    /// Find the latest log file in directory
+    ///
+    /// Log files are rotated daily and have a knows naming format,
+    /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Option<PathBuf> {
         debug!("Getting latest log file");
         let entries = read_dir(&self.log_dir).unwrap();
