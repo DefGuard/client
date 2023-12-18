@@ -530,7 +530,7 @@ pub async fn get_interface_logs(
     from: Option<String>,
     handle: AppHandle,
 ) -> Result<String, Error> {
-    debug!("Starting log watcher for location {location_id}");
+    info!("Starting log watcher for location {location_id}");
     let app_state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         // parse `from` timestamp
@@ -571,8 +571,9 @@ pub async fn get_interface_logs(
             .log_watchers
             .lock()
             .expect("Failed to lock log watchers mutex");
-        if let Some(old_token) = log_watchers.insert(interface_name, token) {
+        if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
             // cancel previous log watcher for this interface
+            debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
             old_token.cancel();
         }
 
@@ -586,7 +587,7 @@ pub async fn get_interface_logs(
 /// Stops the log watcher thread
 #[tauri::command]
 pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<(), Error> {
-    debug!("Stopping log watcher for location {location_id}");
+    info!("Stopping log watcher for location {location_id}");
     let app_state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         // prepare interface name

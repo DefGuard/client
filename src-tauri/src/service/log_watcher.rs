@@ -170,13 +170,18 @@ impl ServiceLogWatcher {
         debug!("Parsed log line into: {log_line:?}");
 
         // filter by log level
-        if log_line.level <= self.log_level {
+        if log_line.level > self.log_level {
+            debug!(
+                "Log level {} is above configured verbosity threshold {}. Skipping line...",
+                log_line.level, self.log_level
+            );
             return Ok(None);
         }
 
         // filter by optional timestamp
         if let Some(from) = self.from {
             if log_line.timestamp < from {
+                debug!("Timestamp is before configured threshold {from}. Skipping line...");
                 return Ok(None);
             }
         }
@@ -184,6 +189,7 @@ impl ServiceLogWatcher {
         // publish all log lines with a matching interface name or with no interface name specified
         if let Some(interface_name) = &log_line.fields.interface_name {
             if interface_name != &self.interface_name {
+                debug!("Interface name {interface_name} is not the configured name {}. Skipping line...", self.interface_name);
                 return Ok(None);
             }
         }
