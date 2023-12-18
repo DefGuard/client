@@ -84,18 +84,17 @@ const GridItem = ({ location }: GridItemProps) => {
           <Helper
             initialPlacement="right"
             icon={
-              <svg xmlns="http://www.w3.org/2000/svg" width={12} height={12} fill="none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 12 12"
+                width={12}
+                height={12}
+                fill="none"
+              >
+                <path fill="#899CA8" d="M6.4 12a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" />
                 <path
-                  style={{
-                    fill: 'var(--surface-icon-primary)',
-                  }}
-                  d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12Z"
-                />
-                <path
-                  style={{
-                    fill: 'var(--surface-icon-secondary)',
-                  }}
-                  d="M6.667 5.333a.667.667 0 0 0-1.334 0v3.334a.667.667 0 0 0 1.334 0V5.333ZM6.667 3.333a.667.667 0 1 0-1.334 0 .667.667 0 0 0 1.334 0Z"
+                  fill="#fff"
+                  d="M7.067 5.333a.667.667 0 0 0-1.333 0v3.334a.667.667 0 0 0 1.333 0V5.333ZM7.067 3.333a.667.667 0 1 0-1.333 0 .667.667 0 0 0 1.333 0Z"
                 />
               </svg>
             }

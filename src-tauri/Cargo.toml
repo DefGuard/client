@@ -1,6 +1,6 @@
 [package]
 name = "defguard-client"
-version = "0.1.0"
+version = "0.2.0"
 description = "Defguard desktop client"
 license = "Apache-2.0"
 homepage = "https://github.com/DefGuard/client"
@@ -37,6 +37,7 @@ x25519-dalek = { version = "2", features = [
     "static_secrets",
 ] }
 strum = { version = "0.25", features = ["derive"] }
+dark-light = "1.0"
 
 tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
