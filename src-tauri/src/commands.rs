@@ -554,17 +554,26 @@ pub async fn get_interface_logs(
 
         // spawn task
         let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-            let mut log_watcher =
-                ServiceLogWatcher::new(handle_clone, token_clone, topic_clone, interface_name_clone, log_level, from);
+            let mut log_watcher = ServiceLogWatcher::new(
+                handle_clone,
+                token_clone,
+                topic_clone,
+                interface_name_clone,
+                log_level,
+                from,
+            );
             log_watcher.run()?;
             Ok(())
         });
 
         // store `CancellationToken` to manually stop watcher thread
-        let mut log_watchers = app_state.log_watchers.lock().expect("Failed to lock log watchers mutex");
+        let mut log_watchers = app_state
+            .log_watchers
+            .lock()
+            .expect("Failed to lock log watchers mutex");
         if let Some(old_token) = log_watchers.insert(interface_name, token) {
-          // cancel previous log watcher for this interface
-          old_token.cancel();
+            // cancel previous log watcher for this interface
+            old_token.cancel();
         }
 
         Ok(event_topic)
