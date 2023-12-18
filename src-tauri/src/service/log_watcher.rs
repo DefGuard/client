@@ -143,7 +143,7 @@ impl ServiceLogWatcher {
         debug!("Parsed log line into: {log_line:?}");
 
         // filter by log level
-        if log_line.level < self.log_level {
+        if log_line.level <= self.log_level {
             return Ok(None);
         }
 
@@ -152,11 +152,6 @@ impl ServiceLogWatcher {
             if interface_name != &self.interface_name {
                 return Ok(None);
             }
-        }
-
-        // filter by log level
-        if log_line.level < self.log_level {
-            return Ok(None);
         }
 
         Ok(Some(log_line))
