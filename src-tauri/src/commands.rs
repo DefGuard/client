@@ -19,9 +19,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::query;
 use std::str::FromStr;
 use struct_patch::Patch;
-use tauri::async_runtime::TokioJoinHandle;
-use tauri::{AppHandle, Manager, State};
-use tracing::Level;
+use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager, State};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -536,10 +534,14 @@ pub async fn get_interface_logs(
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         // parse `from` timestamp
         let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
-        // TODO: fetch configured log level from DB
-        let log_level = Level::INFO;
+
+        // fetch configured log level from DB
+        let settings = Settings::get(&app_state.get_pool()).await?;
+        let log_level = settings.log_level.into();
+
         let interface_name = get_interface_name(&location);
         let event_topic = format!("log-update-{interface_name}");
+
         // explicitly clone before topic is moved into the closure
         let topic_clone = event_topic.clone();
         let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, FromRow, Type};
 use struct_patch::Patch;
 use strum::{AsRefStr, EnumString};
+use tracing::Level;
 
 use crate::{database::DbPool, error::Error};
 
@@ -25,6 +26,17 @@ pub enum SettingsLogLevel {
     Info,
     Debug,
     Trace,
+}
+
+impl From<SettingsLogLevel> for Level {
+    fn from(val: SettingsLogLevel) -> Self {
+        match val {
+            SettingsLogLevel::Error => Self::ERROR,
+            SettingsLogLevel::Info => Self::INFO,
+            SettingsLogLevel::Debug => Self::DEBUG,
+            SettingsLogLevel::Trace => Self::TRACE,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type, EnumString, AsRefStr)]
