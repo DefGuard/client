@@ -147,6 +147,13 @@ impl ServiceLogWatcher {
             return Ok(None);
         }
 
+        // filter by optional timestamp
+        if let Some(from) = self.from {
+            if log_line.timestamp < from {
+                return Ok(None);
+            }
+        }
+
         // publish all log lines with a matching interface name or with no interface name specified
         if let Some(interface_name) = &log_line.fields.interface_name {
             if interface_name != &self.interface_name {
