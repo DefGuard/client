@@ -20,6 +20,7 @@ use sqlx::query;
 use std::str::FromStr;
 use struct_patch::Patch;
 use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager, State};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -544,13 +545,28 @@ pub async fn get_interface_logs(
 
         // explicitly clone before topic is moved into the closure
         let topic_clone = event_topic.clone();
+        let interface_name_clone = interface_name.clone();
+        let handle_clone = handle.clone();
+
+        // prepare cancellation token
+        let token = CancellationToken::new();
+        let token_clone = token.clone();
+
+        // spawn task
         let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
             let mut log_watcher =
-                ServiceLogWatcher::new(handle, topic_clone, interface_name, log_level, from);
+                ServiceLogWatcher::new(handle_clone, token_clone, topic_clone, interface_name_clone, log_level, from);
             log_watcher.run()?;
             Ok(())
         });
-        // TODO: store handle/oneshot channel to manually stop watcher thread
+
+        // store `CancellationToken` to manually stop watcher thread
+        let mut log_watchers = app_state.log_watchers.lock().expect("Failed to lock log watchers mutex");
+        if let Some(old_token) = log_watchers.insert(interface_name, token) {
+          // cancel previous log watcher for this interface
+          old_token.cancel();
+        }
+
         Ok(event_topic)
     } else {
         error!("Location with id: {location_id} not found.");

@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
@@ -17,6 +19,7 @@ pub struct AppState {
     pub db: Arc<Mutex<Option<DbPool>>>,
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
     pub client: DesktopDaemonServiceClient<Channel>,
+    pub log_watchers: Arc<Mutex<HashMap<String, CancellationToken>>>,
 }
 
 impl Default for AppState {
@@ -33,6 +36,7 @@ impl AppState {
             db: Arc::new(Mutex::new(None)),
             active_connections: Arc::new(Mutex::new(Vec::new())),
             client,
+            log_watchers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 

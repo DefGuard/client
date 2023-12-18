@@ -17,6 +17,7 @@ use std::{
 };
 use tauri::{AppHandle, Manager};
 use thiserror::Error;
+use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
 #[derive(Error, Debug)]
@@ -59,6 +60,7 @@ impl ServiceLogWatcher {
     #[must_use]
     pub fn new(
         handle: AppHandle,
+        token: CancellationToken,
         event_topic: String,
         interface_name: String,
         log_level: Level,
