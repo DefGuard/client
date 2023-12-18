@@ -70,6 +70,9 @@ const getSettings = async (): Promise<Settings> => invokeWrapper('get_settings')
 const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
   invokeWrapper('update_settings', { data });
 
+const deleteInstance = async (id: number) =>
+  invokeWrapper('delete_instance', { instanceId: id });
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -83,4 +86,5 @@ export const clientApi = {
   updateLocationRouting,
   getSettings,
   updateSettings,
+  deleteInstance,
 };

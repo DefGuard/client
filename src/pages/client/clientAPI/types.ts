@@ -52,4 +52,5 @@ export type TauriCommandKey =
   | 'save_device_config'
   | 'update_location_routing'
   | 'get_settings'
-  | 'update_settings';
+  | 'update_settings'
+  | 'delete_instance';

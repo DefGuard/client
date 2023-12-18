@@ -819,6 +819,95 @@ type RootTranslation = {
 			}
 		}
 	}
+	modals: {
+		updateInstance: {
+			/**
+			 * P​l​e​a​s​e​ ​p​r​o​v​i​d​e​d​ ​I​n​s​t​a​n​c​e​ ​t​o​k​e​n
+			 */
+			title: string
+			/**
+			 * E​n​t​e​r​ ​t​h​e​ ​t​o​k​e​n​ ​s​e​n​t​ ​b​y​ ​t​h​e​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​u​p​d​a​t​e​ ​t​h​e​ ​I​n​s​t​a​n​c​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​.​
+		​A​l​t​e​r​n​a​t​i​v​e​l​y​,​ ​y​o​u​ ​c​a​n​ ​c​h​o​o​s​e​ ​t​o​ ​r​e​m​o​v​e​ ​t​h​i​s​ ​I​n​s​t​a​n​c​e​ ​e​n​t​i​r​e​l​y​ ​b​y​ ​c​l​i​c​k​i​n​g​ ​t​h​e​ ​'​R​e​m​o​v​e​ ​I​n​s​t​a​n​c​e​'​ ​b​u​t​t​o​n​ ​b​e​l​o​w​.
+			 */
+			infoMessage: string
+			form: {
+				fieldLabels: {
+					/**
+					 * T​o​k​e​n
+					 */
+					token: string
+					/**
+					 * U​R​L
+					 */
+					url: string
+				}
+				fieldErrors: {
+					token: {
+						/**
+						 * T​o​k​e​n​ ​o​r​ ​U​R​L​ ​r​e​j​e​c​t​e​d​.
+						 */
+						rejected: string
+						/**
+						 * I​n​s​t​a​n​c​e​ ​f​o​r​ ​t​h​i​s​ ​t​o​k​e​n​ ​w​a​s​ ​n​o​t​ ​f​o​u​n​d​.
+						 */
+						instanceIsNotPresent: string
+					}
+				}
+			}
+			controls: {
+				/**
+				 * U​p​d​a​t​e​ ​I​n​s​t​a​n​c​e
+				 */
+				updateInstance: string
+				/**
+				 * R​e​m​o​v​e​ ​I​n​s​t​a​n​c​e
+				 */
+				removeInstance: string
+			}
+			messages: {
+				/**
+				 * {​n​a​m​e​}​ ​u​p​d​a​t​e​d​.
+				 * @param {string} name
+				 */
+				success: RequiredParams<'name'>
+				/**
+				 * T​o​k​e​n​ ​o​r​ ​U​R​L​ ​i​s​ ​i​n​v​a​l​i​d​.
+				 */
+				error: string
+				/**
+				 * I​n​t​a​n​c​e​ ​f​o​r​ ​g​i​v​e​n​ ​t​o​k​e​n​ ​i​s​ ​n​o​t​ ​r​e​g​i​s​t​e​r​e​d​ ​!
+				 */
+				errorInstanceNotFound: string
+			}
+		}
+		deleteInstance: {
+			/**
+			 * D​e​l​e​t​e​ ​i​n​s​t​a​n​c​e
+			 */
+			title: string
+			/**
+			 * A​r​e​ ​y​o​u​ ​s​u​r​e​ ​y​o​u​ ​w​a​n​t​ ​t​o​ ​d​e​l​e​t​e​ ​{​n​a​m​e​}​?
+			 * @param {string} name
+			 */
+			subtitle: RequiredParams<'name'>
+			messages: {
+				/**
+				 * I​n​s​t​a​n​c​e​ ​d​e​l​e​t​e​d
+				 */
+				success: string
+				/**
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​e​d
+				 */
+				error: string
+			}
+			controls: {
+				/**
+				 * D​e​l​e​t​e​ ​i​n​s​t​a​n​c​e
+				 */
+				submit: string
+			}
+		}
+	}
 }
 
 export type TranslationFunctions = {
@@ -1619,6 +1708,93 @@ export type TranslationFunctions = {
 						submit: () => LocalizedString
 					}
 				}
+			}
+		}
+	}
+	modals: {
+		updateInstance: {
+			/**
+			 * Please provided Instance token
+			 */
+			title: () => LocalizedString
+			/**
+			 * Enter the token sent by the administrator to update the Instance configuration.
+		Alternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.
+			 */
+			infoMessage: () => LocalizedString
+			form: {
+				fieldLabels: {
+					/**
+					 * Token
+					 */
+					token: () => LocalizedString
+					/**
+					 * URL
+					 */
+					url: () => LocalizedString
+				}
+				fieldErrors: {
+					token: {
+						/**
+						 * Token or URL rejected.
+						 */
+						rejected: () => LocalizedString
+						/**
+						 * Instance for this token was not found.
+						 */
+						instanceIsNotPresent: () => LocalizedString
+					}
+				}
+			}
+			controls: {
+				/**
+				 * Update Instance
+				 */
+				updateInstance: () => LocalizedString
+				/**
+				 * Remove Instance
+				 */
+				removeInstance: () => LocalizedString
+			}
+			messages: {
+				/**
+				 * {name} updated.
+				 */
+				success: (arg: { name: string }) => LocalizedString
+				/**
+				 * Token or URL is invalid.
+				 */
+				error: () => LocalizedString
+				/**
+				 * Intance for given token is not registered !
+				 */
+				errorInstanceNotFound: () => LocalizedString
+			}
+		}
+		deleteInstance: {
+			/**
+			 * Delete instance
+			 */
+			title: () => LocalizedString
+			/**
+			 * Are you sure you want to delete {name}?
+			 */
+			subtitle: (arg: { name: string }) => LocalizedString
+			messages: {
+				/**
+				 * Instance deleted
+				 */
+				success: () => LocalizedString
+				/**
+				 * Unexpected error occured
+				 */
+				error: () => LocalizedString
+			}
+			controls: {
+				/**
+				 * Delete instance
+				 */
+				submit: () => LocalizedString
 			}
 		}
 	}

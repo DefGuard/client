@@ -533,7 +533,7 @@ pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<S
     Ok(settings)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance {}", instance_id);
     let app_state = handle.state::<AppState>();

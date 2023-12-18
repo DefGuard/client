@@ -73,8 +73,8 @@ impl Instance {
     }
 
     pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
-        query!("DELETE FROM instance WHERE id = $1", &id)
-            .execute()
+        query!("DELETE FROM instance WHERE id = $1", id)
+            .execute(pool)
             .await?;
         Ok(())
     }

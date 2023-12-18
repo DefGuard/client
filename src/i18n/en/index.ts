@@ -388,6 +388,45 @@ If you want to disengage your VPN connection, simply press "deactivate".
       },
     },
   },
+  modals: {
+    updateInstance: {
+      title: 'Please provided Instance token',
+      infoMessage:
+        "Enter the token sent by the administrator to update the Instance configuration.\nAlternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.",
+      form: {
+        fieldLabels: {
+          token: 'Token',
+          url: 'URL',
+        },
+        fieldErrors: {
+          token: {
+            rejected: 'Token or URL rejected.',
+            instanceIsNotPresent: 'Instance for this token was not found.',
+          },
+        },
+      },
+      controls: {
+        updateInstance: 'Update Instance',
+        removeInstance: 'Remove Instance',
+      },
+      messages: {
+        success: '{name: string} updated.',
+        error: 'Token or URL is invalid.',
+        errorInstanceNotFound: 'Intance for given token is not registered !',
+      },
+    },
+    deleteInstance: {
+      title: 'Delete instance',
+      subtitle: 'Are you sure you want to delete {name: string}?',
+      messages: {
+        success: 'Instance deleted',
+        error: 'Unexpected error occured',
+      },
+      controls: {
+        submit: 'Delete instance',
+      },
+    },
+  },
 } satisfies BaseTranslation;
 
 export default en;
