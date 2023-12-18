@@ -53,6 +53,7 @@ pub struct ServiceLogWatcher {
     current_log_file: Option<PathBuf>,
     current_position: u64,
     handle: AppHandle,
+    cancellation_token: CancellationToken,
     event_topic: String,
 }
 
@@ -60,7 +61,7 @@ impl ServiceLogWatcher {
     #[must_use]
     pub fn new(
         handle: AppHandle,
-        token: CancellationToken,
+        cancellation_token: CancellationToken,
         event_topic: String,
         interface_name: String,
         log_level: Level,
@@ -77,6 +78,7 @@ impl ServiceLogWatcher {
             current_log_file: None,
             current_position: 0,
             handle,
+            cancellation_token,
             event_topic,
         }
     }
@@ -98,6 +100,13 @@ impl ServiceLogWatcher {
         self.parse_log_dir()?;
 
         for result in rx {
+            if self.cancellation_token.is_cancelled() {
+                info!(
+                    "Received cancellation request. Stopping log watcher for interface {}",
+                    self.interface_name
+                );
+                break;
+            }
             match result {
                 Ok(_events) => {
                     self.parse_log_dir()?;
