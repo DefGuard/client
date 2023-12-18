@@ -585,12 +585,34 @@ pub async fn get_interface_logs(
 
 /// Stops the log watcher thread
 #[tauri::command]
-pub async fn stop_interface_logs(
-    location_id: i64,
-    from: Option<String>,
-    handle: AppHandle,
-) -> Result<String, Error> {
-    unimplemented!()
+pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<(), Error> {
+    debug!("Stopping log watcher for location {location_id}");
+    let app_state = handle.state::<AppState>();
+    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
+        // prepare interface name
+        let interface_name = get_interface_name(&location);
+
+        // get `CancellationToken` to manually stop watcher thread
+        let mut log_watchers = app_state
+            .log_watchers
+            .lock()
+            .expect("Failed to lock log watchers mutex");
+
+        match log_watchers.remove(&interface_name) {
+            Some(token) => {
+                debug!("Using cancellation token for log watcher on interface {interface_name}");
+                token.cancel();
+                Ok(())
+            }
+            None => {
+                error!("Log watcher for interface {interface_name} not found.");
+                Err(Error::NotFound)
+            }
+        }
+    } else {
+        error!("Location with id: {location_id} not found.");
+        Err(Error::NotFound)
+    }
 }
 
 #[tauri::command]
