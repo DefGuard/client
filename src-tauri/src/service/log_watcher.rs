@@ -6,7 +6,10 @@
 
 use crate::utils::get_service_log_dir;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
+use notify_debouncer_mini::{
+    new_debouncer,
+    notify::{self, RecursiveMode},
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{
@@ -26,6 +29,10 @@ pub enum LogWatcherError {
     TauriError(#[from] tauri::Error),
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
+    #[error(transparent)]
+    NotifyError(#[from] notify::Error),
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 }
 
 /// Represents a single line in log file
@@ -89,12 +96,11 @@ impl ServiceLogWatcher {
     pub fn run(&mut self) -> Result<(), LogWatcherError> {
         // setup debouncer
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut debouncer = new_debouncer(Duration::from_secs(2), tx).unwrap();
+        let mut debouncer = new_debouncer(Duration::from_secs(2), tx)?;
 
         debouncer
             .watcher()
-            .watch(&self.log_dir, RecursiveMode::Recursive)
-            .unwrap();
+            .watch(&self.log_dir, RecursiveMode::Recursive)?;
 
         // parse log dir initially before watching for changes
         self.parse_log_dir()?;
@@ -126,7 +132,7 @@ impl ServiceLogWatcher {
     /// the directory is detected.
     fn parse_log_dir(&mut self) -> Result<(), LogWatcherError> {
         // get latest log file
-        let latest_log_file = self.get_latest_log_file();
+        let latest_log_file = self.get_latest_log_file()?;
         info!("found latest log file: {latest_log_file:?}");
 
         // check if latest file changed
@@ -138,13 +144,13 @@ impl ServiceLogWatcher {
 
         // read and parse file from last position
         if let Some(log_file) = &self.current_log_file {
-            let file = File::open(log_file).unwrap();
-            let size = file.metadata().unwrap().len();
+            let file = File::open(log_file)?;
+            let size = file.metadata()?.len();
             let mut reader = BufReader::new(file);
-            reader.seek_relative(self.current_position as i64).unwrap();
+            reader.seek_relative(self.current_position as i64)?;
             let mut parsed_lines = Vec::new();
             for line in reader.lines() {
-                let line = line.unwrap();
+                let line = line?;
                 if let Some(parsed_line) = self.parse_log_line(line)? {
                     parsed_lines.push(parsed_line);
                 }
@@ -201,15 +207,15 @@ impl ServiceLogWatcher {
     ///
     /// Log files are rotated daily and have a knows naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
-    fn get_latest_log_file(&self) -> Option<PathBuf> {
+    fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         debug!("Getting latest log file");
-        let entries = read_dir(&self.log_dir).unwrap();
+        let entries = read_dir(&self.log_dir)?;
 
         let mut latest_log = None;
         let mut latest_time = SystemTime::UNIX_EPOCH;
         for entry in entries.flatten() {
             // skip directories
-            if entry.metadata().unwrap().is_file() {
+            if entry.metadata()?.is_file() {
                 let filename = entry.file_name().to_string_lossy().into_owned();
                 if let Some(timestamp) = extract_timestamp(&filename) {
                     if timestamp > latest_time {
@@ -219,19 +225,19 @@ impl ServiceLogWatcher {
                 }
             }
         }
-        latest_log
+        Ok(latest_log)
     }
 }
 
 fn extract_timestamp(filename: &str) -> Option<SystemTime> {
     debug!("Extracting timestamp from log file name: {filename}");
     // we know that the date is always in the last 10 characters
-    let split_pos = filename.char_indices().nth_back(9).unwrap().0;
+    let split_pos = filename.char_indices().nth_back(9)?.0;
     let timestamp = &filename[split_pos..];
     // parse and convert to `SystemTime`
-    let timestamp = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d")
-        .unwrap()
-        .and_time(NaiveTime::default())
-        .timestamp();
-    Some(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp as u64))
+    if let Ok(timestamp) = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d") {
+        let timestamp = timestamp.and_time(NaiveTime::default()).timestamp();
+        return Some(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp as u64));
+    }
+    None
 }
