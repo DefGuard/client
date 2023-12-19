@@ -4,8 +4,10 @@
 //! and communicate with the desktop client over HTTP.
 
 use clap::Parser;
-use defguard_client::service::{config::Config, run_server};
-use defguard_client::utils::get_service_log_dir;
+use defguard_client::{
+    service::{config::Config, run_server},
+    utils::get_service_log_dir,
+};
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
