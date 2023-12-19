@@ -555,7 +555,11 @@ pub async fn get_interface_logs(
         let settings = Settings::get(&app_state.get_pool()).await?;
         let log_level = settings.log_level.into();
 
+        #[cfg(target_os = "macos")]
+        let interface_name = get_interface_name();
+        #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&location);
+
         let event_topic = format!("log-update-{interface_name}");
 
         // explicitly clone before topic is moved into the closure
@@ -606,6 +610,9 @@ pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<
     let app_state = handle.state::<AppState>();
     if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         // prepare interface name
+        #[cfg(target_os = "macos")]
+        let interface_name = get_interface_name();
+        #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&location);
 
         // get `CancellationToken` to manually stop watcher thread
