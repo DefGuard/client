@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{api::process, Env};
-use tauri::{Manager, State, SystemTrayEvent};
+use tauri::{Manager, State};
 use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
@@ -24,7 +24,7 @@ use defguard_client::{
         update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings},
-    tray::{configure_tray_icon, create_tray_menu},
+    tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
     utils::load_log_targets,
 };
 use std::{env, str::FromStr};
@@ -100,48 +100,7 @@ async fn main() {
             _ => {}
         })
         .system_tray(system_tray)
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "quit" => {
-                    let app_state: State<AppState> = app.state();
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            let _ = app_state.close_all_connections().await;
-                            std::process::exit(0);
-                        });
-                    });
-                }
-                "show" => {
-                    if let Some(main_window) = app.get_window("main") {
-                        if main_window
-                            .is_minimized()
-                            .expect("Failed to check minimization state")
-                        {
-                            main_window
-                                .unminimize()
-                                .expect("Failed to unminimize main window.");
-                        } else if !main_window
-                            .is_visible()
-                            .expect("Failed to check main window visibility")
-                        {
-                            main_window.show().expect("Failed to show main window.");
-                        }
-                    }
-                }
-                "hide" => {
-                    if let Some(main_window) = app.get_window("main") {
-                        if main_window
-                            .is_visible()
-                            .expect("Failed to check main window visibility")
-                        {
-                            main_window.hide().expect("Failed to hide main window");
-                        }
-                    }
-                }
-                _ => {}
-            },
-            _ => {}
-        })
+        .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             app.emit_all("single-instance", Payload { args: argv, cwd })
                 .unwrap();
