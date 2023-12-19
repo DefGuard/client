@@ -8,6 +8,7 @@ use defguard_client::{
     service::{config::Config, run_server},
     utils::get_service_log_dir,
 };
+use std::io::stdout;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
@@ -30,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     // prepare tracing layers
     let stdout_layer = fmt::layer()
         .pretty()
-        .with_writer(std::io::stdout.with_max_level(tracing::Level::DEBUG))
+        .with_writer(stdout.with_max_level(tracing::Level::DEBUG))
         .with_filter(filter);
     let json_file_layer = fmt::layer()
         .json()
