@@ -256,6 +256,10 @@ type RootTranslation = {
 						 * L​o​c​a​t​i​o​n​s
 						 */
 						title: string
+						/**
+						 * E​d​i​t​ ​I​n​s​t​a​n​c​e
+						 */
+						edit: string
 						filters: {
 							views: {
 								/**
@@ -1152,6 +1156,10 @@ export type TranslationFunctions = {
 						 * Locations
 						 */
 						title: () => LocalizedString
+						/**
+						 * Edit Instance
+						 */
+						edit: () => LocalizedString
 						filters: {
 							views: {
 								/**

@@ -103,6 +103,7 @@ const en = {
           },
           header: {
             title: 'Locations',
+            edit: 'Edit Instance',
             filters: {
               views: {
                 grid: 'Grid View',
