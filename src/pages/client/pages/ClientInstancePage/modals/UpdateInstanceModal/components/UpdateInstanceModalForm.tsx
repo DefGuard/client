@@ -14,6 +14,7 @@ import {
 import { useToaster } from '../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { EnrollmentStartResponse } from '../../../../../../../shared/hooks/api/types';
 import { clientApi } from '../../../../../clientAPI/clientApi';
+import { useDeleteInstanceModal } from '../../DeleteInstanceModal/useDeleteInstanceModal';
 import { useUpdateInstanceModal } from '../useUpdateInstanceModal';
 
 type FormFields = {
@@ -25,6 +26,7 @@ export const UpdateInstanceModalForm = () => {
   const { LL } = useI18nContext();
   const localLL = LL.modals.updateInstance;
   const instance = useUpdateInstanceModal((state) => state.instance);
+  const openDeleteInstance = useDeleteInstanceModal((state) => state.open);
   const toaster = useToaster();
 
   const defaultValues = useMemo(
@@ -145,6 +147,11 @@ export const UpdateInstanceModalForm = () => {
           styleVariant={ButtonStyleVariant.DELETE}
           size={ButtonSize.LARGE}
           text={localLL.controls.removeInstance()}
+          onClick={() => {
+            if (instance) {
+              openDeleteInstance(instance);
+            }
+          }}
         />
       </div>
     </form>

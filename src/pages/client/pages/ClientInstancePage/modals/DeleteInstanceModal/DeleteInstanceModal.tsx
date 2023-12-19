@@ -1,3 +1,5 @@
+import './style.scss';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
 import { useEffect } from 'react';
@@ -58,6 +60,7 @@ export const DeleteInstanceModal = () => {
 
   return (
     <ConfirmModal
+      id="delete-instance-modal"
       title={localLL.title()}
       subTitle={localLL.subtitle({ name: instance?.name ?? '' })}
       type={ConfirmModalType.WARNING}

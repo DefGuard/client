@@ -21,10 +21,15 @@
 
     .options {
       display: flex;
+      flex-grow: 1;
       flex-flow: row nowrap;
       align-self: center;
       justify-content: flex-start;
       column-gap: 20px;
+
+      .btn {
+        margin-left: auto;
+      }
     }
 
     .select-container {
