@@ -19,7 +19,7 @@
     width: 270px;
   }
 
-  & > .logo-desktop {
+  &>.logo-desktop {
     display: none;
     flex-flow: row nowrap;
     align-items: center;
@@ -32,16 +32,14 @@
       display: flex;
     }
 
-    svg {
-      &:nth-child(2) {
-        path {
-          fill: var(--text-body-primary);
-        }
+    :nth-child(2) {
+      path {
+        fill: var(--text-body-primary);
       }
     }
   }
 
-  & > .logo-mobile {
+  &>.logo-mobile {
     display: flex;
     height: 70px;
     flex-flow: row nowrap;
@@ -55,13 +53,13 @@
       display: none;
     }
 
-    & > svg {
+    &>svg {
       width: 40px;
       height: 40px;
     }
   }
 
-  & > .items {
+  &>.items {
     display: flex;
     flex-grow: 1;
     flex-shrink: 0;
@@ -79,7 +77,7 @@
       padding-top: 70px;
     }
 
-    & > .client-bar-item {
+    &>.client-bar-item {
       display: grid;
       box-sizing: border-box;
       width: 100%;
@@ -100,8 +98,8 @@
         align-content: center;
       }
 
-      & > svg,
-      & > .icon-wrapper {
+      &>svg,
+      &>.icon-wrapper {
         display: none;
         grid-column: 1;
         grid-row: 1;
@@ -115,7 +113,7 @@
         }
       }
 
-      & > p {
+      &>p {
         grid-row: 1;
         grid-column: 2;
         width: 100%;
@@ -135,7 +133,7 @@
         }
       }
 
-      & > .instance-shorted {
+      &>.instance-shorted {
         display: flex;
         flex-flow: row nowrap;
         align-items: center;
@@ -152,20 +150,20 @@
           display: none;
         }
 
-        & > p {
+        &>p {
           @include typography(app-side-bar);
           text-transform: uppercase;
           color: var(--text-button-secondary);
         }
 
-        & > .connection-icon {
+        &>.connection-icon {
           position: absolute;
           right: -1px;
           top: -2px;
         }
       }
 
-      & > .connection-icon {
+      &>.connection-icon {
         display: none;
 
         @include media-breakpoint-up(lg) {
@@ -180,7 +178,7 @@
       }
 
       &.active {
-        & > p {
+        &>p {
           color: var(--text-body-primary);
         }
       }
@@ -199,7 +197,7 @@
 
       &:not(.active) {
         &:hover {
-          & > p {
+          &>p {
             color: var(--text-body-primary);
           }
         }
@@ -227,14 +225,17 @@
         justify-content: center;
         padding: 0;
       }
-      & > .icon-wrapper {
+
+      &>.icon-wrapper {
         display: flex;
+
         svg {
           width: 15px;
           height: 15px;
         }
       }
-      & > p {
+
+      &>p {
         display: none;
 
         @include media-breakpoint-up(lg) {
