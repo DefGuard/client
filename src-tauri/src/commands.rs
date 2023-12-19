@@ -547,7 +547,7 @@ pub async fn get_interface_logs(
 ) -> Result<String, Error> {
     info!("Starting log watcher for location {location_id}");
     let app_state = handle.state::<AppState>();
-    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
+    if let Some(connection) = app_state.find_connection(location_id) {
         // parse `from` timestamp
         let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
 
@@ -555,10 +555,7 @@ pub async fn get_interface_logs(
         let settings = Settings::get(&app_state.get_pool()).await?;
         let log_level = settings.log_level.into();
 
-        #[cfg(target_os = "macos")]
-        let interface_name = get_interface_name();
-        #[cfg(not(target_os = "macos"))]
-        let interface_name = get_interface_name(&location);
+        let interface_name = connection.interface_name;
 
         let event_topic = format!("log-update-{interface_name}");
 
@@ -598,7 +595,7 @@ pub async fn get_interface_logs(
 
         Ok(event_topic)
     } else {
-        error!("Location with id: {location_id} not found.");
+        error!("No active connection found for location with id: {location_id}");
         Err(Error::NotFound)
     }
 }
@@ -608,12 +605,9 @@ pub async fn get_interface_logs(
 pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<(), Error> {
     info!("Stopping log watcher for location {location_id}");
     let app_state = handle.state::<AppState>();
-    if let Some(location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
+    if let Some(connection) = app_state.find_connection(location_id) {
         // prepare interface name
-        #[cfg(target_os = "macos")]
-        let interface_name = get_interface_name();
-        #[cfg(not(target_os = "macos"))]
-        let interface_name = get_interface_name(&location);
+        let interface_name = connection.interface_name;
 
         // get `CancellationToken` to manually stop watcher thread
         let mut log_watchers = app_state
@@ -633,7 +627,7 @@ pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<
             }
         }
     } else {
-        error!("Location with id: {location_id} not found.");
+        error!("No active connection found for location with id: {location_id}");
         Err(Error::NotFound)
     }
 }
