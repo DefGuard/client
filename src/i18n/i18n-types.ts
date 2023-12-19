@@ -826,7 +826,7 @@ type RootTranslation = {
 	modals: {
 		updateInstance: {
 			/**
-			 * P​l​e​a​s​e​ ​p​r​o​v​i​d​e​d​ ​I​n​s​t​a​n​c​e​ ​t​o​k​e​n
+			 * U​p​d​a​t​e​ ​i​n​s​t​a​n​c​e
 			 */
 			title: string
 			/**
@@ -1722,7 +1722,7 @@ export type TranslationFunctions = {
 	modals: {
 		updateInstance: {
 			/**
-			 * Please provided Instance token
+			 * Update instance
 			 */
 			title: () => LocalizedString
 			/**

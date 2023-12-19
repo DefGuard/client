@@ -362,6 +362,7 @@ pub async fn update_instance(
     instance_id: i64,
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
+    app_handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received update_instance command");
     trace!("Processing following response:\n {response:#?}");
@@ -390,6 +391,7 @@ pub async fn update_instance(
         }
         transaction.commit().await?;
         info!("Instance {} updated", instance_id);
+        app_handle.emit_all("instance-update", ())?;
         Ok(())
     } else {
         Err(Error::NotFound)
@@ -566,6 +568,7 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
         error!("Instance {} not found", instance_id);
         return Err(Error::NotFound);
     }
+    handle.emit_all("instance-update", ())?;
     info!("Instance {}, deleted", instance_id);
     Ok(())
 }

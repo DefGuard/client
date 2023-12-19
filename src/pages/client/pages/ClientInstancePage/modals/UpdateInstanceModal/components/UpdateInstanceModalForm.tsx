@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { Body, fetch } from '@tauri-apps/api/http';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -12,29 +13,39 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import { EnrollmentStartResponse } from '../../../../../../../shared/hooks/api/types';
+import {
+  CreateDeviceResponse,
+  EnrollmentStartResponse,
+} from '../../../../../../../shared/hooks/api/types';
 import { clientApi } from '../../../../../clientAPI/clientApi';
+import { clientQueryKeys } from '../../../../../query';
 import { useDeleteInstanceModal } from '../../DeleteInstanceModal/useDeleteInstanceModal';
 import { useUpdateInstanceModal } from '../useUpdateInstanceModal';
+
+const { updateInstance } = clientApi;
 
 type FormFields = {
   token: string;
   url: string;
 };
 
+const invalidateOnSuccess = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+
 export const UpdateInstanceModalForm = () => {
   const { LL } = useI18nContext();
   const localLL = LL.modals.updateInstance;
   const instance = useUpdateInstanceModal((state) => state.instance);
   const openDeleteInstance = useDeleteInstanceModal((state) => state.open);
+  const closeModal = useUpdateInstanceModal((state) => state.close);
   const toaster = useToaster();
+  const queryClient = useQueryClient();
 
   const defaultValues = useMemo(
     (): FormFields => ({
-      url: instance?.url ?? '',
+      url: '',
       token: '',
     }),
-    [instance],
+    [],
   );
 
   const schema = useMemo(
@@ -96,6 +107,39 @@ export const UpdateInstanceModalForm = () => {
       if (instance) {
         const authCookie = res.headers['set-cookie'];
         headers['Cookie'] = authCookie;
+        const instanceInfoResponse = await fetch<CreateDeviceResponse>(
+          `${proxy_api_url}/enrollment/network_info`,
+          {
+            method: 'POST',
+            headers,
+            body: Body.json({
+              pubkey: instance.pubkey,
+            }),
+          },
+        );
+        if (instanceInfoResponse.ok) {
+          updateInstance({
+            instanceId: instance.id,
+            response: instanceInfoResponse.data,
+          })
+            .then(() => {
+              invalidateOnSuccess.forEach((k) => {
+                queryClient.invalidateQueries({
+                  type: 'active',
+                  queryKey: [k],
+                });
+              });
+              toaster.success(
+                localLL.messages.success({
+                  name: instance.name,
+                }),
+              );
+              closeModal();
+            })
+            .catch(() => {
+              toaster.error(LL.common.messages.error());
+            });
+        }
       } else {
         // Instance not found in client, use add instance.
         toaster.error(localLL.messages.errorInstanceNotFound());
@@ -125,12 +169,12 @@ export const UpdateInstanceModalForm = () => {
   return (
     <form data-testid="update-instance-modal-form" onSubmit={handleSubmit(onValidSubmit)}>
       <FormInput
-        label={localLL.form.fieldLabels.token()}
+        label={localLL.form.fieldLabels.url()}
         controller={{ control, name: 'url' }}
         disabled={isSubmitting}
       />
       <FormInput
-        label={localLL.form.fieldLabels.url()}
+        label={localLL.form.fieldLabels.token()}
         controller={{ control, name: 'token' }}
         disabled={isSubmitting}
       />

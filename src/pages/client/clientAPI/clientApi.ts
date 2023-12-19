@@ -13,6 +13,7 @@ import {
   Settings,
   StatsRequest,
   TauriCommandKey,
+  UpdateInstnaceRequest,
 } from './types';
 
 // Streamlines logging for invokes
@@ -73,6 +74,9 @@ const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
 const deleteInstance = async (id: number) =>
   invokeWrapper('delete_instance', { instanceId: id });
 
+const updateInstance = async (data: UpdateInstnaceRequest) =>
+  invokeWrapper('update_instance', data);
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -87,4 +91,5 @@ export const clientApi = {
   getSettings,
   updateSettings,
   deleteInstance,
+  updateInstance,
 };

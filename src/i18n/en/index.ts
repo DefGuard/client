@@ -391,7 +391,7 @@ If you want to disengage your VPN connection, simply press "deactivate".
   },
   modals: {
     updateInstance: {
-      title: 'Please provided Instance token',
+      title: 'Update instance',
       infoMessage:
         "Enter the token sent by the administrator to update the Instance configuration.\nAlternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.",
       form: {
