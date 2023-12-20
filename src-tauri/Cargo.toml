@@ -44,6 +44,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 lazy_static = "1.4"
 struct-patch = "0.4"
+windows-service = "0.6.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 nix = { version = "0.27", features = ["net"] }

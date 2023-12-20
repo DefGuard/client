@@ -1,32 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Fragment>
-    <!-- <ComponentGroup Id="WindowsServiceComponents" Directory="INSTALLDIR">
-      <Component Id="DefGuardServiceFragment">
-        <File Id="DefguardServiceFile" Source="defguard-service.exe" />
-        <ServiceInstall Name="DefGuardService" DisplayName="~DefGuard Client Service" Type="ownProcess" Start="auto" ErrorControl="normal" />
-        <ServiceControl Id="DefGuardService" Name="DefGuardService" Start="install" Stop="both" Remove="uninstall" />
-      </Component>
-    </ComponentGroup> -->
     <DirectoryRef Id="INSTALLDIR">
-    <!-- <DirectoryRef Id="TARGETDIR"> -->
       <Component Id="DefGuardServiceFragment">
         <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\defguard-service.exe" />
-        <!-- TODO: Grant admin privilages -->
-        <!-- <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\bundle\msi\defguard-service.exe" /> -->
-        <!-- <File Compressed='no' KeyPath="yes" Id="DefguardServiceFile" Source="C:\Users\User\Documents\GitHub\client\src-tauri\target\release\defguard-service.exe" /> -->
-        <!-- <File Compressed='no' KeyPath="yes" Id="DefguardServiceFile" Source="C:\Users\User\Documents\GitHub\client\src-tauri\target\release\defguard-service.exe" /> -->
-        <!-- <ServiceInstall
+        <ServiceInstall
           Account="NT AUTHORITY\LocalService"
-          Id="DefGuardServiceInstaller"
+          Id="DefguardService"
           Name="DefguardService"
-          DisplayName="~DefGuard Client Service"
+          DisplayName="~Defguard Service"
           Type="ownProcess"
           Start="auto"
           ErrorControl="normal"
-        >
-        </ServiceInstall>
-        <ServiceControl Id="DefGuardService" Name="DefguardService" Start="install" Stop="both" Remove="uninstall" /> -->
+        />
+        <ServiceControl Id="DefguardService" Name="DefguardService" Start="install" Stop="both" Remove="uninstall" />
+        <!-- <ServiceInstall
+          Account="NT AUTHORITY\LocalService"
+          Id="DefguardTest104"
+          Name="DefguardTest104"
+          DisplayName="~DefguardTest104"
+          Type="ownProcess"
+          Start="auto"
+          ErrorControl="normal"
+        />
+        <ServiceControl Id="DefguardTest104" Name="DefguardTest104" Start="install" Stop="both" Remove="uninstall" /> -->
+        <!-- <ServiceControl Id="DefGuardService" Name="DefguardService" Start="install" Stop="both" Remove="uninstall" /> -->
+
+        <!-- <ServiceControl Id="DefGuardServiceStart" Name="DefguardService" Start="install" Wait="no" /> -->
+        <!-- <ServiceControl Id="DefGuardServiceStop" Name="DefguardService" Start="uninstall" Remove="uninstall" Wait="yes" /> -->
+
+
+
            <!-- <util:PermissionEx  User="Everyone" ServicePauseContinue="yes" ServiceQueryStatus="yes"
                                     ServiceStart="yes" ServiceStop="yes" ServiceUserDefinedControl="yes" />   -->
         <!-- <ServiceInstall
