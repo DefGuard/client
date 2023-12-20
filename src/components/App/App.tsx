@@ -42,7 +42,7 @@ dayjs.extend(timezone);
 
 const queryClient = new QueryClient();
 
-const { getSettings } = clientApi;
+const { getSettings, getInstances } = clientApi;
 
 const router = createBrowserRouter([
   {
@@ -110,14 +110,15 @@ export const App = () => {
 
   // load settings from tauri first time
   useEffect(() => {
-    const loadSettings = async () => {
-      debug('Loading settings from tauri');
-      const res = await getSettings();
-      setClientState({ settings: res });
-      debug('Settings loaded and set');
+    const loadTauriState = async () => {
+      debug('App init state from tauri');
+      const settings = await getSettings();
+      const instances = await getInstances();
+      setClientState({ settings, instances });
+      debug('Tauri init data loaded');
       setSettingsLoaded(true);
     };
-    loadSettings();
+    loadTauriState();
   }, [setClientState, setSettingsLoaded]);
 
   if (!appLoaded) return null;

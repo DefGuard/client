@@ -225,13 +225,16 @@
         justify-content: center;
         padding: 0;
       }
+
       & > .icon-wrapper {
         display: flex;
+
         svg {
           width: 15px;
           height: 15px;
         }
       }
+
       & > p {
         display: none;
 
