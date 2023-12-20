@@ -1,8 +1,8 @@
-PRAGMA foreign_keys=off;
+-- add on delete cascade to existing tables
+PRAGMA defer_foreign_keys = ON;
+PRAGMA foreign_keys=OFF;
 
--- Migrate table wireguard_keys
-
-ALTER TABLE wireguard_keys RENAME TO _wireguard_keys_old;
+ALTER TABLE wireguard_keys RENAME TO wireguard_keys_old;
 
 CREATE TABLE wireguard_keys
 (
@@ -13,13 +13,7 @@ CREATE TABLE wireguard_keys
     FOREIGN KEY (instance_id) REFERENCES instance(id) ON DELETE CASCADE
 );
 
-INSERT INTO wireguard_keys SELECT * FROM _wireguard_keys_old;
-
-DROP TABLE _wireguard_keys_old;
-
--- Migrate location
-
-ALTER TABLE location RENAME TO _location_old;
+ALTER TABLE location RENAME TO location_old;
 
 CREATE TABLE location
 (
@@ -36,13 +30,7 @@ CREATE TABLE location
   FOREIGN KEY (instance_id) REFERENCES instance(id) ON DELETE CASCADE
 );
 
-INSERT INTO location SELECT * FROM _location_old;
-
-DROP TABLE _location_old;
-
--- update location_stats
-
-ALTER TABLE location_stats RENAME TO _location_stats_old;
+ALTER TABLE location_stats RENAME TO location_stats_old;
 
 CREATE TABLE  location_stats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,16 +44,7 @@ CREATE TABLE  location_stats (
   FOREIGN KEY (location_id) REFERENCES location(id) ON DELETE CASCADE
 );
 
-INSERT INTO location_stats SELECT * FROM _location_stats_old;
-
-DROP TABLE _location_stats_old;
-
--- restore index
-CREATE INDEX idx_collected_location ON location_stats (collected_at, location_id);
-
--- Migrate connections
-
-ALTER TABLE connection RENAME TO _connection_old;
+ALTER TABLE connection RENAME TO connection_old;
 
 CREATE TABLE connection (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,8 +55,20 @@ CREATE TABLE connection (
   FOREIGN KEY (location_id) REFERENCES location(id) ON DELETE CASCADE
 );
 
-INSERT INTO connection SELECT * FROM _connection_old;
 
-DROP TABLE _connection_old;
+-- copy data
+INSERT INTO location SELECT * FROM location_old;
+INSERT INTO wireguard_keys SELECT * FROM wireguard_keys_old;
+INSERT INTO connection SELECT * FROM connection_old;
+INSERT INTO location_stats SELECT * FROM location_stats_old;
 
-PRAGMA foreign_keys=on;
+-- drop old tables
+DROP TABLE location_old;
+DROP TABLE wireguard_keys_old;
+DROP TABLE connection_old;
+DROP TABLE location_stats_old;
+-- restore index
+CREATE INDEX idx_collected_location ON location_stats (collected_at, location_id);
+
+PRAGMA defer_foreign_keys = OFF;
+PRAGMA foreign_keys=ON;
