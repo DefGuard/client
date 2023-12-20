@@ -25,6 +25,11 @@ export type SaveConfigRequest = {
   response: CreateDeviceResponse;
 };
 
+export type UpdateInstnaceRequest = {
+  instanceId: number;
+  response: CreateDeviceResponse;
+};
+
 export type SaveDeviceConfigResponse = {
   instance: DefguardInstance;
   locations: DefguardLocation[];
@@ -54,4 +59,6 @@ export type TauriCommandKey =
   | 'save_device_config'
   | 'update_location_routing'
   | 'get_settings'
-  | 'update_settings';
+  | 'update_settings'
+  | 'delete_instance'
+  | 'update_instance';
