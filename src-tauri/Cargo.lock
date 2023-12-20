@@ -163,7 +163,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ca33f4bc4ed1babef42cad36cc1f51fa88be00420404e5b1e80ab1b18f7678c"
 dependencies = [
  "concurrent-queue",
- "event-listener 4.0.0",
+ "event-listener 4.0.1",
  "event-listener-strategy",
  "futures-core",
  "pin-project-lite",
@@ -249,7 +249,7 @@ version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7125e42787d53db9dd54261812ef17e937c95a51e4d291373b670342fa44310c"
 dependencies = [
- "event-listener 4.0.0",
+ "event-listener 4.0.1",
  "event-listener-strategy",
  "pin-project-lite",
 ]
@@ -1123,7 +1123,7 @@ checksum = "7046468a81e6a002061c01e6a7c83139daf91b11c30e66795b13217c2d885c8b"
 
 [[package]]
 name = "defguard-client"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
@@ -1448,9 +1448,9 @@ dependencies = [
 
 [[package]]
 name = "event-listener"
-version = "4.0.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "770d968249b5d99410d61f5bf89057f3199a077a04d087092f58e7d10692baae"
+checksum = "84f2cdcf274580f2d63697192d744727b3198894b1bf02923643bf59e2c26712"
 dependencies = [
  "concurrent-queue",
  "parking",
@@ -1463,7 +1463,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "958e4d70b6d5e81971bebec42271ec641e7ff4e170a6fa605f2b8a8b65cb97d3"
 dependencies = [
- "event-listener 4.0.0",
+ "event-listener 4.0.1",
  "pin-project-lite",
 ]
 
@@ -4262,9 +4262,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12022b835073e5b11e90a14f86838ceb1c8fb0325b72416845c487ac0fa95e80"
+checksum = "eb3622f419d1296904700073ea6cc23ad690adbd66f13ea683df73298736f0c1"
 dependencies = [
  "serde",
 ]
@@ -5106,7 +5106,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-log"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#563ca73de0f49e5ca50fba8168f350b8b6a9219b"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#7de603ebff4c8900d1cc24644c5c5a2dd06ab48b"
 dependencies = [
  "byte-unit",
  "fern",
@@ -5121,7 +5121,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-single-instance"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#563ca73de0f49e5ca50fba8168f350b8b6a9219b"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#7de603ebff4c8900d1cc24644c5c5a2dd06ab48b"
 dependencies = [
  "log",
  "serde",
@@ -5321,9 +5321,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.35.0"
+version = "1.35.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841d45b238a16291a4e1584e61820b8ae57d696cc5015c459c229ccc6990cc1c"
+checksum = "c89b4efa943be685f629b149f53829423f8f5531ea21249408e8e2f8671ec104"
 dependencies = [
  "backtrace",
  "bytes",
