@@ -62,5 +62,6 @@ pub use models::{
     connection::{ActiveConnection, Connection, ConnectionInfo},
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
+    tunnel::Tunnel,
     wireguard_keys::WireguardKeys,
 };
