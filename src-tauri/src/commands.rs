@@ -1,17 +1,21 @@
 use crate::{
     appstate::AppState,
     database::{
-        models::instance::InstanceInfo, ActiveConnection, Connection, ConnectionInfo, Instance,
-        Location, LocationStats, WireguardKeys,
+        models::{instance::InstanceInfo, settings::SettingsPatch},
+        ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
+        WireguardKeys,
     },
     error::Error,
     service::proto::RemoveInterfaceRequest,
+    tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
+use sqlx::query;
 use std::str::FromStr;
+use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Clone, serde::Serialize)]
@@ -240,7 +244,6 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
 #[derive(Serialize, Debug)]
 pub struct LocationInfo {
     pub id: i64,
-    // Native id of network from defguard
     pub instance_id: i64,
     pub name: String,
     pub address: String,
@@ -285,11 +288,81 @@ pub async fn all_locations(
 
     Ok(location_info)
 }
+
+#[derive(Serialize, Debug)]
+pub struct LocationInterfaceDetails {
+    pub location_id: i64,
+    // client interface config
+    pub name: String,    // interface name generated from location name
+    pub pubkey: String,  // own pubkey of client interface
+    pub address: String, // IP within WireGuard network assigned to the client
+    pub dns: Option<String>,
+    pub listen_port: u32,
+    // peer config
+    pub peer_pubkey: String,
+    pub peer_endpoint: String,
+    pub allowed_ips: String,
+    pub persistent_keepalive_interval: Option<u16>,
+    pub last_handshake: i64,
+}
+
+#[tauri::command(async)]
+pub async fn location_interface_details(
+    location_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<LocationInterfaceDetails, Error> {
+    debug!("Fetching location details for location ID {location_id}");
+    let pool = app_state.get_pool();
+    if let Some(location) = Location::find_by_id(&pool, location_id).await? {
+        debug!("Fetching WireGuard keys for location {}", location.name);
+        let keys = WireguardKeys::find_by_instance_id(&pool, location.instance_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let peer_pubkey = keys.pubkey;
+
+        // generate interface name
+        #[cfg(target_os = "macos")]
+        let interface_name = get_interface_name();
+        #[cfg(not(target_os = "macos"))]
+        let interface_name = get_interface_name(&location);
+
+        let result = query!(
+            r#"
+            SELECT last_handshake, listen_port as "listen_port!: u32",
+              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
+            FROM location_stats
+            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1
+            "#,
+            location_id
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        Ok(LocationInterfaceDetails {
+            location_id,
+            name: interface_name,
+            pubkey: location.pubkey,
+            address: location.address,
+            dns: location.dns,
+            listen_port: result.listen_port,
+            peer_pubkey,
+            peer_endpoint: location.endpoint,
+            allowed_ips: location.allowed_ips,
+            persistent_keepalive_interval: result.persistent_keepalive_interval,
+            last_handshake: result.last_handshake,
+        })
+    } else {
+        error!("Location ID {location_id} not found");
+        Err(Error::NotFound)
+    }
+}
+
 #[tauri::command(async)]
 pub async fn update_instance(
     instance_id: i64,
     response: CreateDeviceResponse,
     app_state: State<'_, AppState>,
+    app_handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received update_instance command");
     trace!("Processing following response:\n {response:#?}");
@@ -318,6 +391,7 @@ pub async fn update_instance(
         }
         transaction.commit().await?;
         info!("Instance {} updated", instance_id);
+        app_handle.emit_all("instance-update", ())?;
         Ok(())
     } else {
         Err(Error::NotFound)
@@ -441,4 +515,55 @@ pub async fn update_location_routing(
         error!("Location with id: {} not found.", location_id);
         Err(Error::NotFound)
     }
+}
+
+#[tauri::command]
+pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
+    let app_state = handle.state::<AppState>();
+    let settings = Settings::get(&app_state.get_pool()).await?;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
+    let app_state = handle.state::<AppState>();
+    let pool = &app_state.get_pool();
+    let mut settings = Settings::get(pool).await?;
+    settings.apply(data);
+    settings.save(pool).await?;
+    configure_tray_icon(&handle, &settings.tray_icon_theme)?;
+    Ok(settings)
+}
+
+#[tauri::command(async)]
+pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), Error> {
+    debug!("Deleting instance {instance_id}");
+    let app_state = handle.state::<AppState>();
+    let mut client = app_state.client.clone();
+    let pool = &app_state.get_pool();
+    if let Some(instance) = Instance::find_by_id(pool, instance_id).await? {
+        let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
+        for location in instance_locations.iter() {
+            if let Some(location_id) = location.id {
+                if let Some(connection) = app_state.find_and_remove_connection(location_id) {
+                    debug!("Found active connection for location({location_id}), closing...",);
+                    let request = RemoveInterfaceRequest {
+                        interface_name: connection.interface_name.clone(),
+                    };
+                    client
+                        .remove_interface(request)
+                        .await
+                        .map_err(|_| Error::InternalError)?;
+                    debug!("Connection closed and interface removed");
+                }
+            }
+        }
+        instance.delete(pool).await?;
+    } else {
+        error!("Instance {instance_id} not found");
+        return Err(Error::NotFound);
+    }
+    handle.emit_all("instance-update", ())?;
+    info!("Instance {instance_id}, deleted");
+    Ok(())
 }

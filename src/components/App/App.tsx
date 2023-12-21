@@ -12,7 +12,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import timezone from 'dayjs/plugin/timezone';
 import updateLocale from 'dayjs/plugin/updateLocale';
 import utc from 'dayjs/plugin/utc';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { debug } from 'tauri-plugin-log-api';
 import { localStorageDetector } from 'typesafe-i18n/detectors';
@@ -20,12 +20,16 @@ import { localStorageDetector } from 'typesafe-i18n/detectors';
 import TypesafeI18n from '../../i18n/i18n-react';
 import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
+import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
+import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstancePage/ClientAddInstnacePage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
+import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
+import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 
 dayjs.extend(duration);
@@ -37,6 +41,8 @@ dayjs.extend(updateLocale);
 dayjs.extend(timezone);
 
 const queryClient = new QueryClient();
+
+const { getSettings, getInstances } = clientApi;
 
 const router = createBrowserRouter([
   {
@@ -65,6 +71,10 @@ const router = createBrowserRouter([
         element: <ClientAddInstancePage />,
       },
       {
+        path: '/client/settings',
+        element: <ClientSettingsPage />,
+      },
+      {
         path: '/client/*',
         element: <Navigate to={routes.client.base} />,
       },
@@ -79,8 +89,16 @@ const router = createBrowserRouter([
 const detectedLocale = detectLocale(localStorageDetector);
 
 export const App = () => {
-  const [wasLoaded, setWasLoaded] = useState(false);
+  const [localeLoaded, setWasLoaded] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const setClientState = useClientStore((state) => state.setState);
 
+  const appLoaded = useMemo(
+    () => localeLoaded && settingsLoaded,
+    [localeLoaded, settingsLoaded],
+  );
+
+  // load locales
   useEffect(() => {
     debug('Loading locales');
     loadLocaleAsync(detectedLocale).then(() => {
@@ -90,12 +108,27 @@ export const App = () => {
     dayjs.locale(detectedLocale);
   }, []);
 
-  if (!wasLoaded) return null;
+  // load settings from tauri first time
+  useEffect(() => {
+    const loadTauriState = async () => {
+      debug('App init state from tauri');
+      const settings = await getSettings();
+      const instances = await getInstances();
+      setClientState({ settings, instances });
+      debug('Tauri init data loaded');
+      setSettingsLoaded(true);
+    };
+    loadTauriState();
+  }, [setClientState, setSettingsLoaded]);
+
+  if (!appLoaded) return null;
 
   return (
     <TypesafeI18n locale={detectedLocale}>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <ThemeProvider>
+          <RouterProvider router={router} />
+        </ThemeProvider>
       </QueryClientProvider>
       <ToastManager />
     </TypesafeI18n>

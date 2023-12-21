@@ -136,6 +136,84 @@ type RootTranslation = {
 	pages: {
 		client: {
 			pages: {
+				settingsPage: {
+					/**
+					 * S​e​t​t​i​n​g​s
+					 */
+					title: string
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * S​y​s​t​e​m​ ​t​r​a​y
+								 */
+								title: string
+								/**
+								 * T​r​a​y​ ​i​c​o​n​ ​t​h​e​m​e
+								 */
+								label: string
+								options: {
+									/**
+									 * C​o​l​o​r
+									 */
+									color: string
+									/**
+									 * W​h​i​t​e
+									 */
+									white: string
+									/**
+									 * B​l​a​c​k
+									 */
+									black: string
+									/**
+									 * G​r​a​y
+									 */
+									gray: string
+								}
+							}
+							logging: {
+								/**
+								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
+								 */
+								title: string
+								options: {
+									/**
+									 * E​r​r​o​r
+									 */
+									error: string
+									/**
+									 * I​n​f​o
+									 */
+									info: string
+									/**
+									 * D​e​b​u​g
+									 */
+									debug: string
+									/**
+									 * T​r​a​c​e
+									 */
+									trace: string
+								}
+							}
+							theme: {
+								/**
+								 * T​h​e​m​e
+								 */
+								title: string
+								options: {
+									/**
+									 * L​i​g​h​t
+									 */
+									light: string
+									/**
+									 * D​a​r​k
+									 */
+									dark: string
+								}
+							}
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * L​o​c​a​t​i​o​n​s
@@ -164,7 +242,11 @@ type RootTranslation = {
 							 */
 							label: string
 							/**
-							 * <​p​>​A​l​l​o​w​e​d​ ​t​r​a​f​f​i​c​:​<​/​b​r​>​ ​O​n​l​y​ ​t​r​a​f​i​c​ ​t​h​a​t​ ​w​a​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​.​<​/​p​>
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​ ​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​A​l​l​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​A​L​L​ ​y​o​u​r​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>
 							 */
 							helper: string
 						}
@@ -174,6 +256,10 @@ type RootTranslation = {
 						 * L​o​c​a​t​i​o​n​s
 						 */
 						title: string
+						/**
+						 * E​d​i​t​ ​I​n​s​t​a​n​c​e
+						 */
+						edit: string
 						filters: {
 							views: {
 								/**
@@ -360,6 +446,10 @@ type RootTranslation = {
 				 * A​d​d​ ​I​n​s​t​a​n​c​e
 				 */
 				addInstance: string
+				/**
+				 * S​e​t​t​i​n​g​s
+				 */
+				settings: string
 				copyright: {
 					/**
 					 * C​o​p​y​r​i​g​h​t​ ​©​ ​2​0​2​3
@@ -733,6 +823,95 @@ type RootTranslation = {
 			}
 		}
 	}
+	modals: {
+		updateInstance: {
+			/**
+			 * U​p​d​a​t​e​ ​i​n​s​t​a​n​c​e
+			 */
+			title: string
+			/**
+			 * E​n​t​e​r​ ​t​h​e​ ​t​o​k​e​n​ ​s​e​n​t​ ​b​y​ ​t​h​e​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​u​p​d​a​t​e​ ​t​h​e​ ​I​n​s​t​a​n​c​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​.​
+		​A​l​t​e​r​n​a​t​i​v​e​l​y​,​ ​y​o​u​ ​c​a​n​ ​c​h​o​o​s​e​ ​t​o​ ​r​e​m​o​v​e​ ​t​h​i​s​ ​I​n​s​t​a​n​c​e​ ​e​n​t​i​r​e​l​y​ ​b​y​ ​c​l​i​c​k​i​n​g​ ​t​h​e​ ​'​R​e​m​o​v​e​ ​I​n​s​t​a​n​c​e​'​ ​b​u​t​t​o​n​ ​b​e​l​o​w​.
+			 */
+			infoMessage: string
+			form: {
+				fieldLabels: {
+					/**
+					 * T​o​k​e​n
+					 */
+					token: string
+					/**
+					 * U​R​L
+					 */
+					url: string
+				}
+				fieldErrors: {
+					token: {
+						/**
+						 * T​o​k​e​n​ ​o​r​ ​U​R​L​ ​r​e​j​e​c​t​e​d​.
+						 */
+						rejected: string
+						/**
+						 * I​n​s​t​a​n​c​e​ ​f​o​r​ ​t​h​i​s​ ​t​o​k​e​n​ ​w​a​s​ ​n​o​t​ ​f​o​u​n​d​.
+						 */
+						instanceIsNotPresent: string
+					}
+				}
+			}
+			controls: {
+				/**
+				 * U​p​d​a​t​e​ ​I​n​s​t​a​n​c​e
+				 */
+				updateInstance: string
+				/**
+				 * R​e​m​o​v​e​ ​I​n​s​t​a​n​c​e
+				 */
+				removeInstance: string
+			}
+			messages: {
+				/**
+				 * {​n​a​m​e​}​ ​u​p​d​a​t​e​d​.
+				 * @param {string} name
+				 */
+				success: RequiredParams<'name'>
+				/**
+				 * T​o​k​e​n​ ​o​r​ ​U​R​L​ ​i​s​ ​i​n​v​a​l​i​d​.
+				 */
+				error: string
+				/**
+				 * I​n​t​a​n​c​e​ ​f​o​r​ ​g​i​v​e​n​ ​t​o​k​e​n​ ​i​s​ ​n​o​t​ ​r​e​g​i​s​t​e​r​e​d​ ​!
+				 */
+				errorInstanceNotFound: string
+			}
+		}
+		deleteInstance: {
+			/**
+			 * D​e​l​e​t​e​ ​i​n​s​t​a​n​c​e
+			 */
+			title: string
+			/**
+			 * A​r​e​ ​y​o​u​ ​s​u​r​e​ ​y​o​u​ ​w​a​n​t​ ​t​o​ ​d​e​l​e​t​e​ ​{​n​a​m​e​}​?
+			 * @param {string} name
+			 */
+			subtitle: RequiredParams<'name'>
+			messages: {
+				/**
+				 * I​n​s​t​a​n​c​e​ ​d​e​l​e​t​e​d
+				 */
+				success: string
+				/**
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​e​d
+				 */
+				error: string
+			}
+			controls: {
+				/**
+				 * D​e​l​e​t​e​ ​i​n​s​t​a​n​c​e
+				 */
+				submit: string
+			}
+		}
+	}
 }
 
 export type TranslationFunctions = {
@@ -857,6 +1036,84 @@ export type TranslationFunctions = {
 	pages: {
 		client: {
 			pages: {
+				settingsPage: {
+					/**
+					 * Settings
+					 */
+					title: () => LocalizedString
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * System tray
+								 */
+								title: () => LocalizedString
+								/**
+								 * Tray icon theme
+								 */
+								label: () => LocalizedString
+								options: {
+									/**
+									 * Color
+									 */
+									color: () => LocalizedString
+									/**
+									 * White
+									 */
+									white: () => LocalizedString
+									/**
+									 * Black
+									 */
+									black: () => LocalizedString
+									/**
+									 * Gray
+									 */
+									gray: () => LocalizedString
+								}
+							}
+							logging: {
+								/**
+								 * Logging threshold
+								 */
+								title: () => LocalizedString
+								options: {
+									/**
+									 * Error
+									 */
+									error: () => LocalizedString
+									/**
+									 * Info
+									 */
+									info: () => LocalizedString
+									/**
+									 * Debug
+									 */
+									debug: () => LocalizedString
+									/**
+									 * Trace
+									 */
+									trace: () => LocalizedString
+								}
+							}
+							theme: {
+								/**
+								 * Theme
+								 */
+								title: () => LocalizedString
+								options: {
+									/**
+									 * Light
+									 */
+									light: () => LocalizedString
+									/**
+									 * Dark
+									 */
+									dark: () => LocalizedString
+								}
+							}
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * Locations
@@ -885,7 +1142,11 @@ export type TranslationFunctions = {
 							 */
 							label: () => LocalizedString
 							/**
-							 * <p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>
+							 * 
+						                <p>
+						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+						                  <b>All traffic</b> - route ALL your network traffic through this VPN location
+						                </p>
 							 */
 							helper: () => LocalizedString
 						}
@@ -895,6 +1156,10 @@ export type TranslationFunctions = {
 						 * Locations
 						 */
 						title: () => LocalizedString
+						/**
+						 * Edit Instance
+						 */
+						edit: () => LocalizedString
 						filters: {
 							views: {
 								/**
@@ -1081,6 +1346,10 @@ export type TranslationFunctions = {
 				 * Add Instance
 				 */
 				addInstance: () => LocalizedString
+				/**
+				 * Settings
+				 */
+				settings: () => LocalizedString
 				copyright: {
 					/**
 					 * Copyright © 2023
@@ -1447,6 +1716,93 @@ export type TranslationFunctions = {
 						submit: () => LocalizedString
 					}
 				}
+			}
+		}
+	}
+	modals: {
+		updateInstance: {
+			/**
+			 * Update instance
+			 */
+			title: () => LocalizedString
+			/**
+			 * Enter the token sent by the administrator to update the Instance configuration.
+		Alternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.
+			 */
+			infoMessage: () => LocalizedString
+			form: {
+				fieldLabels: {
+					/**
+					 * Token
+					 */
+					token: () => LocalizedString
+					/**
+					 * URL
+					 */
+					url: () => LocalizedString
+				}
+				fieldErrors: {
+					token: {
+						/**
+						 * Token or URL rejected.
+						 */
+						rejected: () => LocalizedString
+						/**
+						 * Instance for this token was not found.
+						 */
+						instanceIsNotPresent: () => LocalizedString
+					}
+				}
+			}
+			controls: {
+				/**
+				 * Update Instance
+				 */
+				updateInstance: () => LocalizedString
+				/**
+				 * Remove Instance
+				 */
+				removeInstance: () => LocalizedString
+			}
+			messages: {
+				/**
+				 * {name} updated.
+				 */
+				success: (arg: { name: string }) => LocalizedString
+				/**
+				 * Token or URL is invalid.
+				 */
+				error: () => LocalizedString
+				/**
+				 * Intance for given token is not registered !
+				 */
+				errorInstanceNotFound: () => LocalizedString
+			}
+		}
+		deleteInstance: {
+			/**
+			 * Delete instance
+			 */
+			title: () => LocalizedString
+			/**
+			 * Are you sure you want to delete {name}?
+			 */
+			subtitle: (arg: { name: string }) => LocalizedString
+			messages: {
+				/**
+				 * Instance deleted
+				 */
+				success: () => LocalizedString
+				/**
+				 * Unexpected error occured
+				 */
+				error: () => LocalizedString
+			}
+			controls: {
+				/**
+				 * Delete instance
+				 */
+				submit: () => LocalizedString
 			}
 		}
 	}

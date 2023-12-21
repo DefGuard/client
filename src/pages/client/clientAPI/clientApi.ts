@@ -10,8 +10,10 @@ import {
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
+  Settings,
   StatsRequest,
   TauriCommandKey,
+  UpdateInstnaceRequest,
 } from './types';
 
 // Streamlines logging for invokes
@@ -20,7 +22,6 @@ async function invokeWrapper<T>(
   args?: InvokeArgs,
   timeout: number = 5000,
 ): Promise<T> {
-  console.log(`Invoking command ${command}`);
   debug(`Invoking command '${command}'`);
   try {
     const res = await pTimeout(invoke<T>(command, args), {
@@ -65,6 +66,17 @@ const getActiveConnection = async (data: ConnectionRequest): Promise<Connection>
 const updateLocationRouting = async (data: RoutingRequest): Promise<Connection> =>
   invokeWrapper('update_location_routing', data);
 
+const getSettings = async (): Promise<Settings> => invokeWrapper('get_settings');
+
+const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
+  invokeWrapper('update_settings', { data });
+
+const deleteInstance = async (id: number) =>
+  invokeWrapper('delete_instance', { instanceId: id });
+
+const updateInstance = async (data: UpdateInstnaceRequest) =>
+  invokeWrapper('update_instance', data);
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -76,4 +88,8 @@ export const clientApi = {
   getActiveConnection,
   saveConfig,
   updateLocationRouting,
+  getSettings,
+  updateSettings,
+  deleteInstance,
+  updateInstance,
 };

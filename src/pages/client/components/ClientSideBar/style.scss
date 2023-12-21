@@ -5,12 +5,15 @@
   position: fixed;
   inset: 0;
   height: 100%;
-  max-height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
   width: 70px;
   background-color: var(--surface-nav-bg);
   border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-flow: column;
 
   @include media-breakpoint-up(lg) {
     width: 270px;
@@ -27,6 +30,12 @@
 
     @include media-breakpoint-up(lg) {
       display: flex;
+    }
+
+    :nth-child(2) {
+      path {
+        fill: var(--text-body-primary);
+      }
     }
   }
 
@@ -52,6 +61,8 @@
 
   & > .items {
     display: flex;
+    flex-grow: 1;
+    flex-shrink: 0;
     flex-flow: column;
     align-items: flex-start;
     justify-content: flex-start;
@@ -201,6 +212,10 @@
       }
     }
 
+    #settings-nav-item {
+      margin-top: auto;
+    }
+
     #add-instance {
       @include media-breakpoint-down(lg) {
         display: grid;
@@ -210,13 +225,16 @@
         justify-content: center;
         padding: 0;
       }
+
       & > .icon-wrapper {
         display: flex;
+
         svg {
           width: 15px;
           height: 15px;
         }
       }
+
       & > p {
         display: none;
 

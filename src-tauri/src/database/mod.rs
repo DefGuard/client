@@ -41,6 +41,7 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
     let pool = DbPool::connect(&format!("sqlite://{}", db_path.to_str().unwrap())).await?;
     debug!("Running migrations.");
     sqlx::migrate!().run(&pool).await?;
+    Settings::init_defaults(&pool).await?;
     info!("Applied migrations.");
     Ok(pool)
 }
@@ -63,5 +64,6 @@ pub use models::{
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
     tunnel::Tunnel,
+    settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
     wireguard_keys::WireguardKeys,
 };

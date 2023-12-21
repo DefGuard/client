@@ -178,9 +178,13 @@ pub async fn spawn_stats_thread(handle: tauri::AppHandle, interface_name: String
                     let peers: Vec<Peer> =
                         interface_data.peers.into_iter().map(Into::into).collect();
                     for peer in peers {
-                        let mut location_stats = peer_to_location_stats(&peer, &state.get_pool())
-                            .await
-                            .unwrap();
+                        let mut location_stats = peer_to_location_stats(
+                            &peer,
+                            interface_data.listen_port,
+                            &state.get_pool(),
+                        )
+                        .await
+                        .unwrap();
                         debug!("Saving location stats: {location_stats:#?}");
                         let _ = location_stats.save(&state.get_pool()).await;
                         debug!("Saved location stats: {location_stats:#?}");

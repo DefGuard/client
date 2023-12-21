@@ -34,8 +34,10 @@ x25519-dalek = { version = "2", features = [
     "getrandom",
     "static_secrets",
 ] }
+strum = { version = "0.25", features = ["derive"] }
+dark-light = "1.0"
 
-tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored"] }
+tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
@@ -43,6 +45,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 lazy_static = "1.4"
 rust-ini = "0.20"
+struct-patch = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 nix = { version = "0.27", features = ["net"] }

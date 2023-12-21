@@ -52,6 +52,39 @@ const en = {
   pages: {
     client: {
       pages: {
+        settingsPage: {
+          title: 'Settings',
+          tabs: {
+            global: {
+              tray: {
+                title: 'System tray',
+                label: 'Tray icon theme',
+                options: {
+                  color: 'Color',
+                  white: 'White',
+                  black: 'Black',
+                  gray: 'Gray',
+                },
+              },
+              logging: {
+                title: 'Logging threshold',
+                options: {
+                  error: 'Error',
+                  info: 'Info',
+                  debug: 'Debug',
+                  trace: 'Trace',
+                },
+              },
+              theme: {
+                title: 'Theme',
+                options: {
+                  light: 'Light',
+                  dark: 'Dark',
+                },
+              },
+            },
+          },
+        },
         instancePage: {
           title: 'Locations',
           controls: {
@@ -70,6 +103,7 @@ const en = {
           },
           header: {
             title: 'Locations',
+            edit: 'Edit Instance',
             filters: {
               views: {
                 grid: 'Grid View',
@@ -160,6 +194,7 @@ const en = {
       sideBar: {
         instances: 'Instances',
         addInstance: 'Add Instance',
+        settings: 'Settings',
         copyright: {
           copyright: `Copyright © 2023`,
           appVersion: 'Application version: {version:string}',
@@ -351,6 +386,45 @@ If you want to disengage your VPN connection, simply press "deactivate".
             submit: 'Next',
           },
         },
+      },
+    },
+  },
+  modals: {
+    updateInstance: {
+      title: 'Update instance',
+      infoMessage:
+        "Enter the token sent by the administrator to update the Instance configuration.\nAlternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.",
+      form: {
+        fieldLabels: {
+          token: 'Token',
+          url: 'URL',
+        },
+        fieldErrors: {
+          token: {
+            rejected: 'Token or URL rejected.',
+            instanceIsNotPresent: 'Instance for this token was not found.',
+          },
+        },
+      },
+      controls: {
+        updateInstance: 'Update Instance',
+        removeInstance: 'Remove Instance',
+      },
+      messages: {
+        success: '{name: string} updated.',
+        error: 'Token or URL is invalid.',
+        errorInstanceNotFound: 'Intance for given token is not registered !',
+      },
+    },
+    deleteInstance: {
+      title: 'Delete instance',
+      subtitle: 'Are you sure you want to delete {name: string}?',
+      messages: {
+        success: 'Instance deleted',
+        error: 'Unexpected error occured',
+      },
+      controls: {
+        submit: 'Delete instance',
       },
     },
   },

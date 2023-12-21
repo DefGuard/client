@@ -12,10 +12,10 @@
   },
   "tauri": {
     "systemTray": {
-      "iconPath": "icons/32x32.png",
-      "iconAsTemplate": false
+      "iconPath": "resources/icons/tray-32x32-color.png",
+      "iconAsTemplate": false,
+      "menuOnLeftClick": false
     },
-
     "allowlist": {
       "all": false,
       "window": {
@@ -58,7 +58,9 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
+      "resources": [
+        "resources/*"
+      ],
       "shortDescription": "",
       "targets": ["deb", "app", "appimage"],
       "windows": {
