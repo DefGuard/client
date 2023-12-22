@@ -15,3 +15,15 @@ CREATE TABLE tunnel (
     pre_down TEXT,
     post_down TEXT
 );
+
+CREATE TABLE tunnel_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tunnel_id BIGINT NOT NULL,
+    upload BIGINT NOT NULL,
+    download BIGINT NOT NULL,
+    last_handshake BIGINT NOT NULL,
+    collected_at TIMESTAMP NOT NULL,
+    listen_port INTEGER NOT NULL,
+    persistent_keepalive_interval INTEGER NOT NULL,
+  FOREIGN KEY (tunnel_id) REFERENCES tunnel(id)
+);

@@ -1,5 +1,8 @@
-use crate::database::DbPool;
+use std::time::SystemTime;
+use crate::{commands::DateTimeAggregation, database::DbPool, error::Error};
+use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use defguard_wireguard_rs::host::Peer;
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
@@ -142,4 +145,137 @@ impl Tunnel {
         .await?;
         Ok(tunnels)
     }
+    pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
+        query_as!(
+            Tunnel,
+            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, 
+            route_all_traffic, pre_up, post_up, pre_down, post_down \
+            FROM tunnel WHERE pubkey = $1;",
+            pubkey
+        )
+        .fetch_one(pool)
+        .await
+    }
 }
+
+
+
+#[derive(FromRow, Debug, Serialize, Deserialize)]
+pub struct TunnelStats {
+    id: Option<i64>,
+    tunnel_id: i64,
+    upload: i64,
+    download: i64,
+    last_handshake: i64,
+    collected_at: NaiveDateTime,
+    listen_port: u32,
+    persistent_keepalive_interval: Option<u16>,
+}
+
+impl TunnelStats {
+    #[must_use]
+    pub fn new(
+        tunnel_id: i64,
+        upload: i64,
+        download: i64,
+        last_handshake: i64,
+        collected_at: NaiveDateTime,
+        listen_port: u32,
+        persistent_keepalive_interval: Option<u16>,
+    ) -> Self {
+        TunnelStats {
+            id: None,
+            tunnel_id,
+            upload,
+            download,
+            last_handshake,
+            collected_at,
+            listen_port,
+            persistent_keepalive_interval,
+        }
+    }
+
+    pub async fn save(&mut self, pool: &DbPool) -> Result<(), SqlxError> {
+        let result = query!(
+            "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7) \
+            RETURNING id;",
+            self.tunnel_id,
+            self.upload,
+            self.download,
+            self.last_handshake,
+            self.collected_at,
+            self.listen_port,
+            self.persistent_keepalive_interval,
+        )
+        .fetch_one(pool)
+        .await?;
+        self.id = Some(result.id);
+        Ok(())
+    }
+
+    pub async fn all_by_tunnel_id(
+        pool: &DbPool,
+        tunnel_id: i64,
+        from: &NaiveDateTime,
+        aggregation: &DateTimeAggregation,
+    ) -> Result<Vec<Self>, SqlxError> {
+        let aggregation = aggregation.fstring();
+        let stats = query_as!(
+            TunnelStats,
+            r#"
+            WITH cte AS (
+                SELECT
+                    id, tunnel_id,
+                    COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) as upload,
+                    COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) as download,
+                    last_handshake, strftime($1, collected_at) as collected_at, listen_port, persistent_keepalive_interval
+                FROM tunnel_stats
+                ORDER BY collected_at
+                LIMIT -1 OFFSET 1
+            )
+            SELECT
+                id, tunnel_id,
+                SUM(MAX(upload, 0)) as "upload!: i64",
+                SUM(MAX(download, 0)) as "download!: i64",
+                last_handshake,
+                collected_at as "collected_at!: NaiveDateTime",
+                listen_port as "listen_port!: u32",
+                persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
+            FROM cte
+            WHERE tunnel_id = $2
+            AND collected_at >= $3
+            GROUP BY collected_at
+            ORDER BY collected_at;
+            "#,
+            aggregation,
+            tunnel_id,
+            from
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(stats)
+    }
+}
+pub async fn peer_to_tunnel_stats(
+    peer: &Peer,
+    listen_port: u32,
+    pool: &DbPool,
+) -> Result<TunnelStats, Error> {
+    let tunnel = Tunnel::find_by_public_key(pool, &peer.public_key.to_string()).await?;
+    Ok(TunnelStats {
+        id: None,
+        tunnel_id: tunnel.id.unwrap(),
+        upload: peer.tx_bytes as i64,
+        download: peer.rx_bytes as i64,
+        last_handshake: peer.last_handshake.map_or(0, |ts| {
+            ts.duration_since(SystemTime::UNIX_EPOCH)
+                .map_or(0, |duration| duration.as_secs() as i64)
+        }),
+        collected_at: Utc::now().naive_utc(),
+        listen_port,
+        persistent_keepalive_interval: peer.persistent_keepalive_interval,
+    })
+}
+
+
