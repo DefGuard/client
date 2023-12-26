@@ -52,8 +52,7 @@ export const LocationLogs = ({ locationId }: Props) => {
         <ActionButton variant={ActionButtonVariant.COPY} />
         <ActionButton variant={ActionButtonVariant.DOWNLOAD} />
       </div>
-      <div ref={logsContainerElement} className="logs-container">
-      </div>
+      <div ref={logsContainerElement} className="logs-container"></div>
     </Card>
   );
 };

@@ -1,131 +1,130 @@
 @use '@scssutils' as *;
 
 #locations-detail-view {
-    .detail-card {
-        display: flex;
-        flex-flow: column;
-        row-gap: 20px;
-        padding: 20px 0;
-        min-height: 50vh;
-        overflow: hidden;
-        max-height: none;
-        margin-bottom: 20px;
+  .detail-card {
+    display: flex;
+    flex-flow: column;
+    row-gap: 20px;
+    padding: 20px 0;
+    min-height: 50vh;
+    overflow: hidden;
+    max-height: none;
+    margin-bottom: 20px;
 
-        &.tabbed {
-            border-top-left-radius: 0;
-        }
-
-        @include media-breakpoint-up(lg) {
-            min-height: 600px;
-        }
-
-
-        &>.location-no-stats {
-            padding-top: 50px;
-        }
-
-        &>.header {
-            display: flex;
-            flex-flow: row nowrap;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            row-gap: 20px;
-            box-sizing: border-box;
-            padding: 0 20px;
-
-            .route {
-                .controls {
-                    position: relative;
-
-                    .helper {
-                        position: absolute;
-                        top: -10px;
-                        right: -20px;
-                    }
-                }
-            }
-        }
-
-        .toggle {
-            .toggle-option {
-                height: 32px;
-
-                span {
-                    text-align: left;
-                    @include typography(app-button-s);
-                }
-            }
-        }
-
-        &>.grid-item {
-            box-sizing: border-box;
-            padding: 20px 25px;
-            min-height: 245px;
-
-            &>.top {
-                width: 100%;
-                display: flex;
-                flex-flow: row nowrap;
-                align-items: flex-start;
-
-                &>.btn {
-                    margin-left: auto;
-                    height: 40px;
-                }
-            }
-
-            &>.info {
-                margin: 32px 0;
-                display: flex;
-                flex-flow: row;
-                align-items: flex-start;
-                justify-content: space-between;
-            }
-
-            &>.no-data {
-                width: 100%;
-                display: block;
-                text-align: center;
-                margin-top: 42px;
-
-                @include typography(app-button-xl);
-
-                color: var(--text-body-primary);
-            }
-        }
-
-        &>.location-usage {
-            box-sizing: border-box;
-            padding: 0 20px;
-            height: clamp(100px, 400px, 25vh);
-        }
-
-        &>.info {
-            display: flex;
-            flex-flow: row wrap;
-            column-gap: 10px;
-            row-gap: 20px;
-            align-items: center;
-            justify-content: space-between;
-            box-sizing: border-box;
-            padding: 0 20px;
-        }
-
-        &>.route {
-            display: flex;
-            flex-flow: column;
-            row-gap: 8px;
-            box-sizing: border-box;
-            padding: 0 20px;
-
-            .top {
-                display: flex;
-                flex-flow: row nowrap;
-                column-gap: 0;
-                align-items: center;
-                justify-content: flex-start;
-            }
-        }
+    &.tabbed {
+      border-top-left-radius: 0;
     }
+
+    @include media-breakpoint-up(lg) {
+      min-height: 600px;
+    }
+
+    & > .location-no-stats {
+      padding-top: 50px;
+    }
+
+    & > .header {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      row-gap: 20px;
+      box-sizing: border-box;
+      padding: 0 20px;
+
+      .route {
+        .controls {
+          position: relative;
+
+          .helper {
+            position: absolute;
+            top: -10px;
+            right: -20px;
+          }
+        }
+      }
+    }
+
+    .toggle {
+      .toggle-option {
+        height: 32px;
+
+        span {
+          text-align: left;
+          @include typography(app-button-s);
+        }
+      }
+    }
+
+    & > .grid-item {
+      box-sizing: border-box;
+      padding: 20px 25px;
+      min-height: 245px;
+
+      & > .top {
+        width: 100%;
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: flex-start;
+
+        & > .btn {
+          margin-left: auto;
+          height: 40px;
+        }
+      }
+
+      & > .info {
+        margin: 32px 0;
+        display: flex;
+        flex-flow: row;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+
+      & > .no-data {
+        width: 100%;
+        display: block;
+        text-align: center;
+        margin-top: 42px;
+
+        @include typography(app-button-xl);
+
+        color: var(--text-body-primary);
+      }
+    }
+
+    & > .location-usage {
+      box-sizing: border-box;
+      padding: 0 20px;
+      height: clamp(100px, 400px, 25vh);
+    }
+
+    & > .info {
+      display: flex;
+      flex-flow: row wrap;
+      column-gap: 10px;
+      row-gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      box-sizing: border-box;
+      padding: 0 20px;
+    }
+
+    & > .route {
+      display: flex;
+      flex-flow: column;
+      row-gap: 8px;
+      box-sizing: border-box;
+      padding: 0 20px;
+
+      .top {
+        display: flex;
+        flex-flow: row nowrap;
+        column-gap: 0;
+        align-items: center;
+        justify-content: flex-start;
+      }
+    }
+  }
 }

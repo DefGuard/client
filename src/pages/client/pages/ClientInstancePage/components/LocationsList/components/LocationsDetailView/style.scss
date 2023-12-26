@@ -1,7 +1,6 @@
 @use '@scssutils' as *;
 
 #locations-detail-view {
-
   // set headers
   h1,
   h2,
@@ -22,9 +21,9 @@
     @include typography(app-side-bar);
   }
 
-  // set cards 
+  // set cards
 
-  &>.card {
+  & > .card {
     box-sizing: border-box;
     padding: 20px 20px 20px 25px;
   }
@@ -33,7 +32,7 @@
   .location-no-stats {
     flex-grow: 1;
 
-    &>* {
+    & > * {
       max-width: 400px;
     }
   }

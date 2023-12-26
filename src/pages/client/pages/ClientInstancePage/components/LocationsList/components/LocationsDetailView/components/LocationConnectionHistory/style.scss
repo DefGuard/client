@@ -4,16 +4,15 @@
   display: inline-grid;
   grid-template-columns: 1.5fr repeat(4, 1fr);
 
-  &>* {
+  & > * {
     grid-row: 1;
   }
 }
 
-
 #connection-history-card {
   margin-bottom: 50px;
 
-  &>header {
+  & > header {
     display: flex;
     flex-flow: row nowrap;
     align-items: center;
