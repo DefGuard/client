@@ -7,6 +7,7 @@ import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '.
 import {
   ConnectionRequest,
   GetLocationsRequest,
+  InterfaceLogsRequest,
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
@@ -54,12 +55,10 @@ const disconnect = async (data: ConnectionRequest): Promise<void> =>
 const getLocationStats = async (data: StatsRequest): Promise<LocationStats[]> =>
   invokeWrapper('location_stats', data);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const getLocationInterfaceLogs = async (data: any): Promise<string> =>
+const getLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<string> =>
   invokeWrapper('get_interface_logs', data);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const stopLocationInterfaceLogs = async (data: any): Promise<void> =>
+const stopLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<void> =>
   invokeWrapper('stop_interface_logs', data);
 
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>

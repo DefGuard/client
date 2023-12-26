@@ -39,6 +39,23 @@ export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
 export type LogLevel = 'error' | 'info' | 'debug' | 'trace';
 
+export type LogItemField = {
+  message: string;
+  interface_name?: string;
+};
+
+export type LogItem = {
+  // datetime UTC
+  timestamp: string;
+  level: LogLevel;
+  target: string;
+  fields: LogItemField;
+};
+
+export type InterfaceLogsRequest = {
+  locationId: DefguardLocation['id'];
+};
+
 export type Settings = {
   theme: ThemeKey;
   log_level: LogLevel;

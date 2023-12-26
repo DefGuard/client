@@ -1,0 +1,62 @@
+@use '@scssutils' as *;
+
+#location-details-card {
+  display: flex;
+  flex-flow: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  row-gap: 20px;
+
+  & > * {
+    width: 100%;
+  }
+
+  .info-section {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    row-gap: 8px;
+    column-gap: 30px;
+
+    h3 {
+      width: 100%;
+    }
+
+    & > .info {
+      display: flex;
+      flex-flow: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      flex-grow: 0;
+      row-gap: 8px;
+
+      & > label {
+        user-select: none;
+      }
+
+      & > .values {
+        display: flex;
+        flex-flow: row wrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 8px;
+        overflow: hidden;
+
+        &.ips {
+          max-width: 250px;
+        }
+
+        &.pubkey {
+          max-width: 380px;
+        }
+
+        & > * {
+          @include typography(app-button-xl);
+          color: var(--text-body-primary);
+          max-width: 100%;
+        }
+      }
+    }
+  }
+}
