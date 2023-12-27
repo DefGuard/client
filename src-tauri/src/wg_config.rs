@@ -67,9 +67,8 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
     let peer_pubkey = peer_section
         .get("PublicKey")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("PublicKey".to_string()))?;
-    let peer_allowed_ips = peer_section
-        .get("AllowedIPs")
-        .ok_or_else(|| WireguardConfigParseError::KeyNotFound("AllowedIPs".to_string()))?;
+    let peer_allowed_ips = peer_section.get("AllowedIPs");
+
     let endpoint = peer_section
         .get("Endpoint")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("Endpoint".to_string()))?;
@@ -86,7 +85,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
         prvkey.into(),
         address.into(),
         peer_pubkey.into(),
-        peer_allowed_ips.into(),
+        peer_allowed_ips.map(str::to_string),
         endpoint.into(),
         dns,
         persistent_keep_alive,
@@ -135,7 +134,10 @@ mod test {
         );
         assert_eq!(tunnel.endpoint, "10.0.0.0:1234");
         assert_eq!(tunnel.dns, Some("10.0.0.2".to_string()));
-        assert_eq!(tunnel.allowed_ips, "10.0.0.10/24, 10.2.0.1/24, 0.0.0.0/0");
+        assert_eq!(
+            tunnel.allowed_ips,
+            Some("10.0.0.10/24, 10.2.0.1/24, 0.0.0.0/0".into())
+        );
         assert_eq!(tunnel.pre_up, None);
         assert_eq!(tunnel.post_up,
           Some("iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT".to_string()));

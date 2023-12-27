@@ -5,7 +5,7 @@ CREATE TABLE tunnel (
     prvkey TEXT NOT NULL,
     address TEXT NOT NULL,
     server_pubkey TEXT NOT NULL,
-    allowed_ips TEXT NOT NULL,
+    allowed_ips TEXT,
     endpoint TEXT NOT NULL,
     dns TEXT,
     route_all_traffic BOOLEAN NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE tunnel_stats (
     collected_at TIMESTAMP NOT NULL,
     listen_port INTEGER NOT NULL,
     persistent_keepalive_interval INTEGER NOT NULL,
-  FOREIGN KEY (tunnel_id) REFERENCES tunnel(id) ON DELETE CASCADE
+    FOREIGN KEY (tunnel_id) REFERENCES tunnel(id) ON DELETE CASCADE
 );
 CREATE TABLE tunnel_connection (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

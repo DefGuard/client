@@ -15,7 +15,7 @@ pub struct Tunnel {
     // server config
     pub address: String,
     pub server_pubkey: String,
-    pub allowed_ips: String,
+    pub allowed_ips: Option<String>,
     // server_address:port
     pub endpoint: String,
     pub dns: Option<String>,
@@ -37,7 +37,7 @@ impl Tunnel {
         prvkey: String,
         address: String,
         server_pubkey: String,
-        allowed_ips: String,
+        allowed_ips: Option<String>,
         endpoint: String,
         dns: Option<String>,
         persistent_keep_alive: i64,

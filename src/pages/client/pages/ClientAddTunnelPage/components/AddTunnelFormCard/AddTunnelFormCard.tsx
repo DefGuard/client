@@ -21,7 +21,7 @@ type FormFields = {
   prvkey: string;
   address: string;
   server_pubkey: string;
-  allowed_ips: string;
+  allowed_ips?: string;
   endpoint: string;
   dns?: string;
   persistent_keep_alive: number;
