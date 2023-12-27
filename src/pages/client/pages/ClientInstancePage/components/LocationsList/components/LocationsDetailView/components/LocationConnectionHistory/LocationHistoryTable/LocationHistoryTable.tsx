@@ -4,14 +4,14 @@ import dayjs from 'dayjs';
 import { floor, isUndefined } from 'lodash-es';
 import { ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
+import { useI18nContext } from '../../../../../../../../../../../i18n/i18n-react';
 import {
   ListHeader,
   ListRowCell,
   ListSortDirection,
-} from '../../../../../../../../shared/defguard-ui/components/Layout/VirtualizedList/types';
-import { VirtualizedList } from '../../../../../../../../shared/defguard-ui/components/Layout/VirtualizedList/VirtualizedList';
-import { Connection } from '../../../../../../types';
+} from '../../../../../../../../../../../shared/defguard-ui/components/Layout/VirtualizedList/types';
+import { VirtualizedList } from '../../../../../../../../../../../shared/defguard-ui/components/Layout/VirtualizedList/VirtualizedList';
+import { Connection } from '../../../../../../../../../types';
 
 type Props = {
   connections: Connection[];
@@ -31,7 +31,7 @@ const getDuration = (start: string, end: string): string => {
   }
 };
 
-export const LocationConnectionHistory = ({ connections }: Props) => {
+export const LocationHistoryTable = ({ connections }: Props) => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client.pages.instancePage.detailView.history.headers;
   const connectionsLength = useRef(0);

@@ -1,5 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
+    path::PathBuf,
     str::FromStr,
 };
 
@@ -215,4 +216,16 @@ pub fn load_log_targets() -> Vec<String> {
         }
         Err(_) => Vec::new(),
     }
+}
+
+// helper function to get log file directory for the defguard-service daemon
+pub fn get_service_log_dir() -> PathBuf {
+    // FIXME: find out what's a shared log dir on Windows
+    #[cfg(target_os = "windows")]
+    unimplemented!();
+
+    #[cfg(not(target_os = "windows"))]
+    let path = PathBuf::from("/var/log/defguard-service");
+
+    path
 }

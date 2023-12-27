@@ -5,4 +5,5 @@ export const clientQueryKeys = {
   getConnections: 'GET_CONNECTIONS',
   getConnectionHistory: 'GET_CONNECTIONS_HISTORY',
   getActiveConnection: 'GET_ACTIVE_CONNECTION',
+  getLocationDetails: 'GET_LOCATION_DETAILS',
 };

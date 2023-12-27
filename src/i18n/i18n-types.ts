@@ -348,6 +348,73 @@ type RootTranslation = {
 								download: string
 							}
 						}
+						details: {
+							/**
+							 * D​e​t​a​i​l​s
+							 */
+							title: string
+							logs: {
+								/**
+								 * L​o​g
+								 */
+								title: string
+							}
+							info: {
+								configuration: {
+									/**
+									 * D​e​v​i​c​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n
+									 */
+									title: string
+									/**
+									 * P​u​b​l​i​c​ ​k​e​y
+									 */
+									pubkey: string
+									/**
+									 * A​d​d​r​e​s​s​e​s
+									 */
+									address: string
+									/**
+									 * L​i​s​t​e​n​ ​p​o​r​t
+									 */
+									listenPort: string
+								}
+								vpn: {
+									/**
+									 * V​P​N​ ​S​e​r​v​e​r​ ​C​o​n​f​i​g​u​r​a​t​i​o​n
+									 */
+									title: string
+									/**
+									 * P​u​b​l​i​c​ ​k​e​y
+									 */
+									pubkey: string
+									/**
+									 * S​e​r​v​e​r​ ​A​d​d​r​e​s​s
+									 */
+									serverAddress: string
+									/**
+									 * A​l​l​o​w​e​d​ ​I​P​s
+									 */
+									allowedIps: string
+									/**
+									 * D​N​S​ ​s​e​r​v​e​r​s
+									 */
+									dns: string
+									/**
+									 * P​e​r​s​i​s​t​e​n​ ​k​e​e​p​a​l​i​v​e
+									 */
+									keepalive: string
+									/**
+									 * L​a​t​e​s​t​ ​H​a​n​d​s​h​a​k​e
+									 */
+									handshake: string
+									/**
+									 * {​s​e​c​o​n​d​s​}​ ​s​e​c​o​n​d​s​ ​a​g​o
+									 * @param {number} seconds
+									 */
+									handshakeValue: RequiredParams<'seconds'>
+								}
+							}
+						}
 					}
 				}
 				addTunnelPage: {
@@ -1370,6 +1437,72 @@ export type TranslationFunctions = {
 								 * Download
 								 */
 								download: () => LocalizedString
+							}
+						}
+						details: {
+							/**
+							 * Details
+							 */
+							title: () => LocalizedString
+							logs: {
+								/**
+								 * Log
+								 */
+								title: () => LocalizedString
+							}
+							info: {
+								configuration: {
+									/**
+									 * Device configuration
+									 */
+									title: () => LocalizedString
+									/**
+									 * Public key
+									 */
+									pubkey: () => LocalizedString
+									/**
+									 * Addresses
+									 */
+									address: () => LocalizedString
+									/**
+									 * Listen port
+									 */
+									listenPort: () => LocalizedString
+								}
+								vpn: {
+									/**
+									 * VPN Server Configuration
+									 */
+									title: () => LocalizedString
+									/**
+									 * Public key
+									 */
+									pubkey: () => LocalizedString
+									/**
+									 * Server Address
+									 */
+									serverAddress: () => LocalizedString
+									/**
+									 * Allowed IPs
+									 */
+									allowedIps: () => LocalizedString
+									/**
+									 * DNS servers
+									 */
+									dns: () => LocalizedString
+									/**
+									 * Persisten keepalive
+									 */
+									keepalive: () => LocalizedString
+									/**
+									 * Latest Handshake
+									 */
+									handshake: () => LocalizedString
+									/**
+									 * {seconds} seconds ago
+									 */
+									handshakeValue: (arg: { seconds: number }) => LocalizedString
+								}
 							}
 						}
 					}

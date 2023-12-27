@@ -23,10 +23,12 @@ defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", 
 dirs = "5.0"
 local-ip-address = "0.5"
 log = "0.4"
+notify-debouncer-mini = "0.4"
 prost = "0.12"
 rand = "0.8"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_with = "3.4"
 sqlx = { version = "0.7", features = ["chrono", "sqlite", "runtime-tokio", "uuid", "macros"] }
 thiserror = "1.0"
 tonic = "0.10"
@@ -41,8 +43,10 @@ tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray",
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio-util = "0.7"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 lazy_static = "1.4"
 rust-ini = "0.20"
 struct-patch = "0.4"

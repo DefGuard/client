@@ -40,6 +40,8 @@ pub enum Error {
     ResourceNotFound(String),
     #[error("Config parse error {0}")]
     ConfigParseError(String),
+    #[error("Failed to acquire mutex lock")]
+    MutexError,
 }
 
 // we must manually implement serde::Serialize
