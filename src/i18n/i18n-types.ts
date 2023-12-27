@@ -491,6 +491,14 @@ type RootTranslation = {
 								 * E​r​r​o​r​ ​p​a​r​s​i​n​g​ ​c​o​n​f​i​g​ ​f​i​l​e
 								 */
 								configError: string
+								/**
+								 * T​u​n​n​e​l​ ​a​d​d​e​d
+								 */
+								addSuccess: string
+								/**
+								 * C​r​e​a​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+								 */
+								addError: string
 							}
 						}
 					}
@@ -1581,6 +1589,14 @@ export type TranslationFunctions = {
 								 * Error parsing config file
 								 */
 								configError: () => LocalizedString
+								/**
+								 * Tunnel added
+								 */
+								addSuccess: () => LocalizedString
+								/**
+								 * Creating tunnel failed
+								 */
+								addError: () => LocalizedString
 							}
 						}
 					}

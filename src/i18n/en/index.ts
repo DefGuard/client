@@ -189,6 +189,8 @@ const en = {
               submit: 'Add Tunnel',
               messages: {
                 configError: 'Error parsing config file',
+                addSuccess: 'Tunnel added',
+                addError: 'Creating tunnel failed',
               },
             },
           },
