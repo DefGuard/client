@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -12,6 +11,8 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../clientAPI/clientApi';
 
 type FormFields = {
@@ -47,17 +48,13 @@ const defaultValues: FormFields = {
 
 export const AddTunnelFormCard = () => {
   const { LL } = useI18nContext();
-  const { parseConfig } = clientApi;
+  const { parseConfig, saveTunnel } = clientApi;
   const toaster = useToaster();
+  const { privateKey, publicKey } = generateWGKeys();
   const localLL = LL.pages.client.pages.addTunnelPage.forms.initTunnel;
   const schema = useMemo(
     () =>
       z.object({
-        url: z
-          .string()
-          .trim()
-          .min(1, LL.form.errors.required())
-          .url(LL.form.errors.invalid()),
         name: z.string().trim().min(1, LL.form.errors.required()),
         pubkey: z.string().trim().min(1, LL.form.errors.required()),
         prvkey: z.string().trim().min(1, LL.form.errors.required()),
@@ -66,11 +63,16 @@ export const AddTunnelFormCard = () => {
         endpoint: z.string().trim().min(1, LL.form.errors.required()),
         dns: z.string().trim().min(1, LL.form.errors.required()),
         allowed_ips: z.string().trim().min(1, LL.form.errors.required()),
-        persistentKeepAlive: z.number(),
+        persistentKeepAlive: z.string(),
       }),
     [LL.form.errors],
   );
-  const handleValidSubmit = () => console.log();
+  const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
+    console.log('tutaj');
+    saveTunnel(values)
+      .then((res) => console.log(res))
+      .catch((err) => console.error(err));
+  };
   const { handleSubmit, control, reset } = useForm<FormFields>({
     resolver: zodResolver(schema),
     defaultValues,
@@ -152,7 +154,7 @@ export const AddTunnelFormCard = () => {
           controller={{ control, name: 'persistent_keep_alive' }}
           label={localLL.labels.persistentKeepAlive()}
         />
-        <h3> Advanced Options</h3>
+        <h3>Advanced Options</h3>
         <FormInput
           controller={{ control, name: 'pre_up' }}
           label={localLL.labels.preUp()}

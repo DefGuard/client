@@ -577,3 +577,13 @@ pub async fn parse_config(config: String) -> Result<Tunnel, Error> {
         Error::ConfigParseError(error.to_string())
     })
 }
+#[tauri::command(async)]
+pub async fn save_tunnel(
+    mut tunnel: Tunnel,
+    app_state: State<'_, AppState>,
+) -> Result<(), Error> {
+    debug!("Received tunnel configuration: {tunnel:#?}");
+    tunnel.save(&app_state.get_pool()).await?;
+    info!("Saved tunnel {tunnel:#?}");
+    Ok(())
+}

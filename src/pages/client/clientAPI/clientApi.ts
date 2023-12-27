@@ -3,7 +3,13 @@ import { InvokeArgs } from '@tauri-apps/api/tauri';
 import pTimeout from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
-import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '../types';
+import {
+  Connection,
+  DefguardInstance,
+  DefguardLocation,
+  LocationStats,
+  Tunnel,
+} from '../types';
 import {
   ConnectionRequest,
   GetLocationsRequest,
@@ -80,6 +86,9 @@ const updateInstance = async (data: UpdateInstnaceRequest) =>
 const parseConfig = async (config: string) =>
   invokeWrapper('parse_config', { config: config });
 
+const saveTunnel = async (tunnel: Tunnel) =>
+  invokeWrapper('save_tunnel', { tunnel: tunnel });
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -96,4 +105,5 @@ export const clientApi = {
   deleteInstance,
   updateInstance,
   parseConfig,
+  saveTunnel,
 };

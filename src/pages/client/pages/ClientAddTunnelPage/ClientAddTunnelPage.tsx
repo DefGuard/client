@@ -1,8 +1,8 @@
 import './style.scss';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
-import { AddTunnelFormCard } from './components/AddTunnelFormCard/AddTunnelFormCard';
 import { AddTunnelGuide } from './AddTunnelGuide/AddTunnelGuide';
+import { AddTunnelFormCard } from './components/AddTunnelFormCard/AddTunnelFormCard';
 
 export const ClientAddTunnelPage = () => {
   const { LL } = useI18nContext();

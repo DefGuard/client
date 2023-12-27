@@ -34,6 +34,10 @@ export type SaveDeviceConfigResponse = {
   instance: DefguardInstance;
   locations: DefguardLocation[];
 };
+export type SaveTunnelRequest = {
+  privateKey: string;
+  response: CreateDeviceResponse;
+};
 
 export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
@@ -60,4 +64,5 @@ export type TauriCommandKey =
   | 'update_settings'
   | 'delete_instance'
   | 'update_instance'
-  | 'parse_config';
+  | 'parse_config'
+  | 'save_tunnel';
