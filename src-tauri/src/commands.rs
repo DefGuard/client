@@ -3,9 +3,11 @@ use crate::{
     database::{
         models::{instance::InstanceInfo, settings::SettingsPatch},
         ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
+        Tunnel,
         WireguardKeys,
     },
     error::Error,
+    wg_config::parse_wireguard_config,
     service::proto::RemoveInterfaceRequest,
     tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
@@ -566,4 +568,12 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
     handle.emit_all("instance-update", ())?;
     info!("Instance {instance_id}, deleted");
     Ok(())
+}
+#[tauri::command(async)]
+pub async fn parse_config(config: String) -> Result<Tunnel, Error> {
+    debug!("Parsing config file");
+    parse_wireguard_config(&config).map_err(|error| {
+        error!("{error}");
+        Error::ConfigParseError(error.to_string())
+    })
 }

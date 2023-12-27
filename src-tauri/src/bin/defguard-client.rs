@@ -15,12 +15,13 @@ use defguard_client::{
     __cmd__connect, __cmd__delete_instance, __cmd__disconnect, __cmd__get_settings,
     __cmd__last_connection, __cmd__location_interface_details, __cmd__location_stats,
     __cmd__save_device_config, __cmd__update_instance, __cmd__update_location_routing,
-    __cmd__update_settings,
+    __cmd__update_settings, __cmd__parse_config,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, connect, delete_instance,
         disconnect, get_settings, last_connection, location_interface_details, location_stats,
         save_device_config, update_instance, update_location_routing, update_settings,
+        parse_config,
     },
     database::{self, models::settings::Settings},
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
@@ -89,6 +90,7 @@ async fn main() {
             get_settings,
             update_settings,
             delete_instance,
+            parse_config,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {

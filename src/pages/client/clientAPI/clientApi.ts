@@ -77,6 +77,9 @@ const deleteInstance = async (id: number) =>
 const updateInstance = async (data: UpdateInstnaceRequest) =>
   invokeWrapper('update_instance', data);
 
+const parseConfig = async (config: string) =>
+  invokeWrapper('parse_config', { config: config });
+
 export const clientApi = {
   getInstances,
   getLocations,
@@ -92,4 +95,5 @@ export const clientApi = {
   updateSettings,
   deleteInstance,
   updateInstance,
+  parseConfig,
 };

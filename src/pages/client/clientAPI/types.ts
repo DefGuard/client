@@ -59,4 +59,5 @@ export type TauriCommandKey =
   | 'get_settings'
   | 'update_settings'
   | 'delete_instance'
-  | 'update_instance';
+  | 'update_instance'
+  | 'parse_config';
