@@ -7,15 +7,11 @@ use crate::{
         WireguardKeys,
     },
     error::Error,
-<<<<<<< HEAD
     wg_config::parse_wireguard_config,
-    service::proto::RemoveInterfaceRequest,
-=======
     service::{
         log_watcher::{LogWatcherError, ServiceLogWatcher},
         proto::RemoveInterfaceRequest,
     },
->>>>>>> bda6809a9b5dede86fd75a68807102ebc3d2c25d
     tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
 };
