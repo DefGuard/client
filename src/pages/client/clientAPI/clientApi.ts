@@ -7,6 +7,9 @@ import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '.
 import {
   ConnectionRequest,
   GetLocationsRequest,
+  InterfaceLogsRequest,
+  LocationDetails,
+  LocationDetailsRequest,
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
@@ -54,6 +57,12 @@ const disconnect = async (data: ConnectionRequest): Promise<void> =>
 const getLocationStats = async (data: StatsRequest): Promise<LocationStats[]> =>
   invokeWrapper('location_stats', data);
 
+const getLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<string> =>
+  invokeWrapper('get_interface_logs', data);
+
+const stopLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<void> =>
+  invokeWrapper('stop_interface_logs', data);
+
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
   invokeWrapper('last_connection', data);
 
@@ -71,11 +80,15 @@ const getSettings = async (): Promise<Settings> => invokeWrapper('get_settings')
 const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
   invokeWrapper('update_settings', { data });
 
-const deleteInstance = async (id: number) =>
+const deleteInstance = async (id: number): Promise<void> =>
   invokeWrapper('delete_instance', { instanceId: id });
 
-const updateInstance = async (data: UpdateInstnaceRequest) =>
+const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
+
+const getLocationDetails = async (
+  data: LocationDetailsRequest,
+): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
 
 export const clientApi = {
   getInstances,
@@ -83,6 +96,8 @@ export const clientApi = {
   connect,
   disconnect,
   getLocationStats,
+  getLocationInterfaceLogs,
+  stopLocationInterfaceLogs,
   getLastConnection,
   getConnectionHistory,
   getActiveConnection,
@@ -91,5 +106,6 @@ export const clientApi = {
   getSettings,
   updateSettings,
   deleteInstance,
+  getLocationDetails,
   updateInstance,
 };

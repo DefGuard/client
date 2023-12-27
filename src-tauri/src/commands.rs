@@ -6,7 +6,10 @@ use crate::{
         WireguardKeys,
     },
     error::Error,
-    service::proto::RemoveInterfaceRequest,
+    service::{
+        log_watcher::{LogWatcherError, ServiceLogWatcher},
+        proto::RemoveInterfaceRequest,
+    },
     tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
 };
@@ -16,7 +19,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::query;
 use std::str::FromStr;
 use struct_patch::Patch;
-use tauri::{AppHandle, Manager, State};
+use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager, State};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -46,10 +50,17 @@ pub async fn connect(location_id: i64, handle: AppHandle) -> Result<(), Error> {
         let address = local_ip()?;
         let connection =
             ActiveConnection::new(location_id, address.to_string(), interface_name.clone());
-        state.active_connections.lock().unwrap().push(connection);
+        state
+            .active_connections
+            .lock()
+            .map_err(|_| Error::MutexError)?
+            .push(connection);
         debug!(
             "Active connections: {:#?}",
-            state.active_connections.lock().unwrap()
+            state
+                .active_connections
+                .lock()
+                .map_err(|_| Error::MutexError)?
         );
         debug!("Sending event connection-changed.");
         handle.emit_all(
@@ -177,17 +188,25 @@ pub async fn save_device_config(
 
     instance.save(&mut *transaction).await?;
 
-    let mut keys = WireguardKeys::new(instance.id.unwrap(), response.device.pubkey, private_key);
+    let mut keys = WireguardKeys::new(
+        instance.id.expect("Missing instance ID"),
+        response.device.pubkey,
+        private_key,
+    );
     keys.save(&mut *transaction).await?;
     for location in response.configs {
-        let mut new_location = device_config_to_location(location, instance.id.unwrap());
+        let mut new_location =
+            device_config_to_location(location, instance.id.expect("Missing instance ID"));
         new_location.save(&mut *transaction).await?;
     }
     transaction.commit().await?;
     info!("Instance created.");
     trace!("Created following instance: {instance:#?}");
-    let locations =
-        Location::find_by_instance_id(&app_state.get_pool(), instance.id.unwrap()).await?;
+    let locations = Location::find_by_instance_id(
+        &app_state.get_pool(),
+        instance.id.expect("Missing instance ID"),
+    )
+    .await?;
     trace!("Created following locations: {locations:#?}");
     handle.emit_all("instance-update", ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
@@ -202,13 +221,13 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     debug!("Retrieving all instances.");
 
     let instances = Instance::all(&app_state.get_pool()).await?;
-    debug!("Found intances({})", instances.len());
+    debug!("Found ({}) instances", instances.len());
     trace!("Instances found: {instances:#?}");
     let mut instance_info: Vec<InstanceInfo> = vec![];
     let connection_ids: Vec<i64> = app_state
         .active_connections
         .lock()
-        .unwrap()
+        .map_err(|_| Error::MutexError)?
         .iter()
         .map(|connection| connection.location_id)
         .collect();
@@ -226,7 +245,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
         let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance_id)
             .await?
-            .unwrap();
+            .ok_or(Error::NotFound)?;
         instance_info.push(InstanceInfo {
             id: instance.id,
             uuid: instance.uuid.clone(),
@@ -262,27 +281,26 @@ pub async fn all_locations(
     let active_locations_ids: Vec<i64> = app_state
         .active_connections
         .lock()
-        .unwrap()
+        .map_err(|_| Error::MutexError)?
         .iter()
         .map(|con| con.location_id)
         .collect();
     let mut location_info = vec![];
     for location in locations {
         let info = LocationInfo {
-            id: location.id.unwrap(),
+            id: location.id.expect("Missing location ID"),
             instance_id: location.instance_id,
             name: location.name,
             address: location.address,
             endpoint: location.endpoint,
-            active: active_locations_ids.contains(&location.id.unwrap()),
+            active: active_locations_ids.contains(&location.id.expect("Missing location ID")),
             route_all_traffic: location.route_all_traffic,
         };
         location_info.push(info);
     }
     debug!(
-        "Returning {} locations for instance {}",
+        "Returning {} locations for instance {instance_id}",
         location_info.len(),
-        instance_id
     );
     trace!("Locations returned:\n{location_info:#?}");
 
@@ -390,7 +408,7 @@ pub async fn update_instance(
             }
         }
         transaction.commit().await?;
-        info!("Instance {} updated", instance_id);
+        info!("Instance {instance_id} updated");
         app_handle.emit_all("instance-update", ())?;
         Ok(())
     } else {
@@ -399,7 +417,7 @@ pub async fn update_instance(
 }
 
 /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
-fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
+pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Error> {
     Ok(match from {
         Some(from) => DateTime::<Utc>::from_str(&from).map_err(|_| Error::Datetime)?,
         None => Utc::now() - Duration::hours(1),
@@ -467,7 +485,7 @@ pub async fn active_connection(
     debug!("Retrieving active connection for location with id: {location_id}");
     if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
         debug!("Location found");
-        let connection = state.find_connection(location.id.unwrap());
+        let connection = state.find_connection(location.id.expect("Missing location ID"));
         if connection.is_some() {
             debug!("Active connection found");
         }
@@ -475,7 +493,7 @@ pub async fn active_connection(
         debug!("Connection returned");
         Ok(connection)
     } else {
-        error!("Location with id: {} not found.", location_id);
+        error!("Location with id: {location_id} not found.");
         Err(Error::NotFound)
     }
 }
@@ -500,7 +518,7 @@ pub async fn update_location_routing(
     handle: AppHandle,
 ) -> Result<Location, Error> {
     let app_state = handle.state::<AppState>();
-    debug!("Updating location routing {}", location_id);
+    debug!("Updating location routing {location_id}");
     if let Some(mut location) = Location::find_by_id(&app_state.get_pool(), location_id).await? {
         location.route_all_traffic = route_all_traffic;
         location.save(&app_state.get_pool()).await?;
@@ -512,7 +530,106 @@ pub async fn update_location_routing(
         )?;
         Ok(location)
     } else {
-        error!("Location with id: {} not found.", location_id);
+        error!("Location with id: {location_id} not found.");
+        Err(Error::NotFound)
+    }
+}
+
+/// Starts a log watcher in a separate thread
+///
+/// The watcher parses `defguard-service` log files and extracts logs relevant
+/// to the WireGuard interface for a given location.
+/// Logs are then transmitted to the frontend by using `tauri` `Events`.
+/// Returned value is the name of an event topic to monitor.
+#[tauri::command]
+pub async fn get_interface_logs(
+    location_id: i64,
+    from: Option<String>,
+    handle: AppHandle,
+) -> Result<String, Error> {
+    info!("Starting log watcher for location {location_id}");
+    let app_state = handle.state::<AppState>();
+    if let Some(connection) = app_state.find_connection(location_id) {
+        // parse `from` timestamp
+        let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
+
+        // fetch configured log level from DB
+        let settings = Settings::get(&app_state.get_pool()).await?;
+        let log_level = settings.log_level.into();
+
+        let interface_name = connection.interface_name;
+
+        let event_topic = format!("log-update-{interface_name}");
+
+        // explicitly clone before topic is moved into the closure
+        let topic_clone = event_topic.clone();
+        let interface_name_clone = interface_name.clone();
+        let handle_clone = handle.clone();
+
+        // prepare cancellation token
+        let token = CancellationToken::new();
+        let token_clone = token.clone();
+
+        // spawn task
+        let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
+            let mut log_watcher = ServiceLogWatcher::new(
+                handle_clone,
+                token_clone,
+                topic_clone,
+                interface_name_clone,
+                log_level,
+                from,
+            );
+            log_watcher.run()?;
+            Ok(())
+        });
+
+        // store `CancellationToken` to manually stop watcher thread
+        let mut log_watchers = app_state
+            .log_watchers
+            .lock()
+            .expect("Failed to lock log watchers mutex");
+        if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
+            // cancel previous log watcher for this interface
+            debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
+            old_token.cancel();
+        }
+
+        Ok(event_topic)
+    } else {
+        error!("No active connection found for location with id: {location_id}");
+        Err(Error::NotFound)
+    }
+}
+
+/// Stops the log watcher thread
+#[tauri::command]
+pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<(), Error> {
+    info!("Stopping log watcher for location {location_id}");
+    let app_state = handle.state::<AppState>();
+    if let Some(connection) = app_state.find_connection(location_id) {
+        // prepare interface name
+        let interface_name = connection.interface_name;
+
+        // get `CancellationToken` to manually stop watcher thread
+        let mut log_watchers = app_state
+            .log_watchers
+            .lock()
+            .expect("Failed to lock log watchers mutex");
+
+        match log_watchers.remove(&interface_name) {
+            Some(token) => {
+                debug!("Using cancellation token for log watcher on interface {interface_name}");
+                token.cancel();
+                Ok(())
+            }
+            None => {
+                error!("Log watcher for interface {interface_name} not found.");
+                Err(Error::NotFound)
+            }
+        }
+    } else {
+        error!("No active connection found for location with id: {location_id}");
         Err(Error::NotFound)
     }
 }

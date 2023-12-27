@@ -163,7 +163,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ca33f4bc4ed1babef42cad36cc1f51fa88be00420404e5b1e80ab1b18f7678c"
 dependencies = [
  "concurrent-queue",
- "event-listener 4.0.0",
+ "event-listener 4.0.1",
  "event-listener-strategy",
  "futures-core",
  "pin-project-lite",
@@ -249,7 +249,7 @@ version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7125e42787d53db9dd54261812ef17e937c95a51e4d291373b670342fa44310c"
 dependencies = [
- "event-listener 4.0.0",
+ "event-listener 4.0.1",
  "event-listener-strategy",
  "pin-project-lite",
 ]
@@ -1136,11 +1136,13 @@ dependencies = [
  "local-ip-address",
  "log",
  "nix 0.27.1",
+ "notify-debouncer-mini",
  "prost",
  "prost-build",
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "serde_with",
  "sqlx",
  "struct-patch",
  "strum",
@@ -1150,9 +1152,11 @@ dependencies = [
  "tauri-plugin-single-instance",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tonic",
  "tonic-build",
  "tracing",
+ "tracing-appender",
  "tracing-subscriber",
  "x25519-dalek",
 ]
@@ -1444,9 +1448,9 @@ dependencies = [
 
 [[package]]
 name = "event-listener"
-version = "4.0.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "770d968249b5d99410d61f5bf89057f3199a077a04d087092f58e7d10692baae"
+checksum = "84f2cdcf274580f2d63697192d744727b3198894b1bf02923643bf59e2c26712"
 dependencies = [
  "concurrent-queue",
  "parking",
@@ -1459,7 +1463,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "958e4d70b6d5e81971bebec42271ec641e7ff4e170a6fa605f2b8a8b65cb97d3"
 dependencies = [
- "event-listener 4.0.0",
+ "event-listener 4.0.1",
  "pin-project-lite",
 ]
 
@@ -1585,6 +1589,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fsevent-sys"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76ee7a02da4d231650c7cea31349b889be2f45ddb3ef3032d2ec8185f6313fd2"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -2347,6 +2360,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "inotify"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8069d3ec154eb856955c1c0fbffefbf5f3c40a104ec912d4797314c1801abff"
+dependencies = [
+ "bitflags 1.3.2",
+ "inotify-sys",
+ "libc",
+]
+
+[[package]]
+name = "inotify-sys"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e05c02b5e89bff3b946cedeca278abc628fe811e604f027c45a8aa3cf793d0eb"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2464,6 +2497,26 @@ dependencies = [
  "serde_json",
  "thiserror",
  "treediff",
+]
+
+[[package]]
+name = "kqueue"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7447f1ca1b7b563588a205fe93dea8df60fd981423a768bc1c0ded35ed147d0c"
+dependencies = [
+ "kqueue-sys",
+ "libc",
+]
+
+[[package]]
+name = "kqueue-sys"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed9625ffda8729b85e45cf04090035ac368927b8cebc34898e7c120f52e4838b"
+dependencies = [
+ "bitflags 1.3.2",
+ "libc",
 ]
 
 [[package]]
@@ -2736,6 +2789,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f3d0b296e374a4e6f3c7b0a1f5a51d748a0d34c85e7dc48fc3fa9a87657fe09"
 dependencies = [
  "libc",
+ "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
 ]
@@ -2935,6 +2989,36 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "notify"
+version = "6.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6205bd8bb1e454ad2e27422015fb5e4f2bcc7e08fa8f27058670d208324a4d2d"
+dependencies = [
+ "bitflags 2.4.1",
+ "crossbeam-channel",
+ "filetime",
+ "fsevent-sys",
+ "inotify",
+ "kqueue",
+ "libc",
+ "log",
+ "mio",
+ "walkdir",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "notify-debouncer-mini"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d40b221972a1fc5ef4d858a2f671fb34c75983eb385463dff3780eeff6a9d43"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "notify",
 ]
 
 [[package]]
@@ -4178,9 +4262,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12022b835073e5b11e90a14f86838ceb1c8fb0325b72416845c487ac0fa95e80"
+checksum = "eb3622f419d1296904700073ea6cc23ad690adbd66f13ea683df73298736f0c1"
 dependencies = [
  "serde",
 ]
@@ -5022,7 +5106,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-log"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#563ca73de0f49e5ca50fba8168f350b8b6a9219b"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#7de603ebff4c8900d1cc24644c5c5a2dd06ab48b"
 dependencies = [
  "byte-unit",
  "fern",
@@ -5037,7 +5121,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-single-instance"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#563ca73de0f49e5ca50fba8168f350b8b6a9219b"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#7de603ebff4c8900d1cc24644c5c5a2dd06ab48b"
 dependencies = [
  "log",
  "serde",
@@ -5237,9 +5321,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.35.0"
+version = "1.35.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841d45b238a16291a4e1584e61820b8ae57d696cc5015c459c229ccc6990cc1c"
+checksum = "c89b4efa943be685f629b149f53829423f8f5531ea21249408e8e2f8671ec104"
 dependencies = [
  "backtrace",
  "bytes",
@@ -5474,6 +5558,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-appender"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
+dependencies = [
+ "crossbeam-channel",
+ "thiserror",
+ "time",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-attributes"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5506,6 +5602,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-serde"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc6b213177105856957181934e4920de57730fc69bf42c37ee5bb664d406d9e1"
+dependencies = [
+ "serde",
+ "tracing-core",
+]
+
+[[package]]
 name = "tracing-subscriber"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5515,12 +5621,15 @@ dependencies = [
  "nu-ansi-term",
  "once_cell",
  "regex",
+ "serde",
+ "serde_json",
  "sharded-slab",
  "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
  "tracing-log",
+ "tracing-serde",
 ]
 
 [[package]]

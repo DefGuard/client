@@ -140,6 +140,30 @@ const en = {
                 download: 'Download',
               },
             },
+            details: {
+              title: 'Details',
+              logs: {
+                title: 'Log',
+              },
+              info: {
+                configuration: {
+                  title: 'Device configuration',
+                  pubkey: 'Public key',
+                  address: 'Addresses',
+                  listenPort: 'Listen port',
+                },
+                vpn: {
+                  title: 'VPN Server Configuration',
+                  pubkey: 'Public key',
+                  serverAddress: 'Server Address',
+                  allowedIps: 'Allowed IPs',
+                  dns: 'DNS servers',
+                  keepalive: 'Persisten keepalive',
+                  handshake: 'Latest Handshake',
+                  handshakeValue: '{seconds: number} seconds ago',
+                },
+              },
+            },
           },
         },
         addInstancePage: {

@@ -39,10 +39,45 @@ export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
 export type LogLevel = 'error' | 'info' | 'debug' | 'trace';
 
+export type LogItemField = {
+  message: string;
+  interface_name?: string;
+};
+
+export type LogItem = {
+  // datetime UTC
+  timestamp: string;
+  level: LogLevel;
+  target: string;
+  fields: LogItemField;
+};
+
+export type InterfaceLogsRequest = {
+  locationId: DefguardLocation['id'];
+};
+
 export type Settings = {
   theme: ThemeKey;
   log_level: LogLevel;
   tray_icon_theme: TrayIconTheme;
+};
+
+export type LocationDetails = {
+  location_id: number;
+  name: string;
+  pubkey: string;
+  address: string;
+  dns?: string[];
+  listen_port: number;
+  peer_pubkey: string;
+  peer_endpoint: string;
+  allowed_ips: string;
+  persistent_keepalive_interval?: number;
+  last_handshake: number;
+};
+
+export type LocationDetailsRequest = {
+  locationId: number;
 };
 
 export type TauriCommandKey =
@@ -51,6 +86,8 @@ export type TauriCommandKey =
   | 'connect'
   | 'disconnect'
   | 'location_stats'
+  | 'get_interface_logs'
+  | 'stop_interface_logs'
   | 'last_connection'
   | 'all_connections'
   | 'active_connection'
@@ -59,4 +96,5 @@ export type TauriCommandKey =
   | 'get_settings'
   | 'update_settings'
   | 'delete_instance'
-  | 'update_instance';
+  | 'update_instance'
+  | 'location_interface_details';
