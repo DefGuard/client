@@ -55,6 +55,7 @@
           @include typography(app-button-xl);
           color: var(--text-body-primary);
           max-width: 100%;
+          user-select: auto;
         }
       }
     }

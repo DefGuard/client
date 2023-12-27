@@ -407,6 +407,11 @@ type RootTranslation = {
 									 * L​a​t​e​s​t​ ​H​a​n​d​s​h​a​k​e
 									 */
 									handshake: string
+									/**
+									 * {​s​e​c​o​n​d​s​}​ ​s​e​c​o​n​d​s​ ​a​g​o
+									 * @param {number} seconds
+									 */
+									handshakeValue: RequiredParams<'seconds'>
 								}
 							}
 						}
@@ -1369,6 +1374,10 @@ export type TranslationFunctions = {
 									 * Latest Handshake
 									 */
 									handshake: () => LocalizedString
+									/**
+									 * {seconds} seconds ago
+									 */
+									handshakeValue: (arg: { seconds: number }) => LocalizedString
 								}
 							}
 						}

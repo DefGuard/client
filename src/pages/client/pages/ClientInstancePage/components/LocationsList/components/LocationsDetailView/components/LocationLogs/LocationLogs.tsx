@@ -29,11 +29,25 @@ export const LocationLogs = ({ locationId }: Props) => {
       const eventTopic = await getLocationInterfaceLogs({ locationId });
       // assign unlisten
       eventUnlisten = await listen<LogItem[]>(eventTopic, ({ payload: logItems }) => {
-        logItems.forEach((item) => {
-          const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
-          const element = createLogLineElement(messageString);
-          logsContainerElement.current?.appendChild(element);
-        });
+        if (logsContainerElement.current) {
+          logItems.forEach((item) => {
+            if (logsContainerElement.current) {
+              const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
+              const element = createLogLineElement(messageString);
+              const scrollAfterAppend =
+                logsContainerElement.current.scrollHeight -
+                  logsContainerElement.current.scrollTop ===
+                logsContainerElement.current.clientHeight;
+              logsContainerElement.current.appendChild(element);
+              // auto scroll to bottom if user didn't scroll up
+              if (scrollAfterAppend) {
+                logsContainerElement.current.scrollTo({
+                  top: logsContainerElement.current.scrollHeight,
+                });
+              }
+            }
+          });
+        }
       });
     };
     startLogging();

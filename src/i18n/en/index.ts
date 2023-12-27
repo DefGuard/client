@@ -160,6 +160,7 @@ const en = {
                   dns: 'DNS servers',
                   keepalive: 'Persisten keepalive',
                   handshake: 'Latest Handshake',
+                  handshakeValue: '{seconds: number} seconds ago',
                 },
               },
             },

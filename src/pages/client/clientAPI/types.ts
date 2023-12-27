@@ -62,6 +62,24 @@ export type Settings = {
   tray_icon_theme: TrayIconTheme;
 };
 
+export type LocationDetails = {
+  location_id: number;
+  name: string;
+  pubkey: string;
+  address: string;
+  dns?: string[];
+  listen_port: number;
+  peer_pubkey: string;
+  peer_endpoint: string;
+  allowed_ips: string;
+  persistent_keepalive_interval?: number;
+  last_handshake: number;
+};
+
+export type LocationDetailsRequest = {
+  locationId: number;
+};
+
 export type TauriCommandKey =
   | 'all_instances'
   | 'all_locations'
@@ -78,4 +96,5 @@ export type TauriCommandKey =
   | 'get_settings'
   | 'update_settings'
   | 'delete_instance'
-  | 'update_instance';
+  | 'update_instance'
+  | 'location_interface_details';

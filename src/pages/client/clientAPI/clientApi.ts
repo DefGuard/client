@@ -8,6 +8,8 @@ import {
   ConnectionRequest,
   GetLocationsRequest,
   InterfaceLogsRequest,
+  LocationDetails,
+  LocationDetailsRequest,
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
@@ -78,11 +80,15 @@ const getSettings = async (): Promise<Settings> => invokeWrapper('get_settings')
 const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
   invokeWrapper('update_settings', { data });
 
-const deleteInstance = async (id: number) =>
+const deleteInstance = async (id: number): Promise<void> =>
   invokeWrapper('delete_instance', { instanceId: id });
 
-const updateInstance = async (data: UpdateInstnaceRequest) =>
+const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
+
+const getLocationDetails = async (
+  data: LocationDetailsRequest,
+): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
 
 export const clientApi = {
   getInstances,
@@ -100,5 +106,6 @@ export const clientApi = {
   getSettings,
   updateSettings,
   deleteInstance,
+  getLocationDetails,
   updateInstance,
 };
