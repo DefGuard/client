@@ -5,12 +5,18 @@ import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
+import { ArrowSingle } from '../../../../../../shared/defguard-ui/components/icons/ArrowSingle/ArrowSingle';
+import {
+  ArrowSingleDirection,
+  ArrowSingleSize,
+} from '../../../../../../shared/defguard-ui/components/icons/ArrowSingle/types';
 import { Button } from '../../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import {
   ButtonSize,
   ButtonStyleVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../clientAPI/clientApi';
@@ -52,8 +58,6 @@ export const AddTunnelFormCard = () => {
   const { LL } = useI18nContext();
   const { parseConfig, saveTunnel } = clientApi;
   const toaster = useToaster();
-  const cidrRegex =
-    /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}|[0-9a-fA-F:.]+\/\d{1,3})$/;
 
   const localLL = LL.pages.client.pages.addTunnelPage.forms.initTunnel;
   /* eslint-disable no-useless-escape */
@@ -66,23 +70,27 @@ export const AddTunnelFormCard = () => {
         server_pubkey: z.string().trim().min(1, LL.form.errors.required()),
         address: z.string().refine((value) => {
           // Regular expression to match IPv4 CIDR and IPv6 CIDR
+          const cidrRegex =
+            /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}|[0-9a-fA-F:.]+\/\d{1,3})$/;
           return cidrRegex.test(value);
-        }, 'Invalid IP address with subnet mask format'),
+        }, LL.form.errors.invalid()),
         endpoint: z.string().refine((value) => {
           // Regular expression to match IPv4, IPv6, or domain name with port
           const endpointRegex = /^([0-9a-fA-F:\.]+|\w+(\.\w+)+)(:\d+)?$/;
           return endpointRegex.test(value);
-        }, 'Invalid VPN server endpoint format'),
+        }, LL.form.errors.invalid()),
         dns: z.string().trim().min(1, LL.form.errors.required()),
         allowed_ips: z.string().refine((value) => {
+          const cidrRegex =
+            /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}|[0-9a-fA-F:.]+\/\d{1,3})$/;
           // Regular expression to match IPv4 CIDR and IPv6 CIDR
           const ips = value.split(',').map((ip) => ip.trim());
           return ips.every((ip) => cidrRegex.test(ip));
-        }, 'Invalid allowed IPs format'),
+        }, LL.form.errors.invalid()),
         persistent_keep_alive: z.number(),
         route_all_traffic: z.boolean(),
       }),
-    [LL.form.errors, cidrRegex],
+    [LL.form.errors],
   );
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
     saveTunnel(values)
@@ -130,24 +138,28 @@ export const AddTunnelFormCard = () => {
   };
 
   useEffect(() => {
-    // FIXME: handle any
-    const onPrvKeyChange = (e) => {
+    // eslint-disable-next-line
+    const onPrvKeyChange = (e: any) => {
       if (generatedKeys && e.target.value !== defaultValues.prvkey) {
         setGeneratedKeys(false);
       }
     };
 
-    // Attach the event listener to the 'prvkey' input
     const prvKeyInput = document.getElementsByName('prvkey')[0];
     if (prvKeyInput) {
       prvKeyInput.addEventListener('input', onPrvKeyChange);
 
-      // Cleanup the event listener when the component unmounts
       return () => {
         prvKeyInput.removeEventListener('input', onPrvKeyChange);
       };
     }
   }, [generatedKeys]);
+
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
+  const handleToggleAdvancedOptions = () => {
+    setShowAdvancedOptions(!showAdvancedOptions);
+  };
 
   return (
     <Card id="add-tunnel-form-card">
@@ -156,67 +168,102 @@ export const AddTunnelFormCard = () => {
         <div className="controls">
           <Button
             styleVariant={ButtonStyleVariant.STANDARD}
-            text={'Import Config File'}
+            text={localLL.controls.importConfig()}
             onClick={() => handleConfigUpload()}
           />
           <Button
             styleVariant={ButtonStyleVariant.STANDARD}
-            text={'Generate key pair'}
+            text={localLL.controls.generatePrvkey()}
             onClick={() => generateKeyPair()}
           />
         </div>
       </header>
       <form onSubmit={handleSubmit(handleValidSubmit)}>
-        <FormInput controller={{ control, name: 'name' }} label={localLL.labels.name()} />
-        <FormInput
-          controller={{ control, name: 'prvkey' }}
-          label={localLL.labels.privateKey()}
-        />
-        <FormInput
-          controller={{ control, name: 'pubkey' }}
-          disabled={generatedKeys}
-          label={localLL.labels.publicKey()}
-        />
-        <FormInput
-          controller={{ control, name: 'address' }}
-          label={localLL.labels.address()}
-        />
-        <h3> VPN Server</h3>
+        <div className="client">
+          <FormInput
+            controller={{ control, name: 'name' }}
+            label={localLL.labels.name()}
+            labelExtras={<Helper>{localLL.helpers.name()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'prvkey' }}
+            label={localLL.labels.privateKey()}
+            labelExtras={<Helper>{localLL.helpers.prvkey()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'pubkey' }}
+            disabled={generatedKeys}
+            label={localLL.labels.publicKey()}
+            labelExtras={<Helper>{localLL.helpers.pubkey()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'address' }}
+            label={localLL.labels.address()}
+            labelExtras={<Helper>{localLL.helpers.address()}</Helper>}
+          />
+        </div>
+        <h3>{localLL.sections.vpnServer()}</h3>
         <FormInput
           controller={{ control, name: 'server_pubkey' }}
           label={localLL.labels.serverPubkey()}
+          labelExtras={<Helper>{localLL.helpers.serverPubkey()}</Helper>}
         />
         <FormInput
           controller={{ control, name: 'endpoint' }}
           label={localLL.labels.endpoint()}
+          labelExtras={<Helper>{localLL.helpers.endpoint()}</Helper>}
         />
-        <FormInput controller={{ control, name: 'dns' }} label={localLL.labels.dns()} />
+        <FormInput
+          controller={{ control, name: 'dns' }}
+          label={localLL.labels.dns()}
+          labelExtras={<Helper>{localLL.helpers.dns()}</Helper>}
+        />
         <FormInput
           controller={{ control, name: 'allowed_ips' }}
           label={localLL.labels.allowedips()}
+          labelExtras={<Helper>{localLL.helpers.allowedIps()}</Helper>}
         />
 
         <FormInput
           controller={{ control, name: 'persistent_keep_alive' }}
           label={localLL.labels.persistentKeepAlive()}
+          labelExtras={<Helper>{localLL.helpers.persistentKeepAlive()}</Helper>}
         />
-        <h3>Advanced Options</h3>
-        <FormInput
-          controller={{ control, name: 'pre_up' }}
-          label={localLL.labels.preUp()}
-        />
-        <FormInput
-          controller={{ control, name: 'post_up' }}
-          label={localLL.labels.postUp()}
-        />
-        <FormInput
-          controller={{ control, name: 'pre_down' }}
-          label={localLL.labels.PreDown()}
-        />
-        <FormInput
-          controller={{ control, name: 'post_down' }}
-          label={localLL.labels.PostDown()}
-        />
+        <div className="advanced-options-header">
+          <h3>{localLL.sections.advancedOptions()}</h3>
+          <Helper> {localLL.helpers.advancedOptions()}</Helper>
+          <div className="underscore"></div>
+          <button type="button" onClick={handleToggleAdvancedOptions}>
+            <ArrowSingle
+              direction={
+                showAdvancedOptions ? ArrowSingleDirection.UP : ArrowSingleDirection.DOWN
+              }
+              size={ArrowSingleSize.SMALL}
+            />
+          </button>
+        </div>
+        <div className={`advanced-options ${showAdvancedOptions ? 'open' : ''}`}>
+          <FormInput
+            controller={{ control, name: 'pre_up' }}
+            label={localLL.labels.preUp()}
+            labelExtras={<Helper>{localLL.helpers.preUp()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'post_up' }}
+            label={localLL.labels.postUp()}
+            labelExtras={<Helper>{localLL.helpers.postUp()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'pre_down' }}
+            label={localLL.labels.PreDown()}
+            labelExtras={<Helper>{localLL.helpers.preDown()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'post_down' }}
+            label={localLL.labels.PostDown()}
+            labelExtras={<Helper>{localLL.helpers.postDown()}</Helper>}
+          />
+        </div>
         <div className="controls">
           <Button
             type="submit"

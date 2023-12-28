@@ -69,14 +69,49 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        margin-bottom: 1rem;
         & > .controls {
           display: flex;
           gap: 15px;
         }
       }
       form {
+        & > .client {
+          border-bottom: 1px solid var(--border-primary);
+          margin-bottom: 1rem;
+        }
         & > h3 {
-          padding-bottom: 1rem;
+          margin-bottom: 1rem;
+        }
+        .advanced-options-header {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 1rem;
+          & > button {
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+          }
+          .arrow-single {
+            width: 22px;
+            height: 22px;
+            margin-left: auto;
+          }
+          .underscore {
+            flex-grow: 1;
+            border-bottom: 1px solid var(--border-primary);
+            margin-right: 10px;
+          }
+        }
+        .advanced-options {
+          display: none;
+          transition: opacity 0.5s ease;
+        }
+
+        .advanced-options.open {
+          display: block;
         }
         > .controls {
           padding-top: 42px;
