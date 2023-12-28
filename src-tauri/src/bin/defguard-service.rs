@@ -25,17 +25,21 @@ async fn main() -> anyhow::Result<()> {
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     // prepare log level filter for stdout
-    let filter = EnvFilter::try_from_default_env()
+    let stdout_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| format!("{},hyper=info", config.log_level).into());
+
+    // prepare log level filter for json file
+    let json_filter = EnvFilter::new(format!("{},hyper=info", tracing::Level::DEBUG));
 
     // prepare tracing layers
     let stdout_layer = fmt::layer()
         .pretty()
         .with_writer(stdout.with_max_level(tracing::Level::DEBUG))
-        .with_filter(filter);
+        .with_filter(stdout_filter);
     let json_file_layer = fmt::layer()
         .json()
-        .with_writer(non_blocking.with_max_level(tracing::Level::DEBUG));
+        .with_writer(non_blocking.with_max_level(tracing::Level::DEBUG))
+        .with_filter(json_filter);
 
     // initialize tracing subscriber
     tracing_subscriber::registry()
