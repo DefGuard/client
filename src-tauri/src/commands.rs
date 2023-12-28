@@ -526,9 +526,23 @@ pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
 pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
     let app_state = handle.state::<AppState>();
     let pool = &app_state.get_pool();
+    trace!("Pool received");
     let mut settings = Settings::get(pool).await?;
+    trace!("Settings loaded from table");
     settings.apply(data);
+    debug!("Saving settings");
     settings.save(pool).await?;
-    configure_tray_icon(&handle, &settings.tray_icon_theme)?;
+    debug!("Settings saved");
+    match configure_tray_icon(&handle, &settings.tray_icon_theme) {
+        Ok(_) => {
+            trace!("Tray icon updated");
+        }
+        Err(e) => {
+            error!(
+                "Failed to update tray icon druing settings update, err: {}",
+                e.to_string()
+            );
+        }
+    }
     Ok(settings)
 }

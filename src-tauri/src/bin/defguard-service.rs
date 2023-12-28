@@ -35,14 +35,10 @@ fn main() -> windows_service::Result<()> {
 
 #[cfg(windows)]
 mod defguard_windows_service {
-    use std::{
-        ffi::OsString,
-        sync::mpsc,
-        time::Duration,
-    };
     use clap::Parser;
     use defguard_client::service::{config::Config, run_server};
     use log::error;
+    use std::{ffi::OsString, sync::mpsc, time::Duration};
     use tokio::runtime::Runtime;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
     use windows_service::{
@@ -71,7 +67,7 @@ mod defguard_windows_service {
             error!("Error while running the service. {:?}", _e);
         }
     }
-    
+
     fn run_service() -> Result<()> {
         // Create a channel to be able to poll a stop event from the service worker loop.
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
@@ -121,15 +117,13 @@ mod defguard_windows_service {
                 .init();
 
             runtime.spawn(run_server(config));
-            
+
             loop {
                 // Poll shutdown event.
                 match shutdown_rx.recv_timeout(Duration::from_secs(1)) {
                     // Break the loop either upon stop or channel disconnect
-                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => {
-                        break
-                    },
-    
+                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+
                     // Continue work if no events were received within the timeout
                     Err(mpsc::RecvTimeoutError::Timeout) => (),
                 };
