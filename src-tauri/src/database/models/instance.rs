@@ -1,13 +1,16 @@
 use crate::{database::DbPool, error::Error};
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow};
+use url::Url;
 
 #[derive(FromRow, Serialize, Deserialize, Debug)]
 pub struct Instance {
     pub id: Option<i64>,
     pub name: String,
     pub uuid: String,
-    pub url: String,
+    pub url: Url,
+    pub proxy_url: Url,
+    pub username: String,
 }
 
 impl Instance {
