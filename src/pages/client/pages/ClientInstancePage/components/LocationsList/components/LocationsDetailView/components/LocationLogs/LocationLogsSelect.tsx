@@ -63,7 +63,7 @@ export const LocationLogsSelect = ({ initSelected, onChange }: Props) => {
 
   return (
     <Select
-      sizeVariant={SelectSizeVariant.STANDARD}
+      sizeVariant={SelectSizeVariant.SMALL}
       selected={selected}
       renderSelected={renderSelected}
       options={options}
