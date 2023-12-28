@@ -45,7 +45,6 @@ tonic = "0.10"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-url = { version = "2.5", features = [] }
 x25519-dalek = { version = "2", features = [
     "getrandom",
     "static_secrets",

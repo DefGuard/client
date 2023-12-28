@@ -1184,7 +1184,6 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
- "url",
  "x25519-dalek",
 ]
 
