@@ -92,8 +92,8 @@ const deleteInstance = async (id: number): Promise<void> =>
 const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
 
-const parseConfig = async (config: string) =>
-  invokeWrapper('parse_config', { config: config });
+const parseTunnelConfig = async (config: string) =>
+  invokeWrapper('parse_tunnel_config', { config: config });
 
 const saveTunnel = async (tunnel: Tunnel) =>
   invokeWrapper('save_tunnel', { tunnel: tunnel });
@@ -120,6 +120,6 @@ export const clientApi = {
   deleteInstance,
   getLocationDetails,
   updateInstance,
-  parseConfig,
+  parseTunnelConfig,
   saveTunnel,
 };

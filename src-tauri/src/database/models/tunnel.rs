@@ -1,9 +1,9 @@
-use std::time::SystemTime;
 use crate::{commands::DateTimeAggregation, database::DbPool, error::Error};
 use chrono::{NaiveDateTime, Utc};
-use serde::{Deserialize, Serialize};
 use defguard_wireguard_rs::host::Peer;
+use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
+use std::time::SystemTime;
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct Tunnel {
@@ -158,8 +158,6 @@ impl Tunnel {
     }
 }
 
-
-
 #[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct TunnelStats {
     id: Option<i64>,
@@ -277,5 +275,3 @@ pub async fn peer_to_tunnel_stats(
         persistent_keepalive_interval: peer.persistent_keepalive_interval,
     })
 }
-
-

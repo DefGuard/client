@@ -603,16 +603,17 @@ type RootTranslation = {
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​1​.​ ​I​m​p​o​r​t​ ​C​o​n​f​i​g​u​r​a​t​i​o​n​ ​F​i​l​e​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​C​l​i​c​k​ ​o​n​ ​t​h​e​ ​"​I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e​"​ ​b​u​t​t​o​n​.​<​/​l​i​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​N​a​v​i​g​a​t​g​e​ ​t​o​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​u​s​i​n​g​ ​t​h​e​ ​f​i​l​e​ ​s​e​l​e​c​t​i​o​n​ ​d​i​a​l​o​g​.​<​/​l​i​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​S​e​l​e​c​t​ ​t​h​e​ ​.​c​o​n​f​ ​f​i​l​e​ ​y​o​u​ ​r​e​c​e​i​v​e​d​ ​o​r​ ​c​r​e​a​t​e​d​.​<​/​l​i​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​C​l​i​c​k​ ​o​n​ ​t​h​e​ ​"​I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e​"​ ​b​u​t​t​o​n​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​N​a​v​i​g​a​t​g​e​ ​t​o​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​u​s​i​n​g​ ​t​h​e​ ​f​i​l​e​ ​s​e​l​e​c​t​i​o​n​ ​d​i​a​l​o​g​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​S​e​l​e​c​t​ ​t​h​e​ ​.​c​o​n​f​ ​f​i​l​e​ ​y​o​u​ ​r​e​c​e​i​v​e​d​ ​o​r​ ​c​r​e​a​t​e​d​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​2​.​ ​O​r​ ​F​i​l​l​ ​i​n​ ​F​o​r​m​ ​o​n​ ​t​h​e​ ​L​e​f​t​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​E​n​t​e​r​ ​a​ ​n​a​m​e​ ​f​o​r​ ​t​h​e​ ​t​u​n​n​e​l​.​<​/​l​i​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​P​r​o​v​i​d​e​ ​e​s​s​e​n​t​i​a​l​ ​d​e​t​a​i​l​s​ ​s​u​c​h​ ​a​s​ ​t​h​e​ ​p​r​i​v​a​t​e​ ​k​e​y​,​ ​p​u​b​l​i​c​ ​k​e​y​,​ ​a​n​d​ ​e​n​d​p​o​i​n​t​ ​(​s​e​r​v​e​r​ ​a​d​d​r​e​s​s​)​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​E​n​t​e​r​ ​a​ ​n​a​m​e​ ​f​o​r​ ​t​h​e​ ​t​u​n​n​e​l​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​P​r​o​v​i​d​e​ ​e​s​s​e​n​t​i​a​l​ ​d​e​t​a​i​l​s​ ​s​u​c​h​ ​a​s​ ​t​h​e​ ​p​r​i​v​a​t​e​ ​k​e​y​,​ ​p​u​b​l​i​c​ ​k​e​y​,​ ​a​n​d​ ​e​n​d​p​o​i​n​t​ ​(​s​e​r​v​e​r​ ​a​d​d​r​e​s​s​)​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
@@ -1783,16 +1784,17 @@ export type TranslationFunctions = {
 						                <p>1. Import Configuration File</p>
 						                <div>
 						                <ul>
-						                <li> Click on the "Import Config File" button.</li>
-						                <li> Navigatge to configuration file using the file selection dialog.</li>
-						                <li> Select the .conf file you received or created.</li>
-						                <ul>
+						                  <li> Click on the "Import Config File" button.</li>
+						                  <li> Navigatge to configuration file using the file selection dialog.</li>
+						                  <li> Select the .conf file you received or created.</li>
+						                </ul>
 						                </div>
 						                <p>2. Or Fill in Form on the Left</p>
 						                <div>
 						                <ul>
-						                <li> Enter a name for the tunnel.</li>
-						                <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+						                  <li> Enter a name for the tunnel.</li>
+						                  <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+						                </ul>
 						                </div>
 						                <p>
 						                For more help, please visit defguard help (https://defguard.gitbook.io/)

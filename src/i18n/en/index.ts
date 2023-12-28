@@ -241,16 +241,17 @@ const en = {
                 <p>1. Import Configuration File</p>
                 <div>
                 <ul>
-                <li> Click on the "Import Config File" button.</li>
-                <li> Navigatge to configuration file using the file selection dialog.</li>
-                <li> Select the .conf file you received or created.</li>
-                <ul>
+                  <li> Click on the "Import Config File" button.</li>
+                  <li> Navigatge to configuration file using the file selection dialog.</li>
+                  <li> Select the .conf file you received or created.</li>
+                </ul>
                 </div>
                 <p>2. Or Fill in Form on the Left</p>
                 <div>
                 <ul>
-                <li> Enter a name for the tunnel.</li>
-                <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+                  <li> Enter a name for the tunnel.</li>
+                  <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+                </ul>
                 </div>
                 <p>
                 For more help, please visit defguard help (https://defguard.gitbook.io/)

@@ -63,7 +63,7 @@ pub use models::{
     connection::{ActiveConnection, Connection, ConnectionInfo},
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
-    tunnel::Tunnel,
     settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
+    tunnel::Tunnel,
     wireguard_keys::WireguardKeys,
 };

@@ -18,7 +18,14 @@ import {
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import {
+  cidrRegex,
+  patternValidEndpoint,
+  patternValidIp,
+  patternValidWireguardKey,
+} from '../../../../../../shared/patterns';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
+import { validateIpOrDomainList } from '../../../../../../shared/validators/tunnel';
 import { clientApi } from '../../../../clientAPI/clientApi';
 
 type FormFields = {
@@ -56,7 +63,7 @@ const defaultValues: FormFields = {
 
 export const AddTunnelFormCard = () => {
   const { LL } = useI18nContext();
-  const { parseConfig, saveTunnel } = clientApi;
+  const { parseTunnelConfig, saveTunnel } = clientApi;
   const toaster = useToaster();
 
   const localLL = LL.pages.client.pages.addTunnelPage.forms.initTunnel;
@@ -65,25 +72,40 @@ export const AddTunnelFormCard = () => {
     () =>
       z.object({
         name: z.string().trim().min(1, LL.form.errors.required()),
-        pubkey: z.string().trim().min(1, LL.form.errors.required()),
-        prvkey: z.string().trim().min(1, LL.form.errors.required()),
-        server_pubkey: z.string().trim().min(1, LL.form.errors.required()),
+        pubkey: z
+          .string()
+          .trim()
+          .min(1, LL.form.errors.required())
+          .refine((value) => {
+            return patternValidWireguardKey.test(value);
+          }, LL.form.errors.invalid()),
+        prvkey: z
+          .string()
+          .trim()
+          .min(1, LL.form.errors.required())
+          .refine((value) => {
+            return patternValidWireguardKey.test(value);
+          }, LL.form.errors.invalid()),
+        server_pubkey: z
+          .string()
+          .trim()
+          .min(1, LL.form.errors.required())
+          .refine((value) => {
+            return patternValidWireguardKey.test(value);
+          }, LL.form.errors.invalid()),
         address: z.string().refine((value) => {
-          // Regular expression to match IPv4 CIDR and IPv6 CIDR
-          const cidrRegex =
-            /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}|[0-9a-fA-F:.]+\/\d{1,3})$/;
-          return cidrRegex.test(value);
+          return patternValidIp.test(value);
         }, LL.form.errors.invalid()),
-        endpoint: z.string().refine((value) => {
-          // Regular expression to match IPv4, IPv6, or domain name with port
-          const endpointRegex = /^([0-9a-fA-F:\.]+|\w+(\.\w+)+)(:\d+)?$/;
-          return endpointRegex.test(value);
+        endpoint: z
+          .string()
+          .min(1, LL.form.errors.required())
+          .refine((value) => {
+            return patternValidEndpoint.test(value);
+          }, LL.form.errors.invalid()),
+        dns: z.string().refine((value) => {
+          return validateIpOrDomainList(value, ',', true);
         }, LL.form.errors.invalid()),
-        dns: z.string().trim().min(1, LL.form.errors.required()),
         allowed_ips: z.string().refine((value) => {
-          const cidrRegex =
-            /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}|[0-9a-fA-F:.]+\/\d{1,3})$/;
-          // Regular expression to match IPv4 CIDR and IPv6 CIDR
           const ips = value.split(',').map((ip) => ip.trim());
           return ips.every((ip) => cidrRegex.test(ip));
         }, LL.form.errors.invalid()),
@@ -116,7 +138,7 @@ export const AddTunnelFormCard = () => {
         reader.onload = () => {
           if (reader.result && input.files) {
             const res = reader.result;
-            parseConfig(res as string)
+            parseTunnelConfig(res as string)
               .then((data) => reset(data as FormFields))
               .catch(() => toaster.error(localLL.messages.configError()));
           }

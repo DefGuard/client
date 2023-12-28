@@ -3,17 +3,16 @@ use crate::{
     database::{
         models::{instance::InstanceInfo, settings::SettingsPatch},
         ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
-        Tunnel,
-        WireguardKeys,
+        Tunnel, WireguardKeys,
     },
     error::Error,
-    wg_config::parse_wireguard_config,
     service::{
         log_watcher::{LogWatcherError, ServiceLogWatcher},
         proto::RemoveInterfaceRequest,
     },
     tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
+    wg_config::parse_wireguard_config,
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
@@ -687,7 +686,7 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
     Ok(())
 }
 #[tauri::command(async)]
-pub async fn parse_config(config: String) -> Result<Tunnel, Error> {
+pub async fn parse_tunnel_config(config: String) -> Result<Tunnel, Error> {
     debug!("Parsing config file");
     parse_wireguard_config(&config).map_err(|error| {
         error!("{error}");
@@ -695,10 +694,7 @@ pub async fn parse_config(config: String) -> Result<Tunnel, Error> {
     })
 }
 #[tauri::command(async)]
-pub async fn save_tunnel(
-    mut tunnel: Tunnel,
-    app_state: State<'_, AppState>,
-) -> Result<(), Error> {
+pub async fn save_tunnel(mut tunnel: Tunnel, app_state: State<'_, AppState>) -> Result<(), Error> {
     debug!("Received tunnel configuration: {tunnel:#?}");
     tunnel.save(&app_state.get_pool()).await?;
     info!("Saved tunnel {tunnel:#?}");
