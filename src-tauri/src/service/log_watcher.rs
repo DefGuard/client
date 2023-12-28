@@ -243,6 +243,12 @@ fn extract_timestamp(filename: &str) -> Option<SystemTime> {
     None
 }
 
+/// Starts a log watcher in a separate thread
+///
+/// The watcher parses `defguard-service` log files and extracts logs relevant
+/// to the WireGuard interface for a given location.
+/// Logs are then transmitted to the frontend by using `tauri` `Events`.
+/// Returned value is the name of an event topic to monitor.
 pub async fn spawn_log_watcher_task(
     handle: AppHandle,
     location_id: i64,
@@ -256,7 +262,8 @@ pub async fn spawn_log_watcher_task(
     // parse `from` timestamp
     let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
 
-    let event_topic = format!("log-update-{location_id}");
+    // FIXME: handle different naming for bare WireGuard tunnels once implemented
+    let event_topic = format!("log-update-location-{location_id}");
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();
@@ -295,6 +302,7 @@ pub async fn spawn_log_watcher_task(
     Ok(event_topic)
 }
 
+/// Stops the log watcher thread
 pub fn stop_log_watcher_task(handle: AppHandle, interface_name: String) -> Result<(), Error> {
     info!("Stopping log watcher task for interface {interface_name}");
     let app_state = handle.state::<AppState>();

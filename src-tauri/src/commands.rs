@@ -1,13 +1,15 @@
-use crate::service::log_watcher::stop_log_watcher_task;
 use crate::{
     appstate::AppState,
     database::{
         models::{instance::InstanceInfo, settings::SettingsPatch},
         ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
-        SettingsLogLevel, Tunnel, WireguardKeys,
+        Tunnel, WireguardKeys,
     },
     error::Error,
-    service::{log_watcher::spawn_log_watcher_task, proto::RemoveInterfaceRequest},
+    service::{
+        log_watcher::{spawn_log_watcher_task, stop_log_watcher_task},
+        proto::RemoveInterfaceRequest,
+    },
     tray::configure_tray_icon,
     utils::{get_interface_name, setup_interface, spawn_stats_thread},
     wg_config::parse_wireguard_config,
@@ -89,8 +91,9 @@ pub async fn disconnect(location_id: i64, handle: AppHandle) -> Result<(), Error
         trace!("Connection: {:#?}", connection);
         debug!("Removing interface");
         let mut client = state.client.clone();
+        let interface_name = connection.interface_name.clone();
         let request = RemoveInterfaceRequest {
-            interface_name: connection.interface_name.clone(),
+            interface_name: interface_name.clone(),
         };
         if let Err(error) = client.remove_interface(request).await {
             error!("Failed to remove interface: {error}");
@@ -109,6 +112,9 @@ pub async fn disconnect(location_id: i64, handle: AppHandle) -> Result<(), Error
                 message: "Created new connection".into(),
             },
         )?;
+
+        stop_log_watcher_task(handle, interface_name)?;
+
         info!("Location {} disconnected", connection.location_id);
         Ok(())
     } else {
@@ -543,52 +549,6 @@ pub async fn update_location_routing(
         Ok(location)
     } else {
         error!("Location with id: {location_id} not found.");
-        Err(Error::NotFound)
-    }
-}
-
-/// Starts a log watcher in a separate thread
-///
-/// The watcher parses `defguard-service` log files and extracts logs relevant
-/// to the WireGuard interface for a given location.
-/// Logs are then transmitted to the frontend by using `tauri` `Events`.
-/// Returned value is the name of an event topic to monitor.
-#[tauri::command]
-pub async fn get_interface_logs(
-    location_id: i64,
-    log_level: SettingsLogLevel,
-    from: Option<String>,
-    handle: AppHandle,
-) -> Result<String, Error> {
-    info!("Starting log watcher for location {location_id}");
-    let app_state = handle.state::<AppState>();
-    if let Some(connection) = app_state.find_connection(location_id) {
-        spawn_log_watcher_task(
-            handle,
-            location_id,
-            connection.interface_name,
-            log_level.into(),
-            from,
-        )
-        .await
-    } else {
-        error!("No active connection found for location with id: {location_id}");
-        Err(Error::NotFound)
-    }
-}
-
-/// Stops the log watcher thread
-#[tauri::command]
-pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<(), Error> {
-    info!("Stopping log watcher for location {location_id}");
-    let app_state = handle.state::<AppState>();
-    if let Some(connection) = app_state.find_connection(location_id) {
-        // prepare interface name
-        let interface_name = connection.interface_name;
-
-        stop_log_watcher_task(handle, interface_name)
-    } else {
-        error!("No active connection found for location with id: {location_id}");
         Err(Error::NotFound)
     }
 }
