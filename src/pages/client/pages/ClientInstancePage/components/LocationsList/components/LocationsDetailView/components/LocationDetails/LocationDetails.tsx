@@ -47,7 +47,7 @@ const InfoSection = memo(({ locationId }: Props) => {
 
   const handshakeString = () => {
     if (data) {
-      const handshake = dayjs.unix(data.last_handshake);
+      const handshake = data.last_handshake && dayjs.unix(data.last_handshake);
       const now = dayjs();
       return localLL.info.vpn.handshakeValue({ seconds: now.diff(handshake, 'seconds') });
     }

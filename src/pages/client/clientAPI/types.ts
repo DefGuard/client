@@ -72,12 +72,12 @@ export type LocationDetails = {
   pubkey: string;
   address: string;
   dns?: string[];
-  listen_port: number;
+  listen_port?: number;
   peer_pubkey: string;
   peer_endpoint: string;
   allowed_ips: string;
   persistent_keepalive_interval?: number;
-  last_handshake: number;
+  last_handshake?: number;
 };
 
 export type LocationDetailsRequest = {
