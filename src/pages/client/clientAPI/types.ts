@@ -67,7 +67,7 @@ export type LocationDetails = {
   name: string;
   pubkey: string;
   address: string;
-  dns?: string[];
+  dns?: string;
   listen_port: number;
   peer_pubkey: string;
   peer_endpoint: string;
