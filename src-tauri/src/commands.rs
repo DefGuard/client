@@ -553,10 +553,6 @@ pub async fn get_interface_logs(
         // parse `from` timestamp
         let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
 
-        // fetch configured log level from DB
-        let settings = Settings::get(&app_state.get_pool()).await?;
-        let log_level = settings.log_level.into();
-
         let interface_name = connection.interface_name;
 
         let event_topic = format!("log-update-{interface_name}");
@@ -577,7 +573,7 @@ pub async fn get_interface_logs(
                 token_clone,
                 topic_clone,
                 interface_name_clone,
-                log_level,
+                tracing::Level::TRACE,
                 from,
             );
             log_watcher.run()?;
