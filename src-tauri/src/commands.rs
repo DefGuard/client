@@ -18,6 +18,7 @@ use sqlx::query;
 use std::str::FromStr;
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
+use tracing::Level;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -66,9 +67,13 @@ pub async fn connect(location_id: i64, handle: AppHandle) -> Result<(), Error> {
                 message: "Created new connection".into(),
             },
         )?;
+
         // Spawn stats threads
         debug!("Spawning stats thread");
-        spawn_stats_thread(handle, interface_name).await;
+        spawn_stats_thread(handle.clone(), interface_name.clone()).await;
+
+        // spawn log watcher
+        spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
     }
     Ok(())
 }
