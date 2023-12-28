@@ -3,7 +3,13 @@ import { InvokeArgs } from '@tauri-apps/api/tauri';
 import pTimeout from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
-import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '../types';
+import {
+  Connection,
+  DefguardInstance,
+  DefguardLocation,
+  LocationStats,
+  Tunnel,
+} from '../types';
 import {
   ConnectionRequest,
   GetLocationsRequest,
@@ -86,6 +92,12 @@ const deleteInstance = async (id: number): Promise<void> =>
 const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
 
+const parseTunnelConfig = async (config: string) =>
+  invokeWrapper('parse_tunnel_config', { config: config });
+
+const saveTunnel = async (tunnel: Tunnel) =>
+  invokeWrapper('save_tunnel', { tunnel: tunnel });
+
 const getLocationDetails = async (
   data: LocationDetailsRequest,
 ): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
@@ -108,4 +120,6 @@ export const clientApi = {
   deleteInstance,
   getLocationDetails,
   updateInstance,
+  parseTunnelConfig,
+  saveTunnel,
 };

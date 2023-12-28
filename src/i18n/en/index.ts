@@ -166,6 +166,100 @@ const en = {
             },
           },
         },
+        addTunnelPage: {
+          title: 'Add WireGuard® Tunnel',
+          forms: {
+            initTunnel: {
+              title: 'Please provide Instance URL and token',
+              sections: {
+                vpnServer: 'VPN Server',
+                advancedOptions: 'Advanced Options',
+              },
+              labels: {
+                name: 'Tunnel Name',
+                privateKey: 'Private Key',
+                publicKey: 'Public Key',
+                address: 'Address',
+                serverPubkey: 'Public Key',
+                endpoint: 'VPN Server Address:Port',
+                dns: 'DNS',
+                allowedips: 'Allowed IPs (seperate with comma)',
+                persistentKeepAlive: 'Persistent Keep Alive (sec)',
+                preUp: 'PreUp',
+                postUp: 'PostUp',
+                PreDown: 'PreDown',
+                PostDown: 'PostDown',
+              },
+              helpers: {
+                advancedOptions:
+                  'Click the "Advanced Options" section to reveal additional settings for fine-tuning your WireGuard tunnel configuration. You can customize pre and post scripts, among other options.',
+                name: 'A unique name for your WireGuard tunnel to identify it easily.',
+                pubkey:
+                  'The public key associated with the WireGuard tunnel for secure communication.',
+                prvkey:
+                  'The private key associated with the WireGuard tunnel for secure communication.',
+                address:
+                  'The IP address assigned to this WireGuard client within the VPN network.',
+                serverPubkey:
+                  'The public key of the WireGuard server for secure communication.',
+                allowedIps:
+                  'A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.',
+                endpoint:
+                  'The address and port of the WireGuard server, typically in the format "hostname:port".',
+                dns: 'The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution.',
+                persistentKeepAlive:
+                  'The interval (in seconds) for sending periodic keep-alive messages to ensure the tunnel stays active. Adjust as needed.',
+                routeAllTraffic:
+                  'If enabled, all network traffic will be routed through the WireGuard tunnel.',
+                preUp:
+                  'Shell commands or scripts to be executed before bringing up the WireGuard tunnel.',
+                postUp:
+                  'Shell commands or scripts to be executed after bringing up the WireGuard tunnel.',
+                preDown:
+                  'Shell commands or scripts to be executed before tearing down the WireGuard tunnel.',
+                postDown:
+                  'Shell commands or scripts to be executed after tearing down the WireGuard tunnel.',
+              },
+              submit: 'Add Tunnel',
+              messages: {
+                configError: 'Error parsing config file',
+                addSuccess: 'Tunnel added',
+                addError: 'Creating tunnel failed',
+              },
+              controls: {
+                importConfig: 'Import Config File',
+                generatePrvkey: 'Generate Private Key',
+              },
+            },
+          },
+          guide: {
+            title: 'Adding WireGuard tunnel',
+            subTitle: `<p>To establish secure communication between two or more devices over the internet create a virtual private network by configuring your tunnel.</p><p>If you don’t see options like Table or MTU it means we do not support it for now, but will be added later.</p>`,
+            card: {
+              title: 'Setting Up A new Tunnel:',
+              content: `
+                <p>1. Import Configuration File</p>
+                <div>
+                <ul>
+                  <li> Click on the "Import Config File" button.</li>
+                  <li> Navigatge to configuration file using the file selection dialog.</li>
+                  <li> Select the .conf file you received or created.</li>
+                </ul>
+                </div>
+                <p>2. Or Fill in Form on the Left</p>
+                <div>
+                <ul>
+                  <li> Enter a name for the tunnel.</li>
+                  <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+                </ul>
+                </div>
+                <p>
+                For more help, please visit defguard help (https://defguard.gitbook.io/)
+                </p>
+              `,
+            },
+          },
+        },
         addInstancePage: {
           title: 'Add Instance',
           forms: {
@@ -216,8 +310,10 @@ const en = {
         },
       },
       sideBar: {
-        instances: 'Instances',
+        instances: 'defguard Instances',
         addInstance: 'Add Instance',
+        addTunnel: 'Add Tunnel',
+        tunnels: 'Wireguard Tunnels',
         settings: 'Settings',
         copyright: {
           copyright: `Copyright © 2023`,

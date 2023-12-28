@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 14
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d7cf32155e5dc7d775d5884014d4b9dfc7d69250bdf2799a8684fd4d93986701"
+}

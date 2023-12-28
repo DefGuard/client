@@ -48,6 +48,7 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 lazy_static = "1.4"
+rust-ini = "0.20"
 struct-patch = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]

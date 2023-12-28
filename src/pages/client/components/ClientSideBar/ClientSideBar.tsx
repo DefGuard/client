@@ -8,6 +8,7 @@ import SvgDefguadNavLogoCollapsed from '../../../../shared/components/svg/Defgua
 import SvgDefguardLogoIcon from '../../../../shared/components/svg/DefguardLogoIcon';
 import SvgDefguardLogoText from '../../../../shared/components/svg/DefguardLogoText';
 import SvgIconNavConnections from '../../../../shared/components/svg/IconNavConnections';
+import SvgIconNavVpn from '../../../../shared/components/svg/IconNavVpn';
 import { IconContainer } from '../../../../shared/defguard-ui/components/Layout/IconContainer/IconContainer';
 import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus';
 import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconSettings';
@@ -37,6 +38,11 @@ export const ClientSideBar = () => {
           <ClientBarItem instance={instance} key={instance.id} />
         ))}
         <AddInstance />
+        <div className="client-bar-item active" id="instances-nav-label">
+          <SvgIconNavVpn />
+          <p>{LL.pages.client.sideBar.tunnels()}</p>
+        </div>
+        <AddTunnel />
         <SettingsNav />
       </div>
     </div>
@@ -78,6 +84,24 @@ const AddInstance = () => {
         <SvgIconPlus />
       </IconContainer>
       <p>{LL.pages.client.sideBar.addInstance()}</p>
+    </div>
+  );
+};
+const AddTunnel = () => {
+  const { LL } = useI18nContext();
+  const navigate = useNavigate();
+  return (
+    <div
+      id="add-instance"
+      className="client-bar-item clickable"
+      onClick={() => {
+        navigate(routes.client.addTunnel, { replace: true });
+      }}
+    >
+      <IconContainer>
+        <SvgIconPlus />
+      </IconContainer>
+      <p>{LL.pages.client.sideBar.addTunnel()}</p>
     </div>
   );
 };
