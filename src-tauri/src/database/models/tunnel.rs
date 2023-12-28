@@ -275,3 +275,65 @@ pub async fn peer_to_tunnel_stats(
         persistent_keepalive_interval: peer.persistent_keepalive_interval,
     })
 }
+
+#[derive(FromRow, Debug, Serialize, Clone)]
+pub struct TunnelConnection {
+    pub id: Option<i64>,
+    pub tunnel_id: i64,
+    pub connected_from: String,
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime
+}
+
+impl TunnelConnection {
+    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+        let result = query!(
+            "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
+            VALUES ($1, $2, $3, $4) \
+            RETURNING id;",
+            self.tunnel_id,
+            self.connected_from,
+            self.start,
+            self.end,
+        )
+        .fetch_one(pool)
+        .await?;
+        self.id = Some(result.id);
+        Ok(())
+    }
+
+    pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
+        let connections = query_as!(
+            TunnelConnection,
+            r#"
+            SELECT id, tunnel_id, connected_from, start, end 
+            FROM tunnel_connection
+            WHERE tunnel_id = $1
+            "#,
+            tunnel_id
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(connections)
+    }
+
+    pub async fn lastest_by_tunnel_id(
+        pool: &DbPool,
+        tunnel_id: i64,
+    ) -> Result<Option<Self>, Error> {
+        let connection = query_as!(
+            TunnelConnection,
+            r#"
+            SELECT id, tunnel_id, connected_from, start, end
+            FROM tunnel_connection
+            WHERE tunnel_id = $1
+            ORDER BY end DESC
+            LIMIT 1
+            "#,
+            tunnel_id
+        )
+        .fetch_optional(pool)
+        .await?;
+        Ok(connection)
+    }
+}
