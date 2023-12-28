@@ -32,7 +32,7 @@ import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPag
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
-import { ClientTunnelPage } from 'src/pages/client/pages/ClientTunnelPage/ClientTunnelPage';
+import { ClientTunnelPage } from '../../pages/client/pages/ClientTunnelPage/ClientTunnelPage';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -44,7 +44,7 @@ dayjs.extend(timezone);
 
 const queryClient = new QueryClient();
 
-const { getSettings, getInstances } = clientApi;
+const { getSettings, getInstances, getTunnels } = clientApi;
 
 const router = createBrowserRouter([
   {
@@ -124,7 +124,8 @@ export const App = () => {
       debug('App init state from tauri');
       const settings = await getSettings();
       const instances = await getInstances();
-      setClientState({ settings, instances });
+      const tunnels = await getTunnels();
+      setClientState({ settings, instances, tunnels });
       debug('Tauri init data loaded');
       setSettingsLoaded(true);
     };

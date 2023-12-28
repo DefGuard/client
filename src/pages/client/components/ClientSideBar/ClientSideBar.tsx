@@ -17,8 +17,12 @@ import { useClientStore } from '../../hooks/useClientStore';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 
 export const ClientSideBar = () => {
+  const navigate = useNavigate();
   const { LL } = useI18nContext();
-  const instances = useClientStore((state) => state.instances);
+  const [instances, tunnels] = useClientStore((state) => [
+    state.instances,
+    state.tunnels,
+  ]);
 
   return (
     <div id="client-page-side">
@@ -35,13 +39,23 @@ export const ClientSideBar = () => {
           <p>{LL.pages.client.sideBar.instances()}</p>
         </div>
         {instances.map((instance) => (
-          <ClientBarItem instance={instance} key={instance.id} />
+          <ClientBarItem instance={{ ...instance, type: 'Instance' }} key={instance.id} />
         ))}
         <AddInstance />
-        <div className="client-bar-item active" id="instances-nav-label">
+        <div
+          className="client-bar-item active"
+          id="instances-nav-label"
+          onClick={() => {
+            console.log('Here');
+            navigate(routes.client.tunnelPage, { replace: true });
+          }}
+        >
           <SvgIconNavVpn />
           <p>{LL.pages.client.sideBar.tunnels()}</p>
         </div>
+        {tunnels.map((tunnel) => (
+          <ClientBarItem instance={{ ...tunnel, type: 'Tunnel' }} key={tunnel.id} />
+        ))}
         <AddTunnel />
         <SettingsNav />
       </div>

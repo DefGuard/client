@@ -5,19 +5,35 @@ import { useMatch, useNavigate } from 'react-router-dom';
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { DefguardInstance } from '../../../../types';
+import { WireguardInstanceType } from '../../../../types';
 
-type Props = {
-  instance: DefguardInstance;
+// Define a generic interface for the type with required fields
+interface BaseInstance {
+  id?: number;
+  name: string;
+  connected: boolean;
+  type: WireguardInstanceType;
+}
+
+// Extend the generic type in the Props interface
+type Props<T extends BaseInstance> = {
+  instance: T;
 };
 
-export const ClientBarItem = ({ instance }: Props) => {
+export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) => {
   const instancePage = useMatch('/client/');
   const navigate = useNavigate();
   const setClientStore = useClientStore((state) => state.setState);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
+  const active =
+    instance.type === 'Tunnel'
+      ? routes.client.tunnelPage + instance.id === window.location.pathname
+      : instance.type === 'Instance'
+        ? instance.id === selectedInstance
+        : false;
+
   const cn = classNames('client-bar-item', 'clickable', {
-    active: instance.id === selectedInstance,
+    active: active,
     connected: instance.connected,
   });
 
@@ -33,9 +49,24 @@ export const ClientBarItem = ({ instance }: Props) => {
         className={cn}
         ref={refs.setReference}
         onClick={() => {
-          setClientStore({ selectedInstance: instance.id });
-          if (!instancePage) {
-            navigate(routes.client.base, { replace: true });
+          if (instance.type === 'Instance') {
+            setClientStore({
+              selectedInstance: {
+                id: instance.id as number,
+                type: WireguardInstanceType.DEFGUARDINSTANCE,
+              },
+            });
+            if (!instancePage) {
+              navigate(routes.client.base, { replace: true });
+            }
+          } else {
+            setClientStore({
+              selectedInstance: {
+                id: instance.id as number,
+                type: WireguardInstanceType.DEFGUARDINSTANCE,
+              },
+            });
+            navigate(routes.client.tunnelPage);
           }
         }}
       >

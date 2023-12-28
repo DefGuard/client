@@ -701,53 +701,28 @@ pub async fn save_tunnel(mut tunnel: Tunnel, app_state: State<'_, AppState>) -> 
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelInfo {
     pub id: Option<i64>,
     pub name: String,
     pub connected: bool,
 }
 
-
 #[tauri::command(async)]
 pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo>, Error> {
     debug!("Retrieving all instances.");
 
-    let instances = Instance::all(&app_state.get_pool()).await?;
-    debug!("Found ({}) instances", instances.len());
-    trace!("Instances found: {instances:#?}");
-    let mut instance_info: Vec<InstanceInfo> = vec![];
-    let connection_ids: Vec<i64> = app_state
-        .active_connections
-        .lock()
-        .map_err(|_| Error::MutexError)?
-        .iter()
-        .map(|connection| connection.location_id)
-        .collect();
-    for instance in &instances {
-        let Some(instance_id) = instance.id else {
-            continue;
-        };
-        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
-        let location_ids: Vec<i64> = locations
-            .iter()
-            .filter_map(|location| location.id)
-            .collect();
-        let connected = connection_ids
-            .iter()
-            .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance_id)
-            .await?
-            .ok_or(Error::NotFound)?;
-        instance_info.push(InstanceInfo {
-            id: instance.id,
-            uuid: instance.uuid.clone(),
-            name: instance.name.clone(),
-            url: instance.url.clone(),
-            connected,
-            pubkey: keys.pubkey,
-        });
+    let tunnels = Tunnel::all(&app_state.get_pool()).await?;
+    debug!("Found ({}) tunnels", tunnels.len());
+    trace!("Instances found: {tunnels:#?}");
+    let mut tunnel_info: Vec<TunnelInfo> = vec![];
+
+    for tunnel in tunnels {
+      tunnel_info.push(TunnelInfo {
+        id: tunnel.id,
+        name: tunnel.name,
+        connected: false,
+      })
     }
-    info!("Instances retrieved({})", instance_info.len());
-    trace!("Returning following instances: {instance_info:#?}");
-    Ok(instance_info)
+    Ok(tunnel_info)
 }

@@ -166,6 +166,9 @@ const en = {
             },
           },
         },
+        tunnelPage: {
+          title: 'WireGuard Tunnels',
+        },
         addTunnelPage: {
           title: 'Add WireGuard® Tunnel',
           forms: {

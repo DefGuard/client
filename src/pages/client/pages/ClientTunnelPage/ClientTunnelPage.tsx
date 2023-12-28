@@ -10,28 +10,27 @@ import { routes } from '../../../../shared/routes';
 import { useClientStore } from '../../hooks/useClientStore';
 import { LocationsList } from '../ClientInstancePage/components/LocationsList/LocationsList';
 import { StatsFilterSelect } from '../ClientInstancePage/components/StatsFilterSelect/StatsFilterSelect';
-import { StatsLayoutSelect } from '../ClientInstancePage/components/StatsLayoutSelect/StatsLayoutSelect';
 import { DeleteInstanceModal } from '../ClientInstancePage/modals/DeleteInstanceModal/DeleteInstanceModal';
 import { UpdateInstanceModal } from '../ClientInstancePage/modals/UpdateInstanceModal/UpdateInstanceModal';
 import { useUpdateInstanceModal } from '../ClientInstancePage/modals/UpdateInstanceModal/useUpdateInstanceModal';
 
 export const ClientTunnelPage = () => {
   const { LL } = useI18nContext();
-  const pageLL = LL.pages.client.pages.instancePage;
-  const instances = useClientStore((state) => state.instances);
+  const pageLL = LL.pages.client.pages.tunnelPage;
+  const tunnels = useClientStore((state) => state.tunnels);
   const selectedInstanceId = useClientStore((state) => state.selectedInstance);
   const selectedInstance = useMemo(
-    () => instances.find((i) => i.id === selectedInstanceId),
-    [instances, selectedInstanceId],
+    () => tunnels.find((i) => i.id === selectedInstanceId),
+    [tunnels, selectedInstanceId],
   );
   const navigate = useNavigate();
 
-  // router guard, if no instances redirect to add instance, for now, later this will be replaced by init welcome flow
+  // router guard, if no tunnels redirect to add instance, for now, later this will be replaced by init welcome flow
   useEffect(() => {
-    if (instances.length === 0) {
-      navigate(routes.client.addInstance, { replace: true });
+    if (tunnels.length === 0) {
+      navigate(routes.client.addTunnel, { replace: true });
     }
-  }, [instances, navigate]);
+  }, [tunnels, navigate]);
 
   return (
     <section id="client-instance-page" className="client-page">
@@ -39,7 +38,6 @@ export const ClientTunnelPage = () => {
         <h1>{pageLL.title()}</h1>
         <div className="options">
           <StatsFilterSelect />
-          <StatsLayoutSelect />
           <Button
             styleVariant={ButtonStyleVariant.STANDARD}
             text={LL.pages.client.pages.instancePage.header.edit()}

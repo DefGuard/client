@@ -38,10 +38,10 @@ export const LocationsList = () => {
   return (
     <>
       {selectedView === ClientView.GRID && (
-        <LocationsGridView locations={locations} instanceId={selectedInstance} />
+        <LocationsGridView locations={locations} instanceId={selectedInstance.id} />
       )}
       {selectedView === ClientView.DETAIL && (
-        <LocationsDetailView locations={locations} instanceId={selectedInstance} />
+        <LocationsDetailView locations={locations} instanceId={selectedInstance.id} />
       )}
     </>
   );

@@ -103,4 +103,5 @@ export type TauriCommandKey =
   | 'update_instance'
   | 'parse_tunnel_config'
   | 'save_tunnel'
+  | 'all_tunnels'
   | 'location_interface_details';

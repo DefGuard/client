@@ -49,12 +49,23 @@ export type Tunnel = {
   post_up?: string;
   pre_down?: string;
   post_down?: string;
+  connected: boolean;
 };
 
 export enum ClientView {
   GRID = 0,
   DETAIL = 1,
 }
+
+export enum WireguardInstanceType {
+  TUNNEL = 'Tunnel',
+  DEFGUARDINSTANCE = 'Instance',
+}
+
+export type SelectedInstance = {
+  id: number;
+  type: WireguardInstanceType;
+};
 
 export enum TauriEventKey {
   SINGLE_INSTANCE = 'single-instance',

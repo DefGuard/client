@@ -102,8 +102,11 @@ const getLocationDetails = async (
   data: LocationDetailsRequest,
 ): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
 
+const getTunnels = async (): Promise<Tunnel[]> => invokeWrapper('all_tunnels');
+
 export const clientApi = {
   getInstances,
+  getTunnels,
   getLocations,
   connect,
   disconnect,
