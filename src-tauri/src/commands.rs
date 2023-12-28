@@ -1,3 +1,4 @@
+use crate::service::log_watcher::stop_log_watcher_task;
 use crate::{
     appstate::AppState,
     database::{
@@ -585,23 +586,7 @@ pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<
         // prepare interface name
         let interface_name = connection.interface_name;
 
-        // get `CancellationToken` to manually stop watcher thread
-        let mut log_watchers = app_state
-            .log_watchers
-            .lock()
-            .expect("Failed to lock log watchers mutex");
-
-        match log_watchers.remove(&interface_name) {
-            Some(token) => {
-                debug!("Using cancellation token for log watcher on interface {interface_name}");
-                token.cancel();
-                Ok(())
-            }
-            None => {
-                error!("Log watcher for interface {interface_name} not found.");
-                Err(Error::NotFound)
-            }
-        }
+        stop_log_watcher_task(handle, interface_name)
     } else {
         error!("No active connection found for location with id: {location_id}");
         Err(Error::NotFound)

@@ -250,7 +250,7 @@ pub async fn spawn_log_watcher_task(
     log_level: Level,
     from: Option<String>,
 ) -> Result<String, Error> {
-    debug!("Spawning log watcher task for location ID {location_id}, interface {interface_name}");
+    info!("Spawning log watcher task for location ID {location_id}, interface {interface_name}");
     let app_state = handle.state::<AppState>();
 
     // parse `from` timestamp
@@ -293,4 +293,27 @@ pub async fn spawn_log_watcher_task(
     }
 
     Ok(event_topic)
+}
+
+pub fn stop_log_watcher_task(handle: AppHandle, interface_name: String) -> Result<(), Error> {
+    info!("Stopping log watcher task for interface {interface_name}");
+    let app_state = handle.state::<AppState>();
+
+    // get `CancellationToken` to manually stop watcher thread
+    let mut log_watchers = app_state
+        .log_watchers
+        .lock()
+        .expect("Failed to lock log watchers mutex");
+
+    match log_watchers.remove(&interface_name) {
+        Some(token) => {
+            debug!("Using cancellation token for log watcher on interface {interface_name}");
+            token.cancel();
+            Ok(())
+        }
+        None => {
+            error!("Log watcher for interface {interface_name} not found.");
+            Err(Error::NotFound)
+        }
+    }
 }
