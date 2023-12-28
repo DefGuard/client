@@ -4,7 +4,7 @@
 //! The watcher monitors a given directory for any changes. Whenever a change is detected
 //! it parses the log files and sends logs relevant to a specified interface to the fronted.
 
-use crate::utils::get_service_log_dir;
+use crate::{appstate::AppState, error::Error, utils::get_service_log_dir};
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use notify_debouncer_mini::{
     new_debouncer,
@@ -16,9 +16,10 @@ use std::{
     fs::{read_dir, File},
     io::{BufRead, BufReader},
     path::PathBuf,
+    str::FromStr,
     time::{Duration, SystemTime},
 };
-use tauri::{AppHandle, Manager};
+use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
@@ -240,4 +241,87 @@ fn extract_timestamp(filename: &str) -> Option<SystemTime> {
         return Some(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp as u64));
     }
     None
+}
+
+/// Starts a log watcher in a separate thread
+///
+/// The watcher parses `defguard-service` log files and extracts logs relevant
+/// to the WireGuard interface for a given location.
+/// Logs are then transmitted to the frontend by using `tauri` `Events`.
+/// Returned value is the name of an event topic to monitor.
+pub async fn spawn_log_watcher_task(
+    handle: AppHandle,
+    location_id: i64,
+    interface_name: String,
+    log_level: Level,
+    from: Option<String>,
+) -> Result<String, Error> {
+    info!("Spawning log watcher task for location ID {location_id}, interface {interface_name}");
+    let app_state = handle.state::<AppState>();
+
+    // parse `from` timestamp
+    let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
+
+    // FIXME: handle different naming for bare WireGuard tunnels once implemented
+    let event_topic = format!("log-update-location-{location_id}");
+
+    // explicitly clone before topic is moved into the closure
+    let topic_clone = event_topic.clone();
+    let interface_name_clone = interface_name.clone();
+    let handle_clone = handle.clone();
+
+    // prepare cancellation token
+    let token = CancellationToken::new();
+    let token_clone = token.clone();
+
+    // spawn task
+    let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
+        let mut log_watcher = ServiceLogWatcher::new(
+            handle_clone,
+            token_clone,
+            topic_clone,
+            interface_name_clone,
+            log_level,
+            from,
+        );
+        log_watcher.run()?;
+        Ok(())
+    });
+
+    // store `CancellationToken` to manually stop watcher thread
+    let mut log_watchers = app_state
+        .log_watchers
+        .lock()
+        .expect("Failed to lock log watchers mutex");
+    if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
+        // cancel previous log watcher for this interface
+        debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
+        old_token.cancel();
+    }
+
+    Ok(event_topic)
+}
+
+/// Stops the log watcher thread
+pub fn stop_log_watcher_task(handle: AppHandle, interface_name: String) -> Result<(), Error> {
+    info!("Stopping log watcher task for interface {interface_name}");
+    let app_state = handle.state::<AppState>();
+
+    // get `CancellationToken` to manually stop watcher thread
+    let mut log_watchers = app_state
+        .log_watchers
+        .lock()
+        .expect("Failed to lock log watchers mutex");
+
+    match log_watchers.remove(&interface_name) {
+        Some(token) => {
+            debug!("Using cancellation token for log watcher on interface {interface_name}");
+            token.cancel();
+            Ok(())
+        }
+        None => {
+            error!("Log watcher for interface {interface_name} not found.");
+            Err(Error::NotFound)
+        }
+    }
 }

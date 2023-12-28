@@ -17,7 +17,7 @@ export const AddInstanceGuide = () => {
       </div>
       <SvgVpnLocation />
       <Card id="token-guide">
-        <h2>{localLL.card.title()}:</h2>
+        <h2>{localLL.card.title()}</h2>
         {parse(localLL.card.content())}
       </Card>
     </section>

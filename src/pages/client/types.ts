@@ -34,6 +34,23 @@ export type Connection = {
   download?: number;
 };
 
+export type Tunnel = {
+  id?: number;
+  name: string;
+  pubkey: string;
+  prvkey: string;
+  address: string;
+  server_pubkey: string;
+  allowed_ips?: string;
+  endpoint: string;
+  dns?: string;
+  persistent_keep_alive: number;
+  pre_up?: string;
+  post_up?: string;
+  pre_down?: string;
+  post_down?: string;
+};
+
 export enum ClientView {
   GRID = 0,
   DETAIL = 1,

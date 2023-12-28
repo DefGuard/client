@@ -24,6 +24,7 @@ import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstancePage/ClientAddInstnacePage';
+import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPage/ClientAddTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
@@ -69,6 +70,10 @@ const router = createBrowserRouter([
       {
         path: '/client/add-instance',
         element: <ClientAddInstancePage />,
+      },
+      {
+        path: '/client/add-tunnel',
+        element: <ClientAddTunnelPage />,
       },
       {
         path: '/client/settings',
