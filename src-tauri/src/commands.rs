@@ -316,13 +316,13 @@ pub struct LocationInterfaceDetails {
     pub pubkey: String,  // own pubkey of client interface
     pub address: String, // IP within WireGuard network assigned to the client
     pub dns: Option<String>,
-    pub listen_port: u32,
+    pub listen_port: Option<u32>,
     // peer config
     pub peer_pubkey: String,
     pub peer_endpoint: String,
     pub allowed_ips: String,
     pub persistent_keepalive_interval: Option<u16>,
-    pub last_handshake: i64,
+    pub last_handshake: Option<i64>,
 }
 
 #[tauri::command(async)]
@@ -354,8 +354,13 @@ pub async fn location_interface_details(
             "#,
             location_id
         )
-        .fetch_one(&pool)
+        .fetch_optional(&pool)
         .await?;
+
+        let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
+            Some(record) => {(Some(record.listen_port), record.persistent_keepalive_interval, Some(record.last_handshake))}
+            None => {(None, None, None)}
+        };
 
         Ok(LocationInterfaceDetails {
             location_id,
@@ -363,12 +368,12 @@ pub async fn location_interface_details(
             pubkey: location.pubkey,
             address: location.address,
             dns: location.dns,
-            listen_port: result.listen_port,
+            listen_port,
             peer_pubkey,
             peer_endpoint: location.endpoint,
             allowed_ips: location.allowed_ips,
-            persistent_keepalive_interval: result.persistent_keepalive_interval,
-            last_handshake: result.last_handshake,
+            persistent_keepalive_interval,
+            last_handshake,
         })
     } else {
         error!("Location ID {location_id} not found");
