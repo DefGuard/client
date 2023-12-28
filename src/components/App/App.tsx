@@ -32,6 +32,7 @@ import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPag
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
+import { ClientTunnelPage } from 'src/pages/client/pages/ClientTunnelPage/ClientTunnelPage';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -74,6 +75,10 @@ const router = createBrowserRouter([
       {
         path: '/client/add-tunnel',
         element: <ClientAddTunnelPage />,
+      },
+      {
+        path: '/client/tunnel',
+        element: <ClientTunnelPage />,
       },
       {
         path: '/client/settings',

@@ -94,9 +94,7 @@ const InfoSection = memo(({ locationId }: Props) => {
         </div>
         <div className="info">
           <Label>{localLL.info.vpn.dns()}</Label>
-          <div className="values">
-            <p>{data && data.dns && data.dns.map((d) => <p key={d}>{d}</p>)}</p>
-          </div>
+          <div className="values"></div>
         </div>
         <div className="info">
           <Label>{localLL.info.vpn.keepalive()}</Label>
