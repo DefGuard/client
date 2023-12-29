@@ -27,12 +27,12 @@ import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstanc
 import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPage/ClientAddTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
+import { ClientTunnelPage } from '../../pages/client/pages/ClientTunnelPage/ClientTunnelPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
-import { ClientTunnelPage } from '../../pages/client/pages/ClientTunnelPage/ClientTunnelPage';
 
 dayjs.extend(duration);
 dayjs.extend(utc);

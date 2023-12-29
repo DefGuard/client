@@ -4,20 +4,19 @@ import { useMemo, useState } from 'react';
 
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from './components/LocationDetails/LocationDetails';
 
 type Props = {
-  instanceId: DefguardInstance['id'];
-  locations: DefguardLocation[];
+  locations: CommonWireguardFields[];
 };
 
 const findLocationById = (
-  locations: DefguardLocation[],
+  locations: CommonWireguardFields[],
   id: number,
-): DefguardLocation | undefined => locations.find((location) => location.id === id);
+): CommonWireguardFields | undefined => locations.find((location) => location.id === id);
 
 export const LocationsDetailView = ({ locations }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
@@ -34,7 +33,8 @@ export const LocationsDetailView = ({ locations }: Props) => {
   );
 
   const activeLocation = useMemo(
-    (): DefguardLocation | undefined => findLocationById(locations, activeLocationId),
+    (): CommonWireguardFields | undefined =>
+      findLocationById(locations, activeLocationId),
     [locations, activeLocationId],
   );
 

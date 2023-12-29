@@ -6,9 +6,10 @@ import { Badge } from '../../../../../../../../shared/defguard-ui/components/Lay
 import { BadgeStyleVariant } from '../../../../../../../../shared/defguard-ui/components/Layout/Badge/types';
 import SvgIconConnection from '../../../../../../../../shared/defguard-ui/components/svg/IconConnection';
 import { DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../LocationsGridView/LocationsGridView';
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
 };
 
 export const LocationCardTitle = ({ location }: Props) => {

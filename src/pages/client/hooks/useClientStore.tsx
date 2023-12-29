@@ -6,8 +6,8 @@ import { Settings } from '../clientAPI/types';
 import {
   ClientView,
   DefguardInstance,
-  Tunnel,
   SelectedInstance,
+  Tunnel,
   WireguardInstanceType,
 } from '../types';
 
@@ -46,7 +46,7 @@ export const useClientStore = createWithEqualityFn<Store>(
       const res = await getInstances();
       let selected = get().selectedInstance;
       // check if currently selected instances is in updated instances
-      if (!isUndefined(selected) && res.length) {
+      if (!isUndefined(selected) && res.length && selected.id) {
         if (!res.map((i) => i.id).includes(selected.id)) {
           selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARDINSTANCE };
         }

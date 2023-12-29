@@ -52,6 +52,16 @@ export type Tunnel = {
   connected: boolean;
 };
 
+export type CommonWireguardFields = {
+  id: number;
+  name: string;
+  address: string;
+  endpoint: string;
+  route_all_traffic: boolean;
+  active: boolean;
+  type?: WireguardInstanceType;
+};
+
 export enum ClientView {
   GRID = 0,
   DETAIL = 1,
@@ -63,7 +73,7 @@ export enum WireguardInstanceType {
 }
 
 export type SelectedInstance = {
-  id: number;
+  id?: number;
   type: WireguardInstanceType;
 };
 

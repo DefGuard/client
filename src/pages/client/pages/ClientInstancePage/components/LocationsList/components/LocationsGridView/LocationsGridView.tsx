@@ -12,7 +12,11 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import {
+  CommonWireguardFields,
+  DefguardInstance,
+  DefguardLocation,
+} from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -24,7 +28,7 @@ import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
   instanceId: DefguardInstance['id'];
-  locations: DefguardLocation[];
+  locations: CommonWireguardFields[];
 };
 
 export const LocationsGridView = ({ instanceId, locations }: Props) => {
@@ -38,7 +42,7 @@ export const LocationsGridView = ({ instanceId, locations }: Props) => {
 };
 
 type GridItemProps = {
-  location: DefguardLocation;
+  location: CommonWireguardFields;
 };
 
 const GridItem = ({ location }: GridItemProps) => {

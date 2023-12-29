@@ -705,7 +705,10 @@ pub async fn save_tunnel(mut tunnel: Tunnel, app_state: State<'_, AppState>) -> 
 pub struct TunnelInfo {
     pub id: Option<i64>,
     pub name: String,
-    pub connected: bool,
+    pub address: String,
+    pub endpoint: String,
+    pub active: bool,
+    pub route_all_traffic: bool,
 }
 
 #[tauri::command(async)]
@@ -721,7 +724,10 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
       tunnel_info.push(TunnelInfo {
         id: tunnel.id,
         name: tunnel.name,
-        connected: false,
+        address: tunnel.address,
+        endpoint: tunnel.endpoint,
+        route_all_traffic: tunnel.route_all_traffic,
+        active: false,
       })
     }
     Ok(tunnel_info)

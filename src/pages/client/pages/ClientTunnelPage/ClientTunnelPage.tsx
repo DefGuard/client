@@ -12,7 +12,6 @@ import { LocationsList } from '../ClientInstancePage/components/LocationsList/Lo
 import { StatsFilterSelect } from '../ClientInstancePage/components/StatsFilterSelect/StatsFilterSelect';
 import { DeleteInstanceModal } from '../ClientInstancePage/modals/DeleteInstanceModal/DeleteInstanceModal';
 import { UpdateInstanceModal } from '../ClientInstancePage/modals/UpdateInstanceModal/UpdateInstanceModal';
-import { useUpdateInstanceModal } from '../ClientInstancePage/modals/UpdateInstanceModal/useUpdateInstanceModal';
 
 export const ClientTunnelPage = () => {
   const { LL } = useI18nContext();

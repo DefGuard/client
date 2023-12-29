@@ -63,7 +63,7 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
             setClientStore({
               selectedInstance: {
                 id: instance.id as number,
-                type: WireguardInstanceType.DEFGUARDINSTANCE,
+                type: WireguardInstanceType.TUNNEL,
               },
             });
             navigate(routes.client.tunnelPage);

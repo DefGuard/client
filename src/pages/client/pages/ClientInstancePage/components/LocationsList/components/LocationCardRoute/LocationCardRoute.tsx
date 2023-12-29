@@ -7,10 +7,10 @@ import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
 import { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../types';
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
 };
 const { updateLocationRouting } = clientApi;
 

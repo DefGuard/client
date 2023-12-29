@@ -14,12 +14,12 @@ import {
 import SvgIconX from '../../../../../../../../shared/defguard-ui/components/svg/IconX';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../LocationsGridView/LocationsGridView';
 
 const { connect, disconnect } = clientApi;
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
 };
 
 export const LocationCardConnectButton = ({ location }: Props) => {

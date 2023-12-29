@@ -14,14 +14,16 @@ import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus'
 import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconSettings';
 import { routes } from '../../../../shared/routes';
 import { useClientStore } from '../../hooks/useClientStore';
+import { WireguardInstanceType } from '../../types';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 
 export const ClientSideBar = () => {
   const navigate = useNavigate();
   const { LL } = useI18nContext();
-  const [instances, tunnels] = useClientStore((state) => [
+  const [instances, tunnels, setClientStore] = useClientStore((state) => [
     state.instances,
     state.tunnels,
+    state.setState,
   ]);
 
   return (
@@ -39,14 +41,22 @@ export const ClientSideBar = () => {
           <p>{LL.pages.client.sideBar.instances()}</p>
         </div>
         {instances.map((instance) => (
-          <ClientBarItem instance={{ ...instance, type: 'Instance' }} key={instance.id} />
+          <ClientBarItem
+            instance={{ ...instance, type: WireguardInstanceType.DEFGUARDINSTANCE }}
+            key={instance.id}
+          />
         ))}
         <AddInstance />
         <div
           className="client-bar-item active"
           id="instances-nav-label"
           onClick={() => {
-            console.log('Here');
+            setClientStore({
+              selectedInstance: {
+                id: undefined,
+                type: WireguardInstanceType.TUNNEL,
+              },
+            });
             navigate(routes.client.tunnelPage, { replace: true });
           }}
         >
@@ -54,7 +64,10 @@ export const ClientSideBar = () => {
           <p>{LL.pages.client.sideBar.tunnels()}</p>
         </div>
         {tunnels.map((tunnel) => (
-          <ClientBarItem instance={{ ...tunnel, type: 'Tunnel' }} key={tunnel.id} />
+          <ClientBarItem
+            instance={{ ...tunnel, type: WireguardInstanceType.TUNNEL }}
+            key={tunnel.id}
+          />
         ))}
         <AddTunnel />
         <SettingsNav />

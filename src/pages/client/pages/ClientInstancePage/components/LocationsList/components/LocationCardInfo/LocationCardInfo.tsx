@@ -6,10 +6,10 @@ import dayjs from 'dayjs';
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../query';
-import { Connection, DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields, Connection } from '../../../../../../types';
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
   connection?: Connection;
 };
 

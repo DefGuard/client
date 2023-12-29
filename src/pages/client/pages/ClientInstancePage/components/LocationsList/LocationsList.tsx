@@ -6,11 +6,11 @@ import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/us
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../query';
-import { ClientView } from '../../../../types';
+import { ClientView, WireguardInstanceType } from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 
-const { getLocations } = clientApi;
+const { getLocations, getTunnels } = clientApi;
 
 export const LocationsList = () => {
   const { LL } = useI18nContext();
@@ -20,11 +20,25 @@ export const LocationsList = () => {
 
   const toaster = useToaster();
 
+  const queryKey =
+    selectedInstance?.type === WireguardInstanceType.DEFGUARDINSTANCE
+      ? [clientQueryKeys.getLocations, selectedInstance?.id as number]
+      : [clientQueryKeys.getTunnels];
+
+  console.log(selectedInstance);
+
+  const queryFn =
+    selectedInstance?.type === WireguardInstanceType.DEFGUARDINSTANCE
+      ? () => getLocations({ instanceId: selectedInstance?.id as number })
+      : () => getTunnels();
+
   const { data: locations, isError } = useQuery({
-    queryKey: [clientQueryKeys.getLocations, selectedInstance as number],
-    queryFn: () => getLocations({ instanceId: selectedInstance as number }),
+    queryKey,
+    queryFn,
     enabled: !!selectedInstance,
   });
+
+  console.log(locations);
 
   useEffect(() => {
     if (isError) {
@@ -37,10 +51,10 @@ export const LocationsList = () => {
 
   return (
     <>
-      {selectedView === ClientView.GRID && (
+      {selectedView === ClientView.GRID && selectedInstance.id && (
         <LocationsGridView locations={locations} instanceId={selectedInstance.id} />
       )}
-      {selectedView === ClientView.DETAIL && (
+      {selectedView === ClientView.DETAIL && selectedInstance.id && (
         <LocationsDetailView locations={locations} instanceId={selectedInstance.id} />
       )}
     </>
