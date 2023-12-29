@@ -82,7 +82,7 @@ export const LocationLogs = ({ locationId }: Props) => {
       <div className="top">
         <h3>{localLL.title()}</h3>
         <LocationLogsSelect
-          initSelected={'info'}
+          initSelected={appLogLevel}
           onChange={(level) => {
             locationLogLevelRef.current = level;
           }}
