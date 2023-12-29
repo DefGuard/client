@@ -14,7 +14,7 @@ import {
 import SvgIconX from '../../../../../../../../shared/defguard-ui/components/svg/IconX';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { CommonWireguardFields } from '../LocationsGridView/LocationsGridView';
+import { CommonWireguardFields } from '../../../../../../types';
 
 const { connect, disconnect } = clientApi;
 

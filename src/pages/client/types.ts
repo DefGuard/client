@@ -52,6 +52,8 @@ export type Tunnel = {
   connected: boolean;
 };
 
+// Common fields between Tunnel and Location
+// Shared between components as props to avoid component duplication
 export type CommonWireguardFields = {
   id: number;
   name: string;
