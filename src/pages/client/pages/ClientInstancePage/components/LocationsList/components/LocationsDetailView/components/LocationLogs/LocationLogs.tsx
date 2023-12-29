@@ -11,12 +11,10 @@ import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
 import { ActionButtonVariant } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
-import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { LogItem, LogLevel } from '../../../../../../../../clientAPI/types';
+import { useClientStore } from '../../../../../../../../hooks/useClientStore';
 import { DefguardLocation } from '../../../../../../../../types';
 import { LocationLogsSelect } from './LocationLogsSelect';
-
-const { getLocationInterfaceLogs, stopLocationInterfaceLogs } = clientApi;
 
 type Props = {
   locationId: DefguardLocation['id'];
@@ -24,17 +22,11 @@ type Props = {
 
 export const LocationLogs = ({ locationId }: Props) => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);
-  const locationLogLevelRef = useRef<LogLevel>('info');
+  const appLogLevel = useClientStore((state) => state.settings.log_level);
+  const locationLogLevelRef = useRef<LogLevel>(appLogLevel);
   const logsRef = useRef('');
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details.logs;
-
-  const handleLogsDownload = async () => {
-    const path = await save({});
-    if (path) {
-      await writeTextFile(path, logsRef.current);
-    }
-  };
 
   const handleLogsDownload = async () => {
     const path = await save({});
@@ -52,12 +44,15 @@ export const LocationLogs = ({ locationId }: Props) => {
         ({ payload: logItems }) => {
           if (logsContainerElement.current) {
             logItems.forEach((item) => {
-              if (logsContainerElement.current) {
+              if (
+                logsContainerElement.current &&
+                filterLogByLevel(locationLogLevelRef.current, item.level)
+              ) {
                 const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
                 const element = createLogLineElement(messageString);
                 const scrollAfterAppend =
                   logsContainerElement.current.scrollHeight -
-                  logsContainerElement.current.scrollTop ===
+                    logsContainerElement.current.scrollTop ===
                   logsContainerElement.current.clientHeight;
                 logsContainerElement.current.appendChild(element);
                 // auto scroll to bottom if user didn't scroll up
