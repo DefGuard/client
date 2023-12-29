@@ -8,7 +8,6 @@ import {
   Connection,
   DefguardInstance,
   LocationStats,
-  Tunnel,
 } from '../types';
 import {
   ConnectionRequest,
@@ -22,6 +21,7 @@ import {
   StatsRequest,
   TauriCommandKey,
   UpdateInstnaceRequest,
+  TunnelRequest,
 } from './types';
 
 // Streamlines logging for invokes
@@ -89,7 +89,7 @@ const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
 const parseTunnelConfig = async (config: string) =>
   invokeWrapper('parse_tunnel_config', { config: config });
 
-const saveTunnel = async (tunnel: Tunnel) =>
+const saveTunnel = async (tunnel: TunnelRequest) =>
   invokeWrapper('save_tunnel', { tunnel: tunnel });
 
 const getLocationDetails = async (

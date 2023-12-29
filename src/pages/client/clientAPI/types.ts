@@ -80,6 +80,22 @@ export type LocationDetails = {
   last_handshake?: number;
 };
 
+export type TunnelRequest = {
+  name: string;
+  pubkey: string;
+  prvkey: string;
+  address: string;
+  server_pubkey: string;
+  allowed_ips?: string;
+  endpoint: string;
+  dns?: string;
+  persistent_keep_alive: number;
+  pre_up?: string;
+  post_up?: string;
+  pre_down?: string;
+  post_down?: string;
+};
+
 export type LocationDetailsRequest = {
   locationId: number;
 };

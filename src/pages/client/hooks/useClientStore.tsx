@@ -5,9 +5,9 @@ import { clientApi } from '../clientAPI/clientApi';
 import { Settings } from '../clientAPI/types';
 import {
   ClientView,
+  CommonWireguardFields,
   DefguardInstance,
   SelectedInstance,
-  Tunnel,
   WireguardInstanceType,
 } from '../types';
 
@@ -68,7 +68,7 @@ type Store = StoreValues & StoreMethods;
 
 type StoreValues = {
   instances: DefguardInstance[];
-  tunnels: Tunnel[];
+  tunnels: CommonWireguardFields[];
   selectedView: ClientView;
   statsFilter: number;
   settings: Settings;
