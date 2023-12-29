@@ -47,7 +47,7 @@ const InfoSection = memo(({ locationId }: Props) => {
 
   const handshakeString = () => {
     if (data) {
-      const handshake = dayjs.unix(data.last_handshake);
+      const handshake = data.last_handshake && dayjs.unix(data.last_handshake);
       const now = dayjs();
       return localLL.info.vpn.handshakeValue({ seconds: now.diff(handshake, 'seconds') });
     }
@@ -94,7 +94,11 @@ const InfoSection = memo(({ locationId }: Props) => {
         </div>
         <div className="info">
           <Label>{localLL.info.vpn.dns()}</Label>
-          <div className="values"></div>
+          <div className="values">
+            <p>
+              {data && data.dns && data.dns.split(',').map((d) => <p key={d}>{d}</p>)}
+            </p>
+          </div>
         </div>
         <div className="info">
           <Label>{localLL.info.vpn.keepalive()}</Label>

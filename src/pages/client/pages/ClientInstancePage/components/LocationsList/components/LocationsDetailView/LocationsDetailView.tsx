@@ -1,10 +1,15 @@
 import './style.scss';
 
-import { useMemo, useState } from 'react';
+import { isUndefined } from 'lodash-es';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
 import { CommonWireguardFields } from '../../../../../../types';
+
+import { routes } from '../../../../../../../../shared/routes';
+
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from './components/LocationDetails/LocationDetails';
@@ -19,7 +24,10 @@ const findLocationById = (
 ): CommonWireguardFields | undefined => locations.find((location) => location.id === id);
 
 export const LocationsDetailView = ({ locations }: Props) => {
-  const [activeLocationId, setActiveLocationId] = useState<number>(locations[0].id);
+  const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
+    locations[0]?.id ?? undefined,
+  );
+  const navigate = useNavigate();
 
   const tabs = useMemo(
     (): CardTabsData[] =>
@@ -32,11 +40,19 @@ export const LocationsDetailView = ({ locations }: Props) => {
     [locations, activeLocationId],
   );
 
-  const activeLocation = useMemo(
-    (): CommonWireguardFields | undefined =>
-      findLocationById(locations, activeLocationId),
-    [locations, activeLocationId],
-  );
+
+  const activeLocation = useMemo((): CommonWireguardFields | undefined => {
+    if (!isUndefined(activeLocationId)) {
+      return findLocationById(locations, activeLocationId);
+    }
+    return undefined;
+  }, [locations, activeLocationId]);
+
+  useEffect(() => {
+    if (activeLocationId === undefined) {
+      navigate(routes.client.addInstance, { replace: true });
+    }
+  }, [activeLocationId, navigate]);
 
   return (
     <div id="locations-detail-view">

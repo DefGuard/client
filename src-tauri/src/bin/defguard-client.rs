@@ -12,17 +12,16 @@ use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
-    __cmd__connect, __cmd__delete_instance, __cmd__disconnect, __cmd__get_interface_logs,
-    __cmd__get_settings, __cmd__last_connection, __cmd__location_interface_details,
-    __cmd__location_stats, __cmd__parse_tunnel_config, __cmd__save_device_config,
-    __cmd__save_tunnel, __cmd__stop_interface_logs, __cmd__update_instance,
-    __cmd__update_location_routing, __cmd__update_settings, __cmd__all_tunnels,
+    __cmd__connect, __cmd__delete_instance, __cmd__disconnect, __cmd__get_settings,
+    __cmd__last_connection, __cmd__location_interface_details, __cmd__location_stats,
+    __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
+    __cmd__update_instance, __cmd__update_location_routing, __cmd__update_settings, __cmd__all_tunnels,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, connect, delete_instance,
-        disconnect, get_interface_logs, get_settings, last_connection, location_interface_details,
-        location_stats, parse_tunnel_config, save_device_config, save_tunnel, stop_interface_logs,
-        update_instance, update_location_routing, update_settings, all_tunnels
+        disconnect, get_settings, last_connection, location_interface_details, location_stats,
+        parse_tunnel_config, save_device_config, save_tunnel, update_instance,
+        update_location_routing, update_settings, all_tunnels
     },
     database::{self, models::settings::Settings},
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
@@ -84,8 +83,6 @@ async fn main() {
             update_instance,
             location_stats,
             location_interface_details,
-            get_interface_logs,
-            stop_interface_logs,
             all_connections,
             last_connection,
             active_connection,
