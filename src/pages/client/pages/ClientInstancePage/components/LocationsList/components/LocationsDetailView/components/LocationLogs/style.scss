@@ -11,7 +11,13 @@
     padding: 10px 20px;
     border-bottom: 1px solid var(--border-primary);
 
-    :nth-child(2) {
+    .select {
+      width: 100%;
+      max-width: 110px;
+      margin-left: 10px;
+    }
+
+    :nth-child(3) {
       margin-left: auto;
     }
   }
