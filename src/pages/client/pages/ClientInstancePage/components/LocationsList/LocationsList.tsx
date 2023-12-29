@@ -25,8 +25,6 @@ export const LocationsList = () => {
       ? [clientQueryKeys.getLocations, selectedInstance?.id as number]
       : [clientQueryKeys.getTunnels];
 
-  console.log(selectedInstance);
-
   const queryFn =
     selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE
       ? () => getLocations({ instanceId: selectedInstance?.id as number })
