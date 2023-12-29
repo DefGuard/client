@@ -13,7 +13,6 @@ import {
 import {
   ConnectionRequest,
   GetLocationsRequest,
-  InterfaceLogsRequest,
   LocationDetails,
   LocationDetailsRequest,
   RoutingRequest,
@@ -63,12 +62,6 @@ const disconnect = async (data: ConnectionRequest): Promise<void> =>
 const getLocationStats = async (data: StatsRequest): Promise<LocationStats[]> =>
   invokeWrapper('location_stats', data);
 
-const getLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<string> =>
-  invokeWrapper('get_interface_logs', data);
-
-const stopLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<void> =>
-  invokeWrapper('stop_interface_logs', data);
-
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
   invokeWrapper('last_connection', data);
 
@@ -108,8 +101,6 @@ export const clientApi = {
   connect,
   disconnect,
   getLocationStats,
-  getLocationInterfaceLogs,
-  stopLocationInterfaceLogs,
   getLastConnection,
   getConnectionHistory,
   getActiveConnection,

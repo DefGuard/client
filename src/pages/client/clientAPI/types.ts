@@ -71,13 +71,13 @@ export type LocationDetails = {
   name: string;
   pubkey: string;
   address: string;
-  dns?: string[];
+  dns?: string;
   listen_port: number;
   peer_pubkey: string;
   peer_endpoint: string;
   allowed_ips: string;
   persistent_keepalive_interval?: number;
-  last_handshake: number;
+  last_handshake?: number;
 };
 
 export type LocationDetailsRequest = {
@@ -90,8 +90,6 @@ export type TauriCommandKey =
   | 'connect'
   | 'disconnect'
   | 'location_stats'
-  | 'get_interface_logs'
-  | 'stop_interface_logs'
   | 'last_connection'
   | 'all_connections'
   | 'active_connection'

@@ -7,7 +7,7 @@ use crate::{
     },
     error::Error,
     service::{
-        log_watcher::{LogWatcherError, ServiceLogWatcher},
+        log_watcher::{spawn_log_watcher_task, stop_log_watcher_task},
         proto::RemoveInterfaceRequest,
     },
     tray::configure_tray_icon,
@@ -20,8 +20,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::query;
 use std::str::FromStr;
 use struct_patch::Patch;
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager, State};
-use tokio_util::sync::CancellationToken;
+use tauri::{AppHandle, Manager, State};
+use tracing::Level;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -70,9 +70,13 @@ pub async fn connect(location_id: i64, handle: AppHandle) -> Result<(), Error> {
                 message: "Created new connection".into(),
             },
         )?;
+
         // Spawn stats threads
         debug!("Spawning stats thread");
-        spawn_stats_thread(handle, interface_name).await;
+        spawn_stats_thread(handle.clone(), interface_name.clone()).await;
+
+        // spawn log watcher
+        spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
     }
     Ok(())
 }
@@ -87,8 +91,9 @@ pub async fn disconnect(location_id: i64, handle: AppHandle) -> Result<(), Error
         trace!("Connection: {:#?}", connection);
         debug!("Removing interface");
         let mut client = state.client.clone();
+        let interface_name = connection.interface_name.clone();
         let request = RemoveInterfaceRequest {
-            interface_name: connection.interface_name.clone(),
+            interface_name: interface_name.clone(),
         };
         if let Err(error) = client.remove_interface(request).await {
             error!("Failed to remove interface: {error}");
@@ -107,6 +112,9 @@ pub async fn disconnect(location_id: i64, handle: AppHandle) -> Result<(), Error
                 message: "Created new connection".into(),
             },
         )?;
+
+        stop_log_watcher_task(handle, interface_name)?;
+
         info!("Location {} disconnected", connection.location_id);
         Ok(())
     } else {
@@ -316,13 +324,13 @@ pub struct LocationInterfaceDetails {
     pub pubkey: String,  // own pubkey of client interface
     pub address: String, // IP within WireGuard network assigned to the client
     pub dns: Option<String>,
-    pub listen_port: u32,
+    pub listen_port: Option<u32>,
     // peer config
     pub peer_pubkey: String,
     pub peer_endpoint: String,
     pub allowed_ips: String,
     pub persistent_keepalive_interval: Option<u16>,
-    pub last_handshake: i64,
+    pub last_handshake: Option<i64>,
 }
 
 #[tauri::command(async)]
@@ -354,8 +362,17 @@ pub async fn location_interface_details(
             "#,
             location_id
         )
-        .fetch_one(&pool)
+        .fetch_optional(&pool)
         .await?;
+
+        let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
+            Some(record) => (
+                Some(record.listen_port),
+                record.persistent_keepalive_interval,
+                Some(record.last_handshake),
+            ),
+            None => (None, None, None),
+        };
 
         Ok(LocationInterfaceDetails {
             location_id,
@@ -363,12 +380,12 @@ pub async fn location_interface_details(
             pubkey: location.pubkey,
             address: location.address,
             dns: location.dns,
-            listen_port: result.listen_port,
+            listen_port,
             peer_pubkey,
             peer_endpoint: location.endpoint,
             allowed_ips: location.allowed_ips,
-            persistent_keepalive_interval: result.persistent_keepalive_interval,
-            last_handshake: result.last_handshake,
+            persistent_keepalive_interval,
+            last_handshake,
         })
     } else {
         error!("Location ID {location_id} not found");
@@ -532,105 +549,6 @@ pub async fn update_location_routing(
         Ok(location)
     } else {
         error!("Location with id: {location_id} not found.");
-        Err(Error::NotFound)
-    }
-}
-
-/// Starts a log watcher in a separate thread
-///
-/// The watcher parses `defguard-service` log files and extracts logs relevant
-/// to the WireGuard interface for a given location.
-/// Logs are then transmitted to the frontend by using `tauri` `Events`.
-/// Returned value is the name of an event topic to monitor.
-#[tauri::command]
-pub async fn get_interface_logs(
-    location_id: i64,
-    from: Option<String>,
-    handle: AppHandle,
-) -> Result<String, Error> {
-    info!("Starting log watcher for location {location_id}");
-    let app_state = handle.state::<AppState>();
-    if let Some(connection) = app_state.find_connection(location_id) {
-        // parse `from` timestamp
-        let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
-
-        // fetch configured log level from DB
-        let settings = Settings::get(&app_state.get_pool()).await?;
-        let log_level = settings.log_level.into();
-
-        let interface_name = connection.interface_name;
-
-        let event_topic = format!("log-update-{interface_name}");
-
-        // explicitly clone before topic is moved into the closure
-        let topic_clone = event_topic.clone();
-        let interface_name_clone = interface_name.clone();
-        let handle_clone = handle.clone();
-
-        // prepare cancellation token
-        let token = CancellationToken::new();
-        let token_clone = token.clone();
-
-        // spawn task
-        let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-            let mut log_watcher = ServiceLogWatcher::new(
-                handle_clone,
-                token_clone,
-                topic_clone,
-                interface_name_clone,
-                log_level,
-                from,
-            );
-            log_watcher.run()?;
-            Ok(())
-        });
-
-        // store `CancellationToken` to manually stop watcher thread
-        let mut log_watchers = app_state
-            .log_watchers
-            .lock()
-            .expect("Failed to lock log watchers mutex");
-        if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
-            // cancel previous log watcher for this interface
-            debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
-            old_token.cancel();
-        }
-
-        Ok(event_topic)
-    } else {
-        error!("No active connection found for location with id: {location_id}");
-        Err(Error::NotFound)
-    }
-}
-
-/// Stops the log watcher thread
-#[tauri::command]
-pub async fn stop_interface_logs(location_id: i64, handle: AppHandle) -> Result<(), Error> {
-    info!("Stopping log watcher for location {location_id}");
-    let app_state = handle.state::<AppState>();
-    if let Some(connection) = app_state.find_connection(location_id) {
-        // prepare interface name
-        let interface_name = connection.interface_name;
-
-        // get `CancellationToken` to manually stop watcher thread
-        let mut log_watchers = app_state
-            .log_watchers
-            .lock()
-            .expect("Failed to lock log watchers mutex");
-
-        match log_watchers.remove(&interface_name) {
-            Some(token) => {
-                debug!("Using cancellation token for log watcher on interface {interface_name}");
-                token.cancel();
-                Ok(())
-            }
-            None => {
-                error!("Log watcher for interface {interface_name} not found.");
-                Err(Error::NotFound)
-            }
-        }
-    } else {
-        error!("No active connection found for location with id: {location_id}");
         Err(Error::NotFound)
     }
 }
