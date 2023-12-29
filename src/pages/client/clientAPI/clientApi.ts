@@ -20,8 +20,8 @@ import {
   Settings,
   StatsRequest,
   TauriCommandKey,
-  UpdateInstnaceRequest,
   TunnelRequest,
+  UpdateInstnaceRequest,
 } from './types';
 
 // Streamlines logging for invokes
