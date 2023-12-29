@@ -3,7 +3,8 @@ export type DefguardInstance = {
   uuid: string;
   name: string;
   url: string;
-  connected: boolean;
+  // connected
+  active: boolean;
   pubkey: string;
 };
 
@@ -49,7 +50,8 @@ export type Tunnel = {
   post_up?: string;
   pre_down?: string;
   post_down?: string;
-  connected: boolean;
+  // connected
+  active: boolean;
 };
 
 // Common fields between Tunnel and Location

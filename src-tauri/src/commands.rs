@@ -260,7 +260,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             uuid: instance.uuid.clone(),
             name: instance.name.clone(),
             url: instance.url.clone(),
-            connected,
+            active: connected,
             pubkey: keys.pubkey,
         });
     }

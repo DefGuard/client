@@ -97,6 +97,6 @@ pub struct InstanceInfo {
     pub name: String,
     pub uuid: String,
     pub url: String,
-    pub connected: bool,
+    pub active: bool,
     pub pubkey: String,
 }

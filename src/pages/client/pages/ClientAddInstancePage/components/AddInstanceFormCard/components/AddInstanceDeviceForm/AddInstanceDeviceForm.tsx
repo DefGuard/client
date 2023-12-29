@@ -24,6 +24,7 @@ import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
+import { WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
 const { saveConfig } = clientApi;
@@ -102,7 +103,12 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
           .then((res) => {
             setIsLoading(false);
             toaster.success(localLL.messages.addSuccess());
-            setClientStore({ selectedInstance: res.instance.id });
+            setClientStore({
+              selectedInstance: {
+                id: res.instance.id,
+                type: WireguardInstanceType.DEFGUARD_INSTANCE,
+              },
+            });
             navigate(routes.client.base, { replace: true });
           })
           .catch(() => {

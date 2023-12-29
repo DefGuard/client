@@ -7,15 +7,14 @@ import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { WireguardInstanceType } from '../../../../types';
 
-// Define a generic interface for the type with required fields
 interface BaseInstance {
   id?: number;
   name: string;
-  connected: boolean;
+  // Connected
+  active: boolean;
   type: WireguardInstanceType;
 }
 
-// Extend the generic type in the Props interface
 type Props<T extends BaseInstance> = {
   instance: T;
 };
@@ -36,7 +35,7 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
 
   const cn = classNames('client-bar-item', 'clickable', {
     active: active,
-    connected: instance.connected,
+    connected: instance.active,
   });
 
   const { refs, floatingStyles } = useFloating({
@@ -79,7 +78,7 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
           <p>{instance.name[0]}</p>
         </div>
       </div>
-      {instance.connected && (
+      {instance.active && (
         <div
           className="client-bar-active-item-bar"
           ref={refs.setFloating}
