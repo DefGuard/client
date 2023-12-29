@@ -25,6 +25,9 @@
         "all": true,
         "request": true,
         "scope": ["https://**", "http://**"]
+      },
+      "fs": {
+        "scope": ["$RESOURCE/*"]
       }
     },
     "bundle": {
