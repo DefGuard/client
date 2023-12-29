@@ -9,15 +9,8 @@ export type DefguardInstance = {
 };
 
 export type DefguardLocation = {
-  id: number;
   instance_id: number;
-  name: string;
-  address: string;
-  endpoint: string;
-  // connected
-  active: boolean;
-  route_all_traffic: boolean;
-};
+} & CommonWireguardFields;
 
 export type LocationStats = {
   collected_at: number;
@@ -37,24 +30,19 @@ export type Connection = {
 
 export type Tunnel = {
   id?: number;
-  name: string;
   pubkey: string;
   prvkey: string;
-  address: string;
   server_pubkey: string;
   allowed_ips?: string;
-  endpoint: string;
   dns?: string;
   persistent_keep_alive: number;
   pre_up?: string;
   post_up?: string;
   pre_down?: string;
   post_down?: string;
-  // connected
-  active: boolean;
-};
+} & CommonWireguardFields;
 
-// Common fields between Tunnel and Location
+// Common fields between Tunnel, Location and instance
 // Shared between components as props to avoid component duplication
 export type CommonWireguardFields = {
   id: number;
@@ -62,6 +50,7 @@ export type CommonWireguardFields = {
   address: string;
   endpoint: string;
   route_all_traffic: boolean;
+  // Connected
   active: boolean;
   type?: WireguardInstanceType;
 };

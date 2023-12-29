@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
@@ -20,15 +20,21 @@ export const LocationsList = () => {
 
   const toaster = useToaster();
 
-  const queryKey =
-    selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE
-      ? [clientQueryKeys.getLocations, selectedInstance?.id as number]
-      : [clientQueryKeys.getTunnels];
+  const queryKey = useMemo(() => {
+    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
+      return [clientQueryKeys.getLocations, selectedInstance?.id as number];
+    } else {
+      return [clientQueryKeys.getTunnels];
+    }
+  }, [selectedInstance]);
 
-  const queryFn =
-    selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE
-      ? () => getLocations({ instanceId: selectedInstance?.id as number })
-      : () => getTunnels();
+  const queryFn = useCallback(() => {
+    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
+      return getLocations({ instanceId: selectedInstance?.id as number });
+    } else {
+      return getTunnels();
+    }
+  }, [selectedInstance]);
 
   const { data: locations, isError } = useQuery({
     queryKey,
