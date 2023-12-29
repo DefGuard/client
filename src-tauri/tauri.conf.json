@@ -27,7 +27,8 @@
         "scope": ["https://**", "http://**"]
       },
       "fs": {
-        "scope": ["$RESOURCE/*"]
+        "all": true,
+        "scope": ["$RESOURCE/*", "$APPDATA/*"]
       }
     },
     "bundle": {
