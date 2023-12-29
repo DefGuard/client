@@ -3,11 +3,16 @@ import { InvokeArgs } from '@tauri-apps/api/tauri';
 import pTimeout from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
-import { Connection, DefguardInstance, DefguardLocation, LocationStats } from '../types';
+import {
+  Connection,
+  DefguardInstance,
+  DefguardLocation,
+  LocationStats,
+  Tunnel,
+} from '../types';
 import {
   ConnectionRequest,
   GetLocationsRequest,
-  InterfaceLogsRequest,
   LocationDetails,
   LocationDetailsRequest,
   RoutingRequest,
@@ -57,12 +62,6 @@ const disconnect = async (data: ConnectionRequest): Promise<void> =>
 const getLocationStats = async (data: StatsRequest): Promise<LocationStats[]> =>
   invokeWrapper('location_stats', data);
 
-const getLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<string> =>
-  invokeWrapper('get_interface_logs', data);
-
-const stopLocationInterfaceLogs = async (data: InterfaceLogsRequest): Promise<void> =>
-  invokeWrapper('stop_interface_logs', data);
-
 const getLastConnection = async (data: ConnectionRequest): Promise<Connection> =>
   invokeWrapper('last_connection', data);
 
@@ -86,6 +85,12 @@ const deleteInstance = async (id: number): Promise<void> =>
 const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
 
+const parseTunnelConfig = async (config: string) =>
+  invokeWrapper('parse_tunnel_config', { config: config });
+
+const saveTunnel = async (tunnel: Tunnel) =>
+  invokeWrapper('save_tunnel', { tunnel: tunnel });
+
 const getLocationDetails = async (
   data: LocationDetailsRequest,
 ): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
@@ -96,8 +101,6 @@ export const clientApi = {
   connect,
   disconnect,
   getLocationStats,
-  getLocationInterfaceLogs,
-  stopLocationInterfaceLogs,
   getLastConnection,
   getConnectionHistory,
   getActiveConnection,
@@ -108,4 +111,6 @@ export const clientApi = {
   deleteInstance,
   getLocationDetails,
   updateInstance,
+  parseTunnelConfig,
+  saveTunnel,
 };

@@ -34,6 +34,10 @@ export type SaveDeviceConfigResponse = {
   instance: DefguardInstance;
   locations: DefguardLocation[];
 };
+export type SaveTunnelRequest = {
+  privateKey: string;
+  response: CreateDeviceResponse;
+};
 
 export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
@@ -73,7 +77,7 @@ export type LocationDetails = {
   peer_endpoint: string;
   allowed_ips: string;
   persistent_keepalive_interval?: number;
-  last_handshake: number;
+  last_handshake?: number;
 };
 
 export type LocationDetailsRequest = {
@@ -86,8 +90,6 @@ export type TauriCommandKey =
   | 'connect'
   | 'disconnect'
   | 'location_stats'
-  | 'get_interface_logs'
-  | 'stop_interface_logs'
   | 'last_connection'
   | 'all_connections'
   | 'active_connection'
@@ -97,4 +99,6 @@ export type TauriCommandKey =
   | 'update_settings'
   | 'delete_instance'
   | 'update_instance'
+  | 'parse_tunnel_config'
+  | 'save_tunnel'
   | 'location_interface_details';

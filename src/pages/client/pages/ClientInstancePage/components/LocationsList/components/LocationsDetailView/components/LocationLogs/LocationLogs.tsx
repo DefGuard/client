@@ -4,6 +4,7 @@ import { clipboard } from '@tauri-apps/api';
 import { save } from '@tauri-apps/api/dialog';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { writeTextFile } from '@tauri-apps/api/fs';
+import { isUndefined } from 'lodash-es';
 import { useEffect, useRef } from 'react';
 
 import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
@@ -35,47 +36,51 @@ export const LocationLogs = ({ locationId }: Props) => {
     }
   };
 
-  // mount logger and stream log elements into log-container
+  const handleLogsDownload = async () => {
+    const path = await save({});
+    if (path) {
+      await writeTextFile(path, logsRef.current);
+    }
+  };
+
+  // Listen to new logs
   useEffect(() => {
     let eventUnlisten: UnlistenFn;
-    const startLogging = async () => {
-      const eventTopic = await getLocationInterfaceLogs({ locationId });
-      // assign unlisten
-      eventUnlisten = await listen<LogItem[]>(eventTopic, ({ payload: logItems }) => {
-        if (logsContainerElement.current) {
-          logItems.forEach((item) => {
-            if (
-              logsContainerElement.current &&
-              filterLogByLevel(locationLogLevelRef.current, item.level)
-            ) {
-              const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
-              const element = createLogLineElement(messageString);
-              const scrollAfterAppend =
-                logsContainerElement.current.scrollHeight -
+    const startLogListen = async () => {
+      eventUnlisten = await listen<LogItem[]>(
+        `log-update-location-${locationId}`,
+        ({ payload: logItems }) => {
+          if (logsContainerElement.current) {
+            logItems.forEach((item) => {
+              if (logsContainerElement.current) {
+                const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
+                const element = createLogLineElement(messageString);
+                const scrollAfterAppend =
+                  logsContainerElement.current.scrollHeight -
                   logsContainerElement.current.scrollTop ===
-                logsContainerElement.current.clientHeight;
-              logsContainerElement.current.appendChild(element);
-              logsRef.current += messageString + '\n';
-              // auto scroll to bottom if user didn't scroll up
-              if (scrollAfterAppend) {
-                logsContainerElement.current.scrollTo({
-                  top: logsContainerElement.current.scrollHeight,
-                });
+                  logsContainerElement.current.clientHeight;
+                logsContainerElement.current.appendChild(element);
+                // auto scroll to bottom if user didn't scroll up
+                if (scrollAfterAppend) {
+                  logsContainerElement.current.scrollTo({
+                    top: logsContainerElement.current.scrollHeight,
+                  });
+                }
               }
-            }
-          });
-        }
-      });
+            });
+          }
+        },
+      );
     };
-
-    startLogging();
+    if (!isUndefined(locationId)) {
+      startLogListen();
+    }
     //unsubscribe on dismount
     return () => {
       eventUnlisten?.();
-      stopLocationInterfaceLogs({ locationId });
     };
     //eslint-disable-next-line
-  }, []);
+  }, [locationId]);
 
   return (
     <Card shaded={false} id="location-logs" bordered>

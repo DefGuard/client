@@ -417,6 +417,213 @@ type RootTranslation = {
 						}
 					}
 				}
+				addTunnelPage: {
+					/**
+					 * A​d​d​ ​W​i​r​e​G​u​a​r​d​®​ ​T​u​n​n​e​l
+					 */
+					title: string
+					forms: {
+						initTunnel: {
+							/**
+							 * P​l​e​a​s​e​ ​p​r​o​v​i​d​e​ ​I​n​s​t​a​n​c​e​ ​U​R​L​ ​a​n​d​ ​t​o​k​e​n
+							 */
+							title: string
+							sections: {
+								/**
+								 * V​P​N​ ​S​e​r​v​e​r
+								 */
+								vpnServer: string
+								/**
+								 * A​d​v​a​n​c​e​d​ ​O​p​t​i​o​n​s
+								 */
+								advancedOptions: string
+							}
+							labels: {
+								/**
+								 * T​u​n​n​e​l​ ​N​a​m​e
+								 */
+								name: string
+								/**
+								 * P​r​i​v​a​t​e​ ​K​e​y
+								 */
+								privateKey: string
+								/**
+								 * P​u​b​l​i​c​ ​K​e​y
+								 */
+								publicKey: string
+								/**
+								 * A​d​d​r​e​s​s
+								 */
+								address: string
+								/**
+								 * P​u​b​l​i​c​ ​K​e​y
+								 */
+								serverPubkey: string
+								/**
+								 * V​P​N​ ​S​e​r​v​e​r​ ​A​d​d​r​e​s​s​:​P​o​r​t
+								 */
+								endpoint: string
+								/**
+								 * D​N​S
+								 */
+								dns: string
+								/**
+								 * A​l​l​o​w​e​d​ ​I​P​s​ ​(​s​e​p​e​r​a​t​e​ ​w​i​t​h​ ​c​o​m​m​a​)
+								 */
+								allowedips: string
+								/**
+								 * P​e​r​s​i​s​t​e​n​t​ ​K​e​e​p​ ​A​l​i​v​e​ ​(​s​e​c​)
+								 */
+								persistentKeepAlive: string
+								/**
+								 * P​r​e​U​p
+								 */
+								preUp: string
+								/**
+								 * P​o​s​t​U​p
+								 */
+								postUp: string
+								/**
+								 * P​r​e​D​o​w​n
+								 */
+								PreDown: string
+								/**
+								 * P​o​s​t​D​o​w​n
+								 */
+								PostDown: string
+							}
+							helpers: {
+								/**
+								 * C​l​i​c​k​ ​t​h​e​ ​"​A​d​v​a​n​c​e​d​ ​O​p​t​i​o​n​s​"​ ​s​e​c​t​i​o​n​ ​t​o​ ​r​e​v​e​a​l​ ​a​d​d​i​t​i​o​n​a​l​ ​s​e​t​t​i​n​g​s​ ​f​o​r​ ​f​i​n​e​-​t​u​n​i​n​g​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​.​ ​Y​o​u​ ​c​a​n​ ​c​u​s​t​o​m​i​z​e​ ​p​r​e​ ​a​n​d​ ​p​o​s​t​ ​s​c​r​i​p​t​s​,​ ​a​m​o​n​g​ ​o​t​h​e​r​ ​o​p​t​i​o​n​s​.
+								 */
+								advancedOptions: string
+								/**
+								 * A​ ​u​n​i​q​u​e​ ​n​a​m​e​ ​f​o​r​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​t​o​ ​i​d​e​n​t​i​f​y​ ​i​t​ ​e​a​s​i​l​y​.
+								 */
+								name: string
+								/**
+								 * T​h​e​ ​p​u​b​l​i​c​ ​k​e​y​ ​a​s​s​o​c​i​a​t​e​d​ ​w​i​t​h​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
+								 */
+								pubkey: string
+								/**
+								 * T​h​e​ ​p​r​i​v​a​t​e​ ​k​e​y​ ​a​s​s​o​c​i​a​t​e​d​ ​w​i​t​h​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
+								 */
+								prvkey: string
+								/**
+								 * T​h​e​ ​I​P​ ​a​d​d​r​e​s​s​ ​a​s​s​i​g​n​e​d​ ​t​o​ ​t​h​i​s​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​ ​w​i​t​h​i​n​ ​t​h​e​ ​V​P​N​ ​n​e​t​w​o​r​k​.
+								 */
+								address: string
+								/**
+								 * T​h​e​ ​p​u​b​l​i​c​ ​k​e​y​ ​o​f​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​s​e​r​v​e​r​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
+								 */
+								serverPubkey: string
+								/**
+								 * A​ ​c​o​m​m​a​-​s​e​p​a​r​a​t​e​d​ ​l​i​s​t​ ​o​f​ ​I​P​ ​a​d​d​r​e​s​s​e​s​ ​o​r​ ​C​I​D​R​ ​r​a​n​g​e​s​ ​t​h​a​t​ ​a​r​e​ ​a​l​l​o​w​e​d​ ​f​o​r​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​t​u​n​n​e​l​.
+								 */
+								allowedIps: string
+								/**
+								 * T​h​e​ ​a​d​d​r​e​s​s​ ​a​n​d​ ​p​o​r​t​ ​o​f​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​s​e​r​v​e​r​,​ ​t​y​p​i​c​a​l​l​y​ ​i​n​ ​t​h​e​ ​f​o​r​m​a​t​ ​"​h​o​s​t​n​a​m​e​:​p​o​r​t​"​.
+								 */
+								endpoint: string
+								/**
+								 * T​h​e​ ​D​N​S​ ​(​D​o​m​a​i​n​ ​N​a​m​e​ ​S​y​s​t​e​m​)​ ​s​e​r​v​e​r​ ​t​h​a​t​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​s​h​o​u​l​d​ ​u​s​e​ ​f​o​r​ ​n​a​m​e​ ​r​e​s​o​l​u​t​i​o​n​.
+								 */
+								dns: string
+								/**
+								 * T​h​e​ ​i​n​t​e​r​v​a​l​ ​(​i​n​ ​s​e​c​o​n​d​s​)​ ​f​o​r​ ​s​e​n​d​i​n​g​ ​p​e​r​i​o​d​i​c​ ​k​e​e​p​-​a​l​i​v​e​ ​m​e​s​s​a​g​e​s​ ​t​o​ ​e​n​s​u​r​e​ ​t​h​e​ ​t​u​n​n​e​l​ ​s​t​a​y​s​ ​a​c​t​i​v​e​.​ ​A​d​j​u​s​t​ ​a​s​ ​n​e​e​d​e​d​.
+								 */
+								persistentKeepAlive: string
+								/**
+								 * I​f​ ​e​n​a​b​l​e​d​,​ ​a​l​l​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​w​i​l​l​ ​b​e​ ​r​o​u​t​e​d​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								routeAllTraffic: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​b​e​f​o​r​e​ ​b​r​i​n​g​i​n​g​ ​u​p​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								preUp: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​a​f​t​e​r​ ​b​r​i​n​g​i​n​g​ ​u​p​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								postUp: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​b​e​f​o​r​e​ ​t​e​a​r​i​n​g​ ​d​o​w​n​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								preDown: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​a​f​t​e​r​ ​t​e​a​r​i​n​g​ ​d​o​w​n​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								postDown: string
+							}
+							/**
+							 * A​d​d​ ​T​u​n​n​e​l
+							 */
+							submit: string
+							messages: {
+								/**
+								 * E​r​r​o​r​ ​p​a​r​s​i​n​g​ ​c​o​n​f​i​g​ ​f​i​l​e
+								 */
+								configError: string
+								/**
+								 * T​u​n​n​e​l​ ​a​d​d​e​d
+								 */
+								addSuccess: string
+								/**
+								 * C​r​e​a​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+								 */
+								addError: string
+							}
+							controls: {
+								/**
+								 * I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e
+								 */
+								importConfig: string
+								/**
+								 * G​e​n​e​r​a​t​e​ ​P​r​i​v​a​t​e​ ​K​e​y
+								 */
+								generatePrvkey: string
+							}
+						}
+					}
+					guide: {
+						/**
+						 * A​d​d​i​n​g​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l
+						 */
+						title: string
+						/**
+						 * <​p​>​T​o​ ​e​s​t​a​b​l​i​s​h​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​ ​b​e​t​w​e​e​n​ ​t​w​o​ ​o​r​ ​m​o​r​e​ ​d​e​v​i​c​e​s​ ​o​v​e​r​ ​t​h​e​ ​i​n​t​e​r​n​e​t​ ​c​r​e​a​t​e​ ​a​ ​v​i​r​t​u​a​l​ ​p​r​i​v​a​t​e​ ​n​e​t​w​o​r​k​ ​b​y​ ​c​o​n​f​i​g​u​r​i​n​g​ ​y​o​u​r​ ​t​u​n​n​e​l​.​<​/​p​>​<​p​>​I​f​ ​y​o​u​ ​d​o​n​’​t​ ​s​e​e​ ​o​p​t​i​o​n​s​ ​l​i​k​e​ ​T​a​b​l​e​ ​o​r​ ​M​T​U​ ​i​t​ ​m​e​a​n​s​ ​w​e​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​i​t​ ​f​o​r​ ​n​o​w​,​ ​b​u​t​ ​w​i​l​l​ ​b​e​ ​a​d​d​e​d​ ​l​a​t​e​r​.​<​/​p​>
+						 */
+						subTitle: string
+						card: {
+							/**
+							 * S​e​t​t​i​n​g​ ​U​p​ ​A​ ​n​e​w​ ​T​u​n​n​e​l​:
+							 */
+							title: string
+							/**
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​1​.​ ​I​m​p​o​r​t​ ​C​o​n​f​i​g​u​r​a​t​i​o​n​ ​F​i​l​e​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​C​l​i​c​k​ ​o​n​ ​t​h​e​ ​"​I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e​"​ ​b​u​t​t​o​n​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​N​a​v​i​g​a​t​g​e​ ​t​o​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​u​s​i​n​g​ ​t​h​e​ ​f​i​l​e​ ​s​e​l​e​c​t​i​o​n​ ​d​i​a​l​o​g​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​S​e​l​e​c​t​ ​t​h​e​ ​.​c​o​n​f​ ​f​i​l​e​ ​y​o​u​ ​r​e​c​e​i​v​e​d​ ​o​r​ ​c​r​e​a​t​e​d​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​2​.​ ​O​r​ ​F​i​l​l​ ​i​n​ ​F​o​r​m​ ​o​n​ ​t​h​e​ ​L​e​f​t​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​E​n​t​e​r​ ​a​ ​n​a​m​e​ ​f​o​r​ ​t​h​e​ ​t​u​n​n​e​l​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​P​r​o​v​i​d​e​ ​e​s​s​e​n​t​i​a​l​ ​d​e​t​a​i​l​s​ ​s​u​c​h​ ​a​s​ ​t​h​e​ ​p​r​i​v​a​t​e​ ​k​e​y​,​ ​p​u​b​l​i​c​ ​k​e​y​,​ ​a​n​d​ ​e​n​d​p​o​i​n​t​ ​(​s​e​r​v​e​r​ ​a​d​d​r​e​s​s​)​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
+							 */
+							content: string
+						}
+					}
+				}
 				addInstancePage: {
 					/**
 					 * A​d​d​ ​I​n​s​t​a​n​c​e
@@ -506,13 +713,21 @@ type RootTranslation = {
 			}
 			sideBar: {
 				/**
-				 * I​n​s​t​a​n​c​e​s
+				 * d​e​f​g​u​a​r​d​ ​I​n​s​t​a​n​c​e​s
 				 */
 				instances: string
 				/**
 				 * A​d​d​ ​I​n​s​t​a​n​c​e
 				 */
 				addInstance: string
+				/**
+				 * A​d​d​ ​T​u​n​n​e​l
+				 */
+				addTunnel: string
+				/**
+				 * W​i​r​e​g​u​a​r​d​ ​T​u​n​n​e​l​s
+				 */
+				tunnels: string
 				/**
 				 * S​e​t​t​i​n​g​s
 				 */
@@ -1383,6 +1598,213 @@ export type TranslationFunctions = {
 						}
 					}
 				}
+				addTunnelPage: {
+					/**
+					 * Add WireGuard® Tunnel
+					 */
+					title: () => LocalizedString
+					forms: {
+						initTunnel: {
+							/**
+							 * Please provide Instance URL and token
+							 */
+							title: () => LocalizedString
+							sections: {
+								/**
+								 * VPN Server
+								 */
+								vpnServer: () => LocalizedString
+								/**
+								 * Advanced Options
+								 */
+								advancedOptions: () => LocalizedString
+							}
+							labels: {
+								/**
+								 * Tunnel Name
+								 */
+								name: () => LocalizedString
+								/**
+								 * Private Key
+								 */
+								privateKey: () => LocalizedString
+								/**
+								 * Public Key
+								 */
+								publicKey: () => LocalizedString
+								/**
+								 * Address
+								 */
+								address: () => LocalizedString
+								/**
+								 * Public Key
+								 */
+								serverPubkey: () => LocalizedString
+								/**
+								 * VPN Server Address:Port
+								 */
+								endpoint: () => LocalizedString
+								/**
+								 * DNS
+								 */
+								dns: () => LocalizedString
+								/**
+								 * Allowed IPs (seperate with comma)
+								 */
+								allowedips: () => LocalizedString
+								/**
+								 * Persistent Keep Alive (sec)
+								 */
+								persistentKeepAlive: () => LocalizedString
+								/**
+								 * PreUp
+								 */
+								preUp: () => LocalizedString
+								/**
+								 * PostUp
+								 */
+								postUp: () => LocalizedString
+								/**
+								 * PreDown
+								 */
+								PreDown: () => LocalizedString
+								/**
+								 * PostDown
+								 */
+								PostDown: () => LocalizedString
+							}
+							helpers: {
+								/**
+								 * Click the "Advanced Options" section to reveal additional settings for fine-tuning your WireGuard tunnel configuration. You can customize pre and post scripts, among other options.
+								 */
+								advancedOptions: () => LocalizedString
+								/**
+								 * A unique name for your WireGuard tunnel to identify it easily.
+								 */
+								name: () => LocalizedString
+								/**
+								 * The public key associated with the WireGuard tunnel for secure communication.
+								 */
+								pubkey: () => LocalizedString
+								/**
+								 * The private key associated with the WireGuard tunnel for secure communication.
+								 */
+								prvkey: () => LocalizedString
+								/**
+								 * The IP address assigned to this WireGuard client within the VPN network.
+								 */
+								address: () => LocalizedString
+								/**
+								 * The public key of the WireGuard server for secure communication.
+								 */
+								serverPubkey: () => LocalizedString
+								/**
+								 * A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.
+								 */
+								allowedIps: () => LocalizedString
+								/**
+								 * The address and port of the WireGuard server, typically in the format "hostname:port".
+								 */
+								endpoint: () => LocalizedString
+								/**
+								 * The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution.
+								 */
+								dns: () => LocalizedString
+								/**
+								 * The interval (in seconds) for sending periodic keep-alive messages to ensure the tunnel stays active. Adjust as needed.
+								 */
+								persistentKeepAlive: () => LocalizedString
+								/**
+								 * If enabled, all network traffic will be routed through the WireGuard tunnel.
+								 */
+								routeAllTraffic: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed before bringing up the WireGuard tunnel.
+								 */
+								preUp: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed after bringing up the WireGuard tunnel.
+								 */
+								postUp: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed before tearing down the WireGuard tunnel.
+								 */
+								preDown: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed after tearing down the WireGuard tunnel.
+								 */
+								postDown: () => LocalizedString
+							}
+							/**
+							 * Add Tunnel
+							 */
+							submit: () => LocalizedString
+							messages: {
+								/**
+								 * Error parsing config file
+								 */
+								configError: () => LocalizedString
+								/**
+								 * Tunnel added
+								 */
+								addSuccess: () => LocalizedString
+								/**
+								 * Creating tunnel failed
+								 */
+								addError: () => LocalizedString
+							}
+							controls: {
+								/**
+								 * Import Config File
+								 */
+								importConfig: () => LocalizedString
+								/**
+								 * Generate Private Key
+								 */
+								generatePrvkey: () => LocalizedString
+							}
+						}
+					}
+					guide: {
+						/**
+						 * Adding WireGuard tunnel
+						 */
+						title: () => LocalizedString
+						/**
+						 * <p>To establish secure communication between two or more devices over the internet create a virtual private network by configuring your tunnel.</p><p>If you don’t see options like Table or MTU it means we do not support it for now, but will be added later.</p>
+						 */
+						subTitle: () => LocalizedString
+						card: {
+							/**
+							 * Setting Up A new Tunnel:
+							 */
+							title: () => LocalizedString
+							/**
+							 * 
+						                <p>1. Import Configuration File</p>
+						                <div>
+						                <ul>
+						                  <li> Click on the "Import Config File" button.</li>
+						                  <li> Navigatge to configuration file using the file selection dialog.</li>
+						                  <li> Select the .conf file you received or created.</li>
+						                </ul>
+						                </div>
+						                <p>2. Or Fill in Form on the Left</p>
+						                <div>
+						                <ul>
+						                  <li> Enter a name for the tunnel.</li>
+						                  <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+						                </ul>
+						                </div>
+						                <p>
+						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                </p>
+						              
+							 */
+							content: () => LocalizedString
+						}
+					}
+				}
 				addInstancePage: {
 					/**
 					 * Add Instance
@@ -1472,13 +1894,21 @@ export type TranslationFunctions = {
 			}
 			sideBar: {
 				/**
-				 * Instances
+				 * defguard Instances
 				 */
 				instances: () => LocalizedString
 				/**
 				 * Add Instance
 				 */
 				addInstance: () => LocalizedString
+				/**
+				 * Add Tunnel
+				 */
+				addTunnel: () => LocalizedString
+				/**
+				 * Wireguard Tunnels
+				 */
+				tunnels: () => LocalizedString
 				/**
 				 * Settings
 				 */
