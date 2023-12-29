@@ -36,7 +36,7 @@ export const useClientStore = createWithEqualityFn<Store>(
         return set({
           instances: values,
           selectedInstance:
-            { id: values[0]?.id, type: WireguardInstanceType.DEFGUARDINSTANCE } ??
+            { id: values[0]?.id, type: WireguardInstanceType.DEFGUARD_INSTANCE } ??
             undefined,
         });
       }
@@ -48,11 +48,11 @@ export const useClientStore = createWithEqualityFn<Store>(
       // check if currently selected instances is in updated instances
       if (!isUndefined(selected) && res.length && selected.id) {
         if (!res.map((i) => i.id).includes(selected.id)) {
-          selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARDINSTANCE };
+          selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARD_INSTANCE };
         }
       }
       if (isUndefined(selected) && res.length) {
-        selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARDINSTANCE };
+        selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARD_INSTANCE };
       }
       set({ instances: res, selectedInstance: selected });
     },

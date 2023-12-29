@@ -71,7 +71,7 @@ export enum ClientView {
 
 export enum WireguardInstanceType {
   TUNNEL = 'Tunnel',
-  DEFGUARDINSTANCE = 'Instance',
+  DEFGUARD_INSTANCE = 'Instance',
 }
 
 export type SelectedInstance = {

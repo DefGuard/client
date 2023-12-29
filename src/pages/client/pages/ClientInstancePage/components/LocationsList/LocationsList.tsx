@@ -21,14 +21,14 @@ export const LocationsList = () => {
   const toaster = useToaster();
 
   const queryKey =
-    selectedInstance?.type === WireguardInstanceType.DEFGUARDINSTANCE
+    selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE
       ? [clientQueryKeys.getLocations, selectedInstance?.id as number]
       : [clientQueryKeys.getTunnels];
 
   console.log(selectedInstance);
 
   const queryFn =
-    selectedInstance?.type === WireguardInstanceType.DEFGUARDINSTANCE
+    selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE
       ? () => getLocations({ instanceId: selectedInstance?.id as number })
       : () => getTunnels();
 
@@ -37,8 +37,6 @@ export const LocationsList = () => {
     queryFn,
     enabled: !!selectedInstance,
   });
-
-  console.log(locations);
 
   useEffect(() => {
     if (isError) {
@@ -51,12 +49,16 @@ export const LocationsList = () => {
 
   return (
     <>
-      {selectedView === ClientView.GRID && selectedInstance.id && (
-        <LocationsGridView locations={locations} instanceId={selectedInstance.id} />
-      )}
-      {selectedView === ClientView.DETAIL && selectedInstance.id && (
-        <LocationsDetailView locations={locations} instanceId={selectedInstance.id} />
-      )}
+      {selectedView === ClientView.GRID &&
+        (selectedInstance.id ||
+          selectedInstance.type === WireguardInstanceType.TUNNEL) && (
+          <LocationsGridView locations={locations} />
+        )}
+      {selectedView === ClientView.DETAIL &&
+        selectedInstance.id &&
+        selectedInstance.type === WireguardInstanceType.DEFGUARD_INSTANCE && (
+          <LocationsDetailView locations={locations} />
+        )}
     </>
   );
 };

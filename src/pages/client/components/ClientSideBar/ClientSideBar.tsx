@@ -42,8 +42,8 @@ export const ClientSideBar = () => {
         </div>
         {instances.map((instance) => (
           <ClientBarItem
-            instance={{ ...instance, type: WireguardInstanceType.DEFGUARDINSTANCE }}
-            key={instance.id}
+            instance={{ ...instance, type: WireguardInstanceType.DEFGUARD_INSTANCE }}
+            key={`${instance.id}${WireguardInstanceType.DEFGUARD_INSTANCE}`}
           />
         ))}
         <AddInstance />
@@ -66,7 +66,7 @@ export const ClientSideBar = () => {
         {tunnels.map((tunnel) => (
           <ClientBarItem
             instance={{ ...tunnel, type: WireguardInstanceType.TUNNEL }}
-            key={tunnel.id}
+            key={`${tunnel.id}${WireguardInstanceType.TUNNEL}`}
           />
         ))}
         <AddTunnel />

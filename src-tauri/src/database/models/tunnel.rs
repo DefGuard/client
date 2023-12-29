@@ -282,7 +282,7 @@ pub struct TunnelConnection {
     pub tunnel_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,
-    pub end: NaiveDateTime
+    pub end: NaiveDateTime,
 }
 
 impl TunnelConnection {

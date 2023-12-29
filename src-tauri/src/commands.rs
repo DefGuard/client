@@ -639,14 +639,14 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
     let mut tunnel_info: Vec<TunnelInfo> = vec![];
 
     for tunnel in tunnels {
-      tunnel_info.push(TunnelInfo {
-        id: tunnel.id,
-        name: tunnel.name,
-        address: tunnel.address,
-        endpoint: tunnel.endpoint,
-        route_all_traffic: tunnel.route_all_traffic,
-        active: false,
-      })
+        tunnel_info.push(TunnelInfo {
+            id: tunnel.id,
+            name: tunnel.name,
+            address: tunnel.address,
+            endpoint: tunnel.endpoint,
+            route_all_traffic: tunnel.route_all_traffic,
+            active: false,
+        })
     }
     Ok(tunnel_info)
 }

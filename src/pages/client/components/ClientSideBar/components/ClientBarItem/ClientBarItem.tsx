@@ -25,11 +25,13 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
   const navigate = useNavigate();
   const setClientStore = useClientStore((state) => state.setState);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
+
+  // FIXME: Fix tunnel active when detail will be implemented
   const active =
-    instance.type === 'Tunnel'
+    instance.type === WireguardInstanceType.TUNNEL
       ? routes.client.tunnelPage + instance.id === window.location.pathname
-      : instance.type === 'Instance'
-        ? instance.id === selectedInstance
+      : instance.type === WireguardInstanceType.DEFGUARD_INSTANCE
+        ? instance.id === selectedInstance?.id
         : false;
 
   const cn = classNames('client-bar-item', 'clickable', {
@@ -49,11 +51,11 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
         className={cn}
         ref={refs.setReference}
         onClick={() => {
-          if (instance.type === 'Instance') {
+          if (instance.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
             setClientStore({
               selectedInstance: {
                 id: instance.id as number,
-                type: WireguardInstanceType.DEFGUARDINSTANCE,
+                type: WireguardInstanceType.DEFGUARD_INSTANCE,
               },
             });
             if (!instancePage) {

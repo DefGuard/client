@@ -6,10 +6,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
-import { CommonWireguardFields } from '../../../../../../types';
-
 import { routes } from '../../../../../../../../shared/routes';
-
+import { CommonWireguardFields } from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from './components/LocationDetails/LocationDetails';
@@ -39,7 +37,6 @@ export const LocationsDetailView = ({ locations }: Props) => {
       })),
     [locations, activeLocationId],
   );
-
 
   const activeLocation = useMemo((): CommonWireguardFields | undefined => {
     if (!isUndefined(activeLocationId)) {
