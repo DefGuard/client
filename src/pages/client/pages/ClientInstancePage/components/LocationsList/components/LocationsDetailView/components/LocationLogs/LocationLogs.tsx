@@ -1,17 +1,15 @@
 import './style.scss';
 
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { isUndefined } from 'lodash-es';
 import { useEffect, useRef } from 'react';
 
 import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
 import { ActionButtonVariant } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
-import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { LogItem } from '../../../../../../../../clientAPI/types';
 import { DefguardLocation } from '../../../../../../../../types';
-
-const { getLocationInterfaceLogs, stopLocationInterfaceLogs } = clientApi;
 
 type Props = {
   locationId: DefguardLocation['id'];
@@ -22,42 +20,44 @@ export const LocationLogs = ({ locationId }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details.logs;
 
-  // mount logger and stream log elements into log-container
+  // Listen to new logs
   useEffect(() => {
     let eventUnlisten: UnlistenFn;
-    const startLogging = async () => {
-      const eventTopic = await getLocationInterfaceLogs({ locationId });
-      // assign unlisten
-      eventUnlisten = await listen<LogItem[]>(eventTopic, ({ payload: logItems }) => {
-        if (logsContainerElement.current) {
-          logItems.forEach((item) => {
-            if (logsContainerElement.current) {
-              const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
-              const element = createLogLineElement(messageString);
-              const scrollAfterAppend =
-                logsContainerElement.current.scrollHeight -
-                  logsContainerElement.current.scrollTop ===
-                logsContainerElement.current.clientHeight;
-              logsContainerElement.current.appendChild(element);
-              // auto scroll to bottom if user didn't scroll up
-              if (scrollAfterAppend) {
-                logsContainerElement.current.scrollTo({
-                  top: logsContainerElement.current.scrollHeight,
-                });
+    const startLogListen = async () => {
+      eventUnlisten = await listen<LogItem[]>(
+        `log-update-location-${locationId}`,
+        ({ payload: logItems }) => {
+          if (logsContainerElement.current) {
+            logItems.forEach((item) => {
+              if (logsContainerElement.current) {
+                const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
+                const element = createLogLineElement(messageString);
+                const scrollAfterAppend =
+                  logsContainerElement.current.scrollHeight -
+                    logsContainerElement.current.scrollTop ===
+                  logsContainerElement.current.clientHeight;
+                logsContainerElement.current.appendChild(element);
+                // auto scroll to bottom if user didn't scroll up
+                if (scrollAfterAppend) {
+                  logsContainerElement.current.scrollTo({
+                    top: logsContainerElement.current.scrollHeight,
+                  });
+                }
               }
-            }
-          });
-        }
-      });
+            });
+          }
+        },
+      );
     };
-    startLogging();
+    if (!isUndefined(locationId)) {
+      startLogListen();
+    }
     //unsubscribe on dismount
     return () => {
       eventUnlisten?.();
-      stopLocationInterfaceLogs({ locationId });
     };
     //eslint-disable-next-line
-  }, []);
+  }, [locationId]);
 
   return (
     <Card shaded={false} id="location-logs" bordered>
