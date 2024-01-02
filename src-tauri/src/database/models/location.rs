@@ -57,32 +57,6 @@ pub async fn peer_to_location_stats(
 }
 
 impl Location {
-    // #[allow(clippy::too_many_arguments)]
-    // #[must_use]
-    // pub fn new(
-    //     instance_id: i64,
-    //     network_id: i64,
-    //     name: String,
-    //     address: String,
-    //     pubkey: String,
-    //     endpoint: String,
-    //     allowed_ips: String,
-    //     dns: Option<String>,
-    // ) -> Self {
-    //     Location {
-    //         id: None,
-    //         instance_id,
-    //         network_id,
-    //         name,
-    //         address,
-    //         pubkey,
-    //         endpoint,
-    //         allowed_ips,
-    //         dns,
-    //         route_all_traffic: false,
-    //     }
-    // }
-
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let locations = query_as!(
             Self,
