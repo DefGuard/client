@@ -28,7 +28,11 @@ export const ClientPage = () => {
     const subs: UnlistenFn[] = [];
 
     listen(TauriEventKey.INSTANCE_UPDATE, () => {
-      const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+      const invalidate = [
+        clientQueryKeys.getInstances,
+        clientQueryKeys.getLocations,
+        clientQueryKeys.getTunnels,
+      ];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
           queryKey: [key],

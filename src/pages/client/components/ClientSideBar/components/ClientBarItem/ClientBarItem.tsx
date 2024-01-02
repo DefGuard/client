@@ -26,11 +26,7 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
   const selectedInstance = useClientStore((state) => state.selectedInstance);
 
   const active =
-    instance.type === WireguardInstanceType.TUNNEL
-      ? window.location.pathname.includes(String(instance.id))
-      : instance.type === WireguardInstanceType.DEFGUARD_INSTANCE
-        ? instance.id === selectedInstance?.id
-        : false;
+    instance.type === selectedInstance?.type && instance.id === selectedInstance.id;
 
   const cn = classNames('client-bar-item', 'clickable', {
     active: active,
@@ -56,9 +52,6 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
                 type: WireguardInstanceType.DEFGUARD_INSTANCE,
               },
             });
-            if (!instancePage) {
-              navigate(routes.client.base, { replace: true });
-            }
           } else {
             setClientStore({
               selectedInstance: {
@@ -66,7 +59,9 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
                 type: WireguardInstanceType.TUNNEL,
               },
             });
-            navigate(`${routes.client.tunnelPage}/${instance.id}`, { replace: true });
+          }
+          if (!instancePage) {
+            navigate(routes.client.base, { replace: true });
           }
         }}
       >
