@@ -260,7 +260,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             uuid: instance.uuid.clone(),
             name: instance.name.clone(),
             url: instance.url.clone(),
-            connected,
+            active: connected,
             pubkey: keys.pubkey,
         });
     }
@@ -630,4 +630,36 @@ pub async fn save_tunnel(mut tunnel: Tunnel, app_state: State<'_, AppState>) -> 
     tunnel.save(&app_state.get_pool()).await?;
     info!("Saved tunnel {tunnel:#?}");
     Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TunnelInfo {
+    pub id: Option<i64>,
+    pub name: String,
+    pub address: String,
+    pub endpoint: String,
+    pub active: bool,
+    pub route_all_traffic: bool,
+}
+
+#[tauri::command(async)]
+pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo>, Error> {
+    debug!("Retrieving all instances.");
+
+    let tunnels = Tunnel::all(&app_state.get_pool()).await?;
+    debug!("Found ({}) tunnels", tunnels.len());
+    trace!("Instances found: {tunnels:#?}");
+    let mut tunnel_info: Vec<TunnelInfo> = vec![];
+
+    for tunnel in tunnels {
+        tunnel_info.push(TunnelInfo {
+            id: tunnel.id,
+            name: tunnel.name,
+            address: tunnel.address,
+            endpoint: tunnel.endpoint,
+            route_all_traffic: tunnel.route_all_traffic,
+            active: false,
+        })
+    }
+    Ok(tunnel_info)
 }

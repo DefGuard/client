@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../query';
-import { ClientView } from '../../../../types';
+import { ClientView, WireguardInstanceType } from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 
-const { getLocations } = clientApi;
+const { getLocations, getTunnels } = clientApi;
 
 export const LocationsList = () => {
   const { LL } = useI18nContext();
@@ -20,9 +20,25 @@ export const LocationsList = () => {
 
   const toaster = useToaster();
 
+  const queryKey = useMemo(() => {
+    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
+      return [clientQueryKeys.getLocations, selectedInstance?.id as number];
+    } else {
+      return [clientQueryKeys.getTunnels];
+    }
+  }, [selectedInstance]);
+
+  const queryFn = useCallback(() => {
+    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
+      return getLocations({ instanceId: selectedInstance?.id as number });
+    } else {
+      return getTunnels();
+    }
+  }, [selectedInstance]);
+
   const { data: locations, isError } = useQuery({
-    queryKey: [clientQueryKeys.getLocations, selectedInstance as number],
-    queryFn: () => getLocations({ instanceId: selectedInstance as number }),
+    queryKey,
+    queryFn,
     enabled: !!selectedInstance,
   });
 
@@ -37,12 +53,16 @@ export const LocationsList = () => {
 
   return (
     <>
-      {selectedView === ClientView.GRID && (
-        <LocationsGridView locations={locations} instanceId={selectedInstance} />
-      )}
-      {selectedView === ClientView.DETAIL && (
-        <LocationsDetailView locations={locations} instanceId={selectedInstance} />
-      )}
+      {selectedView === ClientView.GRID &&
+        (selectedInstance.id ||
+          selectedInstance.type === WireguardInstanceType.TUNNEL) && (
+          <LocationsGridView locations={locations} />
+        )}
+      {selectedView === ClientView.DETAIL &&
+        selectedInstance.id &&
+        selectedInstance.type === WireguardInstanceType.DEFGUARD_INSTANCE && (
+          <LocationsDetailView locations={locations} />
+        )}
     </>
   );
 };

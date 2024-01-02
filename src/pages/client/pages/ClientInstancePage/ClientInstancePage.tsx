@@ -19,7 +19,7 @@ export const ClientInstancePage = () => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client.pages.instancePage;
   const instances = useClientStore((state) => state.instances);
-  const selectedInstanceId = useClientStore((state) => state.selectedInstance);
+  const selectedInstanceId = useClientStore((state) => state.selectedInstance?.id);
   const selectedInstance = useMemo(
     () => instances.find((i) => i.id === selectedInstanceId),
     [instances, selectedInstanceId],

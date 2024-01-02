@@ -12,7 +12,7 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -23,22 +23,21 @@ import { LocationCardRoute } from '../LocationCardRoute/LocationCardRoute';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
-  instanceId: DefguardInstance['id'];
-  locations: DefguardLocation[];
+  locations: CommonWireguardFields[];
 };
 
-export const LocationsGridView = ({ instanceId, locations }: Props) => {
+export const LocationsGridView = ({ locations }: Props) => {
   return (
     <div id="locations-grid-view">
       {locations.map((l) => (
-        <GridItem location={l} key={`${instanceId}${l.id}`} />
+        <GridItem location={l} key={`${l.name}${l.id}`} />
       ))}
     </div>
   );
 };
 
 type GridItemProps = {
-  location: DefguardLocation;
+  location: CommonWireguardFields;
 };
 
 const GridItem = ({ location }: GridItemProps) => {

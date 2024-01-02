@@ -417,6 +417,12 @@ type RootTranslation = {
 						}
 					}
 				}
+				tunnelPage: {
+					/**
+					 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
+					 */
+					title: string
+				}
 				addTunnelPage: {
 					/**
 					 * A​d​d​ ​W​i​r​e​G​u​a​r​d​®​ ​T​u​n​n​e​l
@@ -1597,6 +1603,12 @@ export type TranslationFunctions = {
 							}
 						}
 					}
+				}
+				tunnelPage: {
+					/**
+					 * WireGuard Tunnels
+					 */
+					title: () => LocalizedString
 				}
 				addTunnelPage: {
 					/**

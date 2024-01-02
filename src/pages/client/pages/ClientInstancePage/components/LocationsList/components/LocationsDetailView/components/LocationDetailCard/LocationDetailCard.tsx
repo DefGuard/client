@@ -15,7 +15,7 @@ import { getStatsFilterValue } from '../../../../../../../../../../shared/utils/
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../../../query';
-import { DefguardLocation } from '../../../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../../../types';
 import { LocationUsageChart } from '../../../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../../../LocationCardConnectButton/LocationCardConnectButton';
@@ -25,7 +25,7 @@ import { LocationCardRoute } from '../../../LocationCardRoute/LocationCardRoute'
 import { LocationCardTitle } from '../../../LocationCardTitle/LocationCardTitle';
 
 type Props = {
-  location: DefguardLocation;
+  location: CommonWireguardFields;
   tabbed?: boolean;
 };
 

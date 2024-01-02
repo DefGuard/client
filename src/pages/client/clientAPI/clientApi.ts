@@ -4,11 +4,10 @@ import pTimeout from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
 import {
+  CommonWireguardFields,
   Connection,
   DefguardInstance,
-  DefguardLocation,
   LocationStats,
-  Tunnel,
 } from '../types';
 import {
   ConnectionRequest,
@@ -21,6 +20,7 @@ import {
   Settings,
   StatsRequest,
   TauriCommandKey,
+  TunnelRequest,
   UpdateInstnaceRequest,
 } from './types';
 
@@ -50,8 +50,9 @@ const saveConfig = async (data: SaveConfigRequest): Promise<SaveDeviceConfigResp
 const getInstances = async (): Promise<DefguardInstance[]> =>
   invokeWrapper('all_instances');
 
-const getLocations = async (data: GetLocationsRequest): Promise<DefguardLocation[]> =>
-  invokeWrapper('all_locations', data);
+const getLocations = async (
+  data: GetLocationsRequest,
+): Promise<CommonWireguardFields[]> => invokeWrapper('all_locations', data);
 
 const connect = async (data: ConnectionRequest): Promise<void> =>
   invokeWrapper('connect', data);
@@ -88,15 +89,19 @@ const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
 const parseTunnelConfig = async (config: string) =>
   invokeWrapper('parse_tunnel_config', { config: config });
 
-const saveTunnel = async (tunnel: Tunnel) =>
+const saveTunnel = async (tunnel: TunnelRequest) =>
   invokeWrapper('save_tunnel', { tunnel: tunnel });
 
 const getLocationDetails = async (
   data: LocationDetailsRequest,
 ): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
 
+const getTunnels = async (): Promise<CommonWireguardFields[]> =>
+  invokeWrapper('all_tunnels');
+
 export const clientApi = {
   getInstances,
+  getTunnels,
   getLocations,
   connect,
   disconnect,
