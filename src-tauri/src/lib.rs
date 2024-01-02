@@ -9,6 +9,10 @@ pub mod tray;
 pub mod utils;
 pub mod wg_config;
 
+pub mod proto {
+    tonic::include_proto!("enrollment");
+}
+
 #[derive(Clone, serde::Serialize)]
 struct Payload {
     args: Vec<String>,
