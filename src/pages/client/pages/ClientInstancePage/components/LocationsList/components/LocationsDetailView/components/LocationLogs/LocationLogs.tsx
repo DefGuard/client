@@ -43,7 +43,6 @@ export const LocationLogs = ({ locationId, locationType }: Props) => {
       eventUnlisten = await listen<LogItem[]>(
         `log-update-${locationType}-${locationId}`,
         ({ payload: logItems }) => {
-          console.log('LogItems', logItems);
           if (logsContainerElement.current) {
             logItems.forEach((item) => {
               if (
@@ -52,7 +51,6 @@ export const LocationLogs = ({ locationId, locationType }: Props) => {
               ) {
                 const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
                 const element = createLogLineElement(messageString);
-                console.log('element', element);
                 const scrollAfterAppend =
                   logsContainerElement.current.scrollHeight -
                     logsContainerElement.current.scrollTop ===

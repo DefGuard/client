@@ -507,7 +507,7 @@ pub async fn handle_connection_for_location(
         handle,
         location.id.expect("Missing Location ID"),
         interface_name,
-        LocationType::Tunnel,
+        LocationType::Location,
         Level::DEBUG,
         None,
     )
