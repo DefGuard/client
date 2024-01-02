@@ -168,6 +168,9 @@ const en = {
         },
         tunnelPage: {
           title: 'WireGuard Tunnels',
+          header: {
+            edit: 'Edit Tunnel',
+          },
         },
         addTunnelPage: {
           title: 'Add WireGuard® Tunnel',

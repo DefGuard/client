@@ -422,6 +422,12 @@ type RootTranslation = {
 					 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
 					 */
 					title: string
+					header: {
+						/**
+						 * E​d​i​t​ ​T​u​n​n​e​l
+						 */
+						edit: string
+					}
 				}
 				addTunnelPage: {
 					/**
@@ -1609,6 +1615,12 @@ export type TranslationFunctions = {
 					 * WireGuard Tunnels
 					 */
 					title: () => LocalizedString
+					header: {
+						/**
+						 * Edit Tunnel
+						 */
+						edit: () => LocalizedString
+					}
 				}
 				addTunnelPage: {
 					/**

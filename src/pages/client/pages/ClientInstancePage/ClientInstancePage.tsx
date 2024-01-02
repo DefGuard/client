@@ -31,7 +31,7 @@ export const ClientInstancePage = () => {
   );
   const navigate = useNavigate();
 
-  const isLocationPage = selectedInstanceType === WireguardInstanceType.TUNNEL;
+  const isLocationPage = selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE;
 
   const openUpdateInstanceModal = useUpdateInstanceModal((state) => state.open);
 
@@ -45,10 +45,10 @@ export const ClientInstancePage = () => {
   return (
     <section id="client-instance-page" className="client-page">
       <header>
-        <h1>{!isLocationPage ? instanceLL.title() : tunelLL.title()}</h1>
+        <h1>{isLocationPage ? instanceLL.title() : tunelLL.title()}</h1>
         <div className="options">
           <StatsFilterSelect />
-          {!isLocationPage && (
+          {isLocationPage && (
             <>
               <StatsLayoutSelect />
               <Button
@@ -62,6 +62,18 @@ export const ClientInstancePage = () => {
                 }}
               />
             </>
+          )}
+          {!isLocationPage && selectedInstanceId && (
+            <Button
+              styleVariant={ButtonStyleVariant.STANDARD}
+              text={LL.pages.client.pages.tunnelPage.header.edit()}
+              disabled={!selectedInstanceId}
+              onClick={() => {
+                if (selectedInstance) {
+                  openUpdateInstanceModal(selectedInstance);
+                }
+              }}
+            />
           )}
         </div>
       </header>
