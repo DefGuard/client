@@ -25,10 +25,9 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
   const setClientStore = useClientStore((state) => state.setState);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
 
-  // FIXME: Fix tunnel active when detail will be implemented
   const active =
     instance.type === WireguardInstanceType.TUNNEL
-      ? routes.client.tunnelPage + instance.id === window.location.pathname
+      ? window.location.pathname.includes(String(instance.id))
       : instance.type === WireguardInstanceType.DEFGUARD_INSTANCE
         ? instance.id === selectedInstance?.id
         : false;
@@ -44,6 +43,7 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
       autoUpdate(refElement, floatingElement, updateFunc),
   });
 
+  console.log(instance);
   return (
     <>
       <div
@@ -67,7 +67,7 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
                 type: WireguardInstanceType.TUNNEL,
               },
             });
-            navigate(routes.client.tunnelPage);
+            navigate(`${routes.client.tunnelPage}/${instance.id}`, { replace: true });
           }
         }}
       >

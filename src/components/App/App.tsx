@@ -27,6 +27,7 @@ import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstanc
 import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPage/ClientAddTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
+import { ClientTunnelDetailPage } from '../../pages/client/pages/ClientTunnelDetailPage/ClientTunnelDetailPage';
 import { ClientTunnelPage } from '../../pages/client/pages/ClientTunnelPage/ClientTunnelPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
@@ -79,6 +80,10 @@ const router = createBrowserRouter([
       {
         path: '/client/tunnel',
         element: <ClientTunnelPage />,
+      },
+      {
+        path: '/client/tunnel/:id',
+        element: <ClientTunnelDetailPage />,
       },
       {
         path: '/client/settings',

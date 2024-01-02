@@ -52,7 +52,8 @@ export type CommonWireguardFields = {
   route_all_traffic: boolean;
   // Connected
   active: boolean;
-  type?: WireguardInstanceType;
+  // Tunnel or Location
+  location_type: WireguardInstanceType;
 };
 
 export enum ClientView {

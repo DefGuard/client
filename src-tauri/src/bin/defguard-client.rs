@@ -71,7 +71,7 @@ async fn main() {
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
 
     let log_level =
-        LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
+        LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("debug".into()))
             .unwrap_or(LevelFilter::Info);
 
     tauri::Builder::default()

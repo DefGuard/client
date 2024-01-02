@@ -10,7 +10,7 @@ use tonic::{codegen::tokio_stream::StreamExt, transport::Channel};
 
 use crate::{
     appstate::AppState,
-    database::{models::location::peer_to_location_stats, DbPool, Location, WireguardKeys},
+    database::{models::location::peer_to_location_stats, DbPool, Location, WireguardKeys, Tunnel},
     error::Error,
     service::proto::{
         desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
@@ -144,8 +144,8 @@ pub fn get_interface_name() -> String {
 #[cfg(not(target_os = "macos"))]
 /// Returns interface name for location
 #[must_use]
-pub fn get_interface_name(location: &Location) -> String {
-    remove_whitespace(&location.name)
+pub fn get_interface_name(name: &str) -> String {
+    remove_whitespace(name)
 }
 
 fn is_port_free(port: u16) -> bool {
@@ -228,4 +228,72 @@ pub fn get_service_log_dir() -> PathBuf {
     let path = PathBuf::from("/var/log/defguard-service");
 
     path
+}
+/// Setup client interface
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel,
+    interface_name: String,
+    mut client: DesktopDaemonServiceClient<Channel>,
+) -> Result<(), Error> {
+        // prepare peer config
+        debug!("Decoding location public key: {}.", tunnel.server_pubkey);
+        let peer_key: Key = Key::from_str(&tunnel.server_pubkey)?;
+        let mut peer = Peer::new(peer_key);
+
+        debug!("Parsing location endpoint: {}", tunnel.endpoint);
+        let endpoint: SocketAddr = tunnel.endpoint.parse()?;
+        peer.endpoint = Some(endpoint);
+        peer.persistent_keepalive_interval = Some(tunnel.persistent_keep_alive.try_into().expect("Failed to parse persistent keep alive"));
+
+        debug!("Parsing location allowed ips: {:?}", tunnel.allowed_ips);
+        let allowed_ips: Vec<String> = if tunnel.route_all_traffic {
+            debug!("Using all traffic routing: {DEFAULT_ROUTE}");
+            vec![DEFAULT_ROUTE.into()]
+        } else {
+            debug!("Using predefined location traffic");
+            tunnel.allowed_ips
+              .as_ref()
+                    .map(|ips| ips.split(',').map(str::to_string).collect())
+                    .unwrap_or(Vec::new())
+        };
+        for allowed_ip in &allowed_ips {
+            match IpAddrMask::from_str(allowed_ip) {
+                Ok(addr) => {
+                    peer.allowed_ips.push(addr);
+                }
+                Err(err) => {
+                    // Handle the error from IpAddrMask::from_str, if needed
+                    error!("Error parsing IP address {allowed_ip}: {err}");
+                    // Continue to the next iteration of the loop
+                    continue;
+                }
+            }
+        }
+
+        // request interface configuration
+        if let Some(port) = find_random_free_port() {
+            let interface_config = InterfaceConfiguration {
+                name: interface_name,
+                prvkey: tunnel.prvkey.clone(),
+                address: tunnel.address.clone(),
+                port: port.into(),
+                peers: vec![peer.clone()],
+            };
+            debug!("Creating interface {interface_config:#?}");
+            let request = CreateInterfaceRequest {
+                config: Some(interface_config.clone().into()),
+                allowed_ips,
+                dns: tunnel.dns.clone(),
+            };
+            if let Err(error) = client.create_interface(request).await {
+                error!("Failed to create interface: {error}");
+                Err(Error::InternalError)
+            } else {
+                info!("Created interface {interface_config:#?}");
+                Ok(())
+            }
+        } else {
+            error!("Error finding free port");
+            Err(Error::InternalError)
+        }
 }

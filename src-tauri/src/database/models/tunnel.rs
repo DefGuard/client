@@ -1,4 +1,4 @@
-use crate::{commands::DateTimeAggregation, database::DbPool, error::Error};
+use crate::{commands::DateTimeAggregation, database::{DbPool, ActiveConnection}, error::Error};
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
@@ -317,10 +317,7 @@ impl TunnelConnection {
         Ok(connections)
     }
 
-    pub async fn lastest_by_tunnel_id(
-        pool: &DbPool,
-        tunnel_id: i64,
-    ) -> Result<Option<Self>, Error> {
+    pub async fn latest_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, Error> {
         let connection = query_as!(
             TunnelConnection,
             r#"
@@ -335,5 +332,72 @@ impl TunnelConnection {
         .fetch_optional(pool)
         .await?;
         Ok(connection)
+    }
+}
+
+/// Historical connection
+#[derive(FromRow, Debug, Serialize)]
+pub struct TunnelConnectionInfo {
+    pub id: i64,
+    pub tunnel_id: i64,
+    pub connected_from: String,
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime,
+    pub upload: Option<i32>,
+    pub download: Option<i32>,
+}
+
+impl TunnelConnectionInfo {
+    pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
+        // Because we store interface information for given timestamp select last upload and download
+        // before connection ended
+        // FIXME: Optimize query
+        let connections = query_as!(
+            TunnelConnectionInfo,
+            r#"
+              SELECT
+                  c.id as "id!",
+                  c.tunnel_id as "tunnel_id!",
+                  c.connected_from as "connected_from!",
+                  c.start as "start!",
+                  c.end as "end!",
+                  COALESCE((
+                      SELECT ls.upload
+                      FROM tunnel_stats AS ls
+                      WHERE ls.tunnel_id = c.tunnel_id
+                      AND ls.collected_at >= c.start
+                      AND ls.collected_at <= c.end
+                      ORDER BY ls.collected_at DESC
+                      LIMIT 1
+                  ), 0) as "upload: _",
+                  COALESCE((
+                      SELECT ls.download
+                      FROM tunnel_stats AS ls
+                      WHERE ls.tunnel_id = c.tunnel_id
+                      AND ls.collected_at >= c.start
+                      AND ls.collected_at <= c.end
+                      ORDER BY ls.collected_at DESC
+                      LIMIT 1
+                  ), 0) as "download: _"
+              FROM tunnel_connection AS c WHERE tunnel_id = $1
+              ORDER BY start DESC;
+            "#,
+            tunnel_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(connections)
+    }
+}
+impl From<ActiveConnection> for TunnelConnection {
+    fn from(active_connection: ActiveConnection) -> Self {
+        TunnelConnection {
+            id: None,
+            tunnel_id: active_connection.location_id,
+            connected_from: active_connection.connected_from,
+            start: active_connection.start,
+            end: Utc::now().naive_utc(),
+        }
     }
 }

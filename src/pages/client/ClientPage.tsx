@@ -39,7 +39,7 @@ export const ClientPage = () => {
     });
 
     listen(TauriEventKey.LOCATION_UPDATE, () => {
-      const invalidate = [clientQueryKeys.getLocations];
+      const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
           queryKey: [key],
@@ -57,6 +57,7 @@ export const ClientPage = () => {
         clientQueryKeys.getConnectionHistory,
         clientQueryKeys.getLocationStats,
         clientQueryKeys.getInstances,
+        clientQueryKeys.getTunnels,
       ];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({

@@ -15,6 +15,7 @@ use crate::{
         },
         utils::setup_client,
     },
+    LocationType,
 };
 
 pub struct AppState {
@@ -48,13 +49,13 @@ impl AppState {
     pub fn get_connections(&self) -> Vec<ActiveConnection> {
         self.active_connections.lock().unwrap().clone()
     }
-    pub fn find_and_remove_connection(&self, location_id: i64) -> Option<ActiveConnection> {
+    pub fn find_and_remove_connection(&self, location_id: i64, location_type: LocationType) -> Option<ActiveConnection> {
         debug!("Removing active connection for location with id: {location_id}");
         let mut connections = self.active_connections.lock().unwrap();
 
         if let Some(index) = connections
             .iter()
-            .position(|conn| conn.location_id == location_id)
+            .position(|conn| conn.location_id == location_id && conn.location_type == location_type)
         {
             // Found a connection with the specified location_id
             let removed_connection = connections.remove(index);
@@ -63,6 +64,23 @@ impl AppState {
         } else {
             None // Connection not found
         }
+    }
+
+    pub fn get_connection_id_by_type(&self, location_type: LocationType) -> Vec<i64> {
+        let active_connections = self.active_connections.lock().unwrap();
+
+        let connection_ids: Vec<i64> = active_connections
+            .iter()
+            .filter_map(|con| {
+                if con.location_type == location_type {
+                    Some(con.location_id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        connection_ids
     }
 
     pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
@@ -89,19 +107,25 @@ impl AppState {
         }
         Ok(())
     }
-    pub fn find_connection(&self, location_id: i64) -> Option<ActiveConnection> {
+    pub fn find_connection(
+        &self,
+        id: i64,
+        location_type: LocationType,
+    ) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().unwrap();
-        debug!("Checking for active connection with location id: {location_id} in active connections: {connections:#?}");
+        debug!(
+        "Checking for active connection with id: {id}, location_type: {location_type:?} in active connections: {connections:#?}"
+    );
 
         if let Some(connection) = connections
             .iter()
-            .find(|conn| conn.location_id == location_id)
+            .find(|conn| conn.location_id == id && conn.location_type == location_type)
         {
-            // 'connection' now contains the first element with the specified location_id
+            // 'connection' now contains the first element with the specified id and location_type
             debug!("Found connection: {connection:#?}");
             Some(connection.to_owned())
         } else {
-            error!("Element with location_id {location_id} not found.");
+            error!("Element with id: {id}, location_type: {location_type:?} not found.");
             None
         }
     }
