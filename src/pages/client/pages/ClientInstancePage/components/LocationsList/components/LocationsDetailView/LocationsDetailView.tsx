@@ -7,20 +7,19 @@ import { useNavigate } from 'react-router-dom';
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
 import { routes } from '../../../../../../../../shared/routes';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from './components/LocationDetails/LocationDetails';
 
 type Props = {
-  instanceId: DefguardInstance['id'];
-  locations: DefguardLocation[];
+  locations: CommonWireguardFields[];
 };
 
 const findLocationById = (
-  locations: DefguardLocation[],
+  locations: CommonWireguardFields[],
   id: number,
-): DefguardLocation | undefined => locations.find((location) => location.id === id);
+): CommonWireguardFields | undefined => locations.find((location) => location.id === id);
 
 export const LocationsDetailView = ({ locations }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
@@ -39,7 +38,7 @@ export const LocationsDetailView = ({ locations }: Props) => {
     [locations, activeLocationId],
   );
 
-  const activeLocation = useMemo((): DefguardLocation | undefined => {
+  const activeLocation = useMemo((): CommonWireguardFields | undefined => {
     if (!isUndefined(activeLocationId)) {
       return findLocationById(locations, activeLocationId);
     }

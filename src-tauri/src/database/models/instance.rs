@@ -130,6 +130,6 @@ pub struct InstanceInfo {
     pub uuid: String,
     pub url: String,
     pub proxy_url: String,
-    pub connected: bool,
+    pub active: bool,
     pub pubkey: String,
 }

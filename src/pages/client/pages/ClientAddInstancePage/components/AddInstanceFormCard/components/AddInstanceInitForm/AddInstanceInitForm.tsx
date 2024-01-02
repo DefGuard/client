@@ -26,6 +26,7 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
+import { WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
 type Props = {
@@ -140,7 +141,12 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
                 toaster.success(
                   LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
                 );
-                setClientState({ selectedInstance: instance.id });
+                setClientState({
+                  selectedInstance: {
+                    id: instance.id,
+                    type: WireguardInstanceType.DEFGUARD_INSTANCE,
+                  },
+                });
                 navigate(routes.client.base, { replace: true });
               })
               .catch((e) => {

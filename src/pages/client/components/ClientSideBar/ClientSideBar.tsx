@@ -14,11 +14,17 @@ import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus'
 import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconSettings';
 import { routes } from '../../../../shared/routes';
 import { useClientStore } from '../../hooks/useClientStore';
+import { WireguardInstanceType } from '../../types';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 
 export const ClientSideBar = () => {
+  const navigate = useNavigate();
   const { LL } = useI18nContext();
-  const instances = useClientStore((state) => state.instances);
+  const [instances, tunnels, setClientStore] = useClientStore((state) => [
+    state.instances,
+    state.tunnels,
+    state.setState,
+  ]);
 
   return (
     <div id="client-page-side">
@@ -35,13 +41,34 @@ export const ClientSideBar = () => {
           <p>{LL.pages.client.sideBar.instances()}</p>
         </div>
         {instances.map((instance) => (
-          <ClientBarItem instance={instance} key={instance.id} />
+          <ClientBarItem
+            instance={{ ...instance, type: WireguardInstanceType.DEFGUARD_INSTANCE }}
+            key={`${instance.id}${WireguardInstanceType.DEFGUARD_INSTANCE}`}
+          />
         ))}
         <AddInstance />
-        <div className="client-bar-item active" id="instances-nav-label">
+        <div
+          className="client-bar-item active"
+          id="instances-nav-label"
+          onClick={() => {
+            setClientStore({
+              selectedInstance: {
+                id: undefined,
+                type: WireguardInstanceType.TUNNEL,
+              },
+            });
+            navigate(routes.client.tunnelPage, { replace: true });
+          }}
+        >
           <SvgIconNavVpn />
           <p>{LL.pages.client.sideBar.tunnels()}</p>
         </div>
+        {tunnels.map((tunnel) => (
+          <ClientBarItem
+            instance={{ ...tunnel, type: WireguardInstanceType.TUNNEL }}
+            key={`${tunnel.id}${WireguardInstanceType.TUNNEL}`}
+          />
+        ))}
         <AddTunnel />
         <SettingsNav />
       </div>

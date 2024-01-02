@@ -17,5 +17,10 @@ struct Payload {
     cwd: String,
 }
 
+pub enum ConnectionType {
+    Tunnel,
+    Location,
+}
+
 #[macro_use]
 extern crate log;

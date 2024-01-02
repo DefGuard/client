@@ -27,6 +27,7 @@ import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstanc
 import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPage/ClientAddTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
+import { ClientTunnelPage } from '../../pages/client/pages/ClientTunnelPage/ClientTunnelPage';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
@@ -43,7 +44,7 @@ dayjs.extend(timezone);
 
 const queryClient = new QueryClient();
 
-const { getSettings, getInstances } = clientApi;
+const { getSettings, getInstances, getTunnels } = clientApi;
 
 const router = createBrowserRouter([
   {
@@ -74,6 +75,10 @@ const router = createBrowserRouter([
       {
         path: '/client/add-tunnel',
         element: <ClientAddTunnelPage />,
+      },
+      {
+        path: '/client/tunnel',
+        element: <ClientTunnelPage />,
       },
       {
         path: '/client/settings',
@@ -119,7 +124,8 @@ export const App = () => {
       debug('App init state from tauri');
       const settings = await getSettings();
       const instances = await getInstances();
-      setClientState({ settings, instances });
+      const tunnels = await getTunnels();
+      setClientState({ settings, instances, tunnels });
       debug('Tauri init data loaded');
       setSettingsLoaded(true);
     };
