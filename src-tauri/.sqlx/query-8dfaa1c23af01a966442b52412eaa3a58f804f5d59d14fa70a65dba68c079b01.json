@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic FROM location WHERE id = $1;",
+  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE pubkey = $1;",
   "describe": {
     "columns": [
       {
@@ -52,6 +52,16 @@
         "name": "route_all_traffic",
         "ordinal": 9,
         "type_info": "Bool"
+      },
+      {
+        "name": "mfa_enabled",
+        "ordinal": 10,
+        "type_info": "Bool"
+      },
+      {
+        "name": "keepalive_interval",
+        "ordinal": 11,
+        "type_info": "Int64"
       }
     ],
     "parameters": {
@@ -67,8 +77,10 @@
       false,
       true,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "8b86e04ec40a25f43d431ee84a7cc3131c526a683be8d6739fedd40a9d56c41f"
+  "hash": "8dfaa1c23af01a966442b52412eaa3a58f804f5d59d14fa70a65dba68c079b01"
 }

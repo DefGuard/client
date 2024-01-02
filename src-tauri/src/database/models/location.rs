@@ -19,6 +19,8 @@ pub struct Location {
     pub allowed_ips: String,
     pub dns: Option<String>,
     pub route_all_traffic: bool,
+    pub mfa_enabled: bool,
+    pub keepalive_interval: i64,
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
@@ -55,36 +57,11 @@ pub async fn peer_to_location_stats(
 }
 
 impl Location {
-    #[allow(clippy::too_many_arguments)]
-    #[must_use]
-    pub fn new(
-        instance_id: i64,
-        network_id: i64,
-        name: String,
-        address: String,
-        pubkey: String,
-        endpoint: String,
-        allowed_ips: String,
-        dns: Option<String>,
-    ) -> Self {
-        Location {
-            id: None,
-            instance_id,
-            network_id,
-            name,
-            address,
-            pubkey,
-            endpoint,
-            allowed_ips,
-            dns,
-            route_all_traffic: false,
-        }
-    }
-
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let locations = query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
+             route_all_traffic, mfa_enabled, keepalive_interval \
         FROM location;"
         )
         .fetch_all(pool)
@@ -100,18 +77,20 @@ impl Location {
             None => {
                 // Insert a new record when there is no ID
                 let result = query!(
-                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic) \
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
-                RETURNING id;",
-                self.instance_id,
-                self.name,
-                self.address,
-                self.pubkey,
-                self.endpoint,
-                self.allowed_ips,
-                self.dns,
-                self.network_id,
-                self.route_all_traffic,
+                    "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
+                    RETURNING id;",
+                    self.instance_id,
+                    self.name,
+                    self.address,
+                    self.pubkey,
+                    self.endpoint,
+                    self.allowed_ips,
+                    self.dns,
+                    self.network_id,
+                    self.route_all_traffic,
+                    self.mfa_enabled,
+                    self.keepalive_interval
             )
             .fetch_one(executor)
             .await?;
@@ -120,18 +99,20 @@ impl Location {
             Some(id) => {
                 // Update the existing record when there is an ID
                 query!(
-                "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
-                network_id = $8, route_all_traffic = $9 WHERE id = $10;",
-                self.instance_id,
-                self.name,
-                self.address,
-                self.pubkey,
-                self.endpoint,
-                self.allowed_ips,
-                self.dns,
-                self.network_id,
-                self.route_all_traffic,
-                id,
+                    "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
+                    network_id = $8, route_all_traffic = $9, mfa_enabled = $10, keepalive_interval = $11 WHERE id = $12;",
+                    self.instance_id,
+                    self.name,
+                    self.address,
+                    self.pubkey,
+                    self.endpoint,
+                    self.allowed_ips,
+                    self.dns,
+                    self.network_id,
+                    self.route_all_traffic,
+                    self.mfa_enabled,
+                    self.keepalive_interval,
+                    id,
             )
             .execute(executor)
             .await?;
@@ -144,7 +125,8 @@ impl Location {
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE id = $1;",
             location_id
         )
@@ -158,7 +140,8 @@ impl Location {
     ) -> Result<Vec<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE instance_id = $1;",
             instance_id
         )
@@ -169,7 +152,8 @@ impl Location {
     pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE pubkey = $1;",
             pubkey
         )
@@ -186,7 +170,8 @@ impl Location {
     {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic \
+            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE network_id = $1;",
             instance_id
         )

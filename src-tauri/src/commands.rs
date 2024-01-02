@@ -6,6 +6,7 @@ use crate::{
         Tunnel, WireguardKeys,
     },
     error::Error,
+    proto::{DeviceConfig, DeviceConfigResponse},
     service::{
         log_watcher::{spawn_log_watcher_task, stop_log_watcher_task},
         proto::RemoveInterfaceRequest,
@@ -131,18 +132,6 @@ pub struct Device {
     pub created_at: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DeviceConfig {
-    pub network_id: i64,
-    pub network_name: String,
-    pub config: String,
-    pub endpoint: String,
-    pub assigned_ip: String,
-    pub pubkey: String,
-    pub allowed_ips: String,
-    pub dns: Option<String>,
-}
-
 #[must_use]
 pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location {
     Location {
@@ -156,6 +145,8 @@ pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) 
         allowed_ips: device_config.allowed_ips,
         dns: device_config.dns,
         route_all_traffic: false,
+        mfa_enabled: device_config.mfa_enabled,
+        keepalive_interval: device_config.keepalive_interval.into(),
     }
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -167,13 +158,6 @@ pub struct InstanceResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct CreateDeviceResponse {
-    instance: InstanceResponse,
-    configs: Vec<DeviceConfig>,
-    device: Device,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location>,
     instance: Instance,
@@ -182,24 +166,26 @@ pub struct SaveDeviceConfigResponse {
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
-    response: CreateDeviceResponse,
+    response: DeviceConfigResponse,
     app_state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
     debug!("Received device configuration: {response:#?}");
 
     let mut transaction = app_state.get_pool().begin().await?;
-    let mut instance = Instance::new(
-        response.instance.name,
-        response.instance.id,
-        response.instance.url,
-    );
+    let instance_info = response
+        .instance
+        .expect("Missing instance info in device config response");
+    let mut instance: Instance = instance_info.into();
 
     instance.save(&mut *transaction).await?;
 
+    let device = response
+        .device
+        .expect("Missing device info in device config response");
     let mut keys = WireguardKeys::new(
         instance.id.expect("Missing instance ID"),
-        response.device.pubkey,
+        device.pubkey,
         private_key,
     );
     keys.save(&mut *transaction).await?;
@@ -240,7 +226,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .iter()
         .map(|connection| connection.location_id)
         .collect();
-    for instance in &instances {
+    for instance in instances {
         let Some(instance_id) = instance.id else {
             continue;
         };
@@ -257,9 +243,10 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             .ok_or(Error::NotFound)?;
         instance_info.push(InstanceInfo {
             id: instance.id,
-            uuid: instance.uuid.clone(),
-            name: instance.name.clone(),
-            url: instance.url.clone(),
+            uuid: instance.uuid,
+            name: instance.name,
+            url: instance.url,
+            proxy_url: instance.proxy_url,
             active: connected,
             pubkey: keys.pubkey,
         });
@@ -396,7 +383,7 @@ pub async fn location_interface_details(
 #[tauri::command(async)]
 pub async fn update_instance(
     instance_id: i64,
-    response: CreateDeviceResponse,
+    response: DeviceConfigResponse,
     app_state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<(), Error> {
@@ -406,8 +393,13 @@ pub async fn update_instance(
     let instance = Instance::find_by_id(&app_state.get_pool(), instance_id).await?;
     if let Some(mut instance) = instance {
         let mut transaction = app_state.get_pool().begin().await?;
-        instance.name = response.instance.name;
-        instance.url = response.instance.url;
+        let instance_info = response
+            .instance
+            .expect("Missing instance info in device config response");
+        instance.name = instance_info.name;
+        instance.url = instance_info.url;
+        instance.proxy_url = instance_info.proxy_url;
+        instance.username = instance_info.username;
         instance.save(&mut *transaction).await?;
 
         for location in response.configs {
@@ -420,6 +412,8 @@ pub async fn update_instance(
                 old_location.pubkey = new_location.pubkey;
                 old_location.endpoint = new_location.endpoint;
                 old_location.allowed_ips = new_location.allowed_ips;
+                old_location.mfa_enabled = new_location.mfa_enabled;
+                old_location.keepalive_interval = new_location.keepalive_interval;
                 old_location.save(&mut *transaction).await?;
             } else {
                 new_location.save(&mut *transaction).await?;
