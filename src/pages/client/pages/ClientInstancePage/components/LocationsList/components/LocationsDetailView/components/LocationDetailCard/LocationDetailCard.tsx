@@ -47,6 +47,7 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
     queryFn: () =>
       getLocationStats({
         locationId: location.id,
+        locationType: location.location_type,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location,

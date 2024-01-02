@@ -2,7 +2,7 @@ use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query, query_as, FromRow};
 
-use crate::{database::DbPool, error::Error, LocationType};
+use crate::{database::DbPool, error::Error, CommonConnection, CommonConnectionInfo, LocationType};
 
 #[derive(FromRow, Debug, Serialize, Clone)]
 pub struct Connection {
@@ -76,6 +76,19 @@ pub struct ConnectionInfo {
     pub end: NaiveDateTime,
     pub upload: Option<i32>,
     pub download: Option<i32>,
+}
+impl Into<CommonConnectionInfo> for ConnectionInfo {
+    fn into(self) -> CommonConnectionInfo {
+        CommonConnectionInfo {
+            id: self.id,
+            location_id: self.location_id,
+            connected_from: self.connected_from,
+            start: self.start,
+            end: self.end,
+            upload: self.upload,
+            download: self.download,
+        }
+    }
 }
 
 impl ConnectionInfo {
@@ -158,6 +171,19 @@ impl From<ActiveConnection> for Connection {
             connected_from: active_connection.connected_from,
             start: active_connection.start,
             end: Utc::now().naive_utc(),
+        }
+    }
+}
+// Implementing From for Connection into CommonConnection
+impl From<Connection> for CommonConnection {
+    fn from(connection: Connection) -> Self {
+        CommonConnection {
+            id: connection.id,
+            location_id: connection.location_id,
+            connected_from: connection.connected_from,
+            start: connection.start,
+            end: connection.end,
+            location_type: LocationType::Location,
         }
     }
 }

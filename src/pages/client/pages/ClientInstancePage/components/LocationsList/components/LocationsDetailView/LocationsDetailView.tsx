@@ -59,9 +59,15 @@ export const LocationsDetailView = ({ locations }: Props) => {
         <LocationConnectionHistory
           locationId={activeLocation.id}
           connected={activeLocation.active}
+          locationType={activeLocation.location_type}
         />
       )}
-      {activeLocation && <LocationDetails locationId={activeLocation.id} />}
+      {activeLocation && (
+        <LocationDetails
+          locationId={activeLocation.id}
+          locationType={activeLocation.location_type}
+        />
+      )}
     </div>
   );
 };

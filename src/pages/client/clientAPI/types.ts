@@ -19,6 +19,7 @@ export type RoutingRequest = {
 
 export type StatsRequest = {
   locationId: number;
+  locationType: WireguardInstanceType;
   from?: string;
 };
 
@@ -100,6 +101,7 @@ export type TunnelRequest = {
 
 export type LocationDetailsRequest = {
   locationId: number;
+  locationType: WireguardInstanceType;
 };
 
 export type TauriCommandKey =

@@ -12,7 +12,7 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { CommonWireguardFields } from '../../../../../../types';
+import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -54,15 +54,29 @@ const GridItem = ({ location }: GridItemProps) => {
   const statsFilter = useClientStore((state) => state.statsFilter);
 
   const { data: lastConnection } = useQuery({
-    queryKey: [clientQueryKeys.getConnections, location.id as number],
-    queryFn: () => getLastConnection({ locationId: location.id as number }),
+    queryKey: [
+      clientQueryKeys.getConnections,
+      location.id as number,
+      location.location_type,
+    ],
+    queryFn: () =>
+      getLastConnection({
+        locationId: location.id as number,
+        locationType: location.location_type,
+      }),
     enabled: !!location.id,
   });
   const { data: locationStats } = useQuery({
-    queryKey: [clientQueryKeys.getLocationStats, location.id as number, statsFilter],
+    queryKey: [
+      clientQueryKeys.getLocationStats,
+      location.id as number,
+      statsFilter,
+      location.location_type,
+    ],
     queryFn: () =>
       getLocationStats({
         locationId: location.id as number,
+        locationType: location.location_type as WireguardInstanceType,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,

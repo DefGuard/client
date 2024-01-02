@@ -3,7 +3,7 @@ use crate::{
     database::{
         models::{instance::InstanceInfo, settings::SettingsPatch},
         ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
-        Tunnel, TunnelConnection, TunnelConnectionInfo, WireguardKeys,
+        Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
     },
     error::Error,
     service::{
@@ -11,14 +11,16 @@ use crate::{
         proto::RemoveInterfaceRequest,
     },
     tray::configure_tray_icon,
-    utils::{get_interface_name, setup_interface, setup_interface_tunnel, spawn_stats_thread},
+    utils::{
+        get_interface_name, get_location_interface_details, get_tunnel_interface_details,
+        setup_interface, setup_interface_tunnel, spawn_stats_thread,
+    },
     wg_config::parse_wireguard_config,
-    CommonConnection, LocationType,
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, LocationType,
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
-use sqlx::query;
 use std::str::FromStr;
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
@@ -31,59 +33,63 @@ struct Payload {
 
 // Create new WireGuard interface
 #[tauri::command(async)]
-pub async fn connect(location_id: i64, location_type: LocationType, handle: AppHandle) -> Result<(), Error> {
+pub async fn connect(
+    location_id: i64,
+    location_type: LocationType,
+    handle: AppHandle,
+) -> Result<(), Error> {
     let state = handle.state::<AppState>();
     if location_type.eq(&LocationType::Location) {
-    if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
-        debug!(
-            "Creating new interface connection for location: {}",
-            location.name
-        );
-        #[cfg(target_os = "macos")]
-        let interface_name = get_interface_name();
-        #[cfg(not(target_os = "macos"))]
-        let interface_name = get_interface_name(&location.name);
-        setup_interface(
-            &location,
-            interface_name.clone(),
-            &state.get_pool(),
-            state.client.clone(),
-        )
-        .await?;
-        let address = local_ip()?;
-        let connection = ActiveConnection::new(
-            location_id,
-            address.to_string(),
-            interface_name.clone(),
-            LocationType::Location,
-        );
-        state
-            .active_connections
-            .lock()
-            .map_err(|_| Error::MutexError)?
-            .push(connection);
-        debug!(
-            "Active connections: {:#?}",
+        if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
+            debug!(
+                "Creating new interface connection for location: {}",
+                location.name
+            );
+            #[cfg(target_os = "macos")]
+            let interface_name = get_interface_name();
+            #[cfg(not(target_os = "macos"))]
+            let interface_name = get_interface_name(&location.name);
+            setup_interface(
+                &location,
+                interface_name.clone(),
+                &state.get_pool(),
+                state.client.clone(),
+            )
+            .await?;
+            let address = local_ip()?;
+            let connection = ActiveConnection::new(
+                location_id,
+                address.to_string(),
+                interface_name.clone(),
+                LocationType::Location,
+            );
             state
                 .active_connections
                 .lock()
                 .map_err(|_| Error::MutexError)?
-        );
-        debug!("Sending event connection-changed.");
-        handle.emit_all(
-            "connection-changed",
-            Payload {
-                message: "Created new connection".into(),
-            },
-        )?;
+                .push(connection);
+            debug!(
+                "Active connections: {:#?}",
+                state
+                    .active_connections
+                    .lock()
+                    .map_err(|_| Error::MutexError)?
+            );
+            debug!("Sending event connection-changed.");
+            handle.emit_all(
+                "connection-changed",
+                Payload {
+                    message: "Created new connection".into(),
+                },
+            )?;
 
-        // Spawn stats threads
-        debug!("Spawning stats thread");
-        spawn_stats_thread(handle.clone(), interface_name.clone()).await;
+            // Spawn stats threads
+            debug!("Spawning stats thread");
+            spawn_stats_thread(handle.clone(), interface_name.clone(), location_type).await;
 
-        // spawn log watcher
-        spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
-    }
+            // spawn log watcher
+            spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
+        }
     } else {
         if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
             debug!(
@@ -94,12 +100,7 @@ pub async fn connect(location_id: i64, location_type: LocationType, handle: AppH
             let interface_name = get_interface_name();
             #[cfg(not(target_os = "macos"))]
             let interface_name = get_interface_name(&tunnel.name);
-            setup_interface_tunnel(
-                &tunnel,
-                interface_name.clone(),
-                state.client.clone(),
-            )
-            .await?;
+            setup_interface_tunnel(&tunnel, interface_name.clone(), state.client.clone()).await?;
             let address = local_ip()?;
             let connection = ActiveConnection::new(
                 location_id,
@@ -128,10 +129,10 @@ pub async fn connect(location_id: i64, location_type: LocationType, handle: AppH
             )?;
 
             // Spawn stats threads
-            debug!("Spawning stats thread");
-            spawn_stats_thread(handle.clone(), interface_name.clone()).await;
+            info!("Spawning stats thread");
+            spawn_stats_thread(handle.clone(), interface_name.clone(), location_type).await;
 
-            // spawn log watcher
+            //spawn log watcher
             spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
         }
     }
@@ -139,7 +140,11 @@ pub async fn connect(location_id: i64, location_type: LocationType, handle: AppH
 }
 
 #[tauri::command]
-pub async fn disconnect(location_id: i64, location_type: LocationType, handle: AppHandle) -> Result<(), Error> {
+pub async fn disconnect(
+    location_id: i64,
+    location_type: LocationType,
+    handle: AppHandle,
+) -> Result<(), Error> {
     debug!("Disconnecting location {}", location_id);
     let state = handle.state::<AppState>();
 
@@ -160,13 +165,13 @@ pub async fn disconnect(location_id: i64, location_type: LocationType, handle: A
         debug!("Saving connection");
         trace!("Connection: {:#?}", connection);
         if location_type.eq(&LocationType::Location) {
-          let mut connection: Connection = connection.into();
-          connection.save(&state.get_pool()).await?;
-          trace!("Saved connection: {connection:#?}");
+            let mut connection: Connection = connection.into();
+            connection.save(&state.get_pool()).await?;
+            trace!("Saved connection: {connection:#?}");
         } else {
-          let mut connection: TunnelConnection = connection.into();
-          connection.save(&state.get_pool()).await?;
-          trace!("Saved connection: {connection:#?}");
+            let mut connection: TunnelConnection = connection.into();
+            connection.save(&state.get_pool()).await?;
+            trace!("Saved connection: {connection:#?}");
         }
         debug!("Connection saved");
         handle.emit_all(
@@ -351,8 +356,8 @@ pub async fn all_locations(
 ) -> Result<Vec<LocationInfo>, Error> {
     debug!("Retrieving all locations.");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
-    let active_locations_ids: Vec<i64> = app_state
-    .get_connection_id_by_type(LocationType::Location);
+    let active_locations_ids: Vec<i64> =
+        app_state.get_connection_id_by_type(LocationType::Location);
     let mut location_info = vec![];
     for location in locations {
         let info = LocationInfo {
@@ -396,60 +401,14 @@ pub struct LocationInterfaceDetails {
 #[tauri::command(async)]
 pub async fn location_interface_details(
     location_id: i64,
+    location_type: LocationType,
     app_state: State<'_, AppState>,
 ) -> Result<LocationInterfaceDetails, Error> {
-    debug!("Fetching location details for location ID {location_id}");
     let pool = app_state.get_pool();
-    if let Some(location) = Location::find_by_id(&pool, location_id).await? {
-        debug!("Fetching WireGuard keys for location {}", location.name);
-        let keys = WireguardKeys::find_by_instance_id(&pool, location.instance_id)
-            .await?
-            .ok_or(Error::NotFound)?;
-        let peer_pubkey = keys.pubkey;
-
-        // generate interface name
-        #[cfg(target_os = "macos")]
-        let interface_name = get_interface_name();
-        #[cfg(not(target_os = "macos"))]
-        let interface_name = get_interface_name(&location.name);
-
-        let result = query!(
-            r#"
-            SELECT last_handshake, listen_port as "listen_port!: u32",
-              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM location_stats
-            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1
-            "#,
-            location_id
-        )
-        .fetch_optional(&pool)
-        .await?;
-
-        let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
-            Some(record) => (
-                Some(record.listen_port),
-                record.persistent_keepalive_interval,
-                Some(record.last_handshake),
-            ),
-            None => (None, None, None),
-        };
-
-        Ok(LocationInterfaceDetails {
-            location_id,
-            name: interface_name,
-            pubkey: location.pubkey,
-            address: location.address,
-            dns: location.dns,
-            listen_port,
-            peer_pubkey,
-            peer_endpoint: location.endpoint,
-            allowed_ips: location.allowed_ips,
-            persistent_keepalive_interval,
-            last_handshake,
-        })
+    if location_type.eq(&LocationType::Location) {
+        get_location_interface_details(location_id, &pool).await
     } else {
-        error!("Location ID {location_id} not found");
-        Err(Error::NotFound)
+        get_tunnel_interface_details(location_id, &pool).await
     }
 }
 
@@ -532,27 +491,54 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
 #[tauri::command]
 pub async fn location_stats(
     location_id: i64,
+    location_type: LocationType,
     from: Option<String>,
     app_state: State<'_, AppState>,
-) -> Result<Vec<LocationStats>, Error> {
+) -> Result<Vec<CommonLocationStats>, Error> {
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
-    LocationStats::all_by_location_id(&app_state.get_pool(), location_id, &from, &aggregation).await
+    let stats: Vec<CommonLocationStats> = if location_type.eq(&LocationType::Location) {
+        LocationStats::all_by_location_id(&app_state.get_pool(), location_id, &from, &aggregation)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    } else {
+        TunnelStats::all_by_tunnel_id(&app_state.get_pool(), location_id, &from, &aggregation)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    };
+    Ok(stats)
 }
 
 #[tauri::command]
 pub async fn all_connections(
     location_id: i64,
+    location_type: LocationType,
     app_state: State<'_, AppState>,
-) -> Result<Vec<ConnectionInfo>, Error> {
+) -> Result<Vec<CommonConnectionInfo>, Error> {
     debug!("Retrieving connections for location {location_id}");
-    let connections =
-        ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id).await?;
+    let connections: Vec<CommonConnectionInfo> = if location_type.eq(&LocationType::Location) {
+        ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    } else {
+        TunnelConnectionInfo::all_by_tunnel_id(&app_state.get_pool(), location_id)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    };
     debug!("Connections received, returning.");
     trace!("Connections found:\n{:#?}", connections);
     Ok(connections)
 }
+
 #[tauri::command]
 pub async fn all_tunnel_connections(
     location_id: i64,
@@ -696,7 +682,9 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
         let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
         for location in instance_locations.iter() {
             if let Some(location_id) = location.id {
-                if let Some(connection) = app_state.find_and_remove_connection(location_id, LocationType::Location) {
+                if let Some(connection) =
+                    app_state.find_and_remove_connection(location_id, LocationType::Location)
+                {
                     debug!("Found active connection for location({location_id}), closing...",);
                     let request = RemoveInterfaceRequest {
                         interface_name: connection.interface_name.clone(),
@@ -753,8 +741,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
     debug!("Found ({}) tunnels", tunnels.len());
     trace!("Tunnels found: {tunnels:#?}");
     let mut tunnel_info: Vec<TunnelInfo> = vec![];
-    let active_tunnel_ids: Vec<i64> = app_state
-    .get_connection_id_by_type(LocationType::Tunnel);
+    let active_tunnel_ids: Vec<i64> = app_state.get_connection_id_by_type(LocationType::Tunnel);
 
     for tunnel in tunnels {
         tunnel_info.push(TunnelInfo {

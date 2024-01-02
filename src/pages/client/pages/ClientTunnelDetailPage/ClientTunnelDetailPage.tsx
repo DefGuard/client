@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { clientApi } from '../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../query';
+import { WireguardInstanceType } from '../../types';
 import { LocationConnectionHistory } from '../ClientInstancePage/components/LocationsList/components/LocationsDetailView/components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from '../ClientInstancePage/components/LocationsList/components/LocationsDetailView/components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from '../ClientInstancePage/components/LocationsList/components/LocationsDetailView/components/LocationDetails/LocationDetails';
@@ -39,8 +40,12 @@ export const ClientTunnelDetailPage = () => {
             <LocationConnectionHistory
               locationId={tunnel?.id}
               connected={tunnel?.active}
+              locationType={tunnel.location_type}
             />
-            <LocationDetails locationId={tunnel?.id} />
+            <LocationDetails
+              locationId={tunnel?.id}
+              locationType={WireguardInstanceType.TUNNEL}
+            />
           </>
         )}
       </div>

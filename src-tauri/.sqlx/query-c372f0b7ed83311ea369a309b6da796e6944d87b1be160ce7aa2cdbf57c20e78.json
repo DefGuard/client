@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, \n            route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE pubkey = $1;",
+  "query": "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, \n            route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE server_pubkey = $1;",
   "describe": {
     "columns": [
       {
@@ -100,5 +100,5 @@
       true
     ]
   },
-  "hash": "ae23a30884275531d64ecc60c21b9eafef31be52e22b9d0c22ad565f0cdddce9"
+  "hash": "c372f0b7ed83311ea369a309b6da796e6944d87b1be160ce7aa2cdbf57c20e78"
 }

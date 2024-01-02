@@ -13,11 +13,12 @@ import { ActionButtonVariant } from '../../../../../../../../../../shared/defgua
 import { Card } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { LogItem, LogLevel } from '../../../../../../../../clientAPI/types';
 import { useClientStore } from '../../../../../../../../hooks/useClientStore';
-import { DefguardLocation } from '../../../../../../../../types';
+import { DefguardLocation, WireguardInstanceType } from '../../../../../../../../types';
 import { LocationLogsSelect } from './LocationLogsSelect';
 
 type Props = {
   locationId: DefguardLocation['id'];
+  locationType: WireguardInstanceType;
 };
 
 export const LocationLogs = ({ locationId }: Props) => {
@@ -40,7 +41,7 @@ export const LocationLogs = ({ locationId }: Props) => {
     let eventUnlisten: UnlistenFn;
     const startLogListen = async () => {
       eventUnlisten = await listen<LogItem[]>(
-        `log-update-location-${locationId}`,
+        `log-update-location-${locationId}-${location}`,
         ({ payload: logItems }) => {
           if (logsContainerElement.current) {
             logItems.forEach((item) => {

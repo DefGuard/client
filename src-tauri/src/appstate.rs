@@ -49,7 +49,11 @@ impl AppState {
     pub fn get_connections(&self) -> Vec<ActiveConnection> {
         self.active_connections.lock().unwrap().clone()
     }
-    pub fn find_and_remove_connection(&self, location_id: i64, location_type: LocationType) -> Option<ActiveConnection> {
+    pub fn find_and_remove_connection(
+        &self,
+        location_id: i64,
+        location_type: LocationType,
+    ) -> Option<ActiveConnection> {
         debug!("Removing active connection for location with id: {location_id}");
         let mut connections = self.active_connections.lock().unwrap();
 
