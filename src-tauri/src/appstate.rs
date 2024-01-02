@@ -75,7 +75,7 @@ impl AppState {
             info!("Removed connection from active connections: {removed_connection:#?}");
             Some(removed_connection)
         } else {
-            None 
+            None
         }
     }
 
