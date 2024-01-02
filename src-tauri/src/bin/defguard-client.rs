@@ -73,7 +73,7 @@ async fn main() {
         LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
             .unwrap_or(LevelFilter::Info);
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
             save_device_config,
@@ -127,31 +127,30 @@ async fn main() {
                 .build(),
         )
         .manage(AppState::default())
-        .setup(|app| {
-            let handle = app.handle();
-            tauri::async_runtime::spawn(async move {
-                debug!("Initializing database connection");
-                let app_state: State<AppState> = handle.state();
-                let db = database::init_db(&handle)
-                    .await
-                    .expect("Database initialization failed");
-                *app_state.db.lock().unwrap() = Some(db);
-                info!("Database initialization completed");
-                info!("Starting main app thread.");
-                let result = database::info(&app_state.get_pool()).await;
-                info!("Database info result: {:#?}", result);
-                // configure tray
-                if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
-                    configure_tray_icon(&handle, &settings.tray_icon_theme).unwrap();
-                }
-            });
-            Ok(())
-        })
         .build(tauri::generate_context!())
-        .expect("error while running tauri application")
-        .run(|_app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
-            }
-        });
+        .expect("error while running tauri application");
+
+    // initialize database
+    let app_handle = app.handle();
+    debug!("Initializing database connection");
+    let app_state: State<AppState> = app_handle.state();
+    let db = database::init_db(&app_handle)
+        .await
+        .expect("Database initialization failed");
+    *app_state.db.lock().unwrap() = Some(db);
+    info!("Database initialization completed");
+    info!("Starting main app thread.");
+    let result = database::info(&app_state.get_pool()).await;
+    info!("Database info result: {:#?}", result);
+    // configure tray
+    if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
+        configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
+    }
+
+    // run app
+    app.run(|_app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            api.prevent_exit();
+        }
+    });
 }

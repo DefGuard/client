@@ -45,9 +45,11 @@ impl AppState {
     pub fn get_pool(&self) -> DbPool {
         self.db.lock().unwrap().as_ref().cloned().unwrap()
     }
+
     pub fn get_connections(&self) -> Vec<ActiveConnection> {
         self.active_connections.lock().unwrap().clone()
     }
+
     pub fn find_and_remove_connection(&self, location_id: i64) -> Option<ActiveConnection> {
         debug!("Removing active connection for location with id: {location_id}");
         let mut connections = self.active_connections.lock().unwrap();
@@ -89,6 +91,7 @@ impl AppState {
         }
         Ok(())
     }
+
     pub fn find_connection(&self, location_id: i64) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().unwrap();
         debug!("Checking for active connection with location id: {location_id} in active connections: {connections:#?}");
