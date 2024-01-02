@@ -42,6 +42,16 @@ export const useClientStore = createWithEqualityFn<Store>(
       }
       return set({ instances: values });
     },
+    setTunnels: (values) => {
+      if (isUndefined(get().selectedInstance)) {
+        return set({
+          tunnels: values,
+          selectedInstance:
+            { id: values[0]?.id, type: WireguardInstanceType.TUNNEL } ?? undefined,
+        });
+      }
+      return set({ tunnels: values });
+    },
     updateInstances: async () => {
       const res = await getInstances();
       let selected = get().selectedInstance;
@@ -78,6 +88,7 @@ type StoreValues = {
 type StoreMethods = {
   setState: (values: Partial<StoreValues>) => void;
   setInstances: (instances: DefguardInstance[]) => void;
+  setTunnels: (tunnels: CommonWireguardFields[]) => void;
   updateInstances: () => Promise<void>;
   updateSettings: (data: Partial<Settings>) => Promise<void>;
 };

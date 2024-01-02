@@ -709,10 +709,17 @@ pub async fn parse_tunnel_config(config: String) -> Result<Tunnel, Error> {
     })
 }
 #[tauri::command(async)]
-pub async fn save_tunnel(mut tunnel: Tunnel, app_state: State<'_, AppState>) -> Result<(), Error> {
+pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Error> {
+    let app_state = handle.state::<AppState>();
     debug!("Received tunnel configuration: {tunnel:#?}");
     tunnel.save(&app_state.get_pool()).await?;
     info!("Saved tunnel {tunnel:#?}");
+    handle.emit_all(
+        "location-update",
+        Payload {
+            message: "Tunnel saved".into(),
+        },
+    )?;
     Ok(())
 }
 

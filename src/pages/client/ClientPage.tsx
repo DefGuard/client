@@ -11,15 +11,24 @@ import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
 import { TauriEventKey } from './types';
 
-const { getInstances } = clientApi;
+const { getInstances, getTunnels } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
-  const setInstances = useClientStore((state) => state.setInstances);
+  const [setInstances, setTunnels] = useClientStore((state) => [
+    state.setInstances,
+    state.setTunnels,
+  ]);
 
   const { data: instances } = useQuery({
     queryFn: getInstances,
     queryKey: [clientQueryKeys.getInstances],
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+  const { data: tunnels } = useQuery({
+    queryFn: getTunnels,
+    queryKey: [clientQueryKeys.getTunnels],
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
@@ -82,7 +91,10 @@ export const ClientPage = () => {
     if (instances) {
       setInstances(instances);
     }
-  }, [instances, setInstances]);
+    if (tunnels) {
+      setTunnels(tunnels);
+    }
+  }, [instances, setInstances, tunnels, setTunnels]);
 
   return (
     <>
