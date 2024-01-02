@@ -43,11 +43,19 @@ impl AppState {
     }
 
     pub fn get_pool(&self) -> DbPool {
-        self.db.lock().unwrap().as_ref().cloned().unwrap()
+        self.db
+            .lock()
+            .expect("Failed to lock dbpool mutex")
+            .as_ref()
+            .cloned()
+            .unwrap()
     }
 
     pub fn get_connections(&self) -> Vec<ActiveConnection> {
-        self.active_connections.lock().unwrap().clone()
+        self.active_connections
+            .lock()
+            .expect("Failed to lock active connections mutex")
+            .clone()
     }
 
     pub fn find_and_remove_connection(&self, location_id: i64) -> Option<ActiveConnection> {
