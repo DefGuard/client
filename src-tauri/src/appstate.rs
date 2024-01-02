@@ -120,16 +120,11 @@ impl AppState {
         }
         Ok(())
     }
-<<<<<<< HEAD
     pub fn find_connection(
         &self,
         id: i64,
         location_type: LocationType,
     ) -> Option<ActiveConnection> {
-=======
-
-    pub fn find_connection(&self, location_id: i64) -> Option<ActiveConnection> {
->>>>>>> a7d466ec10b42518a44e50699478d287341214be
         let connections = self.active_connections.lock().unwrap();
         debug!(
         "Checking for active connection with id: {id}, location_type: {location_type:?} in active connections: {connections:#?}"

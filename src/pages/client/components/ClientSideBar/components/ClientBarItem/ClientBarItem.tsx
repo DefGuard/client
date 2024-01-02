@@ -43,7 +43,6 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
       autoUpdate(refElement, floatingElement, updateFunc),
   });
 
-  console.log(instance);
   return (
     <>
       <div

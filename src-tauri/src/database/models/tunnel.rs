@@ -265,7 +265,6 @@ pub async fn peer_to_tunnel_stats(
     listen_port: u32,
     pool: &DbPool,
 ) -> Result<TunnelStats, Error> {
-    info!("{peer:?}");
     let tunnel = Tunnel::find_by_server_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(TunnelStats {
         id: None,

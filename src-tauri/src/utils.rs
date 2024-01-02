@@ -208,9 +208,9 @@ pub async fn spawn_stats_thread(
                             )
                             .await
                             .unwrap();
-                            info!("Saving tunnel stats: {tunnel_stats:#?}");
+                            debug!("Saving tunnel stats: {tunnel_stats:#?}");
                             let _ = tunnel_stats.save(&state.get_pool()).await;
-                            info!("Saved location stats: {tunnel_stats:#?}");
+                            debug!("Saved location stats: {tunnel_stats:#?}");
                         }
                     }
                 }
