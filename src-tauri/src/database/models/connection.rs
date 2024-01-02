@@ -77,16 +77,16 @@ pub struct ConnectionInfo {
     pub upload: Option<i32>,
     pub download: Option<i32>,
 }
-impl Into<CommonConnectionInfo> for ConnectionInfo {
-    fn into(self) -> CommonConnectionInfo {
+impl From<ConnectionInfo> for CommonConnectionInfo {
+    fn from(val: ConnectionInfo) -> Self {
         CommonConnectionInfo {
-            id: self.id,
-            location_id: self.location_id,
-            connected_from: self.connected_from,
-            start: self.start,
-            end: self.end,
-            upload: self.upload,
-            download: self.download,
+            id: val.id,
+            location_id: val.location_id,
+            connected_from: val.connected_from,
+            start: val.start,
+            end: val.end,
+            upload: val.upload,
+            download: val.download,
         }
     }
 }

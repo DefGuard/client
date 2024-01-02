@@ -3,6 +3,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
+use tauri::AppHandle;
 
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
@@ -11,18 +12,23 @@ use tonic::{codegen::tokio_stream::StreamExt, transport::Channel};
 
 use crate::{
     appstate::AppState,
-    commands::LocationInterfaceDetails,
+    commands::{LocationInterfaceDetails, Payload},
     database::{
-        models::location::peer_to_location_stats, models::tunnel::peer_to_tunnel_stats, DbPool,
-        Location, Tunnel, WireguardKeys,
+        models::location::peer_to_location_stats, models::tunnel::peer_to_tunnel_stats,
+        ActiveConnection, DbPool, Location, Tunnel, WireguardKeys,
     },
     error::Error,
-    service::proto::{
-        desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
-        ReadInterfaceDataRequest,
+    service::{
+        log_watcher::spawn_log_watcher_task,
+        proto::{
+            desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
+            ReadInterfaceDataRequest,
+        },
     },
     LocationType,
 };
+use local_ip_address::local_ip;
+use tracing::Level;
 
 pub static IS_MACOS: bool = cfg!(target_os = "macos");
 pub static STATS_PERIOD: u64 = 60;
@@ -283,7 +289,7 @@ pub async fn setup_interface_tunnel(
             .allowed_ips
             .as_ref()
             .map(|ips| ips.split(',').map(str::to_string).collect())
-            .unwrap_or(Vec::new())
+            .unwrap_or_default()
     };
     for allowed_ip in &allowed_ips {
         match IpAddrMask::from_str(allowed_ip) {
@@ -332,7 +338,7 @@ pub async fn get_tunnel_interface_details(
     pool: &DbPool,
 ) -> Result<LocationInterfaceDetails, Error> {
     debug!("Fetching tunnel details for tunnel ID {tunnel_id}");
-    if let Some(tunnel) = Tunnel::find_by_id(&pool, tunnel_id).await? {
+    if let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? {
         debug!("Fetching WireGuard keys for location {}", tunnel.name);
         let peer_pubkey = tunnel.pubkey;
 
@@ -386,9 +392,9 @@ pub async fn get_location_interface_details(
     pool: &DbPool,
 ) -> Result<LocationInterfaceDetails, Error> {
     debug!("Fetching location details for location ID {location_id}");
-    if let Some(location) = Location::find_by_id(&pool, location_id).await? {
+    if let Some(location) = Location::find_by_id(pool, location_id).await? {
         debug!("Fetching WireGuard keys for location {}", location.name);
-        let keys = WireguardKeys::find_by_instance_id(&pool, location.instance_id)
+        let keys = WireguardKeys::find_by_instance_id(pool, location.instance_id)
             .await?
             .ok_or(Error::NotFound)?;
         let peer_pubkey = keys.pubkey;
@@ -437,4 +443,130 @@ pub async fn get_location_interface_details(
         error!("Location ID {location_id} not found");
         Err(Error::NotFound)
     }
+}
+
+/// Setup new connection for location
+pub async fn handle_connection_for_location(
+    location: &Location,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!(
+        "Creating new interface connection for location: {}",
+        location.name
+    );
+    let state = handle.state::<AppState>();
+    #[cfg(target_os = "macos")]
+    let interface_name = get_interface_name();
+    #[cfg(not(target_os = "macos"))]
+    let interface_name = get_interface_name(&location.name);
+    setup_interface(
+        location,
+        interface_name.clone(),
+        &state.get_pool(),
+        state.client.clone(),
+    )
+    .await?;
+    let address = local_ip()?;
+    let connection = ActiveConnection::new(
+        location.id.expect("Missing Location ID"),
+        address.to_string(),
+        interface_name.clone(),
+        LocationType::Location,
+    );
+    state
+        .active_connections
+        .lock()
+        .map_err(|_| Error::MutexError)?
+        .push(connection);
+    debug!(
+        "Active connections: {:#?}",
+        state
+            .active_connections
+            .lock()
+            .map_err(|_| Error::MutexError)?
+    );
+    debug!("Sending event connection-changed.");
+    handle.emit_all(
+        "connection-changed",
+        Payload {
+            message: "Created new connection".into(),
+        },
+    )?;
+
+    // Spawn stats threads
+    debug!("Spawning stats thread");
+    spawn_stats_thread(
+        handle.clone(),
+        interface_name.clone(),
+        LocationType::Location,
+    )
+    .await;
+
+    // spawn log watcher
+    spawn_log_watcher_task(
+        handle,
+        location.id.expect("Missing Location ID"),
+        interface_name,
+        LocationType::Tunnel,
+        Level::DEBUG,
+        None,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Setup new connection for tunnel
+pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) -> Result<(), Error> {
+    debug!(
+        "Creating new interface connection for tunnel: {}",
+        tunnel.name
+    );
+    let state = handle.state::<AppState>();
+    #[cfg(target_os = "macos")]
+    let interface_name = get_interface_name();
+    #[cfg(not(target_os = "macos"))]
+    let interface_name = get_interface_name(&tunnel.name);
+    setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
+    let address = local_ip()?;
+    let connection = ActiveConnection::new(
+        tunnel.id.expect("Missing Tunnel ID"),
+        address.to_string(),
+        interface_name.clone(),
+        LocationType::Tunnel,
+    );
+    state
+        .active_connections
+        .lock()
+        .map_err(|_| Error::MutexError)?
+        .push(connection);
+    debug!(
+        "Active connections: {:#?}",
+        state
+            .active_connections
+            .lock()
+            .map_err(|_| Error::MutexError)?
+    );
+    debug!("Sending event connection-changed.");
+    handle.emit_all(
+        "connection-changed",
+        Payload {
+            message: "Created new connection".into(),
+        },
+    )?;
+
+    // Spawn stats threads
+    info!("Spawning stats thread");
+    spawn_stats_thread(handle.clone(), interface_name.clone(), LocationType::Tunnel).await;
+
+    //spawn log watcher
+    spawn_log_watcher_task(
+        handle,
+        tunnel.id.expect("Missing Tunnel ID"),
+        interface_name,
+        LocationType::Tunnel,
+        Level::DEBUG,
+        None,
+    )
+    .await?;
+    Ok(())
 }

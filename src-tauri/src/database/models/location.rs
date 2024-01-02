@@ -43,8 +43,8 @@ impl From<LocationStats> for CommonLocationStats {
         CommonLocationStats {
             id: location_stats.id,
             location_id: location_stats.location_id,
-            upload: location_stats.upload as i64,
-            download: location_stats.download as i64,
+            upload: location_stats.upload,
+            download: location_stats.download,
             last_handshake: location_stats.last_handshake,
             collected_at: location_stats.collected_at,
             listen_port: location_stats.listen_port,

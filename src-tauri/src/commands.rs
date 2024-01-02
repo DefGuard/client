@@ -7,29 +7,24 @@ use crate::{
     },
     error::Error,
     proto::{DeviceConfig, DeviceConfigResponse},
-    service::{
-        log_watcher::{spawn_log_watcher_task, stop_log_watcher_task},
-        proto::RemoveInterfaceRequest,
-    },
+    service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest},
     tray::configure_tray_icon,
     utils::{
-        get_interface_name, get_location_interface_details, get_tunnel_interface_details,
-        setup_interface, setup_interface_tunnel, spawn_stats_thread,
+        get_location_interface_details, get_tunnel_interface_details,
+        handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, LocationType,
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
-use tracing::Level;
 
 #[derive(Clone, serde::Serialize)]
-struct Payload {
-    message: String,
+pub struct Payload {
+    pub message: String,
 }
 
 // Create new WireGuard interface
@@ -42,100 +37,16 @@ pub async fn connect(
     let state = handle.state::<AppState>();
     if location_type.eq(&LocationType::Location) {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
-            debug!(
-                "Creating new interface connection for location: {}",
-                location.name
-            );
-            #[cfg(target_os = "macos")]
-            let interface_name = get_interface_name();
-            #[cfg(not(target_os = "macos"))]
-            let interface_name = get_interface_name(&location.name);
-            setup_interface(
-                &location,
-                interface_name.clone(),
-                &state.get_pool(),
-                state.client.clone(),
-            )
-            .await?;
-            let address = local_ip()?;
-            let connection = ActiveConnection::new(
-                location_id,
-                address.to_string(),
-                interface_name.clone(),
-                LocationType::Location,
-            );
-            state
-                .active_connections
-                .lock()
-                .map_err(|_| Error::MutexError)?
-                .push(connection);
-            debug!(
-                "Active connections: {:#?}",
-                state
-                    .active_connections
-                    .lock()
-                    .map_err(|_| Error::MutexError)?
-            );
-            debug!("Sending event connection-changed.");
-            handle.emit_all(
-                "connection-changed",
-                Payload {
-                    message: "Created new connection".into(),
-                },
-            )?;
-
-            // Spawn stats threads
-            debug!("Spawning stats thread");
-            spawn_stats_thread(handle.clone(), interface_name.clone(), location_type).await;
-
-            // spawn log watcher
-            spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
+            handle_connection_for_location(&location, handle).await?
+        } else {
+            error!("Location {location_id} not found");
+            return Err(Error::NotFound);
         }
+    } else if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
+        handle_connection_for_tunnel(&tunnel, handle).await?
     } else {
-        if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
-            debug!(
-                "Creating new interface connection for tunnel: {}",
-                tunnel.name
-            );
-            #[cfg(target_os = "macos")]
-            let interface_name = get_interface_name();
-            #[cfg(not(target_os = "macos"))]
-            let interface_name = get_interface_name(&tunnel.name);
-            setup_interface_tunnel(&tunnel, interface_name.clone(), state.client.clone()).await?;
-            let address = local_ip()?;
-            let connection = ActiveConnection::new(
-                location_id,
-                address.to_string(),
-                interface_name.clone(),
-                LocationType::Tunnel,
-            );
-            state
-                .active_connections
-                .lock()
-                .map_err(|_| Error::MutexError)?
-                .push(connection);
-            debug!(
-                "Active connections: {:#?}",
-                state
-                    .active_connections
-                    .lock()
-                    .map_err(|_| Error::MutexError)?
-            );
-            debug!("Sending event connection-changed.");
-            handle.emit_all(
-                "connection-changed",
-                Payload {
-                    message: "Created new connection".into(),
-                },
-            )?;
-
-            // Spawn stats threads
-            info!("Spawning stats thread");
-            spawn_stats_thread(handle.clone(), interface_name.clone(), location_type).await;
-
-            //spawn log watcher
-            spawn_log_watcher_task(handle, location_id, interface_name, Level::DEBUG, None).await?;
-        }
+        error!("Tunnel {location_id} not found");
+        return Err(Error::NotFound);
     }
     Ok(())
 }
@@ -580,15 +491,13 @@ pub async fn last_connection(
         } else {
             Ok(None)
         }
+    } else if let Some(connection) =
+        TunnelConnection::latest_by_tunnel_id(&app_state.get_pool(), location_id).await?
+    {
+        trace!("Connection found");
+        Ok(Some(connection.into()))
     } else {
-        if let Some(connection) =
-            TunnelConnection::latest_by_tunnel_id(&app_state.get_pool(), location_id).await?
-        {
-            trace!("Connection found");
-            Ok(Some(connection.into()))
-        } else {
-            Ok(None)
-        }
+        Ok(None)
     }
 }
 
@@ -617,21 +526,19 @@ pub async fn update_location_routing(
             error!("Location with id: {location_id} not found.");
             Err(Error::NotFound)
         }
+    } else if let Some(mut tunnel) = Tunnel::find_by_id(&app_state.get_pool(), location_id).await? {
+        tunnel.route_all_traffic = route_all_traffic;
+        tunnel.save(&app_state.get_pool()).await?;
+        handle.emit_all(
+            "location-update",
+            Payload {
+                message: "Tunnel routing updated".into(),
+            },
+        )?;
+        Ok(())
     } else {
-        if let Some(mut tunnel) = Tunnel::find_by_id(&app_state.get_pool(), location_id).await? {
-            tunnel.route_all_traffic = route_all_traffic;
-            tunnel.save(&app_state.get_pool()).await?;
-            handle.emit_all(
-                "location-update",
-                Payload {
-                    message: "Tunnel routing updated".into(),
-                },
-            )?;
-            Ok(())
-        } else {
-            error!("Tunnel with id: {location_id} not found.");
-            Err(Error::NotFound)
-        }
+        error!("Tunnel with id: {location_id} not found.");
+        Err(Error::NotFound)
     }
 }
 
