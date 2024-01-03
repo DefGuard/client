@@ -21,7 +21,7 @@ struct Payload {
 
 /// Location type used in commands to check if we using tunel or location
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
-pub enum LocationType {
+pub enum ConnectionType {
     Tunnel,
     Location,
 }
@@ -52,7 +52,7 @@ pub struct CommonConnection {
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
-    pub location_type: LocationType,
+    pub connection_type: ConnectionType,
 }
 
 // Common fields for LocationStats and TunnelStats due to shared command
@@ -66,7 +66,7 @@ pub struct CommonLocationStats {
     pub collected_at: NaiveDateTime,
     pub listen_port: u32,
     pub persistent_keepalive_interval: Option<u16>,
-    pub location_type: LocationType,
+    pub connection_type: ConnectionType,
 }
 // Common fields for ConnectionInfo and TunnelConnectionInfo due to shared command
 #[derive(Debug, Serialize)]

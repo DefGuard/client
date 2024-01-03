@@ -78,12 +78,15 @@ export const LocationsList = () => {
         selectedInstance.type === WireguardInstanceType.DEFGUARD_INSTANCE && (
           <LocationsDetailView
             locations={locations}
-            locationType={selectedInstance.type}
+            connectionType={selectedInstance.type}
           />
         )}
 
       {selectedInstance.id && selectedInstance.type === WireguardInstanceType.TUNNEL && (
-        <LocationsDetailView locations={locations} locationType={selectedInstance.type} />
+        <LocationsDetailView
+          locations={locations}
+          connectionType={selectedInstance.type}
+        />
       )}
     </>
   );

@@ -57,12 +57,12 @@ const GridItem = ({ location }: GridItemProps) => {
     queryKey: [
       clientQueryKeys.getConnections,
       location.id as number,
-      location.location_type,
+      location.connection_type,
     ],
     queryFn: () =>
       getLastConnection({
         locationId: location.id as number,
-        locationType: location.location_type,
+        connectionType: location.connection_type,
       }),
     enabled: !!location.id,
   });
@@ -71,12 +71,12 @@ const GridItem = ({ location }: GridItemProps) => {
       clientQueryKeys.getLocationStats,
       location.id as number,
       statsFilter,
-      location.location_type,
+      location.connection_type,
     ],
     queryFn: () =>
       getLocationStats({
         locationId: location.id as number,
-        locationType: location.location_type as WireguardInstanceType,
+        connectionType: location.connection_type as WireguardInstanceType,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,

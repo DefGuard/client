@@ -26,7 +26,7 @@ use crate::{
             ReadInterfaceDataRequest,
         },
     },
-    LocationType,
+    ConnectionType,
 };
 use local_ip_address::local_ip;
 use tracing::Level;
@@ -175,7 +175,7 @@ fn is_port_free(port: u16) -> bool {
 pub async fn spawn_stats_thread(
     handle: tauri::AppHandle,
     interface_name: String,
-    location_type: LocationType,
+    connection_type: ConnectionType,
 ) {
     tokio::spawn(async move {
         let state = handle.state::<AppState>();
@@ -196,7 +196,7 @@ pub async fn spawn_stats_thread(
                     let peers: Vec<Peer> =
                         interface_data.peers.into_iter().map(Into::into).collect();
                     for peer in peers {
-                        if location_type.eq(&LocationType::Location) {
+                        if connection_type.eq(&ConnectionType::Location) {
                             let mut location_stats = peer_to_location_stats(
                                 &peer,
                                 interface_data.listen_port,
@@ -472,7 +472,7 @@ pub async fn handle_connection_for_location(
         location.id.expect("Missing Location ID"),
         address.to_string(),
         interface_name.clone(),
-        LocationType::Location,
+        ConnectionType::Location,
     );
     state
         .active_connections
@@ -499,7 +499,7 @@ pub async fn handle_connection_for_location(
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
-        LocationType::Location,
+        ConnectionType::Location,
     )
     .await;
 
@@ -508,7 +508,7 @@ pub async fn handle_connection_for_location(
         handle,
         location.id.expect("Missing Location ID"),
         interface_name,
-        LocationType::Location,
+        ConnectionType::Location,
         Level::DEBUG,
         None,
     )
@@ -536,7 +536,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         tunnel.id.expect("Missing Tunnel ID"),
         address.to_string(),
         interface_name.clone(),
-        LocationType::Tunnel,
+        ConnectionType::Tunnel,
     );
     state
         .active_connections
@@ -564,14 +564,19 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
 
     // Spawn stats threads
     info!("Spawning stats thread");
-    spawn_stats_thread(handle.clone(), interface_name.clone(), LocationType::Tunnel).await;
+    spawn_stats_thread(
+        handle.clone(),
+        interface_name.clone(),
+        ConnectionType::Tunnel,
+    )
+    .await;
 
     //spawn log watcher
     spawn_log_watcher_task(
         handle,
         tunnel.id.expect("Missing Tunnel ID"),
         interface_name,
-        LocationType::Tunnel,
+        ConnectionType::Tunnel,
         Level::DEBUG,
         None,
     )

@@ -15,12 +15,12 @@ import { LocationLogs } from '../LocationLogs/LocationLogs';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
 };
 
 const { getLocationDetails } = clientApi;
 
-export const LocationDetails = ({ locationId, locationType }: Props) => {
+export const LocationDetails = ({ locationId, connectionType }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details;
 
@@ -29,19 +29,19 @@ export const LocationDetails = ({ locationId, locationType }: Props) => {
       <header>
         <h2>{localLL.title()}</h2>
       </header>
-      <LocationLogs locationId={locationId} locationType={locationType} />
-      <InfoSection locationId={locationId} locationType={locationType} />
+      <LocationLogs locationId={locationId} connectionType={connectionType} />
+      <InfoSection locationId={locationId} connectionType={connectionType} />
     </Card>
   );
 };
 
-const InfoSection = memo(({ locationId, locationType }: Props) => {
+const InfoSection = memo(({ locationId, connectionType }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details;
 
   const { data } = useQuery({
-    queryKey: [clientQueryKeys.getLocationDetails, locationId, locationType],
-    queryFn: () => getLocationDetails({ locationId, locationType }),
+    queryKey: [clientQueryKeys.getLocationDetails, locationId, connectionType],
+    queryFn: () => getLocationDetails({ locationId, connectionType }),
     enabled: !!locationId,
     refetchInterval: 1000,
   });

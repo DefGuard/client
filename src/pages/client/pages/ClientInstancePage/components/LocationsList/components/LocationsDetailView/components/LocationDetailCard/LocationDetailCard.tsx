@@ -42,12 +42,12 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
       clientQueryKeys.getLocationStats,
       location.id,
       statsFilter,
-      location.location_type,
+      location.connection_type,
     ],
     queryFn: () =>
       getLocationStats({
         locationId: location.id,
-        locationType: location.location_type,
+        connectionType: location.connection_type,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location,
@@ -57,11 +57,11 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
   });
 
   const { data: lastConnection } = useQuery({
-    queryKey: [clientQueryKeys.getConnections, location.id, location.location_type],
+    queryKey: [clientQueryKeys.getConnections, location.id, location.connection_type],
     queryFn: () =>
       getLastConnection({
         locationId: location.id,
-        locationType: location.location_type,
+        connectionType: location.connection_type,
       }),
     enabled: !!location,
     refetchInterval: 10 * 1000,

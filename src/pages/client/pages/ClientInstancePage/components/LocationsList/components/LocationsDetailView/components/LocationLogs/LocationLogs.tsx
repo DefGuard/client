@@ -18,10 +18,10 @@ import { LocationLogsSelect } from './LocationLogsSelect';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
 };
 
-export const LocationLogs = ({ locationId, locationType }: Props) => {
+export const LocationLogs = ({ locationId, connectionType }: Props) => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);
   const appLogLevel = useClientStore((state) => state.settings.log_level);
   const locationLogLevelRef = useRef<LogLevel>(appLogLevel);
@@ -41,7 +41,7 @@ export const LocationLogs = ({ locationId, locationType }: Props) => {
     let eventUnlisten: UnlistenFn;
     const startLogListen = async () => {
       eventUnlisten = await listen<LogItem[]>(
-        `log-update-${locationType}-${locationId}`,
+        `log-update-${connectionType}-${locationId}`,
         ({ payload: logItems }) => {
           if (logsContainerElement.current) {
             logItems.forEach((item) => {

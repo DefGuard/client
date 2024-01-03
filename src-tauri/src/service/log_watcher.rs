@@ -4,7 +4,7 @@
 //! The watcher monitors a given directory for any changes. Whenever a change is detected
 //! it parses the log files and sends logs relevant to a specified interface to the fronted.
 
-use crate::{appstate::AppState, error::Error, utils::get_service_log_dir, LocationType};
+use crate::{appstate::AppState, error::Error, utils::get_service_log_dir, ConnectionType};
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use notify_debouncer_mini::{
     new_debouncer,
@@ -253,7 +253,7 @@ pub async fn spawn_log_watcher_task(
     handle: AppHandle,
     location_id: i64,
     interface_name: String,
-    location_type: LocationType,
+    connection_type: ConnectionType,
     log_level: Level,
     from: Option<String>,
 ) -> Result<String, Error> {
@@ -263,7 +263,7 @@ pub async fn spawn_log_watcher_task(
     // parse `from` timestamp
     let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
 
-    let connection_type = if location_type.eq(&LocationType::Tunnel) {
+    let connection_type = if connection_type.eq(&ConnectionType::Tunnel) {
         "Tunnel"
     } else {
         "Location"
