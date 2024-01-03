@@ -523,9 +523,6 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         tunnel.name
     );
     let state = handle.state::<AppState>();
-    if let Some(pre_up) = &tunnel.pre_up {
-        execute_command(&pre_up)?
-    }
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
     #[cfg(not(target_os = "macos"))]
@@ -557,10 +554,6 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
             message: "Created new connection".into(),
         },
     )?;
-
-    if let Some(post_up) = &tunnel.post_up {
-        execute_command(&post_up)?
-    }
 
     // Spawn stats threads
     info!("Spawning stats thread");

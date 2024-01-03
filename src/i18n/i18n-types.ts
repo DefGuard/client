@@ -436,13 +436,13 @@ type RootTranslation = {
 					title: string
 					messages: {
 						/**
-						 * T​u​n​n​e​l​ ​a​d​d​e​d
+						 * T​u​n​n​e​l​ ​e​d​i​t​e​d
 						 */
 						editSuccess: string
 						/**
-						 * C​r​e​a​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+						 * E​d​i​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
 						 */
-						addError: string
+						editError: string
 					}
 					controls: {
 						/**
@@ -1651,13 +1651,13 @@ export type TranslationFunctions = {
 					title: () => LocalizedString
 					messages: {
 						/**
-						 * Tunnel added
+						 * Tunnel edited
 						 */
 						editSuccess: () => LocalizedString
 						/**
-						 * Creating tunnel failed
+						 * Editing tunnel failed
 						 */
-						addError: () => LocalizedString
+						editError: () => LocalizedString
 					}
 					controls: {
 						/**

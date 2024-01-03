@@ -97,9 +97,11 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
     saveTunnel(values)
       .then(() => {
         navigate(routes.client.base, { replace: true });
-        toaster.success(localLL.messages.addSuccess());
+        toaster.success(LL.pages.client.pages.editTunnelPage.messages.editSuccess());
       })
-      .catch(() => toaster.error(localLL.messages.addError()));
+      .catch(() =>
+        toaster.error(LL.pages.client.pages.editTunnelPage.messages.editError()),
+      );
   };
 
   const { handleSubmit, control } = useForm<Tunnel>({

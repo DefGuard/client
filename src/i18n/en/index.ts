@@ -176,8 +176,8 @@ const en = {
         editTunnelPage: {
           title: 'Edit WireGuard® Tunnel',
           messages: {
-            editSuccess: 'Tunnel added',
-            addError: 'Creating tunnel failed',
+            editSuccess: 'Tunnel edited',
+            editError: 'Editing tunnel failed',
           },
           controls: {
             save: 'Save changes',
