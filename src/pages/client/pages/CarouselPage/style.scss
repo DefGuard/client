@@ -1,0 +1,156 @@
+@use '@scssutils' as *;
+
+#carousel-page {
+  .card {
+    box-sizing: border-box;
+    padding: 60px;
+
+    .github {
+      height: 60px;
+      width: 270px;
+      p,
+      span {
+        @include typography(app-button-l);
+        text-decoration: none;
+      }
+    }
+
+    .more {
+      @include typography(app-body-1);
+    }
+
+    ul {
+      margin: 0;
+    }
+
+    h2 {
+      font-family: 'Poppins';
+      font-size: 48px;
+      font-style: normal;
+      color: var(--text-body-primary);
+      line-height: normal;
+      text-align: center;
+      width: 100%;
+      font-weight: 400;
+      height: 72px;
+    }
+
+    strong,
+    b {
+      font-weight: 700;
+    }
+
+    .row {
+      width: 100%;
+      display: grid;
+      grid-template-rows: auto auto;
+      grid-template-columns: 1fr;
+      row-gap: 20px;
+
+      @include media-breakpoint-up(xl) {
+        grid-template-rows: auto;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 40px;
+        row-gap: 0;
+      }
+
+      & > img {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9;
+        border: none;
+        background-color: transparent;
+        border-radius: 15px;
+        box-shadow: var(--box-shadow);
+      }
+
+      &.between {
+        @include media-breakpoint-up(xl) {
+          grid-template-columns: auto auto;
+          grid-template-rows: 1fr;
+          justify-items: space-between;
+        }
+      }
+
+      .text {
+        display: flex;
+        flex-flow: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        row-gap: 20px;
+        max-width: 650px;
+        @include typography(app-welcome-2);
+        text-align: center;
+
+        @include media-breakpoint-up(xl) {
+          text-align: left;
+        }
+
+        strong,
+        b {
+          font-weight: 700;
+        }
+
+        &.centered {
+          justify-content: center;
+        }
+      }
+    }
+  }
+
+  #welcome-slide {
+    h2 {
+      margin-bottom: 40px;
+    }
+
+    & > .row {
+      padding: 0 60px;
+    }
+
+    .inner-card {
+      display: flex;
+      flex-flow: column;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--surface-frame-bg);
+      border-radius: 15px;
+      box-shadow: var(--box-shadow);
+      min-height: 415px;
+      box-sizing: border-box;
+      padding: 64px;
+      width: 420px;
+      overflow: hidden;
+      user-select: none;
+
+      h3 {
+        @include typography(app-body-1);
+        margin-bottom: 20px;
+      }
+
+      p {
+        @include typography(welcome-h2);
+        text-align: center;
+        color: var(--text-body-tertiary);
+        margin-bottom: 45px;
+        max-width: 100%;
+      }
+    }
+  }
+
+  #factor-slide,
+  #security-slide,
+  #instances-slide,
+  #support-slide {
+    justify-content: space-between;
+  }
+
+  #support-slide {
+    .text {
+      max-width: 600px;
+      user-select: text;
+      p {
+        margin-bottom: 20px;
+      }
+    }
+  }
+}

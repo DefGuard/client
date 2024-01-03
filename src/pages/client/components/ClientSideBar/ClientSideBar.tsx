@@ -28,11 +28,17 @@ export const ClientSideBar = () => {
 
   return (
     <div id="client-page-side">
-      <div className="logo-desktop">
+      <div
+        className="logo-desktop"
+        onClick={() => navigate(routes.client.carousel, { replace: true })}
+      >
         <SvgDefguardLogoIcon />
         <SvgDefguardLogoText />
       </div>
-      <div className="logo-mobile">
+      <div
+        className="logo-mobile"
+        onClick={() => navigate(routes.client.carousel, { replace: true })}
+      >
         <SvgDefguadNavLogoCollapsed />
       </div>
       <div className="items">

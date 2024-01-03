@@ -23,6 +23,7 @@ import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
+import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
 import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstancePage/ClientAddInstnacePage';
 import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPage/ClientAddTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
@@ -67,6 +68,10 @@ const router = createBrowserRouter([
         path: '/client/',
         index: true,
         element: <ClientInstancePage />,
+      },
+      {
+        path: '/client/carousel',
+        element: <CarouselPage />,
       },
       {
         path: '/client/add-instance',

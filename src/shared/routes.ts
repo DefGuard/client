@@ -8,6 +8,7 @@ export const routes = {
     addTunnel: '/client/add-tunnel',
     tunnelPage: '/client/tunnel',
     settings: '/client/settings',
+    carousel: '/client/carousel',
   },
   enrollment: '/enrollment',
   timeout: '/timeout',

@@ -52,6 +52,61 @@ const en = {
   pages: {
     client: {
       pages: {
+        carouselPage: {
+          slides: {
+            shared: {
+              isMore: 'defguard is all the above and more!',
+              githubButton: 'Visit defguard on',
+            },
+            welcome: {
+              // md
+              title: 'Welcome to **defguard** desktop client!',
+              instance: {
+                title: 'Add Instance',
+                subtitle:
+                  'Establish a connection to defguard instance effortlessly by configuring it with a single token.',
+              },
+              tunel: {
+                title: 'Add Tunel',
+                subtitle:
+                  'Utilize it as a WireGuard® Desktop Client with ease. Set up your own tunnel or import a configuration file.',
+              },
+            },
+            twoFa: {
+              // md
+              title: 'WireGuard **2FA with defguard**',
+              // md
+              sideText: `Since Wireguard protocol doesn't support 2FA/MFA - most (if not all) currently available Wireguard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not Wireguard tunnel).  
+
+If you would like to secure your Wireguard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using Wireguard PSK keys and peers configuration by defguard gateway!`,
+            },
+            security: {
+              // md
+              title: 'Security and Privacy **done right!**',
+              // md
+              sideText: `* Privacy requires controlling your data, thus your user data (Identity, SSO) needs to be on-premise (on your servers)
+* Securing your data and applications requires authentication and authorization (SSO) with Multi-Factor Authentication, and for highest security - MFA with Hardware Security Modules
+* Accessing your data and applications securely and privately requires data encryption (HTTPS) and a secure tunnel between your device and the Internet to encrypt all traffic (VPN).
+* To fully trust your SSO, VPN, it needs to be Open Source`,
+            },
+            instances: {
+              // md
+              title: '**Multiple** instance & locations',
+              // md
+              sideText: `**defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!`,
+            },
+            support: {
+              // md
+              title: '**Support us** on Github',
+              // md
+              text: `**defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by:  
+- staring us on GitHub
+- spreading the word about **defguard**!
+- join our Matrix server: https://matrix.to/#/#defguard:teonite.com`,
+            },
+          },
+        },
         settingsPage: {
           title: 'Settings',
           tabs: {
