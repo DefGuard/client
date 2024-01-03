@@ -1,6 +1,7 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     path::PathBuf,
+    process::Command,
     str::FromStr,
 };
 use tauri::AppHandle;
@@ -522,6 +523,9 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         tunnel.name
     );
     let state = handle.state::<AppState>();
+    if let Some(pre_up) = &tunnel.pre_up {
+        execute_command(&pre_up)?
+    }
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
     #[cfg(not(target_os = "macos"))]
@@ -554,6 +558,10 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         },
     )?;
 
+    if let Some(post_up) = &tunnel.post_up {
+        execute_command(&post_up)?
+    }
+
     // Spawn stats threads
     info!("Spawning stats thread");
     spawn_stats_thread(handle.clone(), interface_name.clone(), LocationType::Tunnel).await;
@@ -568,5 +576,27 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         None,
     )
     .await?;
+    Ok(())
+}
+/// Execute command passed as argument.
+pub fn execute_command(command: &str) -> Result<(), Error> {
+    let mut command_parts = command.split_whitespace();
+
+    if let Some(command) = command_parts.next() {
+        let output = Command::new(command).args(command_parts).output()?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            info!("Command executed successfully. Stdout:\n{}", stdout);
+            if !stderr.is_empty() {
+                error!("Stderr:\n{}", stderr);
+            }
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            error!("Error executing command. Stderr:\n{}", stderr);
+        }
+    }
     Ok(())
 }
