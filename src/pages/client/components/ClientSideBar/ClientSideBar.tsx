@@ -22,7 +22,7 @@ export const ClientSideBar = () => {
   const navigate = useNavigate();
   const { LL } = useI18nContext();
   const [selectedInstance, instances, tunnels, setClientStore] = useClientStore(
-    (state) => [state.selectedInstance, state.instances, state.tunnels, state.setState],
+    (state) => [state.selectedInstance, state.instances, state.tunnels, state.setState]
   );
   const tunnelPathActive =
     selectedInstance?.id === undefined &&
@@ -86,20 +86,18 @@ const SettingsNav = () => {
   const navigate = useNavigate();
   const pathActive = useMatch(routes.client.settings);
   return (
-    <>
-      <div
-        id="settings-nav-item"
-        className={classNames('client-bar-item clickable', {
-          active: pathActive !== null,
-        })}
-        onClick={() => {
-          navigate(routes.client.settings, { replace: true });
-        }}
-      >
-        <SvgIconSettings />
-        <p>{LL.pages.client.sideBar.settings()}</p>
-      </div>
-    </>
+    <div
+      id="settings-nav-item"
+      className={classNames('client-bar-item clickable', {
+        active: pathActive !== null,
+      })}
+      onClick={() => {
+        navigate(routes.client.settings, { replace: true });
+      }}
+    >
+      <SvgIconSettings />
+      <p>{LL.pages.client.sideBar.settings()}</p>
+    </div>
   );
 };
 
