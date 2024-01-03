@@ -22,7 +22,7 @@ export const ClientSideBar = () => {
   const navigate = useNavigate();
   const { LL } = useI18nContext();
   const [selectedInstance, instances, tunnels, setClientStore] = useClientStore(
-    (state) => [state.selectedInstance, state.instances, state.tunnels, state.setState]
+    (state) => [state.selectedInstance, state.instances, state.tunnels, state.setState],
   );
   const tunnelPathActive =
     selectedInstance?.id === undefined &&
