@@ -576,25 +576,3 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     .await?;
     Ok(())
 }
-/// Execute command passed as argument.
-pub fn execute_command(command: &str) -> Result<(), Error> {
-    let mut command_parts = command.split_whitespace();
-
-    if let Some(command) = command_parts.next() {
-        let output = Command::new(command).args(command_parts).output()?;
-
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-
-            info!("Command executed successfully. Stdout:\n{}", stdout);
-            if !stderr.is_empty() {
-                error!("Stderr:\n{}", stderr);
-            }
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("Error executing command. Stderr:\n{}", stderr);
-        }
-    }
-    Ok(())
-}
