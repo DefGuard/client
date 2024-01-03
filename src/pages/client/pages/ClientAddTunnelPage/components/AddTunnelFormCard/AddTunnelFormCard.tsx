@@ -111,6 +111,10 @@ export const AddTunnelFormCard = () => {
         }, LL.form.errors.invalid()),
         persistent_keep_alive: z.number(),
         route_all_traffic: z.boolean(),
+        pre_up: z.string().nullable(),
+        post_up: z.string().nullable(),
+        pre_down: z.string().nullable(),
+        post_down: z.string().nullable(),
       }),
     [LL.form.errors],
   );

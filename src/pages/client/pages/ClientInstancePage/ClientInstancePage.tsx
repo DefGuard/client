@@ -69,9 +69,7 @@ export const ClientInstancePage = () => {
               text={LL.pages.client.pages.tunnelPage.header.edit()}
               disabled={!selectedInstanceId}
               onClick={() => {
-                if (selectedInstance) {
-                  openUpdateInstanceModal(selectedInstance);
-                }
+                navigate(routes.client.editTunnel, { replace: true });
               }}
             />
           )}

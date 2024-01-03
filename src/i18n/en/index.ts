@@ -172,6 +172,17 @@ const en = {
             edit: 'Edit Tunnel',
           },
         },
+
+        editTunnelPage: {
+          title: 'Edit WireGuard® Tunnel',
+          messages: {
+            editSuccess: 'Tunnel added',
+            addError: 'Creating tunnel failed',
+          },
+          controls: {
+            save: 'Save changes',
+          },
+        },
         addTunnelPage: {
           title: 'Add WireGuard® Tunnel',
           forms: {
