@@ -2,7 +2,10 @@ use chrono::{NaiveDateTime, Utc};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 use std::time::SystemTime;
 
-use crate::{commands::DateTimeAggregation, database::DbPool, error::Error};
+use crate::{
+    commands::DateTimeAggregation, database::DbPool, error::Error, CommonLocationStats,
+    ConnectionType,
+};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +36,22 @@ pub struct LocationStats {
     collected_at: NaiveDateTime,
     listen_port: u32,
     persistent_keepalive_interval: Option<u16>,
+}
+
+impl From<LocationStats> for CommonLocationStats {
+    fn from(location_stats: LocationStats) -> Self {
+        CommonLocationStats {
+            id: location_stats.id,
+            location_id: location_stats.location_id,
+            upload: location_stats.upload,
+            download: location_stats.download,
+            last_handshake: location_stats.last_handshake,
+            collected_at: location_stats.collected_at,
+            listen_port: location_stats.listen_port,
+            persistent_keepalive_interval: location_stats.persistent_keepalive_interval,
+            connection_type: ConnectionType::Location,
+        }
+    }
 }
 
 pub async fn peer_to_location_stats(

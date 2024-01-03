@@ -68,6 +68,6 @@ pub use models::{
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
     settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
-    tunnel::Tunnel,
+    tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
     wireguard_keys::WireguardKeys,
 };

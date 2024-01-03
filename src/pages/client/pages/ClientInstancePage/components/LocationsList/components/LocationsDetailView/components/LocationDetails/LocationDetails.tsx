@@ -10,16 +10,17 @@ import { Divider } from '../../../../../../../../../../shared/defguard-ui/compon
 import { Label } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Label/Label';
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
-import { DefguardLocation } from '../../../../../../../../types';
+import { DefguardLocation, WireguardInstanceType } from '../../../../../../../../types';
 import { LocationLogs } from '../LocationLogs/LocationLogs';
 
 type Props = {
   locationId: DefguardLocation['id'];
+  connectionType: WireguardInstanceType;
 };
 
 const { getLocationDetails } = clientApi;
 
-export const LocationDetails = ({ locationId }: Props) => {
+export const LocationDetails = ({ locationId, connectionType }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details;
 
@@ -28,19 +29,19 @@ export const LocationDetails = ({ locationId }: Props) => {
       <header>
         <h2>{localLL.title()}</h2>
       </header>
-      <LocationLogs locationId={locationId} />
-      <InfoSection locationId={locationId} />
+      <LocationLogs locationId={locationId} connectionType={connectionType} />
+      <InfoSection locationId={locationId} connectionType={connectionType} />
     </Card>
   );
 };
 
-const InfoSection = memo(({ locationId }: Props) => {
+const InfoSection = memo(({ locationId, connectionType }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details;
 
   const { data } = useQuery({
-    queryKey: [clientQueryKeys.getLocationDetails, locationId],
-    queryFn: () => getLocationDetails({ locationId }),
+    queryKey: [clientQueryKeys.getLocationDetails, locationId, connectionType],
+    queryFn: () => getLocationDetails({ locationId, connectionType }),
     enabled: !!locationId,
     refetchInterval: 1000,
   });

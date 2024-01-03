@@ -2,7 +2,9 @@ use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query, query_as, FromRow};
 
-use crate::{database::DbPool, error::Error};
+use crate::{
+    database::DbPool, error::Error, CommonConnection, CommonConnectionInfo, ConnectionType,
+};
 
 #[derive(FromRow, Debug, Serialize, Clone)]
 pub struct Connection {
@@ -77,6 +79,19 @@ pub struct ConnectionInfo {
     pub upload: Option<i32>,
     pub download: Option<i32>,
 }
+impl From<ConnectionInfo> for CommonConnectionInfo {
+    fn from(val: ConnectionInfo) -> Self {
+        CommonConnectionInfo {
+            id: val.id,
+            location_id: val.location_id,
+            connected_from: val.connected_from,
+            start: val.start,
+            end: val.end,
+            upload: val.upload,
+            download: val.download,
+        }
+    }
+}
 
 impl ConnectionInfo {
     pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
@@ -129,16 +144,23 @@ pub struct ActiveConnection {
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub interface_name: String,
+    pub connection_type: ConnectionType,
 }
 impl ActiveConnection {
     #[must_use]
-    pub fn new(location_id: i64, connected_from: String, interface_name: String) -> Self {
+    pub fn new(
+        location_id: i64,
+        connected_from: String,
+        interface_name: String,
+        connection_type: ConnectionType,
+    ) -> Self {
         let start = Utc::now().naive_utc();
         Self {
             location_id,
             connected_from,
             start,
             interface_name,
+            connection_type,
         }
     }
 }
@@ -151,6 +173,19 @@ impl From<ActiveConnection> for Connection {
             connected_from: active_connection.connected_from,
             start: active_connection.start,
             end: Utc::now().naive_utc(),
+        }
+    }
+}
+// Implementing From for Connection into CommonConnection
+impl From<Connection> for CommonConnection {
+    fn from(connection: Connection) -> Self {
+        CommonConnection {
+            id: connection.id,
+            location_id: connection.location_id,
+            connected_from: connection.connected_from,
+            start: connection.start,
+            end: connection.end,
+            connection_type: ConnectionType::Location,
         }
     }
 }

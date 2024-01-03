@@ -38,10 +38,16 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
   const statsFilter = useClientStore((state) => state.statsFilter);
 
   const { data: locationStats } = useQuery({
-    queryKey: [clientQueryKeys.getLocationStats, location.id, statsFilter],
+    queryKey: [
+      clientQueryKeys.getLocationStats,
+      location.id,
+      statsFilter,
+      location.connection_type,
+    ],
     queryFn: () =>
       getLocationStats({
         locationId: location.id,
+        connectionType: location.connection_type,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location,
@@ -51,8 +57,12 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
   });
 
   const { data: lastConnection } = useQuery({
-    queryKey: [clientQueryKeys.getConnections, location.id],
-    queryFn: () => getLastConnection({ locationId: location.id }),
+    queryKey: [clientQueryKeys.getConnections, location.id, location.connection_type],
+    queryFn: () =>
+      getLastConnection({
+        locationId: location.id,
+        connectionType: location.connection_type,
+      }),
     enabled: !!location,
     refetchInterval: 10 * 1000,
     refetchOnWindowFocus: true,

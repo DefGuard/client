@@ -57,7 +57,7 @@ export const ClientSideBar = () => {
                 type: WireguardInstanceType.TUNNEL,
               },
             });
-            navigate(routes.client.tunnelPage, { replace: true });
+            navigate(routes.client.base, { replace: true });
           }}
         >
           <SvgIconNavVpn />

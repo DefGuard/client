@@ -1,4 +1,9 @@
-use crate::{commands::DateTimeAggregation, database::DbPool, error::Error};
+use crate::{
+    commands::DateTimeAggregation,
+    database::{ActiveConnection, DbPool},
+    error::Error,
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+};
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
@@ -145,12 +150,12 @@ impl Tunnel {
         .await?;
         Ok(tunnels)
     }
-    pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
+    pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Tunnel,
             "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, 
             route_all_traffic, pre_up, post_up, pre_down, post_down \
-            FROM tunnel WHERE pubkey = $1;",
+            FROM tunnel WHERE server_pubkey = $1;",
             pubkey
         )
         .fetch_one(pool)
@@ -260,7 +265,7 @@ pub async fn peer_to_tunnel_stats(
     listen_port: u32,
     pool: &DbPool,
 ) -> Result<TunnelStats, Error> {
-    let tunnel = Tunnel::find_by_public_key(pool, &peer.public_key.to_string()).await?;
+    let tunnel = Tunnel::find_by_server_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(TunnelStats {
         id: None,
         tunnel_id: tunnel.id.unwrap(),
@@ -283,6 +288,20 @@ pub struct TunnelConnection {
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
+}
+
+impl From<TunnelConnectionInfo> for CommonConnectionInfo {
+    fn from(val: TunnelConnectionInfo) -> Self {
+        CommonConnectionInfo {
+            id: val.id,
+            location_id: val.tunnel_id,
+            connected_from: val.connected_from,
+            start: val.start,
+            end: val.end,
+            upload: val.upload,
+            download: val.download,
+        }
+    }
 }
 
 impl TunnelConnection {
@@ -317,10 +336,7 @@ impl TunnelConnection {
         Ok(connections)
     }
 
-    pub async fn lastest_by_tunnel_id(
-        pool: &DbPool,
-        tunnel_id: i64,
-    ) -> Result<Option<Self>, Error> {
+    pub async fn latest_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, Error> {
         let connection = query_as!(
             TunnelConnection,
             r#"
@@ -335,5 +351,102 @@ impl TunnelConnection {
         .fetch_optional(pool)
         .await?;
         Ok(connection)
+    }
+}
+
+/// Historical connection
+#[derive(FromRow, Debug, Serialize)]
+pub struct TunnelConnectionInfo {
+    pub id: i64,
+    pub tunnel_id: i64,
+    pub connected_from: String,
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime,
+    pub upload: Option<i32>,
+    pub download: Option<i32>,
+}
+
+impl TunnelConnectionInfo {
+    pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
+        // Because we store interface information for given timestamp select last upload and download
+        // before connection ended
+        // FIXME: Optimize query
+        let connections = query_as!(
+            TunnelConnectionInfo,
+            r#"
+              SELECT
+                  c.id as "id!",
+                  c.tunnel_id as "tunnel_id!",
+                  c.connected_from as "connected_from!",
+                  c.start as "start!",
+                  c.end as "end!",
+                  COALESCE((
+                      SELECT ls.upload
+                      FROM tunnel_stats AS ls
+                      WHERE ls.tunnel_id = c.tunnel_id
+                      AND ls.collected_at >= c.start
+                      AND ls.collected_at <= c.end
+                      ORDER BY ls.collected_at DESC
+                      LIMIT 1
+                  ), 0) as "upload: _",
+                  COALESCE((
+                      SELECT ls.download
+                      FROM tunnel_stats AS ls
+                      WHERE ls.tunnel_id = c.tunnel_id
+                      AND ls.collected_at >= c.start
+                      AND ls.collected_at <= c.end
+                      ORDER BY ls.collected_at DESC
+                      LIMIT 1
+                  ), 0) as "download: _"
+              FROM tunnel_connection AS c WHERE tunnel_id = $1
+              ORDER BY start DESC;
+            "#,
+            tunnel_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(connections)
+    }
+}
+impl From<ActiveConnection> for TunnelConnection {
+    fn from(active_connection: ActiveConnection) -> Self {
+        TunnelConnection {
+            id: None,
+            tunnel_id: active_connection.location_id,
+            connected_from: active_connection.connected_from,
+            start: active_connection.start,
+            end: Utc::now().naive_utc(),
+        }
+    }
+}
+
+// Implementing From for TunnelConnection into CommonConnection
+impl From<TunnelConnection> for CommonConnection {
+    fn from(tunnel_connection: TunnelConnection) -> Self {
+        CommonConnection {
+            id: tunnel_connection.id,
+            location_id: tunnel_connection.tunnel_id, // Assuming you want to map tunnel_id to location_id
+            connected_from: tunnel_connection.connected_from,
+            start: tunnel_connection.start,
+            end: tunnel_connection.end,
+            connection_type: ConnectionType::Tunnel, // You need to set the connection_type appropriately based on your logic,
+        }
+    }
+}
+// Implement From trait for converting TunnelStats to CommonLocationStats
+impl From<TunnelStats> for CommonLocationStats {
+    fn from(tunnel_stats: TunnelStats) -> Self {
+        CommonLocationStats {
+            id: tunnel_stats.id,
+            location_id: tunnel_stats.tunnel_id,
+            upload: tunnel_stats.upload,
+            download: tunnel_stats.download,
+            last_handshake: tunnel_stats.last_handshake,
+            collected_at: tunnel_stats.collected_at,
+            listen_port: tunnel_stats.listen_port,
+            persistent_keepalive_interval: tunnel_stats.persistent_keepalive_interval, // Set the appropriate value
+            connection_type: ConnectionType::Tunnel,
+        }
     }
 }

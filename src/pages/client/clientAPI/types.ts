@@ -1,6 +1,6 @@
 import { ThemeKey } from '../../../shared/defguard-ui/hooks/theme/types';
 import { CreateDeviceResponse } from '../../../shared/hooks/api/types';
-import { DefguardInstance, DefguardLocation } from '../types';
+import { DefguardInstance, DefguardLocation, WireguardInstanceType } from '../types';
 
 export type GetLocationsRequest = {
   instanceId: number;
@@ -8,15 +8,18 @@ export type GetLocationsRequest = {
 
 export type ConnectionRequest = {
   locationId: number;
+  connectionType: WireguardInstanceType;
 };
 
 export type RoutingRequest = {
   locationId: number;
+  connectionType: WireguardInstanceType;
   routeAllTraffic?: boolean;
 };
 
 export type StatsRequest = {
   locationId: number;
+  connectionType: WireguardInstanceType;
   from?: string;
 };
 
@@ -98,6 +101,7 @@ export type TunnelRequest = {
 
 export type LocationDetailsRequest = {
   locationId: number;
+  connectionType: WireguardInstanceType;
 };
 
 export type TauriCommandKey =

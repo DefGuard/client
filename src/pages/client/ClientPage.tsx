@@ -11,15 +11,24 @@ import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
 import { TauriEventKey } from './types';
 
-const { getInstances } = clientApi;
+const { getInstances, getTunnels } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
-  const setInstances = useClientStore((state) => state.setInstances);
+  const [setInstances, setTunnels] = useClientStore((state) => [
+    state.setInstances,
+    state.setTunnels,
+  ]);
 
   const { data: instances } = useQuery({
     queryFn: getInstances,
     queryKey: [clientQueryKeys.getInstances],
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+  const { data: tunnels } = useQuery({
+    queryFn: getTunnels,
+    queryKey: [clientQueryKeys.getTunnels],
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
@@ -28,7 +37,11 @@ export const ClientPage = () => {
     const subs: UnlistenFn[] = [];
 
     listen(TauriEventKey.INSTANCE_UPDATE, () => {
-      const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+      const invalidate = [
+        clientQueryKeys.getInstances,
+        clientQueryKeys.getLocations,
+        clientQueryKeys.getTunnels,
+      ];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
           queryKey: [key],
@@ -39,7 +52,7 @@ export const ClientPage = () => {
     });
 
     listen(TauriEventKey.LOCATION_UPDATE, () => {
-      const invalidate = [clientQueryKeys.getLocations];
+      const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
           queryKey: [key],
@@ -57,6 +70,7 @@ export const ClientPage = () => {
         clientQueryKeys.getConnectionHistory,
         clientQueryKeys.getLocationStats,
         clientQueryKeys.getInstances,
+        clientQueryKeys.getTunnels,
       ];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
@@ -77,7 +91,10 @@ export const ClientPage = () => {
     if (instances) {
       setInstances(instances);
     }
-  }, [instances, setInstances]);
+    if (tunnels) {
+      setTunnels(tunnels);
+    }
+  }, [instances, setInstances, tunnels, setTunnels]);
 
   return (
     <>
