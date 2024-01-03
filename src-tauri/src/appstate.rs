@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
-    database::{ActiveConnection, Connection, DbPool},
+    database::{ActiveConnection, Connection, DbPool, TunnelConnection},
     error::Error,
     service::{
         proto::{
@@ -111,11 +111,22 @@ impl AppState {
             debug!("Removed interface");
             debug!("Saving connection");
             trace!("Connection: {connection:#?}");
-            let mut connection: Connection = connection.into();
-            connection.save(&self.get_pool()).await?;
-            debug!("Connection saved");
-            trace!("Saved connection: {connection:#?}");
-            info!("Location {} disconnected", connection.location_id);
+            match connection.connection_type {
+                ConnectionType::Location => {
+                    let mut connection: Connection = connection.into();
+                    connection.save(&self.get_pool()).await?;
+                    debug!("Connection saved");
+                    trace!("Saved connection: {connection:#?}");
+                    info!("Location {} disconnected", connection.location_id);
+                }
+                ConnectionType::Tunnel => {
+                    let mut connection: TunnelConnection = connection.into();
+                    connection.save(&self.get_pool()).await?;
+                    debug!("Connection saved");
+                    trace!("Saved connection: {connection:#?}");
+                    info!("Tunnel {} disconnected", connection.tunnel_id);
+                }
+            }
         }
         Ok(())
     }

@@ -6,6 +6,7 @@ export const routes = {
     instancePage: '/client/',
     addInstance: '/client/add-instance',
     addTunnel: '/client/add-tunnel',
+    editTunnel: '/client/edit-tunnel',
     settings: '/client/settings',
   },
   enrollment: '/enrollment',

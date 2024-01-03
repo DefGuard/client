@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -24,6 +25,7 @@ import {
   patternValidIp,
   patternValidWireguardKey,
 } from '../../../../../../shared/patterns';
+import { routes } from '../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { validateIpOrDomainList } from '../../../../../../shared/validators/tunnel';
 import { clientApi } from '../../../../clientAPI/clientApi';
@@ -65,6 +67,7 @@ export const AddTunnelFormCard = () => {
   const { LL } = useI18nContext();
   const { parseTunnelConfig, saveTunnel } = clientApi;
   const toaster = useToaster();
+  const navigate = useNavigate();
 
   const localLL = LL.pages.client.pages.addTunnelPage.forms.initTunnel;
   /* eslint-disable no-useless-escape */
@@ -102,21 +105,37 @@ export const AddTunnelFormCard = () => {
           .refine((value) => {
             return patternValidEndpoint.test(value);
           }, LL.form.errors.invalid()),
-        dns: z.string().refine((value) => {
-          return validateIpOrDomainList(value, ',', true);
-        }, LL.form.errors.invalid()),
+        dns: z
+          .string()
+          .refine((value) => {
+            if (value) {
+              return validateIpOrDomainList(value, ',', true);
+            }
+            return true;
+          }, LL.form.errors.invalid())
+          .optional(),
         allowed_ips: z.string().refine((value) => {
-          const ips = value.split(',').map((ip) => ip.trim());
-          return ips.every((ip) => cidrRegex.test(ip));
+          if (value) {
+            const ips = value.split(',').map((ip) => ip.trim());
+            return ips.every((ip) => cidrRegex.test(ip));
+          }
+          return true;
         }, LL.form.errors.invalid()),
         persistent_keep_alive: z.number(),
         route_all_traffic: z.boolean(),
+        pre_up: z.string().nullable(),
+        post_up: z.string().nullable(),
+        pre_down: z.string().nullable(),
+        post_down: z.string().nullable(),
       }),
     [LL.form.errors],
   );
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
     saveTunnel(values)
-      .then(() => toaster.success(localLL.messages.addSuccess()))
+      .then(() => {
+        navigate(routes.client.base, { replace: true });
+        toaster.success(localLL.messages.addSuccess());
+      })
       .catch(() => toaster.error(localLL.messages.addError()));
   };
   const { handleSubmit, control, reset, setValue } = useForm<FormFields>({

@@ -422,6 +422,34 @@ type RootTranslation = {
 					 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
 					 */
 					title: string
+					header: {
+						/**
+						 * E​d​i​t​ ​T​u​n​n​e​l
+						 */
+						edit: string
+					}
+				}
+				editTunnelPage: {
+					/**
+					 * E​d​i​t​ ​W​i​r​e​G​u​a​r​d​®​ ​T​u​n​n​e​l
+					 */
+					title: string
+					messages: {
+						/**
+						 * T​u​n​n​e​l​ ​e​d​i​t​e​d
+						 */
+						editSuccess: string
+						/**
+						 * E​d​i​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+						 */
+						editError: string
+					}
+					controls: {
+						/**
+						 * S​a​v​e​ ​c​h​a​n​g​e​s
+						 */
+						save: string
+					}
 				}
 				addTunnelPage: {
 					/**
@@ -1609,6 +1637,34 @@ export type TranslationFunctions = {
 					 * WireGuard Tunnels
 					 */
 					title: () => LocalizedString
+					header: {
+						/**
+						 * Edit Tunnel
+						 */
+						edit: () => LocalizedString
+					}
+				}
+				editTunnelPage: {
+					/**
+					 * Edit WireGuard® Tunnel
+					 */
+					title: () => LocalizedString
+					messages: {
+						/**
+						 * Tunnel edited
+						 */
+						editSuccess: () => LocalizedString
+						/**
+						 * Editing tunnel failed
+						 */
+						editError: () => LocalizedString
+					}
+					controls: {
+						/**
+						 * Save changes
+						 */
+						save: () => LocalizedString
+					}
 				}
 				addTunnelPage: {
 					/**
