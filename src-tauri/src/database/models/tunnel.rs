@@ -290,16 +290,16 @@ pub struct TunnelConnection {
     pub end: NaiveDateTime,
 }
 
-impl Into<CommonConnectionInfo> for TunnelConnectionInfo {
-    fn into(self) -> CommonConnectionInfo {
+impl From<TunnelConnectionInfo> for CommonConnectionInfo {
+    fn from(val: TunnelConnectionInfo) -> Self {
         CommonConnectionInfo {
-            id: self.id,
-            location_id: self.tunnel_id,
-            connected_from: self.connected_from,
-            start: self.start,
-            end: self.end,
-            upload: self.upload,
-            download: self.download,
+            id: val.id,
+            location_id: val.tunnel_id,
+            connected_from: val.connected_from,
+            start: val.start,
+            end: val.end,
+            upload: val.upload,
+            download: val.download,
         }
     }
 }
@@ -440,8 +440,8 @@ impl From<TunnelStats> for CommonLocationStats {
         CommonLocationStats {
             id: tunnel_stats.id,
             location_id: tunnel_stats.tunnel_id,
-            upload: tunnel_stats.upload as i64,
-            download: tunnel_stats.download as i64,
+            upload: tunnel_stats.upload,
+            download: tunnel_stats.download,
             last_handshake: tunnel_stats.last_handshake,
             collected_at: tunnel_stats.collected_at,
             listen_port: tunnel_stats.listen_port,

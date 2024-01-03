@@ -29,7 +29,7 @@ export const LocationDetails = ({ locationId, locationType }: Props) => {
       <header>
         <h2>{localLL.title()}</h2>
       </header>
-      <LocationLogs locationId={locationId} />
+      <LocationLogs locationId={locationId} locationType={locationType} />
       <InfoSection locationId={locationId} locationType={locationType} />
     </Card>
   );
