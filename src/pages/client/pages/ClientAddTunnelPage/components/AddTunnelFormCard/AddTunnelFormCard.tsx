@@ -105,12 +105,21 @@ export const AddTunnelFormCard = () => {
           .refine((value) => {
             return patternValidEndpoint.test(value);
           }, LL.form.errors.invalid()),
-        dns: z.string().refine((value) => {
-          return validateIpOrDomainList(value, ',', true);
-        }, LL.form.errors.invalid()),
+        dns: z
+          .string()
+          .refine((value) => {
+            if (value) {
+              return validateIpOrDomainList(value, ',', true);
+            }
+            return true;
+          }, LL.form.errors.invalid())
+          .optional(),
         allowed_ips: z.string().refine((value) => {
-          const ips = value.split(',').map((ip) => ip.trim());
-          return ips.every((ip) => cidrRegex.test(ip));
+          if (value) {
+            const ips = value.split(',').map((ip) => ip.trim());
+            return ips.every((ip) => cidrRegex.test(ip));
+          }
+          return true;
         }, LL.form.errors.invalid()),
         persistent_keep_alive: z.number(),
         route_all_traffic: z.boolean(),

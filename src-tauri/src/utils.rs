@@ -1,7 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     path::PathBuf,
-    process::Command,
     str::FromStr,
 };
 use tauri::AppHandle;

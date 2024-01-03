@@ -30,14 +30,86 @@ type Props = {
   submitRef: React.MutableRefObject<HTMLInputElement | null>; // Add submitRef prop
 };
 
+type FormFields = {
+  id?: number;
+  name: string;
+  pubkey: string;
+  prvkey: string;
+  address: string;
+  server_pubkey: string;
+  allowed_ips?: string;
+  endpoint: string;
+  dns?: string;
+  persistent_keep_alive: number;
+  route_all_traffic: boolean;
+  pre_up?: string;
+  post_up?: string;
+  pre_down?: string;
+  post_down?: string;
+};
+const defaultValues: FormFields = {
+  name: '',
+  pubkey: '',
+  prvkey: '',
+  address: '',
+  server_pubkey: '',
+  allowed_ips: '',
+  endpoint: '',
+  dns: '',
+  persistent_keep_alive: 25, // Adjust as needed
+  route_all_traffic: false,
+  pre_up: '',
+  post_up: '',
+  pre_down: '',
+  post_down: '',
+};
 const { saveTunnel } = clientApi;
+
+const tunnelToForm = (tunnel: Tunnel): FormFields => {
+  const {
+    id,
+    pubkey,
+    prvkey,
+    server_pubkey,
+    allowed_ips,
+    dns,
+    persistent_keep_alive,
+    pre_up,
+    post_up,
+    pre_down,
+    post_down,
+    ...commonFields
+  } = tunnel;
+
+  return {
+    id: id,
+    pubkey,
+    prvkey,
+    server_pubkey,
+    allowed_ips: allowed_ips || '',
+    dns: dns || '',
+    persistent_keep_alive,
+    pre_up: pre_up || '',
+    post_up: post_up || '',
+    pre_down: pre_down || '',
+    post_down: post_down || '',
+    ...commonFields,
+  };
+};
 
 export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.addTunnelPage.forms.initTunnel;
   const navigate = useNavigate();
-
   const toaster = useToaster();
+
+  const defaultFormValues: FormFields = useMemo<FormFields>(() => {
+    if (tunnel) {
+      return tunnelToForm(tunnel);
+    }
+    return defaultValues;
+  }, [tunnel]);
+
   const schema = useMemo(
     () =>
       z.object({
@@ -76,16 +148,22 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
         dns: z
           .string()
           .refine((value) => {
-            return validateIpOrDomainList(value, ',', true);
+            if (value) {
+              return validateIpOrDomainList(value, ',', true);
+            }
+            return true;
           }, LL.form.errors.invalid())
           .optional(),
         allowed_ips: z.string().refine((value) => {
-          const ips = value.split(',').map((ip) => ip.trim());
-          return ips.every((ip) => cidrRegex.test(ip));
+          if (value) {
+            const ips = value.split(',').map((ip) => ip.trim());
+            return ips.every((ip) => cidrRegex.test(ip));
+          }
+          return true;
         }, LL.form.errors.invalid()),
         persistent_keep_alive: z.number(),
         route_all_traffic: z.boolean(),
-        pre_up: z.string().nullable(), // Add nullable to missing fields
+        pre_up: z.string().nullable(),
         post_up: z.string().nullable(),
         pre_down: z.string().nullable(),
         post_down: z.string().nullable(),
@@ -93,7 +171,7 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
     [LL.form.errors],
   );
 
-  const handleValidSubmit: SubmitHandler<Tunnel> = (values) => {
+  const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
     saveTunnel(values)
       .then(() => {
         navigate(routes.client.base, { replace: true });
@@ -106,7 +184,7 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
 
   const { handleSubmit, control } = useForm<Tunnel>({
     resolver: zodResolver(schema),
-    defaultValues: tunnel,
+    defaultValues: defaultFormValues,
     mode: 'all',
   });
 
