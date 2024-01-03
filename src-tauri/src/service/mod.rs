@@ -155,9 +155,9 @@ impl DesktopDaemonService for DaemonService {
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
         if let Some(pre_down) = request.pre_down {
-            debug!("Executing specified PostUp command: {pre_down}");
+            debug!("Executing specified PreDown command: {pre_down}");
             let _ = execute_command(&pre_down);
-            info!("Executed specified PostUp command: {pre_down}");
+            info!("Executed specified PreDown command: {pre_down}");
         }
         // remove interface
         wgapi.remove_interface().map_err(|err| {
@@ -166,9 +166,9 @@ impl DesktopDaemonService for DaemonService {
             Status::new(Code::Internal, msg)
         })?;
         if let Some(post_down) = request.post_down {
-            debug!("Executing specified PostUp command: {post_down}");
+            debug!("Executing specified PostDown command: {post_down}");
             let _ = execute_command(&post_down);
-            info!("Executed specified PostUp command: {post_down}");
+            info!("Executed specified PostDown command: {post_down}");
         }
 
         Ok(Response::new(()))
