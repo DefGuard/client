@@ -168,6 +168,20 @@ const en = {
         },
         tunnelPage: {
           title: 'WireGuard Tunnels',
+          header: {
+            edit: 'Edit Tunnel',
+          },
+        },
+
+        editTunnelPage: {
+          title: 'Edit WireGuard® Tunnel',
+          messages: {
+            editSuccess: 'Tunnel edited',
+            editError: 'Editing tunnel failed',
+          },
+          controls: {
+            save: 'Save changes',
+          },
         },
         addTunnelPage: {
           title: 'Add WireGuard® Tunnel',

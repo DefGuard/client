@@ -697,3 +697,17 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
     }
     Ok(tunnel_info)
 }
+#[tauri::command(async)]
+pub async fn tunnel_details(
+    tunnel_id: i64,
+    app_state: State<'_, AppState>,
+) -> Result<Tunnel, Error> {
+    debug!("Retrieving Tunnel with ID {tunnel_id}.");
+
+    if let Some(tunnel) = Tunnel::find_by_id(&app_state.get_pool(), tunnel_id).await? {
+        Ok(tunnel)
+    } else {
+        error!("Tunnel with ID: {tunnel_id}, not found");
+        Err(Error::NotFound)
+    }
+}

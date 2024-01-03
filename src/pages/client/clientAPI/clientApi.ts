@@ -8,6 +8,7 @@ import {
   Connection,
   DefguardInstance,
   LocationStats,
+  Tunnel,
 } from '../types';
 import {
   ConnectionRequest,
@@ -99,6 +100,9 @@ const getLocationDetails = async (
 const getTunnels = async (): Promise<CommonWireguardFields[]> =>
   invokeWrapper('all_tunnels');
 
+const getTunnelDetails = async (id: number): Promise<Tunnel> =>
+  invokeWrapper('tunnel_details', { tunnelId: id });
+
 export const clientApi = {
   getInstances,
   getTunnels,
@@ -118,4 +122,5 @@ export const clientApi = {
   updateInstance,
   parseTunnelConfig,
   saveTunnel,
+  getTunnelDetails,
 };

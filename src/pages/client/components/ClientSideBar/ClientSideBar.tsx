@@ -9,6 +9,7 @@ import SvgDefguardLogoIcon from '../../../../shared/components/svg/DefguardLogoI
 import SvgDefguardLogoText from '../../../../shared/components/svg/DefguardLogoText';
 import SvgIconNavConnections from '../../../../shared/components/svg/IconNavConnections';
 import SvgIconNavVpn from '../../../../shared/components/svg/IconNavVpn';
+import { Divider } from '../../../../shared/defguard-ui/components/Layout/Divider/Divider';
 import { IconContainer } from '../../../../shared/defguard-ui/components/Layout/IconContainer/IconContainer';
 import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus';
 import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconSettings';
@@ -20,11 +21,12 @@ import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 export const ClientSideBar = () => {
   const navigate = useNavigate();
   const { LL } = useI18nContext();
-  const [instances, tunnels, setClientStore] = useClientStore((state) => [
-    state.instances,
-    state.tunnels,
-    state.setState,
-  ]);
+  const [selectedInstance, instances, tunnels, setClientStore] = useClientStore(
+    (state) => [state.selectedInstance, state.instances, state.tunnels, state.setState],
+  );
+  const tunnelPathActive =
+    selectedInstance?.id === undefined &&
+    selectedInstance?.type === WireguardInstanceType.TUNNEL;
 
   return (
     <div id="client-page-side">
@@ -47,8 +49,11 @@ export const ClientSideBar = () => {
           />
         ))}
         <AddInstance />
+        <Divider />
         <div
-          className="client-bar-item active"
+          className={classNames('client-bar-item clickable', {
+            active: tunnelPathActive,
+          })}
           id="instances-nav-label"
           onClick={() => {
             setClientStore({
