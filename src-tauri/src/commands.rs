@@ -66,24 +66,43 @@ pub async fn disconnect(
         debug!("Removing interface");
         let mut client = state.client.clone();
         let interface_name = connection.interface_name.clone();
-        let request = RemoveInterfaceRequest {
-            interface_name: interface_name.clone(),
-        };
-        if let Err(error) = client.remove_interface(request).await {
-            error!("Failed to remove interface: {error}");
-            return Err(Error::InternalError);
-        }
-        debug!("Removed interface");
-        debug!("Saving connection");
-        trace!("Connection: {:#?}", connection);
-        if connection_type.eq(&ConnectionType::Location) {
-            let mut connection: Connection = connection.into();
-            connection.save(&state.get_pool()).await?;
-            trace!("Saved connection: {connection:#?}");
-        } else {
-            let mut connection: TunnelConnection = connection.into();
-            connection.save(&state.get_pool()).await?;
-            trace!("Saved connection: {connection:#?}");
+        match connection_type {
+            ConnectionType::Location => {
+                let request = RemoveInterfaceRequest {
+                    interface_name: interface_name.clone(),
+                    pre_down: None,
+                    post_down: None,
+                };
+                if let Err(error) = client.remove_interface(request).await {
+                    error!("Failed to remove interface: {error}");
+                    return Err(Error::InternalError);
+                }
+                let mut connection: Connection = connection.into();
+                connection.save(&state.get_pool()).await?;
+                trace!("Saved connection: {connection:#?}");
+                debug!("Removed interface");
+                debug!("Saving connection");
+                trace!("Connection: {:#?}", connection);
+            }
+            ConnectionType::Tunnel => {
+                if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
+                    let request = RemoveInterfaceRequest {
+                        interface_name: interface_name.clone(),
+                        pre_down: tunnel.pre_down,
+                        post_down: tunnel.post_up,
+                    };
+                    if let Err(error) = client.remove_interface(request).await {
+                        error!("Failed to remove interface: {error}");
+                        return Err(Error::InternalError);
+                    }
+                    let mut connection: TunnelConnection = connection.into();
+                    connection.save(&state.get_pool()).await?;
+                    trace!("Saved connection: {connection:#?}");
+                } else {
+                    error!("Tunnel with ID {location_id} not found");
+                    return Err(Error::NotFound);
+                }
+            }
         }
         debug!("Connection saved");
         handle.emit_all(
@@ -102,6 +121,7 @@ pub async fn disconnect(
         Err(Error::NotFound)
     }
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
     pub id: i64,
@@ -600,6 +620,8 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
                     debug!("Found active connection for location({location_id}), closing...",);
                     let request = RemoveInterfaceRequest {
                         interface_name: connection.interface_name.clone(),
+                        pre_down: None,
+                        post_down: None,
                     };
                     client
                         .remove_interface(request)

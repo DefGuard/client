@@ -1,6 +1,7 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     path::PathBuf,
+    process::Command,
     str::FromStr,
 };
 use tauri::AppHandle;
@@ -92,6 +93,8 @@ pub async fn setup_interface(
                 config: Some(interface_config.clone().into()),
                 allowed_ips,
                 dns: location.dns.clone(),
+                pre_up: None,
+                post_up: None,
             };
             if let Err(error) = client.create_interface(request).await {
                 error!("Failed to create interface: {error}");
@@ -319,6 +322,8 @@ pub async fn setup_interface_tunnel(
             config: Some(interface_config.clone().into()),
             allowed_ips,
             dns: tunnel.dns.clone(),
+            pre_up: tunnel.pre_up.clone(),
+            post_up: tunnel.post_up.clone(),
         };
         if let Err(error) = client.create_interface(request).await {
             error!("Failed to create interface: {error}");
@@ -573,5 +578,27 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         None,
     )
     .await?;
+    Ok(())
+}
+/// Execute command passed as argument.
+pub fn execute_command(command: &str) -> Result<(), Error> {
+    let mut command_parts = command.split_whitespace();
+
+    if let Some(command) = command_parts.next() {
+        let output = Command::new(command).args(command_parts).output()?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            info!("Command executed successfully. Stdout:\n{}", stdout);
+            if !stderr.is_empty() {
+                error!("Stderr:\n{stderr}");
+            }
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            error!("Error executing command. Stderr:\n{stderr}");
+        }
+    }
     Ok(())
 }

@@ -103,6 +103,8 @@ impl AppState {
             let mut client = self.client.clone();
             let request = RemoveInterfaceRequest {
                 interface_name: connection.interface_name.clone(),
+                pre_down: None,
+                post_down: None,
             };
             if let Err(error) = client.remove_interface(request).await {
                 error!("Failed to remove interface: {error}");
