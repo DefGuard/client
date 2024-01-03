@@ -24,6 +24,7 @@ import {
   patternValidIp,
   patternValidWireguardKey,
 } from '../../../../../../shared/patterns';
+import { routes } from '../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { validateIpOrDomainList } from '../../../../../../shared/validators/tunnel';
 import { clientApi } from '../../../../clientAPI/clientApi';
@@ -65,6 +66,7 @@ export const AddTunnelFormCard = () => {
   const { LL } = useI18nContext();
   const { parseTunnelConfig, saveTunnel } = clientApi;
   const toaster = useToaster();
+  const navigate = useNavigate();
 
   const localLL = LL.pages.client.pages.addTunnelPage.forms.initTunnel;
   /* eslint-disable no-useless-escape */
@@ -120,7 +122,10 @@ export const AddTunnelFormCard = () => {
   );
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
     saveTunnel(values)
-      .then(() => toaster.success(localLL.messages.addSuccess()))
+      .then(() => {
+        navigate(routes.client.base, { replace: true });
+        toaster.success(localLL.messages.addSuccess());
+      })
       .catch(() => toaster.error(localLL.messages.addError()));
   };
   const { handleSubmit, control, reset, setValue } = useForm<FormFields>({
