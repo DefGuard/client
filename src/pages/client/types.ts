@@ -53,7 +53,7 @@ export type CommonWireguardFields = {
   // Connected
   active: boolean;
   // Tunnel or Location
-  location_type: WireguardInstanceType;
+  connection_type: WireguardInstanceType;
 };
 
 export enum ClientView {

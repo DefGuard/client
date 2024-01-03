@@ -2,7 +2,7 @@ use crate::{
     commands::DateTimeAggregation,
     database::{ActiveConnection, DbPool},
     error::Error,
-    CommonConnection, CommonConnectionInfo, CommonLocationStats, LocationType,
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
@@ -430,7 +430,7 @@ impl From<TunnelConnection> for CommonConnection {
             connected_from: tunnel_connection.connected_from,
             start: tunnel_connection.start,
             end: tunnel_connection.end,
-            location_type: LocationType::Tunnel, // You need to set the location_type appropriately based on your logic,
+            connection_type: ConnectionType::Tunnel, // You need to set the connection_type appropriately based on your logic,
         }
     }
 }
@@ -446,7 +446,7 @@ impl From<TunnelStats> for CommonLocationStats {
             collected_at: tunnel_stats.collected_at,
             listen_port: tunnel_stats.listen_port,
             persistent_keepalive_interval: tunnel_stats.persistent_keepalive_interval, // Set the appropriate value
-            location_type: LocationType::Tunnel,
+            connection_type: ConnectionType::Tunnel,
         }
     }
 }

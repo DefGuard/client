@@ -2,7 +2,9 @@ use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query, query_as, FromRow};
 
-use crate::{database::DbPool, error::Error, CommonConnection, CommonConnectionInfo, LocationType};
+use crate::{
+    database::DbPool, error::Error, CommonConnection, CommonConnectionInfo, ConnectionType,
+};
 
 #[derive(FromRow, Debug, Serialize, Clone)]
 pub struct Connection {
@@ -142,7 +144,7 @@ pub struct ActiveConnection {
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub interface_name: String,
-    pub location_type: LocationType,
+    pub connection_type: ConnectionType,
 }
 impl ActiveConnection {
     #[must_use]
@@ -150,7 +152,7 @@ impl ActiveConnection {
         location_id: i64,
         connected_from: String,
         interface_name: String,
-        location_type: LocationType,
+        connection_type: ConnectionType,
     ) -> Self {
         let start = Utc::now().naive_utc();
         Self {
@@ -158,7 +160,7 @@ impl ActiveConnection {
             connected_from,
             start,
             interface_name,
-            location_type,
+            connection_type,
         }
     }
 }
@@ -183,7 +185,7 @@ impl From<Connection> for CommonConnection {
             connected_from: connection.connected_from,
             start: connection.start,
             end: connection.end,
-            location_type: LocationType::Location,
+            connection_type: ConnectionType::Location,
         }
     }
 }

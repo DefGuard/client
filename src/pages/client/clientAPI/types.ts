@@ -8,18 +8,18 @@ export type GetLocationsRequest = {
 
 export type ConnectionRequest = {
   locationId: number;
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
 };
 
 export type RoutingRequest = {
   locationId: number;
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
   routeAllTraffic?: boolean;
 };
 
 export type StatsRequest = {
   locationId: number;
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
   from?: string;
 };
 
@@ -101,7 +101,7 @@ export type TunnelRequest = {
 
 export type LocationDetailsRequest = {
   locationId: number;
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
 };
 
 export type TauriCommandKey =

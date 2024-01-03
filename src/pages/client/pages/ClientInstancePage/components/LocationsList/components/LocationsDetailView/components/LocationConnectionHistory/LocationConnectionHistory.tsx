@@ -12,7 +12,7 @@ import { LocationHistoryTable } from './LocationHistoryTable/LocationHistoryTabl
 
 type Props = {
   locationId: DefguardLocation['id'];
-  locationType: WireguardInstanceType;
+  connectionType: WireguardInstanceType;
   connected: boolean;
 };
 
@@ -20,7 +20,7 @@ const { getConnectionHistory } = clientApi;
 
 export const LocationConnectionHistory = ({
   locationId,
-  locationType,
+  connectionType,
   connected,
 }: Props) => {
   const { LL } = useI18nContext();
@@ -28,7 +28,7 @@ export const LocationConnectionHistory = ({
 
   const { data: connectionHistory } = useQuery({
     queryKey: [clientQueryKeys.getConnectionHistory, locationId],
-    queryFn: () => getConnectionHistory({ locationId, locationType }),
+    queryFn: () => getConnectionHistory({ locationId, connectionType }),
     enabled: !!locationId,
     refetchInterval: 10 * 1000,
     refetchOnWindowFocus: true,

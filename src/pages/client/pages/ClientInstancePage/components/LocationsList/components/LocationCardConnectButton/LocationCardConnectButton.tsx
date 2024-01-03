@@ -38,12 +38,12 @@ export const LocationCardConnectButton = ({ location }: Props) => {
         if (location?.active) {
           await disconnect({
             locationId: location.id,
-            locationType: location.location_type,
+            connectionType: location.connection_type,
           });
         } else {
           await connect({
             locationId: location?.id,
-            locationType: location.location_type,
+            connectionType: location.connection_type,
           });
         }
         setIsLoading(false);

@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 use crate::{
     commands::DateTimeAggregation, database::DbPool, error::Error, CommonLocationStats,
-    LocationType,
+    ConnectionType,
 };
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ impl From<LocationStats> for CommonLocationStats {
             collected_at: location_stats.collected_at,
             listen_port: location_stats.listen_port,
             persistent_keepalive_interval: location_stats.persistent_keepalive_interval,
-            location_type: LocationType::Location,
+            connection_type: ConnectionType::Location,
         }
     }
 }

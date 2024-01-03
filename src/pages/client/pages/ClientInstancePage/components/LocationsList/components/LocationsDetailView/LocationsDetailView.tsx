@@ -18,7 +18,7 @@ import { LocationDetails } from './components/LocationDetails/LocationDetails';
 
 type Props = {
   locations: CommonWireguardFields[];
-  locationType?: WireguardInstanceType;
+  connectionType?: WireguardInstanceType;
 };
 
 const findLocationById = (
@@ -30,7 +30,7 @@ const { getTunnels } = clientApi;
 
 export const LocationsDetailView = ({
   locations,
-  locationType = WireguardInstanceType.DEFGUARD_INSTANCE,
+  connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
 }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
     locations[0]?.id ?? undefined,
@@ -76,7 +76,7 @@ export const LocationsDetailView = ({
 
   return (
     <div id="locations-detail-view">
-      {locationType === WireguardInstanceType.DEFGUARD_INSTANCE && (
+      {connectionType === WireguardInstanceType.DEFGUARD_INSTANCE && (
         <>
           <CardTabs tabs={tabs} />
           {activeLocation && <LocationDetailCard location={activeLocation} tabbed />}
@@ -84,29 +84,32 @@ export const LocationsDetailView = ({
             <LocationConnectionHistory
               locationId={activeLocation.id}
               connected={activeLocation.active}
-              locationType={activeLocation.location_type}
+              connectionType={activeLocation.connection_type}
             />
           )}
           {activeLocation && (
             <LocationDetails
               locationId={activeLocation.id}
-              locationType={activeLocation.location_type}
+              connectionType={activeLocation.connection_type}
             />
           )}
         </>
       )}
-      {locationType === WireguardInstanceType.TUNNEL && (
+      {connectionType === WireguardInstanceType.TUNNEL && (
         <>
           {tunnel && <LocationDetailCard location={tunnel} />}
           {tunnel && (
             <LocationConnectionHistory
               locationId={tunnel.id}
               connected={tunnel.active}
-              locationType={tunnel.location_type}
+              connectionType={tunnel.connection_type}
             />
           )}
           {tunnel && (
-            <LocationDetails locationId={tunnel.id} locationType={tunnel.location_type} />
+            <LocationDetails
+              locationId={tunnel.id}
+              connectionType={tunnel.connection_type}
+            />
           )}
         </>
       )}

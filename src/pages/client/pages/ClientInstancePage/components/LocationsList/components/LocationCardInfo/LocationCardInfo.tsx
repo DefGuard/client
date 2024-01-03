@@ -27,12 +27,12 @@ export const LocationCardInfo = ({ location, connection }: Props) => {
     queryKey: [
       clientQueryKeys.getActiveConnection,
       location?.id as number,
-      location?.location_type,
+      location?.connection_type,
     ],
     queryFn: () =>
       getActiveConnection({
         locationId: location?.id as number,
-        locationType: location?.location_type as WireguardInstanceType,
+        connectionType: location?.connection_type as WireguardInstanceType,
       }),
     enabled: location?.active,
   });
