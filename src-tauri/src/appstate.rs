@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
-    database::{ActiveConnection, Connection, DbPool, TunnelConnection},
+    database::{ActiveConnection, Connection, DbPool, Tunnel, TunnelConnection},
     error::Error,
     service::{
         proto::{
@@ -101,20 +101,21 @@ impl AppState {
             trace!("Connection: {connection:#?}");
             debug!("Removing interface");
             let mut client = self.client.clone();
-            let request = RemoveInterfaceRequest {
+
+            debug!("Removed interface");
+            debug!("Saving connection");
+            trace!("Connection: {connection:#?}");
+            let mut request = RemoveInterfaceRequest {
                 interface_name: connection.interface_name.clone(),
                 pre_down: None,
                 post_down: None,
             };
-            if let Err(error) = client.remove_interface(request).await {
-                error!("Failed to remove interface: {error}");
-                return Err(Error::InternalError);
-            }
-            debug!("Removed interface");
-            debug!("Saving connection");
-            trace!("Connection: {connection:#?}");
             match connection.connection_type {
                 ConnectionType::Location => {
+                    if let Err(error) = client.remove_interface(request).await {
+                        error!("Failed to remove interface: {error}");
+                        return Err(Error::InternalError);
+                    }
                     let mut connection: Connection = connection.into();
                     connection.save(&self.get_pool()).await?;
                     debug!("Connection saved");
@@ -122,11 +123,22 @@ impl AppState {
                     info!("Location {} disconnected", connection.location_id);
                 }
                 ConnectionType::Tunnel => {
-                    let mut connection: TunnelConnection = connection.into();
-                    connection.save(&self.get_pool()).await?;
-                    debug!("Connection saved");
-                    trace!("Saved connection: {connection:#?}");
-                    info!("Tunnel {} disconnected", connection.tunnel_id);
+                    if let Some(tunnel) =
+                        Tunnel::find_by_id(&self.get_pool(), connection.location_id).await?
+                    {
+                        request.pre_down = tunnel.pre_down;
+                        request.post_down = tunnel.post_down;
+                        if let Err(error) = client.remove_interface(request).await {
+                            error!("Failed to remove interface: {error}");
+                            return Err(Error::InternalError);
+                        }
+                        let mut connection: TunnelConnection = connection.into();
+                        connection.save(&self.get_pool()).await?;
+                        trace!("Saved connection: {connection:#?}");
+                    } else {
+                        error!("Tunnel with ID {} not found", connection.location_id);
+                        return Err(Error::NotFound);
+                    }
                 }
             }
         }

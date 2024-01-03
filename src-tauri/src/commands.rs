@@ -89,7 +89,7 @@ pub async fn disconnect(
                     let request = RemoveInterfaceRequest {
                         interface_name: interface_name.clone(),
                         pre_down: tunnel.pre_down,
-                        post_down: tunnel.post_up,
+                        post_down: tunnel.post_down,
                     };
                     if let Err(error) = client.remove_interface(request).await {
                         error!("Failed to remove interface: {error}");
