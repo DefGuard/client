@@ -69,6 +69,49 @@
             <RegistrySearch Id="PrevInstallDirReg" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="InstallDir" Type="raw"/>
         </Property>
 
+        <!-- <Property Id="WixSilentExecCmdLine" Value="[INSTALLDIR]resources-windows\binaries\wireguard-installer.exe" Hidden="yes"/>
+        <CustomAction Id="SilentExecExample" BinaryKey="WixCA" DllEntry="WixSilentExec" Execute="immediate" Return="check"/>
+
+        <InstallExecuteSequence>
+            <Custom Action="SilentExecExample" After="InstallFinalize"/>
+        </InstallExecuteSequence> -->
+        
+
+        <!-- TODO: silently install Wireguard -->
+        <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]cmd.exe /C start .\resources-windows\binaries\wireguard-installer.exe" />
+
+        <InstallExecuteSequence>
+            <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE</Custom>
+        </InstallExecuteSequence>
+
+        <!-- TODO: try passive mode -->
+        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]msiexec.exe /i .\resources-windows\binaries\wireguard-amd64-0.5.3.msi" /> -->
+        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]msiexec.exe /i C:\wireguard-amd64-0.5.3.msi /qn" />
+
+        <InstallExecuteSequence>
+            <Custom Action="LaunchApp" Before="InstallInitialize">NOT REMOVE</Custom>
+        </InstallExecuteSequence> -->
+
+        <!-- After="InstallFinalize" -->
+
+        <!-- TODO: silent install - might need MSI installer -->
+        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]msiexec.exe .\resources-windows\binaries\wireguard-installer.exe \quiet" />
+
+        <InstallExecuteSequence>
+            <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE</Custom>
+        </InstallExecuteSequence> -->
+
+
+        <!-- <Property Id="WixSilentExecCmdLine" Value="[SystemFolder]cmd.exe /C start .\resources-windows\binaries\wireguard-installer.exe" Hidden="yes"/>
+        <CustomAction Id="SilentExecExample" BinaryKey="WixCA" DllEntry="WixSilentExec" Execute="immediate" Return="check"/>
+        <InstallExecuteSequence>
+            <Custom Action="SilentExecExample" After="InstallFinalize"/>
+        </InstallExecuteSequence> -->
+
+        <!-- <InstallExecuteSequence>
+            <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE</Custom>
+        </InstallExecuteSequence> -->
+
         <!-- launch app checkbox -->
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.LaunchApp)" />
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1"/>
@@ -246,6 +289,30 @@
             <MergeRef Id="{{ id }}"/>
             {{/each~}}
         </Feature>
+
+
+        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]cmd.exe /C start .\resources-windows\binaries\wireguard-installer.exe" />
+        <InstallExecuteSequence>
+            <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE</Custom>
+        </InstallExecuteSequence> -->
+
+
+        <!-- TODO: ??? -->
+        <!-- <DirectoryRef Id="CUSTOM.INSTALLATION.DIRECTORY">
+            <Component Id="ApplicationFiles64" Guid="{4A91A21D-FC99-419C-8144-211DE78014C6}">
+                <File Id="ApplicationFile1" Source="SourceFiles/Some-x86-file.dll" />
+                <Condition> %PROCESSOR_ARCHITECTURE="x86" </Condition>
+            </Component>
+            <Component Id="ApplicationFiles64" Guid="{E59BB1E9-9B56-4355-BCDC-F03501D326A8}">
+                <File Id="ApplicationFile1" Source="SourceFiles/Some-x86-64-file.dll" />
+                <Condition> %PROCESSOR_ARCHITECTURE="AMD64" </Condition>
+            </Component>
+            <Component Id="ApplicationFiles64" Guid="{1AD7798A-BE64-4063-AD31-7F386371A150}">
+                <File Id="ApplicationFile1" Source="SourceFiles/Some-IE64-file.dll" />
+                <Condition> %PROCESSOR_ARCHITECTURE="IE64" </Condition>
+            </Component>
+        </DirectoryRef> -->
+
 
         {{#if install_webview}}
         <!-- WebView2 -->

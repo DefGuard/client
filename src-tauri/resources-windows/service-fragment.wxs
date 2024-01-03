@@ -1,11 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Fragment>
+    <!-- <Property Id="WixSilentExecCmdLine" Value="[INSTALLDIR]resources-windows\binaries\TargetProgram.exe" Hidden="yes"/>
+    <CustomAction Id="SilentExecExample" BinaryKey="WixCA" DllEntry="WixSilentExec" Execute="immediate" Return="check"/>
+
+    <InstallExecuteSequence>
+        <Custom Action="SilentExecExample" After="InstallFinalize"/>
+    </InstallExecuteSequence> -->
+
+    <!-- InstallPrivileges="elevated" -->
+
+    <!-- Account="NT AUTHORITY\LocalService" -->
+
+    <!-- <DirectoryRef Id="CUSTOM.INSTALLATION.DIRECTORY">
+      <Component Id="ApplicationFiles64" Guid="{4A91A21D-FC99-419C-8144-211DE78014C6}">
+          <File Id="ApplicationFile1" Source="SourceFiles/Some-x86-file.dll" />
+          <Condition> %PROCESSOR_ARCHITECTURE="x86" </Condition>
+      </Component>
+      <Component Id="ApplicationFiles64" Guid="{E59BB1E9-9B56-4355-BCDC-F03501D326A8}">
+          <File Id="ApplicationFile1" Source="SourceFiles/Some-x86-64-file.dll" />
+          <Condition> %PROCESSOR_ARCHITECTURE="AMD64" </Condition>
+      </Component>
+      <Component Id="ApplicationFiles64" Guid="{1AD7798A-BE64-4063-AD31-7F386371A150}">
+          <File Id="ApplicationFile1" Source="SourceFiles/Some-IE64-file.dll" />
+          <Condition> %PROCESSOR_ARCHITECTURE="IE64" </Condition>
+      </Component>
+    </DirectoryRef> -->
+
     <DirectoryRef Id="INSTALLDIR">
+      <!-- <Component Id="WireGuardFragment">
+        <File KeyPath="yes" Id="WireGuardFile" Source="..\..\defguard-service.exe" />
+
+      </Component> -->
       <Component Id="DefGuardServiceFragment">
         <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\defguard-service.exe" />
         <ServiceInstall
-          Account="NT AUTHORITY\LocalService"
+          Account="LocalSystem"
           Id="DefguardService"
           Name="DefguardService"
           DisplayName="~Defguard Service"
