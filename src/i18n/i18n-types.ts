@@ -304,6 +304,40 @@ type RootTranslation = {
 						}
 					}
 				}
+				createdPage: {
+					tunnel: {
+						/**
+						 * Y​o​u​r​ ​T​u​n​n​e​l​ ​W​a​s​ ​A​d​d​e​d​ ​S​u​c​c​e​s​s​f​u​l​l​y
+						 */
+						title: string
+						/**
+						 * Y​o​u​r​ ​t​u​n​n​e​l​ ​h​a​s​ ​b​e​e​n​ ​s​u​c​c​e​s​s​f​u​l​l​y​ ​a​d​d​e​d​.​ ​Y​o​u​ ​c​a​n​ ​n​o​w​ ​c​o​n​n​e​c​t​ ​t​h​i​s​ ​d​e​v​i​c​e​,​ ​c​h​e​c​k​ ​i​t​s​ ​s​t​a​t​u​s​ ​a​n​d​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​u​s​i​n​g​ ​t​h​e​ ​m​e​n​u​ ​i​n​ ​t​h​e​ ​l​e​f​t​ ​s​i​d​e​b​a​r​.
+						 */
+						content: string
+						controls: {
+							/**
+							 * A​d​d​ ​A​n​o​t​h​e​r​ ​T​u​n​n​e​l
+							 */
+							submit: string
+						}
+					}
+					instance: {
+						/**
+						 * Y​o​u​r​ ​I​n​s​t​a​n​c​e​ ​W​a​s​ ​A​d​d​e​d​ ​S​u​c​c​e​s​s​f​u​l​l​y
+						 */
+						title: string
+						/**
+						 * Y​o​u​r​ ​i​n​s​t​a​n​c​e​ ​h​a​s​ ​b​e​e​n​ ​s​u​c​c​e​s​s​f​u​l​l​y​ ​a​d​d​e​d​.​ ​Y​o​u​ ​c​a​n​ ​n​o​w​ ​c​o​n​n​e​c​t​ ​t​h​i​s​ ​d​e​v​i​c​e​,​ ​c​h​e​c​k​ ​i​t​s​ ​s​t​a​t​u​s​ ​a​n​d​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​u​s​i​n​g​ ​t​h​e​ ​m​e​n​u​ ​i​n​ ​t​h​e​ ​l​e​f​t​ ​s​i​d​e​b​a​r​.
+						 */
+						content: string
+						controls: {
+							/**
+							 * A​d​d​ ​A​n​o​t​h​e​r​ ​I​n​s​t​a​n​c​e
+							 */
+							submit: string
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * L​o​c​a​t​i​o​n​s
@@ -512,6 +546,34 @@ type RootTranslation = {
 					 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
 					 */
 					title: string
+					header: {
+						/**
+						 * E​d​i​t​ ​T​u​n​n​e​l
+						 */
+						edit: string
+					}
+				}
+				editTunnelPage: {
+					/**
+					 * E​d​i​t​ ​W​i​r​e​G​u​a​r​d​®​ ​T​u​n​n​e​l
+					 */
+					title: string
+					messages: {
+						/**
+						 * T​u​n​n​e​l​ ​e​d​i​t​e​d
+						 */
+						editSuccess: string
+						/**
+						 * E​d​i​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+						 */
+						editError: string
+					}
+					controls: {
+						/**
+						 * S​a​v​e​ ​c​h​a​n​g​e​s
+						 */
+						save: string
+					}
 				}
 				addTunnelPage: {
 					/**
@@ -1582,6 +1644,40 @@ export type TranslationFunctions = {
 						}
 					}
 				}
+				createdPage: {
+					tunnel: {
+						/**
+						 * Your Tunnel Was Added Successfully
+						 */
+						title: () => LocalizedString
+						/**
+						 * Your tunnel has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.
+						 */
+						content: () => LocalizedString
+						controls: {
+							/**
+							 * Add Another Tunnel
+							 */
+							submit: () => LocalizedString
+						}
+					}
+					instance: {
+						/**
+						 * Your Instance Was Added Successfully
+						 */
+						title: () => LocalizedString
+						/**
+						 * Your instance has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.
+						 */
+						content: () => LocalizedString
+						controls: {
+							/**
+							 * Add Another Instance
+							 */
+							submit: () => LocalizedString
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * Locations
@@ -1789,6 +1885,34 @@ export type TranslationFunctions = {
 					 * WireGuard Tunnels
 					 */
 					title: () => LocalizedString
+					header: {
+						/**
+						 * Edit Tunnel
+						 */
+						edit: () => LocalizedString
+					}
+				}
+				editTunnelPage: {
+					/**
+					 * Edit WireGuard® Tunnel
+					 */
+					title: () => LocalizedString
+					messages: {
+						/**
+						 * Tunnel edited
+						 */
+						editSuccess: () => LocalizedString
+						/**
+						 * Editing tunnel failed
+						 */
+						editError: () => LocalizedString
+					}
+					controls: {
+						/**
+						 * Save changes
+						 */
+						save: () => LocalizedString
+					}
 				}
 				addTunnelPage: {
 					/**

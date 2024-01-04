@@ -141,6 +141,24 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
             },
           },
         },
+        createdPage: {
+          tunnel: {
+            title: 'Your Tunnel Was Added Successfully',
+            content:
+              'Your tunnel has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.',
+            controls: {
+              submit: 'Add Another Tunnel',
+            },
+          },
+          instance: {
+            title: 'Your Instance Was Added Successfully',
+            content:
+              'Your instance has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.',
+            controls: {
+              submit: 'Add Another Instance',
+            },
+          },
+        },
         instancePage: {
           title: 'Locations',
           controls: {
@@ -224,6 +242,20 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
         },
         tunnelPage: {
           title: 'WireGuard Tunnels',
+          header: {
+            edit: 'Edit Tunnel',
+          },
+        },
+
+        editTunnelPage: {
+          title: 'Edit WireGuard® Tunnel',
+          messages: {
+            editSuccess: 'Tunnel edited',
+            editError: 'Editing tunnel failed',
+          },
+          controls: {
+            save: 'Save changes',
+          },
         },
         addTunnelPage: {
           title: 'Add WireGuard® Tunnel',

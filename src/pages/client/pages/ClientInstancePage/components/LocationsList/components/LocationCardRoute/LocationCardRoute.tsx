@@ -17,9 +17,10 @@ const { updateLocationRouting } = clientApi;
 export const LocationCardRoute = ({ location }: Props) => {
   const handleChange = async (value: boolean) => {
     try {
-      if (location) {
+      if (location && location.connection_type) {
         await updateLocationRouting({
           locationId: location?.id,
+          connectionType: location.connection_type,
           routeAllTraffic: value,
         });
       }

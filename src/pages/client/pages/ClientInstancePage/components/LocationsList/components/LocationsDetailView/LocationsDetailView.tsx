@@ -1,5 +1,6 @@
 import './style.scss';
 
+import { useQuery } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,13 +8,17 @@ import { useNavigate } from 'react-router-dom';
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
 import { routes } from '../../../../../../../../shared/routes';
-import { CommonWireguardFields } from '../../../../../../types';
+import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientStore } from '../../../../../../hooks/useClientStore';
+import { clientQueryKeys } from '../../../../../../query';
+import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from './components/LocationDetails/LocationDetails';
 
 type Props = {
   locations: CommonWireguardFields[];
+  connectionType?: WireguardInstanceType;
 };
 
 const findLocationById = (
@@ -21,10 +26,18 @@ const findLocationById = (
   id: number,
 ): CommonWireguardFields | undefined => locations.find((location) => location.id === id);
 
-export const LocationsDetailView = ({ locations }: Props) => {
+const { getTunnels } = clientApi;
+
+export const LocationsDetailView = ({
+  locations,
+  connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
+}: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
     locations[0]?.id ?? undefined,
   );
+
+  const selectedInstance = useClientStore((state) => state.selectedInstance);
+
   const navigate = useNavigate();
 
   const tabs = useMemo(
@@ -51,17 +64,55 @@ export const LocationsDetailView = ({ locations }: Props) => {
     }
   }, [activeLocationId, navigate]);
 
+  const { data: tunnels } = useQuery({
+    queryKey: [clientQueryKeys.getTunnels],
+    queryFn: () => getTunnels(),
+    enabled: !!(
+      selectedInstance?.id && selectedInstance?.type === WireguardInstanceType.TUNNEL
+    ),
+  });
+
+  const tunnel = tunnels?.find((tunnel) => tunnel.id === selectedInstance?.id);
+
   return (
     <div id="locations-detail-view">
-      <CardTabs tabs={tabs} />
-      {activeLocation && <LocationDetailCard location={activeLocation} tabbed />}
-      {activeLocation && (
-        <LocationConnectionHistory
-          locationId={activeLocation.id}
-          connected={activeLocation.active}
-        />
+      {connectionType === WireguardInstanceType.DEFGUARD_INSTANCE && (
+        <>
+          <CardTabs tabs={tabs} />
+          {activeLocation && <LocationDetailCard location={activeLocation} tabbed />}
+          {activeLocation && (
+            <LocationConnectionHistory
+              locationId={activeLocation.id}
+              connected={activeLocation.active}
+              connectionType={activeLocation.connection_type}
+            />
+          )}
+          {activeLocation && (
+            <LocationDetails
+              locationId={activeLocation.id}
+              connectionType={activeLocation.connection_type}
+            />
+          )}
+        </>
       )}
-      {activeLocation && <LocationDetails locationId={activeLocation.id} />}
+      {connectionType === WireguardInstanceType.TUNNEL && (
+        <>
+          {tunnel && <LocationDetailCard location={tunnel} />}
+          {tunnel && (
+            <LocationConnectionHistory
+              locationId={tunnel.id}
+              connected={tunnel.active}
+              connectionType={tunnel.connection_type}
+            />
+          )}
+          {tunnel && (
+            <LocationDetails
+              locationId={tunnel.id}
+              connectionType={tunnel.connection_type}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };

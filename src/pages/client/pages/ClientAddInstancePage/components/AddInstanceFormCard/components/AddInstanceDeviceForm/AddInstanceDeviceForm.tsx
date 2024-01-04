@@ -109,7 +109,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
                 type: WireguardInstanceType.DEFGUARD_INSTANCE,
               },
             });
-            navigate(routes.client.base, { replace: true });
+            navigate(routes.client.instanceCreated, { replace: true });
           })
           .catch(() => {
             toaster.error(LL.common.messages.error());
