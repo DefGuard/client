@@ -85,6 +85,24 @@ const en = {
             },
           },
         },
+        createdPage: {
+          tunnel: {
+            title: 'Your Tunnel Was Added Successfully',
+            content:
+              'Your tunnel has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.',
+            controls: {
+              submit: 'Add Another Tunnel',
+            },
+          },
+          instance: {
+            title: 'Your Instance Was Added Successfully',
+            content:
+              'Your instance has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.',
+            controls: {
+              submit: 'Add Another Instance',
+            },
+          },
+        },
         instancePage: {
           title: 'Locations',
           controls: {
