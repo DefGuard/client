@@ -698,7 +698,7 @@ pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Erro
     }
     info!("Tunnel {tunnel_id}, deleted");
     Ok(())
-
+}
 
 #[tauri::command]
 pub async fn open_link(link: &str) -> Result<(), Error> {

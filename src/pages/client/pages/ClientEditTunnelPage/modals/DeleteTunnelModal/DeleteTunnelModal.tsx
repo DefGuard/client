@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
 
@@ -59,12 +58,6 @@ export const DeleteTunnelModal = () => {
       console.error(e);
     },
   });
-
-  // reset state on mount
-  useEffect(() => {
-    reset();
-    // eslint-disable-next-line
-  }, []);
 
   return (
     <ConfirmModal
