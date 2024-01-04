@@ -1,22 +1,13 @@
 @use '@scssutils' as *;
 
 #created-page {
-  h1 {
-    @include typography(app-title);
-    color: var(--text-body-primary);
-  }
-
   h2 {
     @include typography(app-body-1);
-    color: var(--text-body-primary);
-  }
-  h3 {
-    @include typography(app-side-bar);
-    color: var(--text-body-primary);
   }
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow-x: auto;
 
   & > .content {
     display: flex;
@@ -28,16 +19,11 @@
       justify-content: flex-start;
     }
 
-    & > * {
-      width: 100%;
-      max-width: 700px;
-    }
-
     & > .card {
       box-sizing: border-box;
       padding: 32px 64px;
-      height: 450px;
-      width: 700px;
+      max-width: 700px;
+      min-width: 300px;
       display: flex;
       & > .card-content {
         display: flex;
