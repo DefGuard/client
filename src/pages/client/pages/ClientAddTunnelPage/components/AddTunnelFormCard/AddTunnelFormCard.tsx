@@ -133,7 +133,7 @@ export const AddTunnelFormCard = () => {
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
     saveTunnel(values)
       .then(() => {
-        navigate(routes.client.base, { replace: true });
+        navigate(routes.client.tunnelCreated, { replace: true });
         toaster.success(localLL.messages.addSuccess());
       })
       .catch(() => toaster.error(localLL.messages.addError()));
