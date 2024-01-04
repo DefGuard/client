@@ -62,12 +62,19 @@
   & > .items {
     display: flex;
     flex-grow: 1;
+    height: 45vh;
     flex-shrink: 0;
     flex-flow: column;
     align-items: flex-start;
     justify-content: flex-start;
     box-sizing: border-box;
     row-gap: 15px;
+    &.flex-end {
+      justify-content: flex-end;
+      @media (min-height: 600px) {
+        padding-bottom: 70px;
+      }
+    }
 
     @include media-breakpoint-up(lg) {
       row-gap: 0;
