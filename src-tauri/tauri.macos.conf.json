@@ -5,7 +5,8 @@
                 "resources-macos/binaries/*"
             ],
             "resources": [
-                "resources-macos/resources/*"
+                "resources-macos/resources/*",
+                "resources/*"
               ]
         }
     }
