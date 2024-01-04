@@ -19,7 +19,6 @@ anyhow = "1.0"
 base64 = "0.21"
 clap = { version = "4.4", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
-dark-light = "1.0"
 defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "main" }
 dirs = "5.0"
 lazy_static = "1.4"
@@ -35,7 +34,10 @@ serde_with = "3.4"
 sqlx = { version = "0.7", features = ["chrono", "sqlite", "runtime-tokio", "uuid", "macros"] }
 struct-patch = "0.4"
 strum = { version = "0.25", features = ["derive"] }
-tauri = { version = "1.5", features = [ "fs-all", "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png"] }
+dark-light = "1.0"
+webbrowser = "0.8"
+
+tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png", "fs-all"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"

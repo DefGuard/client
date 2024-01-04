@@ -10,6 +10,7 @@ export const routes = {
     instanceCreated: '/client/instance-created',
     editTunnel: '/client/edit-tunnel',
     settings: '/client/settings',
+    carousel: '/client/carousel',
   },
   enrollment: '/enrollment',
   timeout: '/timeout',

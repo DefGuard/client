@@ -668,6 +668,7 @@ pub async fn tunnel_details(
         Err(Error::NotFound)
     }
 }
+
 #[tauri::command(async)]
 pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting tunnel {tunnel_id}");
@@ -697,4 +698,12 @@ pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Erro
     }
     info!("Tunnel {tunnel_id}, deleted");
     Ok(())
+
+
+#[tauri::command]
+pub async fn open_link(link: &str) -> Result<(), Error> {
+    match webbrowser::open(link) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::CommandError(e.to_string())),
+    }
 }

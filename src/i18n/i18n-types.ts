@@ -136,6 +136,96 @@ type RootTranslation = {
 	pages: {
 		client: {
 			pages: {
+				carouselPage: {
+					slides: {
+						shared: {
+							/**
+							 * d​e​f​g​u​a​r​d​ ​i​s​ ​a​l​l​ ​t​h​e​ ​a​b​o​v​e​ ​a​n​d​ ​m​o​r​e​!
+							 */
+							isMore: string
+							/**
+							 * V​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​o​n
+							 */
+							githubButton: string
+						}
+						welcome: {
+							/**
+							 * W​e​l​c​o​m​e​ ​t​o​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​d​e​s​k​t​o​p​ ​c​l​i​e​n​t​!
+							 */
+							title: string
+							instance: {
+								/**
+								 * A​d​d​ ​I​n​s​t​a​n​c​e
+								 */
+								title: string
+								/**
+								 * E​s​t​a​b​l​i​s​h​ ​a​ ​c​o​n​n​e​c​t​i​o​n​ ​t​o​ ​d​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​e​f​f​o​r​t​l​e​s​s​l​y​ ​b​y​ ​c​o​n​f​i​g​u​r​i​n​g​ ​i​t​ ​w​i​t​h​ ​a​ ​s​i​n​g​l​e​ ​t​o​k​e​n​.
+								 */
+								subtitle: string
+							}
+							tunel: {
+								/**
+								 * A​d​d​ ​T​u​n​e​l
+								 */
+								title: string
+								/**
+								 * U​t​i​l​i​z​e​ ​i​t​ ​a​s​ ​a​ ​W​i​r​e​G​u​a​r​d​®​ ​D​e​s​k​t​o​p​ ​C​l​i​e​n​t​ ​w​i​t​h​ ​e​a​s​e​.​ ​S​e​t​ ​u​p​ ​y​o​u​r​ ​o​w​n​ ​t​u​n​n​e​l​ ​o​r​ ​i​m​p​o​r​t​ ​a​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​.
+								 */
+								subtitle: string
+							}
+						}
+						twoFa: {
+							/**
+							 * W​i​r​e​G​u​a​r​d​ ​*​*​2​F​A​ ​w​i​t​h​ ​d​e​f​g​u​a​r​d​*​*
+							 */
+							title: string
+							/**
+							 * S​i​n​c​e​ ​W​i​r​e​g​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​g​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​g​u​a​r​d​ ​t​u​n​n​e​l​)​.​ ​ ​
+						​
+						​I​f​ ​y​o​u​ ​w​o​u​l​d​ ​l​i​k​e​ ​t​o​ ​s​e​c​u​r​e​ ​y​o​u​r​ ​W​i​r​e​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​t​r​y​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​V​P​N​ ​&​ ​S​S​O​ ​s​e​r​v​e​r​ ​(​w​h​i​c​h​ ​i​s​ ​a​l​s​o​ ​f​r​e​e​ ​&​ ​o​p​e​n​ ​s​o​u​r​c​e​)​ ​t​o​ ​g​e​t​ ​r​e​a​l​ ​2​F​A​ ​u​s​i​n​g​ ​W​i​r​e​g​u​a​r​d​ ​P​S​K​ ​k​e​y​s​ ​a​n​d​ ​p​e​e​r​s​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​b​y​ ​d​e​f​g​u​a​r​d​ ​g​a​t​e​w​a​y​!
+							 */
+							sideText: string
+						}
+						security: {
+							/**
+							 * S​e​c​u​r​i​t​y​ ​a​n​d​ ​P​r​i​v​a​c​y​ ​*​*​d​o​n​e​ ​r​i​g​h​t​!​*​*
+							 */
+							title: string
+							/**
+							 * *​ ​P​r​i​v​a​c​y​ ​r​e​q​u​i​r​e​s​ ​c​o​n​t​r​o​l​l​i​n​g​ ​y​o​u​r​ ​d​a​t​a​,​ ​t​h​u​s​ ​y​o​u​r​ ​u​s​e​r​ ​d​a​t​a​ ​(​I​d​e​n​t​i​t​y​,​ ​S​S​O​)​ ​n​e​e​d​s​ ​t​o​ ​b​e​ ​o​n​-​p​r​e​m​i​s​e​ ​(​o​n​ ​y​o​u​r​ ​s​e​r​v​e​r​s​)​
+						​*​ ​S​e​c​u​r​i​n​g​ ​y​o​u​r​ ​d​a​t​a​ ​a​n​d​ ​a​p​p​l​i​c​a​t​i​o​n​s​ ​r​e​q​u​i​r​e​s​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​a​n​d​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​(​S​S​O​)​ ​w​i​t​h​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​,​ ​a​n​d​ ​f​o​r​ ​h​i​g​h​e​s​t​ ​s​e​c​u​r​i​t​y​ ​-​ ​M​F​A​ ​w​i​t​h​ ​H​a​r​d​w​a​r​e​ ​S​e​c​u​r​i​t​y​ ​M​o​d​u​l​e​s​
+						​*​ ​A​c​c​e​s​s​i​n​g​ ​y​o​u​r​ ​d​a​t​a​ ​a​n​d​ ​a​p​p​l​i​c​a​t​i​o​n​s​ ​s​e​c​u​r​e​l​y​ ​a​n​d​ ​p​r​i​v​a​t​e​l​y​ ​r​e​q​u​i​r​e​s​ ​d​a​t​a​ ​e​n​c​r​y​p​t​i​o​n​ ​(​H​T​T​P​S​)​ ​a​n​d​ ​a​ ​s​e​c​u​r​e​ ​t​u​n​n​e​l​ ​b​e​t​w​e​e​n​ ​y​o​u​r​ ​d​e​v​i​c​e​ ​a​n​d​ ​t​h​e​ ​I​n​t​e​r​n​e​t​ ​t​o​ ​e​n​c​r​y​p​t​ ​a​l​l​ ​t​r​a​f​f​i​c​ ​(​V​P​N​)​.​
+						​*​ ​T​o​ ​f​u​l​l​y​ ​t​r​u​s​t​ ​y​o​u​r​ ​S​S​O​,​ ​V​P​N​,​ ​i​t​ ​n​e​e​d​s​ ​t​o​ ​b​e​ ​O​p​e​n​ ​S​o​u​r​c​e
+							 */
+							sideText: string
+						}
+						instances: {
+							/**
+							 * *​*​M​u​l​t​i​p​l​e​*​*​ ​i​n​s​t​a​n​c​e​ ​&​ ​l​o​c​a​t​i​o​n​s
+							 */
+							title: string
+							/**
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​ ​ ​
+						​
+						​I​f​ ​y​o​u​ ​a​r​e​ ​a​n​ ​a​d​m​i​n​/​d​e​v​o​p​s​ ​-​ ​a​l​l​ ​y​o​u​r​ ​c​u​s​t​o​m​e​r​s​ ​(​i​n​s​t​a​n​c​e​s​)​ ​a​n​d​ ​a​l​l​ ​t​h​e​i​r​ ​t​u​n​n​e​l​s​ ​(​l​o​c​a​t​i​o​n​s​)​ ​c​a​n​ ​b​e​ ​i​n​ ​o​n​e​ ​p​l​a​c​e​!
+							 */
+							sideText: string
+						}
+						support: {
+							/**
+							 * *​*​S​u​p​p​o​r​t​ ​u​s​*​*​ ​o​n​ ​G​i​t​h​u​b
+							 */
+							title: string
+							/**
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​i​s​ ​f​r​e​e​ ​a​n​d​ ​t​r​u​l​y​ ​O​p​e​n​ ​S​o​u​r​c​e​ ​a​n​d​ ​o​u​r​ ​t​e​a​m​ ​h​a​s​ ​b​e​e​n​ ​w​o​r​k​i​n​g​ ​o​n​ ​i​t​ ​f​o​r​ ​s​e​v​e​r​a​l​ ​m​o​n​t​h​s​.​ ​P​l​e​a​s​e​ ​c​o​n​s​i​d​e​r​ ​s​u​p​p​o​r​t​i​n​g​ ​u​s​ ​b​y​:​ ​ ​
+						​-​ ​s​t​a​r​i​n​g​ ​u​s​ ​o​n​ ​G​i​t​H​u​b​
+						​-​ ​s​p​r​e​a​d​i​n​g​ ​t​h​e​ ​w​o​r​d​ ​a​b​o​u​t​ ​*​*​d​e​f​g​u​a​r​d​*​*​!​
+						​-​ ​j​o​i​n​ ​o​u​r​ ​M​a​t​r​i​x​ ​s​e​r​v​e​r​:​ ​h​t​t​p​s​:​/​/​m​a​t​r​i​x​.​t​o​/​#​/​#​d​e​f​g​u​a​r​d​:​t​e​o​n​i​t​e​.​c​o​m
+							 */
+							text: string
+						}
+					}
+				}
 				settingsPage: {
 					/**
 					 * S​e​t​t​i​n​g​s
@@ -1413,6 +1503,96 @@ export type TranslationFunctions = {
 	pages: {
 		client: {
 			pages: {
+				carouselPage: {
+					slides: {
+						shared: {
+							/**
+							 * defguard is all the above and more!
+							 */
+							isMore: () => LocalizedString
+							/**
+							 * Visit defguard on
+							 */
+							githubButton: () => LocalizedString
+						}
+						welcome: {
+							/**
+							 * Welcome to **defguard** desktop client!
+							 */
+							title: () => LocalizedString
+							instance: {
+								/**
+								 * Add Instance
+								 */
+								title: () => LocalizedString
+								/**
+								 * Establish a connection to defguard instance effortlessly by configuring it with a single token.
+								 */
+								subtitle: () => LocalizedString
+							}
+							tunel: {
+								/**
+								 * Add Tunel
+								 */
+								title: () => LocalizedString
+								/**
+								 * Utilize it as a WireGuard® Desktop Client with ease. Set up your own tunnel or import a configuration file.
+								 */
+								subtitle: () => LocalizedString
+							}
+						}
+						twoFa: {
+							/**
+							 * WireGuard **2FA with defguard**
+							 */
+							title: () => LocalizedString
+							/**
+							 * Since Wireguard protocol doesn't support 2FA/MFA - most (if not all) currently available Wireguard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not Wireguard tunnel).  
+					
+						If you would like to secure your Wireguard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using Wireguard PSK keys and peers configuration by defguard gateway!
+							 */
+							sideText: () => LocalizedString
+						}
+						security: {
+							/**
+							 * Security and Privacy **done right!**
+							 */
+							title: () => LocalizedString
+							/**
+							 * * Privacy requires controlling your data, thus your user data (Identity, SSO) needs to be on-premise (on your servers)
+						* Securing your data and applications requires authentication and authorization (SSO) with Multi-Factor Authentication, and for highest security - MFA with Hardware Security Modules
+						* Accessing your data and applications securely and privately requires data encryption (HTTPS) and a secure tunnel between your device and the Internet to encrypt all traffic (VPN).
+						* To fully trust your SSO, VPN, it needs to be Open Source
+							 */
+							sideText: () => LocalizedString
+						}
+						instances: {
+							/**
+							 * **Multiple** instance & locations
+							 */
+							title: () => LocalizedString
+							/**
+							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+					
+						If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
+							 */
+							sideText: () => LocalizedString
+						}
+						support: {
+							/**
+							 * **Support us** on Github
+							 */
+							title: () => LocalizedString
+							/**
+							 * **defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by:  
+						- staring us on GitHub
+						- spreading the word about **defguard**!
+						- join our Matrix server: https://matrix.to/#/#defguard:teonite.com
+							 */
+							text: () => LocalizedString
+						}
+					}
+				}
 				settingsPage: {
 					/**
 					 * Settings
