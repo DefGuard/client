@@ -1,0 +1,50 @@
+<Wix
+    xmlns="http://wixtoolset.org/schemas/v4/wxs"
+    xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+>
+    <Bundle
+        Name="Defguard Client"
+        UpgradeCode="923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43"
+        Version="0.1.1"
+        IconSourceFile="..\icons\icon.ico"
+    >
+        <BootstrapperApplication>
+            <bal:WixStandardBootstrapperApplication
+                LogoFile="..\icons\128x128@2x.png"
+                LicenseUrl=""
+                Theme="hyperlinkLicense" />
+
+        </BootstrapperApplication>
+
+        <Variable Name="DO_NOT_LAUNCH" bal:Overridable="yes" Value="True" />
+        <!-- <Variable Name="LaunchTarget" Value="[INSTALLDIR]defguard-client.exe"/> -->
+
+        <Chain>
+            <MsiPackage Visible="yes" Permanent="yes" Id="WireguardDependency" Vital="yes" SourceFile=".\binaries\wireguard-amd64-0.5.3.msi">
+                <MsiProperty Name="DO_NOT_LAUNCH" Value="True" />
+            </MsiPackage>
+
+            <RollbackBoundary />
+
+            <MsiPackage Vital="yes" Id="MainPackage" SourceFile=".\binaries\defguard-client_0.2.0_x64_en-US.msi" />
+
+            <!-- <PackageGroupRef Id="BundlePackages" /> -->
+
+        </Chain>
+    </Bundle>
+
+    <!-- <Fragment>
+        <PackageGroup Id="BundlePackages">
+            <PackageGroupRef Id="PrereqPackages" />
+            <MsiPackage Id="PackageB" SourceFile=".\binaries\defguard-client_0.2.0_x64_en-US.msi" />
+        </PackageGroup>
+    </Fragment>
+
+    <Fragment>
+        <PackageGroup Id="PrereqPackages">
+            <MsiPackage SourceFile=".\binaries\wireguard-amd64-0.5.3.msi">
+                <MsiProperty Name="PREREQSONLY" Value="1" />
+            </MsiPackage>
+        </PackageGroup>
+    </Fragment> -->
+</Wix>
