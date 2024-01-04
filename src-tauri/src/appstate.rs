@@ -7,14 +7,11 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
-    database::{ActiveConnection, Connection, DbPool, TunnelConnection},
-    error::Error,
+    database::{ActiveConnection, DbPool},
     service::{
-        proto::{
-            desktop_daemon_service_client::DesktopDaemonServiceClient, RemoveInterfaceRequest,
-        },
-        utils::setup_client,
+        proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
+    utils::disconnect_interface,
     ConnectionType,
 };
 
@@ -100,33 +97,7 @@ impl AppState {
             debug!("Found active connection");
             trace!("Connection: {connection:#?}");
             debug!("Removing interface");
-            let mut client = self.client.clone();
-            let request = RemoveInterfaceRequest {
-                interface_name: connection.interface_name.clone(),
-            };
-            if let Err(error) = client.remove_interface(request).await {
-                error!("Failed to remove interface: {error}");
-                return Err(Error::InternalError);
-            }
-            debug!("Removed interface");
-            debug!("Saving connection");
-            trace!("Connection: {connection:#?}");
-            match connection.connection_type {
-                ConnectionType::Location => {
-                    let mut connection: Connection = connection.into();
-                    connection.save(&self.get_pool()).await?;
-                    debug!("Connection saved");
-                    trace!("Saved connection: {connection:#?}");
-                    info!("Location {} disconnected", connection.location_id);
-                }
-                ConnectionType::Tunnel => {
-                    let mut connection: TunnelConnection = connection.into();
-                    connection.save(&self.get_pool()).await?;
-                    debug!("Connection saved");
-                    trace!("Saved connection: {connection:#?}");
-                    info!("Tunnel {} disconnected", connection.tunnel_id);
-                }
-            }
+            disconnect_interface(connection, self).await?;
         }
         Ok(())
     }
