@@ -12,7 +12,7 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -23,22 +23,21 @@ import { LocationCardRoute } from '../LocationCardRoute/LocationCardRoute';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
-  instanceId: DefguardInstance['id'];
-  locations: DefguardLocation[];
+  locations: CommonWireguardFields[];
 };
 
-export const LocationsGridView = ({ instanceId, locations }: Props) => {
+export const LocationsGridView = ({ locations }: Props) => {
   return (
     <div id="locations-grid-view">
       {locations.map((l) => (
-        <GridItem location={l} key={`${instanceId}${l.id}`} />
+        <GridItem location={l} key={`${l.name}${l.id}`} />
       ))}
     </div>
   );
 };
 
 type GridItemProps = {
-  location: DefguardLocation;
+  location: CommonWireguardFields;
 };
 
 const GridItem = ({ location }: GridItemProps) => {
@@ -55,15 +54,29 @@ const GridItem = ({ location }: GridItemProps) => {
   const statsFilter = useClientStore((state) => state.statsFilter);
 
   const { data: lastConnection } = useQuery({
-    queryKey: [clientQueryKeys.getConnections, location.id as number],
-    queryFn: () => getLastConnection({ locationId: location.id as number }),
+    queryKey: [
+      clientQueryKeys.getConnections,
+      location.id as number,
+      location.connection_type,
+    ],
+    queryFn: () =>
+      getLastConnection({
+        locationId: location.id as number,
+        connectionType: location.connection_type,
+      }),
     enabled: !!location.id,
   });
   const { data: locationStats } = useQuery({
-    queryKey: [clientQueryKeys.getLocationStats, location.id as number, statsFilter],
+    queryKey: [
+      clientQueryKeys.getLocationStats,
+      location.id as number,
+      statsFilter,
+      location.connection_type,
+    ],
     queryFn: () =>
       getLocationStats({
         locationId: location.id as number,
+        connectionType: location.connection_type as WireguardInstanceType,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,

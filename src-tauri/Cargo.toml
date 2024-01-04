@@ -1,6 +1,6 @@
 [package]
 name = "defguard-client"
-version = "0.2.0"
+version = "0.1.1"
 description = "Defguard desktop client"
 license = "Apache-2.0"
 homepage = "https://github.com/DefGuard/client"
@@ -20,31 +20,38 @@ clap = { version = "4.4", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
 defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "8-add-windows-support-for-defguard-client" }
 dirs = "5.0"
+lazy_static = "1.4"
 local-ip-address = "0.5"
 log = "0.4"
+notify-debouncer-mini = "0.4"
 prost = "0.12"
 rand = "0.8"
+rust-ini = "0.20"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_with = "3.4"
 sqlx = { version = "0.7", features = ["chrono", "sqlite", "runtime-tokio", "uuid", "macros"] }
+struct-patch = "0.4"
+strum = { version = "0.25", features = ["derive"] }
+dark-light = "1.0"
+webbrowser = "0.8"
+windows-service = "0.6.0"
+
+tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png", "fs-all"] }
+tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
+tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio-util = "0.7"
 tonic = "0.10"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 x25519-dalek = { version = "2", features = [
     "getrandom",
     "static_secrets",
 ] }
-strum = { version = "0.25", features = ["derive"] }
-dark-light = "1.0"
 
-tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png"] }
-tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-lazy_static = "1.4"
-struct-patch = "0.4"
-windows-service = "0.6.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 nix = { version = "0.27", features = ["net"] }

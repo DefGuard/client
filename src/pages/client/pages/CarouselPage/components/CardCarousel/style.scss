@@ -1,0 +1,30 @@
+@use '@scssutils' as *;
+
+.card-carousel {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: 30px;
+  min-width: 900px;
+  overflow-x: auto;
+
+  & > .card-wrapper {
+    display: block;
+    width: 100%;
+    max-width: 1200px;
+
+    & > .card {
+      width: 100%;
+      max-width: inherit;
+      min-height: 720px;
+      overflow: hidden;
+      box-sizing: border-box;
+      padding: 60px;
+      display: flex;
+      flex-flow: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+  }
+}

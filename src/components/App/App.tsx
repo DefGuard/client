@@ -23,9 +23,14 @@ import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
+import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
+import { ClientAddedPage } from '../../pages/client/pages/ClientAddedPage/ClientAddedPage';
 import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstancePage/ClientAddInstnacePage';
+import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPage/ClientAddTunnelPage';
+import { ClientEditTunnelPage } from '../../pages/client/pages/ClientEditTunnelPage/ClientEditTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
+import { WireguardInstanceType } from '../../pages/client/types';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
@@ -42,7 +47,7 @@ dayjs.extend(timezone);
 
 const queryClient = new QueryClient();
 
-const { getSettings } = clientApi;
+const { getSettings, getInstances, getTunnels } = clientApi;
 
 const router = createBrowserRouter([
   {
@@ -67,8 +72,28 @@ const router = createBrowserRouter([
         element: <ClientInstancePage />,
       },
       {
+        path: '/client/carousel',
+        element: <CarouselPage />,
+      },
+      {
         path: '/client/add-instance',
         element: <ClientAddInstancePage />,
+      },
+      {
+        path: '/client/instance-created',
+        element: <ClientAddedPage pageType={WireguardInstanceType.DEFGUARD_INSTANCE} />,
+      },
+      {
+        path: '/client/add-tunnel',
+        element: <ClientAddTunnelPage />,
+      },
+      {
+        path: '/client/tunnel-created',
+        element: <ClientAddedPage pageType={WireguardInstanceType.TUNNEL} />,
+      },
+      {
+        path: '/client/edit-tunnel',
+        element: <ClientEditTunnelPage />,
       },
       {
         path: '/client/settings',
@@ -110,14 +135,16 @@ export const App = () => {
 
   // load settings from tauri first time
   useEffect(() => {
-    const loadSettings = async () => {
-      debug('Loading settings from tauri');
-      const res = await getSettings();
-      setClientState({ settings: res });
-      debug('Settings loaded and set');
+    const loadTauriState = async () => {
+      debug('App init state from tauri');
+      const settings = await getSettings();
+      const instances = await getInstances();
+      const tunnels = await getTunnels();
+      setClientState({ settings, instances, tunnels });
+      debug('Tauri init data loaded');
       setSettingsLoaded(true);
     };
-    loadSettings();
+    loadTauriState();
   }, [setClientState, setSettingsLoaded]);
 
   if (!appLoaded) return null;

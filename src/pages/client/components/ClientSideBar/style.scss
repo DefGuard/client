@@ -27,6 +27,7 @@
     height: 108px;
     column-gap: 7px;
     border-bottom: 1px solid var(--border-primary);
+    cursor: pointer;
 
     @include media-breakpoint-up(lg) {
       display: flex;
@@ -48,6 +49,7 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    cursor: pointer;
 
     @include media-breakpoint-up(lg) {
       display: none;
@@ -62,12 +64,19 @@
   & > .items {
     display: flex;
     flex-grow: 1;
+    height: 45vh;
     flex-shrink: 0;
     flex-flow: column;
     align-items: flex-start;
     justify-content: flex-start;
     box-sizing: border-box;
     row-gap: 15px;
+    &.flex-end {
+      justify-content: flex-end;
+      @media (min-height: 600px) {
+        padding-bottom: 70px;
+      }
+    }
 
     @include media-breakpoint-up(lg) {
       row-gap: 0;
@@ -225,13 +234,16 @@
         justify-content: center;
         padding: 0;
       }
+
       & > .icon-wrapper {
         display: flex;
+
         svg {
           width: 15px;
           height: 15px;
         }
       }
+
       & > p {
         display: none;
 

@@ -52,6 +52,62 @@ const en = {
   pages: {
     client: {
       pages: {
+        carouselPage: {
+          slides: {
+            shared: {
+              isMore: 'defguard is all the above and more!',
+              githubButton: 'Visit defguard on',
+            },
+            welcome: {
+              // md
+              title: 'Welcome to **defguard** desktop client!',
+              instance: {
+                title: 'Add Instance',
+                subtitle:
+                  'Establish a connection to defguard instance effortlessly by configuring it with a single token.',
+              },
+              tunel: {
+                title: 'Add Tunel',
+                subtitle:
+                  'Utilize it as a WireGuard® Desktop Client with ease. Set up your own tunnel or import a configuration file.',
+              },
+            },
+            twoFa: {
+              // md
+              title: 'WireGuard **2FA with defguard**',
+              // md
+              sideText: `Since Wireguard protocol doesn't support 2FA/MFA - most (if not all) currently available Wireguard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not Wireguard tunnel).  
+
+If you would like to secure your Wireguard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using Wireguard PSK keys and peers configuration by defguard gateway!`,
+            },
+            security: {
+              // md
+              title: 'Security and Privacy **done right!**',
+              // md
+              sideText: `* Privacy requires controlling your data, thus your user data (Identity, SSO) needs to be on-premise (on your servers)
+* Securing your data and applications requires authentication and authorization (SSO) with Multi-Factor Authentication, and for highest security - MFA with Hardware Security Modules
+* Accessing your data and applications securely and privately requires data encryption (HTTPS) and a secure tunnel between your device and the Internet to encrypt all traffic (VPN).
+* To fully trust your SSO, VPN, it needs to be Open Source`,
+            },
+            instances: {
+              // md
+              title: '**Multiple** instance & locations',
+              // md
+              sideText: `**defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+
+If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!`,
+            },
+            support: {
+              // md
+              title: '**Support us** on Github',
+              // md
+              text: `**defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by:  
+- staring us on GitHub
+- spreading the word about **defguard**!
+- join our Matrix server: https://matrix.to/#/#defguard:teonite.com`,
+            },
+          },
+        },
         settingsPage: {
           title: 'Settings',
           tabs: {
@@ -85,6 +141,24 @@ const en = {
             },
           },
         },
+        createdPage: {
+          tunnel: {
+            title: 'Your Tunnel Was Added Successfully',
+            content:
+              'Your tunnel has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.',
+            controls: {
+              submit: 'Add Another Tunnel',
+            },
+          },
+          instance: {
+            title: 'Your Instance Was Added Successfully',
+            content:
+              'Your instance has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.',
+            controls: {
+              submit: 'Add Another Instance',
+            },
+          },
+        },
         instancePage: {
           title: 'Locations',
           controls: {
@@ -103,6 +177,7 @@ const en = {
           },
           header: {
             title: 'Locations',
+            edit: 'Edit Instance',
             filters: {
               views: {
                 grid: 'Grid View',
@@ -138,6 +213,141 @@ const en = {
                 upload: 'Upload',
                 download: 'Download',
               },
+            },
+            details: {
+              title: 'Details',
+              logs: {
+                title: 'Log',
+              },
+              info: {
+                configuration: {
+                  title: 'Device configuration',
+                  pubkey: 'Public key',
+                  address: 'Addresses',
+                  listenPort: 'Listen port',
+                },
+                vpn: {
+                  title: 'VPN Server Configuration',
+                  pubkey: 'Public key',
+                  serverAddress: 'Server Address',
+                  allowedIps: 'Allowed IPs',
+                  dns: 'DNS servers',
+                  keepalive: 'Persisten keepalive',
+                  handshake: 'Latest Handshake',
+                  handshakeValue: '{seconds: number} seconds ago',
+                },
+              },
+            },
+          },
+        },
+        tunnelPage: {
+          title: 'WireGuard Tunnels',
+          header: {
+            edit: 'Edit Tunnel',
+          },
+        },
+
+        editTunnelPage: {
+          title: 'Edit WireGuard® Tunnel',
+          messages: {
+            editSuccess: 'Tunnel edited',
+            editError: 'Editing tunnel failed',
+          },
+          controls: {
+            save: 'Save changes',
+          },
+        },
+        addTunnelPage: {
+          title: 'Add WireGuard® Tunnel',
+          forms: {
+            initTunnel: {
+              title: 'Please provide Instance URL and token',
+              sections: {
+                vpnServer: 'VPN Server',
+                advancedOptions: 'Advanced Options',
+              },
+              labels: {
+                name: 'Tunnel Name',
+                privateKey: 'Private Key',
+                publicKey: 'Public Key',
+                address: 'Address',
+                serverPubkey: 'Public Key',
+                endpoint: 'VPN Server Address:Port',
+                dns: 'DNS',
+                allowedips: 'Allowed IPs (seperate with comma)',
+                persistentKeepAlive: 'Persistent Keep Alive (sec)',
+                preUp: 'PreUp',
+                postUp: 'PostUp',
+                PreDown: 'PreDown',
+                PostDown: 'PostDown',
+              },
+              helpers: {
+                advancedOptions:
+                  'Click the "Advanced Options" section to reveal additional settings for fine-tuning your WireGuard tunnel configuration. You can customize pre and post scripts, among other options.',
+                name: 'A unique name for your WireGuard tunnel to identify it easily.',
+                pubkey:
+                  'The public key associated with the WireGuard tunnel for secure communication.',
+                prvkey:
+                  'The private key associated with the WireGuard tunnel for secure communication.',
+                address:
+                  'The IP address assigned to this WireGuard client within the VPN network.',
+                serverPubkey:
+                  'The public key of the WireGuard server for secure communication.',
+                allowedIps:
+                  'A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.',
+                endpoint:
+                  'The address and port of the WireGuard server, typically in the format "hostname:port".',
+                dns: 'The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution.',
+                persistentKeepAlive:
+                  'The interval (in seconds) for sending periodic keep-alive messages to ensure the tunnel stays active. Adjust as needed.',
+                routeAllTraffic:
+                  'If enabled, all network traffic will be routed through the WireGuard tunnel.',
+                preUp:
+                  'Shell commands or scripts to be executed before bringing up the WireGuard tunnel.',
+                postUp:
+                  'Shell commands or scripts to be executed after bringing up the WireGuard tunnel.',
+                preDown:
+                  'Shell commands or scripts to be executed before tearing down the WireGuard tunnel.',
+                postDown:
+                  'Shell commands or scripts to be executed after tearing down the WireGuard tunnel.',
+              },
+              submit: 'Add Tunnel',
+              messages: {
+                configError: 'Error parsing config file',
+                addSuccess: 'Tunnel added',
+                addError: 'Creating tunnel failed',
+              },
+              controls: {
+                importConfig: 'Import Config File',
+                generatePrvkey: 'Generate Private Key',
+              },
+            },
+          },
+          guide: {
+            title: 'Adding WireGuard tunnel',
+            subTitle: `<p>To establish secure communication between two or more devices over the internet create a virtual private network by configuring your tunnel.</p><p>If you don’t see options like Table or MTU it means we do not support it for now, but will be added later.</p>`,
+            card: {
+              title: 'Setting Up A new Tunnel:',
+              content: `
+                <p>1. Import Configuration File</p>
+                <div>
+                <ul>
+                  <li> Click on the "Import Config File" button.</li>
+                  <li> Navigatge to configuration file using the file selection dialog.</li>
+                  <li> Select the .conf file you received or created.</li>
+                </ul>
+                </div>
+                <p>2. Or Fill in Form on the Left</p>
+                <div>
+                <ul>
+                  <li> Enter a name for the tunnel.</li>
+                  <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+                </ul>
+                </div>
+                <p>
+                For more help, please visit defguard help (https://defguard.gitbook.io/)
+                </p>
+              `,
             },
           },
         },
@@ -191,8 +401,10 @@ const en = {
         },
       },
       sideBar: {
-        instances: 'Instances',
+        instances: 'defguard Instances',
         addInstance: 'Add Instance',
+        addTunnel: 'Add Tunnel',
+        tunnels: 'Wireguard Tunnels',
         settings: 'Settings',
         copyright: {
           copyright: `Copyright © 2023`,
@@ -385,6 +597,56 @@ If you want to disengage your VPN connection, simply press "deactivate".
             submit: 'Next',
           },
         },
+      },
+    },
+  },
+  modals: {
+    updateInstance: {
+      title: 'Update instance',
+      infoMessage:
+        "Enter the token sent by the administrator to update the Instance configuration.\nAlternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.",
+      form: {
+        fieldLabels: {
+          token: 'Token',
+          url: 'URL',
+        },
+        fieldErrors: {
+          token: {
+            rejected: 'Token or URL rejected.',
+            instanceIsNotPresent: 'Instance for this token was not found.',
+          },
+        },
+      },
+      controls: {
+        updateInstance: 'Update Instance',
+        removeInstance: 'Remove Instance',
+      },
+      messages: {
+        success: '{name: string} updated.',
+        error: 'Token or URL is invalid.',
+        errorInstanceNotFound: 'Intance for given token is not registered !',
+      },
+    },
+    deleteInstance: {
+      title: 'Delete instance',
+      subtitle: 'Are you sure you want to delete {name: string}?',
+      messages: {
+        success: 'Instance deleted',
+        error: 'Unexpected error occured',
+      },
+      controls: {
+        submit: 'Delete instance',
+      },
+    },
+    deleteTunnel: {
+      title: 'Delete tunnel',
+      subtitle: 'Are you sure you want to delete {name: string}?',
+      messages: {
+        success: 'Tunnel deleted',
+        error: 'Unexpected error occured',
+      },
+      controls: {
+        submit: 'Delete tunnel',
       },
     },
   },

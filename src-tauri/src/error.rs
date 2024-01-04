@@ -38,6 +38,12 @@ pub enum Error {
     StrumError(#[from] strum::ParseError),
     #[error("Required resource not found {0}")]
     ResourceNotFound(String),
+    #[error("Config parse error {0}")]
+    ConfigParseError(String),
+    #[error("Failed to acquire mutex lock")]
+    MutexError,
+    #[error("Command failed: {0}")]
+    CommandError(String),
 }
 
 // we must manually implement serde::Serialize

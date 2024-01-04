@@ -3,23 +3,37 @@ import './style.scss';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
+import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
+import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
 import { TauriEventKey } from './types';
 
-const { getInstances } = clientApi;
+const { getInstances, getTunnels } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
-  const setInstances = useClientStore((state) => state.setInstances);
+  const [setInstances, setTunnels] = useClientStore((state) => [
+    state.setInstances,
+    state.setTunnels,
+  ]);
+  const navigate = useNavigate();
+  const firstLaunch = useClientFlags((state) => state.firstStart);
+  const location = useLocation();
 
   const { data: instances } = useQuery({
     queryFn: getInstances,
     queryKey: [clientQueryKeys.getInstances],
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+  const { data: tunnels } = useQuery({
+    queryFn: getTunnels,
+    queryKey: [clientQueryKeys.getTunnels],
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
@@ -28,7 +42,11 @@ export const ClientPage = () => {
     const subs: UnlistenFn[] = [];
 
     listen(TauriEventKey.INSTANCE_UPDATE, () => {
-      const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+      const invalidate = [
+        clientQueryKeys.getInstances,
+        clientQueryKeys.getLocations,
+        clientQueryKeys.getTunnels,
+      ];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
           queryKey: [key],
@@ -39,7 +57,7 @@ export const ClientPage = () => {
     });
 
     listen(TauriEventKey.LOCATION_UPDATE, () => {
-      const invalidate = [clientQueryKeys.getLocations];
+      const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
           queryKey: [key],
@@ -57,6 +75,7 @@ export const ClientPage = () => {
         clientQueryKeys.getConnectionHistory,
         clientQueryKeys.getLocationStats,
         clientQueryKeys.getInstances,
+        clientQueryKeys.getTunnels,
       ];
       invalidate.forEach((key) =>
         queryClient.invalidateQueries({
@@ -77,7 +96,17 @@ export const ClientPage = () => {
     if (instances) {
       setInstances(instances);
     }
-  }, [instances, setInstances]);
+    if (tunnels) {
+      setTunnels(tunnels);
+    }
+  }, [instances, setInstances, tunnels, setTunnels]);
+
+  // navigate to carousel on first app Launch
+  useEffect(() => {
+    if (!location.pathname.includes(routes.client.carousel) && firstLaunch) {
+      navigate(routes.client.carousel, { replace: true });
+    }
+  }, [firstLaunch, navigate, location.pathname]);
 
   return (
     <>

@@ -1,0 +1,55 @@
+@use '@scssutils' as *;
+
+#add-tunnel-guide {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: flex-start;
+  row-gap: 50px;
+
+  p {
+    @include typography(app-body-2);
+
+    color: var(--text-body-primary);
+  }
+  a {
+    @include typography(app-body-2);
+
+    color: var(--text-body-primary);
+  }
+  li {
+    @include typography(app-body-2);
+
+    color: var(--text-body-primary);
+  }
+
+  #tunnel-guide {
+    * {
+      text-align: center;
+      width: 100%;
+    }
+
+    h2 {
+      padding-bottom: 20px;
+    }
+
+    p {
+      max-width: 500px;
+    }
+  }
+
+  #setup-guide {
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    row-gap: 20px;
+    box-sizing: border-box;
+    padding: 20px 25px;
+
+    & > div {
+      box-sizing: border-box;
+      padding-left: 20px;
+    }
+  }
+}

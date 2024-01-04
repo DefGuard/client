@@ -8,12 +8,13 @@
   },
   "package": {
     "productName": "defguard-client",
-    "version": "0.2.0"
+    "version": "0.1.1"
   },
   "tauri": {
     "systemTray": {
       "iconPath": "resources/icons/tray-32x32-color.png",
-      "iconAsTemplate": false
+      "iconAsTemplate": false,
+      "menuOnLeftClick": false
     },
     "allowlist": {
       "all": false,
@@ -24,6 +25,10 @@
         "all": true,
         "request": true,
         "scope": ["https://**", "http://**"]
+      },
+      "fs": {
+        "all": true,
+        "scope": ["$RESOURCE/*", "$APPDATA/*"]
       }
     },
     "bundle": {

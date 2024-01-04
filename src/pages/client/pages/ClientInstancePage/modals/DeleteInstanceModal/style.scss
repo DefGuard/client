@@ -1,0 +1,8 @@
+@use '@scssutils' as *;
+
+#delete-instance-modal {
+  @include media-breakpoint-up(lg) {
+    width: 100%;
+    max-width: 578px;
+  }
+}

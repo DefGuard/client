@@ -2,6 +2,7 @@ pub mod config;
 pub mod proto {
     tonic::include_proto!("client");
 }
+pub mod log_watcher;
 pub mod utils;
 
 use std::{
@@ -22,10 +23,10 @@ use tonic::{
     transport::Server,
     Code, Response, Status,
 };
-use tracing::{debug, info};
+use tracing::{debug, info, info_span};
 
 use self::config::Config;
-use crate::utils::IS_MACOS;
+use crate::utils::{execute_command, IS_MACOS};
 
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
@@ -45,7 +46,7 @@ pub enum DaemonError {
     TransportError(#[from] tonic::transport::Error),
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DaemonService {
     stats_period: u64,
 }
@@ -85,9 +86,16 @@ impl DesktopDaemonService for DaemonService {
             ))?
             .into();
         let ifname = &config.name;
+        let _span = info_span!("create_interface", interface_name = &ifname).entered();
         info!("Creating interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
+
+        if let Some(pre_up) = request.pre_up {
+            debug!("Executing specified PreUp command: {pre_up}");
+            let _ = execute_command(&pre_up);
+            info!("Executed specified PreUp command: {pre_up}");
+        }
 
         // create new interface
         debug!("Creating new interface {ifname}");
@@ -141,6 +149,11 @@ impl DesktopDaemonService for DaemonService {
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
+        if let Some(post_up) = request.post_up {
+            debug!("Executing specified PostUp command: {post_up}");
+            let _ = execute_command(&post_up);
+            info!("Executed specified PostUp command: {post_up}");
+        }
 
         Ok(Response::new(()))
     }
@@ -151,16 +164,26 @@ impl DesktopDaemonService for DaemonService {
     ) -> Result<Response<()>, Status> {
         let request = request.into_inner();
         let ifname = request.interface_name;
+        let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         info!("Removing interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
-
+        if let Some(pre_down) = request.pre_down {
+            debug!("Executing specified PreDown command: {pre_down}");
+            let _ = execute_command(&pre_down);
+            info!("Executed specified PreDown command: {pre_down}");
+        }
         // remove interface
         wgapi.remove_interface().map_err(|err| {
             let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
+        if let Some(post_down) = request.post_down {
+            debug!("Executing specified PostDown command: {post_down}");
+            let _ = execute_command(&post_down);
+            info!("Executed specified PostDown command: {post_down}");
+        }
 
         Ok(Response::new(()))
     }
@@ -173,6 +196,7 @@ impl DesktopDaemonService for DaemonService {
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
         let ifname = request.interface_name;
+        let _span = info_span!("read_interface_data", interface_name = &ifname).entered();
         info!("Starting interface data stream for {ifname}");
 
         let stats_period = self.stats_period;
@@ -224,6 +248,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("defguard daemon listening on {addr}");
 
     Server::builder()
+        .trace_fn(|_| tracing::info_span!("defguard_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
         .serve(addr)
         .await?;
