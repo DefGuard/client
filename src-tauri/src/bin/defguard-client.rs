@@ -22,7 +22,7 @@ use defguard_client::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, disconnect, get_settings, last_connection, location_interface_details,
         location_stats, open_link, parse_tunnel_config, save_device_config, save_tunnel,
-        update_instance, update_location_routing, update_settings, tunnel_details
+        tunnel_details, update_instance, update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings},
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
@@ -94,7 +94,7 @@ async fn main() {
             parse_tunnel_config,
             save_tunnel,
             all_tunnels,
-            open_link
+            open_link,
             tunnel_details,
         ])
         .on_window_event(|event| match event.event() {

@@ -1,7 +1,7 @@
 import './style.scss';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 

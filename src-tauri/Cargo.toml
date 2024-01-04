@@ -19,7 +19,6 @@ anyhow = "1.0"
 base64 = "0.21"
 clap = { version = "4.4", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
-dark-light = "1.0"
 defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "main" }
 dirs = "5.0"
 lazy_static = "1.4"
