@@ -10,7 +10,7 @@ use crate::{
     service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest},
     tray::configure_tray_icon,
     utils::{
-        get_location_interface_details, get_tunnel_interface_details,
+        disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
         handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
@@ -59,51 +59,11 @@ pub async fn disconnect(
 ) -> Result<(), Error> {
     debug!("Disconnecting location {}", location_id);
     let state = handle.state::<AppState>();
-
     if let Some(connection) = state.find_and_remove_connection(location_id, &connection_type) {
+        let interface_name = connection.interface_name.clone();
         debug!("Found active connection");
         trace!("Connection: {:#?}", connection);
-        debug!("Removing interface");
-        let mut client = state.client.clone();
-        let interface_name = connection.interface_name.clone();
-        match connection_type {
-            ConnectionType::Location => {
-                let request = RemoveInterfaceRequest {
-                    interface_name: interface_name.clone(),
-                    pre_down: None,
-                    post_down: None,
-                };
-                if let Err(error) = client.remove_interface(request).await {
-                    error!("Failed to remove interface: {error}");
-                    return Err(Error::InternalError);
-                }
-                let mut connection: Connection = connection.into();
-                connection.save(&state.get_pool()).await?;
-                trace!("Saved connection: {connection:#?}");
-                debug!("Removed interface");
-                debug!("Saving connection");
-                trace!("Connection: {:#?}", connection);
-            }
-            ConnectionType::Tunnel => {
-                if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
-                    let request = RemoveInterfaceRequest {
-                        interface_name: interface_name.clone(),
-                        pre_down: tunnel.pre_down,
-                        post_down: tunnel.post_down,
-                    };
-                    if let Err(error) = client.remove_interface(request).await {
-                        error!("Failed to remove interface: {error}");
-                        return Err(Error::InternalError);
-                    }
-                    let mut connection: TunnelConnection = connection.into();
-                    connection.save(&state.get_pool()).await?;
-                    trace!("Saved connection: {connection:#?}");
-                } else {
-                    error!("Tunnel with ID {location_id} not found");
-                    return Err(Error::NotFound);
-                }
-            }
-        }
+        disconnect_interface(connection, &state).await?;
         debug!("Connection saved");
         handle.emit_all(
             "connection-changed",
@@ -111,10 +71,7 @@ pub async fn disconnect(
                 message: "Created new connection".into(),
             },
         )?;
-
         stop_log_watcher_task(handle, interface_name)?;
-
-        info!("Location {location_id} {connection_type:?} disconnected");
         Ok(())
     } else {
         error!("Connection for location with id: {location_id} not found");
