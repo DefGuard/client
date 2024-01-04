@@ -77,19 +77,40 @@
         </InstallExecuteSequence> -->
         
 
+        <!-- TODO: Here -->
         <!-- TODO: silently install Wireguard -->
-        <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]cmd.exe /C start .\resources-windows\binaries\wireguard-installer.exe" />
+        <!-- <CustomAction
+            Id="LaunchApp"
+            Directory="INSTALLDIR"
+            ExeCommand="[SystemFolder]cmd.exe /C start .\resources-windows\binaries\wireguard-installer.exe"
+        />
+
+        <InstallExecuteSequence>
+            <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE</Custom>
+        </InstallExecuteSequence> -->
+
+        <!-- TODO: try passive mode -->
+        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]msiexec.exe /i .\resources-windows\binaries\wireguard-amd64-0.5.3.msi" /> -->
+        <!-- <CustomAction
+            Id="LaunchApp"
+            Directory="INSTALLDIR"
+            ExeCommand="[SystemFolder]msiexec.exe /i C:\wireguard-amd64-0.5.3.msi /qn"
+        /> -->
+
+        <!-- Launches defguard-client after installation -->
+        <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]cmd.exe /C start defguard-client.exe" />
 
         <InstallExecuteSequence>
             <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE</Custom>
         </InstallExecuteSequence>
 
-        <!-- TODO: try passive mode -->
-        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]msiexec.exe /i .\resources-windows\binaries\wireguard-amd64-0.5.3.msi" /> -->
-        <!-- <CustomAction Id="LaunchApp" Directory="INSTALLDIR" ExeCommand="[SystemFolder]msiexec.exe /i C:\wireguard-amd64-0.5.3.msi /qn" />
-
-        <InstallExecuteSequence>
-            <Custom Action="LaunchApp" Before="InstallInitialize">NOT REMOVE</Custom>
+ <!-- Before ="InstallFiles" -->
+ <!-- Before="InstallInitialize" -->
+        <!-- <InstallExecuteSequence>
+            <Custom
+                Action="QtExecCmdLine"
+                Before="InstallFiles"
+            >NOT REMOVE</Custom>
         </InstallExecuteSequence> -->
 
         <!-- After="InstallFinalize" -->
