@@ -1,9 +1,6 @@
 {
     "tauri": {
         "bundle": {
-            "externalBin": [
-                "resources-windows/binaries/*"
-            ],
             "resources": [
                 "resources-windows/binaries/*"
             ]
