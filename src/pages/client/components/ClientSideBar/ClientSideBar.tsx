@@ -37,7 +37,7 @@ export const ClientSideBar = () => {
       <div className="logo-mobile">
         <SvgDefguadNavLogoCollapsed />
       </div>
-      <div className="items">
+      <div className="items flex-end">
         <div className="client-bar-item active" id="instances-nav-label">
           <SvgIconNavConnections />
           <p>{LL.pages.client.sideBar.instances()}</p>
@@ -49,7 +49,9 @@ export const ClientSideBar = () => {
           />
         ))}
         <AddInstance />
-        <Divider />
+      </div>
+      <Divider />
+      <div className="items">
         <div
           className={classNames('client-bar-item clickable', {
             active: tunnelPathActive,
