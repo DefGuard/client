@@ -27,6 +27,7 @@
     height: 108px;
     column-gap: 7px;
     border-bottom: 1px solid var(--border-primary);
+    cursor: pointer;
 
     @include media-breakpoint-up(lg) {
       display: flex;
@@ -48,6 +49,7 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    cursor: pointer;
 
     @include media-breakpoint-up(lg) {
       display: none;

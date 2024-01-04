@@ -100,6 +100,10 @@ const getLocationDetails = async (
 const getTunnels = async (): Promise<CommonWireguardFields[]> =>
   invokeWrapper('all_tunnels');
 
+// opens given link in system default browser
+const openLink = async (link: string): Promise<void> =>
+  invokeWrapper('open_link', { link });
+
 const getTunnelDetails = async (id: number): Promise<Tunnel> =>
   invokeWrapper('tunnel_details', { tunnelId: id });
 
@@ -122,5 +126,6 @@ export const clientApi = {
   updateInstance,
   parseTunnelConfig,
   saveTunnel,
+  openLink,
   getTunnelDetails,
 };

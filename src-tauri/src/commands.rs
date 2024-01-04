@@ -668,3 +668,11 @@ pub async fn tunnel_details(
         Err(Error::NotFound)
     }
 }
+
+#[tauri::command]
+pub async fn open_link(link: &str) -> Result<(), Error> {
+    match webbrowser::open(link) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::CommandError(e.to_string())),
+    }
+}
