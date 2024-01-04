@@ -42,6 +42,8 @@ pub enum Error {
     ConfigParseError(String),
     #[error("Failed to acquire mutex lock")]
     MutexError,
+    #[error("Command failed: {0}")]
+    CommandError(String),
 }
 
 // we must manually implement serde::Serialize

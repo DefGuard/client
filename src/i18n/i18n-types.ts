@@ -206,6 +206,7 @@ type RootTranslation = {
 							title: string
 							/**
 							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​ ​ ​
+						​
 						​I​f​ ​y​o​u​ ​a​r​e​ ​a​n​ ​a​d​m​i​n​/​d​e​v​o​p​s​ ​-​ ​a​l​l​ ​y​o​u​r​ ​c​u​s​t​o​m​e​r​s​ ​(​i​n​s​t​a​n​c​e​s​)​ ​a​n​d​ ​a​l​l​ ​t​h​e​i​r​ ​t​u​n​n​e​l​s​ ​(​l​o​c​a​t​i​o​n​s​)​ ​c​a​n​ ​b​e​ ​i​n​ ​o​n​e​ ​p​l​a​c​e​!
 							 */
 							sideText: string
@@ -1483,6 +1484,7 @@ export type TranslationFunctions = {
 							title: () => LocalizedString
 							/**
 							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+					
 						If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
 							 */
 							sideText: () => LocalizedString

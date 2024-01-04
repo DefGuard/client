@@ -8,6 +8,7 @@
     .github {
       height: 60px;
       width: 270px;
+
       p,
       span {
         @include typography(app-button-l);
@@ -54,14 +55,13 @@
         row-gap: 0;
       }
 
-      & > img {
+      & > .image-box {
         width: 100%;
-        height: auto;
-        aspect-ratio: 16/9;
+        height: 301px;
         border: none;
-        background-color: transparent;
         border-radius: 15px;
         box-shadow: var(--box-shadow);
+        background-size: cover;
       }
 
       &.between {
@@ -107,6 +107,36 @@
       padding: 0 60px;
     }
 
+    .wireguard-logo {
+      path {
+        fill: var(--text-body-primary);
+      }
+    }
+
+    .logo-container {
+      width: 100%;
+      height: 85px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-flow: row nowrap;
+      column-gap: 13px;
+
+      :nth-child(1) {
+        width: 40px;
+        height: 100%;
+      }
+
+      :nth-child(2) {
+        width: 159px;
+        height: 46px;
+
+        path {
+          fill: var(--text-body-primary);
+        }
+      }
+    }
+
     .inner-card {
       display: flex;
       flex-flow: column;
@@ -148,8 +178,27 @@
     .text {
       max-width: 600px;
       user-select: text;
+
       p {
         margin-bottom: 20px;
+      }
+    }
+
+    .logo-container {
+      height: 118px;
+      width: 100%;
+      display: flex;
+      flex-flow: row nowrap;
+      column-gap: 18px;
+
+      :nth-child(1) {
+        height: 100%;
+      }
+
+      :nth-child(2) {
+        path {
+          fill: var(--text-body-primary);
+        }
       }
     }
   }

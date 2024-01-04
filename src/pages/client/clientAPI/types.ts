@@ -118,4 +118,5 @@ export type TauriCommandKey =
   | 'parse_tunnel_config'
   | 'save_tunnel'
   | 'all_tunnels'
-  | 'location_interface_details';
+  | 'location_interface_details'
+  | 'open_link';

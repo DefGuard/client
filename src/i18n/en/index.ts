@@ -94,6 +94,7 @@ If you would like to secure your Wireguard instance try **defguard** VPN & SSO s
               title: '**Multiple** instance & locations',
               // md
               sideText: `**defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+
 If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!`,
             },
             support: {

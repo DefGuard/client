@@ -4,8 +4,8 @@ import classNames from 'classnames';
 import { useMatch, useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
+import { IconDefguard } from '../../../../shared/components/icons/IconDefguard/IconDeguard';
 import SvgDefguadNavLogoCollapsed from '../../../../shared/components/svg/DefguardLogoCollapsed';
-import SvgDefguardLogoIcon from '../../../../shared/components/svg/DefguardLogoIcon';
 import SvgDefguardLogoText from '../../../../shared/components/svg/DefguardLogoText';
 import SvgIconNavConnections from '../../../../shared/components/svg/IconNavConnections';
 import SvgIconNavVpn from '../../../../shared/components/svg/IconNavVpn';
@@ -32,7 +32,7 @@ export const ClientSideBar = () => {
         className="logo-desktop"
         onClick={() => navigate(routes.client.carousel, { replace: true })}
       >
-        <SvgDefguardLogoIcon />
+        <IconDefguard />
         <SvgDefguardLogoText />
       </div>
       <div

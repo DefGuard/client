@@ -1,5 +1,8 @@
 import './style.scss';
 
+import { useEffect } from 'react';
+
+import { useClientFlags } from '../../hooks/useClientFlags';
 import {
   InstancesSlide,
   SecuritySlide,
@@ -34,6 +37,13 @@ const slides: CarouselItem[] = [
 ];
 
 export const CarouselPage = () => {
+  const setClientFlags = useClientFlags((state) => state.setValues);
+
+  useEffect(() => {
+    setClientFlags({ firstStart: false });
+    // eslint-next-line-ignore
+  }, [setClientFlags]);
+
   return (
     <section className="client-page" id="carousel-page">
       <CardCarousel cards={slides} />

@@ -663,3 +663,11 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
     }
     Ok(tunnel_info)
 }
+
+#[tauri::command]
+pub async fn open_link(link: &str) -> Result<(), Error> {
+    match webbrowser::open(link) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::CommandError(e.to_string())),
+    }
+}
