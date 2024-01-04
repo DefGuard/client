@@ -161,6 +161,23 @@ impl Tunnel {
         .fetch_one(pool)
         .await
     }
+    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
+        // delete instance
+        query!("DELETE FROM tunnel WHERE id = $1", id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
+        match self.id {
+            Some(id) => {
+                Tunnel::delete_by_id(pool, id).await?;
+                Ok(())
+            }
+            None => Err(Error::NotFound),
+        }
+    }
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]

@@ -1351,6 +1351,33 @@ type RootTranslation = {
 				submit: string
 			}
 		}
+		deleteTunnel: {
+			/**
+			 * D​e​l​e​t​e​ ​t​u​n​n​e​l
+			 */
+			title: string
+			/**
+			 * A​r​e​ ​y​o​u​ ​s​u​r​e​ ​y​o​u​ ​w​a​n​t​ ​t​o​ ​d​e​l​e​t​e​ ​{​n​a​m​e​}​?
+			 * @param {string} name
+			 */
+			subtitle: RequiredParams<'name'>
+			messages: {
+				/**
+				 * T​u​n​n​e​l​ ​d​e​l​e​t​e​d
+				 */
+				success: string
+				/**
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​e​d
+				 */
+				error: string
+			}
+			controls: {
+				/**
+				 * D​e​l​e​t​e​ ​t​u​n​n​e​l
+				 */
+				submit: string
+			}
+		}
 	}
 }
 
@@ -2680,6 +2707,32 @@ export type TranslationFunctions = {
 			controls: {
 				/**
 				 * Delete instance
+				 */
+				submit: () => LocalizedString
+			}
+		}
+		deleteTunnel: {
+			/**
+			 * Delete tunnel
+			 */
+			title: () => LocalizedString
+			/**
+			 * Are you sure you want to delete {name}?
+			 */
+			subtitle: (arg: { name: string }) => LocalizedString
+			messages: {
+				/**
+				 * Tunnel deleted
+				 */
+				success: () => LocalizedString
+				/**
+				 * Unexpected error occured
+				 */
+				error: () => LocalizedString
+			}
+			controls: {
+				/**
+				 * Delete tunnel
 				 */
 				submit: () => LocalizedString
 			}

@@ -638,6 +638,17 @@ If you want to disengage your VPN connection, simply press "deactivate".
         submit: 'Delete instance',
       },
     },
+    deleteTunnel: {
+      title: 'Delete tunnel',
+      subtitle: 'Are you sure you want to delete {name: string}?',
+      messages: {
+        success: 'Tunnel deleted',
+        error: 'Unexpected error occured',
+      },
+      controls: {
+        submit: 'Delete tunnel',
+      },
+    },
   },
 } satisfies BaseTranslation;
 
