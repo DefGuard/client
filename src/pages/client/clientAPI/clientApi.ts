@@ -103,6 +103,9 @@ const getTunnels = async (): Promise<CommonWireguardFields[]> =>
 const getTunnelDetails = async (id: number): Promise<Tunnel> =>
   invokeWrapper('tunnel_details', { tunnelId: id });
 
+const deleteTunnel = async (id: number): Promise<void> =>
+  invokeWrapper('delete_tunnel', { tunnelId: id });
+
 export const clientApi = {
   getInstances,
   getTunnels,
@@ -118,6 +121,7 @@ export const clientApi = {
   getSettings,
   updateSettings,
   deleteInstance,
+  deleteTunnel,
   getLocationDetails,
   updateInstance,
   parseTunnelConfig,

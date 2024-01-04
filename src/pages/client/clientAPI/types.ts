@@ -123,4 +123,5 @@ export type TauriCommandKey =
   | 'save_tunnel'
   | 'all_tunnels'
   | 'tunnel_details'
+  | 'delete_tunnel'
   | 'location_interface_details';

@@ -668,3 +668,33 @@ pub async fn tunnel_details(
         Err(Error::NotFound)
     }
 }
+#[tauri::command(async)]
+pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Error> {
+    debug!("Deleting tunnel {tunnel_id}");
+    let app_state = handle.state::<AppState>();
+    let mut client = app_state.client.clone();
+    let pool = &app_state.get_pool();
+    if let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? {
+        if let Some(connection) =
+            app_state.find_and_remove_connection(tunnel_id, &ConnectionType::Tunnel)
+        {
+            debug!("Found active connection for tunnel({tunnel_id}), closing...",);
+            let request = RemoveInterfaceRequest {
+                interface_name: connection.interface_name.clone(),
+                pre_down: tunnel.pre_down.clone(),
+                post_down: tunnel.post_up.clone(),
+            };
+            client
+                .remove_interface(request)
+                .await
+                .map_err(|_| Error::InternalError)?;
+            debug!("Connection closed and interface removed");
+        }
+        tunnel.delete(pool).await?;
+    } else {
+        error!("Tunnel {tunnel_id} not found");
+        return Err(Error::NotFound);
+    }
+    info!("Tunnel {tunnel_id}, deleted");
+    Ok(())
+}

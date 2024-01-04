@@ -17,6 +17,8 @@ import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
 import { WireguardInstanceType } from '../../types';
 import { EditTunnelFormCard } from './components/EditTunnelFormCard';
+import { DeleteTunnelModal } from './modals/DeleteTunnelModal/DeleteTunnelModal';
+import { useDeleteTunnelModal } from './modals/DeleteTunnelModal/useDeleteTunnelModal';
 
 const { getTunnelDetails } = clientApi;
 
@@ -25,6 +27,7 @@ export const ClientEditTunnelPage = () => {
   const navigate = useNavigate();
   const submitRef = useRef<HTMLInputElement | null>(null);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
+  const openDeleteTunnel = useDeleteTunnelModal((state) => state.open);
   useEffect(() => {
     if (
       selectedInstance?.id === undefined ||
@@ -40,30 +43,45 @@ export const ClientEditTunnelPage = () => {
     enabled: !!selectedInstance?.id,
   });
   return (
-    <section className="client-page" id="client-edit-tunnel-page">
-      <header>
-        <h1>{LL.pages.client.pages.editTunnelPage.title()}</h1>
-        <div className="controls">
-          <Button
-            size={ButtonSize.SMALL}
-            styleVariant={ButtonStyleVariant.STANDARD}
-            text={LL.common.controls.cancel()}
-            type="submit"
-            onClick={() => navigate(routes.client.base, { replace: true })}
-          />
-          <Button
-            size={ButtonSize.SMALL}
-            styleVariant={ButtonStyleVariant.SAVE}
-            text={LL.pages.client.pages.editTunnelPage.controls.save()}
-            icon={<SvgIconCheckmarkSmall />}
-            type="submit"
-            onClick={() => submitRef.current?.click()}
-          />
+    <>
+      <section className="client-page" id="client-edit-tunnel-page">
+        <header>
+          <h1>{LL.pages.client.pages.editTunnelPage.title()}</h1>
+          <div className="controls">
+            <Button
+              size={ButtonSize.SMALL}
+              styleVariant={ButtonStyleVariant.STANDARD}
+              text={LL.common.controls.cancel()}
+              type="submit"
+              onClick={() => navigate(routes.client.base, { replace: true })}
+            />
+            <Button
+              size={ButtonSize.SMALL}
+              styleVariant={ButtonStyleVariant.DELETE}
+              text={'Delete tunnel'}
+              type="submit"
+              onClick={() => {
+                console.log(tunnel);
+                if (tunnel) {
+                  openDeleteTunnel(tunnel);
+                }
+              }}
+            />
+            <Button
+              size={ButtonSize.SMALL}
+              styleVariant={ButtonStyleVariant.SAVE}
+              text={LL.pages.client.pages.editTunnelPage.controls.save()}
+              icon={<SvgIconCheckmarkSmall />}
+              type="submit"
+              onClick={() => submitRef.current?.click()}
+            />
+          </div>
+        </header>
+        <div className="content">
+          {tunnel && <EditTunnelFormCard tunnel={tunnel} submitRef={submitRef} />}
         </div>
-      </header>
-      <div className="content">
-        {tunnel && <EditTunnelFormCard tunnel={tunnel} submitRef={submitRef} />}
-      </div>
-    </section>
+      </section>
+      <DeleteTunnelModal />
+    </>
   );
 };
