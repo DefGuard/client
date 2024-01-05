@@ -33,7 +33,7 @@
       text-align: center;
       width: 100%;
       font-weight: 400;
-      height: 72px;
+      min-height: 72px;
     }
 
     strong,
@@ -46,9 +46,12 @@
       display: grid;
       grid-template-rows: auto auto;
       grid-template-columns: 1fr;
+      align-items: center;
+      justify-items: center;
       row-gap: 20px;
+      column-gap: 10px;
 
-      @include media-breakpoint-up(xl) {
+      @include media-breakpoint-up(xxl) {
         grid-template-rows: auto;
         grid-template-columns: 1fr 1fr;
         column-gap: 40px;
@@ -100,7 +103,8 @@
 
   #welcome-slide {
     h2 {
-      margin-bottom: 40px;
+      padding-bottom: 40px;
+      display: block;
     }
 
     & > .row {
@@ -170,8 +174,17 @@
   #factor-slide,
   #security-slide,
   #instances-slide,
+  #support-slide,
+  #welcome-slide {
+    min-height: 750px;
+  }
+
+  #factor-slide,
+  #security-slide,
+  #instances-slide,
   #support-slide {
     justify-content: space-between;
+    row-gap: 25px;
   }
 
   #support-slide {
