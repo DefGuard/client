@@ -259,6 +259,7 @@ pub fn get_service_log_dir() -> PathBuf {
     #[cfg(not(target_os = "windows"))]
     let path = PathBuf::from("/var/log/defguard-service");
 
+    #[cfg(not(target_os = "windows"))]
     path
 }
 /// Setup client interface
