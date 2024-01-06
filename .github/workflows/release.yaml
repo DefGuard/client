@@ -334,6 +334,7 @@ jobs:
       # TODO: bundle .msi
       - name: Bundle .msi
         run: |
+          dotnet tool install --global wix
           wix --version
           ls
           # wix extension add -g WixToolset.Bal.wixext
