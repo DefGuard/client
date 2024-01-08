@@ -8,18 +8,14 @@ use defguard_client::{
     service::{config::Config, run_server},
     utils::get_service_log_dir,
 };
+use tracing_appender::non_blocking::WorkerGuard;
 use std::io::stdout;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
 
-#[cfg(not(windows))]
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // parse config
-    let config: Config = Config::parse();
-
+fn logging_setup(config: &Config) -> WorkerGuard {
     // prepare log file appender
     let log_dir = get_service_log_dir();
     let file_appender = tracing_appender::rolling::daily(log_dir, "defguard-service.log");
@@ -48,6 +44,16 @@ async fn main() -> anyhow::Result<()> {
         .with(json_file_layer)
         .init();
 
+    _guard
+}
+
+#[cfg(not(windows))]
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // parse config
+    let config: Config = Config::parse();
+    let _guard = logging_setup(&config);
+
     // run gRPC server
     run_server(config).await?;
 
@@ -61,12 +67,12 @@ fn main() -> windows_service::Result<()> {
 
 #[cfg(windows)]
 mod defguard_windows_service {
+    use crate::logging_setup;
     use clap::Parser;
     use defguard_client::service::{config::Config, run_server};
     use log::error;
     use std::{ffi::OsString, sync::mpsc, time::Duration};
     use tokio::runtime::Runtime;
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
     use windows_service::{
         define_windows_service,
         service::{
@@ -132,15 +138,8 @@ mod defguard_windows_service {
                 process_id: None,
             })?;
 
-            let config = Config::parse();
-
-            tracing_subscriber::registry()
-                .with(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| format!("{},hyper=info", config.log_level).into()),
-                )
-                .with(tracing_subscriber::fmt::layer())
-                .init();
+            let config: Config = Config::parse();
+            let _guard = logging_setup(&config);
 
             runtime.spawn(run_server(config));
 
