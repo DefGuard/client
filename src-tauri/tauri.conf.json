@@ -66,7 +66,7 @@
         "resources/*"
       ],
       "shortDescription": "",
-      "targets": ["deb", "app", "appimage", "msi"],
+      "targets": ["deb", "app", "appimage"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
