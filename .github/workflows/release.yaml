@@ -333,13 +333,14 @@ jobs:
 
       - name: Bundle .msi
         run: |
+          ls src-tauri\target\release\bundle\msi
           dotnet tool install --global wix
           wix --version
           wix extension add -g WixToolset.Bal.wixext
           ls
           wix build .\src-tauri\resources-windows\defguard-client.wxs -ext WixToolset.Bal.wixext
           ls
-          ls .\src-tauri\resources-windows
+          ls .\src-tauri\resources-windows\binaries
 
       # - name: Upload installer
       #   uses: actions/upload-release-asset@v1.0.2
