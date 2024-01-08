@@ -289,12 +289,12 @@ jobs:
 
       - name: Write release version
         run: |
-          # $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
-          # echo Version: $env:VERSION
-          # echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
-          
-          $env:VERSION=echo 1.0.0
+          $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
+          echo Version: $env:VERSION
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
+          
+          # $env:VERSION=echo 1.0.0
+          # echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
 
       - uses: actions/setup-node@v3
         with:
