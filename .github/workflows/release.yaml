@@ -5,44 +5,42 @@ on:
     tags:
       - v*.*.*
 
-# on: push
-
 jobs:
-  # build-wireguard-go:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       architecture: [arm64, amd64]
+  build-wireguard-go:
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [arm64, amd64]
     
-  #   runs-on: [self-hosted, macOS]
+    runs-on: [self-hosted, macOS]
     
-  #   steps:
-  #    - uses: actions/checkout@v4
-  #      with:
-  #        repository: WireGuard/wireguard-go
-  #        ref: master
-  #        fetch-depth: 0
-  #    - name: Set up Go
-  #      uses: actions/setup-go@v4
-  #      with:
-  #        go-version: '1.20'
-  #    - name: Build wireguard-go binary
-  #      run: make
-  #      env:
-  #       GOOS: darwin
-  #       GOARCH: ${{ matrix.architecture }}
-  #    - name: Upload binary artifact arm64
-  #      if: matrix.architecture == 'arm64'
-  #      uses: actions/upload-artifact@v3
-  #      with:
-  #        name: wireguard-go-aarch64-apple-darwin
-  #        path: wireguard-go
-  #    - name: Upload binary artifact amd64
-  #      if: matrix.architecture == 'amd64'
-  #      uses: actions/upload-artifact@v3
-  #      with:
-  #        name: wireguard-go-x86_64-apple-darwin
-  #        path: wireguard-go
+    steps:
+     - uses: actions/checkout@v4
+       with:
+         repository: WireGuard/wireguard-go
+         ref: master
+         fetch-depth: 0
+     - name: Set up Go
+       uses: actions/setup-go@v4
+       with:
+         go-version: '1.20'
+     - name: Build wireguard-go binary
+       run: make
+       env:
+        GOOS: darwin
+        GOARCH: ${{ matrix.architecture }}
+     - name: Upload binary artifact arm64
+       if: matrix.architecture == 'arm64'
+       uses: actions/upload-artifact@v3
+       with:
+         name: wireguard-go-aarch64-apple-darwin
+         path: wireguard-go
+     - name: Upload binary artifact amd64
+       if: matrix.architecture == 'amd64'
+       uses: actions/upload-artifact@v3
+       with:
+         name: wireguard-go-x86_64-apple-darwin
+         path: wireguard-go
 
   create-release:
     name: create-release
@@ -58,223 +56,223 @@ jobs:
           draft: true
           generate_release_notes: true
 
-  # build-linux:
-  #   needs:
-  #     - create-release
+  build-linux:
+    needs:
+      - create-release
 
-  #   runs-on:
-  #     - self-hosted
-  #     - Linux
+    runs-on:
+      - self-hosted
+      - Linux
 
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         submodules: "recursive"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
-  #     - name: Write release version
-  #       run: |
-  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-  #         echo Version: $VERSION
-  #         echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-  #     - uses: actions/setup-node@v3
-  #       with:
-  #         node-version: "20"
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
 
-  #     - uses: pnpm/action-setup@v2
-  #       with:
-  #         version: 8
-  #         run_install: false
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
 
-  #     - name: Get pnpm store directory
-  #       shell: bash
-  #       run: |
-  #         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-  #     - uses: actions/cache@v3
-  #       name: Setup pnpm cache
-  #       with:
-  #         path: ${{ env.STORE_PATH }}
-  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-pnpm-build-store-
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
 
-  #     - name: Install deps
-  #       run: pnpm install --frozen-lockfile
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
 
-  #     - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-  #     - name: install linux deps
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
+      - name: install linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
 
-  #     - name: install protobuf compiler
-  #       run: |
-  #         PB_REL='https://github.com/protocolbuffers/protobuf/releases'
-  #         PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
-  #         sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local
+      - name: install protobuf compiler
+        run: |
+          PB_REL='https://github.com/protocolbuffers/protobuf/releases'
+          PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
+          sudo unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local
 
-  #     - name: Build packages
-  #       uses: tauri-apps/tauri-action@v0
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - name: Upload DEB
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_amd64.deb
-  #         asset_name: defguard-client_${{ env.VERSION }}_amd64.deb
-  #         asset_content_type: application/octet-stream
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_amd64.deb
+          asset_name: defguard-client_${{ env.VERSION }}_amd64.deb
+          asset_content_type: application/octet-stream
 
-  #     - name: Upload AppImage
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/release/bundle/appimage/defguard-client_${{ env.VERSION }}_amd64.AppImage
-  #         asset_name: defguard-client_${{ env.VERSION }}_amd64.AppImage
-  #         asset_content_type: application/octet-stream
+      - name: Upload AppImage
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/appimage/defguard-client_${{ env.VERSION }}_amd64.AppImage
+          asset_name: defguard-client_${{ env.VERSION }}_amd64.AppImage
+          asset_content_type: application/octet-stream
 
-  #     - name: Rename client binary
-  #       run: mv src-tauri/target/release/defguard-client defguard-client-linux-x86_64-${{ github.ref_name }}
+      - name: Rename client binary
+        run: mv src-tauri/target/release/defguard-client defguard-client-linux-x86_64-${{ github.ref_name }}
 
-  #     - name: Tar client binary
-  #       uses: a7ul/tar-action@v1.1.0
-  #       with:
-  #         command: c
-  #         files: |
-  #           defguard-client-linux-x86_64-${{ github.ref_name }}
-  #         outPath: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
+      - name: Tar client binary
+        uses: a7ul/tar-action@v1.1.0
+        with:
+          command: c
+          files: |
+            defguard-client-linux-x86_64-${{ github.ref_name }}
+          outPath: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
 
-  #     - name: Upload client archive
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
-  #         asset_name: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
-  #         asset_content_type: application/octet-stream
+      - name: Upload client archive
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
 
-  #     - name: Rename daemon binary
-  #       run: mv src-tauri/target/release/defguard-service defguard-service-linux-x86_64-${{ github.ref_name }}
+      - name: Rename daemon binary
+        run: mv src-tauri/target/release/defguard-service defguard-service-linux-x86_64-${{ github.ref_name }}
 
-  #     - name: Tar daemon binary
-  #       uses: a7ul/tar-action@v1.1.0
-  #       with:
-  #         command: c
-  #         files: |
-  #           defguard-service-linux-x86_64-${{ github.ref_name }}
-  #         outPath: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
+      - name: Tar daemon binary
+        uses: a7ul/tar-action@v1.1.0
+        with:
+          command: c
+          files: |
+            defguard-service-linux-x86_64-${{ github.ref_name }}
+          outPath: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
 
-  #     - name: Upload daemon archive
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
-  #         asset_name: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
-  #         asset_content_type: application/octet-stream
+      - name: Upload daemon archive
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
 
-  # build-macos:
-  #   needs:
-  #     - create-release
-  #     - build-wireguard-go
+  build-macos:
+    needs:
+      - create-release
+      - build-wireguard-go
 
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
 
-  #   runs-on:
-  #     - self-hosted
-  #     - macOS
+    runs-on:
+      - self-hosted
+      - macOS
 
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         submodules: "recursive"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
-  #     - name: Write release version
-  #       run: |
-  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-  #         echo Version: $VERSION
-  #         echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-  #     - uses: actions/setup-node@v3
-  #       with:
-  #         node-version: "20"
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
 
-  #     - uses: pnpm/action-setup@v2
-  #       with:
-  #         version: 8
-  #         run_install: false
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
 
-  #     - name: Get pnpm store directory
-  #       shell: bash
-  #       run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-  #     - uses: actions/cache@v3
-  #       name: Setup pnpm cache
-  #       with:
-  #         path: ${{ env.STORE_PATH }}
-  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-pnpm-build-store-
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
 
-  #     - name: Install deps
-  #       run: pnpm install --frozen-lockfile
-  #     - uses: dtolnay/rust-toolchain@stable
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
 
-  #     - name: Install protobuf compiler
-  #       run: brew install protobuf
+      - name: Install protobuf compiler
+        run: brew install protobuf
 
-  #     - name: Install ARM target
-  #       run: rustup target add aarch64-apple-darwin
+      - name: Install ARM target
+        run: rustup target add aarch64-apple-darwin
 
-  #     - name: Download wireguard-go binary
-  #       uses: actions/download-artifact@v3
-  #       with:
-  #         name: wireguard-go-${{ matrix.target }}
-  #         path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
+      - name: Download wireguard-go binary
+        uses: actions/download-artifact@v3
+        with:
+          name: wireguard-go-${{ matrix.target }}
+          path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
 
-  #     - name: Unlock keychain
-  #       run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
+      - name: Unlock keychain
+        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
 
-  #     - name: Build app
-  #       uses: tauri-apps/tauri-action@v0
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         APPLE_SIGNING_IDENTITY: "Developer ID Application: TEONITE (6WD6W6WQNV)"
-  #         APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-  #         APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-  #         APPLE_ID: "admin@teonite.com"
-  #         APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
-  #         APPLE_TEAM_ID: "6WD6W6WQNV"
-  #       with:
-  #         args: --target ${{ matrix.target }} -v
+      - name: Build app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: TEONITE (6WD6W6WQNV)"
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: "admin@teonite.com"
+          APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: "6WD6W6WQNV"
+        with:
+          args: --target ${{ matrix.target }} -v
 
-  #     - name: Build installation package
-  #       run: |
-  #         bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "Developer ID Installer: TEONITE (6WD6W6WQNV)" /Users/admin/Library/Keychains/login.keychain
-  #         xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-  #         xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+      - name: Build installation package
+        run: |
+          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "Developer ID Installer: TEONITE (6WD6W6WQNV)" /Users/admin/Library/Keychains/login.keychain
+          xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+          xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
 
-  #     - name: Upload installation package
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-  #         asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
-  #         asset_content_type: application/octet-stream
+      - name: Upload installation package
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
+          asset_content_type: application/octet-stream
 
   build-windows:
     needs:
@@ -292,9 +290,6 @@ jobs:
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
           echo Version: $env:VERSION
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
-          
-          # $env:VERSION=echo 1.0.0
-          # echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
 
       - uses: actions/setup-node@v3
         with:
@@ -333,14 +328,10 @@ jobs:
 
       - name: Bundle application
         run: |
-          ls src-tauri\target\release\bundle\msi
           dotnet tool install --global wix
           wix --version
           wix extension add -g WixToolset.Bal.wixext
-          ls
           wix build .\src-tauri\resources-windows\defguard-client.wxs -ext WixToolset.Bal.wixext
-          ls
-          ls .\src-tauri\resources-windows\binaries
 
       - name: Upload installer
         uses: actions/upload-release-asset@v1.0.2
@@ -350,7 +341,5 @@ jobs:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: src-tauri/resources-windows/defguard-client.exe
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
-          # asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
-          # asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
           asset_content_type: application/octet-stream
         
