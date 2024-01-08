@@ -545,6 +545,7 @@ pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<S
     let mut settings = Settings::get(pool).await?;
     trace!("Settings read from table");
     settings.apply(data);
+    debug!("Saving settings");
     settings.save(pool).await?;
     debug!("Settings saved, reconfiguring tray icon.");
     match configure_tray_icon(&handle, &settings.tray_icon_theme) {
