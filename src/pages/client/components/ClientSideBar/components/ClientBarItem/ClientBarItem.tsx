@@ -1,5 +1,7 @@
 import { autoUpdate, useFloating } from '@floating-ui/react';
 import classNames from 'classnames';
+import { isUndefined } from 'lodash-es';
+import { useMemo } from 'react';
 import { useMatch, useNavigate } from 'react-router-dom';
 
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
@@ -7,30 +9,35 @@ import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { WireguardInstanceType } from '../../../../types';
 
-interface BaseInstance {
-  id?: number;
-  name: string;
-  // Connected
-  active: boolean;
-  type: WireguardInstanceType;
-}
-
-type Props<T extends BaseInstance> = {
-  instance: T;
+type Props = {
+  itemType: WireguardInstanceType;
+  itemId: number;
+  label: string;
+  active?: boolean;
 };
 
-export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) => {
-  const instancePage = useMatch('/client/');
+export const ClientBarItem = ({
+  itemType,
+  itemId,
+  label,
+  active: acitve = false,
+}: Props) => {
+  const instancePage = useMatch('/client/instance/');
   const navigate = useNavigate();
   const setClientStore = useClientStore((state) => state.setState);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
-
-  const active =
-    instance.type === selectedInstance?.type && instance.id === selectedInstance.id;
+  const itemSelected = useMemo(() => {
+    return (
+      !isUndefined(selectedInstance) &&
+      !isUndefined(selectedInstance?.id) &&
+      selectedInstance.id === itemId &&
+      selectedInstance.type === itemType
+    );
+  }, [selectedInstance, itemType, itemId]);
 
   const cn = classNames('client-bar-item', 'clickable', {
-    active: active,
-    connected: instance.active,
+    active: itemSelected,
+    connected: acitve,
   });
 
   const { refs, floatingStyles } = useFloating({
@@ -45,34 +52,37 @@ export const ClientBarItem = <T extends BaseInstance>({ instance }: Props<T>) =>
         className={cn}
         ref={refs.setReference}
         onClick={() => {
-          if (instance.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
-            setClientStore({
-              selectedInstance: {
-                id: instance.id as number,
-                type: WireguardInstanceType.DEFGUARD_INSTANCE,
-              },
-            });
-          } else {
-            setClientStore({
-              selectedInstance: {
-                id: instance.id as number,
-                type: WireguardInstanceType.TUNNEL,
-              },
-            });
+          switch (itemType) {
+            case WireguardInstanceType.DEFGUARD_INSTANCE:
+              setClientStore({
+                selectedInstance: {
+                  id: itemId,
+                  type: WireguardInstanceType.DEFGUARD_INSTANCE,
+                },
+              });
+              break;
+            case WireguardInstanceType.TUNNEL:
+              setClientStore({
+                selectedInstance: {
+                  id: itemId,
+                  type: WireguardInstanceType.TUNNEL,
+                },
+              });
+              break;
           }
           if (!instancePage) {
-            navigate(routes.client.base, { replace: true });
+            navigate(routes.client.instancePage, { replace: true });
           }
         }}
       >
         <SvgIconConnection className="connection-icon" />
-        <p>{instance.name}</p>
+        <p>{label}</p>
         <div className="instance-shorted">
           <SvgIconConnection className="connection-icon" />
-          <p>{instance.name[0]}</p>
+          <p>{label[0]}</p>
         </div>
       </div>
-      {instance.active && (
+      {acitve && (
         <div
           className="client-bar-active-item-bar"
           ref={refs.setFloating}

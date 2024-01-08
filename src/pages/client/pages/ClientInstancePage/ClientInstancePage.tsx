@@ -1,5 +1,6 @@
 import './style.scss';
 
+import { isUndefined } from 'lodash-es';
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,7 +9,7 @@ import { Button } from '../../../../shared/defguard-ui/components/Layout/Button/
 import { ButtonStyleVariant } from '../../../../shared/defguard-ui/components/Layout/Button/types';
 import { routes } from '../../../../shared/routes';
 import { useClientStore } from '../../hooks/useClientStore';
-import { WireguardInstanceType } from '../../types';
+import { DefguardInstance, WireguardInstanceType } from '../../types';
 import { LocationsList } from './components/LocationsList/LocationsList';
 import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 import { StatsLayoutSelect } from './components/StatsLayoutSelect/StatsLayoutSelect';
@@ -21,26 +22,38 @@ export const ClientInstancePage = () => {
   const instanceLL = LL.pages.client.pages.instancePage;
   const tunelLL = LL.pages.client.pages.tunnelPage;
   const instances = useClientStore((state) => state.instances);
+  const tunnels = useClientStore((state) => state.tunnels);
   const [selectedInstanceId, selectedInstanceType] = useClientStore((state) => [
     state.selectedInstance?.id,
     state.selectedInstance?.type,
   ]);
-  const selectedInstance = useMemo(
-    () => instances.find((i) => i.id === selectedInstanceId),
-    [instances, selectedInstanceId],
-  );
+
+  const selectedInstance = useMemo((): DefguardInstance | undefined => {
+    if (
+      !isUndefined(selectedInstanceId) &&
+      selectedInstanceType &&
+      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE
+    ) {
+      return instances.find((i) => i.id === selectedInstanceId);
+    }
+  }, [selectedInstanceId, selectedInstanceType, instances]);
+
   const navigate = useNavigate();
 
   const isLocationPage = selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE;
 
   const openUpdateInstanceModal = useUpdateInstanceModal((state) => state.open);
 
-  // router guard, if no instances redirect to add instance, for now, later this will be replaced by init welcome flow
   useEffect(() => {
-    if (instances.length === 0) {
+    if (
+      !selectedInstanceType ||
+      (selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE &&
+        !selectedInstance) ||
+      (selectedInstanceType === WireguardInstanceType.TUNNEL && tunnels.length === 0)
+    ) {
       navigate(routes.client.addInstance, { replace: true });
     }
-  }, [instances, navigate]);
+  }, [selectedInstance, navigate, tunnels.length, selectedInstanceType]);
 
   return (
     <section id="client-instance-page" className="client-page">
@@ -51,16 +64,18 @@ export const ClientInstancePage = () => {
           {isLocationPage && (
             <>
               <StatsLayoutSelect />
-              <Button
-                styleVariant={ButtonStyleVariant.STANDARD}
-                text={LL.pages.client.pages.instancePage.header.edit()}
-                disabled={!selectedInstance}
-                onClick={() => {
-                  if (selectedInstance) {
-                    openUpdateInstanceModal(selectedInstance);
-                  }
-                }}
-              />
+              {selectedInstance && (
+                <Button
+                  styleVariant={ButtonStyleVariant.STANDARD}
+                  text={LL.pages.client.pages.instancePage.header.edit()}
+                  disabled={!selectedInstance}
+                  onClick={() => {
+                    if (selectedInstance) {
+                      openUpdateInstanceModal(selectedInstance);
+                    }
+                  }}
+                />
+              )}
             </>
           )}
           {!isLocationPage && selectedInstanceId && (

@@ -3,7 +3,7 @@ export const routes = {
   main: '/',
   client: {
     base: '/client',
-    instancePage: '/client/',
+    instancePage: '/client/instance',
     addInstance: '/client/add-instance',
     addTunnel: '/client/add-tunnel',
     tunnelCreated: '/client/tunnel-created',
