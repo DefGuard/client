@@ -1,11 +1,11 @@
 name: "Build app & create release"
 
-# on:
-#   push:
-#     tags:
-#       - v*.*.*
+on:
+  push:
+    tags:
+      - v*.*.*
 
-on: push
+# on: push
 
 jobs:
   # build-wireguard-go:
@@ -44,19 +44,19 @@ jobs:
   #        name: wireguard-go-x86_64-apple-darwin
   #        path: wireguard-go
 
-  # create-release:
-  #   name: create-release
-  #   runs-on: self-hosted
-  #   outputs:
-  #     upload_url: ${{ steps.release.outputs.upload_url }}
-  #   steps:
-  #     - name: Create GitHub release
-  #       id: release
-  #       uses: softprops/action-gh-release@v1
-  #       if: startsWith(github.ref, 'refs/tags/')
-  #       with:
-  #         draft: true
-  #         generate_release_notes: true
+  create-release:
+    name: create-release
+    runs-on: self-hosted
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+    steps:
+      - name: Create GitHub release
+        id: release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true
+          generate_release_notes: true
 
   # build-linux:
   #   needs:
@@ -277,8 +277,8 @@ jobs:
   #         asset_content_type: application/octet-stream
 
   build-windows:
-    # needs:
-    #   - create-release
+    needs:
+      - create-release
 
     runs-on: windows-latest
 
@@ -331,7 +331,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Bundle .msi
+      - name: Bundle application
         run: |
           ls src-tauri\target\release\bundle\msi
           dotnet tool install --global wix
@@ -342,13 +342,15 @@ jobs:
           ls
           ls .\src-tauri\resources-windows\binaries
 
-      # - name: Upload installer
-      #   uses: actions/upload-release-asset@v1.0.2
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ needs.create-release.outputs.upload_url }}
-      #     asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
-      #     asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
-      #     asset_content_type: application/octet-stream
+      - name: Upload installer
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/resources-windows/defguard-client.exe
+          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
+          # asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          # asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          asset_content_type: application/octet-stream
         
