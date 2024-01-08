@@ -6,11 +6,11 @@
         Name="Defguard Client"
         UpgradeCode="923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43"
         Version="$(env.VERSION)"
-        IconSourceFile="..\icons\icon.ico"
+        IconSourceFile="src-tauri\icons\icon.ico"
     >
         <BootstrapperApplication>
             <bal:WixStandardBootstrapperApplication
-                LogoFile="..\icons\128x128@2x.png"
+                LogoFile="src-tauri\icons\128x128@2x.png"
                 LicenseUrl=""
                 Theme="hyperlinkLicense" />
 
@@ -28,7 +28,7 @@
                 Visible="yes"
                 Permanent="yes"
                 Id="WireguardDependency"
-                SourceFile=".\binaries\wireguard-amd64-0.5.3.msi"
+                SourceFile="src-tauri\resources-windows\binaries\wireguard-amd64-0.5.3.msi"
             >
                 <MsiProperty Name="DO_NOT_LAUNCH" Value="True" />
             </MsiPackage>
@@ -38,7 +38,7 @@
             <MsiPackage
                 Vital="yes"
                 Id="MainPackage"
-                SourceFile="..\target\release\bundle\msi\defguard-client_$(env.VERSION)_x64_en-US.msi"
+                SourceFile="src-tauri\target\release\bundle\msi\defguard-client_$(env.VERSION)_x64_en-US.msi"
             />
 
             <!-- <MsiPackage Vital="yes" Id="MainPackage" SourceFile="..\target\release\bundle\msi\defguard-client_0.1.1_x64_en-US.msi" /> -->
