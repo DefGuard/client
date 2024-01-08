@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { pickBy } from 'lodash-es';
 import { useEffect, useMemo, useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -110,7 +111,7 @@ export const AddTunnelFormCard = () => {
         dns: z
           .string()
           .refine((value) => {
-            if (value) {
+            if (value && value.length != 0) {
               return validateIpOrDomainList(value, ',', true);
             }
             return true;
@@ -160,7 +161,15 @@ export const AddTunnelFormCard = () => {
           if (reader.result && input.files) {
             const res = reader.result;
             parseTunnelConfig(res as string)
-              .then((data) => reset(data as FormFields))
+              .then((data) => {
+                const fileData = data as Partial<FormFields>;
+                const trimed = pickBy(
+                  fileData,
+                  (value) => value !== undefined && value !== null,
+                );
+                const parsedConfig = { ...defaultValues, ...trimed };
+                reset(parsedConfig);
+              })
               .catch(() => toaster.error(localLL.messages.configError()));
           }
         };

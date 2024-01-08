@@ -20,6 +20,15 @@
       gap: 10px;
       align-items: center;
       justify-content: flex-start;
+
+      & > .btn {
+        min-width: 135px;
+
+        span {
+          display: block;
+          padding: 0 1px;
+        }
+      }
     }
   }
 }
