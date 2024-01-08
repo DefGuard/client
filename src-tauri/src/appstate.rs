@@ -101,6 +101,7 @@ impl AppState {
         }
         Ok(())
     }
+
     pub fn find_connection(
         &self,
         id: i64,

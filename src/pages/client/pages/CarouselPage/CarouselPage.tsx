@@ -46,7 +46,7 @@ export const CarouselPage = () => {
 
   return (
     <section className="client-page" id="carousel-page">
-      <CardCarousel cards={slides} />
+      <CardCarousel cards={slides} autoSlide />
     </section>
   );
 };
