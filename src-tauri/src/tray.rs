@@ -51,7 +51,7 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
                         let _ = app_state.close_all_connections().await;
-                        std::process::exit(0);
+                        app.exit(0);
                     });
                 });
             }

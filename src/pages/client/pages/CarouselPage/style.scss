@@ -74,29 +74,30 @@
           justify-items: space-between;
         }
       }
+    }
 
-      .text {
-        display: flex;
-        flex-flow: column;
-        align-items: flex-start;
-        justify-content: flex-start;
-        row-gap: 20px;
-        max-width: 650px;
-        @include typography(app-welcome-2);
-        text-align: center;
+    .text {
+      display: flex;
+      flex-flow: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      row-gap: 20px;
+      max-width: 650px;
 
-        @include media-breakpoint-up(xl) {
-          text-align: left;
-        }
+      @include typography(app-welcome-2);
+      text-align: center;
 
-        strong,
-        b {
-          font-weight: 700;
-        }
+      @include media-breakpoint-up(xl) {
+        text-align: left;
+      }
 
-        &.centered {
-          justify-content: center;
-        }
+      strong,
+      b {
+        font-weight: 700;
+      }
+
+      &.centered {
+        justify-content: center;
       }
     }
   }

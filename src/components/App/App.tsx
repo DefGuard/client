@@ -69,6 +69,10 @@ const router = createBrowserRouter([
       {
         path: '/client/',
         index: true,
+        element: <Navigate to={routes.client.instancePage} />,
+      },
+      {
+        path: '/client/instance',
         element: <ClientInstancePage />,
       },
       {
