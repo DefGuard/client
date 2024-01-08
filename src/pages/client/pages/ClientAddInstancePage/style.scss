@@ -21,6 +21,7 @@
       flex-flow: row;
       align-items: center;
       justify-content: center;
+
       .btn {
         width: 100%;
         max-width: 200px;
@@ -42,30 +43,33 @@
   }
 
   & > .content {
-    display: flex;
-    flex-flow: row wrap;
-    align-items: flex-start;
-    justify-content: center;
-    row-gap: 50px;
-    column-gap: 50px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    align-items: start;
+    justify-items: center;
+    column-gap: 25px;
+    row-gap: 25px;
 
-    @include media-breakpoint-up(xxl) {
-      justify-content: flex-start;
+    @include media-breakpoint-up(xl) {
+      column-gap: 50px;
     }
 
     & > * {
       width: 100%;
-      max-width: 700px;
+      flex-grow: 1;
     }
 
     & > .card {
       box-sizing: border-box;
       padding: 32px 64px;
+
       & > h2 {
         width: 100%;
         text-align: center;
         padding-bottom: 42px;
       }
+
       form > .controls {
         padding-top: 42px;
 

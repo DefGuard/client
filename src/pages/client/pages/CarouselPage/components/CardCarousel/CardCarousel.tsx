@@ -3,7 +3,8 @@ import './style.scss';
 import classNames from 'classnames';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isUndefined } from 'lodash-es';
-import { HTMLProps, useMemo, useState } from 'react';
+import { HTMLProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { interval } from 'rxjs';
 
 import { CarouselControls } from './components/CarouselControl/CarouselControl';
 import { CarouselItem } from './types';
@@ -12,6 +13,10 @@ type Props = {
   cards: CarouselItem[];
   activeCardIndex?: number;
   onChange?: (index: number) => void;
+  /** Progress slides if main container is not hovered, this can only be used when activeCardIndex is NOT provided */
+  autoSlide?: boolean;
+  /** How often carousel will change, in milisenconds*/
+  autoSlideInterval?: number;
 } & HTMLProps<HTMLDivElement>;
 
 export const CardCarousel = ({
@@ -19,8 +24,11 @@ export const CardCarousel = ({
   cards,
   activeCardIndex,
   onChange,
+  autoSlide = false,
+  autoSlideInterval = 4000,
   ...rest
 }: Props) => {
+  const hoveredRef = useRef<boolean>(false);
   const [internalIndex, setInternalIndex] = useState(0);
 
   const cardsCount = useMemo(() => cards.length, [cards.length]);
@@ -36,8 +44,39 @@ export const CardCarousel = ({
     return cards[activeIndex];
   }, [activeIndex, cards]);
 
+  const nextSlide = useCallback(() => {
+    setInternalIndex((currentIndex) => {
+      if (currentIndex === cardsCount - 1) {
+        return 0;
+      }
+      return currentIndex + 1;
+    });
+  }, [setInternalIndex, cardsCount]);
+
+  useEffect(() => {
+    if (autoSlide) {
+      const sub = interval(autoSlideInterval).subscribe(() => {
+        if (!hoveredRef.current) {
+          nextSlide();
+        }
+      });
+      return () => {
+        sub.unsubscribe();
+      };
+    }
+  }, [nextSlide, autoSlide, autoSlideInterval]);
+
   return (
-    <div className={classNames('card-carousel', className)} {...rest}>
+    <div
+      className={classNames('card-carousel', className)}
+      onMouseEnter={() => {
+        hoveredRef.current = true;
+      }}
+      onMouseLeave={() => {
+        hoveredRef.current = false;
+      }}
+      {...rest}
+    >
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.div
           className="card-wrapper"
