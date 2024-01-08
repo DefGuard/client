@@ -2,7 +2,8 @@
     "tauri": {
         "bundle": {
             "resources": [
-                "resources-windows/binaries/*"
+                "resources-windows/binaries/*",
+                "resources/*"
             ]
         }
     }

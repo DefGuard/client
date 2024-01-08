@@ -254,12 +254,13 @@ pub fn load_log_targets() -> Vec<String> {
 pub fn get_service_log_dir() -> PathBuf {
     // FIXME: find out what's a shared log dir on Windows
     #[cfg(target_os = "windows")]
-    unimplemented!();
+    let path = PathBuf::new();
+    // let path = PathBuf::from("%APPDATA%/Roaming/net.defguard/logs");
+    // unimplemented!();
 
     #[cfg(not(target_os = "windows"))]
     let path = PathBuf::from("/var/log/defguard-service");
 
-    #[cfg(not(target_os = "windows"))]
     path
 }
 /// Setup client interface

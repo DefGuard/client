@@ -336,9 +336,11 @@ jobs:
         run: |
           dotnet tool install --global wix
           wix --version
+          wix extension add -g WixToolset.Bal.wixext
           ls
-          # wix extension add -g WixToolset.Bal.wixext
-          # wix build .\defguard-client.wxs -ext WixToolset.Bal.wixext
+          wix build .\src-tauri\resources-windows\defguard-client.wxs -ext WixToolset.Bal.wixext
+          ls
+          ls .\src-tauri\resources-windows
 
       # - name: Upload installer
       #   uses: actions/upload-release-asset@v1.0.2
