@@ -16,9 +16,6 @@
 
         </BootstrapperApplication>
 
-        <!-- TODO: hide bundle from add/remove -->
-        <!-- Proto update -->
-
         <Variable Name="DO_NOT_LAUNCH" bal:Overridable="yes" Value="True" />
         <!-- <Variable Name="LaunchTarget" Value="[INSTALLDIR]defguard-client.exe"/> -->
 
@@ -40,28 +37,6 @@
                 Id="MainPackage"
                 SourceFile="src-tauri\target\release\bundle\msi\defguard-client_$(env.VERSION)_x64_en-US.msi"
             />
-
-            <!-- <MsiPackage Vital="yes" Id="MainPackage" SourceFile="..\target\release\bundle\msi\defguard-client_0.1.1_x64_en-US.msi" /> -->
-            <!-- ..\target\release\bundle\defguard-client_0.2.0_x64_en-US.msi -->
-            <!-- <MsiPackage Vital="yes" Id="MainPackage" SourceFile=".\binaries\defguard-client_0.2.0_x64_en-US.msi" /> -->
-
-            <!-- <PackageGroupRef Id="BundlePackages" /> -->
-
         </Chain>
     </Bundle>
-
-    <!-- <Fragment>
-        <PackageGroup Id="BundlePackages">
-            <PackageGroupRef Id="PrereqPackages" />
-            <MsiPackage Id="PackageB" SourceFile=".\binaries\defguard-client_0.2.0_x64_en-US.msi" />
-        </PackageGroup>
-    </Fragment>
-
-    <Fragment>
-        <PackageGroup Id="PrereqPackages">
-            <MsiPackage SourceFile=".\binaries\wireguard-amd64-0.5.3.msi">
-                <MsiProperty Name="PREREQSONLY" Value="1" />
-            </MsiPackage>
-        </PackageGroup>
-    </Fragment> -->
 </Wix>
