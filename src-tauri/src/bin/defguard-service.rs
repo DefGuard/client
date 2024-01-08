@@ -8,8 +8,8 @@ use defguard_client::{
     service::{config::Config, run_server},
     utils::get_service_log_dir,
 };
-use tracing_appender::non_blocking::WorkerGuard;
 use std::io::stdout;
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
