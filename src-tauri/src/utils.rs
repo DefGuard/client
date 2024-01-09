@@ -75,11 +75,13 @@ pub async fn setup_interface(
                 peers: vec![peer.clone()],
             };
             debug!("Creating interface {interface_config:#?}");
-            let request = CreateInterfaceRequest {
-                config: Some(interface_config.clone().into()),
-                allowed_ips,
-                dns: location.dns.clone(),
-            };
+           let request = CreateInterfaceRequest {
+               config: Some(interface_config.clone().into()),
+               allowed_ips,
+               dns: location.dns.clone(),
+               pre_up: None,
+               post_up: None,
+           };
             if let Err(error) = client.create_interface(request).await {
                 error!("Failed to create interface: {error}");
                 Err(Error::InternalError)
