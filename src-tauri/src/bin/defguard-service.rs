@@ -83,7 +83,7 @@ mod defguard_windows_service {
         service_dispatcher, Result,
     };
 
-    const SERVICE_NAME: &str = "DefguardService";
+    static SERVICE_NAME: &str = "DefguardService";
     const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
     pub fn run() -> Result<()> {
@@ -95,8 +95,8 @@ mod defguard_windows_service {
     define_windows_service!(ffi_service_main, service_main);
 
     pub fn service_main(_arguments: Vec<OsString>) {
-        if let Err(_e) = run_service() {
-            error!("Error while running the service. {:?}", _e);
+        if let Err(err) = run_service() {
+            error!("Error while running the service. {err}");
         }
     }
 
