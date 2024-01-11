@@ -97,12 +97,14 @@ mod defguard_windows_service {
     pub fn service_main(_arguments: Vec<OsString>) {
         if let Err(err) = run_service() {
             error!("Error while running the service. {err}");
+            panic!("{err}");
         }
     }
 
     fn run_service() -> Result<()> {
         // Create a channel to be able to poll a stop event from the service worker loop.
-        let (shutdown_tx, shutdown_rx) = mpsc::channel();
+        let (shutdown_tx, shutdown_rx) = mpsc::channel::<u32>();
+        let shutdown_tx_server = shutdown_tx.clone();
 
         // Define system service event handler that will be receiving service events.
         let event_handler = move |control_event| -> ServiceControlHandlerResult {
@@ -113,7 +115,7 @@ mod defguard_windows_service {
 
                 // Handle stop
                 ServiceControl::Stop => {
-                    shutdown_tx.send(()).unwrap();
+                    shutdown_tx.send(1).unwrap();
                     ServiceControlHandlerResult::NoError
                 }
 
@@ -141,13 +143,29 @@ mod defguard_windows_service {
             let config: Config = Config::parse();
             let _guard = logging_setup(&config);
 
-            runtime.spawn(run_server(config));
+            let default_panic = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                default_panic(info);
+                std::process::exit(1);
+            }));
+
+            runtime.spawn(async move {
+                let server_result = run_server(config).await;
+
+                if server_result.is_err() {
+                    shutdown_tx_server.send(2).unwrap();
+                }
+            });
 
             loop {
                 // Poll shutdown event.
                 match shutdown_rx.recv_timeout(Duration::from_secs(1)) {
                     // Break the loop either upon stop or channel disconnect
-                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    Ok(1) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    Ok(2) => {
+                        panic!("Server has stopped working.")
+                    }
+                    Ok(_) => break,
 
                     // Continue work if no events were received within the timeout
                     Err(mpsc::RecvTimeoutError::Timeout) => (),

@@ -12,7 +12,15 @@
           Type="ownProcess"
           Start="auto"
           ErrorControl="normal"
-        />
+        >
+          <util:ServiceConfig
+            ResetPeriodInDays="1"
+            RestartServiceDelayInSeconds="30"
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"
+          />
+        </ServiceInstall>
         <ServiceControl Id="DefguardService" Name="DefguardService" Start="install" Stop="both" Remove="uninstall" />
       </Component>
     </DirectoryRef>
