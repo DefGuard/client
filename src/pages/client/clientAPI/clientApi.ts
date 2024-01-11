@@ -29,7 +29,7 @@ import {
 async function invokeWrapper<T>(
   command: TauriCommandKey,
   args?: InvokeArgs,
-  timeout: number = 15000,
+  timeout: number = 10000,
 ): Promise<T> {
   debug(`Invoking command '${command}'`);
   try {

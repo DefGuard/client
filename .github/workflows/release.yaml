@@ -346,4 +346,4 @@ jobs:
           asset_path: src-tauri/resources-windows/defguard-client.exe
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
           asset_content_type: application/octet-stream
-        
+  

@@ -31,7 +31,6 @@
         <Property Id="REINSTALLMODE" Value="amus" />
 
         <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
-        <!-- <SetProperty Id="MSIUSEREALADMINDETECTION" Value="1" Before="InstallFiles" Sequence="first"/> -->
 
         {{#if allow_downgrades}}
             <MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes" />
@@ -42,10 +41,6 @@
         <InstallExecuteSequence>
             <RemoveShortcuts>Installed AND NOT UPGRADINGPRODUCTCODE</RemoveShortcuts>
         </InstallExecuteSequence>
-
-        <!-- <Condition Message="Installation requires Administrator privileges">
-            <![CDATA[Privileged]]>
-        </Condition> -->
 
         <Media Id="1" Cabinet="app.cab" EmbedCab="yes" />
 
