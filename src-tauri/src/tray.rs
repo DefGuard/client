@@ -4,14 +4,26 @@ use tauri::{
 
 use crate::{appstate::AppState, database::TrayIconTheme, error::Error};
 
+static SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
+static JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
+static FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
+
 #[must_use]
 pub fn create_tray_menu() -> SystemTrayMenu {
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
     let show = CustomMenuItem::new("show".to_string(), "Show");
     let hide = CustomMenuItem::new("hide".to_string(), "Hide");
+    let subscribe_updates =
+        CustomMenuItem::new("subscribe_updates".to_string(), "Subscribe for updates");
+    let join_community = CustomMenuItem::new("join_community".to_string(), "Join our Community");
+    let follow_us = CustomMenuItem::new("follow_us".to_string(), "Follow us");
     SystemTrayMenu::new()
         .add_item(show)
         .add_item(hide)
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(subscribe_updates)
+        .add_item(join_community)
+        .add_item(follow_us)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)
 }
@@ -65,6 +77,15 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                         main_window.hide().expect("Failed to hide main window");
                     }
                 }
+            }
+            "subscribe_updates" => {
+                let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
+            }
+            "join_community" => {
+                let _ = webbrowser::open(JOIN_COMMUNITY_LINK);
+            }
+            "follow_us" => {
+                let _ = webbrowser::open(FOLLOW_US_LINK);
             }
             _ => {}
         },
