@@ -4,6 +4,8 @@ pub mod proto {
 }
 pub mod log_watcher;
 pub mod utils;
+#[cfg(windows)]
+pub mod windows_service;
 
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -97,44 +99,57 @@ impl DesktopDaemonService for DaemonService {
             info!("Executed specified PreUp command: {pre_up}");
         }
 
-        // create new interface
-        debug!("Creating new interface {ifname}");
-        wgapi.create_interface().map_err(|err| {
-            let msg = format!("Failed to create WireGuard interface {ifname}: {err}");
-            error!("{msg}");
-            Status::new(Code::Internal, msg)
-        })?;
+        #[cfg(not(windows))]
+        {
+            // create new interface
+            debug!("Creating new interface {ifname}");
+            wgapi.create_interface().map_err(|err| {
+                let msg = format!("Failed to create WireGuard interface {ifname}: {err}");
+                error!("{msg}");
+                Status::new(Code::Internal, msg)
+            })?;
+        }
 
-        // configure interface
-        debug!("Configuring new interface {ifname} with configuration: {config:?}");
-        wgapi.configure_interface(&config).map_err(|err| {
-            let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
-            error!("{msg}");
-            Status::new(Code::Internal, msg)
-        })?;
-
-        // configure routing
-        debug!("Configuring interface {ifname} routing");
-        wgapi.configure_peer_routing(&config.peers).map_err(|err| {
-            let msg =
-                format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
-            error!("{msg}");
-            Status::new(Code::Internal, msg)
-        })?;
-
-        // Configure dns
-        debug!("Configuring DNS for interface {ifname}");
         let dns: Vec<IpAddr> = request
             .dns
             .into_iter()
             .filter_map(|s| s.parse().ok())
             .collect();
 
-        wgapi.configure_dns(&dns).map_err(|err| {
-            let msg = format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
+        // configure interface
+        debug!("Configuring new interface {ifname} with configuration: {config:?}");
+
+        #[cfg(not(windows))]
+        let configure_interface_result = wgapi.configure_interface(&config);
+        #[cfg(windows)]
+        let configure_interface_result = wgapi.configure_interface(&config, &dns);
+
+        configure_interface_result.map_err(|err| {
+            let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
+
+        #[cfg(not(windows))]
+        {
+            // configure routing
+            debug!("Configuring interface {ifname} routing");
+            wgapi.configure_peer_routing(&config.peers).map_err(|err| {
+                let msg =
+                    format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
+                error!("{msg}");
+                Status::new(Code::Internal, msg)
+            })?;
+
+            // Configure dns
+            debug!("Configuring DNS for interface {ifname}");
+            wgapi.configure_dns(&dns).map_err(|err| {
+                let msg =
+                    format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
+                error!("{msg}");
+                Status::new(Code::Internal, msg)
+            })?;
+        }
         if let Some(post_up) = request.post_up {
             debug!("Executing specified PostUp command: {post_up}");
             let _ = execute_command(&post_up);
