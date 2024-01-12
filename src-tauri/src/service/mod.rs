@@ -4,6 +4,8 @@ pub mod proto {
 }
 pub mod log_watcher;
 pub mod utils;
+#[cfg(windows)]
+pub mod windows_service;
 
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
