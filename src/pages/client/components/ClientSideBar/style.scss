@@ -86,7 +86,8 @@
       padding-top: 70px;
     }
 
-    & > .client-bar-item, & > div > .client-bar-item {
+    & > .client-bar-item,
+    & > div > .client-bar-item {
       display: grid;
       box-sizing: border-box;
       width: 100%;

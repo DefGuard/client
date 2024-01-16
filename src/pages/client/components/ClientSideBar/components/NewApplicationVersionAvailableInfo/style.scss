@@ -64,7 +64,8 @@
       display: none;
     }
 
-    & > p, & > div > p {
+    & > p,
+    & > div > p {
       text-align: center;
       @include typography(app-copyright);
       color: var(--text-body-primary);
