@@ -3,6 +3,7 @@ import { InvokeArgs } from '@tauri-apps/api/tauri';
 import pTimeout from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
+import { NewApplicationVersionInfo } from '../../../shared/hooks/api/types';
 import {
   CommonWireguardFields,
   Connection,
@@ -110,6 +111,9 @@ const getTunnelDetails = async (id: number): Promise<Tunnel> =>
 const deleteTunnel = async (id: number): Promise<void> =>
   invokeWrapper('delete_tunnel', { tunnelId: id });
 
+const getLatestAppVersion = async (): Promise<NewApplicationVersionInfo> =>
+  invokeWrapper('get_latest_app_version');
+
 export const clientApi = {
   getInstances,
   getTunnels,
@@ -132,4 +136,5 @@ export const clientApi = {
   saveTunnel,
   openLink,
   getTunnelDetails,
+  getLatestAppVersion,
 };

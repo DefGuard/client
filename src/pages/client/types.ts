@@ -76,4 +76,5 @@ export enum TauriEventKey {
   CONNECTION_CHANGED = 'connection-changed',
   INSTANCE_UPDATE = 'instance-update',
   LOCATION_UPDATE = 'location-update',
+  APP_VERSION_FETCH = 'app-version-fetch',
 }

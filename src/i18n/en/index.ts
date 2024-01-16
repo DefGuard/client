@@ -138,6 +138,10 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   dark: 'Dark',
                 },
               },
+              versionUpdate: {
+                title: 'Updates',
+                checkboxTitle: 'Check for updates',
+              },
             },
           },
         },
@@ -410,6 +414,12 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
           copyright: `Copyright © 2023`,
           appVersion: 'Application version: {version:string}',
         },
+        applicationVersion: 'Application version: ',
+      },
+      newApplicationVersion: {
+        header: 'New version available',
+        dismiss: 'Dismiss',
+        releaseNotes: "See what's new",
       },
     },
     enrollment: {

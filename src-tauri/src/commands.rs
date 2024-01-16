@@ -18,7 +18,7 @@ use crate::{
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{collections::HashMap, env, str::FromStr};
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
@@ -706,5 +706,57 @@ pub async fn open_link(link: &str) -> Result<(), Error> {
     match webbrowser::open(link) {
         Ok(_) => Ok(()),
         Err(e) => Err(Error::CommandError(e.to_string())),
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AppVersionInfo {
+    pub version: String,
+    pub release_date: String,
+    pub release_notes_url: String,
+    pub update_url: String,
+}
+
+#[tauri::command(async)]
+pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
+    let app_version = handle.package_info().version.to_string();
+    let current_version = app_version.as_str();
+    let operating_system = env::consts::OS;
+
+    let mut request_data = HashMap::new();
+    request_data.insert("product", "client");
+    request_data.insert("client_version", current_version);
+    request_data.insert("operating_system", operating_system);
+
+    info!("Fetching latest application version with args: current version {current_version} and operating system {operating_system}");
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://pkgs.defguard.net/api/update/check")
+        .json(&request_data)
+        .send()
+        .await;
+
+    if let Ok(response) = res {
+        let response_json: Result<AppVersionInfo, reqwest::Error> = response.json().await;
+
+        if let Ok(result) = response_json {
+            let result = AppVersionInfo {
+                version: result.version,
+                release_date: result.release_date,
+                release_notes_url: result.release_notes_url,
+                update_url: result.update_url,
+            };
+
+            Ok(result)
+        } else {
+            let err = response_json.err().unwrap();
+            error!("Failed to deserialize latest application version response {err}");
+            return Err(Error::CommandError(err.to_string()));
+        }
+    } else {
+        let err = res.err().unwrap();
+        error!("Failed to fetch latest application version {err}");
+        Err(Error::CommandError(err.to_string()))
     }
 }

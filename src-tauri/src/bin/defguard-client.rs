@@ -13,7 +13,7 @@ use tauri_plugin_log::LogTarget;
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
-    __cmd__disconnect, __cmd__get_settings, __cmd__last_connection,
+    __cmd__disconnect, __cmd__get_latest_app_version, __cmd__get_settings, __cmd__last_connection,
     __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link,
     __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
     __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
@@ -21,12 +21,13 @@ use defguard_client::{
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
-        delete_instance, delete_tunnel, disconnect, get_settings, last_connection,
-        location_interface_details, location_stats, open_link, parse_tunnel_config,
-        save_device_config, save_tunnel, tunnel_details, update_instance, update_location_routing,
-        update_settings,
+        delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
+        last_connection, location_interface_details, location_stats, open_link,
+        parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
+        update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings},
+    latest_app_version::fetch_latest_app_version_loop,
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
     utils::load_log_targets,
 };
@@ -99,6 +100,7 @@ async fn main() {
             open_link,
             tunnel_details,
             delete_tunnel,
+            get_latest_app_version,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -153,6 +155,10 @@ async fn main() {
     if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
         configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
     }
+
+    tauri::async_runtime::spawn(
+        async move { fetch_latest_app_version_loop(app_handle.clone()).await },
+    );
 
     // run app
     app.run(|_app_handle, event| {

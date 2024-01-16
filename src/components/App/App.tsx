@@ -36,6 +36,7 @@ import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPag
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
+import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -161,6 +162,7 @@ export const App = () => {
         </ThemeProvider>
       </QueryClientProvider>
       <ToastManager />
+      <ApplicationUpdateManager />
     </TypesafeI18n>
   );
 };

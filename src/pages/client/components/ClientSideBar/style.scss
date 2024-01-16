@@ -86,7 +86,7 @@
       padding-top: 70px;
     }
 
-    & > .client-bar-item {
+    & > .client-bar-item, & > div > .client-bar-item {
       display: grid;
       box-sizing: border-box;
       width: 100%;
@@ -109,7 +109,7 @@
 
       & > svg,
       & > .icon-wrapper {
-        display: none;
+        margin-bottom: 20px;
         grid-column: 1;
         grid-row: 1;
         width: 40px;
@@ -119,6 +119,7 @@
           display: flex;
           width: 24px;
           height: 24px;
+          margin-bottom: 0;
         }
       }
 
@@ -222,7 +223,7 @@
     }
 
     #settings-nav-item {
-      margin-top: auto;
+      // margin-top: auto;
     }
 
     #add-instance {
@@ -262,4 +263,32 @@
   background-color: var(--surface-main-primary);
   content: ' ';
   z-index: 3;
+}
+
+#footer-application-info {
+  width: 100%;
+  padding-top: 20px;
+  padding-bottom: 20px;
+
+  & > p {
+    @include typography(app-copyright);
+    color: var(--text-body-tertiary);
+    text-align: center;
+
+    @include media-breakpoint-down(lg) {
+      padding-left: 5px;
+      padding-right: 5px;
+    }
+
+    & > span {
+      cursor: pointer;
+    }
+  }
+}
+
+.client-bar-bottom-menu-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: auto;
 }

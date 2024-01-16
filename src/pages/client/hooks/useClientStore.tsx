@@ -24,6 +24,7 @@ const defaultValues: StoreValues = {
     log_level: 'error',
     theme: 'light',
     tray_icon_theme: 'color',
+    check_for_updates: true,
   },
 };
 
