@@ -4,7 +4,7 @@ use tokio::time::sleep;
 
 use crate::{appstate::AppState, commands::get_latest_app_version, database::Settings};
 
-const INTERVAL_IN_SECONDS: u64 = 12 * 60 * 60; // 12 hours
+const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
 pub async fn fetch_latest_app_version_loop(app_handle: AppHandle) {
     let state = app_handle.state::<AppState>();
@@ -12,7 +12,7 @@ pub async fn fetch_latest_app_version_loop(app_handle: AppHandle) {
 
     loop {
         debug!("Waiting to fetch latest application version");
-        sleep(Duration::from_secs(INTERVAL_IN_SECONDS)).await;
+        sleep(INTERVAL_IN_SECONDS).await;
 
         let settings = Settings::get(pool).await;
 
