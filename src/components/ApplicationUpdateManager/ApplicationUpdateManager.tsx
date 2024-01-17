@@ -19,6 +19,7 @@ export const ApplicationUpdateManager = () => {
   const setApplicationUpdateData = useApplicationUpdateStore((state) => state.setValues);
   const checkForUpdates = useClientStore((state) => state.settings.check_for_updates);
 
+  // Get current application version.
   useEffect(() => {
     const getAppVersion = async () => {
       const version = await getVersion().catch(() => {
@@ -30,9 +31,11 @@ export const ApplicationUpdateManager = () => {
     getAppVersion();
   }, []);
 
+  // Listen to new application release info.
   useEffect(() => {
     const subs: UnlistenFn[] = [];
 
+    // Stop listening if "check for updates" setting has been turned off.
     if (!checkForUpdates) {
       subs.forEach((sub) => sub());
       return;
@@ -57,6 +60,7 @@ export const ApplicationUpdateManager = () => {
     };
   }, [checkForUpdates, setApplicationUpdateData]);
 
+  // Check for updates on launch and when "check for updates" setting has been turned on.
   useEffect(() => {
     if (!checkForUpdates || !appVersion) return;
 

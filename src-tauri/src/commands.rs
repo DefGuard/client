@@ -717,6 +717,8 @@ pub struct AppVersionInfo {
     pub update_url: String,
 }
 
+static PRODUCT_NAME: &str = "defguard-client";
+
 #[tauri::command(async)]
 pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
     let app_version = handle.package_info().version.to_string();
@@ -724,7 +726,7 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     let operating_system = env::consts::OS;
 
     let mut request_data = HashMap::new();
-    request_data.insert("product", "client");
+    request_data.insert("product", PRODUCT_NAME);
     request_data.insert("client_version", current_version);
     request_data.insert("operating_system", operating_system);
 
@@ -738,22 +740,13 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         .await;
 
     if let Ok(response) = res {
-        let response_json: Result<AppVersionInfo, reqwest::Error> = response.json().await;
+        let response_json: Result<AppVersionInfo, reqwest::Error> =
+            response.json::<AppVersionInfo>().await;
 
-        if let Ok(result) = response_json {
-            let result = AppVersionInfo {
-                version: result.version,
-                release_date: result.release_date,
-                release_notes_url: result.release_notes_url,
-                update_url: result.update_url,
-            };
-
-            Ok(result)
-        } else {
-            let err = response_json.err().unwrap();
+        response_json.map_err(|err| {
             error!("Failed to deserialize latest application version response {err}");
-            return Err(Error::CommandError(err.to_string()));
-        }
+            Error::CommandError(err.to_string())
+        })
     } else {
         let err = res.err().unwrap();
         error!("Failed to fetch latest application version {err}");
