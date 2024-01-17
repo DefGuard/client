@@ -91,6 +91,13 @@ export type EnrollmentInstanceInfo = {
   url: string;
 };
 
+export type NewApplicationVersionInfo = {
+  version: string;
+  release_date: string;
+  release_notes_url: string;
+  update_url: string;
+};
+
 // FIXME: strong types
 export type UseApi = {
   enrollment: {

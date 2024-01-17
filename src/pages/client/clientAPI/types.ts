@@ -67,6 +67,7 @@ export type Settings = {
   theme: ThemeKey;
   log_level: LogLevel;
   tray_icon_theme: TrayIconTheme;
+  check_for_updates: boolean;
 };
 
 export type LocationDetails = {
@@ -125,4 +126,5 @@ export type TauriCommandKey =
   | 'tunnel_details'
   | 'delete_tunnel'
   | 'location_interface_details'
-  | 'open_link';
+  | 'open_link'
+  | 'get_latest_app_version';

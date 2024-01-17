@@ -58,6 +58,7 @@ pub struct Settings {
     pub theme: SettingsTheme,
     pub log_level: SettingsLogLevel,
     pub tray_icon_theme: TrayIconTheme,
+    pub check_for_updates: bool,
 }
 
 impl Settings {
@@ -70,6 +71,7 @@ impl Settings {
             log_level: SettingsLogLevel::from_str(&query_res.log_level)?,
             theme: SettingsTheme::from_str(&query_res.theme)?,
             tray_icon_theme: TrayIconTheme::from_str(&query_res.tray_icon_theme)?,
+            check_for_updates: query_res.check_for_updates,
         };
         Ok(settings)
     }
@@ -77,11 +79,12 @@ impl Settings {
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         query!(
             "UPDATE settings \
-            SET theme = $1, log_level = $2, tray_icon_theme = $3 \
+            SET theme = $1, log_level = $2, tray_icon_theme = $3, check_for_updates = $4 \
             WHERE id = 1;",
             self.theme,
             self.log_level,
-            self.tray_icon_theme
+            self.tray_icon_theme,
+            self.check_for_updates,
         )
         .execute(pool)
         .await?;
@@ -106,12 +109,14 @@ impl Settings {
                 log_level: SettingsLogLevel::Info,
                 theme: init_theme,
                 tray_icon_theme: TrayIconTheme::Color,
+                check_for_updates: true,
             };
             query!(
-                "INSERT INTO settings (log_level, theme, tray_icon_theme) VALUES ($1, $2, $3);",
+                "INSERT INTO settings (log_level, theme, tray_icon_theme, check_for_updates) VALUES ($1, $2, $3, $4);",
                 default_settings.log_level,
                 default_settings.theme,
                 default_settings.tray_icon_theme,
+                default_settings.check_for_updates,
             )
             .execute(pool)
             .await?;

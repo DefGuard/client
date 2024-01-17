@@ -4,6 +4,7 @@ pub mod appstate;
 pub mod commands;
 pub mod database;
 pub mod error;
+pub mod latest_app_version;
 pub mod service;
 pub mod tray;
 pub mod utils;

@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
+import { LabeledCheckbox } from '../../../../../../shared/defguard-ui/components/Layout/LabeledCheckbox/LabeledCheckbox';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
 import {
   SelectOption,
@@ -20,6 +21,10 @@ export const GlobalSettingsTab = () => {
 
   return (
     <div id="global-settings-tab">
+      <section>
+        <h2>{localLL.versionUpdate.title()}</h2>
+        <CheckForUpdatesOption />
+      </section>
       <section>
         <h2>{localLL.tray.title()}</h2>
         <TrayIconThemeSelect />
@@ -216,6 +221,27 @@ const TrayIconThemeSelect = () => {
       renderSelected={renderSelectedTrayTheme}
       onChangeSingle={(theme) => mutate({ tray_icon_theme: theme })}
       loading={isPending}
+    />
+  );
+};
+
+const CheckForUpdatesOption = () => {
+  const { LL } = useI18nContext();
+  const localLL = LL.pages.client.pages.settingsPage.tabs.global;
+  const settings = useClientStore((state) => state.settings);
+  const updateClientSettings = useClientStore((state) => state.updateSettings);
+  const { mutate, isPending } = useMutation({
+    mutationFn: updateClientSettings,
+  });
+
+  return (
+    <LabeledCheckbox
+      label={localLL.versionUpdate.checkboxTitle()}
+      disabled={isPending}
+      value={settings.check_for_updates}
+      onChange={(value) => {
+        mutate({ check_for_updates: value });
+      }}
     />
   );
 };

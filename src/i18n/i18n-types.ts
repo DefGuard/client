@@ -301,6 +301,16 @@ type RootTranslation = {
 									dark: string
 								}
 							}
+							versionUpdate: {
+								/**
+								 * U​p​d​a​t​e​s
+								 */
+								title: string
+								/**
+								 * C​h​e​c​k​ ​f​o​r​ ​u​p​d​a​t​e​s
+								 */
+								checkboxTitle: string
+							}
 						}
 					}
 				}
@@ -901,6 +911,24 @@ type RootTranslation = {
 					 */
 					appVersion: RequiredParams<'version'>
 				}
+				/**
+				 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n​:​ 
+				 */
+				applicationVersion: string
+			}
+			newApplicationVersion: {
+				/**
+				 * N​e​w​ ​v​e​r​s​i​o​n​ ​a​v​a​i​l​a​b​l​e
+				 */
+				header: string
+				/**
+				 * D​i​s​m​i​s​s
+				 */
+				dismiss: string
+				/**
+				 * S​e​e​ ​w​h​a​t​'​s​ ​n​e​w
+				 */
+				releaseNotes: string
 			}
 		}
 		enrollment: {
@@ -1668,6 +1696,16 @@ export type TranslationFunctions = {
 									dark: () => LocalizedString
 								}
 							}
+							versionUpdate: {
+								/**
+								 * Updates
+								 */
+								title: () => LocalizedString
+								/**
+								 * Check for updates
+								 */
+								checkboxTitle: () => LocalizedString
+							}
 						}
 					}
 				}
@@ -2266,6 +2304,24 @@ export type TranslationFunctions = {
 					 */
 					appVersion: (arg: { version: string }) => LocalizedString
 				}
+				/**
+				 * Application version: 
+				 */
+				applicationVersion: () => LocalizedString
+			}
+			newApplicationVersion: {
+				/**
+				 * New version available
+				 */
+				header: () => LocalizedString
+				/**
+				 * Dismiss
+				 */
+				dismiss: () => LocalizedString
+				/**
+				 * See what's new
+				 */
+				releaseNotes: () => LocalizedString
 			}
 		}
 		enrollment: {

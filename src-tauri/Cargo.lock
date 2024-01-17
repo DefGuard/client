@@ -1157,6 +1157,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.5",
+ "reqwest",
  "rust-ini 0.20.0",
  "serde",
  "serde_json",

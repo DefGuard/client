@@ -1,6 +1,8 @@
 import './style.scss';
 
+import { getVersion } from '@tauri-apps/api/app';
 import classNames from 'classnames';
+import { useEffect, useState } from 'react';
 import { useMatch, useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
@@ -14,9 +16,13 @@ import { IconContainer } from '../../../../shared/defguard-ui/components/Layout/
 import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus';
 import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconSettings';
 import { routes } from '../../../../shared/routes';
+import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { WireguardInstanceType } from '../../types';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
+import { NewApplicationVersionAvailableInfo } from './components/NewApplicationVersionAvailableInfo/NewApplicationVersionAvailableInfo';
+
+const { openLink } = clientApi;
 
 export const ClientSideBar = () => {
   const navigate = useNavigate();
@@ -91,8 +97,44 @@ export const ClientSideBar = () => {
           />
         ))}
         <AddTunnel />
-        <SettingsNav />
+        <div className="client-bar-bottom-menu-container">
+          <NewApplicationVersionAvailableInfo />
+          <SettingsNav />
+          <Divider />
+          <FooterApplicationInfo />
+        </div>
       </div>
+    </div>
+  );
+};
+
+const FooterApplicationInfo = () => {
+  const { LL } = useI18nContext();
+  const [appVersion, setAppVersion] = useState<string>('-');
+
+  useEffect(() => {
+    const getAppVersion = async () => {
+      const version = await getVersion().catch(() => {
+        return '';
+      });
+      setAppVersion(version);
+    };
+
+    getAppVersion();
+  }, []);
+
+  return (
+    <div id="footer-application-info">
+      <p>
+        Copyright © {new Date().getFullYear()}{' '}
+        <span onClick={() => openLink('https://teonite.com/')}>teonite</span>
+      </p>
+      <p>
+        {LL.pages.client.sideBar.applicationVersion()}
+        <span onClick={() => openLink('https://github.com/DefGuard/client/releases')}>
+          {appVersion}
+        </span>
+      </p>
     </div>
   );
 };

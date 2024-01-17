@@ -22,12 +22,18 @@
         "name": "tray_icon_theme",
         "ordinal": 3,
         "type_info": "Text"
+      },
+      {
+        "name": "check_for_updates",
+        "ordinal": 4,
+        "type_info": "Bool"
       }
     ],
     "parameters": {
       "Right": 0
     },
     "nullable": [
+      false,
       false,
       false,
       false,
