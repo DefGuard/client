@@ -1,6 +1,6 @@
 [package]
 name = "defguard-client"
-version = "0.2.0"
+version = "0.2.1"
 description = "Defguard desktop client"
 license = "Apache-2.0"
 homepage = "https://github.com/DefGuard/client"
@@ -37,7 +37,7 @@ strum = { version = "0.25", features = ["derive"] }
 dark-light = "1.0"
 webbrowser = "0.8"
 
-tauri = { version = "1.5", features = [ "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png", "fs-all"] }
+tauri = { version = "1.5", features = [ "dialog-all", "clipboard-all", "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png", "fs-all"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"

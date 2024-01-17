@@ -6,17 +6,12 @@
     flex-flow: column;
     row-gap: 20px;
     padding: 20px 0;
-    min-height: 50vh;
     overflow: hidden;
     max-height: none;
     margin-bottom: 20px;
 
     &.tabbed {
       border-top-left-radius: 0;
-    }
-
-    @include media-breakpoint-up(lg) {
-      min-height: 600px;
     }
 
     & > .location-no-stats {
@@ -125,6 +120,12 @@
         align-items: center;
         justify-content: flex-start;
       }
+    }
+
+    & > .no-stats-container {
+      min-height: 25vh;
+      display: flex;
+      align-items: center;
     }
   }
 }

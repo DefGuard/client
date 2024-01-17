@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "defguard-client",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "tauri": {
     "systemTray": {
@@ -29,6 +29,12 @@
       "fs": {
         "all": true,
         "scope": ["$RESOURCE/*", "$APPDATA/*"]
+      },
+      "clipboard": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
       }
     },
     "bundle": {

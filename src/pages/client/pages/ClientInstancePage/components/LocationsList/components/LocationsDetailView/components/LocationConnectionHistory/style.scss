@@ -21,10 +21,10 @@
   }
 
   .connections-list {
-    height: 400px;
+    max-height: 400px;
     grid-template-rows: 28px 1fr;
-    margin-bottom: 50px;
     box-sizing: border-box;
+    margin-top: 20px;
 
     .headers {
       @include list-layout;
@@ -36,11 +36,6 @@
       margin-right: 5px;
       grid-row: 2;
       grid-column: 1;
-      padding-bottom: 15px;
-
-      @include media-breakpoint-up(lg) {
-        padding-bottom: 40px;
-      }
     }
 
     .custom-row {
@@ -62,5 +57,10 @@
         @include typography(app-strap);
       }
     }
+  }
+
+  & > .location-never-connected {
+    margin-bottom: 30px;
+    margin-top: 10px;
   }
 }
