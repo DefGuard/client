@@ -301,7 +301,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   'A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.',
                 endpoint:
                   'The address and port of the WireGuard server, typically in the format "hostname:port".',
-                dns: 'The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution.',
+                dns: 'The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution. Right now we only support DNS server IP, in the feature we will support domain search.',
                 persistentKeepAlive:
                   'The interval (in seconds) for sending periodic keep-alive messages to ensure the tunnel stays active. Adjust as needed.',
                 routeAllTraffic:
