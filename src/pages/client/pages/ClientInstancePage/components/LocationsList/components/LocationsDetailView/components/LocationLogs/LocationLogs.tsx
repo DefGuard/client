@@ -25,14 +25,14 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);
   const appLogLevel = useClientStore((state) => state.settings.log_level);
   const locationLogLevelRef = useRef<LogLevel>(appLogLevel);
-  const logsRef = useRef('');
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details.logs;
 
   const handleLogsDownload = async () => {
     const path = await save({});
     if (path) {
-      await writeTextFile(path, logsRef.current);
+      const logs = getAllLogs();
+      await writeTextFile(path, logs);
     }
   };
 
@@ -78,6 +78,18 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
     //eslint-disable-next-line
   }, [locationId]);
 
+  const getAllLogs = () => {
+    let logs = '';
+
+    if (logsContainerElement) {
+      logsContainerElement.current?.childNodes.forEach((item) => {
+        logs += item.textContent + '\n';
+      });
+    }
+
+    return logs;
+  };
+
   return (
     <Card shaded={false} id="location-logs" bordered>
       <div className="top">
@@ -91,7 +103,10 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
         <ActionButton
           variant={ActionButtonVariant.COPY}
           onClick={() => {
-            clipboard.writeText(logsRef.current);
+            const logs = getAllLogs();
+            if (logs) {
+              clipboard.writeText(logs);
+            }
           }}
         />
         <ActionButton
@@ -113,13 +128,14 @@ const createLogLineElement = (content: string): HTMLParagraphElement => {
 
 // return true if log should be visible
 const filterLogByLevel = (target: LogLevel, log: LogLevel): boolean => {
+  const log_level = log.toLocaleLowerCase();
   switch (target) {
     case 'error':
-      return log === 'error';
+      return log_level === 'error';
     case 'info':
-      return ['info', 'error'].includes(log);
+      return ['info', 'error'].includes(log_level);
     case 'debug':
-      return ['error', 'info', 'debug'].includes(log);
+      return ['error', 'info', 'debug'].includes(log_level);
     case 'trace':
       return true;
   }

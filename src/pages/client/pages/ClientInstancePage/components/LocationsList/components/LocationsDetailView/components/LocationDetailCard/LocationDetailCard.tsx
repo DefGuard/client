@@ -91,14 +91,14 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
               </div>
             )}
             {location?.active && (
-              <>
-                <Label>{localLL.controls.traffic.label()}</Label>
+              <div className="location-card-allowed-traffic">
+                <label>{localLL.controls.traffic.label()}:</label>
                 <p>
                   {location.route_all_traffic
                     ? localLL.controls.traffic.allTraffic()
                     : localLL.controls.traffic.predefinedTraffic()}
                 </p>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -151,7 +151,9 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
         />
       )}
       {(!locationStats || locationStats.length == 0) && !location?.active && (
-        <LocationCardNoStats />
+        <div className="no-stats-container">
+          <LocationCardNoStats />
+        </div>
       )}
     </Card>
   );

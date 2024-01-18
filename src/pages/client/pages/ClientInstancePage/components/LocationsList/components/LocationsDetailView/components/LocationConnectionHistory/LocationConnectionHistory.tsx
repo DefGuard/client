@@ -42,7 +42,11 @@ export const LocationConnectionHistory = ({
       <header>
         <h2>{localLL.title()}</h2>
       </header>
-      {connectionHistory.length === 0 && !connected && <LocationCardNeverConnected />}
+      {connectionHistory.length === 0 && !connected && (
+        <div className="location-never-connected">
+          <LocationCardNeverConnected />
+        </div>
+      )}
       {connectionHistory.length > 0 && (
         <LocationHistoryTable connections={connectionHistory} />
       )}

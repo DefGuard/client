@@ -29,6 +29,12 @@
       "fs": {
         "all": true,
         "scope": ["$RESOURCE/*", "$APPDATA/*"]
+      },
+      "clipboard": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
       }
     },
     "bundle": {
