@@ -22,7 +22,7 @@ type RootTranslation = {
 			/**
 			 * s​e​c​o​n​d​s
 			 */
-			prular: string
+			plural: string
 		}
 		minutes: {
 			/**
@@ -32,7 +32,7 @@ type RootTranslation = {
 			/**
 			 * m​i​n​u​t​e​s
 			 */
-			prular: string
+			plural: string
 		}
 	}
 	form: {
@@ -163,7 +163,7 @@ type RootTranslation = {
 								 */
 								subtitle: string
 							}
-							tunel: {
+							tunnel: {
 								/**
 								 * A​d​d​ ​T​u​n​e​l
 								 */
@@ -1419,7 +1419,7 @@ export type TranslationFunctions = {
 			/**
 			 * seconds
 			 */
-			prular: () => LocalizedString
+			plural: () => LocalizedString
 		}
 		minutes: {
 			/**
@@ -1429,7 +1429,7 @@ export type TranslationFunctions = {
 			/**
 			 * minutes
 			 */
-			prular: () => LocalizedString
+			plural: () => LocalizedString
 		}
 	}
 	form: {
@@ -1558,9 +1558,9 @@ export type TranslationFunctions = {
 								 */
 								subtitle: () => LocalizedString
 							}
-							tunel: {
+							tunnel: {
 								/**
-								 * Add Tunel
+								 * Add Tunnel
 								 */
 								title: () => LocalizedString
 								/**

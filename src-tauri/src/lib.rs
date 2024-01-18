@@ -20,7 +20,7 @@ struct Payload {
     cwd: String,
 }
 
-/// Location type used in commands to check if we using tunel or location
+/// Location type used in commands to check if we using tunnel or location
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
 pub enum ConnectionType {
     Tunnel,

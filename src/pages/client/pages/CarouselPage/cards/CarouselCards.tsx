@@ -47,8 +47,8 @@ export const WelcomeCardSlide = () => {
           className="inner-card"
           onClick={() => navigate(routes.client.addTunnel, { replace: true })}
         >
-          <h3>{localLL.tunel.title()}</h3>
-          <p>{localLL.tunel.subtitle()}</p>
+          <h3>{localLL.tunnel.title()}</h3>
+          <p>{localLL.tunnel.subtitle()}</p>
           <WireguardIcon />
         </div>
       </div>
