@@ -45,15 +45,16 @@ export const ClientInstancePage = () => {
   const openUpdateInstanceModal = useUpdateInstanceModal((state) => state.open);
 
   useEffect(() => {
-    if (
-      !selectedInstanceType ||
-      (selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE &&
-        !selectedInstance) ||
-      (selectedInstanceType === WireguardInstanceType.TUNNEL && tunnels.length === 0)
-    ) {
+    const isDefguardInstance =
+      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE;
+    const isTunnelInstance = selectedInstanceType === WireguardInstanceType.TUNNEL;
+
+    if (isDefguardInstance && !selectedInstance) {
       navigate(routes.client.addInstance, { replace: true });
+    } else if (isTunnelInstance && tunnels.length === 0) {
+      navigate(routes.client.addTunnel, { replace: true });
     }
-  }, [selectedInstance, navigate, tunnels.length, selectedInstanceType]);
+  }, [selectedInstance, selectedInstanceType, tunnels.length, navigate]);
 
   return (
     <section id="client-instance-page" className="client-page">
