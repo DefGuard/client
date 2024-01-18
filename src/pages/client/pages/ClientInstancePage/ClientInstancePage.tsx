@@ -20,7 +20,7 @@ import { useUpdateInstanceModal } from './modals/UpdateInstanceModal/useUpdateIn
 export const ClientInstancePage = () => {
   const { LL } = useI18nContext();
   const instanceLL = LL.pages.client.pages.instancePage;
-  const tunelLL = LL.pages.client.pages.tunnelPage;
+  const tunnelLL = LL.pages.client.pages.tunnelPage;
   const instances = useClientStore((state) => state.instances);
   const tunnels = useClientStore((state) => state.tunnels);
   const [selectedInstanceId, selectedInstanceType] = useClientStore((state) => [
@@ -59,7 +59,7 @@ export const ClientInstancePage = () => {
   return (
     <section id="client-instance-page" className="client-page">
       <header>
-        <h1>{isLocationPage ? instanceLL.title() : tunelLL.title()}</h1>
+        <h1>{isLocationPage ? instanceLL.title() : tunnelLL.title()}</h1>
         <div className="options">
           <StatsFilterSelect />
           {isLocationPage && (

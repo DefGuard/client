@@ -28,7 +28,7 @@ export const TimeLeft = ({ disableLabel }: Props) => {
       let minutesString = '';
       if (minutes > 0) {
         if (minutes > 1) {
-          minutesString = `${minutes} ${LL.time.minutes.prular()}`;
+          minutesString = `${minutes} ${LL.time.minutes.plural()}`;
         } else {
           minutesString = `${minutes} ${LL.time.minutes.singular()}`;
         }
@@ -36,7 +36,7 @@ export const TimeLeft = ({ disableLabel }: Props) => {
       let secondsString = '';
       if (seconds > 0) {
         if (seconds > 1) {
-          secondsString = `${seconds} ${LL.time.seconds.prular()}`;
+          secondsString = `${seconds} ${LL.time.seconds.plural()}`;
         } else {
           secondsString = `${seconds} ${LL.time.seconds.singular()}`;
         }

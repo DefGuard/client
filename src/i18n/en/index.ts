@@ -6,11 +6,11 @@ const en = {
   time: {
     seconds: {
       singular: 'second',
-      prular: 'seconds',
+      plural: 'seconds',
     },
     minutes: {
       singular: 'minute',
-      prular: 'minutes',
+      plural: 'minutes',
     },
   },
   form: {
@@ -66,8 +66,8 @@ const en = {
                 subtitle:
                   'Establish a connection to defguard instance effortlessly by configuring it with a single token.',
               },
-              tunel: {
-                title: 'Add Tunel',
+              tunnel: {
+                title: 'Add Tunnel',
                 subtitle:
                   'Utilize it as a WireGuard® Desktop Client with ease. Set up your own tunnel or import a configuration file.',
               },
@@ -76,9 +76,9 @@ const en = {
               // md
               title: 'WireGuard **2FA with defguard**',
               // md
-              sideText: `Since Wireguard protocol doesn't support 2FA/MFA - most (if not all) currently available Wireguard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not Wireguard tunnel).  
+              sideText: `Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).  
 
-If you would like to secure your Wireguard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using Wireguard PSK keys and peers configuration by defguard gateway!`,
+If you would like to secure your WireGuard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using WireGuard PSK keys and peers configuration by defguard gateway!`,
             },
             security: {
               // md
@@ -236,7 +236,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   serverAddress: 'Server Address',
                   allowedIps: 'Allowed IPs',
                   dns: 'DNS servers',
-                  keepalive: 'Persisten keepalive',
+                  keepalive: 'Persistent keepalive',
                   handshake: 'Latest Handshake',
                   handshakeValue: '{seconds: number} seconds ago',
                 },
@@ -278,7 +278,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 serverPubkey: 'Public Key',
                 endpoint: 'VPN Server Address:Port',
                 dns: 'DNS',
-                allowedips: 'Allowed IPs (seperate with comma)',
+                allowedips: 'Allowed IPs (separate with comma)',
                 persistentKeepAlive: 'Persistent Keep Alive (sec)',
                 preUp: 'PreUp',
                 postUp: 'PostUp',
@@ -301,7 +301,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   'A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.',
                 endpoint:
                   'The address and port of the WireGuard server, typically in the format "hostname:port".',
-                dns: 'The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution.',
+                dns: 'The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution. Right now we only support DNS server IP, in the feature we will support domain search.',
                 persistentKeepAlive:
                   'The interval (in seconds) for sending periodic keep-alive messages to ensure the tunnel stays active. Adjust as needed.',
                 routeAllTraffic:
@@ -337,7 +337,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 <div>
                 <ul>
                   <li> Click on the "Import Config File" button.</li>
-                  <li> Navigatge to configuration file using the file selection dialog.</li>
+                  <li> Navigate to configuration file using the file selection dialog.</li>
                   <li> Select the .conf file you received or created.</li>
                 </ul>
                 </div>
@@ -408,7 +408,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
         instances: 'defguard Instances',
         addInstance: 'Add Instance',
         addTunnel: 'Add Tunnel',
-        tunnels: 'Wireguard Tunnels',
+        tunnels: 'WireGuard Tunnels',
         settings: 'Settings',
         copyright: {
           copyright: `Copyright © 2023`,
@@ -447,7 +447,7 @@ In order to gain access to the company infrastructure, we require you to complet
 
 1. Verify your data
 2. Create your password
-3. Configurate VPN device
+3. Configure VPN device
 
 You have a time limit of **{time: string} minutes** to complete this process.
 If you have any questions, please consult your assigned admin.All necessary information can be found at the bottom of the sidebar.`,
@@ -507,7 +507,7 @@ If you have any questions, please consult your assigned admin.All necessary info
               create: {
                 submit: 'Create Configuration',
                 messageBox:
-                  'Please be advised that you have to download the configuration now, since we do not store your private key. After this dialog is closed, you will not be able to get your fulll configuration file (with private keys, only blank template).',
+                  'Please be advised that you have to download the configuration now, since we do not store your private key. After this dialog is closed, you will not be able to get your full configuration file (with private keys, only blank template).',
                 form: {
                   fields: {
                     name: {
@@ -535,7 +535,7 @@ If you have any questions, please consult your assigned admin.All necessary info
 `,
                   manual: `
         <p>
-          Please be advised that configuration provided here <strong> does not include private key and uses public key to fill it's place </strong> you will need to repalce it on your own for configuration to work properly.
+          Please be advised that configuration provided here <strong> does not include private key and uses public key to fill it's place </strong> you will need to replace it on your own for configuration to work properly.
         </p>
 `,
                 },
@@ -554,7 +554,7 @@ If you have any questions, please consult your assigned admin.All necessary info
               steps: {
                 wireguard: {
                   content:
-                    'Download and install WireGuard client on your compputer or app on phone.',
+                    'Download and install WireGuard client on your computer or app on phone.',
                   button: 'Download WireGuard',
                 },
                 downloadConfig: 'Download provided configuration file to your device.',
@@ -634,7 +634,7 @@ If you want to disengage your VPN connection, simply press "deactivate".
       messages: {
         success: '{name: string} updated.',
         error: 'Token or URL is invalid.',
-        errorInstanceNotFound: 'Intance for given token is not registered !',
+        errorInstanceNotFound: 'Instance for given token is not registered !',
       },
     },
     deleteInstance: {
@@ -642,7 +642,7 @@ If you want to disengage your VPN connection, simply press "deactivate".
       subtitle: 'Are you sure you want to delete {name: string}?',
       messages: {
         success: 'Instance deleted',
-        error: 'Unexpected error occured',
+        error: 'Unexpected error occurred',
       },
       controls: {
         submit: 'Delete instance',
@@ -653,7 +653,7 @@ If you want to disengage your VPN connection, simply press "deactivate".
       subtitle: 'Are you sure you want to delete {name: string}?',
       messages: {
         success: 'Tunnel deleted',
-        error: 'Unexpected error occured',
+        error: 'Unexpected error occurred',
       },
       controls: {
         submit: 'Delete tunnel',

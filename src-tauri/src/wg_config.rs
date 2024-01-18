@@ -51,7 +51,14 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
     let address = interface_section
         .get("Address")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("Address".to_string()))?;
-    let dns = interface_section.get("DNS").map(ToString::to_string);
+    // extract IP if DNS config includes search domains
+    // FIXME: actually handle search domains
+    let dns = interface_section
+        .get("DNS")
+        .and_then(|dns| match dns.split(",").next() {
+            Some(address) => Some(address.to_string()),
+            None => Some(dns.to_string()),
+        });
 
     let pre_up = interface_section.get("PreUp");
     let post_up = interface_section.get("PostUp");
@@ -109,7 +116,7 @@ mod test {
             PrivateKey = GAA2X3DW0WakGVx+DsGjhDpTgg50s1MlmrLf24Psrlg=
             Address = 10.0.0.1/24
             ListenPort = 55055
-            DNS = 10.0.0.2
+            DNS = 10.0.0.2, tnt, teonite.net
             PostUp = iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT
 
             [Peer]
