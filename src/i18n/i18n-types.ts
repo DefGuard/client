@@ -217,12 +217,29 @@ type RootTranslation = {
 							 */
 							title: string
 							/**
-							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​i​s​ ​f​r​e​e​ ​a​n​d​ ​t​r​u​l​y​ ​O​p​e​n​ ​S​o​u​r​c​e​ ​a​n​d​ ​o​u​r​ ​t​e​a​m​ ​h​a​s​ ​b​e​e​n​ ​w​o​r​k​i​n​g​ ​o​n​ ​i​t​ ​f​o​r​ ​s​e​v​e​r​a​l​ ​m​o​n​t​h​s​.​ ​P​l​e​a​s​e​ ​c​o​n​s​i​d​e​r​ ​s​u​p​p​o​r​t​i​n​g​ ​u​s​ ​b​y​:​ ​ ​
-						​-​ ​s​t​a​r​i​n​g​ ​u​s​ ​o​n​ ​G​i​t​H​u​b​
-						​-​ ​s​p​r​e​a​d​i​n​g​ ​t​h​e​ ​w​o​r​d​ ​a​b​o​u​t​ ​*​*​d​e​f​g​u​a​r​d​*​*​!​
-						​-​ ​j​o​i​n​ ​o​u​r​ ​M​a​t​r​i​x​ ​s​e​r​v​e​r​:​ ​h​t​t​p​s​:​/​/​m​a​t​r​i​x​.​t​o​/​#​/​#​d​e​f​g​u​a​r​d​:​t​e​o​n​i​t​e​.​c​o​m
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​i​s​ ​f​r​e​e​ ​a​n​d​ ​t​r​u​l​y​ ​O​p​e​n​ ​S​o​u​r​c​e​ ​a​n​d​ ​o​u​r​ ​t​e​a​m​ ​h​a​s​ ​b​e​e​n​ ​w​o​r​k​i​n​g​ ​o​n​ ​i​t​ ​f​o​r​ ​s​e​v​e​r​a​l​ ​m​o​n​t​h​s​.​ ​P​l​e​a​s​e​ ​c​o​n​s​i​d​e​r​ ​s​u​p​p​o​r​t​i​n​g​ ​u​s​ ​b​y​:​ 
 							 */
 							text: string
+							/**
+							 * s​t​a​r​i​n​g​ ​u​s​ ​o​n
+							 */
+							githubText: string
+							/**
+							 * G​i​t​H​u​b
+							 */
+							githubLink: string
+							/**
+							 * s​p​r​e​a​d​i​n​g​ ​t​h​e​ ​w​o​r​d​ ​a​b​o​u​t​:
+							 */
+							spreadWordText: string
+							/**
+							 * d​e​f​g​u​a​r​d​!
+							 */
+							defguard: string
+							/**
+							 * j​o​i​n​ ​o​u​r​ ​M​a​t​r​i​x​ ​s​e​r​v​e​r​:
+							 */
+							joinMatrix: string
 						}
 					}
 				}
@@ -1612,12 +1629,29 @@ export type TranslationFunctions = {
 							 */
 							title: () => LocalizedString
 							/**
-							 * **defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by:  
-						- staring us on GitHub
-						- spreading the word about **defguard**!
-						- join our Matrix server: https://matrix.to/#/#defguard:teonite.com
+							 * **defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by: 
 							 */
 							text: () => LocalizedString
+							/**
+							 * staring us on
+							 */
+							githubText: () => LocalizedString
+							/**
+							 * GitHub
+							 */
+							githubLink: () => LocalizedString
+							/**
+							 * spreading the word about:
+							 */
+							spreadWordText: () => LocalizedString
+							/**
+							 * defguard!
+							 */
+							defguard: () => LocalizedString
+							/**
+							 * join our Matrix server:
+							 */
+							joinMatrix: () => LocalizedString
 						}
 					}
 				}

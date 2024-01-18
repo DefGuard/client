@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useI18nContext } from '../../../../../i18n/i18n-react';
 import { IconDefguard } from '../../../../../shared/components/icons/IconDefguard/IconDeguard';
 import SvgDefguardLogoText from '../../../../../shared/components/svg/DefguardLogoText';
+import { githubUrl, mastodonUrl, matrixUrl } from '../../../../../shared/constants';
 import { Button } from '../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import {
   ButtonSize,
@@ -173,6 +174,20 @@ export const SupportSlide = () => {
       </div>
       <div className="text centered">
         <Markdown>{localLL.text()}</Markdown>
+        <ul>
+          <li>
+            <span>{localLL.githubText()} </span>
+            <a onClick={() => openLink(githubUrl)}>{localLL.githubLink()}</a>
+          </li>
+          <li>
+            <span onClick={() => openLink(mastodonUrl)}>{localLL.spreadWordText()} </span>
+            <b>{localLL.defguard()}</b>
+          </li>
+          <li>
+            <span>{localLL.joinMatrix()} </span>
+            <a onClick={() => openLink(matrixUrl)}>{matrixUrl}</a>
+          </li>
+        </ul>
       </div>
       <GithubButton />
     </Card>
