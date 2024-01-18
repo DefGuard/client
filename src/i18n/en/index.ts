@@ -101,10 +101,12 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               // md
               title: '**Support us** on Github',
               // md
-              text: `**defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by:  
-- staring us on GitHub
-- spreading the word about **defguard**!
-- join our Matrix server: https://matrix.to/#/#defguard:teonite.com`,
+              text: `**defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by: `,
+              githubText: `staring us on`,
+              githubLink: `GitHub`,
+              spreadWordText: `spreading the word about:`,
+              defguard: `defguard!`,
+              joinMatrix: `join our Matrix server:`,
             },
           },
         },

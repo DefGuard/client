@@ -15,6 +15,10 @@
         text-decoration: none;
       }
     }
+    a {
+      text-decoration: underline;
+      cursor: pointer;
+    }
 
     .more {
       @include typography(app-body-1);
