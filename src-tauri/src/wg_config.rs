@@ -52,6 +52,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
         .get("Address")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("Address".to_string()))?;
     // extract IP if DNS config includes search domains
+    // FIXME: actually handle search domains
     let dns = interface_section
         .get("DNS")
         .and_then(|dns| match dns.split(",").next() {
