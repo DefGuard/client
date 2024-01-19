@@ -165,7 +165,7 @@ type RootTranslation = {
 							}
 							tunnel: {
 								/**
-								 * A​d​d​ ​T​u​n​e​l
+								 * A​d​d​ ​T​u​n​n​e​l
 								 */
 								title: string
 								/**
@@ -180,9 +180,9 @@ type RootTranslation = {
 							 */
 							title: string
 							/**
-							 * S​i​n​c​e​ ​W​i​r​e​g​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​g​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​g​u​a​r​d​ ​t​u​n​n​e​l​)​.​ ​ ​
+							 * S​i​n​c​e​ ​W​i​r​e​G​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​)​.​ ​ ​
 						​
-						​I​f​ ​y​o​u​ ​w​o​u​l​d​ ​l​i​k​e​ ​t​o​ ​s​e​c​u​r​e​ ​y​o​u​r​ ​W​i​r​e​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​t​r​y​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​V​P​N​ ​&​ ​S​S​O​ ​s​e​r​v​e​r​ ​(​w​h​i​c​h​ ​i​s​ ​a​l​s​o​ ​f​r​e​e​ ​&​ ​o​p​e​n​ ​s​o​u​r​c​e​)​ ​t​o​ ​g​e​t​ ​r​e​a​l​ ​2​F​A​ ​u​s​i​n​g​ ​W​i​r​e​g​u​a​r​d​ ​P​S​K​ ​k​e​y​s​ ​a​n​d​ ​p​e​e​r​s​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​b​y​ ​d​e​f​g​u​a​r​d​ ​g​a​t​e​w​a​y​!
+						​I​f​ ​y​o​u​ ​w​o​u​l​d​ ​l​i​k​e​ ​t​o​ ​s​e​c​u​r​e​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​t​r​y​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​V​P​N​ ​&​ ​S​S​O​ ​s​e​r​v​e​r​ ​(​w​h​i​c​h​ ​i​s​ ​a​l​s​o​ ​f​r​e​e​ ​&​ ​o​p​e​n​ ​s​o​u​r​c​e​)​ ​t​o​ ​g​e​t​ ​r​e​a​l​ ​2​F​A​ ​u​s​i​n​g​ ​W​i​r​e​G​u​a​r​d​ ​P​S​K​ ​k​e​y​s​ ​a​n​d​ ​p​e​e​r​s​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​b​y​ ​d​e​f​g​u​a​r​d​ ​g​a​t​e​w​a​y​!
 							 */
 							sideText: string
 						}
@@ -240,6 +240,10 @@ type RootTranslation = {
 							 * j​o​i​n​ ​o​u​r​ ​M​a​t​r​i​x​ ​s​e​r​v​e​r​:
 							 */
 							joinMatrix: string
+							/**
+							 * S​u​p​p​o​r​t​ ​U​s​!
+							 */
+							supportUs: string
 						}
 					}
 				}
@@ -551,7 +555,7 @@ type RootTranslation = {
 									 */
 									dns: string
 									/**
-									 * P​e​r​s​i​s​t​e​n​ ​k​e​e​p​a​l​i​v​e
+									 * P​e​r​s​i​s​t​e​n​t​ ​k​e​e​p​a​l​i​v​e
 									 */
 									keepalive: string
 									/**
@@ -653,7 +657,7 @@ type RootTranslation = {
 								 */
 								dns: string
 								/**
-								 * A​l​l​o​w​e​d​ ​I​P​s​ ​(​s​e​p​e​r​a​t​e​ ​w​i​t​h​ ​c​o​m​m​a​)
+								 * A​l​l​o​w​e​d​ ​I​P​s​ ​(​s​e​p​a​r​a​t​e​ ​w​i​t​h​ ​c​o​m​m​a​)
 								 */
 								allowedips: string
 								/**
@@ -711,7 +715,7 @@ type RootTranslation = {
 								 */
 								endpoint: string
 								/**
-								 * T​h​e​ ​D​N​S​ ​(​D​o​m​a​i​n​ ​N​a​m​e​ ​S​y​s​t​e​m​)​ ​s​e​r​v​e​r​ ​t​h​a​t​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​s​h​o​u​l​d​ ​u​s​e​ ​f​o​r​ ​n​a​m​e​ ​r​e​s​o​l​u​t​i​o​n​.
+								 * T​h​e​ ​D​N​S​ ​(​D​o​m​a​i​n​ ​N​a​m​e​ ​S​y​s​t​e​m​)​ ​s​e​r​v​e​r​ ​t​h​a​t​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​s​h​o​u​l​d​ ​u​s​e​ ​f​o​r​ ​n​a​m​e​ ​r​e​s​o​l​u​t​i​o​n​.​ ​R​i​g​h​t​ ​n​o​w​ ​w​e​ ​o​n​l​y​ ​s​u​p​p​o​r​t​ ​D​N​S​ ​s​e​r​v​e​r​ ​I​P​,​ ​i​n​ ​t​h​e​ ​f​e​a​t​u​r​e​ ​w​e​ ​w​i​l​l​ ​s​u​p​p​o​r​t​ ​d​o​m​a​i​n​ ​s​e​a​r​c​h​.
 								 */
 								dns: string
 								/**
@@ -789,7 +793,7 @@ type RootTranslation = {
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​C​l​i​c​k​ ​o​n​ ​t​h​e​ ​"​I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e​"​ ​b​u​t​t​o​n​.​<​/​l​i​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​N​a​v​i​g​a​t​g​e​ ​t​o​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​u​s​i​n​g​ ​t​h​e​ ​f​i​l​e​ ​s​e​l​e​c​t​i​o​n​ ​d​i​a​l​o​g​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​N​a​v​i​g​a​t​e​ ​t​o​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​u​s​i​n​g​ ​t​h​e​ ​f​i​l​e​ ​s​e​l​e​c​t​i​o​n​ ​d​i​a​l​o​g​.​<​/​l​i​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​S​e​l​e​c​t​ ​t​h​e​ ​.​c​o​n​f​ ​f​i​l​e​ ​y​o​u​ ​r​e​c​e​i​v​e​d​ ​o​r​ ​c​r​e​a​t​e​d​.​<​/​l​i​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
@@ -910,7 +914,7 @@ type RootTranslation = {
 				 */
 				addTunnel: string
 				/**
-				 * W​i​r​e​g​u​a​r​d​ ​T​u​n​n​e​l​s
+				 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
 				 */
 				tunnels: string
 				/**
@@ -1008,7 +1012,7 @@ type RootTranslation = {
 				​
 				​1​.​ ​V​e​r​i​f​y​ ​y​o​u​r​ ​d​a​t​a​
 				​2​.​ ​C​r​e​a​t​e​ ​y​o​u​r​ ​p​a​s​s​w​o​r​d​
-				​3​.​ ​C​o​n​f​i​g​u​r​a​t​e​ ​V​P​N​ ​d​e​v​i​c​e​
+				​3​.​ ​C​o​n​f​i​g​u​r​e​ ​V​P​N​ ​d​e​v​i​c​e​
 				​
 				​Y​o​u​ ​h​a​v​e​ ​a​ ​t​i​m​e​ ​l​i​m​i​t​ ​o​f​ ​*​*​{​t​i​m​e​}​ ​m​i​n​u​t​e​s​*​*​ ​t​o​ ​c​o​m​p​l​e​t​e​ ​t​h​i​s​ ​p​r​o​c​e​s​s​.​
 				​I​f​ ​y​o​u​ ​h​a​v​e​ ​a​n​y​ ​q​u​e​s​t​i​o​n​s​,​ ​p​l​e​a​s​e​ ​c​o​n​s​u​l​t​ ​y​o​u​r​ ​a​s​s​i​g​n​e​d​ ​a​d​m​i​n​.​A​l​l​ ​n​e​c​e​s​s​a​r​y​ ​i​n​f​o​r​m​a​t​i​o​n​ ​c​a​n​ ​b​e​ ​f​o​u​n​d​ ​a​t​ ​t​h​e​ ​b​o​t​t​o​m​ ​o​f​ ​t​h​e​ ​s​i​d​e​b​a​r​.
@@ -1121,7 +1125,7 @@ type RootTranslation = {
 								 */
 								submit: string
 								/**
-								 * P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​y​o​u​ ​h​a​v​e​ ​t​o​ ​d​o​w​n​l​o​a​d​ ​t​h​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​n​o​w​,​ ​s​i​n​c​e​ ​w​e​ ​d​o​ ​n​o​t​ ​s​t​o​r​e​ ​y​o​u​r​ ​p​r​i​v​a​t​e​ ​k​e​y​.​ ​A​f​t​e​r​ ​t​h​i​s​ ​d​i​a​l​o​g​ ​i​s​ ​c​l​o​s​e​d​,​ ​y​o​u​ ​w​i​l​l​ ​n​o​t​ ​b​e​ ​a​b​l​e​ ​t​o​ ​g​e​t​ ​y​o​u​r​ ​f​u​l​l​l​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​(​w​i​t​h​ ​p​r​i​v​a​t​e​ ​k​e​y​s​,​ ​o​n​l​y​ ​b​l​a​n​k​ ​t​e​m​p​l​a​t​e​)​.
+								 * P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​y​o​u​ ​h​a​v​e​ ​t​o​ ​d​o​w​n​l​o​a​d​ ​t​h​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​n​o​w​,​ ​s​i​n​c​e​ ​w​e​ ​d​o​ ​n​o​t​ ​s​t​o​r​e​ ​y​o​u​r​ ​p​r​i​v​a​t​e​ ​k​e​y​.​ ​A​f​t​e​r​ ​t​h​i​s​ ​d​i​a​l​o​g​ ​i​s​ ​c​l​o​s​e​d​,​ ​y​o​u​ ​w​i​l​l​ ​n​o​t​ ​b​e​ ​a​b​l​e​ ​t​o​ ​g​e​t​ ​y​o​u​r​ ​f​u​l​l​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​(​w​i​t​h​ ​p​r​i​v​a​t​e​ ​k​e​y​s​,​ ​o​n​l​y​ ​b​l​a​n​k​ ​t​e​m​p​l​a​t​e​)​.
 								 */
 								messageBox: string
 								form: {
@@ -1167,7 +1171,7 @@ type RootTranslation = {
 									/**
 									 * 
 								​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-								​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​p​r​o​v​i​d​e​d​ ​h​e​r​e​ ​<​s​t​r​o​n​g​>​ ​d​o​e​s​ ​n​o​t​ ​i​n​c​l​u​d​e​ ​p​r​i​v​a​t​e​ ​k​e​y​ ​a​n​d​ ​u​s​e​s​ ​p​u​b​l​i​c​ ​k​e​y​ ​t​o​ ​f​i​l​l​ ​i​t​'​s​ ​p​l​a​c​e​ ​<​/​s​t​r​o​n​g​>​ ​y​o​u​ ​w​i​l​l​ ​n​e​e​d​ ​t​o​ ​r​e​p​a​l​c​e​ ​i​t​ ​o​n​ ​y​o​u​r​ ​o​w​n​ ​f​o​r​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​t​o​ ​w​o​r​k​ ​p​r​o​p​e​r​l​y​.​
+								​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​p​r​o​v​i​d​e​d​ ​h​e​r​e​ ​<​s​t​r​o​n​g​>​ ​d​o​e​s​ ​n​o​t​ ​i​n​c​l​u​d​e​ ​p​r​i​v​a​t​e​ ​k​e​y​ ​a​n​d​ ​u​s​e​s​ ​p​u​b​l​i​c​ ​k​e​y​ ​t​o​ ​f​i​l​l​ ​i​t​'​s​ ​p​l​a​c​e​ ​<​/​s​t​r​o​n​g​>​ ​y​o​u​ ​w​i​l​l​ ​n​e​e​d​ ​t​o​ ​r​e​p​l​a​c​e​ ​i​t​ ​o​n​ ​y​o​u​r​ ​o​w​n​ ​f​o​r​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​t​o​ ​w​o​r​k​ ​p​r​o​p​e​r​l​y​.​
 								​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 							
 									 */
@@ -1206,7 +1210,7 @@ type RootTranslation = {
 							steps: {
 								wireguard: {
 									/**
-									 * D​o​w​n​l​o​a​d​ ​a​n​d​ ​i​n​s​t​a​l​l​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​ ​o​n​ ​y​o​u​r​ ​c​o​m​p​p​u​t​e​r​ ​o​r​ ​a​p​p​ ​o​n​ ​p​h​o​n​e​.
+									 * D​o​w​n​l​o​a​d​ ​a​n​d​ ​i​n​s​t​a​l​l​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​ ​o​n​ ​y​o​u​r​ ​c​o​m​p​u​t​e​r​ ​o​r​ ​a​p​p​ ​o​n​ ​p​h​o​n​e​.
 									 */
 									content: string
 									/**
@@ -1364,7 +1368,7 @@ type RootTranslation = {
 				 */
 				error: string
 				/**
-				 * I​n​t​a​n​c​e​ ​f​o​r​ ​g​i​v​e​n​ ​t​o​k​e​n​ ​i​s​ ​n​o​t​ ​r​e​g​i​s​t​e​r​e​d​ ​!
+				 * I​n​s​t​a​n​c​e​ ​f​o​r​ ​g​i​v​e​n​ ​t​o​k​e​n​ ​i​s​ ​n​o​t​ ​r​e​g​i​s​t​e​r​e​d​ ​!
 				 */
 				errorInstanceNotFound: string
 			}
@@ -1385,7 +1389,7 @@ type RootTranslation = {
 				 */
 				success: string
 				/**
-				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​e​d
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d
 				 */
 				error: string
 			}
@@ -1412,7 +1416,7 @@ type RootTranslation = {
 				 */
 				success: string
 				/**
-				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​e​d
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d
 				 */
 				error: string
 			}
@@ -1592,9 +1596,9 @@ export type TranslationFunctions = {
 							 */
 							title: () => LocalizedString
 							/**
-							 * Since Wireguard protocol doesn't support 2FA/MFA - most (if not all) currently available Wireguard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not Wireguard tunnel).  
+							 * Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).  
 					
-						If you would like to secure your Wireguard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using Wireguard PSK keys and peers configuration by defguard gateway!
+						If you would like to secure your WireGuard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using WireGuard PSK keys and peers configuration by defguard gateway!
 							 */
 							sideText: () => LocalizedString
 						}
@@ -1652,6 +1656,10 @@ export type TranslationFunctions = {
 							 * join our Matrix server:
 							 */
 							joinMatrix: () => LocalizedString
+							/**
+							 * Support Us!
+							 */
+							supportUs: () => LocalizedString
 						}
 					}
 				}
@@ -1963,7 +1971,7 @@ export type TranslationFunctions = {
 									 */
 									dns: () => LocalizedString
 									/**
-									 * Persisten keepalive
+									 * Persistent keepalive
 									 */
 									keepalive: () => LocalizedString
 									/**
@@ -2064,7 +2072,7 @@ export type TranslationFunctions = {
 								 */
 								dns: () => LocalizedString
 								/**
-								 * Allowed IPs (seperate with comma)
+								 * Allowed IPs (separate with comma)
 								 */
 								allowedips: () => LocalizedString
 								/**
@@ -2122,7 +2130,7 @@ export type TranslationFunctions = {
 								 */
 								endpoint: () => LocalizedString
 								/**
-								 * The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution.
+								 * The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution. Right now we only support DNS server IP, in the feature we will support domain search.
 								 */
 								dns: () => LocalizedString
 								/**
@@ -2200,7 +2208,7 @@ export type TranslationFunctions = {
 						                <div>
 						                <ul>
 						                  <li> Click on the "Import Config File" button.</li>
-						                  <li> Navigatge to configuration file using the file selection dialog.</li>
+						                  <li> Navigate to configuration file using the file selection dialog.</li>
 						                  <li> Select the .conf file you received or created.</li>
 						                </ul>
 						                </div>
@@ -2321,7 +2329,7 @@ export type TranslationFunctions = {
 				 */
 				addTunnel: () => LocalizedString
 				/**
-				 * Wireguard Tunnels
+				 * WireGuard Tunnels
 				 */
 				tunnels: () => LocalizedString
 				/**
@@ -2417,7 +2425,7 @@ export type TranslationFunctions = {
 			
 				1. Verify your data
 				2. Create your password
-				3. Configurate VPN device
+				3. Configure VPN device
 			
 				You have a time limit of **{time} minutes** to complete this process.
 				If you have any questions, please consult your assigned admin.All necessary information can be found at the bottom of the sidebar.
@@ -2529,7 +2537,7 @@ export type TranslationFunctions = {
 								 */
 								submit: () => LocalizedString
 								/**
-								 * Please be advised that you have to download the configuration now, since we do not store your private key. After this dialog is closed, you will not be able to get your fulll configuration file (with private keys, only blank template).
+								 * Please be advised that you have to download the configuration now, since we do not store your private key. After this dialog is closed, you will not be able to get your full configuration file (with private keys, only blank template).
 								 */
 								messageBox: () => LocalizedString
 								form: {
@@ -2575,7 +2583,7 @@ export type TranslationFunctions = {
 									/**
 									 * 
 								        <p>
-								          Please be advised that configuration provided here <strong> does not include private key and uses public key to fill it's place </strong> you will need to repalce it on your own for configuration to work properly.
+								          Please be advised that configuration provided here <strong> does not include private key and uses public key to fill it's place </strong> you will need to replace it on your own for configuration to work properly.
 								        </p>
 							
 									 */
@@ -2613,7 +2621,7 @@ export type TranslationFunctions = {
 							steps: {
 								wireguard: {
 									/**
-									 * Download and install WireGuard client on your compputer or app on phone.
+									 * Download and install WireGuard client on your computer or app on phone.
 									 */
 									content: () => LocalizedString
 									/**
@@ -2770,7 +2778,7 @@ export type TranslationFunctions = {
 				 */
 				error: () => LocalizedString
 				/**
-				 * Intance for given token is not registered !
+				 * Instance for given token is not registered !
 				 */
 				errorInstanceNotFound: () => LocalizedString
 			}
@@ -2790,7 +2798,7 @@ export type TranslationFunctions = {
 				 */
 				success: () => LocalizedString
 				/**
-				 * Unexpected error occured
+				 * Unexpected error occurred
 				 */
 				error: () => LocalizedString
 			}
@@ -2816,7 +2824,7 @@ export type TranslationFunctions = {
 				 */
 				success: () => LocalizedString
 				/**
-				 * Unexpected error occured
+				 * Unexpected error occurred
 				 */
 				error: () => LocalizedString
 			}
