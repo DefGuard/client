@@ -107,6 +107,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               spreadWordText: `spreading the word about:`,
               defguard: `defguard!`,
               joinMatrix: `join our Matrix server:`,
+              supportUs: 'Support Us!',
             },
           },
         },
