@@ -1,4 +1,5 @@
 import { createWithEqualityFn } from 'zustand/traditional';
+
 import { CommonWireguardFields } from '../../../../../../types';
 
 const defaultValues: StoreValues = {

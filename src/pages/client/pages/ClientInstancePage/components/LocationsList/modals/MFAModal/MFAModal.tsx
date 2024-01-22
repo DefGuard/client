@@ -1,27 +1,31 @@
-import "./style.scss";
+import './style.scss';
 
-import { useI18nContext } from "../../../../../../../../i18n/i18n-react";
-import { MessageBox } from "../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox";
-import { MessageBoxType } from "../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/types";
-import { ModalWithTitle } from "../../../../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle";
-import { useMFAModal } from "./useMFAModal";
-import { shallow } from "zustand/shallow";
-import { Button } from "../../../../../../../../shared/defguard-ui/components/Layout/Button/Button";
-import { ButtonSize, ButtonStyleVariant } from "../../../../../../../../shared/defguard-ui/components/Layout/Button/types";
-import { useCallback, useMemo, useState } from "react";
-import { z } from "zod";
-import { SubmitHandler, useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { clientApi } from "../../../../../../clientAPI/clientApi";
-import { useMutation } from "@tanstack/react-query";
-import { useToaster } from "../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster";
-import { Body, fetch } from "@tauri-apps/api/http";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { Body, fetch } from '@tauri-apps/api/http';
+import { useCallback, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
+import { SubmitHandler, useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { shallow } from 'zustand/shallow';
+
+import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
+import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
+import {
+  ButtonSize,
+  ButtonStyleVariant,
+} from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
+import { MessageBox } from '../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
+import { MessageBoxType } from '../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/types';
+import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
+import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useMFAModal } from './useMFAModal';
 
 const { connect } = clientApi;
 
 const CODE_LENGTH = 6;
-const CLIENT_MFA_ENDPOINT = "api/v1/client-mfa";
+const CLIENT_MFA_ENDPOINT = 'api/v1/client-mfa';
 
 type FormFields = {
   code: string;
@@ -47,10 +51,7 @@ export const MFAModal = () => {
   const localLL = LL.modals.mfa.authentication;
   const isOpen = useMFAModal((state) => state.isOpen);
   const location = useMFAModal((state) => state.instance);
-  const [close, reset] = useMFAModal(
-    (state) => [state.close, state.reset],
-    shallow,
-  );
+  const [close, reset] = useMFAModal((state) => [state.close, state.reset], shallow);
 
   const resetState = () => {
     reset();
@@ -65,7 +66,7 @@ export const MFAModal = () => {
 
   const startMFA = async (selectedMethod: number) => {
     if (!location) return toaster.error(localLL.errors.locationNotSpecified());
-  
+
     const clientInstances = await clientApi.getInstances();
     const instance = clientInstances.find((i) => i.id === location.instance_id);
 
@@ -94,7 +95,7 @@ export const MFAModal = () => {
     if (response.ok) {
       const { token } = response.data;
 
-      setScreen(selectedMethod === 0 ? 'authenticator_app' : 'email' );
+      setScreen(selectedMethod === 0 ? 'authenticator_app' : 'email');
       setMFAToken(token);
 
       return response.data;
@@ -141,9 +142,10 @@ export const MFAModal = () => {
         />
       ) : (
         <MFACodeForm
-          description={screen === 'authenticator_app' ?
-            localLL.authenticatorAppDescription() :
-            localLL.emailCodeDescription()
+          description={
+            screen === 'authenticator_app'
+              ? localLL.authenticatorAppDescription()
+              : localLL.emailCodeDescription()
           }
           token={mfaToken}
           proxyUrl={proxyUrl}
@@ -161,7 +163,12 @@ type MFAStartProps = {
   showEmailCodeForm: () => void;
 };
 
-const MFAStart = ({ isPending, authMethod, showAuthenticatorAppCodeForm, showEmailCodeForm }: MFAStartProps) => {
+const MFAStart = ({
+  isPending,
+  authMethod,
+  showAuthenticatorAppCodeForm,
+  showEmailCodeForm,
+}: MFAStartProps) => {
   const { LL } = useI18nContext();
   const localLL = LL.modals.mfa.authentication;
 
@@ -181,7 +188,7 @@ const MFAStart = ({ isPending, authMethod, showAuthenticatorAppCodeForm, showEma
           size={ButtonSize.LARGE}
           loading={isAuthenticatorAppPending}
           styleVariant={ButtonStyleVariant.STANDARD}
-          text={isAuthenticatorAppPending ? "" : localLL.useAuthenticatorApp()}
+          text={isAuthenticatorAppPending ? '' : localLL.useAuthenticatorApp()}
           onClick={showAuthenticatorAppCodeForm}
         />
         <Button
@@ -189,13 +196,13 @@ const MFAStart = ({ isPending, authMethod, showAuthenticatorAppCodeForm, showEma
           size={ButtonSize.LARGE}
           loading={isEmailCodePending}
           styleVariant={ButtonStyleVariant.STANDARD}
-          text={isEmailCodePending ? "" : localLL.useEmailCode()}
+          text={isEmailCodePending ? '' : localLL.useEmailCode()}
           onClick={showEmailCodeForm}
         />
       </div>
     </div>
   );
-}
+};
 
 type MFACodeForm = {
   description: string;
@@ -231,7 +238,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
 
     const data = { token, code: Number(code) };
 
-    const response = await fetch<MFAFinishResponse>(proxyUrl + "/finish", {
+    const response = await fetch<MFAFinishResponse>(proxyUrl + '/finish', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -248,12 +255,12 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         presharedKey: response.data.preshared_key,
       });
     } else {
-      const { error } = (response.data as any);
+      const { error } = response.data as any;
       let message = '';
-  
-      if (error === "Unauthorized") {
+
+      if (error === 'Unauthorized') {
         message = localLL.errors.invalidCode();
-      } else if (error === "invalid token" || error === "login session not found") {
+      } else if (error === 'invalid token' || error === 'login session not found') {
         console.error(response.data);
         toaster.error(localLL.errors.tokenExpired());
         resetState();
@@ -304,7 +311,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         <div className="mfa-model-content-footer">
           <Button
             styleVariant={ButtonStyleVariant.PRIMARY}
-            text={isPending ? "" : localLL.buttonSubmit()}
+            text={isPending ? '' : localLL.buttonSubmit()}
             type="submit"
             className="submit"
             size={ButtonSize.SMALL}
