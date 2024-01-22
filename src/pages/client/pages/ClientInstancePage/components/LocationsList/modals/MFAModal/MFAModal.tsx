@@ -6,6 +6,7 @@ import { Body, fetch } from '@tauri-apps/api/http';
 import { useCallback, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -21,7 +22,6 @@ import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/compo
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useMFAModal } from './useMFAModal';
-import { error } from 'tauri-plugin-log-api';
 
 const { connect } = clientApi;
 
@@ -30,6 +30,10 @@ const CLIENT_MFA_ENDPOINT = 'api/v1/client-mfa';
 
 type FormFields = {
   code: string;
+};
+
+type MFAError = {
+  error: string;
 };
 
 const defaultValues: FormFields = {
@@ -101,7 +105,7 @@ export const MFAModal = () => {
 
       return response.data;
     } else {
-      const error = (response.data as any).error;
+      const error = (response.data as unknown as MFAError).error;
       if (error === 'selected MFA method not available') {
         toaster.error(localLL.errors.mfaNotConfigured());
       } else {
@@ -216,10 +220,6 @@ type MFAFinishResponse = {
   preshared_key: string;
 };
 
-type MFAError = {
-  error: string;
-}
-
 const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) => {
   const { LL } = useI18nContext();
   const toaster = useToaster();
@@ -265,7 +265,10 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
 
       if (errorMessage === 'Unauthorized') {
         message = localLL.errors.invalidCode();
-      } else if (errorMessage === 'invalid token' || errorMessage === 'login session not found') {
+      } else if (
+        errorMessage === 'invalid token' ||
+        errorMessage === 'login session not found'
+      ) {
         console.error(response.data);
         toaster.error(localLL.errors.tokenExpired());
         resetState();
@@ -310,7 +313,9 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         />
 
         <div style={{ height: 75 }}>
-          {mfaError ? <MessageBox type={MessageBoxType.ERROR} message={mfaError} /> : null}
+          {mfaError ? (
+            <MessageBox type={MessageBoxType.ERROR} message={mfaError} />
+          ) : null}
         </div>
 
         <div className="mfa-model-content-footer">
