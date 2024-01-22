@@ -1,5 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
+use std::fmt::{Display, Formatter};
 use std::time::SystemTime;
 
 use crate::{
@@ -73,6 +74,15 @@ pub async fn peer_to_location_stats(
         listen_port,
         persistent_keepalive_interval: peer.persistent_keepalive_interval,
     })
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.id {
+            Some(location_id) => write!(f, "[ID {location_id}] {}", self.name),
+            None => write!(f, "{}", self.name),
+        }
+    }
 }
 
 impl Location {
@@ -197,6 +207,19 @@ impl Location {
         .fetch_optional(executor)
 
         .await
+    }
+
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        info!("Removing location {self}");
+        if let Some(id) = self.id {
+            query!("DELETE FROM location WHERE id = $1;", id)
+                .execute(executor)
+                .await?;
+        }
+        Ok(())
     }
 }
 
