@@ -289,10 +289,15 @@ pub async fn update_instance(
 ) -> Result<(), Error> {
     debug!("Received update_instance command");
     trace!("Processing following response:\n {response:#?}");
+    let pool = app_state.get_pool();
 
-    let instance = Instance::find_by_id(&app_state.get_pool(), instance_id).await?;
-    if let Some(mut instance) = instance {
-        let mut transaction = app_state.get_pool().begin().await?;
+    if let Some(mut instance) = Instance::find_by_id(&pool, instance_id).await? {
+        // fetch existing locations for given instance
+        let mut current_locations = Location::find_by_instance_id(&pool, instance_id).await?;
+
+        let mut transaction = pool.begin().await?;
+
+        // update instance
         let instance_info = response
             .instance
             .expect("Missing instance info in device config response");
@@ -302,24 +307,41 @@ pub async fn update_instance(
         instance.username = instance_info.username;
         instance.save(&mut *transaction).await?;
 
+        // process locations received in response
         for location in response.configs {
+            // parse device config
             let mut new_location = device_config_to_location(location, instance_id);
-            let old_location =
-                Location::find_by_native_id(&mut *transaction, new_location.network_id).await?;
-            if let Some(mut old_location) = old_location {
-                old_location.name = new_location.name;
-                old_location.address = new_location.address;
-                old_location.pubkey = new_location.pubkey;
-                old_location.endpoint = new_location.endpoint;
-                old_location.allowed_ips = new_location.allowed_ips;
-                old_location.mfa_enabled = new_location.mfa_enabled;
-                old_location.keepalive_interval = new_location.keepalive_interval;
-                old_location.save(&mut *transaction).await?;
+
+            // check if location is already present in current locations
+            if let Some(position) = current_locations
+                .iter()
+                .position(|loc| loc.network_id == new_location.network_id)
+            {
+                // remove from list of existing locations
+                let mut current_location = current_locations.remove(position);
+                // update existing location
+                current_location.name = new_location.name;
+                current_location.address = new_location.address;
+                current_location.pubkey = new_location.pubkey;
+                current_location.endpoint = new_location.endpoint;
+                current_location.allowed_ips = new_location.allowed_ips;
+                current_location.mfa_enabled = new_location.mfa_enabled;
+                current_location.keepalive_interval = new_location.keepalive_interval;
+                current_location.save(&mut *transaction).await?;
             } else {
+                // create new location
                 new_location.save(&mut *transaction).await?;
             }
         }
+
+        // remove locations which were present in current locations
+        // but no longer found in core response
+        for removed_location in current_locations {
+            removed_location.delete(&mut *transaction).await?;
+        }
+
         transaction.commit().await?;
+
         info!("Instance {instance_id} updated");
         app_handle.emit_all("instance-update", ())?;
         Ok(())

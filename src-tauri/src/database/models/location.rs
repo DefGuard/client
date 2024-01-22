@@ -1,6 +1,9 @@
 use chrono::{NaiveDateTime, Utc};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
-use std::time::SystemTime;
+use std::{
+    fmt::{Display, Formatter},
+    time::SystemTime,
+};
 
 use crate::{
     commands::DateTimeAggregation, database::DbPool, error::Error, CommonLocationStats,
@@ -73,6 +76,15 @@ pub async fn peer_to_location_stats(
         listen_port,
         persistent_keepalive_interval: peer.persistent_keepalive_interval,
     })
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.id {
+            Some(location_id) => write!(f, "[ID {location_id}] {}", self.name),
+            None => write!(f, "{}", self.name),
+        }
+    }
 }
 
 impl Location {
@@ -180,23 +192,17 @@ impl Location {
         .await
     }
 
-    pub async fn find_by_native_id<'e, E>(
-        executor: E,
-        instance_id: i64,
-    ) -> Result<Option<Self>, SqlxError>
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), SqlxError>
     where
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
-        query_as!(
-            Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
-            route_all_traffic, mfa_enabled, keepalive_interval \
-            FROM location WHERE network_id = $1;",
-            instance_id
-        )
-        .fetch_optional(executor)
-
-        .await
+        info!("Removing location {self}");
+        if let Some(id) = self.id {
+            query!("DELETE FROM location WHERE id = $1;", id)
+                .execute(executor)
+                .await?;
+        }
+        Ok(())
     }
 }
 

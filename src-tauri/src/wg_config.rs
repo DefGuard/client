@@ -55,9 +55,9 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
     // FIXME: actually handle search domains
     let dns = interface_section
         .get("DNS")
-        .and_then(|dns| match dns.split(",").next() {
-            Some(address) => Some(address.to_string()),
-            None => Some(dns.to_string()),
+        .map(|dns| match dns.split(',').next() {
+            Some(address) => address.to_string(),
+            None => dns.to_string(),
         });
 
     let pre_up = interface_section.get("PreUp");
