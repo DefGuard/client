@@ -1406,6 +1406,72 @@ type RootTranslation = {
 				submit: string
 			}
 		}
+		mfa: {
+			authentication: {
+				/**
+				 * T​w​o​-​f​a​c​t​o​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n
+				 */
+				title: string
+				/**
+				 * P​a​s​t​e​ ​t​h​e​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​c​o​d​e​ ​f​r​o​m​ ​y​o​u​r​ ​A​u​t​h​e​n​t​i​c​a​t​o​r​ ​A​p​p​l​i​c​a​t​i​o​n​.
+				 */
+				authenticatorAppDescription: string
+				/**
+				 * P​a​s​t​e​ ​t​h​e​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​c​o​d​e​ ​t​h​a​t​ ​w​a​s​ ​s​e​n​t​ ​t​o​ ​y​o​u​r​ ​e​m​a​i​l​ ​a​d​d​r​e​s​s​.
+				 */
+				emailCodeDescription: string
+				/**
+				 * F​o​r​ ​t​h​i​s​ ​c​o​n​n​e​c​t​i​o​n​,​ ​t​w​o​-​f​a​c​t​o​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​(​2​F​A​)​ ​i​s​ ​m​a​n​d​a​t​o​r​y​.
+				 */
+				mfaStartDescriptionPrimary: string
+				/**
+				 * S​e​l​e​c​t​ ​y​o​u​r​ ​p​r​e​f​e​r​r​e​d​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​m​e​t​h​o​d​.
+				 */
+				mfaStartDescriptionSecondary: string
+				/**
+				 * U​s​e​ ​a​u​t​h​e​n​t​i​c​a​t​o​r​ ​a​p​p​ ​i​n​s​t​e​a​d
+				 */
+				useAuthenticatorApp: string
+				/**
+				 * U​s​e​ ​y​o​u​r​ ​e​m​a​i​l​ ​c​o​d​e​ ​i​n​s​t​e​a​d
+				 */
+				useEmailCode: string
+				/**
+				 * U​s​e​ ​t​h​i​s​ ​m​e​t​h​o​d​ ​f​o​r​ ​f​u​t​u​r​e​ ​l​o​g​i​n​s
+				 */
+				saveAuthenticationMethodForFutureLogins: string
+				/**
+				 * V​e​r​i​f​y
+				 */
+				buttonSubmit: string
+				errors: {
+					/**
+					 * S​e​l​e​c​t​e​d​ ​m​e​t​h​o​d​ ​h​a​s​ ​n​o​t​ ​b​e​e​n​ ​c​o​n​f​i​g​u​r​e​d​.
+					 */
+					mfaNotConfigured: string
+					/**
+					 * C​o​u​l​d​ ​n​o​t​ ​s​t​a​r​t​ ​M​F​A​ ​p​r​o​c​e​s​s​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​ ​o​r​ ​c​o​n​t​a​c​t​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					mfaStartGeneric: string
+					/**
+					 * C​o​u​l​d​ ​n​o​t​ ​f​i​n​d​ ​i​n​s​t​a​n​c​e​.
+					 */
+					instanceNotFound: string
+					/**
+					 * L​o​c​a​t​i​o​n​ ​i​s​ ​n​o​t​ ​s​p​e​c​i​f​i​e​d​.
+					 */
+					locationNotSpecified: string
+					/**
+					 * E​r​r​o​r​,​ ​t​h​i​s​ ​c​o​d​e​ ​i​s​ ​i​n​v​a​l​i​d​,​ ​t​r​y​ ​a​g​a​i​n​ ​o​r​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					invalidCode: string
+					/**
+					 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​t​o​ ​c​o​n​n​e​c​t​ ​a​g​a​i​n​.
+					 */
+					tokenExpired: string
+				}
+			}
+		}
 	}
 }
 
@@ -2791,6 +2857,72 @@ export type TranslationFunctions = {
 				 * Delete tunnel
 				 */
 				submit: () => LocalizedString
+			}
+		}
+		mfa: {
+			authentication: {
+				/**
+				 * Two-factor authentication
+				 */
+				title: () => LocalizedString
+				/**
+				 * Paste the authentication code from your Authenticator Application.
+				 */
+				authenticatorAppDescription: () => LocalizedString
+				/**
+				 * Paste the authentication code that was sent to your email address.
+				 */
+				emailCodeDescription: () => LocalizedString
+				/**
+				 * For this connection, two-factor authentication (2FA) is mandatory.
+				 */
+				mfaStartDescriptionPrimary: () => LocalizedString
+				/**
+				 * Select your preferred authentication method.
+				 */
+				mfaStartDescriptionSecondary: () => LocalizedString
+				/**
+				 * Use authenticator app instead
+				 */
+				useAuthenticatorApp: () => LocalizedString
+				/**
+				 * Use your email code instead
+				 */
+				useEmailCode: () => LocalizedString
+				/**
+				 * Use this method for future logins
+				 */
+				saveAuthenticationMethodForFutureLogins: () => LocalizedString
+				/**
+				 * Verify
+				 */
+				buttonSubmit: () => LocalizedString
+				errors: {
+					/**
+					 * Selected method has not been configured.
+					 */
+					mfaNotConfigured: () => LocalizedString
+					/**
+					 * Could not start MFA process. Please try again or contact administrator.
+					 */
+					mfaStartGeneric: () => LocalizedString
+					/**
+					 * Could not find instance.
+					 */
+					instanceNotFound: () => LocalizedString
+					/**
+					 * Location is not specified.
+					 */
+					locationNotSpecified: () => LocalizedString
+					/**
+					 * Error, this code is invalid, try again or contact your administrator.
+					 */
+					invalidCode: () => LocalizedString
+					/**
+					 * Token has expired. Please try to connect again.
+					 */
+					tokenExpired: () => LocalizedString
+				}
 			}
 		}
 	}

@@ -11,6 +11,7 @@ import { clientQueryKeys } from '../../../../query';
 import { ClientView, WireguardInstanceType } from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
+import { MFAModal } from './modals/MFAModal/MFAModal';
 
 const { getLocations, getTunnels } = clientApi;
 
@@ -88,6 +89,7 @@ export const LocationsList = () => {
           connectionType={selectedInstance.type}
         />
       )}
+      <MFAModal />
     </>
   );
 };

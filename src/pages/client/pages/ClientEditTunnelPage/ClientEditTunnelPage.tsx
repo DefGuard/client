@@ -61,7 +61,6 @@ export const ClientEditTunnelPage = () => {
               text={'Delete tunnel'}
               type="submit"
               onClick={() => {
-                console.log(tunnel);
                 if (tunnel) {
                   openDeleteTunnel(tunnel);
                 }
