@@ -1,7 +1,9 @@
 use chrono::{NaiveDateTime, Utc};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
-use std::fmt::{Display, Formatter};
-use std::time::SystemTime;
+use std::{
+    fmt::{Display, Formatter},
+    time::SystemTime,
+};
 
 use crate::{
     commands::DateTimeAggregation, database::DbPool, error::Error, CommonLocationStats,
@@ -187,25 +189,6 @@ impl Location {
             pubkey
         )
         .fetch_one(pool)
-        .await
-    }
-
-    pub async fn find_by_native_id<'e, E>(
-        executor: E,
-        instance_id: i64,
-    ) -> Result<Option<Self>, SqlxError>
-    where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
-    {
-        query_as!(
-            Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
-            route_all_traffic, mfa_enabled, keepalive_interval \
-            FROM location WHERE network_id = $1;",
-            instance_id
-        )
-        .fetch_optional(executor)
-
         .await
     }
 
