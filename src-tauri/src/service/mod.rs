@@ -204,7 +204,7 @@ impl DesktopDaemonService for DaemonService {
 
         let stats_period = self.stats_period;
         let (tx, rx) = mpsc::channel(64);
-        tokio::spawn(async move  {
+        tokio::spawn(async move {
             info!("Spawning stats thread for interface {ifname}");
             // setup WireGuard API
             let error_msg = format!("Failed to initialize WireGuard API for interface {ifname}");
