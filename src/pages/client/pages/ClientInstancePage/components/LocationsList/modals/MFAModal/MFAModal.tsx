@@ -21,6 +21,7 @@ import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/compo
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useMFAModal } from './useMFAModal';
+import { error } from 'tauri-plugin-log-api';
 
 const { connect } = clientApi;
 
@@ -118,12 +119,12 @@ export const MFAModal = () => {
   const showEmailCodeForm = useCallback(() => {
     setAuthMethod(1);
     mutate(1);
-  }, []);
+  }, [mutate]);
 
   const showAuthenticatorAppCodeForm = useCallback(() => {
     setAuthMethod(0);
     mutate(0);
-  }, []);
+  }, [mutate]);
 
   return (
     <ModalWithTitle
@@ -215,13 +216,17 @@ type MFAFinishResponse = {
   preshared_key: string;
 };
 
+type MFAError = {
+  error: string;
+}
+
 const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) => {
   const { LL } = useI18nContext();
   const toaster = useToaster();
   const location = useMFAModal((state) => state.instance);
   const closeModal = useMFAModal((state) => state.close);
 
-  const [error, setError] = useState('');
+  const [mfaError, setMFAError] = useState('');
 
   const localLL = LL.modals.mfa.authentication;
 
@@ -230,7 +235,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
       z.object({
         code: z.string().trim().length(6),
       }),
-    [LL.form.errors],
+    [],
   );
 
   const finishMFA = async (code: string) => {
@@ -255,12 +260,12 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         presharedKey: response.data.preshared_key,
       });
     } else {
-      const { error } = response.data as any;
+      const { error: errorMessage } = response.data as unknown as MFAError;
       let message = '';
 
-      if (error === 'Unauthorized') {
+      if (errorMessage === 'Unauthorized') {
         message = localLL.errors.invalidCode();
-      } else if (error === 'invalid token' || error === 'login session not found') {
+      } else if (errorMessage === 'invalid token' || errorMessage === 'login session not found') {
         console.error(response.data);
         toaster.error(localLL.errors.tokenExpired());
         resetState();
@@ -270,7 +275,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         toaster.error(localLL.errors.mfaStartGeneric());
       }
 
-      setError(message);
+      setMFAError(message);
       error(JSON.stringify(response.data));
       return;
     }
@@ -305,7 +310,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         />
 
         <div style={{ height: 75 }}>
-          {error ? <MessageBox type={MessageBoxType.ERROR} message={error} /> : null}
+          {mfaError ? <MessageBox type={MessageBoxType.ERROR} message={mfaError} /> : null}
         </div>
 
         <div className="mfa-model-content-footer">

@@ -662,9 +662,12 @@ If you want to disengage your VPN connection, simply press "deactivate".
     mfa: {
       authentication: {
         title: 'Two-factor authentication',
-        authenticatorAppDescription: 'Paste the authentication code from your Authenticator Application.',
-        emailCodeDescription: 'Paste the authentication code that was sent to your email address.',
-        mfaStartDescriptionPrimary: 'For this connection, two-factor authentication (2FA) is mandatory.',
+        authenticatorAppDescription:
+          'Paste the authentication code from your Authenticator Application.',
+        emailCodeDescription:
+          'Paste the authentication code that was sent to your email address.',
+        mfaStartDescriptionPrimary:
+          'For this connection, two-factor authentication (2FA) is mandatory.',
         mfaStartDescriptionSecondary: 'Select your preferred authentication method.',
         useAuthenticatorApp: 'Use authenticator app instead',
         useEmailCode: 'Use your email code instead',
@@ -672,10 +675,12 @@ If you want to disengage your VPN connection, simply press "deactivate".
         buttonSubmit: 'Verify',
         errors: {
           mfaNotConfigured: 'Selected method has not been configured.',
-          mfaStartGeneric: 'Could not start MFA process. Please try again or contact administrator.',
+          mfaStartGeneric:
+            'Could not start MFA process. Please try again or contact administrator.',
           instanceNotFound: 'Could not find instance.',
           locationNotSpecified: 'Location is not specified.',
-          invalidCode: 'Error, this code is invalid, try again or contact your administrator.',
+          invalidCode:
+            'Error, this code is invalid, try again or contact your administrator.',
           tokenExpired: 'Token has expired. Please try to connect again.',
         },
       },
