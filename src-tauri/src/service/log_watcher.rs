@@ -45,14 +45,22 @@ struct LogLine {
     level: Level,
     target: String,
     fields: LogLineFields,
+    span: Option<Span>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct Span {
+    interface_name: Option<String>,
+    name: Option<String>,
+    peer: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct LogLineFields {
     message: String,
-    interface_name: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct ServiceLogWatcher {
     interface_name: String,
     log_level: Level,
@@ -194,10 +202,12 @@ impl ServiceLogWatcher {
         }
 
         // publish all log lines with a matching interface name or with no interface name specified
-        if let Some(interface_name) = &log_line.fields.interface_name {
-            if interface_name != &self.interface_name {
-                debug!("Interface name {interface_name} is not the configured name {}. Skipping line...", self.interface_name);
-                return Ok(None);
+        if let Some(ref span) = log_line.span {
+            if let Some(interface_name) = &span.interface_name {
+                if interface_name != &self.interface_name {
+                    debug!("Interface name {interface_name} is not the configured name {}. Skipping line...", self.interface_name);
+                    return Ok(None);
+                }
             }
         }
 
