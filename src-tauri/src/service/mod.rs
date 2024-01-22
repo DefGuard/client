@@ -25,7 +25,7 @@ use tonic::{
     transport::Server,
     Code, Response, Status,
 };
-use tracing::{debug, info, info_span};
+use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use crate::utils::{execute_command, IS_MACOS};
@@ -197,8 +197,10 @@ impl DesktopDaemonService for DaemonService {
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
         let ifname = request.interface_name;
-        let _span = info_span!("read_interface_data", interface_name = &ifname).entered();
-        info!("Starting interface data stream for {ifname}");
+        let span = info_span!("read_interface_data", interface_name = &ifname);
+        span.in_scope(|| {
+            info!("Starting interface data stream for {ifname}");
+        });
 
         let stats_period = self.stats_period;
         let (tx, rx) = mpsc::channel(64);
@@ -231,7 +233,7 @@ impl DesktopDaemonService for DaemonService {
                 debug!("Finished sending stats update for interface {ifname}");
             }
             warn!("Client disconnected from stats update stream for interface {ifname}");
-        });
+        }.instrument(span));
 
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(

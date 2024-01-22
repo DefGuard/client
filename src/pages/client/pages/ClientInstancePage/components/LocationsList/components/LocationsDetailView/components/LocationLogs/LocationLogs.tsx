@@ -5,7 +5,7 @@ import { save } from '@tauri-apps/api/dialog';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { writeTextFile } from '@tauri-apps/api/fs';
 import { isUndefined } from 'lodash-es';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
@@ -35,6 +35,17 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
       await writeTextFile(path, logs);
     }
   };
+
+  const clearLogs = useCallback(() => {
+    if (logsContainerElement.current) {
+      logsContainerElement.current.innerHTML = '';
+    }
+  }, []);
+
+  // Clear logs when the component is unmounted or locationId changes
+  useEffect(() => {
+    return () => clearLogs();
+  }, [clearLogs, locationId]);
 
   // Listen to new logs
   useEffect(() => {
