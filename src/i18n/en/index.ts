@@ -669,8 +669,8 @@ If you want to disengage your VPN connection, simply press "deactivate".
         mfaStartDescriptionPrimary:
           'For this connection, two-factor authentication (2FA) is mandatory.',
         mfaStartDescriptionSecondary: 'Select your preferred authentication method.',
-        useAuthenticatorApp: 'Use authenticator app instead',
-        useEmailCode: 'Use your email code instead',
+        useAuthenticatorApp: 'Use authenticator app',
+        useEmailCode: 'Use your email code',
         saveAuthenticationMethodForFutureLogins: 'Use this method for future logins',
         buttonSubmit: 'Verify',
         errors: {

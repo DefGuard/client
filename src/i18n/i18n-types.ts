@@ -1429,11 +1429,11 @@ type RootTranslation = {
 				 */
 				mfaStartDescriptionSecondary: string
 				/**
-				 * U​s​e​ ​a​u​t​h​e​n​t​i​c​a​t​o​r​ ​a​p​p​ ​i​n​s​t​e​a​d
+				 * U​s​e​ ​a​u​t​h​e​n​t​i​c​a​t​o​r​ ​a​p​p
 				 */
 				useAuthenticatorApp: string
 				/**
-				 * U​s​e​ ​y​o​u​r​ ​e​m​a​i​l​ ​c​o​d​e​ ​i​n​s​t​e​a​d
+				 * U​s​e​ ​y​o​u​r​ ​e​m​a​i​l​ ​c​o​d​e
 				 */
 				useEmailCode: string
 				/**
@@ -2882,11 +2882,11 @@ export type TranslationFunctions = {
 				 */
 				mfaStartDescriptionSecondary: () => LocalizedString
 				/**
-				 * Use authenticator app instead
+				 * Use authenticator app
 				 */
 				useAuthenticatorApp: () => LocalizedString
 				/**
-				 * Use your email code instead
+				 * Use your email code
 				 */
 				useEmailCode: () => LocalizedString
 				/**
