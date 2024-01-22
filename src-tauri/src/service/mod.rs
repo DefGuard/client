@@ -204,7 +204,6 @@ impl DesktopDaemonService for DaemonService {
 
         let stats_period = self.stats_period;
         let (tx, rx) = mpsc::channel(64);
-        // Clone the necessary information from the span
         tokio::spawn(async move  {
             info!("Spawning stats thread for interface {ifname}");
             // setup WireGuard API
@@ -220,7 +219,9 @@ impl DesktopDaemonService for DaemonService {
                 match wgapi.read_interface_data() {
                     Ok(host) => {
                         if let Err(err) = tx.send(Result::<_, Status>::Ok(host.into())).await {
-                        error!("Failed to send stats update for interface {}. Error: {}", ifname, err);
+                            error!(
+                                "Failed to send stats update for interface {ifname}. Error: {err}"
+                            );
                             break;
                         }
                     }
