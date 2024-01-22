@@ -295,7 +295,7 @@ pub async fn update_instance(
         // fetch existing locations for given instance
         let mut current_locations = Location::find_by_instance_id(&pool, instance_id).await?;
 
-        let mut transaction = app_state.get_pool().begin().await?;
+        let mut transaction = pool.begin().await?;
 
         // update instance
         let instance_info = response
