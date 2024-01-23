@@ -141,14 +141,16 @@ impl DesktopDaemonService for DaemonService {
                 Status::new(Code::Internal, msg)
             })?;
 
-            // Configure dns
-            debug!("Configuring DNS for interface {ifname}");
-            wgapi.configure_dns(&dns).map_err(|err| {
-                let msg =
-                    format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
-                error!("{msg}");
-                Status::new(Code::Internal, msg)
-            })?;
+            // Configure DNS
+            if !dns.is_empty() {
+                debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
+                wgapi.configure_dns(&dns).map_err(|err| {
+                    let msg =
+                        format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
+                    error!("{msg}");
+                    Status::new(Code::Internal, msg)
+                })?;
+            }
         }
         if let Some(post_up) = request.post_up {
             debug!("Executing specified PostUp command: {post_up}");

@@ -42,10 +42,10 @@ export const UpdateInstanceModalForm = () => {
 
   const defaultValues = useMemo(
     (): FormFields => ({
-      url: '',
+      url: instance ? instance.proxy_url : '',
       token: '',
     }),
-    [],
+    [instance],
   );
 
   const schema = useMemo(

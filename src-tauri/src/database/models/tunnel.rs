@@ -7,9 +7,11 @@ use crate::{
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 use std::time::SystemTime;
 
+#[serde_as]
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct Tunnel {
     pub id: Option<i64>,
@@ -23,6 +25,7 @@ pub struct Tunnel {
     pub allowed_ips: Option<String>,
     // server_address:port
     pub endpoint: String,
+    #[serde_as(deserialize_as = "NoneAsEmptyString")]
     pub dns: Option<String>,
     pub persistent_keep_alive: i64, // New field
     pub route_all_traffic: bool,
