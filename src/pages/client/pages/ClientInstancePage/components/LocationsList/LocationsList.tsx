@@ -67,28 +67,15 @@ export const LocationsList = () => {
 
   return (
     <>
-      {selectedView === ClientView.GRID &&
-        selectedInstance.type === WireguardInstanceType.DEFGUARD_INSTANCE &&
-        selectedInstance.id !== null && <LocationsGridView locations={locations} />}
+      {selectedView === ClientView.GRID && <LocationsGridView locations={locations} />}
 
-      {selectedInstance.type === WireguardInstanceType.TUNNEL &&
-        selectedInstance.id === undefined && <LocationsGridView locations={locations} />}
-
-      {selectedView === ClientView.DETAIL &&
-        selectedInstance.id &&
-        selectedInstance.type === WireguardInstanceType.DEFGUARD_INSTANCE && (
-          <LocationsDetailView
-            locations={locations}
-            connectionType={selectedInstance.type}
-          />
-        )}
-
-      {selectedInstance.id && selectedInstance.type === WireguardInstanceType.TUNNEL && (
+      {selectedView === ClientView.DETAIL && (
         <LocationsDetailView
           locations={locations}
           connectionType={selectedInstance.type}
         />
       )}
+
       <MFAModal />
     </>
   );
