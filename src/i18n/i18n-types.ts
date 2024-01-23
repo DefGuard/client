@@ -140,7 +140,7 @@ type RootTranslation = {
 					slides: {
 						shared: {
 							/**
-							 * d​e​f​g​u​a​r​d​ ​i​s​ ​a​l​l​ ​t​h​e​ ​a​b​o​v​e​ ​a​n​d​ ​m​o​r​e​!
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​i​s​ ​a​l​l​ ​t​h​e​ ​a​b​o​v​e​ ​a​n​d​ ​m​o​r​e​!
 							 */
 							isMore: string
 							/**
@@ -1622,7 +1622,7 @@ export type TranslationFunctions = {
 					slides: {
 						shared: {
 							/**
-							 * defguard is all the above and more!
+							 * **defguard** is all the above and more!
 							 */
 							isMore: () => LocalizedString
 							/**

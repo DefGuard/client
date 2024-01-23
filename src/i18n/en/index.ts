@@ -55,7 +55,8 @@ const en = {
         carouselPage: {
           slides: {
             shared: {
-              isMore: 'defguard is all the above and more!',
+              //md
+              isMore: '**defguard** is all the above and more!',
               githubButton: 'Visit defguard on',
             },
             welcome: {

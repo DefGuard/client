@@ -14,8 +14,9 @@
     @include typography(app-body-1);
     color: var(--text-body-primary);
   }
+
   path {
-    fill: var(--surface-icon-seconday);
+    fill: var(--surface-icon-secondary);
   }
 
   h1,
@@ -23,6 +24,7 @@
   h3 {
     text-align: left;
   }
+
   a {
     text-decoration: underline;
     cursor: pointer;
@@ -31,29 +33,37 @@
   & > .content {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-    align-items: start;
-    justify-items: center;
-    column-gap: 25px;
-    row-gap: 25px;
+    grid-template-columns: 1fr;
+    gap: 50px;
 
-    @include media-breakpoint-up(xl) {
-      column-gap: 50px;
+    @include media-breakpoint-up(xxl) {
+      grid-template-columns: minmax(400px, 1fr) 1fr;
     }
+
     #settings-card {
-      padding: 64px 25px;
-    }
-    & > .card {
       box-sizing: border-box;
-      min-width: 600px;
-      padding: 32px 64px;
+      padding: 25px;
+      height: max-content;
+      width: 100%;
     }
 
     #security-card {
-      .more {
-        @include typography(app-body-1);
-      }
+      --card-radius: 15px;
+      --content-spacing: 20px;
+
+      padding: 0;
+      margin: 0;
       min-height: 800px;
+      border-radius: 15px;
+
+      & > img {
+        width: 100%;
+        height: auto;
+        border-top-left-radius: var(--card-radius);
+        border-top-right-radius: var(--card-radius);
+        border-bottom: 1px solid var(--border-primary);
+      }
+
       .github {
         height: 60px;
         width: 270px;
@@ -65,22 +75,71 @@
           text-decoration: none;
         }
       }
-      .text {
+
+      .content {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        max-width: 600px;
-        user-select: text;
-        @include typography(app-body-2);
-        .centered {
-          margin: auto;
-          margin-bottom: 20px;
+        flex-flow: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        row-gap: var(--content-spacing);
+        box-sizing: border-box;
+        padding: 25px;
+
+        ul,
+        p,
+        h1,
+        h2,
+        h3,
+        span {
+          max-width: 600px;
         }
+
+        li,
+        p,
+        a,
+        span {
+          @include typography(app-body-2);
+          color: var(--text-body-primary);
+        }
+
+        p,
+        h1,
+        span,
+        a,
         li {
+          strong {
+            font-weight: 700;
+          }
+        }
+
+        ul {
+          margin: 0;
+          width: 100%;
           text-align: left;
         }
-        p {
-          margin-bottom: 20px;
+
+        .title {
+          @include typography(app-welcome-1);
+
+          p,
+          span,
+          a,
+          h1,
+          h2,
+          h3,
+          li {
+            @include typography(app-welcome-1);
+          }
+        }
+
+        .content-wrapper {
+          display: flex;
+          flex-flow: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          row-gap: var(--content-spacing);
         }
       }
     }
