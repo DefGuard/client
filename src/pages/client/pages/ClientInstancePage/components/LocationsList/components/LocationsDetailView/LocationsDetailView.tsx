@@ -74,6 +74,15 @@ export const LocationsDetailView = ({
 
   const tunnel = tunnels?.find((tunnel) => tunnel.id === selectedInstance?.id);
 
+  // select first location if selected is undefined but component is mounted
+  useEffect(() => {
+    if ((!activeLocationId || !activeLocation) && !isUndefined(locations[0])) {
+      setActiveLocationId(locations[0].id);
+    }
+  }, [locations, setActiveLocationId, activeLocationId, activeLocation]);
+
+  if (isUndefined(activeLocationId) || isUndefined(activeLocation)) return null;
+
   return (
     <div id="locations-detail-view">
       {connectionType === WireguardInstanceType.DEFGUARD_INSTANCE && (
