@@ -64,6 +64,7 @@
     "prop-types": "^15.8.1",
     "radash": "^11.0.0",
     "react": "^18.2.0",
+    "react-auth-code-input": "^3.2.1",
     "react-click-away-listener": "^2.2.3",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.2",

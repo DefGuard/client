@@ -9,6 +9,7 @@ export type GetLocationsRequest = {
 export type ConnectionRequest = {
   locationId: number;
   connectionType: WireguardInstanceType;
+  presharedKey?: string;
 };
 
 export type RoutingRequest = {

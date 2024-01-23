@@ -3,6 +3,7 @@ export type DefguardInstance = {
   uuid: string;
   name: string;
   url: string;
+  proxy_url: string;
   // connected
   active: boolean;
   pubkey: string;
@@ -54,6 +55,11 @@ export type CommonWireguardFields = {
   active: boolean;
   // Tunnel or Location
   connection_type: WireguardInstanceType;
+  // Available in Location only
+  mfa_enabled: boolean | undefined;
+  pubkey: string;
+  instance_id: number;
+  network_id: number;
 };
 
 export enum ClientView {

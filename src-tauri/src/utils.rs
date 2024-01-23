@@ -39,6 +39,7 @@ pub static DEFAULT_ROUTE: &str = "0.0.0.0/0";
 pub async fn setup_interface(
     location: &Location,
     interface_name: String,
+    preshared_key: Option<String>,
     pool: &DbPool,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
@@ -52,6 +53,11 @@ pub async fn setup_interface(
         let endpoint: SocketAddr = location.endpoint.parse()?;
         peer.endpoint = Some(endpoint);
         peer.persistent_keepalive_interval = Some(25);
+
+        if let Some(psk) = preshared_key {
+            let peer_psk = Key::from_str(&psk)?;
+            peer.preshared_key = Some(peer_psk);
+        }
 
         debug!("Parsing location allowed ips: {}", location.allowed_ips);
         let allowed_ips: Vec<String> = if location.route_all_traffic {
@@ -452,6 +458,7 @@ pub async fn get_location_interface_details(
 /// Setup new connection for location
 pub async fn handle_connection_for_location(
     location: &Location,
+    preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!(
@@ -466,6 +473,7 @@ pub async fn handle_connection_for_location(
     setup_interface(
         location,
         interface_name.clone(),
+        preshared_key,
         &state.get_pool(),
         state.client.clone(),
     )

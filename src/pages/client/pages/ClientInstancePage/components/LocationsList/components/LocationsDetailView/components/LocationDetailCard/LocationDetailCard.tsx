@@ -143,14 +143,13 @@ export const LocationDetailCard = memo(({ location, tabbed = false }: Props) => 
           <LocationCardRoute location={location} />
         </div>
       )}
-      {locationStats && locationStats.length > 0 && (
+      {locationStats && locationStats.length > 0 ? (
         <LocationUsageChart
           data={locationStats}
           type={LocationUsageChartType.LINE}
           margin={{ left: 20, right: 20 }}
         />
-      )}
-      {(!locationStats || locationStats.length == 0) && !location?.active && (
+      ) : (
         <div className="no-stats-container">
           <LocationCardNoStats />
         </div>

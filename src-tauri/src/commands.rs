@@ -32,12 +32,13 @@ pub struct Payload {
 pub async fn connect(
     location_id: i64,
     connection_type: ConnectionType,
+    preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
     let state = handle.state::<AppState>();
     if connection_type.eq(&ConnectionType::Location) {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
-            handle_connection_for_location(&location, handle).await?
+            handle_connection_for_location(&location, preshared_key, handle).await?
         } else {
             error!("Location {location_id} not found");
             return Err(Error::NotFound);
@@ -216,6 +217,9 @@ pub struct LocationInfo {
     pub active: bool,
     pub route_all_traffic: bool,
     pub connection_type: ConnectionType,
+    pub pubkey: String,
+    pub mfa_enabled: bool,
+    pub network_id: i64,
 }
 
 #[tauri::command(async)]
@@ -238,6 +242,9 @@ pub async fn all_locations(
             active: active_locations_ids.contains(&location.id.expect("Missing location ID")),
             route_all_traffic: location.route_all_traffic,
             connection_type: ConnectionType::Location,
+            pubkey: location.pubkey,
+            mfa_enabled: location.mfa_enabled,
+            network_id: location.network_id,
         };
         location_info.push(info);
     }
