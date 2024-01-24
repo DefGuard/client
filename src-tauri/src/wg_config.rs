@@ -81,7 +81,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("Endpoint".to_string()))?;
     let persistent_keep_alive = peer_section
         .get("PersistentKeepalive")
-        .ok_or_else(|| WireguardConfigParseError::KeyNotFound("PersistentKeepalive".to_string()))?
+        .unwrap_or("25")
         .parse()
         .unwrap();
 
