@@ -5,24 +5,25 @@
 
 use clap::Parser;
 use defguard_client::service::{config::Config, run_server};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+#[cfg(not(windows))]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // parse config
-    let config = Config::parse();
+    use defguard_client::service::utils::logging_setup;
 
-    // initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{},hyper=info", config.log_level).into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // parse config
+    let config: Config = Config::parse();
+    let _guard = logging_setup(&config);
 
     // run gRPC server
     run_server(config).await?;
 
     Ok(())
+}
+
+#[cfg(windows)]
+fn main() -> windows_service::Result<()> {
+    use defguard_client::service::windows_service::defguard_windows_service;
+
+    defguard_windows_service::run()
 }

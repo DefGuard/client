@@ -38,9 +38,14 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
         );
     }
     debug!("Connecting to database: {}", db_path.to_string_lossy());
-    let pool = DbPool::connect(&format!("sqlite://{}", db_path.to_str().unwrap())).await?;
+    let pool = DbPool::connect(&format!(
+        "sqlite://{}",
+        db_path.to_str().expect("Failed to format DB path")
+    ))
+    .await?;
     debug!("Running migrations.");
     sqlx::migrate!().run(&pool).await?;
+    Settings::init_defaults(&pool).await?;
     info!("Applied migrations.");
     Ok(pool)
 }
@@ -62,5 +67,7 @@ pub use models::{
     connection::{ActiveConnection, Connection, ConnectionInfo},
     instance::{Instance, InstanceInfo},
     location::{Location, LocationStats},
+    settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
+    tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
     wireguard_keys::WireguardKeys,
 };

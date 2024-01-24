@@ -8,14 +8,14 @@
   },
   "package": {
     "productName": "defguard-client",
-    "version": "0.1.1"
+    "version": "0.2.0"
   },
   "tauri": {
     "systemTray": {
-      "iconPath": "icons/32x32.png",
-      "iconAsTemplate": false
+      "iconPath": "resources/icons/tray-32x32-color.png",
+      "iconAsTemplate": false,
+      "menuOnLeftClick": false
     },
-
     "allowlist": {
       "all": false,
       "window": {
@@ -25,6 +25,16 @@
         "all": true,
         "request": true,
         "scope": ["https://**", "http://**"]
+      },
+      "fs": {
+        "all": true,
+        "scope": ["$RESOURCE/*", "$APPDATA/*"]
+      },
+      "clipboard": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
       }
     },
     "bundle": {
@@ -58,13 +68,20 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
+      "resources": [
+        "resources/*"
+      ],
       "shortDescription": "",
       "targets": ["deb", "app", "appimage"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "",
+        "wix": {
+          "template": "./resources-windows/main.wxs",
+          "fragmentPaths": ["./resources-windows/service-fragment.wxs"],
+          "componentRefs": ["DefGuardServiceFragment"]
+        }
       }
     },
     "security": {

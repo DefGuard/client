@@ -5,12 +5,15 @@
   position: fixed;
   inset: 0;
   height: 100%;
-  max-height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
   width: 70px;
   background-color: var(--surface-nav-bg);
   border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-flow: column;
 
   @include media-breakpoint-up(lg) {
     width: 270px;
@@ -24,9 +27,16 @@
     height: 108px;
     column-gap: 7px;
     border-bottom: 1px solid var(--border-primary);
+    cursor: pointer;
 
     @include media-breakpoint-up(lg) {
       display: flex;
+    }
+
+    :nth-child(2) {
+      path {
+        fill: var(--text-body-primary);
+      }
     }
   }
 
@@ -39,6 +49,7 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    cursor: pointer;
 
     @include media-breakpoint-up(lg) {
       display: none;
@@ -52,11 +63,20 @@
 
   & > .items {
     display: flex;
+    flex-grow: 1;
+    height: 45vh;
+    flex-shrink: 0;
     flex-flow: column;
     align-items: flex-start;
     justify-content: flex-start;
     box-sizing: border-box;
     row-gap: 15px;
+    &.flex-end {
+      justify-content: flex-end;
+      @media (min-height: 600px) {
+        padding-bottom: 70px;
+      }
+    }
 
     @include media-breakpoint-up(lg) {
       row-gap: 0;
@@ -66,7 +86,8 @@
       padding-top: 70px;
     }
 
-    & > .client-bar-item {
+    & > .client-bar-item,
+    & > div > .client-bar-item {
       display: grid;
       box-sizing: border-box;
       width: 100%;
@@ -89,7 +110,7 @@
 
       & > svg,
       & > .icon-wrapper {
-        display: none;
+        margin-bottom: 20px;
         grid-column: 1;
         grid-row: 1;
         width: 40px;
@@ -99,6 +120,7 @@
           display: flex;
           width: 24px;
           height: 24px;
+          margin-bottom: 0;
         }
       }
 
@@ -201,6 +223,10 @@
       }
     }
 
+    #settings-nav-item {
+      // margin-top: auto;
+    }
+
     #add-instance {
       @include media-breakpoint-down(lg) {
         display: grid;
@@ -210,13 +236,16 @@
         justify-content: center;
         padding: 0;
       }
+
       & > .icon-wrapper {
         display: flex;
+
         svg {
           width: 15px;
           height: 15px;
         }
       }
+
       & > p {
         display: none;
 
@@ -235,4 +264,32 @@
   background-color: var(--surface-main-primary);
   content: ' ';
   z-index: 3;
+}
+
+#footer-application-info {
+  width: 100%;
+  padding-top: 20px;
+  padding-bottom: 20px;
+
+  & > p {
+    @include typography(app-copyright);
+    color: var(--text-body-tertiary);
+    text-align: center;
+
+    @include media-breakpoint-down(lg) {
+      padding-left: 5px;
+      padding-right: 5px;
+    }
+
+    & > span {
+      cursor: pointer;
+    }
+  }
+}
+
+.client-bar-bottom-menu-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: auto;
 }

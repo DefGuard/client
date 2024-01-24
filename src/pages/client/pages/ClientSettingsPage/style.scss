@@ -1,0 +1,147 @@
+@use '@scssutils' as *;
+
+#client-settings-page {
+  h1 {
+    @include typography(app-title);
+    color: var(--text-body-primary);
+  }
+
+  & > header {
+    padding-bottom: 60px;
+  }
+
+  h2 {
+    @include typography(app-body-1);
+    color: var(--text-body-primary);
+  }
+
+  path {
+    fill: var(--surface-icon-secondary);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-align: left;
+  }
+
+  a {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  & > .content {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 50px;
+
+    @include media-breakpoint-up(xxl) {
+      grid-template-columns: minmax(400px, 1fr) 1fr;
+    }
+
+    #settings-card {
+      box-sizing: border-box;
+      padding: 25px;
+      height: max-content;
+      width: 100%;
+    }
+
+    #security-card {
+      --card-radius: 15px;
+      --content-spacing: 20px;
+
+      padding: 0;
+      margin: 0;
+      min-height: 800px;
+      border-radius: 15px;
+
+      & > img {
+        width: 100%;
+        height: auto;
+        border-top-left-radius: var(--card-radius);
+        border-top-right-radius: var(--card-radius);
+        border-bottom: 1px solid var(--border-primary);
+      }
+
+      .github {
+        height: 60px;
+        width: 270px;
+        margin-bottom: 20px;
+
+        p,
+        span {
+          @include typography(app-button-l);
+          text-decoration: none;
+        }
+      }
+
+      .content {
+        display: flex;
+        flex-flow: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        row-gap: var(--content-spacing);
+        box-sizing: border-box;
+        padding: 25px;
+
+        ul,
+        p,
+        h1,
+        h2,
+        h3,
+        span {
+          max-width: 600px;
+        }
+
+        li,
+        p,
+        a,
+        span {
+          @include typography(app-body-2);
+          color: var(--text-body-primary);
+        }
+
+        p,
+        h1,
+        span,
+        a,
+        li {
+          strong {
+            font-weight: 700;
+          }
+        }
+
+        ul {
+          margin: 0;
+          width: 100%;
+          text-align: left;
+        }
+
+        .title {
+          @include typography(app-welcome-1);
+
+          p,
+          span,
+          a,
+          h1,
+          h2,
+          h3,
+          li {
+            @include typography(app-welcome-1);
+          }
+        }
+
+        .content-wrapper {
+          display: flex;
+          flex-flow: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          row-gap: var(--content-spacing);
+        }
+      }
+    }
+  }
+}

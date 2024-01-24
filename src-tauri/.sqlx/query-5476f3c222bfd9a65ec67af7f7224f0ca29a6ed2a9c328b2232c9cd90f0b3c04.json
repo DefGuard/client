@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, tunnel_id, connected_from, start, end\n            FROM tunnel_connection\n            WHERE tunnel_id = $1\n            ORDER BY end DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "tunnel_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "connected_from",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "start",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "end",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5476f3c222bfd9a65ec67af7f7224f0ca29a6ed2a9c328b2232c9cd90f0b3c04"
+}

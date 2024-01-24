@@ -6,10 +6,14 @@ import dayjs from 'dayjs';
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../query';
-import { Connection, DefguardLocation } from '../../../../../../types';
+import {
+  CommonWireguardFields,
+  Connection,
+  WireguardInstanceType,
+} from '../../../../../../types';
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
   connection?: Connection;
 };
 
@@ -20,8 +24,16 @@ export const LocationCardInfo = ({ location, connection }: Props) => {
   const localLL = LL.pages.client.pages.instancePage.connectionLabels;
 
   const { data: activeConnection } = useQuery({
-    queryKey: [clientQueryKeys.getActiveConnection, location?.id as number],
-    queryFn: () => getActiveConnection({ locationId: location?.id as number }),
+    queryKey: [
+      clientQueryKeys.getActiveConnection,
+      location?.id as number,
+      location?.connection_type,
+    ],
+    queryFn: () =>
+      getActiveConnection({
+        locationId: location?.id as number,
+        connectionType: location?.connection_type as WireguardInstanceType,
+      }),
     enabled: location?.active,
   });
 

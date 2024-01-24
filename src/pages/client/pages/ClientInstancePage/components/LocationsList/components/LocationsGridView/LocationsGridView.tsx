@@ -12,7 +12,7 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { DefguardInstance, DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -23,22 +23,21 @@ import { LocationCardRoute } from '../LocationCardRoute/LocationCardRoute';
 import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
-  instanceId: DefguardInstance['id'];
-  locations: DefguardLocation[];
+  locations: CommonWireguardFields[];
 };
 
-export const LocationsGridView = ({ instanceId, locations }: Props) => {
+export const LocationsGridView = ({ locations }: Props) => {
   return (
     <div id="locations-grid-view">
       {locations.map((l) => (
-        <GridItem location={l} key={`${instanceId}${l.id}`} />
+        <GridItem location={l} key={`${l.name}${l.id}`} />
       ))}
     </div>
   );
 };
 
 type GridItemProps = {
-  location: DefguardLocation;
+  location: CommonWireguardFields;
 };
 
 const GridItem = ({ location }: GridItemProps) => {
@@ -55,15 +54,29 @@ const GridItem = ({ location }: GridItemProps) => {
   const statsFilter = useClientStore((state) => state.statsFilter);
 
   const { data: lastConnection } = useQuery({
-    queryKey: [clientQueryKeys.getConnections, location.id as number],
-    queryFn: () => getLastConnection({ locationId: location.id as number }),
+    queryKey: [
+      clientQueryKeys.getConnections,
+      location.id as number,
+      location.connection_type,
+    ],
+    queryFn: () =>
+      getLastConnection({
+        locationId: location.id as number,
+        connectionType: location.connection_type,
+      }),
     enabled: !!location.id,
   });
   const { data: locationStats } = useQuery({
-    queryKey: [clientQueryKeys.getLocationStats, location.id as number, statsFilter],
+    queryKey: [
+      clientQueryKeys.getLocationStats,
+      location.id as number,
+      statsFilter,
+      location.connection_type,
+    ],
     queryFn: () =>
       getLocationStats({
         locationId: location.id as number,
+        connectionType: location.connection_type as WireguardInstanceType,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,
@@ -84,18 +97,17 @@ const GridItem = ({ location }: GridItemProps) => {
           <Helper
             initialPlacement="right"
             icon={
-              <svg xmlns="http://www.w3.org/2000/svg" width={12} height={12} fill="none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 12 12"
+                width={12}
+                height={12}
+                fill="none"
+              >
+                <path fill="#899CA8" d="M6.4 12a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" />
                 <path
-                  style={{
-                    fill: 'var(--surface-icon-primary)',
-                  }}
-                  d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12Z"
-                />
-                <path
-                  style={{
-                    fill: 'var(--surface-icon-secondary)',
-                  }}
-                  d="M6.667 5.333a.667.667 0 0 0-1.334 0v3.334a.667.667 0 0 0 1.334 0V5.333ZM6.667 3.333a.667.667 0 1 0-1.334 0 .667.667 0 0 0 1.334 0Z"
+                  fill="#fff"
+                  d="M7.067 5.333a.667.667 0 0 0-1.333 0v3.334a.667.667 0 0 0 1.333 0V5.333ZM7.067 3.333a.667.667 0 1 0-1.333 0 .667.667 0 0 0 1.333 0Z"
                 />
               </svg>
             }

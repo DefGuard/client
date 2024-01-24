@@ -28,3 +28,7 @@ pnpm install
 ```bash
 pnpm tauri dev
 ```
+
+### Windows
+
+Remove `default-run` line from `[package]` section in `Cargo.toml` to build the project.

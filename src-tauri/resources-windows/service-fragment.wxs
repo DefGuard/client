@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="DefGuardServiceFragment">
+        <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\defguard-service.exe" />
+        <ServiceInstall
+          Account="LocalSystem"
+          Id="DefguardService"
+          Name="DefguardService"
+          DisplayName="Defguard Service"
+          Type="ownProcess"
+          Start="auto"
+          ErrorControl="normal"
+        >
+          <util:ServiceConfig
+            ResetPeriodInDays="1"
+            RestartServiceDelayInSeconds="30"
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"
+          />
+        </ServiceInstall>
+        <ServiceControl Id="DefguardService" Name="DefguardService" Start="install" Stop="both" Remove="uninstall" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

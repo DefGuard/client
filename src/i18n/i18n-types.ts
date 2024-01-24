@@ -22,7 +22,7 @@ type RootTranslation = {
 			/**
 			 * s​e​c​o​n​d​s
 			 */
-			prular: string
+			plural: string
 		}
 		minutes: {
 			/**
@@ -32,7 +32,7 @@ type RootTranslation = {
 			/**
 			 * m​i​n​u​t​e​s
 			 */
-			prular: string
+			plural: string
 		}
 	}
 	form: {
@@ -136,6 +136,239 @@ type RootTranslation = {
 	pages: {
 		client: {
 			pages: {
+				carouselPage: {
+					slides: {
+						shared: {
+							/**
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​i​s​ ​a​l​l​ ​t​h​e​ ​a​b​o​v​e​ ​a​n​d​ ​m​o​r​e​!
+							 */
+							isMore: string
+							/**
+							 * V​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​o​n
+							 */
+							githubButton: string
+						}
+						welcome: {
+							/**
+							 * W​e​l​c​o​m​e​ ​t​o​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​d​e​s​k​t​o​p​ ​c​l​i​e​n​t​!
+							 */
+							title: string
+							instance: {
+								/**
+								 * A​d​d​ ​I​n​s​t​a​n​c​e
+								 */
+								title: string
+								/**
+								 * E​s​t​a​b​l​i​s​h​ ​a​ ​c​o​n​n​e​c​t​i​o​n​ ​t​o​ ​d​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​e​f​f​o​r​t​l​e​s​s​l​y​ ​b​y​ ​c​o​n​f​i​g​u​r​i​n​g​ ​i​t​ ​w​i​t​h​ ​a​ ​s​i​n​g​l​e​ ​t​o​k​e​n​.
+								 */
+								subtitle: string
+							}
+							tunnel: {
+								/**
+								 * A​d​d​ ​T​u​n​n​e​l
+								 */
+								title: string
+								/**
+								 * U​t​i​l​i​z​e​ ​i​t​ ​a​s​ ​a​ ​W​i​r​e​G​u​a​r​d​®​ ​D​e​s​k​t​o​p​ ​C​l​i​e​n​t​ ​w​i​t​h​ ​e​a​s​e​.​ ​S​e​t​ ​u​p​ ​y​o​u​r​ ​o​w​n​ ​t​u​n​n​e​l​ ​o​r​ ​i​m​p​o​r​t​ ​a​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​.
+								 */
+								subtitle: string
+							}
+						}
+						twoFa: {
+							/**
+							 * W​i​r​e​G​u​a​r​d​ ​*​*​2​F​A​ ​w​i​t​h​ ​d​e​f​g​u​a​r​d​*​*
+							 */
+							title: string
+							/**
+							 * S​i​n​c​e​ ​W​i​r​e​G​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​)​.​ ​ ​
+						​
+						​I​f​ ​y​o​u​ ​w​o​u​l​d​ ​l​i​k​e​ ​t​o​ ​s​e​c​u​r​e​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​t​r​y​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​V​P​N​ ​&​ ​S​S​O​ ​s​e​r​v​e​r​ ​(​w​h​i​c​h​ ​i​s​ ​a​l​s​o​ ​f​r​e​e​ ​&​ ​o​p​e​n​ ​s​o​u​r​c​e​)​ ​t​o​ ​g​e​t​ ​r​e​a​l​ ​2​F​A​ ​u​s​i​n​g​ ​W​i​r​e​G​u​a​r​d​ ​P​S​K​ ​k​e​y​s​ ​a​n​d​ ​p​e​e​r​s​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​b​y​ ​d​e​f​g​u​a​r​d​ ​g​a​t​e​w​a​y​!
+							 */
+							sideText: string
+						}
+						security: {
+							/**
+							 * S​e​c​u​r​i​t​y​ ​a​n​d​ ​P​r​i​v​a​c​y​ ​*​*​d​o​n​e​ ​r​i​g​h​t​!​*​*
+							 */
+							title: string
+							/**
+							 * *​ ​P​r​i​v​a​c​y​ ​r​e​q​u​i​r​e​s​ ​c​o​n​t​r​o​l​l​i​n​g​ ​y​o​u​r​ ​d​a​t​a​,​ ​t​h​u​s​ ​y​o​u​r​ ​u​s​e​r​ ​d​a​t​a​ ​(​I​d​e​n​t​i​t​y​,​ ​S​S​O​)​ ​n​e​e​d​s​ ​t​o​ ​b​e​ ​o​n​-​p​r​e​m​i​s​e​ ​(​o​n​ ​y​o​u​r​ ​s​e​r​v​e​r​s​)​
+						​*​ ​S​e​c​u​r​i​n​g​ ​y​o​u​r​ ​d​a​t​a​ ​a​n​d​ ​a​p​p​l​i​c​a​t​i​o​n​s​ ​r​e​q​u​i​r​e​s​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​a​n​d​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​(​S​S​O​)​ ​w​i​t​h​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​,​ ​a​n​d​ ​f​o​r​ ​h​i​g​h​e​s​t​ ​s​e​c​u​r​i​t​y​ ​-​ ​M​F​A​ ​w​i​t​h​ ​H​a​r​d​w​a​r​e​ ​S​e​c​u​r​i​t​y​ ​M​o​d​u​l​e​s​
+						​*​ ​A​c​c​e​s​s​i​n​g​ ​y​o​u​r​ ​d​a​t​a​ ​a​n​d​ ​a​p​p​l​i​c​a​t​i​o​n​s​ ​s​e​c​u​r​e​l​y​ ​a​n​d​ ​p​r​i​v​a​t​e​l​y​ ​r​e​q​u​i​r​e​s​ ​d​a​t​a​ ​e​n​c​r​y​p​t​i​o​n​ ​(​H​T​T​P​S​)​ ​a​n​d​ ​a​ ​s​e​c​u​r​e​ ​t​u​n​n​e​l​ ​b​e​t​w​e​e​n​ ​y​o​u​r​ ​d​e​v​i​c​e​ ​a​n​d​ ​t​h​e​ ​I​n​t​e​r​n​e​t​ ​t​o​ ​e​n​c​r​y​p​t​ ​a​l​l​ ​t​r​a​f​f​i​c​ ​(​V​P​N​)​.​
+						​*​ ​T​o​ ​f​u​l​l​y​ ​t​r​u​s​t​ ​y​o​u​r​ ​S​S​O​,​ ​V​P​N​,​ ​i​t​ ​n​e​e​d​s​ ​t​o​ ​b​e​ ​O​p​e​n​ ​S​o​u​r​c​e
+							 */
+							sideText: string
+						}
+						instances: {
+							/**
+							 * *​*​M​u​l​t​i​p​l​e​*​*​ ​i​n​s​t​a​n​c​e​ ​&​ ​l​o​c​a​t​i​o​n​s
+							 */
+							title: string
+							/**
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​ ​ ​
+						​
+						​I​f​ ​y​o​u​ ​a​r​e​ ​a​n​ ​a​d​m​i​n​/​d​e​v​o​p​s​ ​-​ ​a​l​l​ ​y​o​u​r​ ​c​u​s​t​o​m​e​r​s​ ​(​i​n​s​t​a​n​c​e​s​)​ ​a​n​d​ ​a​l​l​ ​t​h​e​i​r​ ​t​u​n​n​e​l​s​ ​(​l​o​c​a​t​i​o​n​s​)​ ​c​a​n​ ​b​e​ ​i​n​ ​o​n​e​ ​p​l​a​c​e​!
+							 */
+							sideText: string
+						}
+						support: {
+							/**
+							 * *​*​S​u​p​p​o​r​t​ ​u​s​*​*​ ​o​n​ ​G​i​t​h​u​b
+							 */
+							title: string
+							/**
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​i​s​ ​f​r​e​e​ ​a​n​d​ ​t​r​u​l​y​ ​O​p​e​n​ ​S​o​u​r​c​e​ ​a​n​d​ ​o​u​r​ ​t​e​a​m​ ​h​a​s​ ​b​e​e​n​ ​w​o​r​k​i​n​g​ ​o​n​ ​i​t​ ​f​o​r​ ​s​e​v​e​r​a​l​ ​m​o​n​t​h​s​.​ ​P​l​e​a​s​e​ ​c​o​n​s​i​d​e​r​ ​s​u​p​p​o​r​t​i​n​g​ ​u​s​ ​b​y​:​ 
+							 */
+							text: string
+							/**
+							 * s​t​a​r​i​n​g​ ​u​s​ ​o​n
+							 */
+							githubText: string
+							/**
+							 * G​i​t​H​u​b
+							 */
+							githubLink: string
+							/**
+							 * s​p​r​e​a​d​i​n​g​ ​t​h​e​ ​w​o​r​d​ ​a​b​o​u​t​:
+							 */
+							spreadWordText: string
+							/**
+							 * d​e​f​g​u​a​r​d​!
+							 */
+							defguard: string
+							/**
+							 * j​o​i​n​ ​o​u​r​ ​M​a​t​r​i​x​ ​s​e​r​v​e​r​:
+							 */
+							joinMatrix: string
+							/**
+							 * S​u​p​p​o​r​t​ ​U​s​!
+							 */
+							supportUs: string
+						}
+					}
+				}
+				settingsPage: {
+					/**
+					 * S​e​t​t​i​n​g​s
+					 */
+					title: string
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * S​y​s​t​e​m​ ​t​r​a​y
+								 */
+								title: string
+								/**
+								 * T​r​a​y​ ​i​c​o​n​ ​t​h​e​m​e
+								 */
+								label: string
+								options: {
+									/**
+									 * C​o​l​o​r
+									 */
+									color: string
+									/**
+									 * W​h​i​t​e
+									 */
+									white: string
+									/**
+									 * B​l​a​c​k
+									 */
+									black: string
+									/**
+									 * G​r​a​y
+									 */
+									gray: string
+								}
+							}
+							logging: {
+								/**
+								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
+								 */
+								title: string
+								options: {
+									/**
+									 * E​r​r​o​r
+									 */
+									error: string
+									/**
+									 * I​n​f​o
+									 */
+									info: string
+									/**
+									 * D​e​b​u​g
+									 */
+									debug: string
+									/**
+									 * T​r​a​c​e
+									 */
+									trace: string
+								}
+							}
+							theme: {
+								/**
+								 * T​h​e​m​e
+								 */
+								title: string
+								options: {
+									/**
+									 * L​i​g​h​t
+									 */
+									light: string
+									/**
+									 * D​a​r​k
+									 */
+									dark: string
+								}
+							}
+							versionUpdate: {
+								/**
+								 * U​p​d​a​t​e​s
+								 */
+								title: string
+								/**
+								 * C​h​e​c​k​ ​f​o​r​ ​u​p​d​a​t​e​s
+								 */
+								checkboxTitle: string
+							}
+						}
+					}
+				}
+				createdPage: {
+					tunnel: {
+						/**
+						 * Y​o​u​r​ ​T​u​n​n​e​l​ ​W​a​s​ ​A​d​d​e​d​ ​S​u​c​c​e​s​s​f​u​l​l​y
+						 */
+						title: string
+						/**
+						 * Y​o​u​r​ ​t​u​n​n​e​l​ ​h​a​s​ ​b​e​e​n​ ​s​u​c​c​e​s​s​f​u​l​l​y​ ​a​d​d​e​d​.​ ​Y​o​u​ ​c​a​n​ ​n​o​w​ ​c​o​n​n​e​c​t​ ​t​h​i​s​ ​d​e​v​i​c​e​,​ ​c​h​e​c​k​ ​i​t​s​ ​s​t​a​t​u​s​ ​a​n​d​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​u​s​i​n​g​ ​t​h​e​ ​m​e​n​u​ ​i​n​ ​t​h​e​ ​l​e​f​t​ ​s​i​d​e​b​a​r​.
+						 */
+						content: string
+						controls: {
+							/**
+							 * A​d​d​ ​A​n​o​t​h​e​r​ ​T​u​n​n​e​l
+							 */
+							submit: string
+						}
+					}
+					instance: {
+						/**
+						 * Y​o​u​r​ ​I​n​s​t​a​n​c​e​ ​W​a​s​ ​A​d​d​e​d​ ​S​u​c​c​e​s​s​f​u​l​l​y
+						 */
+						title: string
+						/**
+						 * Y​o​u​r​ ​i​n​s​t​a​n​c​e​ ​h​a​s​ ​b​e​e​n​ ​s​u​c​c​e​s​s​f​u​l​l​y​ ​a​d​d​e​d​.​ ​Y​o​u​ ​c​a​n​ ​n​o​w​ ​c​o​n​n​e​c​t​ ​t​h​i​s​ ​d​e​v​i​c​e​,​ ​c​h​e​c​k​ ​i​t​s​ ​s​t​a​t​u​s​ ​a​n​d​ ​v​i​e​w​ ​s​t​a​t​i​s​t​i​c​s​ ​u​s​i​n​g​ ​t​h​e​ ​m​e​n​u​ ​i​n​ ​t​h​e​ ​l​e​f​t​ ​s​i​d​e​b​a​r​.
+						 */
+						content: string
+						controls: {
+							/**
+							 * A​d​d​ ​A​n​o​t​h​e​r​ ​I​n​s​t​a​n​c​e
+							 */
+							submit: string
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * L​o​c​a​t​i​o​n​s
@@ -164,7 +397,11 @@ type RootTranslation = {
 							 */
 							label: string
 							/**
-							 * <​p​>​A​l​l​o​w​e​d​ ​t​r​a​f​f​i​c​:​<​/​b​r​>​ ​O​n​l​y​ ​t​r​a​f​i​c​ ​t​h​a​t​ ​w​a​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​f​o​r​ ​t​h​i​s​ ​l​o​c​a​t​i​o​n​.​<​/​p​>
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​ ​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​A​l​l​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​A​L​L​ ​y​o​u​r​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>
 							 */
 							helper: string
 						}
@@ -174,6 +411,10 @@ type RootTranslation = {
 						 * L​o​c​a​t​i​o​n​s
 						 */
 						title: string
+						/**
+						 * E​d​i​t​ ​I​n​s​t​a​n​c​e
+						 */
+						edit: string
 						filters: {
 							views: {
 								/**
@@ -261,6 +502,314 @@ type RootTranslation = {
 								 */
 								download: string
 							}
+						}
+						details: {
+							/**
+							 * D​e​t​a​i​l​s
+							 */
+							title: string
+							logs: {
+								/**
+								 * L​o​g
+								 */
+								title: string
+							}
+							info: {
+								configuration: {
+									/**
+									 * D​e​v​i​c​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n
+									 */
+									title: string
+									/**
+									 * P​u​b​l​i​c​ ​k​e​y
+									 */
+									pubkey: string
+									/**
+									 * A​d​d​r​e​s​s​e​s
+									 */
+									address: string
+									/**
+									 * L​i​s​t​e​n​ ​p​o​r​t
+									 */
+									listenPort: string
+								}
+								vpn: {
+									/**
+									 * V​P​N​ ​S​e​r​v​e​r​ ​C​o​n​f​i​g​u​r​a​t​i​o​n
+									 */
+									title: string
+									/**
+									 * P​u​b​l​i​c​ ​k​e​y
+									 */
+									pubkey: string
+									/**
+									 * S​e​r​v​e​r​ ​A​d​d​r​e​s​s
+									 */
+									serverAddress: string
+									/**
+									 * A​l​l​o​w​e​d​ ​I​P​s
+									 */
+									allowedIps: string
+									/**
+									 * D​N​S​ ​s​e​r​v​e​r​s
+									 */
+									dns: string
+									/**
+									 * P​e​r​s​i​s​t​e​n​t​ ​k​e​e​p​a​l​i​v​e
+									 */
+									keepalive: string
+									/**
+									 * L​a​t​e​s​t​ ​H​a​n​d​s​h​a​k​e
+									 */
+									handshake: string
+									/**
+									 * {​s​e​c​o​n​d​s​}​ ​s​e​c​o​n​d​s​ ​a​g​o
+									 * @param {number} seconds
+									 */
+									handshakeValue: RequiredParams<'seconds'>
+								}
+							}
+						}
+					}
+				}
+				tunnelPage: {
+					/**
+					 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
+					 */
+					title: string
+					header: {
+						/**
+						 * E​d​i​t​ ​T​u​n​n​e​l
+						 */
+						edit: string
+					}
+				}
+				editTunnelPage: {
+					/**
+					 * E​d​i​t​ ​W​i​r​e​G​u​a​r​d​®​ ​T​u​n​n​e​l
+					 */
+					title: string
+					messages: {
+						/**
+						 * T​u​n​n​e​l​ ​e​d​i​t​e​d
+						 */
+						editSuccess: string
+						/**
+						 * E​d​i​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+						 */
+						editError: string
+					}
+					controls: {
+						/**
+						 * S​a​v​e​ ​c​h​a​n​g​e​s
+						 */
+						save: string
+					}
+				}
+				addTunnelPage: {
+					/**
+					 * A​d​d​ ​W​i​r​e​G​u​a​r​d​®​ ​T​u​n​n​e​l
+					 */
+					title: string
+					forms: {
+						initTunnel: {
+							/**
+							 * P​l​e​a​s​e​ ​p​r​o​v​i​d​e​ ​I​n​s​t​a​n​c​e​ ​U​R​L​ ​a​n​d​ ​t​o​k​e​n
+							 */
+							title: string
+							sections: {
+								/**
+								 * V​P​N​ ​S​e​r​v​e​r
+								 */
+								vpnServer: string
+								/**
+								 * A​d​v​a​n​c​e​d​ ​O​p​t​i​o​n​s
+								 */
+								advancedOptions: string
+							}
+							labels: {
+								/**
+								 * T​u​n​n​e​l​ ​N​a​m​e
+								 */
+								name: string
+								/**
+								 * P​r​i​v​a​t​e​ ​K​e​y
+								 */
+								privateKey: string
+								/**
+								 * P​u​b​l​i​c​ ​K​e​y
+								 */
+								publicKey: string
+								/**
+								 * A​d​d​r​e​s​s
+								 */
+								address: string
+								/**
+								 * P​u​b​l​i​c​ ​K​e​y
+								 */
+								serverPubkey: string
+								/**
+								 * V​P​N​ ​S​e​r​v​e​r​ ​A​d​d​r​e​s​s​:​P​o​r​t
+								 */
+								endpoint: string
+								/**
+								 * D​N​S
+								 */
+								dns: string
+								/**
+								 * A​l​l​o​w​e​d​ ​I​P​s​ ​(​s​e​p​a​r​a​t​e​ ​w​i​t​h​ ​c​o​m​m​a​)
+								 */
+								allowedips: string
+								/**
+								 * P​e​r​s​i​s​t​e​n​t​ ​K​e​e​p​ ​A​l​i​v​e​ ​(​s​e​c​)
+								 */
+								persistentKeepAlive: string
+								/**
+								 * P​r​e​U​p
+								 */
+								preUp: string
+								/**
+								 * P​o​s​t​U​p
+								 */
+								postUp: string
+								/**
+								 * P​r​e​D​o​w​n
+								 */
+								PreDown: string
+								/**
+								 * P​o​s​t​D​o​w​n
+								 */
+								PostDown: string
+							}
+							helpers: {
+								/**
+								 * C​l​i​c​k​ ​t​h​e​ ​"​A​d​v​a​n​c​e​d​ ​O​p​t​i​o​n​s​"​ ​s​e​c​t​i​o​n​ ​t​o​ ​r​e​v​e​a​l​ ​a​d​d​i​t​i​o​n​a​l​ ​s​e​t​t​i​n​g​s​ ​f​o​r​ ​f​i​n​e​-​t​u​n​i​n​g​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​.​ ​Y​o​u​ ​c​a​n​ ​c​u​s​t​o​m​i​z​e​ ​p​r​e​ ​a​n​d​ ​p​o​s​t​ ​s​c​r​i​p​t​s​,​ ​a​m​o​n​g​ ​o​t​h​e​r​ ​o​p​t​i​o​n​s​.
+								 */
+								advancedOptions: string
+								/**
+								 * A​ ​u​n​i​q​u​e​ ​n​a​m​e​ ​f​o​r​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​t​o​ ​i​d​e​n​t​i​f​y​ ​i​t​ ​e​a​s​i​l​y​.
+								 */
+								name: string
+								/**
+								 * T​h​e​ ​p​u​b​l​i​c​ ​k​e​y​ ​a​s​s​o​c​i​a​t​e​d​ ​w​i​t​h​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
+								 */
+								pubkey: string
+								/**
+								 * T​h​e​ ​p​r​i​v​a​t​e​ ​k​e​y​ ​a​s​s​o​c​i​a​t​e​d​ ​w​i​t​h​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
+								 */
+								prvkey: string
+								/**
+								 * T​h​e​ ​I​P​ ​a​d​d​r​e​s​s​ ​a​s​s​i​g​n​e​d​ ​t​o​ ​t​h​i​s​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​ ​w​i​t​h​i​n​ ​t​h​e​ ​V​P​N​ ​n​e​t​w​o​r​k​.
+								 */
+								address: string
+								/**
+								 * T​h​e​ ​p​u​b​l​i​c​ ​k​e​y​ ​o​f​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​s​e​r​v​e​r​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
+								 */
+								serverPubkey: string
+								/**
+								 * A​ ​c​o​m​m​a​-​s​e​p​a​r​a​t​e​d​ ​l​i​s​t​ ​o​f​ ​I​P​ ​a​d​d​r​e​s​s​e​s​ ​o​r​ ​C​I​D​R​ ​r​a​n​g​e​s​ ​t​h​a​t​ ​a​r​e​ ​a​l​l​o​w​e​d​ ​f​o​r​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​t​u​n​n​e​l​.
+								 */
+								allowedIps: string
+								/**
+								 * T​h​e​ ​a​d​d​r​e​s​s​ ​a​n​d​ ​p​o​r​t​ ​o​f​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​s​e​r​v​e​r​,​ ​t​y​p​i​c​a​l​l​y​ ​i​n​ ​t​h​e​ ​f​o​r​m​a​t​ ​"​h​o​s​t​n​a​m​e​:​p​o​r​t​"​.
+								 */
+								endpoint: string
+								/**
+								 * T​h​e​ ​D​N​S​ ​(​D​o​m​a​i​n​ ​N​a​m​e​ ​S​y​s​t​e​m​)​ ​s​e​r​v​e​r​ ​t​h​a​t​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​ ​s​h​o​u​l​d​ ​u​s​e​ ​f​o​r​ ​n​a​m​e​ ​r​e​s​o​l​u​t​i​o​n​.​ ​R​i​g​h​t​ ​n​o​w​ ​w​e​ ​o​n​l​y​ ​s​u​p​p​o​r​t​ ​D​N​S​ ​s​e​r​v​e​r​ ​I​P​,​ ​i​n​ ​t​h​e​ ​f​e​a​t​u​r​e​ ​w​e​ ​w​i​l​l​ ​s​u​p​p​o​r​t​ ​d​o​m​a​i​n​ ​s​e​a​r​c​h​.
+								 */
+								dns: string
+								/**
+								 * T​h​e​ ​i​n​t​e​r​v​a​l​ ​(​i​n​ ​s​e​c​o​n​d​s​)​ ​f​o​r​ ​s​e​n​d​i​n​g​ ​p​e​r​i​o​d​i​c​ ​k​e​e​p​-​a​l​i​v​e​ ​m​e​s​s​a​g​e​s​ ​t​o​ ​e​n​s​u​r​e​ ​t​h​e​ ​t​u​n​n​e​l​ ​s​t​a​y​s​ ​a​c​t​i​v​e​.​ ​A​d​j​u​s​t​ ​a​s​ ​n​e​e​d​e​d​.
+								 */
+								persistentKeepAlive: string
+								/**
+								 * I​f​ ​e​n​a​b​l​e​d​,​ ​a​l​l​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​w​i​l​l​ ​b​e​ ​r​o​u​t​e​d​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								routeAllTraffic: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​b​e​f​o​r​e​ ​b​r​i​n​g​i​n​g​ ​u​p​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								preUp: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​a​f​t​e​r​ ​b​r​i​n​g​i​n​g​ ​u​p​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								postUp: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​b​e​f​o​r​e​ ​t​e​a​r​i​n​g​ ​d​o​w​n​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								preDown: string
+								/**
+								 * S​h​e​l​l​ ​c​o​m​m​a​n​d​s​ ​o​r​ ​s​c​r​i​p​t​s​ ​t​o​ ​b​e​ ​e​x​e​c​u​t​e​d​ ​a​f​t​e​r​ ​t​e​a​r​i​n​g​ ​d​o​w​n​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​.
+								 */
+								postDown: string
+							}
+							/**
+							 * A​d​d​ ​T​u​n​n​e​l
+							 */
+							submit: string
+							messages: {
+								/**
+								 * E​r​r​o​r​ ​p​a​r​s​i​n​g​ ​c​o​n​f​i​g​ ​f​i​l​e
+								 */
+								configError: string
+								/**
+								 * T​u​n​n​e​l​ ​a​d​d​e​d
+								 */
+								addSuccess: string
+								/**
+								 * C​r​e​a​t​i​n​g​ ​t​u​n​n​e​l​ ​f​a​i​l​e​d
+								 */
+								addError: string
+							}
+							controls: {
+								/**
+								 * I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e
+								 */
+								importConfig: string
+								/**
+								 * G​e​n​e​r​a​t​e​ ​P​r​i​v​a​t​e​ ​K​e​y
+								 */
+								generatePrvkey: string
+							}
+						}
+					}
+					guide: {
+						/**
+						 * A​d​d​i​n​g​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l
+						 */
+						title: string
+						/**
+						 * <​p​>​T​o​ ​e​s​t​a​b​l​i​s​h​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​ ​b​e​t​w​e​e​n​ ​t​w​o​ ​o​r​ ​m​o​r​e​ ​d​e​v​i​c​e​s​ ​o​v​e​r​ ​t​h​e​ ​i​n​t​e​r​n​e​t​ ​c​r​e​a​t​e​ ​a​ ​v​i​r​t​u​a​l​ ​p​r​i​v​a​t​e​ ​n​e​t​w​o​r​k​ ​b​y​ ​c​o​n​f​i​g​u​r​i​n​g​ ​y​o​u​r​ ​t​u​n​n​e​l​.​<​/​p​>​<​p​>​I​f​ ​y​o​u​ ​d​o​n​’​t​ ​s​e​e​ ​o​p​t​i​o​n​s​ ​l​i​k​e​ ​T​a​b​l​e​ ​o​r​ ​M​T​U​ ​i​t​ ​m​e​a​n​s​ ​w​e​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​i​t​ ​f​o​r​ ​n​o​w​,​ ​b​u​t​ ​w​i​l​l​ ​b​e​ ​a​d​d​e​d​ ​l​a​t​e​r​.​<​/​p​>
+						 */
+						subTitle: string
+						card: {
+							/**
+							 * S​e​t​t​i​n​g​ ​U​p​ ​A​ ​n​e​w​ ​T​u​n​n​e​l​:
+							 */
+							title: string
+							/**
+							 * 
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​1​.​ ​I​m​p​o​r​t​ ​C​o​n​f​i​g​u​r​a​t​i​o​n​ ​F​i​l​e​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​C​l​i​c​k​ ​o​n​ ​t​h​e​ ​"​I​m​p​o​r​t​ ​C​o​n​f​i​g​ ​F​i​l​e​"​ ​b​u​t​t​o​n​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​N​a​v​i​g​a​t​e​ ​t​o​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​u​s​i​n​g​ ​t​h​e​ ​f​i​l​e​ ​s​e​l​e​c​t​i​o​n​ ​d​i​a​l​o​g​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​S​e​l​e​c​t​ ​t​h​e​ ​.​c​o​n​f​ ​f​i​l​e​ ​y​o​u​ ​r​e​c​e​i​v​e​d​ ​o​r​ ​c​r​e​a​t​e​d​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​2​.​ ​O​r​ ​F​i​l​l​ ​i​n​ ​F​o​r​m​ ​o​n​ ​t​h​e​ ​L​e​f​t​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​E​n​t​e​r​ ​a​ ​n​a​m​e​ ​f​o​r​ ​t​h​e​ ​t​u​n​n​e​l​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​l​i​>​ ​P​r​o​v​i​d​e​ ​e​s​s​e​n​t​i​a​l​ ​d​e​t​a​i​l​s​ ​s​u​c​h​ ​a​s​ ​t​h​e​ ​p​r​i​v​a​t​e​ ​k​e​y​,​ ​p​u​b​l​i​c​ ​k​e​y​,​ ​a​n​d​ ​e​n​d​p​o​i​n​t​ ​(​s​e​r​v​e​r​ ​a​d​d​r​e​s​s​)​.​<​/​l​i​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
+							 */
+							content: string
 						}
 					}
 				}
@@ -353,13 +902,25 @@ type RootTranslation = {
 			}
 			sideBar: {
 				/**
-				 * I​n​s​t​a​n​c​e​s
+				 * d​e​f​g​u​a​r​d​ ​I​n​s​t​a​n​c​e​s
 				 */
 				instances: string
 				/**
 				 * A​d​d​ ​I​n​s​t​a​n​c​e
 				 */
 				addInstance: string
+				/**
+				 * A​d​d​ ​T​u​n​n​e​l
+				 */
+				addTunnel: string
+				/**
+				 * W​i​r​e​G​u​a​r​d​ ​T​u​n​n​e​l​s
+				 */
+				tunnels: string
+				/**
+				 * S​e​t​t​i​n​g​s
+				 */
+				settings: string
 				copyright: {
 					/**
 					 * C​o​p​y​r​i​g​h​t​ ​©​ ​2​0​2​3
@@ -371,6 +932,24 @@ type RootTranslation = {
 					 */
 					appVersion: RequiredParams<'version'>
 				}
+				/**
+				 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n​:​ 
+				 */
+				applicationVersion: string
+			}
+			newApplicationVersion: {
+				/**
+				 * N​e​w​ ​v​e​r​s​i​o​n​ ​a​v​a​i​l​a​b​l​e
+				 */
+				header: string
+				/**
+				 * D​i​s​m​i​s​s
+				 */
+				dismiss: string
+				/**
+				 * S​e​e​ ​w​h​a​t​'​s​ ​n​e​w
+				 */
+				releaseNotes: string
 			}
 		}
 		enrollment: {
@@ -433,7 +1012,7 @@ type RootTranslation = {
 				​
 				​1​.​ ​V​e​r​i​f​y​ ​y​o​u​r​ ​d​a​t​a​
 				​2​.​ ​C​r​e​a​t​e​ ​y​o​u​r​ ​p​a​s​s​w​o​r​d​
-				​3​.​ ​C​o​n​f​i​g​u​r​a​t​e​ ​V​P​N​ ​d​e​v​i​c​e​
+				​3​.​ ​C​o​n​f​i​g​u​r​e​ ​V​P​N​ ​d​e​v​i​c​e​
 				​
 				​Y​o​u​ ​h​a​v​e​ ​a​ ​t​i​m​e​ ​l​i​m​i​t​ ​o​f​ ​*​*​{​t​i​m​e​}​ ​m​i​n​u​t​e​s​*​*​ ​t​o​ ​c​o​m​p​l​e​t​e​ ​t​h​i​s​ ​p​r​o​c​e​s​s​.​
 				​I​f​ ​y​o​u​ ​h​a​v​e​ ​a​n​y​ ​q​u​e​s​t​i​o​n​s​,​ ​p​l​e​a​s​e​ ​c​o​n​s​u​l​t​ ​y​o​u​r​ ​a​s​s​i​g​n​e​d​ ​a​d​m​i​n​.​A​l​l​ ​n​e​c​e​s​s​a​r​y​ ​i​n​f​o​r​m​a​t​i​o​n​ ​c​a​n​ ​b​e​ ​f​o​u​n​d​ ​a​t​ ​t​h​e​ ​b​o​t​t​o​m​ ​o​f​ ​t​h​e​ ​s​i​d​e​b​a​r​.
@@ -546,7 +1125,7 @@ type RootTranslation = {
 								 */
 								submit: string
 								/**
-								 * P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​y​o​u​ ​h​a​v​e​ ​t​o​ ​d​o​w​n​l​o​a​d​ ​t​h​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​n​o​w​,​ ​s​i​n​c​e​ ​w​e​ ​d​o​ ​n​o​t​ ​s​t​o​r​e​ ​y​o​u​r​ ​p​r​i​v​a​t​e​ ​k​e​y​.​ ​A​f​t​e​r​ ​t​h​i​s​ ​d​i​a​l​o​g​ ​i​s​ ​c​l​o​s​e​d​,​ ​y​o​u​ ​w​i​l​l​ ​n​o​t​ ​b​e​ ​a​b​l​e​ ​t​o​ ​g​e​t​ ​y​o​u​r​ ​f​u​l​l​l​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​(​w​i​t​h​ ​p​r​i​v​a​t​e​ ​k​e​y​s​,​ ​o​n​l​y​ ​b​l​a​n​k​ ​t​e​m​p​l​a​t​e​)​.
+								 * P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​y​o​u​ ​h​a​v​e​ ​t​o​ ​d​o​w​n​l​o​a​d​ ​t​h​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​n​o​w​,​ ​s​i​n​c​e​ ​w​e​ ​d​o​ ​n​o​t​ ​s​t​o​r​e​ ​y​o​u​r​ ​p​r​i​v​a​t​e​ ​k​e​y​.​ ​A​f​t​e​r​ ​t​h​i​s​ ​d​i​a​l​o​g​ ​i​s​ ​c​l​o​s​e​d​,​ ​y​o​u​ ​w​i​l​l​ ​n​o​t​ ​b​e​ ​a​b​l​e​ ​t​o​ ​g​e​t​ ​y​o​u​r​ ​f​u​l​l​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​i​l​e​ ​(​w​i​t​h​ ​p​r​i​v​a​t​e​ ​k​e​y​s​,​ ​o​n​l​y​ ​b​l​a​n​k​ ​t​e​m​p​l​a​t​e​)​.
 								 */
 								messageBox: string
 								form: {
@@ -592,7 +1171,7 @@ type RootTranslation = {
 									/**
 									 * 
 								​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-								​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​p​r​o​v​i​d​e​d​ ​h​e​r​e​ ​<​s​t​r​o​n​g​>​ ​d​o​e​s​ ​n​o​t​ ​i​n​c​l​u​d​e​ ​p​r​i​v​a​t​e​ ​k​e​y​ ​a​n​d​ ​u​s​e​s​ ​p​u​b​l​i​c​ ​k​e​y​ ​t​o​ ​f​i​l​l​ ​i​t​'​s​ ​p​l​a​c​e​ ​<​/​s​t​r​o​n​g​>​ ​y​o​u​ ​w​i​l​l​ ​n​e​e​d​ ​t​o​ ​r​e​p​a​l​c​e​ ​i​t​ ​o​n​ ​y​o​u​r​ ​o​w​n​ ​f​o​r​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​t​o​ ​w​o​r​k​ ​p​r​o​p​e​r​l​y​.​
+								​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​P​l​e​a​s​e​ ​b​e​ ​a​d​v​i​s​e​d​ ​t​h​a​t​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​p​r​o​v​i​d​e​d​ ​h​e​r​e​ ​<​s​t​r​o​n​g​>​ ​d​o​e​s​ ​n​o​t​ ​i​n​c​l​u​d​e​ ​p​r​i​v​a​t​e​ ​k​e​y​ ​a​n​d​ ​u​s​e​s​ ​p​u​b​l​i​c​ ​k​e​y​ ​t​o​ ​f​i​l​l​ ​i​t​'​s​ ​p​l​a​c​e​ ​<​/​s​t​r​o​n​g​>​ ​y​o​u​ ​w​i​l​l​ ​n​e​e​d​ ​t​o​ ​r​e​p​l​a​c​e​ ​i​t​ ​o​n​ ​y​o​u​r​ ​o​w​n​ ​f​o​r​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​t​o​ ​w​o​r​k​ ​p​r​o​p​e​r​l​y​.​
 								​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 							
 									 */
@@ -631,7 +1210,7 @@ type RootTranslation = {
 							steps: {
 								wireguard: {
 									/**
-									 * D​o​w​n​l​o​a​d​ ​a​n​d​ ​i​n​s​t​a​l​l​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​ ​o​n​ ​y​o​u​r​ ​c​o​m​p​p​u​t​e​r​ ​o​r​ ​a​p​p​ ​o​n​ ​p​h​o​n​e​.
+									 * D​o​w​n​l​o​a​d​ ​a​n​d​ ​i​n​s​t​a​l​l​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​ ​o​n​ ​y​o​u​r​ ​c​o​m​p​u​t​e​r​ ​o​r​ ​a​p​p​ ​o​n​ ​p​h​o​n​e​.
 									 */
 									content: string
 									/**
@@ -733,6 +1312,188 @@ type RootTranslation = {
 			}
 		}
 	}
+	modals: {
+		updateInstance: {
+			/**
+			 * U​p​d​a​t​e​ ​i​n​s​t​a​n​c​e
+			 */
+			title: string
+			/**
+			 * E​n​t​e​r​ ​t​h​e​ ​t​o​k​e​n​ ​s​e​n​t​ ​b​y​ ​t​h​e​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​u​p​d​a​t​e​ ​t​h​e​ ​I​n​s​t​a​n​c​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​.​
+		​A​l​t​e​r​n​a​t​i​v​e​l​y​,​ ​y​o​u​ ​c​a​n​ ​c​h​o​o​s​e​ ​t​o​ ​r​e​m​o​v​e​ ​t​h​i​s​ ​I​n​s​t​a​n​c​e​ ​e​n​t​i​r​e​l​y​ ​b​y​ ​c​l​i​c​k​i​n​g​ ​t​h​e​ ​'​R​e​m​o​v​e​ ​I​n​s​t​a​n​c​e​'​ ​b​u​t​t​o​n​ ​b​e​l​o​w​.
+			 */
+			infoMessage: string
+			form: {
+				fieldLabels: {
+					/**
+					 * T​o​k​e​n
+					 */
+					token: string
+					/**
+					 * U​R​L
+					 */
+					url: string
+				}
+				fieldErrors: {
+					token: {
+						/**
+						 * T​o​k​e​n​ ​o​r​ ​U​R​L​ ​r​e​j​e​c​t​e​d​.
+						 */
+						rejected: string
+						/**
+						 * I​n​s​t​a​n​c​e​ ​f​o​r​ ​t​h​i​s​ ​t​o​k​e​n​ ​w​a​s​ ​n​o​t​ ​f​o​u​n​d​.
+						 */
+						instanceIsNotPresent: string
+					}
+				}
+			}
+			controls: {
+				/**
+				 * U​p​d​a​t​e​ ​I​n​s​t​a​n​c​e
+				 */
+				updateInstance: string
+				/**
+				 * R​e​m​o​v​e​ ​I​n​s​t​a​n​c​e
+				 */
+				removeInstance: string
+			}
+			messages: {
+				/**
+				 * {​n​a​m​e​}​ ​u​p​d​a​t​e​d​.
+				 * @param {string} name
+				 */
+				success: RequiredParams<'name'>
+				/**
+				 * T​o​k​e​n​ ​o​r​ ​U​R​L​ ​i​s​ ​i​n​v​a​l​i​d​.
+				 */
+				error: string
+				/**
+				 * I​n​s​t​a​n​c​e​ ​f​o​r​ ​g​i​v​e​n​ ​t​o​k​e​n​ ​i​s​ ​n​o​t​ ​r​e​g​i​s​t​e​r​e​d​ ​!
+				 */
+				errorInstanceNotFound: string
+			}
+		}
+		deleteInstance: {
+			/**
+			 * D​e​l​e​t​e​ ​i​n​s​t​a​n​c​e
+			 */
+			title: string
+			/**
+			 * A​r​e​ ​y​o​u​ ​s​u​r​e​ ​y​o​u​ ​w​a​n​t​ ​t​o​ ​d​e​l​e​t​e​ ​{​n​a​m​e​}​?
+			 * @param {string} name
+			 */
+			subtitle: RequiredParams<'name'>
+			messages: {
+				/**
+				 * I​n​s​t​a​n​c​e​ ​d​e​l​e​t​e​d
+				 */
+				success: string
+				/**
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d
+				 */
+				error: string
+			}
+			controls: {
+				/**
+				 * D​e​l​e​t​e​ ​i​n​s​t​a​n​c​e
+				 */
+				submit: string
+			}
+		}
+		deleteTunnel: {
+			/**
+			 * D​e​l​e​t​e​ ​t​u​n​n​e​l
+			 */
+			title: string
+			/**
+			 * A​r​e​ ​y​o​u​ ​s​u​r​e​ ​y​o​u​ ​w​a​n​t​ ​t​o​ ​d​e​l​e​t​e​ ​{​n​a​m​e​}​?
+			 * @param {string} name
+			 */
+			subtitle: RequiredParams<'name'>
+			messages: {
+				/**
+				 * T​u​n​n​e​l​ ​d​e​l​e​t​e​d
+				 */
+				success: string
+				/**
+				 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d
+				 */
+				error: string
+			}
+			controls: {
+				/**
+				 * D​e​l​e​t​e​ ​t​u​n​n​e​l
+				 */
+				submit: string
+			}
+		}
+		mfa: {
+			authentication: {
+				/**
+				 * T​w​o​-​f​a​c​t​o​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n
+				 */
+				title: string
+				/**
+				 * P​a​s​t​e​ ​t​h​e​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​c​o​d​e​ ​f​r​o​m​ ​y​o​u​r​ ​A​u​t​h​e​n​t​i​c​a​t​o​r​ ​A​p​p​l​i​c​a​t​i​o​n​.
+				 */
+				authenticatorAppDescription: string
+				/**
+				 * P​a​s​t​e​ ​t​h​e​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​c​o​d​e​ ​t​h​a​t​ ​w​a​s​ ​s​e​n​t​ ​t​o​ ​y​o​u​r​ ​e​m​a​i​l​ ​a​d​d​r​e​s​s​.
+				 */
+				emailCodeDescription: string
+				/**
+				 * F​o​r​ ​t​h​i​s​ ​c​o​n​n​e​c​t​i​o​n​,​ ​t​w​o​-​f​a​c​t​o​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​(​2​F​A​)​ ​i​s​ ​m​a​n​d​a​t​o​r​y​.
+				 */
+				mfaStartDescriptionPrimary: string
+				/**
+				 * S​e​l​e​c​t​ ​y​o​u​r​ ​p​r​e​f​e​r​r​e​d​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​m​e​t​h​o​d​.
+				 */
+				mfaStartDescriptionSecondary: string
+				/**
+				 * U​s​e​ ​a​u​t​h​e​n​t​i​c​a​t​o​r​ ​a​p​p
+				 */
+				useAuthenticatorApp: string
+				/**
+				 * U​s​e​ ​y​o​u​r​ ​e​m​a​i​l​ ​c​o​d​e
+				 */
+				useEmailCode: string
+				/**
+				 * U​s​e​ ​t​h​i​s​ ​m​e​t​h​o​d​ ​f​o​r​ ​f​u​t​u​r​e​ ​l​o​g​i​n​s
+				 */
+				saveAuthenticationMethodForFutureLogins: string
+				/**
+				 * V​e​r​i​f​y
+				 */
+				buttonSubmit: string
+				errors: {
+					/**
+					 * S​e​l​e​c​t​e​d​ ​m​e​t​h​o​d​ ​h​a​s​ ​n​o​t​ ​b​e​e​n​ ​c​o​n​f​i​g​u​r​e​d​.
+					 */
+					mfaNotConfigured: string
+					/**
+					 * C​o​u​l​d​ ​n​o​t​ ​s​t​a​r​t​ ​M​F​A​ ​p​r​o​c​e​s​s​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​ ​o​r​ ​c​o​n​t​a​c​t​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					mfaStartGeneric: string
+					/**
+					 * C​o​u​l​d​ ​n​o​t​ ​f​i​n​d​ ​i​n​s​t​a​n​c​e​.
+					 */
+					instanceNotFound: string
+					/**
+					 * L​o​c​a​t​i​o​n​ ​i​s​ ​n​o​t​ ​s​p​e​c​i​f​i​e​d​.
+					 */
+					locationNotSpecified: string
+					/**
+					 * E​r​r​o​r​,​ ​t​h​i​s​ ​c​o​d​e​ ​i​s​ ​i​n​v​a​l​i​d​,​ ​t​r​y​ ​a​g​a​i​n​ ​o​r​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					invalidCode: string
+					/**
+					 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​t​o​ ​c​o​n​n​e​c​t​ ​a​g​a​i​n​.
+					 */
+					tokenExpired: string
+				}
+			}
+		}
+	}
 }
 
 export type TranslationFunctions = {
@@ -745,7 +1506,7 @@ export type TranslationFunctions = {
 			/**
 			 * seconds
 			 */
-			prular: () => LocalizedString
+			plural: () => LocalizedString
 		}
 		minutes: {
 			/**
@@ -755,7 +1516,7 @@ export type TranslationFunctions = {
 			/**
 			 * minutes
 			 */
-			prular: () => LocalizedString
+			plural: () => LocalizedString
 		}
 	}
 	form: {
@@ -857,6 +1618,239 @@ export type TranslationFunctions = {
 	pages: {
 		client: {
 			pages: {
+				carouselPage: {
+					slides: {
+						shared: {
+							/**
+							 * **defguard** is all the above and more!
+							 */
+							isMore: () => LocalizedString
+							/**
+							 * Visit defguard on
+							 */
+							githubButton: () => LocalizedString
+						}
+						welcome: {
+							/**
+							 * Welcome to **defguard** desktop client!
+							 */
+							title: () => LocalizedString
+							instance: {
+								/**
+								 * Add Instance
+								 */
+								title: () => LocalizedString
+								/**
+								 * Establish a connection to defguard instance effortlessly by configuring it with a single token.
+								 */
+								subtitle: () => LocalizedString
+							}
+							tunnel: {
+								/**
+								 * Add Tunnel
+								 */
+								title: () => LocalizedString
+								/**
+								 * Utilize it as a WireGuard® Desktop Client with ease. Set up your own tunnel or import a configuration file.
+								 */
+								subtitle: () => LocalizedString
+							}
+						}
+						twoFa: {
+							/**
+							 * WireGuard **2FA with defguard**
+							 */
+							title: () => LocalizedString
+							/**
+							 * Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).  
+					
+						If you would like to secure your WireGuard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using WireGuard PSK keys and peers configuration by defguard gateway!
+							 */
+							sideText: () => LocalizedString
+						}
+						security: {
+							/**
+							 * Security and Privacy **done right!**
+							 */
+							title: () => LocalizedString
+							/**
+							 * * Privacy requires controlling your data, thus your user data (Identity, SSO) needs to be on-premise (on your servers)
+						* Securing your data and applications requires authentication and authorization (SSO) with Multi-Factor Authentication, and for highest security - MFA with Hardware Security Modules
+						* Accessing your data and applications securely and privately requires data encryption (HTTPS) and a secure tunnel between your device and the Internet to encrypt all traffic (VPN).
+						* To fully trust your SSO, VPN, it needs to be Open Source
+							 */
+							sideText: () => LocalizedString
+						}
+						instances: {
+							/**
+							 * **Multiple** instance & locations
+							 */
+							title: () => LocalizedString
+							/**
+							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+					
+						If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
+							 */
+							sideText: () => LocalizedString
+						}
+						support: {
+							/**
+							 * **Support us** on Github
+							 */
+							title: () => LocalizedString
+							/**
+							 * **defguard** is free and truly Open Source and our team has been working on it for several months. Please consider supporting us by: 
+							 */
+							text: () => LocalizedString
+							/**
+							 * staring us on
+							 */
+							githubText: () => LocalizedString
+							/**
+							 * GitHub
+							 */
+							githubLink: () => LocalizedString
+							/**
+							 * spreading the word about:
+							 */
+							spreadWordText: () => LocalizedString
+							/**
+							 * defguard!
+							 */
+							defguard: () => LocalizedString
+							/**
+							 * join our Matrix server:
+							 */
+							joinMatrix: () => LocalizedString
+							/**
+							 * Support Us!
+							 */
+							supportUs: () => LocalizedString
+						}
+					}
+				}
+				settingsPage: {
+					/**
+					 * Settings
+					 */
+					title: () => LocalizedString
+					tabs: {
+						global: {
+							tray: {
+								/**
+								 * System tray
+								 */
+								title: () => LocalizedString
+								/**
+								 * Tray icon theme
+								 */
+								label: () => LocalizedString
+								options: {
+									/**
+									 * Color
+									 */
+									color: () => LocalizedString
+									/**
+									 * White
+									 */
+									white: () => LocalizedString
+									/**
+									 * Black
+									 */
+									black: () => LocalizedString
+									/**
+									 * Gray
+									 */
+									gray: () => LocalizedString
+								}
+							}
+							logging: {
+								/**
+								 * Logging threshold
+								 */
+								title: () => LocalizedString
+								options: {
+									/**
+									 * Error
+									 */
+									error: () => LocalizedString
+									/**
+									 * Info
+									 */
+									info: () => LocalizedString
+									/**
+									 * Debug
+									 */
+									debug: () => LocalizedString
+									/**
+									 * Trace
+									 */
+									trace: () => LocalizedString
+								}
+							}
+							theme: {
+								/**
+								 * Theme
+								 */
+								title: () => LocalizedString
+								options: {
+									/**
+									 * Light
+									 */
+									light: () => LocalizedString
+									/**
+									 * Dark
+									 */
+									dark: () => LocalizedString
+								}
+							}
+							versionUpdate: {
+								/**
+								 * Updates
+								 */
+								title: () => LocalizedString
+								/**
+								 * Check for updates
+								 */
+								checkboxTitle: () => LocalizedString
+							}
+						}
+					}
+				}
+				createdPage: {
+					tunnel: {
+						/**
+						 * Your Tunnel Was Added Successfully
+						 */
+						title: () => LocalizedString
+						/**
+						 * Your tunnel has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.
+						 */
+						content: () => LocalizedString
+						controls: {
+							/**
+							 * Add Another Tunnel
+							 */
+							submit: () => LocalizedString
+						}
+					}
+					instance: {
+						/**
+						 * Your Instance Was Added Successfully
+						 */
+						title: () => LocalizedString
+						/**
+						 * Your instance has been successfully added. You can now connect this device, check its status and view statistics using the menu in the left sidebar.
+						 */
+						content: () => LocalizedString
+						controls: {
+							/**
+							 * Add Another Instance
+							 */
+							submit: () => LocalizedString
+						}
+					}
+				}
 				instancePage: {
 					/**
 					 * Locations
@@ -885,7 +1879,11 @@ export type TranslationFunctions = {
 							 */
 							label: () => LocalizedString
 							/**
-							 * <p>Allowed traffic:</br> Only trafic that was defined by Admin for this location.</p>
+							 * 
+						                <p>
+						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+						                  <b>All traffic</b> - route ALL your network traffic through this VPN location
+						                </p>
 							 */
 							helper: () => LocalizedString
 						}
@@ -895,6 +1893,10 @@ export type TranslationFunctions = {
 						 * Locations
 						 */
 						title: () => LocalizedString
+						/**
+						 * Edit Instance
+						 */
+						edit: () => LocalizedString
 						filters: {
 							views: {
 								/**
@@ -982,6 +1984,313 @@ export type TranslationFunctions = {
 								 */
 								download: () => LocalizedString
 							}
+						}
+						details: {
+							/**
+							 * Details
+							 */
+							title: () => LocalizedString
+							logs: {
+								/**
+								 * Log
+								 */
+								title: () => LocalizedString
+							}
+							info: {
+								configuration: {
+									/**
+									 * Device configuration
+									 */
+									title: () => LocalizedString
+									/**
+									 * Public key
+									 */
+									pubkey: () => LocalizedString
+									/**
+									 * Addresses
+									 */
+									address: () => LocalizedString
+									/**
+									 * Listen port
+									 */
+									listenPort: () => LocalizedString
+								}
+								vpn: {
+									/**
+									 * VPN Server Configuration
+									 */
+									title: () => LocalizedString
+									/**
+									 * Public key
+									 */
+									pubkey: () => LocalizedString
+									/**
+									 * Server Address
+									 */
+									serverAddress: () => LocalizedString
+									/**
+									 * Allowed IPs
+									 */
+									allowedIps: () => LocalizedString
+									/**
+									 * DNS servers
+									 */
+									dns: () => LocalizedString
+									/**
+									 * Persistent keepalive
+									 */
+									keepalive: () => LocalizedString
+									/**
+									 * Latest Handshake
+									 */
+									handshake: () => LocalizedString
+									/**
+									 * {seconds} seconds ago
+									 */
+									handshakeValue: (arg: { seconds: number }) => LocalizedString
+								}
+							}
+						}
+					}
+				}
+				tunnelPage: {
+					/**
+					 * WireGuard Tunnels
+					 */
+					title: () => LocalizedString
+					header: {
+						/**
+						 * Edit Tunnel
+						 */
+						edit: () => LocalizedString
+					}
+				}
+				editTunnelPage: {
+					/**
+					 * Edit WireGuard® Tunnel
+					 */
+					title: () => LocalizedString
+					messages: {
+						/**
+						 * Tunnel edited
+						 */
+						editSuccess: () => LocalizedString
+						/**
+						 * Editing tunnel failed
+						 */
+						editError: () => LocalizedString
+					}
+					controls: {
+						/**
+						 * Save changes
+						 */
+						save: () => LocalizedString
+					}
+				}
+				addTunnelPage: {
+					/**
+					 * Add WireGuard® Tunnel
+					 */
+					title: () => LocalizedString
+					forms: {
+						initTunnel: {
+							/**
+							 * Please provide Instance URL and token
+							 */
+							title: () => LocalizedString
+							sections: {
+								/**
+								 * VPN Server
+								 */
+								vpnServer: () => LocalizedString
+								/**
+								 * Advanced Options
+								 */
+								advancedOptions: () => LocalizedString
+							}
+							labels: {
+								/**
+								 * Tunnel Name
+								 */
+								name: () => LocalizedString
+								/**
+								 * Private Key
+								 */
+								privateKey: () => LocalizedString
+								/**
+								 * Public Key
+								 */
+								publicKey: () => LocalizedString
+								/**
+								 * Address
+								 */
+								address: () => LocalizedString
+								/**
+								 * Public Key
+								 */
+								serverPubkey: () => LocalizedString
+								/**
+								 * VPN Server Address:Port
+								 */
+								endpoint: () => LocalizedString
+								/**
+								 * DNS
+								 */
+								dns: () => LocalizedString
+								/**
+								 * Allowed IPs (separate with comma)
+								 */
+								allowedips: () => LocalizedString
+								/**
+								 * Persistent Keep Alive (sec)
+								 */
+								persistentKeepAlive: () => LocalizedString
+								/**
+								 * PreUp
+								 */
+								preUp: () => LocalizedString
+								/**
+								 * PostUp
+								 */
+								postUp: () => LocalizedString
+								/**
+								 * PreDown
+								 */
+								PreDown: () => LocalizedString
+								/**
+								 * PostDown
+								 */
+								PostDown: () => LocalizedString
+							}
+							helpers: {
+								/**
+								 * Click the "Advanced Options" section to reveal additional settings for fine-tuning your WireGuard tunnel configuration. You can customize pre and post scripts, among other options.
+								 */
+								advancedOptions: () => LocalizedString
+								/**
+								 * A unique name for your WireGuard tunnel to identify it easily.
+								 */
+								name: () => LocalizedString
+								/**
+								 * The public key associated with the WireGuard tunnel for secure communication.
+								 */
+								pubkey: () => LocalizedString
+								/**
+								 * The private key associated with the WireGuard tunnel for secure communication.
+								 */
+								prvkey: () => LocalizedString
+								/**
+								 * The IP address assigned to this WireGuard client within the VPN network.
+								 */
+								address: () => LocalizedString
+								/**
+								 * The public key of the WireGuard server for secure communication.
+								 */
+								serverPubkey: () => LocalizedString
+								/**
+								 * A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.
+								 */
+								allowedIps: () => LocalizedString
+								/**
+								 * The address and port of the WireGuard server, typically in the format "hostname:port".
+								 */
+								endpoint: () => LocalizedString
+								/**
+								 * The DNS (Domain Name System) server that the WireGuard tunnel should use for name resolution. Right now we only support DNS server IP, in the feature we will support domain search.
+								 */
+								dns: () => LocalizedString
+								/**
+								 * The interval (in seconds) for sending periodic keep-alive messages to ensure the tunnel stays active. Adjust as needed.
+								 */
+								persistentKeepAlive: () => LocalizedString
+								/**
+								 * If enabled, all network traffic will be routed through the WireGuard tunnel.
+								 */
+								routeAllTraffic: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed before bringing up the WireGuard tunnel.
+								 */
+								preUp: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed after bringing up the WireGuard tunnel.
+								 */
+								postUp: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed before tearing down the WireGuard tunnel.
+								 */
+								preDown: () => LocalizedString
+								/**
+								 * Shell commands or scripts to be executed after tearing down the WireGuard tunnel.
+								 */
+								postDown: () => LocalizedString
+							}
+							/**
+							 * Add Tunnel
+							 */
+							submit: () => LocalizedString
+							messages: {
+								/**
+								 * Error parsing config file
+								 */
+								configError: () => LocalizedString
+								/**
+								 * Tunnel added
+								 */
+								addSuccess: () => LocalizedString
+								/**
+								 * Creating tunnel failed
+								 */
+								addError: () => LocalizedString
+							}
+							controls: {
+								/**
+								 * Import Config File
+								 */
+								importConfig: () => LocalizedString
+								/**
+								 * Generate Private Key
+								 */
+								generatePrvkey: () => LocalizedString
+							}
+						}
+					}
+					guide: {
+						/**
+						 * Adding WireGuard tunnel
+						 */
+						title: () => LocalizedString
+						/**
+						 * <p>To establish secure communication between two or more devices over the internet create a virtual private network by configuring your tunnel.</p><p>If you don’t see options like Table or MTU it means we do not support it for now, but will be added later.</p>
+						 */
+						subTitle: () => LocalizedString
+						card: {
+							/**
+							 * Setting Up A new Tunnel:
+							 */
+							title: () => LocalizedString
+							/**
+							 * 
+						                <p>1. Import Configuration File</p>
+						                <div>
+						                <ul>
+						                  <li> Click on the "Import Config File" button.</li>
+						                  <li> Navigate to configuration file using the file selection dialog.</li>
+						                  <li> Select the .conf file you received or created.</li>
+						                </ul>
+						                </div>
+						                <p>2. Or Fill in Form on the Left</p>
+						                <div>
+						                <ul>
+						                  <li> Enter a name for the tunnel.</li>
+						                  <li> Provide essential details such as the private key, public key, and endpoint (server address).</li>
+						                </ul>
+						                </div>
+						                <p>
+						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                </p>
+						              
+							 */
+							content: () => LocalizedString
 						}
 					}
 				}
@@ -1074,13 +2383,25 @@ export type TranslationFunctions = {
 			}
 			sideBar: {
 				/**
-				 * Instances
+				 * defguard Instances
 				 */
 				instances: () => LocalizedString
 				/**
 				 * Add Instance
 				 */
 				addInstance: () => LocalizedString
+				/**
+				 * Add Tunnel
+				 */
+				addTunnel: () => LocalizedString
+				/**
+				 * WireGuard Tunnels
+				 */
+				tunnels: () => LocalizedString
+				/**
+				 * Settings
+				 */
+				settings: () => LocalizedString
 				copyright: {
 					/**
 					 * Copyright © 2023
@@ -1091,6 +2412,24 @@ export type TranslationFunctions = {
 					 */
 					appVersion: (arg: { version: string }) => LocalizedString
 				}
+				/**
+				 * Application version: 
+				 */
+				applicationVersion: () => LocalizedString
+			}
+			newApplicationVersion: {
+				/**
+				 * New version available
+				 */
+				header: () => LocalizedString
+				/**
+				 * Dismiss
+				 */
+				dismiss: () => LocalizedString
+				/**
+				 * See what's new
+				 */
+				releaseNotes: () => LocalizedString
 			}
 		}
 		enrollment: {
@@ -1152,7 +2491,7 @@ export type TranslationFunctions = {
 			
 				1. Verify your data
 				2. Create your password
-				3. Configurate VPN device
+				3. Configure VPN device
 			
 				You have a time limit of **{time} minutes** to complete this process.
 				If you have any questions, please consult your assigned admin.All necessary information can be found at the bottom of the sidebar.
@@ -1264,7 +2603,7 @@ export type TranslationFunctions = {
 								 */
 								submit: () => LocalizedString
 								/**
-								 * Please be advised that you have to download the configuration now, since we do not store your private key. After this dialog is closed, you will not be able to get your fulll configuration file (with private keys, only blank template).
+								 * Please be advised that you have to download the configuration now, since we do not store your private key. After this dialog is closed, you will not be able to get your full configuration file (with private keys, only blank template).
 								 */
 								messageBox: () => LocalizedString
 								form: {
@@ -1310,7 +2649,7 @@ export type TranslationFunctions = {
 									/**
 									 * 
 								        <p>
-								          Please be advised that configuration provided here <strong> does not include private key and uses public key to fill it's place </strong> you will need to repalce it on your own for configuration to work properly.
+								          Please be advised that configuration provided here <strong> does not include private key and uses public key to fill it's place </strong> you will need to replace it on your own for configuration to work properly.
 								        </p>
 							
 									 */
@@ -1348,7 +2687,7 @@ export type TranslationFunctions = {
 							steps: {
 								wireguard: {
 									/**
-									 * Download and install WireGuard client on your compputer or app on phone.
+									 * Download and install WireGuard client on your computer or app on phone.
 									 */
 									content: () => LocalizedString
 									/**
@@ -1446,6 +2785,185 @@ export type TranslationFunctions = {
 						 */
 						submit: () => LocalizedString
 					}
+				}
+			}
+		}
+	}
+	modals: {
+		updateInstance: {
+			/**
+			 * Update instance
+			 */
+			title: () => LocalizedString
+			/**
+			 * Enter the token sent by the administrator to update the Instance configuration.
+		Alternatively, you can choose to remove this Instance entirely by clicking the 'Remove Instance' button below.
+			 */
+			infoMessage: () => LocalizedString
+			form: {
+				fieldLabels: {
+					/**
+					 * Token
+					 */
+					token: () => LocalizedString
+					/**
+					 * URL
+					 */
+					url: () => LocalizedString
+				}
+				fieldErrors: {
+					token: {
+						/**
+						 * Token or URL rejected.
+						 */
+						rejected: () => LocalizedString
+						/**
+						 * Instance for this token was not found.
+						 */
+						instanceIsNotPresent: () => LocalizedString
+					}
+				}
+			}
+			controls: {
+				/**
+				 * Update Instance
+				 */
+				updateInstance: () => LocalizedString
+				/**
+				 * Remove Instance
+				 */
+				removeInstance: () => LocalizedString
+			}
+			messages: {
+				/**
+				 * {name} updated.
+				 */
+				success: (arg: { name: string }) => LocalizedString
+				/**
+				 * Token or URL is invalid.
+				 */
+				error: () => LocalizedString
+				/**
+				 * Instance for given token is not registered !
+				 */
+				errorInstanceNotFound: () => LocalizedString
+			}
+		}
+		deleteInstance: {
+			/**
+			 * Delete instance
+			 */
+			title: () => LocalizedString
+			/**
+			 * Are you sure you want to delete {name}?
+			 */
+			subtitle: (arg: { name: string }) => LocalizedString
+			messages: {
+				/**
+				 * Instance deleted
+				 */
+				success: () => LocalizedString
+				/**
+				 * Unexpected error occurred
+				 */
+				error: () => LocalizedString
+			}
+			controls: {
+				/**
+				 * Delete instance
+				 */
+				submit: () => LocalizedString
+			}
+		}
+		deleteTunnel: {
+			/**
+			 * Delete tunnel
+			 */
+			title: () => LocalizedString
+			/**
+			 * Are you sure you want to delete {name}?
+			 */
+			subtitle: (arg: { name: string }) => LocalizedString
+			messages: {
+				/**
+				 * Tunnel deleted
+				 */
+				success: () => LocalizedString
+				/**
+				 * Unexpected error occurred
+				 */
+				error: () => LocalizedString
+			}
+			controls: {
+				/**
+				 * Delete tunnel
+				 */
+				submit: () => LocalizedString
+			}
+		}
+		mfa: {
+			authentication: {
+				/**
+				 * Two-factor authentication
+				 */
+				title: () => LocalizedString
+				/**
+				 * Paste the authentication code from your Authenticator Application.
+				 */
+				authenticatorAppDescription: () => LocalizedString
+				/**
+				 * Paste the authentication code that was sent to your email address.
+				 */
+				emailCodeDescription: () => LocalizedString
+				/**
+				 * For this connection, two-factor authentication (2FA) is mandatory.
+				 */
+				mfaStartDescriptionPrimary: () => LocalizedString
+				/**
+				 * Select your preferred authentication method.
+				 */
+				mfaStartDescriptionSecondary: () => LocalizedString
+				/**
+				 * Use authenticator app
+				 */
+				useAuthenticatorApp: () => LocalizedString
+				/**
+				 * Use your email code
+				 */
+				useEmailCode: () => LocalizedString
+				/**
+				 * Use this method for future logins
+				 */
+				saveAuthenticationMethodForFutureLogins: () => LocalizedString
+				/**
+				 * Verify
+				 */
+				buttonSubmit: () => LocalizedString
+				errors: {
+					/**
+					 * Selected method has not been configured.
+					 */
+					mfaNotConfigured: () => LocalizedString
+					/**
+					 * Could not start MFA process. Please try again or contact administrator.
+					 */
+					mfaStartGeneric: () => LocalizedString
+					/**
+					 * Could not find instance.
+					 */
+					instanceNotFound: () => LocalizedString
+					/**
+					 * Location is not specified.
+					 */
+					locationNotSpecified: () => LocalizedString
+					/**
+					 * Error, this code is invalid, try again or contact your administrator.
+					 */
+					invalidCode: () => LocalizedString
+					/**
+					 * Token has expired. Please try to connect again.
+					 */
+					tokenExpired: () => LocalizedString
 				}
 			}
 		}

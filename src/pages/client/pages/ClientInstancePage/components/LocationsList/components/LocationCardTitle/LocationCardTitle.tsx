@@ -5,10 +5,10 @@ import classNames from 'classnames';
 import { Badge } from '../../../../../../../../shared/defguard-ui/components/Layout/Badge/Badge';
 import { BadgeStyleVariant } from '../../../../../../../../shared/defguard-ui/components/Layout/Badge/types';
 import SvgIconConnection from '../../../../../../../../shared/defguard-ui/components/svg/IconConnection';
-import { DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../types';
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
 };
 
 export const LocationCardTitle = ({ location }: Props) => {

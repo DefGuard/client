@@ -29,7 +29,7 @@ const SvgVpnLocation = (props: SVGProps<SVGSVGElement>) => (
     <rect width={6} height={6} x={36.25} y={69} fill="#3BA5D3" rx={1} />
     <rect width={6} height={6} x={45.25} y={69} fill="#3BA5D3" rx={1} />
     <rect width={6} height={6} x={54.25} y={69} fill="#3BA5D3" rx={1} />
-    <path fill="#CBD3D8" d="M67.25 42h85v8h-85v-8Z" />
+    <path fill="#CBD3D8" d="M67.25 42h85v8h-85z" />
     <path fill="#DFDFDD" d="M152.25 12h105v12h-105z" />
     <rect width={9} height={4} x={244.25} y={16} fill="#0C8CE0" rx={2} />
     <path

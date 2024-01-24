@@ -14,18 +14,20 @@ import {
 import SvgIconX from '../../../../../../../../shared/defguard-ui/components/svg/IconX';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { DefguardLocation } from '../../../../../../types';
+import { CommonWireguardFields } from '../../../../../../types';
+import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
 
 const { connect, disconnect } = clientApi;
 
 type Props = {
-  location?: DefguardLocation;
+  location?: CommonWireguardFields;
 };
 
 export const LocationCardConnectButton = ({ location }: Props) => {
   const toaster = useToaster();
   const [isLoading, setIsLoading] = useState(false);
   const { LL } = useI18nContext();
+  const openMFAModal = useMFAModal((state) => state.open);
 
   const cn = classNames('location-card-connect-button', {
     connected: location?.active,
@@ -36,11 +38,19 @@ export const LocationCardConnectButton = ({ location }: Props) => {
     try {
       if (location) {
         if (location?.active) {
-          await disconnect({ locationId: location.id });
-        } else {
-          await connect({
-            locationId: location?.id,
+          await disconnect({
+            locationId: location.id,
+            connectionType: location.connection_type,
           });
+        } else {
+          if (location.mfa_enabled) {
+            openMFAModal(location);
+          } else {
+            await connect({
+              locationId: location?.id,
+              connectionType: location.connection_type,
+            });
+          }
         }
         setIsLoading(false);
       }

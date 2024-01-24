@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n              SELECT\n                  c.id as \"id!\",\n                  c.tunnel_id as \"tunnel_id!\",\n                  c.connected_from as \"connected_from!\",\n                  c.start as \"start!\",\n                  c.end as \"end!\",\n                  COALESCE((\n                      SELECT ls.upload\n                      FROM tunnel_stats AS ls\n                      WHERE ls.tunnel_id = c.tunnel_id\n                      AND ls.collected_at >= c.start\n                      AND ls.collected_at <= c.end\n                      ORDER BY ls.collected_at DESC\n                      LIMIT 1\n                  ), 0) as \"upload: _\",\n                  COALESCE((\n                      SELECT ls.download\n                      FROM tunnel_stats AS ls\n                      WHERE ls.tunnel_id = c.tunnel_id\n                      AND ls.collected_at >= c.start\n                      AND ls.collected_at <= c.end\n                      ORDER BY ls.collected_at DESC\n                      LIMIT 1\n                  ), 0) as \"download: _\"\n              FROM tunnel_connection AS c WHERE tunnel_id = $1\n              ORDER BY start DESC;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "tunnel_id!",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "connected_from!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "start!",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "end!",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "upload: _",
+        "ordinal": 5,
+        "type_info": "Null"
+      },
+      {
+        "name": "download: _",
+        "ordinal": 6,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "3fe0268bce98cbce7cbf4ce8a4134948a042acdb8363f7735642da642420bfe6"
+}
