@@ -40,3 +40,7 @@ pnpm tauri dev
 ### Windows
 
 Remove `default-run` line from `[package]` section in `Cargo.toml` to build the project.
+
+# Legal
+
+  - *defguard is not an official WireGuard project, and WireGuard is a registered trademark of Jason A. Donenfeld.*
