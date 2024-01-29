@@ -59,6 +59,7 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
         }
         SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
             "quit" => {
+                info!("Received QUIT request. Initiating shutdown...");
                 let app_state: State<AppState> = app.state();
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
