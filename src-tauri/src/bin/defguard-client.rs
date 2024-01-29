@@ -161,9 +161,23 @@ async fn main() {
     );
 
     // run app
-    app.run(|_app_handle, event| {
-        if let tauri::RunEvent::ExitRequested { api, .. } = event {
-            api.prevent_exit();
+    app.run(|app_handle, event| match event {
+        // prevent shutdown on window close
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            debug!("Received exit request");
+            api.prevent_exit()
         }
+        // handle shutdown
+        tauri::RunEvent::Exit => {
+            info!("Exiting event loop...");
+            let app_state: State<AppState> = app_handle.state();
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let _ = app_state.close_all_connections().await;
+                    app_handle.exit(0);
+                });
+            });
+        }
+        _ => {}
     });
 }
