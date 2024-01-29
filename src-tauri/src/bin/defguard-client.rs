@@ -178,6 +178,8 @@ async fn main() {
                 });
             });
         }
-        _ => {}
+        _ => {
+          info!("Received event: {event:?}")
+        }
     });
 }
