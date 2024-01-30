@@ -179,7 +179,7 @@ async fn main() {
             });
         }
         _ => {
-          info!("Received event: {event:?}")
+            trace!("Received event: {event:?}")
         }
     });
 }
