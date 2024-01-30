@@ -1,4 +1,4 @@
-import { patternValidDomain, patternValidIp } from '../patterns';
+import { patternValidDomain, patternValidIp, patternValidIpV6 } from '../patterns';
 
 // Returns flase when invalid
 export const validateIpOrDomain = (val: string, allowMask = false): boolean => {
@@ -13,12 +13,7 @@ export const validateIpList = (
 ): boolean => {
   const trimed = val.replace(' ', '');
   const split = trimed.split(splitWith);
-  for (const value of split) {
-    if (!validateIp(value, allowMasks)) {
-      return false;
-    }
-  }
-  return true;
+  return split.every((value) => validateIp(value, allowMasks));
 };
 
 // Returns flase when invalid
@@ -27,14 +22,9 @@ export const validateIpOrDomainList = (
   splitWith = ',',
   allowMasks = false,
 ): boolean => {
-  const trimed = val.replace(' ', '');
-  const split = trimed.split(splitWith);
-  for (const value of split) {
-    if (!(validateIp(value, allowMasks) && patternValidDomain.test(value))) {
-      return false;
-    }
-  }
-  return true;
+  // split and trim values
+  const split = val.split(splitWith).map((value) => value.trim());
+  return split.every((value) => validateIpOrDomain(value, allowMasks));
 };
 
 // Returns flase when invalid
@@ -50,5 +40,5 @@ export const validateIp = (ip: string, allowMask = false): boolean => {
       return ipValid && maskValid;
     }
   }
-  return patternValidIp.test(ip);
+  return patternValidIp.test(ip) || patternValidIpV6.test(ip);
 };

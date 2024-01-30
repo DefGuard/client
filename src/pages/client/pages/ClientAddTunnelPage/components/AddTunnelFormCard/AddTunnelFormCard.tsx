@@ -26,6 +26,8 @@ import {
   cidrRegex,
   patternValidEndpoint,
   patternValidIp,
+  patternValidIpV6,
+  patternValidIpV6WithPort,
   patternValidWireguardKey,
 } from '../../../../../../shared/patterns';
 import { routes } from '../../../../../../shared/routes';
@@ -100,13 +102,15 @@ export const AddTunnelFormCard = () => {
             return patternValidWireguardKey.test(value);
           }, LL.form.errors.invalid()),
         address: z.string().refine((value) => {
-          return patternValidIp.test(value);
+          return patternValidIp.test(value) || patternValidIpV6.test(value);
         }, LL.form.errors.invalid()),
         endpoint: z
           .string()
           .min(1, LL.form.errors.required())
           .refine((value) => {
-            return patternValidEndpoint.test(value);
+            return (
+              patternValidEndpoint.test(value) || patternValidIpV6WithPort.test(value)
+            );
           }, LL.form.errors.invalid()),
         dns: z
           .string()
