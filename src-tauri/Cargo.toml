@@ -19,7 +19,7 @@ anyhow = "1.0"
 base64 = "0.21"
 clap = { version = "4.4", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.4.0" }
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.4.1" }
 dirs = "5.0"
 lazy_static = "1.4"
 local-ip-address = "0.5"
