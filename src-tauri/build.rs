@@ -15,9 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         config,
         &[
             "proto/client/client.proto",
-            "proto/enrollment/enrollment.proto",
+            "proto/core/proxy.proto",
         ],
-        &["proto/client", "proto/enrollment"],
+        &["proto/client", "proto/core"],
     )?;
 
     tauri_build::build();

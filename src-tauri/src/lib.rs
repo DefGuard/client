@@ -11,7 +11,7 @@ pub mod utils;
 pub mod wg_config;
 
 pub mod proto {
-    tonic::include_proto!("enrollment");
+    tonic::include_proto!("defguard.proxy");
 }
 
 #[derive(Clone, serde::Serialize)]
