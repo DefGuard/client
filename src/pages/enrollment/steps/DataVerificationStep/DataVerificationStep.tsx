@@ -39,10 +39,12 @@ export const DataVerificationStep = () => {
     () =>
       z.object({
         phone: z
-          .string()
-          .trim()
-          .nonempty(LL.form.errors.required())
-          .regex(phonePattern, LL.form.errors.invalid()),
+          .union([
+            z.string().length(0),
+            z.string().trim().regex(phonePattern, LL.form.errors.invalid()),
+          ])
+          .optional()
+          .transform((e) => (e === '' ? undefined : e)),
       }),
     [LL.form.errors],
   );
