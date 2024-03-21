@@ -17,11 +17,8 @@ const { getInstances, getTunnels } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
-  const [setInstances, setTunnels] = useClientStore((state) => [
-    state.setInstances,
-    state.setTunnels,
-  ]);
   const navigate = useNavigate();
+  const setClientState = useClientStore((state) => state.setState);
   const firstLaunch = useClientFlags((state) => state.firstStart);
   const location = useLocation();
 
@@ -91,15 +88,11 @@ export const ClientPage = () => {
     };
   }, [queryClient]);
 
-  // update store
-  useEffect(() => {
-    if (instances) {
-      setInstances(instances);
-    }
-    if (tunnels) {
-      setTunnels(tunnels);
-    }
-  }, [instances, setInstances, tunnels, setTunnels]);
+  // sync zustand
+
+  useEffect(() => setClientState({ instances }), [setClientState, instances]);
+
+  useEffect(() => setClientState({ tunnels }), [tunnels, setClientState]);
 
   // navigate to carousel on first app Launch
   useEffect(() => {

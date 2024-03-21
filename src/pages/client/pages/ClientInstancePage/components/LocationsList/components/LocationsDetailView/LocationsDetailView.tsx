@@ -33,7 +33,7 @@ export const LocationsDetailView = ({
   connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
 }: Props) => {
   const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
-    locations[0]?.id ?? undefined,
+    locations[0]?.id,
   );
 
   const selectedInstance = useClientStore((state) => state.selectedInstance);
