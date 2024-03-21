@@ -13,11 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]");
     tonic_build::configure().compile_with_config(
         config,
-        &[
-            "proto/client/client.proto",
-            "proto/enrollment/enrollment.proto",
-        ],
-        &["proto/client", "proto/enrollment"],
+        &["proto/client/client.proto", "proto/core/proxy.proto"],
+        &["proto/client", "proto/core"],
     )?;
 
     tauri_build::build();
