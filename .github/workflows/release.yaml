@@ -2,8 +2,8 @@ name: "Build app & create release"
 
 on:
   push:
-    tags:
-      - v*.*.*
+    branches:
+      - main
 
 jobs:
   build-wireguard-go:
@@ -366,7 +366,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: defguard-client_${{ env.VERSION }}-msi-signed
-      - name: Bundle application
+        - name: Bundle application
         run: |
           dotnet tool install --global wix
           wix extension add -g WixToolset.Bal.wixext
