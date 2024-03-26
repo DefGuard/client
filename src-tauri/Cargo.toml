@@ -6,7 +6,7 @@ license = ""
 homepage = "https://github.com/DefGuard/client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
-edition = "2024"
+edition = "2021"
 rust-version = "1.60"
 
 [build-dependencies]
