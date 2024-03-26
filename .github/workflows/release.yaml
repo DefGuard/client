@@ -333,9 +333,8 @@ jobs:
       - name: Bundle application
         run: |
           dotnet tool install --global wix
-          wix --version
           wix extension add -g WixToolset.Bal.wixext
-          wix build .\src-tauri\resources-windows\defguard-client.wxs -ext WixToolset.Bal.wixext
+          wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\wix\extensions\WixToolset.Bal.wixext
 
       - name: Upload installer
         uses: actions/upload-release-asset@v1.0.2
