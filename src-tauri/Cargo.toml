@@ -40,6 +40,7 @@ webbrowser = "0.8"
 tauri = { version = "1.5", features = [ "dialog-all", "clipboard-all", "http-all", "window-all", "system-tray", "native-tls-vendored", "icon-png", "fs-all"] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
+tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tokio-util = "0.7"

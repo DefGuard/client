@@ -135,6 +135,7 @@ async fn main() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(AppState::default())
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
