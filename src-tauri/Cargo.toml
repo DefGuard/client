@@ -1,8 +1,8 @@
 [package]
 name = "defguard-client"
-version = "0.2.1"
+version = "0.2.2"
 description = "Defguard desktop client"
-license = "Apache-2.0"
+license = ""
 homepage = "https://github.com/DefGuard/client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
