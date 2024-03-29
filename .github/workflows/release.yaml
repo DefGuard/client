@@ -276,7 +276,7 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           name: defguard-client_${{ env.VERSION }}-windows
-          asset_path: /src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
           asset_content_type: application/octet-stream
   sign-msi:
@@ -297,7 +297,7 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           name: defguard-client_${{ env.VERSION }}-msi-signed
-          asset_path: /src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+          asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
           asset_content_type: application/octet-stream
   bundle-msi-exe:
@@ -308,7 +308,7 @@ jobs:
       - name: Download MSI signed
         uses: actions/download-artifact@v4
         with:
-          name: defguard-client_${{ env.VERSION }}-msi-signed
+          name: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
       - name: Bundle application
         run: |
           dotnet tool install --global wix
