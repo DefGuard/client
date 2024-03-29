@@ -40,8 +40,6 @@ jobs:
   create-release:
     name: create-release
     runs-on: self-hosted
-    outputs:
-      upload_url: ${{ steps.create-release.outputs.upload_url }}
     steps:
       - name: Create GitHub release
         id: release
