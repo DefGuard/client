@@ -276,6 +276,7 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           name: defguard-client_${{ env.VERSION }}-windows
+          asset_path: /src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
           asset_content_type: application/octet-stream
   sign-msi:
@@ -288,7 +289,7 @@ jobs:
         with:
           name: defguard-client_${{ env.VERSION }}-windows
       - name: Sign MSI
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha25 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}.msi -out defguard-client_${{ env.VERSION }}-signed.msi
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha25 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}.msi -out defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
       - name: Upload Signed MSI for later bundle
         uses: actions/upload-release-asset@v1.0.2
         env:
@@ -296,7 +297,8 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           name: defguard-client_${{ env.VERSION }}-msi-signed
-          asset_name: defguard-client_${{ env.VERSION }}-signed.msi
+          asset_path: /src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
           asset_content_type: application/octet-stream
   bundle-msi-exe:
     needs:
