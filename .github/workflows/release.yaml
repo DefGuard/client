@@ -269,16 +269,21 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Upload MSI for later bundle
+      #   uses: actions/upload-release-asset@v1.0.2
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ needs.create-release.outputs.upload_url }}
+      #     name: defguard-client_${{ env.VERSION }}-windows
+      #     asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+      #     asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
+      #     asset_content_type: application/octet-stream
       - name: Upload MSI for later bundle
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          name: defguard-client_${{ env.VERSION }}-windows
-          asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
-          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
-          asset_content_type: application/octet-stream
+          name: defguard.msi
+          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
   sign-msi:
     needs:
       - build-windows
@@ -292,19 +297,24 @@ jobs:
       - name: Download a single artifact
         uses: actions/download-artifact@v4
         with:
-          name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          name: defguard.msi
       - name: Sign MSI
         run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha25 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}_x64_en-US.msi -out defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+      # - name: Upload Signed MSI for later bundle
+      #   uses: actions/upload-release-asset@v1.0.2
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ needs.create-release.outputs.upload_url }}
+      #     name: defguard-client_${{ env.VERSION }}-msi-signed
+      #     asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+      #     asset_name: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+      #     asset_content_type: application/octet-stream
       - name: Upload Signed MSI for later bundle
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          name: defguard-client_${{ env.VERSION }}-msi-signed
-          asset_path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
-          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
-          asset_content_type: application/octet-stream
+          name: defguard-signed.msi
+          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
   bundle-msi-exe:
     needs:
       - sign-msi
@@ -318,7 +328,7 @@ jobs:
       - name: Download MSI signed
         uses: actions/download-artifact@v4
         with:
-          name: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+          name: defguard-signed.msi
       - name: Bundle application
         run: |
           dotnet tool install --global wix
