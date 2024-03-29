@@ -292,9 +292,9 @@ jobs:
       - name: Download a single artifact
         uses: actions/download-artifact@v4
         with:
-          name: defguard-client_${{ env.VERSION }}-windows
+          name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
       - name: Sign MSI
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha25 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}.msi -out defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha25 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}_x64_en-US.msi -out defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
       - name: Upload Signed MSI for later bundle
         uses: actions/upload-release-asset@v1.0.2
         env:
