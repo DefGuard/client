@@ -28,13 +28,13 @@ jobs:
           GOARCH: ${{ matrix.architecture }}
       - name: Upload binary artifact arm64
         if: matrix.architecture == 'arm64'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wireguard-go-aarch64-apple-darwin
           path: wireguard-go
       - name: Upload binary artifact amd64
         if: matrix.architecture == 'amd64'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wireguard-go-x86_64-apple-darwin
           path: wireguard-go
@@ -193,7 +193,7 @@ jobs:
       - name: Install ARM target
         run: rustup target add aarch64-apple-darwin
       - name: Download wireguard-go binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: wireguard-go-${{ matrix.target }}
           path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
@@ -270,7 +270,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload MSI for later bundle
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: defguard.msi
           path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
@@ -291,7 +291,7 @@ jobs:
       - name: Sign MSI
         run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha25 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}_x64_en-US.msi -out defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
       - name: Upload Signed MSI for later bundle
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: defguard-signed.msi
           path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
