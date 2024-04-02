@@ -302,9 +302,9 @@ jobs:
     steps:
       - name: Write release version
         run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
+          echo Version: $env:VERSION
+          echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
       - name: Download MSI signed
         uses: actions/download-artifact@v4
         with:
