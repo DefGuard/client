@@ -277,7 +277,9 @@ jobs:
   sign-msi:
     needs:
       - build-windows
-    runs-on: self-hosted
+    runs-on:
+      - self-hosted
+      - Linux
     steps:
       - name: Write release version
         run: |
