@@ -294,7 +294,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: defguard-signed.msi
-          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
+          path: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
   bundle-msi-exe:
     needs:
       - sign-msi
