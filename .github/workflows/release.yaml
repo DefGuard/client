@@ -313,9 +313,9 @@ jobs:
           name: defguard-signed.msi
       - name: Bundle application
         run: |
-          dotnet tool install --global wix
-          wix extension add WixToolset.Bal.wixext
-          wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\.wix\extensions\WixToolset.Bal.wixext
+          dotnet tool install wix
+          wix extension add WixToolset.Bal.wixext/4
+          wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\.wix\extensions\WixToolset.Bal.wixext\4\wixext4\WixToolset.Bal.wixext.dll
       - name: Upload installer
         uses: actions/upload-release-asset@v1.0.2
         env:
