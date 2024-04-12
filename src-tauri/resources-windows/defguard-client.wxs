@@ -35,7 +35,7 @@
             <MsiPackage
                 Vital="yes"
                 Id="MainPackage"
-                SourceFile="src-tauri\target\release\bundle\msi\defguard-client_$(env.VERSION)_x64_en-US.msi"
+                SourceFile="src-tauri\target\release\bundle\msi\defguard-client_$(env.VERSION)_x64_en-US-signed.msi"
             />
         </Chain>
     </Bundle>

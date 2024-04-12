@@ -314,7 +314,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: defguard-signed.msi
-          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          path: src-tauri/target/release/bundle/msi/
       - name: Bundle application
         run: |
           dotnet tool install --global wix --version 4.0.5
