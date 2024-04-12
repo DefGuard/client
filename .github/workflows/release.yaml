@@ -302,6 +302,9 @@ jobs:
       - sign-msi
     runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - name: Write release version
         run: |
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
