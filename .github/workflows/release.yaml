@@ -311,9 +311,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: defguard-signed.msi
+          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
       - name: Bundle application
         run: |
-          dotnet tool install wix
+          dotnet tool install --global wix
           wix extension add WixToolset.Bal.wixext/4
           wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\.wix\extensions\WixToolset.Bal.wixext\4\wixext4\WixToolset.Bal.wixext.dll
       - name: Upload installer
