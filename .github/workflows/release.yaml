@@ -299,6 +299,7 @@ jobs:
           path: defguard-client_${{ env.VERSION }}_x64_en-US-signed.msi
   bundle-msi-exe:
     needs:
+      - create-release
       - sign-msi
     runs-on: windows-latest
     steps:
