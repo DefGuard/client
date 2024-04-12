@@ -55,6 +55,3 @@ pub fn logging_setup(config: &Config) -> WorkerGuard {
 
     _guard
 }
-
-
-
