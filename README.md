@@ -25,6 +25,12 @@ To learn more about the system see our [documentation](https://defguard.gitbook.
 
 Make sure to install prerequisites from [tauri](https://tauri.app/v1/guides/getting-started/prerequisites/).
 
+### Proto submodule
+Make sure you have cloned, and up to date, proto submodule in `src-tauri/proto`
+
+### Protoc compiler
+Make sure you have [protoc](https://grpc.io/docs/protoc-installation/) available.
+
 ### Install pnpm and node deps
 
 ```bash
@@ -36,6 +42,12 @@ pnpm install
 ```bash
 pnpm tauri dev
 ```
+
+### Build command
+```bash
+pnpm tauri build
+```
+Built packages are available after in `src-tauri/target/release/bundle`.
 
 ### Windows
 
