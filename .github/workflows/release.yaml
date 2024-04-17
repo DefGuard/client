@@ -316,8 +316,8 @@ jobs:
         with:
           name: unsigned-bundle-and-signed-burnengine
           path: |
-            src-tauri/resources-windows/defguard-client.exe
-            src-tauri/resources-windows/burnengine-signed.exe
+            defguard-client.exe
+            burnengine-signed.exe
   reattach-burn-engine:
     needs:
       - sign-burn-engine
@@ -333,7 +333,7 @@ jobs:
           dotnet tool install --global wix --version 4.0.5
           wix extension add WixToolset.Bal.wixext/4
           # reattach burn engine to the bundle
-          wix burn reattach .\src-tauri\resources-windows\defguard-client.exe -engine .\src-tauri\resources-windows\burnengine-signed.exe -o defguard-client-reattached.exe
+          wix burn reattach defguard-client.exe -engine burnengine-signed.exe -o defguard-client-reattached.exe
       - name: Upload bundle with reattached burn-engine
         uses: actions/upload-artifact@v4
         with:
