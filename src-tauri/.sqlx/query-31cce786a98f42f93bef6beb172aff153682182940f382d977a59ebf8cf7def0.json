@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;",
+  "query": "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, \n            route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE server_pubkey = $1;",
   "describe": {
     "columns": [
       {
@@ -34,53 +34,58 @@
         "type_info": "Text"
       },
       {
-        "name": "allowed_ips",
+        "name": "preshared_key",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "endpoint",
+        "name": "allowed_ips",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "dns",
+        "name": "endpoint",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "persistent_keep_alive",
+        "name": "dns",
         "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "persistent_keep_alive",
+        "ordinal": 10,
         "type_info": "Int64"
       },
       {
         "name": "route_all_traffic",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Bool"
       },
       {
         "name": "pre_up",
-        "ordinal": 11,
-        "type_info": "Text"
-      },
-      {
-        "name": "post_up",
         "ordinal": 12,
         "type_info": "Text"
       },
       {
-        "name": "pre_down",
+        "name": "post_up",
         "ordinal": 13,
         "type_info": "Text"
       },
       {
-        "name": "post_down",
+        "name": "pre_down",
         "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "post_down",
+        "ordinal": 15,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -89,6 +94,7 @@
       false,
       false,
       false,
+      true,
       true,
       false,
       true,
@@ -100,5 +106,5 @@
       true
     ]
   },
-  "hash": "66208ae39fb096ab67d767447c7671429006b303eb6aeb452b1a99716a933ba6"
+  "hash": "31cce786a98f42f93bef6beb172aff153682182940f382d977a59ebf8cf7def0"
 }
