@@ -287,8 +287,8 @@ pub async fn setup_interface_tunnel(
             .expect("Failed to parse persistent keep alive"),
     );
 
-    if let Some(psk) = tunnel.preshared_key.clone() {
-        let peer_psk = Key::from_str(&psk)?;
+    if let Some(psk) = &tunnel.preshared_key {
+        let peer_psk = Key::from_str(psk)?;
         peer.preshared_key = Some(peer_psk);
     }
 
