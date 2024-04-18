@@ -22,18 +22,24 @@ pub struct Tunnel {
     // server config
     pub address: String,
     pub server_pubkey: String,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub preshared_key: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub allowed_ips: Option<String>,
     // server_address:port
     pub endpoint: String,
-    #[serde_as(deserialize_as = "NoneAsEmptyString")]
+    #[serde_as(as = "NoneAsEmptyString")]
     pub dns: Option<String>,
     pub persistent_keep_alive: i64, // New field
     pub route_all_traffic: bool,
     // additional commands
+    #[serde_as(as = "NoneAsEmptyString")]
     pub pre_up: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub post_up: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub pre_down: Option<String>,
+    #[serde_as(as = "NoneAsEmptyString")]
     pub post_down: Option<String>,
 }
 
