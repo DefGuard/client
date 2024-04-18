@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 WHERE id = $16;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "ad7da802eaf8c3ff61dc3d9811a3cd8f85e45098d2fe5fc58ca81a43f57fd324"
+}

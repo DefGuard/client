@@ -280,6 +280,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 publicKey: 'Public Key',
                 address: 'Address',
                 serverPubkey: 'Public Key',
+                presharedKey: 'Pre-shared Key',
                 endpoint: 'VPN Server Address:Port',
                 dns: 'DNS',
                 allowedips: 'Allowed IPs (separate with comma)',
@@ -301,6 +302,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   'The IP address assigned to this WireGuard client within the VPN network.',
                 serverPubkey:
                   'The public key of the WireGuard server for secure communication.',
+                presharedKey: 'Optional symmetric secret key for enhanced security.',
                 allowedIps:
                   'A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.',
                 endpoint:

@@ -287,6 +287,11 @@ pub async fn setup_interface_tunnel(
             .expect("Failed to parse persistent keep alive"),
     );
 
+    if let Some(psk) = &tunnel.preshared_key {
+        let peer_psk = Key::from_str(psk)?;
+        peer.preshared_key = Some(peer_psk);
+    }
+
     debug!("Parsing location allowed ips: {:?}", tunnel.allowed_ips);
     let allowed_ips: Vec<String> = if tunnel.route_all_traffic {
         debug!("Using all traffic routing: {DEFAULT_ROUTE}");
