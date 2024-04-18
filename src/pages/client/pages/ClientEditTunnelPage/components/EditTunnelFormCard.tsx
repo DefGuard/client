@@ -39,6 +39,7 @@ type FormFields = {
   prvkey: string;
   address: string;
   server_pubkey: string;
+  preshared_key?: string;
   allowed_ips?: string;
   endpoint: string;
   dns?: string;
@@ -55,6 +56,7 @@ const defaultValues: FormFields = {
   prvkey: '',
   address: '',
   server_pubkey: '',
+  preshared_key: '',
   allowed_ips: '',
   endpoint: '',
   dns: '',
@@ -73,6 +75,7 @@ const tunnelToForm = (tunnel: Tunnel): FormFields => {
     pubkey,
     prvkey,
     server_pubkey,
+    preshared_key,
     allowed_ips,
     dns,
     persistent_keep_alive,
@@ -88,6 +91,7 @@ const tunnelToForm = (tunnel: Tunnel): FormFields => {
     pubkey,
     prvkey,
     server_pubkey,
+    preshared_key: preshared_key || '',
     allowed_ips: allowed_ips || '',
     dns: dns || '',
     persistent_keep_alive,
@@ -137,6 +141,12 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
           .min(1, LL.form.errors.required())
           .refine((value) => {
             return patternValidWireguardKey.test(value);
+          }, LL.form.errors.invalid()),
+        preshared_key: z
+          .string()
+          .trim()
+          .refine((value) => {
+            return value === '' || patternValidWireguardKey.test(value);
           }, LL.form.errors.invalid()),
         address: z.string().refine((value) => {
           return patternValidIp.test(value) || patternValidIpV6.test(value);
@@ -235,6 +245,11 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
             controller={{ control, name: 'server_pubkey' }}
             label={localLL.labels.serverPubkey()}
             labelExtras={<Helper>{localLL.helpers.serverPubkey()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'preshared_key' }}
+            label={localLL.labels.presharedKey()}
+            labelExtras={<Helper>{localLL.helpers.presharedKey()}</Helper>}
           />
           <FormInput
             controller={{ control, name: 'endpoint' }}

@@ -34,6 +34,7 @@ export type Tunnel = {
   pubkey: string;
   prvkey: string;
   server_pubkey: string;
+  preshared_key?: string;
   allowed_ips?: string;
   dns?: string;
   persistent_keep_alive: number;

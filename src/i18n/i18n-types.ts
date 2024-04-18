@@ -649,6 +649,10 @@ type RootTranslation = {
 								 */
 								serverPubkey: string
 								/**
+								 * P​r​e​-​s​h​a​r​e​d​ ​K​e​y
+								 */
+								presharedKey: string
+								/**
 								 * V​P​N​ ​S​e​r​v​e​r​ ​A​d​d​r​e​s​s​:​P​o​r​t
 								 */
 								endpoint: string
@@ -706,6 +710,10 @@ type RootTranslation = {
 								 * T​h​e​ ​p​u​b​l​i​c​ ​k​e​y​ ​o​f​ ​t​h​e​ ​W​i​r​e​G​u​a​r​d​ ​s​e​r​v​e​r​ ​f​o​r​ ​s​e​c​u​r​e​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​.
 								 */
 								serverPubkey: string
+								/**
+								 * O​p​t​i​o​n​a​l​ ​s​y​m​m​e​t​r​i​c​ ​s​e​c​r​e​t​ ​k​e​y​ ​f​o​r​ ​e​n​h​a​n​c​e​d​ ​s​e​c​u​r​i​t​y​.
+								 */
+								presharedKey: string
 								/**
 								 * A​ ​c​o​m​m​a​-​s​e​p​a​r​a​t​e​d​ ​l​i​s​t​ ​o​f​ ​I​P​ ​a​d​d​r​e​s​s​e​s​ ​o​r​ ​C​I​D​R​ ​r​a​n​g​e​s​ ​t​h​a​t​ ​a​r​e​ ​a​l​l​o​w​e​d​ ​f​o​r​ ​c​o​m​m​u​n​i​c​a​t​i​o​n​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​t​u​n​n​e​l​.
 								 */
@@ -2130,6 +2138,10 @@ export type TranslationFunctions = {
 								 */
 								serverPubkey: () => LocalizedString
 								/**
+								 * Pre-shared Key
+								 */
+								presharedKey: () => LocalizedString
+								/**
 								 * VPN Server Address:Port
 								 */
 								endpoint: () => LocalizedString
@@ -2187,6 +2199,10 @@ export type TranslationFunctions = {
 								 * The public key of the WireGuard server for secure communication.
 								 */
 								serverPubkey: () => LocalizedString
+								/**
+								 * Optional symmetric secret key for enhanced security.
+								 */
+								presharedKey: () => LocalizedString
 								/**
 								 * A comma-separated list of IP addresses or CIDR ranges that are allowed for communication through the tunnel.
 								 */
