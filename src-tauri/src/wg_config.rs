@@ -74,6 +74,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
     let peer_pubkey = peer_section
         .get("PublicKey")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("PublicKey".to_string()))?;
+    let preshared_key = peer_section.get("PresharedKey");
     let peer_allowed_ips = peer_section.get("AllowedIPs");
 
     let endpoint = peer_section
@@ -92,6 +93,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
         prvkey.into(),
         address.into(),
         peer_pubkey.into(),
+        preshared_key.map(str::to_string),
         peer_allowed_ips.map(str::to_string),
         endpoint.into(),
         dns,
@@ -121,6 +123,7 @@ mod test {
 
             [Peer]
             PublicKey = BvUB3iZq3U0jZrY6b4KbGhz0IVZzpAdbJiRZGdci9ZU=
+            PresharedKey = LEsliEny+aMcWcRbh8Qf414XsQHSBOAFk3TaEk/aSD0=
             AllowedIPs = 10.0.0.10/24, 10.2.0.1/24, 0.0.0.0/0
             Endpoint = 10.0.0.0:1234
             PersistentKeepalive = 300
