@@ -22,6 +22,7 @@ pub struct Tunnel {
     // server config
     pub address: String,
     pub server_pubkey: String,
+    pub preshared_key: Option<String>,
     pub allowed_ips: Option<String>,
     // server_address:port
     pub endpoint: String,
@@ -45,6 +46,7 @@ impl Tunnel {
         prvkey: String,
         address: String,
         server_pubkey: String,
+        preshared_key: Option<String>,
         allowed_ips: Option<String>,
         endpoint: String,
         dns: Option<String>,
@@ -62,6 +64,7 @@ impl Tunnel {
             prvkey,
             address,
             server_pubkey,
+            preshared_key,
             allowed_ips,
             endpoint,
             dns,
@@ -79,15 +82,16 @@ impl Tunnel {
             None => {
                 // Insert a new record when there is no ID
                 let result = query!(
-                    "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, \
+                    "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, preshared_key, \
                     endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down) \
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id;",
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id;",
                     self.name,
                     self.pubkey,
                     self.prvkey,
                     self.address,
                     self.server_pubkey,
                     self.allowed_ips,
+                    self.preshared_key,
                     self.endpoint,
                     self.dns,
                     self.persistent_keep_alive,
@@ -105,14 +109,15 @@ impl Tunnel {
                 // Update the existing record when there is an ID
                 query!(
                     "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
-                    server_pubkey = $5, allowed_ips = $6, endpoint = $7, dns = $8, \
-                    persistent_keep_alive = $9, route_all_traffic = $10, pre_up = $11, post_up = $12, pre_down = $13, post_down = $14 \
-                    WHERE id = $15;",
+                    server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, \
+                    persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 \
+                    WHERE id = $16;",
                     self.name,
                     self.pubkey,
                     self.prvkey,
                     self.address,
                     self.server_pubkey,
+                    self.preshared_key,
                     self.allowed_ips,
                     self.endpoint,
                     self.dns,
@@ -135,7 +140,7 @@ impl Tunnel {
     pub async fn find_by_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, \
+            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
             persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
             tunnel_id
         )
@@ -146,17 +151,18 @@ impl Tunnel {
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, SqlxError> {
         let tunnels = query_as!(
             Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, \
+            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
             persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
         )
         .fetch_all(pool)
         .await?;
         Ok(tunnels)
     }
+
     pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
-            Tunnel,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, allowed_ips, endpoint, dns, persistent_keep_alive, 
+           Self,
+            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, 
             route_all_traffic, pre_up, post_up, pre_down, post_down \
             FROM tunnel WHERE server_pubkey = $1;",
             pubkey
@@ -164,6 +170,7 @@ impl Tunnel {
         .fetch_one(pool)
         .await
     }
+
     pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
         // delete instance
         query!("DELETE FROM tunnel WHERE id = $1", id)
