@@ -2,7 +2,7 @@
     <img src="docs/header.png" alt="defguard">
  </p>
 
-# defguard desktop client
+# Defguard desktop client
 
 Desktop client for managing WireGuard VPN connections (any WireGuard server and [defguard](https://github.com/DefGuard/defguard) instances).
 
@@ -52,6 +52,25 @@ Built packages are available after in `src-tauri/target/release/bundle`.
 ### Windows
 
 Remove `default-run` line from `[package]` section in `Cargo.toml` to build the project.
+
+# Known issues
+
+## Failed to bundle project
+
+`pnpm tauri build` may fail with error: `Error failed to bundle project: error running appimage.sh`. To
+fix this set the NO_STRIP environment variable:
+
+```
+NO_STRIP=1 pnpm tauri build
+```
+
+## Blank screen
+
+The app launches but the window is blank. Set the `WEBKIT_DISABLE_DMABUF_RENDERER` environment variable:
+
+```
+WEBKIT_DISABLE_DMABUF_RENDERER=1 defguard-client
+```
 
 # Legal
 
