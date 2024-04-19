@@ -156,7 +156,7 @@ pub fn get_interface_name() -> String {
     "utun0".into()
 }
 
-/// Returns interface name for location
+/// Strips location name of all non-alphanumeric characters returning usable interface name.
 #[cfg(not(target_os = "macos"))]
 #[must_use]
 pub fn get_interface_name(name: &str) -> String {
