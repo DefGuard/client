@@ -15,7 +15,7 @@ use crate::{
     appstate::AppState,
     commands::{LocationInterfaceDetails, Payload},
     database::{
-        models::location::peer_to_location_stats, models::tunnel::peer_to_tunnel_stats,
+        models::{location::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
         ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
     },
     error::Error,
@@ -119,12 +119,6 @@ pub async fn setup_interface(
     }
 }
 
-/// Helper function to remove whitespace from location name
-#[must_use]
-pub fn remove_whitespace(s: &str) -> String {
-    s.chars().filter(|c| !c.is_whitespace()).collect()
-}
-
 fn find_random_free_port() -> Option<u16> {
     const MAX_PORT: u16 = 65535;
     const MIN_PORT: u16 = 6000;
@@ -162,11 +156,11 @@ pub fn get_interface_name() -> String {
     "utun0".into()
 }
 
+/// Strips location name of all non-alphanumeric characters returning usable interface name.
 #[cfg(not(target_os = "macos"))]
-/// Returns interface name for location
 #[must_use]
 pub fn get_interface_name(name: &str) -> String {
-    remove_whitespace(name)
+    name.chars().filter(|c| c.is_alphanumeric()).collect()
 }
 
 fn is_port_free(port: u16) -> bool {
