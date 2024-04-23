@@ -50,8 +50,7 @@ pub async fn setup_interface(
         let mut peer = Peer::new(peer_key);
 
         debug!("Parsing location endpoint: {}", location.endpoint);
-        let endpoint: SocketAddr = location.endpoint.parse()?;
-        peer.endpoint = Some(endpoint);
+        peer.set_endpoint(&location.endpoint)?;
         peer.persistent_keepalive_interval = Some(25);
 
         if let Some(psk) = preshared_key {
@@ -272,8 +271,7 @@ pub async fn setup_interface_tunnel(
     let mut peer = Peer::new(peer_key);
 
     debug!("Parsing location endpoint: {}", tunnel.endpoint);
-    let endpoint: SocketAddr = tunnel.endpoint.parse()?;
-    peer.endpoint = Some(endpoint);
+    peer.set_endpoint(&tunnel.endpoint)?;
     peer.persistent_keepalive_interval = Some(
         tunnel
             .persistent_keep_alive
