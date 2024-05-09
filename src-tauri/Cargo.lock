@@ -1191,7 +1191,7 @@ dependencies = [
  "lazy_static",
  "local-ip-address",
  "log",
- "nix 0.27.1",
+ "nix 0.28.0",
  "notify-debouncer-mini",
  "prost",
  "prost-build",
@@ -1224,8 +1224,8 @@ dependencies = [
 
 [[package]]
 name = "defguard_wireguard_rs"
-version = "0.4.3"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.4.3#799775e4a76ee5f0c1f3af57fd9a65032ed23876"
+version = "0.4.4"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.4.4#87ed3bcbc908fd68c106faa86b1a1b977015029b"
 dependencies = [
  "base64 0.21.6",
  "libc",
@@ -1236,7 +1236,7 @@ dependencies = [
  "netlink-packet-utils",
  "netlink-packet-wireguard",
  "netlink-sys",
- "nix 0.27.1",
+ "nix 0.28.0",
  "serde",
  "thiserror",
 ]
@@ -2682,9 +2682,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.152"
+version = "0.2.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13e3bf6590cbc649f4d1a3eefc9d5d6eb746f5200ffb04e5e142700b8faa56e7"
+checksum = "ae743338b92ff9146ce83992f766a31066a91a8c84a45e0e9f21e7cf6de6d346"
 
 [[package]]
 name = "libloading"
@@ -3086,6 +3086,18 @@ checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
 dependencies = [
  "bitflags 2.4.1",
  "cfg-if",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
+dependencies = [
+ "bitflags 2.4.1",
+ "cfg-if",
+ "cfg_aliases",
  "libc",
  "memoffset 0.9.0",
 ]
