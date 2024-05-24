@@ -8,6 +8,7 @@ repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
 edition = "2021"
 rust-version = "1.60"
+authors = ["Defguard"]
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
