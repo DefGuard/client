@@ -157,7 +157,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // register new instance
         // is user in need of full enrollment ?
-        if (r.user.is_active) {
+        if (r.user.enrolled) {
           //no, only create new device for desktop client
           debug('User already active, adding device only.');
           nextStep({
