@@ -63,7 +63,10 @@ pub async fn setup_interface(
             debug!("Using all traffic routing: {DEFAULT_ROUTE}");
             vec![DEFAULT_ROUTE.into()]
         } else {
-            debug!("Using predefined location traffic");
+            debug!(
+                "Using predefined location traffic: {}",
+                location.allowed_ips
+            );
             location
                 .allowed_ips
                 .split(',')
@@ -102,19 +105,26 @@ pub async fn setup_interface(
                 post_up: None,
             };
             if let Err(error) = client.create_interface(request).await {
-                error!("Failed to create interface: {error}");
-                Err(Error::InternalError)
+                let msg = format!(
+                    "Failed to create interface with config {interface_config:#?}. Error: {error}"
+                );
+                error!("{msg}");
+                Err(Error::InternalError(msg))
             } else {
                 info!("Created interface {interface_config:#?}");
                 Ok(())
             }
         } else {
-            error!("Error finding free port");
-            Err(Error::InternalError)
+            error!("Couldn't find free port during interface setup.");
+            Err(Error::InternalError(
+                "Couldn't find free port during interface setup.".to_string(),
+            ))
         }
     } else {
         error!("No keys found for instance: {}", location.instance_id);
-        Err(Error::InternalError)
+        Err(Error::InternalError(
+            "No keys found for instance".to_string(),
+        ))
     }
 }
 
@@ -289,7 +299,11 @@ pub async fn setup_interface_tunnel(
         debug!("Using all traffic routing: {DEFAULT_ROUTE}");
         vec![DEFAULT_ROUTE.into()]
     } else {
-        debug!("Using predefined location traffic");
+        let msg = match &tunnel.allowed_ips {
+            Some(ips) => format!("Using predefined location traffic: {ips}"),
+            None => "No allowed IPs found".to_string(),
+        };
+        debug!("{msg}");
         tunnel
             .allowed_ips
             .as_ref()
@@ -328,15 +342,22 @@ pub async fn setup_interface_tunnel(
             post_up: tunnel.post_up.clone(),
         };
         if let Err(error) = client.create_interface(request).await {
-            error!("Failed to create interface: {error}");
-            Err(Error::InternalError)
+            let msg = format!("Failed to create interface: {error}");
+            error!("{msg}");
+            Err(Error::InternalError(msg))
         } else {
             info!("Created interface {interface_config:#?}");
             Ok(())
         }
     } else {
-        error!("Error finding free port");
-        Err(Error::InternalError)
+        error!(
+            "Error finding free port during tunnel {} setup for interface {interface_name}",
+            tunnel.name
+        );
+        Err(Error::InternalError(format!(
+            "Error finding free port during tunnel {} setup for interface {interface_name}",
+            tunnel.name
+        )))
     }
 }
 
@@ -390,7 +411,7 @@ pub async fn get_tunnel_interface_details(
             last_handshake,
         })
     } else {
-        error!("Tunnel ID {tunnel_id} not found");
+        error!("Error while fetching tunnel details for ID {tunnel_id}: tunnel not found");
         Err(Error::NotFound)
     }
 }
@@ -447,7 +468,8 @@ pub async fn get_location_interface_details(
             last_handshake,
         })
     } else {
-        error!("Location ID {location_id} not found");
+        // error!("Location ID {location_id} not found");
+        error!("Error while fetching location details for ID {location_id}: location not found");
         Err(Error::NotFound)
     }
 }
@@ -627,7 +649,9 @@ pub async fn disconnect_interface(
             };
             if let Err(error) = client.remove_interface(request).await {
                 error!("Failed to remove interface: {error}");
-                return Err(Error::InternalError);
+                return Err(Error::InternalError(
+                    "Failed to remove interface".to_string(),
+                ));
             }
             let mut connection: Connection = active_connection.into();
             connection.save(&state.get_pool()).await?;
@@ -646,8 +670,9 @@ pub async fn disconnect_interface(
                     post_down: tunnel.post_down,
                 };
                 if let Err(error) = client.remove_interface(request).await {
-                    error!("Failed to remove interface: {error}");
-                    return Err(Error::InternalError);
+                    let msg = format!("Failed to remove interface: {error}");
+                    error!("{msg}");
+                    return Err(Error::InternalError(msg));
                 }
                 let mut connection: TunnelConnection = active_connection.into();
                 connection.save(&state.get_pool()).await?;

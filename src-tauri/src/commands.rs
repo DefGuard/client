@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, str::FromStr};
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
+use tracing_subscriber::field::debug;
 
 #[derive(Clone, serde::Serialize)]
 pub struct Payload {
@@ -35,6 +36,7 @@ pub async fn connect(
     preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
+    debug!("Connecting location {location_id} using connection type {connection_type:?}");
     let state = handle.state::<AppState>();
     if connection_type.eq(&ConnectionType::Location) {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
@@ -49,6 +51,7 @@ pub async fn connect(
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);
     }
+    info!("Connected to location with id: {location_id}");
     Ok(())
 }
 
@@ -58,7 +61,7 @@ pub async fn disconnect(
     connection_type: ConnectionType,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!("Disconnecting location {}", location_id);
+    debug!("Disconnecting location {location_id}");
     let state = handle.state::<AppState>();
     if let Some(connection) = state.find_and_remove_connection(location_id, &connection_type) {
         let interface_name = connection.interface_name.clone();
@@ -73,6 +76,7 @@ pub async fn disconnect(
             },
         )?;
         stop_log_watcher_task(handle, interface_name)?;
+        info!("Disconnected from location with id: {location_id}");
         Ok(())
     } else {
         error!("Connection for location with id: {location_id} not found");
@@ -248,6 +252,7 @@ pub async fn all_locations(
         };
         location_info.push(info);
     }
+    info!("Locations retrieved({})", location_info.len());
     debug!(
         "Returning {} locations for instance {instance_id}",
         location_info.len(),
@@ -353,6 +358,7 @@ pub async fn update_instance(
         app_handle.emit_all("instance-update", ())?;
         Ok(())
     } else {
+        error!("Instance with id {instance_id} not found");
         Err(Error::NotFound)
     }
 }
@@ -386,7 +392,10 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     // Use hourly aggregation for longer periods
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
-        duration if duration < Duration::zero() => Err(Error::InternalError),
+        duration if duration < Duration::zero() => Err(Error::InternalError(format!(
+            "Negative duration between dates: now and {}",
+            from
+        ))),
         _ => Ok(DateTimeAggregation::Second),
     }?;
     Ok(aggregation)
@@ -506,6 +515,7 @@ pub async fn last_connection(
         trace!("Connection found");
         Ok(Some(connection.into()))
     } else {
+        trace!("No last connection found");
         Ok(None)
     }
 }
@@ -527,6 +537,7 @@ pub async fn update_location_routing(
             {
                 location.route_all_traffic = route_all_traffic;
                 location.save(&app_state.get_pool()).await?;
+                debug!("Location routing updated for location {location_id}");
                 handle.emit_all(
                     "location-update",
                     Payload {
@@ -535,7 +546,9 @@ pub async fn update_location_routing(
                 )?;
                 Ok(())
             } else {
-                error!("Location with id: {location_id} not found.");
+                error!(
+                    "Couldn't update location routing: location with id {location_id} not found."
+                );
                 Err(Error::NotFound)
             }
         }
@@ -544,6 +557,7 @@ pub async fn update_location_routing(
             {
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&app_state.get_pool()).await?;
+                debug!("Tunnel routing updated for tunnel {location_id}");
                 handle.emit_all(
                     "location-update",
                     Payload {
@@ -552,7 +566,7 @@ pub async fn update_location_routing(
                 )?;
                 Ok(())
             } else {
-                error!("Tunnel with id: {location_id} not found.");
+                error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
                 Err(Error::NotFound)
             }
         }
@@ -561,6 +575,7 @@ pub async fn update_location_routing(
 
 #[tauri::command]
 pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
+    debug!("Retrieving settings");
     let app_state = handle.state::<AppState>();
     let settings = Settings::get(&app_state.get_pool()).await?;
     Ok(settings)
@@ -610,10 +625,14 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
                         pre_down: None,
                         post_down: None,
                     };
-                    client
-                        .remove_interface(request)
-                        .await
-                        .map_err(|_| Error::InternalError)?;
+                    client.remove_interface(request).await.map_err(|status| {
+                        let msg =
+                            format!("Error occured while removing interface {} for location {location_id}, status: {status}",
+                            connection.interface_name
+                        );
+                        error!("{msg}");
+                        Error::InternalError(msg)
+                    })?;
                     debug!("Connection closed and interface removed");
                 }
             }
@@ -692,6 +711,7 @@ pub async fn tunnel_details(
     debug!("Retrieving Tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&app_state.get_pool(), tunnel_id).await? {
+        debug!("Found tunnel {tunnel_id}");
         Ok(tunnel)
     } else {
         error!("Tunnel with ID: {tunnel_id}, not found");
@@ -718,7 +738,14 @@ pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Erro
             client
                 .remove_interface(request)
                 .await
-                .map_err(|_| Error::InternalError)?;
+                .map_err(|status| {
+                    let msg =
+                        format!("Error occured while removing interface {} for tunnel {tunnel_id}, status: {status}",
+                        connection.interface_name
+                    );
+                    error!("{msg}");
+                    Error::InternalError(msg)
+                })?;
             debug!("Connection closed and interface removed");
         }
         tunnel.delete(pool).await?;
