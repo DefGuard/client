@@ -47,14 +47,20 @@ pub async fn setup_interface(
         // prepare peer config
         debug!("Decoding location public key: {}.", location.pubkey);
         let peer_key: Key = Key::from_str(&location.pubkey)?;
+        info!("Location public key decoded.");
+        debug!("Location public key: {peer_key}");
         let mut peer = Peer::new(peer_key);
 
         debug!("Parsing location endpoint: {}", location.endpoint);
         peer.set_endpoint(&location.endpoint)?;
         peer.persistent_keepalive_interval = Some(25);
+        info!("Parsed location endpoint.");
+        debug!("Location endpoint: {}", location.endpoint);
 
         if let Some(psk) = preshared_key {
+            debug!("Decoding preshared key.");
             let peer_psk = Key::from_str(&psk)?;
+            info!("Preshared key decoded.");
             peer.preshared_key = Some(peer_psk);
         }
 
@@ -86,9 +92,13 @@ pub async fn setup_interface(
                 }
             }
         }
+        info!("Parsed allowed IPs for location.");
+        debug!("Allowed IPs: {:#?}", peer.allowed_ips);
 
         // request interface configuration
+        debug!("Looking for a free port for interface {interface_name}...");
         if let Some(port) = find_random_free_port() {
+            info!("Found free port: {port} for interface {interface_name}.");
             let interface_config = InterfaceConfiguration {
                 name: interface_name,
                 prvkey: keys.prvkey,
@@ -278,6 +288,8 @@ pub async fn setup_interface_tunnel(
     // prepare peer config
     debug!("Decoding location public key: {}.", tunnel.server_pubkey);
     let peer_key: Key = Key::from_str(&tunnel.server_pubkey)?;
+    info!("Location public key decoded.");
+    debug!("Location public key: {peer_key}");
     let mut peer = Peer::new(peer_key);
 
     debug!("Parsing location endpoint: {}", tunnel.endpoint);
@@ -288,9 +300,13 @@ pub async fn setup_interface_tunnel(
             .try_into()
             .expect("Failed to parse persistent keep alive"),
     );
+    info!("Parsed location endpoint.");
+    debug!("Location endpoint: {}", tunnel.endpoint);
 
     if let Some(psk) = &tunnel.preshared_key {
+        debug!("Decoding preshared key.");
         let peer_psk = Key::from_str(psk)?;
+        debug!("Preshared key decoded.");
         peer.preshared_key = Some(peer_psk);
     }
 
@@ -323,9 +339,13 @@ pub async fn setup_interface_tunnel(
             }
         }
     }
+    info!("Parsed allowed IPs.");
+    debug!("Allowed IPs: {:#?}", peer.allowed_ips);
 
     // request interface configuration
+    debug!("Looking for a free port for interface {interface_name}...");
     if let Some(port) = find_random_free_port() {
+        info!("Found free port: {port} for interface {interface_name}.");
         let interface_config = InterfaceConfiguration {
             name: interface_name,
             prvkey: tunnel.prvkey.clone(),
@@ -346,7 +366,8 @@ pub async fn setup_interface_tunnel(
             error!("{msg}");
             Err(Error::InternalError(msg))
         } else {
-            info!("Created interface {interface_config:#?}");
+            info!("Created interface {}", interface_config.name);
+            debug!("Created interface with config: {interface_config:#?}");
             Ok(())
         }
     } else {
@@ -367,7 +388,6 @@ pub async fn get_tunnel_interface_details(
 ) -> Result<LocationInterfaceDetails, Error> {
     debug!("Fetching tunnel details for tunnel ID {tunnel_id}");
     if let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? {
-        debug!("Fetching WireGuard keys for location {}", tunnel.name);
         let peer_pubkey = tunnel.pubkey;
 
         // generate interface name
@@ -376,6 +396,7 @@ pub async fn get_tunnel_interface_details(
         #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&tunnel.name);
 
+        debug!("Fetching tunnel stats for tunnel ID {tunnel_id}");
         let result = query!(
             r#"
             SELECT last_handshake, listen_port as "listen_port!: u32",
@@ -387,6 +408,7 @@ pub async fn get_tunnel_interface_details(
         )
         .fetch_optional(pool)
         .await?;
+        info!("Fetched tunnel stats for tunnel ID {tunnel_id}");
 
         let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
             Some(record) => (
@@ -396,6 +418,8 @@ pub async fn get_tunnel_interface_details(
             ),
             None => (None, None, None),
         };
+
+        info!("Fetched tunnel details for tunnel ID {tunnel_id}");
 
         Ok(LocationInterfaceDetails {
             location_id: tunnel_id,
@@ -425,6 +449,10 @@ pub async fn get_location_interface_details(
         let keys = WireguardKeys::find_by_instance_id(pool, location.instance_id)
             .await?
             .ok_or(Error::NotFound)?;
+        info!(
+            "Successfully fetched WireGuard keys for location {}",
+            location.name
+        );
         let peer_pubkey = keys.pubkey;
 
         // generate interface name
@@ -433,6 +461,7 @@ pub async fn get_location_interface_details(
         #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&location.name);
 
+        debug!("Fetching location stats for location ID {location_id}");
         let result = query!(
             r#"
             SELECT last_handshake, listen_port as "listen_port!: u32",
@@ -444,6 +473,7 @@ pub async fn get_location_interface_details(
         )
         .fetch_optional(pool)
         .await?;
+        info!("Fetched location stats for location ID {location_id}");
 
         let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
             Some(record) => (
@@ -453,6 +483,8 @@ pub async fn get_location_interface_details(
             ),
             None => (None, None, None),
         };
+
+        info!("Fetched location details for location ID {location_id}");
 
         Ok(LocationInterfaceDetails {
             location_id,
@@ -509,6 +541,10 @@ pub async fn handle_connection_for_location(
         .lock()
         .map_err(|_| Error::MutexError)?
         .push(connection);
+    info!(
+        "Finished creating new interface connection for location: {}",
+        location.name
+    );
     debug!(
         "Active connections: {:#?}",
         state
@@ -516,24 +552,27 @@ pub async fn handle_connection_for_location(
             .lock()
             .map_err(|_| Error::MutexError)?
     );
-    debug!("Sending event connection-changed.");
+    debug!("Sending event connection-changed...");
     handle.emit_all(
         "connection-changed",
         Payload {
             message: "Created new connection".into(),
         },
     )?;
+    debug!("Event connection-changed sent.");
 
     // Spawn stats threads
-    debug!("Spawning stats thread");
+    debug!("Spawning stats thread...");
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Location,
     )
     .await;
+    info!("Stats thread spawned.");
 
     // spawn log watcher
+    debug!("Spawning log watcher...");
     spawn_log_watcher_task(
         handle,
         location.id.expect("Missing Location ID"),
@@ -543,6 +582,7 @@ pub async fn handle_connection_for_location(
         None,
     )
     .await?;
+    info!("Log watcher spawned.");
     Ok(())
 }
 
@@ -570,6 +610,10 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         .lock()
         .map_err(|_| Error::MutexError)?
         .push(connection);
+    info!(
+        "Finished creating new interface connection for tunnel: {}",
+        tunnel.name
+    );
     debug!(
         "Active connections: {:#?}",
         state
@@ -584,17 +628,20 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
             message: "Created new connection".into(),
         },
     )?;
+    debug!("Event connection-changed sent.");
 
     // Spawn stats threads
-    info!("Spawning stats thread");
+    debug!("Spawning stats thread");
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Tunnel,
     )
     .await;
+    info!("Stats thread spawned");
 
     //spawn log watcher
+    debug!("Spawning log watcher");
     spawn_log_watcher_task(
         handle,
         tunnel.id.expect("Missing Tunnel ID"),
@@ -604,6 +651,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         None,
     )
     .await?;
+    info!("Log watcher spawned");
     Ok(())
 }
 /// Execute command passed as argument.
