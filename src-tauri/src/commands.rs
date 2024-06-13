@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, str::FromStr};
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
-use tracing_subscriber::field::debug;
 
 #[derive(Clone, serde::Serialize)]
 pub struct Payload {
