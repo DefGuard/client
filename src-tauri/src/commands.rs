@@ -408,7 +408,8 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
         duration if duration < Duration::zero() => Err(Error::InternalError(format!(
-            "Negative duration between dates: now and {}",
+            "Negative duration between dates: now ({}) and {}",
+            Utc::now().naive_utc(),
             from
         ))),
         _ => Ok(DateTimeAggregation::Second),

@@ -116,7 +116,7 @@ pub async fn setup_interface(
             };
             if let Err(error) = client.create_interface(request).await {
                 let msg = format!(
-                    "Failed to create interface with config {interface_config:#?}. Error: {error}"
+                    "Failed to create interface with config {interface_config:?}. Error: {error}"
                 );
                 error!("{msg}");
                 Err(Error::InternalError(msg))
@@ -125,10 +125,12 @@ pub async fn setup_interface(
                 Ok(())
             }
         } else {
-            error!("Couldn't find free port during interface setup.");
-            Err(Error::InternalError(
-                "Couldn't find free port during interface setup.".to_string(),
-            ))
+            let msg = format!(
+                "Error finding free port during interface {interface_name} setup for location {}",
+                location.name
+            );
+            error!("{msg}");
+            Err(Error::InternalError(msg))
         }
     } else {
         error!("No keys found for instance: {}", location.instance_id);
@@ -340,7 +342,7 @@ pub async fn setup_interface_tunnel(
         }
     }
     info!("Parsed allowed IPs.");
-    debug!("Allowed IPs: {:#?}", peer.allowed_ips);
+    debug!("Allowed IPs: {:?}", peer.allowed_ips);
 
     // request interface configuration
     debug!("Looking for a free port for interface {interface_name}...");
@@ -367,18 +369,16 @@ pub async fn setup_interface_tunnel(
             Err(Error::InternalError(msg))
         } else {
             info!("Created interface {}", interface_config.name);
-            debug!("Created interface with config: {interface_config:#?}");
+            debug!("Created interface with config: {interface_config:?}");
             Ok(())
         }
     } else {
-        error!(
+        let msg = format!(
             "Error finding free port during tunnel {} setup for interface {interface_name}",
             tunnel.name
         );
-        Err(Error::InternalError(format!(
-            "Error finding free port during tunnel {} setup for interface {interface_name}",
-            tunnel.name
-        )))
+        error!("{msg}");
+        Err(Error::InternalError(msg))
     }
 }
 
@@ -500,7 +500,6 @@ pub async fn get_location_interface_details(
             last_handshake,
         })
     } else {
-        // error!("Location ID {location_id} not found");
         error!("Error while fetching location details for ID {location_id}: location not found");
         Err(Error::NotFound)
     }
