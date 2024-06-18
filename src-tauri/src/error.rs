@@ -26,8 +26,8 @@ pub enum Error {
     AddrParse(#[from] AddrParseError),
     #[error("Local Ip Error: {0}")]
     LocalIpError(#[from] LocalIpError),
-    #[error("Internal error")]
-    InternalError,
+    #[error("Internal error: {0}")]
+    InternalError(String),
     #[error("Failed to parse timestamp")]
     Datetime,
     #[error("Object not found")]

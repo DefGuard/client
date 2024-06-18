@@ -35,6 +35,7 @@ pub async fn connect(
     preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
+    debug!("Connecting location {location_id} using connection type {connection_type:?}");
     let state = handle.state::<AppState>();
     if connection_type.eq(&ConnectionType::Location) {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
@@ -49,6 +50,7 @@ pub async fn connect(
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);
     }
+    info!("Connected to location with id: {location_id}");
     Ok(())
 }
 
@@ -58,7 +60,7 @@ pub async fn disconnect(
     connection_type: ConnectionType,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!("Disconnecting location {}", location_id);
+    debug!("Disconnecting location {location_id}");
     let state = handle.state::<AppState>();
     if let Some(connection) = state.find_and_remove_connection(location_id, &connection_type) {
         let interface_name = connection.interface_name.clone();
@@ -73,9 +75,10 @@ pub async fn disconnect(
             },
         )?;
         stop_log_watcher_task(handle, interface_name)?;
+        info!("Disconnected from location with id: {location_id}");
         Ok(())
     } else {
-        error!("Connection for location with id: {location_id} not found");
+        error!("Error while disconnecting from location with id: {location_id} not found");
         Err(Error::NotFound)
     }
 }
@@ -127,7 +130,7 @@ pub async fn save_device_config(
     app_state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
-    debug!("Received device configuration: {response:#?}");
+    debug!("Received device configuration: {response:#?}.");
 
     let mut transaction = app_state.get_pool().begin().await?;
     let instance_info = response
@@ -165,6 +168,7 @@ pub async fn save_device_config(
         locations,
         instance,
     };
+    info!("Device configuration saved.");
     Ok(res)
 }
 
@@ -248,6 +252,7 @@ pub async fn all_locations(
         };
         location_info.push(info);
     }
+    info!("Locations retrieved({})", location_info.len());
     debug!(
         "Returning {} locations for instance {instance_id}",
         location_info.len(),
@@ -305,6 +310,7 @@ pub async fn update_instance(
         let mut transaction = pool.begin().await?;
 
         // update instance
+        debug!("Updating instance {instance_id}.");
         let instance_info = response
             .instance
             .expect("Missing instance info in device config response");
@@ -315,6 +321,7 @@ pub async fn update_instance(
         instance.save(&mut *transaction).await?;
 
         // process locations received in response
+        debug!("Updating locations for instance {instance_id}.");
         for location in response.configs {
             // parse device config
             let mut new_location = device_config_to_location(location, instance_id);
@@ -326,6 +333,10 @@ pub async fn update_instance(
             {
                 // remove from list of existing locations
                 let mut current_location = current_locations.remove(position);
+                debug!(
+                    "Updating existing location {} for instance {instance_id}.",
+                    current_location.name
+                );
                 // update existing location
                 current_location.name = new_location.name;
                 current_location.address = new_location.address;
@@ -335,17 +346,26 @@ pub async fn update_instance(
                 current_location.mfa_enabled = new_location.mfa_enabled;
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.save(&mut *transaction).await?;
+                info!(
+                    "Location {} updated for instance {instance_id}.",
+                    current_location.name
+                );
             } else {
                 // create new location
+                debug!("Creating new location for instance {instance_id}.");
                 new_location.save(&mut *transaction).await?;
+                info!("New location created for instance {instance_id}.");
             }
         }
+        info!("Locations updated for instance {instance_id}.");
 
         // remove locations which were present in current locations
         // but no longer found in core response
+        debug!("Removing locations for instance {instance_id}.");
         for removed_location in current_locations {
             removed_location.delete(&mut *transaction).await?;
         }
+        info!("Locations removed for instance {instance_id}.");
 
         transaction.commit().await?;
 
@@ -353,6 +373,7 @@ pub async fn update_instance(
         app_handle.emit_all("instance-update", ())?;
         Ok(())
     } else {
+        error!("Instance with id {instance_id} not found");
         Err(Error::NotFound)
     }
 }
@@ -386,7 +407,11 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     // Use hourly aggregation for longer periods
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
-        duration if duration < Duration::zero() => Err(Error::InternalError),
+        duration if duration < Duration::zero() => Err(Error::InternalError(format!(
+            "Negative duration between dates: now ({}) and {}",
+            Utc::now().naive_utc(),
+            from
+        ))),
         _ => Ok(DateTimeAggregation::Second),
     }?;
     Ok(aggregation)
@@ -448,7 +473,7 @@ pub async fn all_connections(
                 .collect()
         }
     };
-    debug!("Connections received, returning.");
+    info!("Connections retrieved({})", connections.len());
     trace!("Connections found:\n{:#?}", connections);
     Ok(connections)
 }
@@ -461,7 +486,7 @@ pub async fn all_tunnel_connections(
     debug!("Retrieving connections for location {location_id}");
     let connections =
         TunnelConnectionInfo::all_by_tunnel_id(&app_state.get_pool(), location_id).await?;
-    debug!("Connections received, returning.");
+    info!("Tunnel connections retrieved({})", connections.len());
     trace!("Connections found:\n{:#?}", connections);
     Ok(connections)
 }
@@ -479,8 +504,8 @@ pub async fn active_connection(
     if connection.is_some() {
         debug!("Active connection found");
     }
-    trace!("Connection:\n{:#?}", connection);
-    debug!("Connection returned");
+    trace!("Connection retrieved:\n{:#?}", connection);
+    info!("Connection retrieved");
     Ok(connection)
 }
 
@@ -495,7 +520,7 @@ pub async fn last_connection(
         if let Some(connection) =
             Connection::latest_by_location_id(&app_state.get_pool(), location_id).await?
         {
-            trace!("Connection found");
+            info!("Found last connection at {}", connection.end);
             Ok(Some(connection.into()))
         } else {
             Ok(None)
@@ -503,9 +528,10 @@ pub async fn last_connection(
     } else if let Some(connection) =
         TunnelConnection::latest_by_tunnel_id(&app_state.get_pool(), location_id).await?
     {
-        trace!("Connection found");
+        info!("Found last connection at {}", connection.end);
         Ok(Some(connection.into()))
     } else {
+        info!("No last connection found");
         Ok(None)
     }
 }
@@ -527,6 +553,7 @@ pub async fn update_location_routing(
             {
                 location.route_all_traffic = route_all_traffic;
                 location.save(&app_state.get_pool()).await?;
+                info!("Location routing updated for location {location_id}");
                 handle.emit_all(
                     "location-update",
                     Payload {
@@ -535,7 +562,9 @@ pub async fn update_location_routing(
                 )?;
                 Ok(())
             } else {
-                error!("Location with id: {location_id} not found.");
+                error!(
+                    "Couldn't update location routing: location with id {location_id} not found."
+                );
                 Err(Error::NotFound)
             }
         }
@@ -544,6 +573,7 @@ pub async fn update_location_routing(
             {
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&app_state.get_pool()).await?;
+                info!("Tunnel routing updated for tunnel {location_id}");
                 handle.emit_all(
                     "location-update",
                     Payload {
@@ -552,7 +582,7 @@ pub async fn update_location_routing(
                 )?;
                 Ok(())
             } else {
-                error!("Tunnel with id: {location_id} not found.");
+                error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
                 Err(Error::NotFound)
             }
         }
@@ -561,8 +591,10 @@ pub async fn update_location_routing(
 
 #[tauri::command]
 pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
+    debug!("Retrieving settings");
     let app_state = handle.state::<AppState>();
     let settings = Settings::get(&app_state.get_pool()).await?;
+    info!("Settings retrieved");
     Ok(settings)
 }
 
@@ -581,7 +613,7 @@ pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<S
         Ok(_) => {}
         Err(e) => {
             error!(
-                "During settings update, tray configuration update failed. err : {}",
+                "Tray configuration update failed during settings update. err : {}",
                 e.to_string()
             );
         }
@@ -610,11 +642,15 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
                         pre_down: None,
                         post_down: None,
                     };
-                    client
-                        .remove_interface(request)
-                        .await
-                        .map_err(|_| Error::InternalError)?;
-                    debug!("Connection closed and interface removed");
+                    client.remove_interface(request).await.map_err(|status| {
+                        let msg =
+                            format!("Error occured while removing interface {} for location {location_id}, status: {status}",
+                            connection.interface_name
+                        );
+                        error!("{msg}");
+                        Error::InternalError(msg)
+                    })?;
+                    info!("Connection closed and interface removed");
                 }
             }
         }
@@ -630,10 +666,12 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
 #[tauri::command(async)]
 pub async fn parse_tunnel_config(config: String) -> Result<Tunnel, Error> {
     debug!("Parsing config file");
-    parse_wireguard_config(&config).map_err(|error| {
+    let tunnel_config = parse_wireguard_config(&config).map_err(|error| {
         error!("{error}");
         Error::ConfigParseError(error.to_string())
-    })
+    })?;
+    info!("Config file parsed");
+    Ok(tunnel_config)
 }
 #[tauri::command(async)]
 pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Error> {
@@ -682,6 +720,8 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
             connection_type: ConnectionType::Tunnel,
         })
     }
+
+    info!("Tunnels retrieved({})", tunnel_info.len());
     Ok(tunnel_info)
 }
 #[tauri::command(async)]
@@ -692,6 +732,7 @@ pub async fn tunnel_details(
     debug!("Retrieving Tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&app_state.get_pool(), tunnel_id).await? {
+        info!("Found tunnel {tunnel_id}");
         Ok(tunnel)
     } else {
         error!("Tunnel with ID: {tunnel_id}, not found");
@@ -718,8 +759,15 @@ pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Erro
             client
                 .remove_interface(request)
                 .await
-                .map_err(|_| Error::InternalError)?;
-            debug!("Connection closed and interface removed");
+                .map_err(|status| {
+                    let msg =
+                        format!("Error occured while removing interface {} for tunnel {tunnel_id}, status: {status}",
+                        connection.interface_name
+                    );
+                    error!("{msg}");
+                    Error::InternalError(msg)
+                })?;
+            info!("Connection closed and interface removed");
         }
         tunnel.delete(pool).await?;
     } else {
@@ -772,10 +820,13 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         let response_json: Result<AppVersionInfo, reqwest::Error> =
             response.json::<AppVersionInfo>().await;
 
-        response_json.map_err(|err| {
+        let response = response_json.map_err(|err| {
             error!("Failed to deserialize latest application version response {err}");
             Error::CommandError(err.to_string())
-        })
+        })?;
+
+        info!("Latest application version fetched: {}", response.version);
+        Ok(response)
     } else {
         let err = res.err().unwrap();
         error!("Failed to fetch latest application version {err}");

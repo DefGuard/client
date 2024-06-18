@@ -101,7 +101,7 @@ pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(),
         Some(icon_path) => {
             let icon = tauri::Icon::File(icon_path);
             app.tray_handle().set_icon(icon)?;
-            debug!("Tray icon changed");
+            info!("Tray icon changed");
             Ok(())
         }
         None => {
