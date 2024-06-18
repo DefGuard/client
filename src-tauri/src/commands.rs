@@ -334,6 +334,7 @@ pub async fn update_instance(
                 current_location.allowed_ips = new_location.allowed_ips;
                 current_location.mfa_enabled = new_location.mfa_enabled;
                 current_location.keepalive_interval = new_location.keepalive_interval;
+                current_location.dns = new_location.dns;
                 current_location.save(&mut *transaction).await?;
             } else {
                 // create new location
