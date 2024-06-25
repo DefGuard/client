@@ -71,6 +71,7 @@ impl AppState {
             info!("Removed connection from active connections: {removed_connection:#?}");
             Some(removed_connection)
         } else {
+            debug!("No active connection found with location_id: {location_id}");
             None
         }
     }
@@ -97,11 +98,15 @@ impl AppState {
         let active_connections = self.get_connections();
         info!("Found {} active connections", active_connections.len());
         for connection in active_connections {
-            debug!("Found active connection");
+            debug!(
+                "Found active connection with location {}",
+                connection.location_id
+            );
             trace!("Connection: {connection:#?}");
-            debug!("Removing interface");
+            debug!("Removing interface {}", connection.interface_name);
             disconnect_interface(connection, self).await?;
         }
+        info!("All active connections closed");
         Ok(())
     }
 
@@ -123,7 +128,7 @@ impl AppState {
             debug!("Found connection: {connection:#?}");
             Some(connection.to_owned())
         } else {
-            error!("Element with id: {id}, connection_type: {connection_type:?} not found.");
+            error!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");
             None
         }
     }

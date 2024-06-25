@@ -3,27 +3,21 @@ const SvgDefguardLogoIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={21}
-    height={44}
+    height={43}
     fill="none"
-    viewBox="0 0 21 44"
+    viewBox="0 0 21 43"
     {...props}
   >
-    <path
-      fill="url(#defguard-logo-icon_svg__a)"
-      d="M20.89 17.962V2.001L17.413 0v7.965L10.459 3.96.027 9.966v24.018l10.432 6.004 6.954-4.003V40L13.94 42 17.417 44l3.473-1.998V21.969l-10.431-5.998-6.955 4.003v-8.01L10.46 7.96l6.954 4.003v3.998zm-10.431 2.013 3.477 2-3.477 2.002-3.477-2.001zm0 8.004 6.954-4.002v8.006l-6.954 4.003-6.955-4.003v-8.006z"
-    />
+    <g clipPath="url(#defguard-logo-icon_svg__a)">
+      <path
+        fill="#0C8CE0"
+        d="M18.706 0v9.315l-8.178-4.658L0 10.65v22.625l10.52 5.992 8.178-4.658v4.8l-3.957 2.258L17.08 43l3.957-2.257V21.29L10.52 15.298 2.34 19.956v-7.98l8.18-4.658 8.178 4.657v2.652l2.34 1.334V1.334L18.698 0zM2.34 31.94v-7.981l8.18 4.657 8.178-4.657v7.98l-8.179 4.658zm15.192-9.978-7.013 3.994-7.013-3.994 7.013-3.995z"
+      />
+    </g>
     <defs>
-      <linearGradient
-        id="defguard-logo-icon_svg__a"
-        x1={10.459}
-        x2={10.459}
-        y1={0}
-        y2={44}
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="#2ACCFF" />
-        <stop offset={1} stopColor="#0071D4" />
-      </linearGradient>
+      <clipPath id="defguard-logo-icon_svg__a">
+        <path fill="#fff" d="M0 0h21v43H0z" />
+      </clipPath>
     </defs>
   </svg>
 );

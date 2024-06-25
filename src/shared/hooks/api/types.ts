@@ -18,6 +18,7 @@ export type UserInfo = {
   is_active: boolean;
   phone_number: string;
   device_names: string[];
+  enrolled: boolean;
 };
 
 export type EnrollmentStartRequest = {
@@ -83,6 +84,7 @@ export type EnrollmentInitialUserInfo = {
   email: string;
   phone_number?: string;
   is_active: boolean;
+  enrolled: boolean;
 };
 
 export type EnrollmentInstanceInfo = {

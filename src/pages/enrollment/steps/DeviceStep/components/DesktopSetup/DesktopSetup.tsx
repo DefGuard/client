@@ -88,11 +88,31 @@ export const DesktopSetup = () => {
     const deviceResponse = await createDeviceMutation({
       name: values.name,
       pubkey: publicKey,
+    }).then((res) => {
+      if (!res.ok) {
+        toaster.error(LL.common.messages.error());
+        error(
+          `Failed to create device during the enrollment. Error details: ${JSON.stringify(
+            res.data,
+          )} Error status code: ${JSON.stringify(res.status)}`,
+        );
+        throw Error('Failed to create device');
+      }
+      return res;
     });
     mutateUserActivation({
       password: userPassword,
       phone_number: userInfo.phone_number,
-    }).then(() => {
+    }).then((res) => {
+      if (!res.ok) {
+        toaster.error(LL.common.messages.error());
+        error(
+          `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
+            res.data,
+          )} Error status code: ${JSON.stringify(res.status)}`,
+        );
+        throw Error('Failed to activate user');
+      }
       info('User activated');
       setIsLoading(true);
       debug('Invoking save_device_config');

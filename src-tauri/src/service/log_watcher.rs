@@ -142,7 +142,7 @@ impl ServiceLogWatcher {
     fn parse_log_dir(&mut self) -> Result<(), LogWatcherError> {
         // get latest log file
         let latest_log_file = self.get_latest_log_file()?;
-        info!("found latest log file: {latest_log_file:?}");
+        debug!("found latest log file: {latest_log_file:?}");
 
         // check if latest file changed
         if latest_log_file.is_some() && latest_log_file != self.current_log_file {
@@ -180,9 +180,9 @@ impl ServiceLogWatcher {
     /// Deserializes the log line into a known struct and checks if the line is relevant
     /// to the specified interface. Also performs filtering by log level and optional timestamp.
     fn parse_log_line(&self, line: String) -> Result<Option<LogLine>, LogWatcherError> {
-        debug!("Parsing log line: {line}");
+        trace!("Parsing log line: {line}");
         let log_line = serde_json::from_str::<LogLine>(&line)?;
-        debug!("Parsed log line into: {log_line:?}");
+        trace!("Parsed log line into: {log_line:?}");
 
         // filter by log level
         if log_line.level > self.log_level {
@@ -205,7 +205,7 @@ impl ServiceLogWatcher {
         if let Some(ref span) = log_line.span {
             if let Some(interface_name) = &span.interface_name {
                 if interface_name != &self.interface_name {
-                    debug!("Interface name {interface_name} is not the configured name {}. Skipping line...", self.interface_name);
+                    trace!("Interface name {interface_name} is not the configured name {}. Skipping line...", self.interface_name);
                     return Ok(None);
                 }
             }
@@ -219,7 +219,7 @@ impl ServiceLogWatcher {
     /// Log files are rotated daily and have a knows naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        debug!("Getting latest log file");
+        debug!("Getting latest log file from directory: {:?}", self.log_dir);
         let entries = read_dir(&self.log_dir)?;
 
         let mut latest_log = None;
@@ -241,7 +241,7 @@ impl ServiceLogWatcher {
 }
 
 fn extract_timestamp(filename: &str) -> Option<SystemTime> {
-    debug!("Extracting timestamp from log file name: {filename}");
+    trace!("Extracting timestamp from log file name: {filename}");
     // we know that the date is always in the last 10 characters
     let split_pos = filename.char_indices().nth_back(9)?.0;
     let timestamp = &filename[split_pos..];

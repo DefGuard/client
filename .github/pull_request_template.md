@@ -7,7 +7,7 @@
 
 #### Documentation ###
 
-- [ ] If testing requires changes in the environment or deployment, please **update the documentation** (https://defguard.gitbook.io) first and **attach the link to the documentation** section in this pool request
+- [ ] If testing requires changes in the environment or deployment, please **update the documentation** (https://defguard.gitbook.io) first and **attach the link to the documentation** section in this pull request
 - [ ] I have commented on my code, particularly in hard-to-understand areas
 
 #### Testing ### 

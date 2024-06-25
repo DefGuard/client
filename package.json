@@ -1,7 +1,7 @@
 {
   "name": "defguard-client",
   "private": false,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "npm-run-all --parallel vite typesafe-i18n",
