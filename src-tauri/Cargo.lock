@@ -486,6 +486,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c79fed4cdb43e993fcdadc7e58a09fd0e3e649c4436fa11da71c9f1f3ee7feb9"
 
 [[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
 name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1224,10 +1230,10 @@ dependencies = [
 
 [[package]]
 name = "defguard_wireguard_rs"
-version = "0.4.4"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.4.4#87ed3bcbc908fd68c106faa86b1a1b977015029b"
+version = "0.4.5"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.4.5#35345d54e7426f2678ad120378d59cf642acce5d"
 dependencies = [
- "base64 0.21.6",
+ "base64 0.22.1",
  "libc",
  "log",
  "netlink-packet-core",
