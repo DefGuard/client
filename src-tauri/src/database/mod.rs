@@ -1,12 +1,12 @@
 pub mod models;
 
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use tauri::AppHandle;
 
 use crate::error::Error;
 
-const DB_NAME: &str = "defguard.db";
+pub const DB_NAME: &str = "defguard.db";
 
 pub type DbPool = sqlx::SqlitePool;
 
@@ -21,6 +21,12 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
     fs::create_dir_all(&app_dir)?;
     info!("Created app data dir at: {}", app_dir.to_string_lossy());
     let db_path = app_dir.join(DB_NAME);
+
+    let pool = setup_db(db_path).await?;
+    Ok(pool)
+}
+
+pub async fn setup_db(db_path: PathBuf) -> Result<DbPool, Error> {
     if db_path.exists() {
         info!(
             "Database exists skipping creating database. Database path: {}",

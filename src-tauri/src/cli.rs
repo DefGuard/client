@@ -1,8 +1,10 @@
 use clap::Parser;
 
+use crate::appstate::AppState;
+
 #[derive(Parser)]
 #[command(version, about)]
-pub struct DefguardCli {
+pub struct CliHandler {
     #[clap(short, long)]
     pub instances: bool,
     #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
@@ -13,4 +15,24 @@ pub struct DefguardCli {
     pub disconnect: Vec<String>,
     #[clap(short, long)]
     pub status: bool,
+}
+
+pub struct DefguardCli {
+    pub cli: CliHandler,
+    pub app_state: AppState,
+}
+
+impl Default for DefguardCli {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DefguardCli {
+    pub fn new() -> Self {
+        DefguardCli {
+            cli: CliHandler::parse(),
+            app_state: AppState::new(),
+        }
+    }
 }
