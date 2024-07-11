@@ -81,3 +81,7 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [dev-dependencies]
 tokio = { version = "1.34", features = ["full"] }
+
+[[bin]]
+name = "defguard-cli"
+path = "src/bin/defguard-cli.rs"
