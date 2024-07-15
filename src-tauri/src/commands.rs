@@ -174,6 +174,11 @@ pub async fn save_device_config(
 
 #[tauri::command(async)]
 pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo>, Error> {
+    let instance_info = gen_list_of_all_instances(app_state.inner()).await?;
+    Ok(instance_info)
+}
+
+pub async fn gen_list_of_all_instances(app_state: &AppState) -> Result<Vec<InstanceInfo>, Error> {
     debug!("Retrieving all instances.");
 
     let instances = Instance::all(&app_state.get_pool()).await?;
@@ -208,6 +213,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     }
     info!("Instances retrieved({})", instance_info.len());
     trace!("Returning following instances: {instance_info:#?}");
+
     Ok(instance_info)
 }
 

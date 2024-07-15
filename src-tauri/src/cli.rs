@@ -2,19 +2,20 @@ use clap::Parser;
 
 use crate::appstate::AppState;
 
+// TODO: add description
 #[derive(Parser)]
 #[command(version, about)]
 pub struct CliHandler {
     #[clap(short, long)]
     pub instances: bool,
     #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
-    pub vpns: Vec<String>,
-    #[clap(short, long, default_value = "")]
-    pub connect: String,
-    #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
-    pub disconnect: Vec<String>,
+    pub vpns: Option<Vec<String>>,
     #[clap(short, long)]
-    pub status: bool,
+    pub connect: Option<String>,
+    #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
+    pub disconnect: Option<Vec<String>>,
+    #[clap(short, long)]
+    pub status: Option<bool>,
 }
 
 pub struct DefguardCli {
