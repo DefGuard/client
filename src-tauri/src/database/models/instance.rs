@@ -104,6 +104,17 @@ impl Instance {
         Ok(instance)
     }
 
+    pub async fn find_by_name(pool: &DbPool, name: String) -> Result<Option<Self>, Error> {
+        let instance = query_as!(
+            Self,
+            "SELECT id \"id?\", name, uuid, url, proxy_url, username FROM instance WHERE name = $1;",
+            name
+        )
+        .fetch_optional(pool)
+        .await?;
+        Ok(instance)
+    }
+
     pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
         // delete instance
         query!("DELETE FROM instance WHERE id = $1", id)

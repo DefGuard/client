@@ -15,7 +15,7 @@ pub struct CliHandler {
     #[clap(short, long, value_parser, num_args = 0.., value_delimiter = ' ')]
     pub disconnect: Option<Vec<String>>,
     #[clap(short, long)]
-    pub status: Option<bool>,
+    pub status: bool,
 }
 
 pub struct DefguardCli {

@@ -237,6 +237,28 @@ pub async fn all_locations(
     instance_id: i64,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, Error> {
+    let location_info = return_all_locations_by_instance(instance_id, app_state.inner()).await?;
+    Ok(location_info)
+}
+
+pub async fn all_locations_by_instance(
+    instance_name: String,
+    app_state: &AppState,
+) -> Result<Vec<LocationInfo>, Error> {
+    let instance_id = Instance::find_by_name(&app_state.get_pool(), instance_name)
+        .await?
+        .unwrap()
+        .id
+        .unwrap();
+
+    let location_info = return_all_locations_by_instance(instance_id, app_state).await?;
+    Ok(location_info)
+}
+
+pub async fn return_all_locations_by_instance(
+    instance_id: i64,
+    app_state: &AppState,
+) -> Result<Vec<LocationInfo>, Error> {
     debug!("Retrieving all locations.");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
     let active_locations_ids: Vec<i64> =

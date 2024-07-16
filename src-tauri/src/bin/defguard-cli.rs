@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use defguard_client::{
     cli::DefguardCli,
-    commands::gen_list_of_all_instances,
-    database::{self, DB_NAME},
+    commands::{all_locations_by_instance, gen_list_of_all_instances},
+    database::{self, Location, DB_NAME},
 };
 use log::{debug, info};
 
@@ -25,7 +25,6 @@ async fn main() -> Result<(), Error> {
     *def_cli.app_state.db.lock().unwrap() = Some(db);
 
     info!("Database initialization completed");
-    info!("Starting main app thread.");
     let result = database::info(&def_cli.app_state.get_pool()).await;
     info!("Database info result: {:#?}", result);
 
@@ -43,11 +42,38 @@ pub async fn run_cli_app(
             let instances = gen_list_of_all_instances(&def_cli.app_state)
                 .await
                 .unwrap_or_default();
-            let json = serde_json::to_string(&instances).unwrap();
 
+            let json = serde_json::to_string(&instances).unwrap();
             writeln!(writer, "{:?}", json).expect("Unable to display instances");
         }
         false => todo!(),
+    }
+
+    let vpns = def_cli.cli.vpns;
+    match vpns {
+        Some(instances) if (instances.is_empty()) => {
+            info!("Listing all vpns");
+            let pool = &def_cli.app_state.get_pool();
+            let locations = Location::all(pool).await;
+
+            match locations {
+                Ok(_) => {
+                    let json = serde_json::to_string(&locations).unwrap();
+                    writeln!(writer, "{:?}", json).expect("Unable to display locations");
+                }
+                Err(err) => todo!(),
+            }
+        }
+        Some(instances) => {
+            info!("Listing {:?} vpns", instances);
+            for instance in instances {
+                let location_info = all_locations_by_instance(instance, &def_cli.app_state).await?;
+
+                let json = serde_json::to_string(&location_info).unwrap();
+                writeln!(writer, "{:?}", json).expect("Unable to display location info");
+            }
+        }
+        None => debug!("option --vpns was not set"),
     }
 
     let disconnect = def_cli.cli.disconnect;
@@ -60,6 +86,23 @@ pub async fn run_cli_app(
             debug!("vpn names: {:?}", vpn_names);
         }
         None => debug!("option --disconnect was not set"),
+    }
+
+    let connect = def_cli.cli.connect;
+    match connect {
+        Some(_) => {}
+        None => debug!("option --connect was not set"),
+    }
+
+    let status = def_cli.cli.status;
+    match status {
+        true => {
+            let active = def_cli.app_state.get_connections();
+            let json = serde_json::to_string(&active).unwrap();
+
+            writeln!(writer, "{:?}", json).expect("Unable to display locations");
+        }
+        false => debug!("option --status was not set"),
     }
 
     Ok(())
