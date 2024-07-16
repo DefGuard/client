@@ -27,7 +27,7 @@ import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
-const { saveConfig } = clientApi;
+const { getInstances, saveConfig } = clientApi;
 
 type Props = {
   response: AddInstanceInitResponse;
@@ -100,16 +100,18 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
           privateKey: privateKey,
           response: deviceResp,
         })
-          .then((res) => {
+          .then(async (res) => {
             setIsLoading(false);
             toaster.success(localLL.messages.addSuccess());
+            const instances = await getInstances();
             setClientStore({
               selectedInstance: {
                 id: res.instance.id,
                 type: WireguardInstanceType.DEFGUARD_INSTANCE,
               },
+              instances,
             });
-            navigate(routes.client.instanceCreated, { replace: true });
+            navigate(routes.client.instancePage, { replace: true });
           })
           .catch(() => {
             toaster.error(LL.common.messages.error());
