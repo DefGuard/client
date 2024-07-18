@@ -4,7 +4,6 @@ import { createWithEqualityFn } from 'zustand/traditional';
 import { clientApi } from '../clientAPI/clientApi';
 import { Settings } from '../clientAPI/types';
 import {
-  ClientView,
   CommonWireguardFields,
   DefguardInstance,
   SelectedInstance,
@@ -19,12 +18,12 @@ const defaultValues: StoreValues = {
   tunnels: [],
   selectedInstance: undefined,
   statsFilter: 1,
-  selectedView: ClientView.GRID,
   settings: {
     log_level: 'error',
     theme: 'light',
     tray_icon_theme: 'color',
     check_for_updates: true,
+    selected_view: null,
   },
 };
 
@@ -80,7 +79,6 @@ type Store = StoreValues & StoreMethods;
 type StoreValues = {
   instances: DefguardInstance[];
   tunnels: CommonWireguardFields[];
-  selectedView: ClientView;
   statsFilter: number;
   settings: Settings;
   selectedInstance?: SelectedInstance;

@@ -63,11 +63,6 @@ export type CommonWireguardFields = {
   network_id: number;
 };
 
-export enum ClientView {
-  GRID = 0,
-  DETAIL = 1,
-}
-
 export enum WireguardInstanceType {
   TUNNEL = 'Tunnel',
   DEFGUARD_INSTANCE = 'Instance',
@@ -76,6 +71,7 @@ export enum WireguardInstanceType {
 export type SelectedInstance = {
   id?: number;
   type: WireguardInstanceType;
+  location_count?: number;
 };
 
 export enum TauriEventKey {
