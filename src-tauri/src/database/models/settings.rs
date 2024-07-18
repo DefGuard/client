@@ -50,6 +50,15 @@ pub enum TrayIconTheme {
     Gray,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type, EnumString, AsRefStr)]
+#[sqlx(type_name = "selected_view", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ClientView {
+    Grid = 0,
+    Detail,
+}
+
 #[derive(FromRow, Debug, Serialize, Deserialize, Patch)]
 #[patch_derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
@@ -59,6 +68,7 @@ pub struct Settings {
     pub log_level: SettingsLogLevel,
     pub tray_icon_theme: TrayIconTheme,
     pub check_for_updates: bool,
+    pub selected_view: Option<ClientView>,
 }
 
 impl Settings {
@@ -72,6 +82,10 @@ impl Settings {
             theme: SettingsTheme::from_str(&query_res.theme)?,
             tray_icon_theme: TrayIconTheme::from_str(&query_res.tray_icon_theme)?,
             check_for_updates: query_res.check_for_updates,
+            selected_view: match &query_res.selected_view {
+                Some(selected_view) => Some(ClientView::from_str(selected_view)?),
+                None => None,
+            },
         };
         Ok(settings)
     }
@@ -79,12 +93,13 @@ impl Settings {
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         query!(
             "UPDATE settings \
-            SET theme = $1, log_level = $2, tray_icon_theme = $3, check_for_updates = $4 \
+            SET theme = $1, log_level = $2, tray_icon_theme = $3, check_for_updates = $4, selected_view = $5 \
             WHERE id = 1;",
             self.theme,
             self.log_level,
             self.tray_icon_theme,
             self.check_for_updates,
+            self.selected_view
         )
         .execute(pool)
         .await?;
@@ -110,13 +125,15 @@ impl Settings {
                 theme: init_theme,
                 tray_icon_theme: TrayIconTheme::Color,
                 check_for_updates: true,
+                selected_view: None,
             };
             query!(
-                "INSERT INTO settings (log_level, theme, tray_icon_theme, check_for_updates) VALUES ($1, $2, $3, $4);",
+                "INSERT INTO settings (log_level, theme, tray_icon_theme, check_for_updates, selected_view) VALUES ($1, $2, $3, $4, $5);",
                 default_settings.log_level,
                 default_settings.theme,
                 default_settings.tray_icon_theme,
                 default_settings.check_for_updates,
+                default_settings.selected_view
             )
             .execute(pool)
             .await?;
