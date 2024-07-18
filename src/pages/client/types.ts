@@ -71,7 +71,6 @@ export enum WireguardInstanceType {
 export type SelectedInstance = {
   id?: number;
   type: WireguardInstanceType;
-  location_count?: number;
 };
 
 export enum TauriEventKey {
