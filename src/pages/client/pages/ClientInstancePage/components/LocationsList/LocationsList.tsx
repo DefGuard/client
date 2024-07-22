@@ -1,51 +1,37 @@
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../../../../../shared/routes';
-import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { clientQueryKeys } from '../../../../query';
-import { ClientView, WireguardInstanceType } from '../../../../types';
+import {
+  CommonWireguardFields,
+  DefguardInstance,
+  WireguardInstanceType,
+} from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 import { MFAModal } from './modals/MFAModal/MFAModal';
 
-const { getLocations, getTunnels } = clientApi;
+interface LocationsListProps {
+  selectedInstance: DefguardInstance | undefined;
+  selectedInstanceType: WireguardInstanceType | undefined;
+  locations: CommonWireguardFields[] | undefined;
+  isError: boolean;
+}
 
-export const LocationsList = () => {
+export const LocationsList = ({
+  selectedInstance,
+  selectedInstanceType,
+  locations,
+  isError,
+}: LocationsListProps) => {
   const { LL } = useI18nContext();
-  const selectedInstance = useClientStore((state) => state.selectedInstance);
 
-  const selectedView = useClientStore((state) => state.selectedView);
-
+  const selectedView = useClientStore((state) => state.settings.selected_view);
   const toaster = useToaster();
-
   const navigate = useNavigate();
-
-  const queryKey = useMemo(() => {
-    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
-      return [clientQueryKeys.getLocations, selectedInstance?.id as number];
-    } else {
-      return [clientQueryKeys.getTunnels];
-    }
-  }, [selectedInstance]);
-
-  const queryFn = useCallback(() => {
-    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
-      return getLocations({ instanceId: selectedInstance?.id as number });
-    } else {
-      return getTunnels();
-    }
-  }, [selectedInstance]);
-
-  const { data: locations, isError } = useQuery({
-    queryKey,
-    queryFn,
-    enabled: !!selectedInstance,
-  });
 
   useEffect(() => {
     if (isError) {
@@ -56,23 +42,31 @@ export const LocationsList = () => {
   useEffect(() => {
     if (
       locations?.length === 0 &&
-      selectedInstance?.type === WireguardInstanceType.TUNNEL
+      selectedInstanceType === WireguardInstanceType.TUNNEL
     ) {
       navigate(routes.client.addTunnel, { replace: true });
     }
-  }, [locations, navigate, selectedInstance]);
+  }, [locations, navigate, selectedInstanceType]);
 
   // TODO: add loader or another placeholder view pointing to opening enter token modal if no instances are found / present
   if (!selectedInstance || !locations) return null;
 
   return (
     <>
-      {selectedView === ClientView.GRID && <LocationsGridView locations={locations} />}
-
-      {selectedView === ClientView.DETAIL && (
+      {locations.length === 1 && selectedView === null && (
         <LocationsDetailView
           locations={locations}
-          connectionType={selectedInstance.type}
+          connectionType={selectedInstanceType}
+        />
+      )}
+      {(selectedView === 'grid' || selectedView === null) && (
+        <LocationsGridView locations={locations} />
+      )}
+
+      {selectedView === 'detail' && (
+        <LocationsDetailView
+          locations={locations}
+          connectionType={selectedInstanceType}
         />
       )}
 

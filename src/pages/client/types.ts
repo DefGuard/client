@@ -63,11 +63,6 @@ export type CommonWireguardFields = {
   network_id: number;
 };
 
-export enum ClientView {
-  GRID = 0,
-  DETAIL = 1,
-}
-
 export enum WireguardInstanceType {
   TUNNEL = 'Tunnel',
   DEFGUARD_INSTANCE = 'Instance',

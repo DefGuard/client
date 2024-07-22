@@ -47,6 +47,8 @@ export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
 export type LogLevel = 'error' | 'info' | 'debug' | 'trace';
 
+export type ClientView = 'grid' | 'detail' | null;
+
 export type LogItemField = {
   message: string;
   interface_name?: string;
@@ -69,6 +71,7 @@ export type Settings = {
   log_level: LogLevel;
   tray_icon_theme: TrayIconTheme;
   check_for_updates: boolean;
+  selected_view: ClientView;
 };
 
 export type LocationDetails = {
