@@ -104,7 +104,14 @@ async fn main() {
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
-                event.window().hide().unwrap();
+                #[cfg(not(target_os = "macos"))]
+                {
+                    event.window().hide().unwrap();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    tauri::AppHandle::hide(&event.window().app_handle()).unwrap();
+                }
                 api.prevent_close();
             }
             _ => {}
