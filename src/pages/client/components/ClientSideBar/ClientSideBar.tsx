@@ -50,7 +50,13 @@ export const ClientSideBar = () => {
         <SvgDefguardLogoCollapsed />
       </div>
       <div className="items flex-end">
-        <div className="client-bar-item active" id="instances-nav-label">
+        <div
+          className="client-bar-item active clickable"
+          id="instances-nav-label"
+          onClick={() => {
+            navigate(routes.client.carousel, { replace: true });
+          }}
+        >
           <SvgIconNavConnections />
           <p>{LL.pages.client.sideBar.instances()}</p>
         </div>
