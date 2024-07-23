@@ -10,6 +10,7 @@ import { ConfirmModal } from '../../../../../../shared/defguard-ui/components/La
 import { ConfirmModalType } from '../../../../../../shared/defguard-ui/components/Layout/modals/ConfirmModal/types';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../hooks/useClientFlags';
 import { clientQueryKeys } from '../../../../query';
 import { useDeleteInstanceModal } from './useDeleteInstanceModal';
 
@@ -34,6 +35,7 @@ export const DeleteInstanceModal = () => {
   const toaster = useToaster();
   const localLL = LL.modals.deleteInstance;
   const queryClient = useQueryClient();
+  const setClientFlags = useClientFlags((state) => state.setValues);
 
   const { mutate, isPending } = useMutation({
     mutationFn: deleteInstance,
@@ -72,6 +74,10 @@ export const DeleteInstanceModal = () => {
       cancelText={LL.common.controls.cancel()}
       onSubmit={() => {
         if (instance) {
+          setClientFlags({
+            selectedInstance: undefined,
+            selectedLocation: undefined,
+          });
           mutate(instance.id);
         }
       }}
