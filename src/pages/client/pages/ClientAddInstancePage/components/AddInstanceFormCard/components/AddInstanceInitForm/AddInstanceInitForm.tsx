@@ -148,6 +148,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
                   type: WireguardInstanceType.DEFGUARD_INSTANCE,
                 };
                 setClientFlags({
+                  selectedLocation: 0,
                   selectedInstance: _selectedInstace,
                 });
                 setClientState({
