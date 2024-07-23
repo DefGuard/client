@@ -22,6 +22,7 @@ import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
+import { useClientFlags } from '../../pages/client/hooks/useClientFlags';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
 import { ClientAddedPage } from '../../pages/client/pages/ClientAddedPage/ClientAddedPage';
@@ -122,6 +123,13 @@ export const App = () => {
   const [localeLoaded, setWasLoaded] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const setClientState = useClientStore((state) => state.setState);
+  const clientFlags = useClientFlags();
+
+  // load last visited Instance and Location from user local storage
+  setClientState({
+    selectedInstance: clientFlags.selectedInstance,
+    selectedLocation: clientFlags.selectedLocation,
+  });
 
   const appLoaded = useMemo(
     () => localeLoaded && settingsLoaded,

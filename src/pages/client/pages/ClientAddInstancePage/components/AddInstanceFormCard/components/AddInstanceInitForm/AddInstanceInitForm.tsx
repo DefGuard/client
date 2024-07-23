@@ -25,8 +25,9 @@ import {
 import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { WireguardInstanceType } from '../../../../../../types';
+import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
 type Props = {
@@ -51,6 +52,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const initEnrollment = useEnrollmentStore((state) => state.init);
   const setClientState = useClientStore((state) => state.setState);
+  const setClientFlags = useClientFlags((state) => state.setValues);
 
   const schema = useMemo(
     () =>
@@ -141,11 +143,15 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
                 toaster.success(
                   LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
                 );
+                const _selectedInstace: SelectedInstance = {
+                  id: instance.id,
+                  type: WireguardInstanceType.DEFGUARD_INSTANCE,
+                };
+                setClientFlags({
+                  selectedInstance: _selectedInstace,
+                });
                 setClientState({
-                  selectedInstance: {
-                    id: instance.id,
-                    type: WireguardInstanceType.DEFGUARD_INSTANCE,
-                  },
+                  selectedInstance: _selectedInstace,
                 });
                 navigate(routes.client.base, { replace: true });
               })
