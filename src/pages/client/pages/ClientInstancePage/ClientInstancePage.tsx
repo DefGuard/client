@@ -118,12 +118,7 @@ export const ClientInstancePage = () => {
           )}
         </div>
       </header>
-      <LocationsList
-        selectedInstance={selectedInstance}
-        selectedInstanceType={selectedInstanceType}
-        locations={locations}
-        isError={isError}
-      />
+      <LocationsList locations={locations} isError={isError} />
       <UpdateInstanceModal />
       <DeleteInstanceModal />
     </section>
