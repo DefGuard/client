@@ -9,6 +9,7 @@ import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
 import { routes } from '../../../../../../../../shared/routes';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
 import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
@@ -32,8 +33,10 @@ export const LocationsDetailView = ({
   locations,
   connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
 }: Props) => {
+  const selectedLocationId = useClientFlags((state) => state.selectedLocation);
+  const setClientFlags = useClientFlags((state) => state.setValues);
   const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
-    locations[0]?.id ?? undefined,
+    selectedLocationId ?? undefined,
   );
 
   const selectedInstance = useClientStore((state) => state.selectedInstance);
@@ -46,9 +49,14 @@ export const LocationsDetailView = ({
         key: location.id,
         content: location.name,
         active: location.id === activeLocationId,
-        onClick: () => setActiveLocationId(location.id),
+        onClick: () => {
+          setClientFlags({
+            selectedLocation: location.id,
+          });
+          setActiveLocationId(location.id);
+        },
       })),
-    [locations, activeLocationId],
+    [locations, activeLocationId, setClientFlags],
   );
 
   const activeLocation = useMemo((): CommonWireguardFields | undefined => {

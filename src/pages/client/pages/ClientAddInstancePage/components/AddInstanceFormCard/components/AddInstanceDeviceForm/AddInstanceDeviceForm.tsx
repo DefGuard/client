@@ -111,6 +111,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
               type: WireguardInstanceType.DEFGUARD_INSTANCE,
             };
             setCliengFlags({
+              selectedLocation: 0,
               selectedInstance: _selectedInstance,
             });
             setClientStore({
