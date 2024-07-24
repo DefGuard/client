@@ -20,6 +20,7 @@ import {
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import {
   CreateDeviceResponse,
+  EnrollmentError,
   EnrollmentStartResponse,
 } from '../../../../../../../../shared/hooks/api/types';
 import { routes } from '../../../../../../../../shared/routes';
@@ -105,7 +106,17 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       .then(async (res: Response<EnrollmentStartResponse>) => {
         const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
-          toaster.error(LL.common.messages.error());
+          const ee: EnrollmentError = JSON.parse(JSON.stringify(res.data));
+          switch (ee.error) {
+            case 'token expired': {
+              toaster.error(LL.common.messages.tokenExpired());
+              break;
+            }
+            default: {
+              toaster.error(LL.common.messages.error());
+              break;
+            }
+          }
           setIsLoading(false);
           error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
