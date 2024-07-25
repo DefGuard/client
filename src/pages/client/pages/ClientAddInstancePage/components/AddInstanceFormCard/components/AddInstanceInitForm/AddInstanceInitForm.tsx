@@ -103,16 +103,14 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       headers,
       body: Body.json(data),
     })
-      .then(async (res: Response<EnrollmentStartResponse>) => {
+      .then(async (res: Response<EnrollmentStartResponse | EnrollmentError>) => {
         const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
           setIsLoading(false);
           error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
 
-          // TODO: consider retriving Error type as a response instead of parsing json
-          const ee: EnrollmentError = JSON.parse(JSON.stringify(res.data));
-          switch (ee.error) {
+          switch ((res.data as EnrollmentError).error) {
             case 'token expired': {
               throw Error(LL.common.messages.tokenExpired());
             }
@@ -122,7 +120,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           }
         }
         debug('Response received with status OK');
-        const r = res.data;
+        const r = res.data as EnrollmentStartResponse;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
         const instance = clientInstances.find((i) => i.uuid === r.instance.id);
