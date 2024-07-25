@@ -106,21 +106,20 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       .then(async (res: Response<EnrollmentStartResponse>) => {
         const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
-          const ee: EnrollmentError = JSON.parse(JSON.stringify(res.data));
-          switch (ee.error) {
-            case 'token expired': {
-              toaster.error(LL.common.messages.tokenExpired());
-              break;
-            }
-            default: {
-              toaster.error(LL.common.messages.error());
-              break;
-            }
-          }
           setIsLoading(false);
           error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
-          return;
+
+          // TODO: consider retriving Error type as a response instead of parsing json
+          const ee: EnrollmentError = JSON.parse(JSON.stringify(res.data));
+          switch (ee.error) {
+            case 'token expired': {
+              throw Error(LL.common.messages.tokenExpired());
+            }
+            default: {
+              throw Error(LL.common.messages.error());
+            }
+          }
         }
         debug('Response received with status OK');
         const r = res.data;
@@ -200,10 +199,10 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           navigate(routes.enrollment, { replace: true });
         }
       })
-      .catch((e) => {
-        toaster.error(LL.common.messages.error());
+      .catch((e: Error) => {
+        toaster.error(e.message);
         setIsLoading(false);
-        error(e);
+        error(e.message);
       });
   };
 
