@@ -1,4 +1,5 @@
 use std::{
+    fs,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     path::PathBuf,
     process::Command,
@@ -733,4 +734,25 @@ pub async fn disconnect_interface(
 
     info!("Location {} {:?} disconnected", id, connection_type);
     Ok(())
+}
+
+pub fn init_app_dirs(app: &AppHandle) {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    paths.push(
+        app.path_resolver()
+            .app_data_dir()
+            .expect("Failed to get app data path."),
+    );
+    paths.push(
+        app.path_resolver()
+            .app_local_data_dir()
+            .expect("Failed to get app data path."),
+    );
+    for path in paths.iter() {
+        if !path.exists() {
+            fs::create_dir_all(path.clone())
+                .expect("Failed to create required application directory");
+            debug!("Application dir {:?} , created.", path.to_str());
+        }
+    }
 }

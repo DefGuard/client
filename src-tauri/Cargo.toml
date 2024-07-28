@@ -66,6 +66,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
 reqwest = { version = "0.11", features = ["json"] }
+secrecy = {version = "0.8", features = ["alloc"]} 
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-service = "0.6"

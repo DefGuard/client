@@ -18,6 +18,7 @@ use defguard_client::{
     __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
     __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
     __cmd__update_settings,
+    app_config::{self, AppConfig},
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
@@ -29,7 +30,7 @@ use defguard_client::{
     database::{self, models::settings::Settings},
     latest_app_version::fetch_latest_app_version_loop,
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
-    utils::load_log_targets,
+    utils::{init_app_dirs, load_log_targets},
 };
 use std::{env, str::FromStr};
 
@@ -142,25 +143,31 @@ async fn main() {
 
     // initialize database
     let app_handle = app.handle();
+    // init app directories
+    init_app_dirs(&app_handle);
     debug!("Initializing database connection");
     let app_state: State<AppState> = app_handle.state();
-    let db = database::init_db(&app_handle)
-        .await
-        .expect("Database initialization failed");
-    *app_state.db.lock().unwrap() = Some(db);
-    info!("Database initialization completed");
-    info!("Starting main app thread.");
-    let result = database::info(&app_state.get_pool()).await;
-    info!("Database info result: {:#?}", result);
-    // configure tray
-    if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
-        configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
+    let app_config = AppConfig::new(&app_handle);
+    if !app_config.db_protected {
+        debug!("App database is unprotected, initializing pool on startup.");
+        //FIXME: This should trigger some response to inform user of the situation instead of panicking
+        let db = database::init_db(&app_handle, None)
+            .await
+            .expect("Database initialization failed");
+        *app_state.db.lock().unwrap() = Some(db);
+        debug!("Database initialization completed");
+        let _ = database::info(&app_state.get_pool()).await;
+        //FIXME: move this out from db
+        // configure tray
+        if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
+            configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
+        }
+
+        tauri::async_runtime::spawn(async move {
+            fetch_latest_app_version_loop(app_handle.clone()).await
+        });
     }
-
-    tauri::async_runtime::spawn(
-        async move { fetch_latest_app_version_loop(app_handle.clone()).await },
-    );
-
+    info!("Starting main app thread.");
     // run app
     app.run(|app_handle, event| match event {
         // prevent shutdown on window close
