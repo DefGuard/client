@@ -44,7 +44,7 @@ strum = { version = "0.25", features = ["derive"] }
 dark-light = "1.0"
 webbrowser = "0.8"
 
-tauri = { version = "1.5", features = [
+tauri = { version = "1.7", features = [
     "dialog-all",
     "clipboard-all",
     "http-all",

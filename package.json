@@ -113,8 +113,5 @@
     "typescript": "^5.3.2",
     "typescript-eslint-language-service": "^5.0.5",
     "vite": "^5.3.5"
-  },
-  "volta": {
-    "node": "20.5.1"
   }
 }
