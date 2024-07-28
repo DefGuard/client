@@ -1251,6 +1251,7 @@ dependencies = [
  "defguard_wireguard_rs",
  "dirs 5.0.1",
  "lazy_static",
+ "libsqlite3-sys",
  "local-ip-address",
  "log",
  "nix 0.28.0",

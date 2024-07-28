@@ -39,6 +39,8 @@ sqlx = { version = "0.7", features = [
     "uuid",
     "macros",
 ] }
+# bundle sqlcipher driver for sqlx
+libsqlite3-sys = {version = "=0.27.0", features = ["bundled-sqlcipher"]}
 struct-patch = "0.4"
 strum = { version = "0.25", features = ["derive"] }
 dark-light = "1.0"

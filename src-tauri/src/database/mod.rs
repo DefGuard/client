@@ -10,7 +10,9 @@ use tauri::AppHandle;
 
 use crate::error::Error;
 
-const DB_NAME: &str = "defguard.db";
+const DB_UNPROTECTED_NAME: &str = "defguard.db";
+
+const DB_PROTECTED_NAME: &str = "defguard.enc.db";
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
@@ -22,16 +24,21 @@ pub async fn init_db(app_handle: &AppHandle, db_password: Option<String>) -> Res
         .path_resolver()
         .app_data_dir()
         .ok_or(Error::Config)?;
-    db_file_path.push(DB_NAME);
     let connect_options = match db_password {
-        Some(pass) => SqliteConnectOptions::new()
-            .create_if_missing(true)
-            .filename(db_file_path.clone())
-            .pragma("key", pass.clone())
-            .pragma("journal_mode", "Delete"),
-        None => SqliteConnectOptions::new()
-            .create_if_missing(true)
-            .filename(db_file_path.clone()),
+        Some(pass) => {
+            db_file_path.push(DB_PROTECTED_NAME);
+            SqliteConnectOptions::new()
+                .create_if_missing(true)
+                .filename(db_file_path.clone())
+                .pragma("key", pass.clone())
+                .pragma("journal_mode", "Delete")
+        }
+        None => {
+            db_file_path.push(DB_UNPROTECTED_NAME);
+            SqliteConnectOptions::new()
+                .create_if_missing(true)
+                .filename(db_file_path.clone())
+        }
     };
     let pool = SqlitePoolOptions::new()
         .connect_with(connect_options)

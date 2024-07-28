@@ -49,7 +49,7 @@ impl AppConfig {
                 Ok(res) => return res,
                 // if deserialization failed, remove file and return default
                 Err(_) => {
-                    fs::remove_file(get_config_file_path(app));
+                    fs::remove_file(get_config_file_path(app)).ok();
                 }
             }
         }
@@ -66,7 +66,7 @@ impl AppConfig {
                         Ok(res) => return res,
                         // if deserialization failed, remove file and return default
                         Err(_) => {
-                            fs::remove_file(config_file_path);
+                            fs::remove_file(config_file_path).ok();
                         }
                     }
                 }
@@ -79,7 +79,14 @@ impl AppConfig {
     pub fn save(self, app: &AppHandle) -> Result<(), serde_json::Error> {
         let mut file = get_config_file(app);
         let serialized = serde_json::to_vec(&self)?;
-        file.write_all(&serialized);
+        file.write_all(&serialized)
+            .expect("Failed to write app config file.");
         Ok(())
     }
+}
+
+#[tauri::command]
+pub async fn command_get_app_config(handle: AppHandle) -> Result<AppConfig, String> {
+    let app_config = AppConfig::new(&handle);
+    Ok(app_config)
 }
