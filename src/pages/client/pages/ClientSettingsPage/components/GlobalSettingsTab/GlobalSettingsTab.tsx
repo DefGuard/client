@@ -1,9 +1,11 @@
 import './style.scss';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
+import { Button } from '../../../../../../shared/defguard-ui/components/Layout/Button/Button';
+import { ButtonStyleVariant } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { LabeledCheckbox } from '../../../../../../shared/defguard-ui/components/Layout/LabeledCheckbox/LabeledCheckbox';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
 import {
@@ -12,12 +14,38 @@ import {
   SelectSizeVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
 import { ThemeKey } from '../../../../../../shared/defguard-ui/hooks/theme/types';
+import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { clientApi } from '../../../../clientAPI/clientApi';
 import { LogLevel, TrayIconTheme } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
+import { clientQueryKeys } from '../../../../query';
+
+const { getAppConfig, protectDatabase } = clientApi;
+
+//FIXME: get user input
+const protectionPassword = 'DefguardProtect32';
 
 export const GlobalSettingsTab = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
+  const toaster = useToaster();
+
+  const { data: appConfig } = useQuery({
+    queryFn: getAppConfig,
+    queryKey: [clientQueryKeys],
+    refetchOnWindowFocus: false,
+  });
+
+  const { mutate: encryptDatabase, isPending } = useMutation({
+    mutationFn: protectDatabase,
+    onSuccess: () => {
+      toaster.success('Database is now protected.');
+    },
+    onError: (e) => {
+      toaster.error('Encryption failed, check console!');
+      console.error(e);
+    },
+  });
 
   return (
     <div id="global-settings-tab">
@@ -36,6 +64,18 @@ export const GlobalSettingsTab = () => {
       <section>
         <h2>{localLL.theme.title()}</h2>
         <ThemeSelect />
+      </section>
+      <section>
+        <h2>Application database protection</h2>
+        <p>status: {String(appConfig?.db_protected)}</p>
+        {appConfig && !appConfig.db_protected && (
+          <Button
+            text="Encrypt Database"
+            styleVariant={ButtonStyleVariant.PRIMARY}
+            onClick={() => encryptDatabase(protectionPassword)}
+            loading={isPending}
+          />
+        )}
       </section>
     </div>
   );

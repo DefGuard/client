@@ -106,6 +106,10 @@ export type LocationDetailsRequest = {
   connectionType: WireguardInstanceType;
 };
 
+export type AppConfig = {
+  db_protected: boolean;
+};
+
 export type TauriCommandKey =
   | 'all_instances'
   | 'all_locations'
@@ -128,4 +132,8 @@ export type TauriCommandKey =
   | 'delete_tunnel'
   | 'location_interface_details'
   | 'open_link'
-  | 'get_latest_app_version';
+  | 'get_latest_app_version'
+  | 'command_unlock_db'
+  | 'command_db_conn_status'
+  | 'command_protect_db'
+  | 'command_get_app_config';

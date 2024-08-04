@@ -3,6 +3,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use defguard_client::app_config::{__cmd__command_get_app_config, command_get_app_config};
+use defguard_client::utils::after_db_app_setup;
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
@@ -10,6 +12,10 @@ use tauri::{api::process, Env};
 use tauri::{Manager, State};
 use tauri_plugin_log::LogTarget;
 
+use defguard_client::database::commands::{
+    __cmd__command_db_conn_status, __cmd__command_protect_db, __cmd__command_unlock_db,
+    command_db_conn_status, command_protect_db, command_unlock_db,
+};
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
@@ -102,6 +108,10 @@ async fn main() {
             tunnel_details,
             delete_tunnel,
             get_latest_app_version,
+            command_protect_db,
+            command_unlock_db,
+            command_db_conn_status,
+            command_get_app_config,
         ])
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -151,21 +161,14 @@ async fn main() {
     if !app_config.db_protected {
         debug!("App database is unprotected, initializing pool on startup.");
         //FIXME: This should trigger some response to inform user of the situation instead of panicking
-        let db = database::init_db(&app_handle, None)
+        let db = database::init_db_connection(&app_handle, None, None)
             .await
-            .expect("Database initialization failed");
+            .expect("Failed to init unprotected db connection");
         *app_state.db.lock().unwrap() = Some(db);
-        debug!("Database initialization completed");
-        let _ = database::info(&app_state.get_pool()).await;
-        //FIXME: move this out from db
-        // configure tray
-        if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
-            configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
-        }
-
-        tauri::async_runtime::spawn(async move {
-            fetch_latest_app_version_loop(app_handle.clone()).await
-        });
+        after_db_app_setup(app_handle.clone())
+            .await
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
     info!("Starting main app thread.");
     // run app
