@@ -1,6 +1,9 @@
 use tauri::{AppHandle, Manager};
 
-use crate::{app_config::AppConfig, appstate::AppState, utils::after_db_app_setup};
+use crate::{
+    app_config::AppConfig, appstate::AppState, database::DB_UNPROTECTED_NAME,
+    utils::after_db_app_setup,
+};
 
 use super::{init_db_connection, protect::protect_db};
 
@@ -23,6 +26,9 @@ pub async fn command_protect_db(app_handle: AppHandle, password: String) -> Resu
         protect_db(&app_handle, &pool, &password)
             .await
             .map_err(|e| e.to_string())?;
+        let mut old_db_path = app_handle.path_resolver().app_data_dir()?;
+        old_db_path.push(DB_UNPROTECTED_NAME);
+        std::fs::remove_file(&old_db_path).ok();
     }
     let pool_option = {
         let mut guard = state.db.lock().expect("Failed to lock db mutex");
@@ -34,6 +40,7 @@ pub async fn command_protect_db(app_handle: AppHandle, password: String) -> Resu
     }
     config.db_protected = true;
     config.save(&app_handle).map_err(|e| e.to_string())?;
+    //FIXME: this is a wip workaround to make sure everything is using new pool
     app_handle.restart();
     Ok(())
 }
