@@ -17,6 +17,7 @@ const defaultValues: StoreValues = {
   instances: [],
   tunnels: [],
   selectedInstance: undefined,
+  selectedLocation: undefined,
   statsFilter: 1,
   settings: {
     log_level: 'error',
@@ -82,6 +83,7 @@ type StoreValues = {
   statsFilter: number;
   settings: Settings;
   selectedInstance?: SelectedInstance;
+  selectedLocation?: number;
 };
 
 type StoreMethods = {

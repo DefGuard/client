@@ -123,6 +123,10 @@ type RootTranslation = {
 			 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​!
 			 */
 			error: string
+			/**
+			 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​i​s​s​u​e​ ​a​ ​n​e​w​ ​e​n​r​o​l​l​m​e​n​t​ ​t​o​k​e​n
+			 */
+			tokenExpired: string
 		}
 	}
 	components: {
@@ -180,7 +184,7 @@ type RootTranslation = {
 							 */
 							title: string
 							/**
-							 * S​i​n​c​e​ ​W​i​r​e​G​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​)​.​ ​ ​
+							 * S​i​n​c​e​ ​W​i​r​e​G​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​)​.​
 						​
 						​I​f​ ​y​o​u​ ​w​o​u​l​d​ ​l​i​k​e​ ​t​o​ ​s​e​c​u​r​e​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​t​r​y​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​V​P​N​ ​&​ ​S​S​O​ ​s​e​r​v​e​r​ ​(​w​h​i​c​h​ ​i​s​ ​a​l​s​o​ ​f​r​e​e​ ​&​ ​o​p​e​n​ ​s​o​u​r​c​e​)​ ​t​o​ ​g​e​t​ ​r​e​a​l​ ​2​F​A​ ​u​s​i​n​g​ ​W​i​r​e​G​u​a​r​d​ ​P​S​K​ ​k​e​y​s​ ​a​n​d​ ​p​e​e​r​s​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​b​y​ ​d​e​f​g​u​a​r​d​ ​g​a​t​e​w​a​y​!
 							 */
@@ -205,7 +209,7 @@ type RootTranslation = {
 							 */
 							title: string
 							/**
-							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​ ​ ​
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​
 						​
 						​I​f​ ​y​o​u​ ​a​r​e​ ​a​n​ ​a​d​m​i​n​/​d​e​v​o​p​s​ ​-​ ​a​l​l​ ​y​o​u​r​ ​c​u​s​t​o​m​e​r​s​ ​(​i​n​s​t​a​n​c​e​s​)​ ​a​n​d​ ​a​l​l​ ​t​h​e​i​r​ ​t​u​n​n​e​l​s​ ​(​l​o​c​a​t​i​o​n​s​)​ ​c​a​n​ ​b​e​ ​i​n​ ​o​n​e​ ​p​l​a​c​e​!
 							 */
@@ -399,7 +403,7 @@ type RootTranslation = {
 							/**
 							 * 
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​ ​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​A​l​l​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​A​L​L​ ​y​o​u​r​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>
 							 */
@@ -1613,6 +1617,10 @@ export type TranslationFunctions = {
 			 * Unexpected error occurred!
 			 */
 			error: () => LocalizedString
+			/**
+			 * Token has expired, please contact your administrator to issue a new enrollment token
+			 */
+			tokenExpired: () => LocalizedString
 		}
 	}
 	components: {
@@ -1670,7 +1678,7 @@ export type TranslationFunctions = {
 							 */
 							title: () => LocalizedString
 							/**
-							 * Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).  
+							 * Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).
 					
 						If you would like to secure your WireGuard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using WireGuard PSK keys and peers configuration by defguard gateway!
 							 */
@@ -1695,7 +1703,7 @@ export type TranslationFunctions = {
 							 */
 							title: () => LocalizedString
 							/**
-							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).
 					
 						If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
 							 */
@@ -1889,7 +1897,7 @@ export type TranslationFunctions = {
 							/**
 							 * 
 						                <p>
-						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br>
 						                  <b>All traffic</b> - route ALL your network traffic through this VPN location
 						                </p>
 							 */

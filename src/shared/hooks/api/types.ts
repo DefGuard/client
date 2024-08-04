@@ -109,3 +109,7 @@ export type UseApi = {
   };
   getAppInfo: () => Promise<Response<AppInfo>>;
 };
+
+export type EnrollmentError = {
+  error: string;
+};

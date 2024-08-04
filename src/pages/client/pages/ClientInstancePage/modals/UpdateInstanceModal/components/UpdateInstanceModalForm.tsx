@@ -18,6 +18,7 @@ import {
   EnrollmentStartResponse,
 } from '../../../../../../../shared/hooks/api/types';
 import { clientApi } from '../../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../../hooks/useClientFlags';
 import { clientQueryKeys } from '../../../../../query';
 import { useDeleteInstanceModal } from '../../DeleteInstanceModal/useDeleteInstanceModal';
 import { useUpdateInstanceModal } from '../useUpdateInstanceModal';
@@ -39,6 +40,7 @@ export const UpdateInstanceModalForm = () => {
   const closeModal = useUpdateInstanceModal((state) => state.close);
   const toaster = useToaster();
   const queryClient = useQueryClient();
+  const setClientFlags = useClientFlags((state) => state.setValues);
 
   const defaultValues = useMemo(
     (): FormFields => ({
@@ -193,6 +195,10 @@ export const UpdateInstanceModalForm = () => {
           text={localLL.controls.removeInstance()}
           onClick={() => {
             if (instance) {
+              setClientFlags({
+                selectedInstance: undefined,
+                selectedLocation: undefined,
+              });
               openDeleteInstance(instance);
             }
           }}
