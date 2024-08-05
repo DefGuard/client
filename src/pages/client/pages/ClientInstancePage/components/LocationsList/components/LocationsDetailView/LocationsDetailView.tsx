@@ -27,7 +27,7 @@ const findLocationById = (
   id: number,
 ): CommonWireguardFields | undefined => locations.find((location) => location.id === id);
 
-const { getTunnels } = clientApi;
+const { getTunnels, getInstances } = clientApi;
 
 export const LocationsDetailView = ({
   locations,
@@ -68,9 +68,14 @@ export const LocationsDetailView = ({
 
   useEffect(() => {
     if (activeLocationId === undefined) {
-      navigate(routes.client.addInstance, { replace: true });
+      // set a new activeLocationId if user has deleted last
+      if (locations.length) {
+        setActiveLocationId(locations.at(0)?.instance_id);
+      } else {
+        navigate(routes.client.settings, { replace: true });
+      }
     }
-  }, [activeLocationId, navigate]);
+  }, [activeLocationId, navigate, locations]);
 
   const { data: tunnels } = useQuery({
     queryKey: [clientQueryKeys.getTunnels],
