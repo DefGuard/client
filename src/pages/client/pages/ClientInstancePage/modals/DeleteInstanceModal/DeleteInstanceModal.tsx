@@ -12,6 +12,7 @@ import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/us
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientFlags } from '../../../../hooks/useClientFlags';
 import { clientQueryKeys } from '../../../../query';
+import { useUpdateInstanceModal } from '../UpdateInstanceModal/useUpdateInstanceModal';
 import { useDeleteInstanceModal } from './useDeleteInstanceModal';
 
 const { deleteInstance } = clientApi;
@@ -32,6 +33,7 @@ export const DeleteInstanceModal = () => {
     (state) => [state.close, state.reset],
     shallow,
   );
+  const [closeUpdate] = useUpdateInstanceModal((state) => [state.close], shallow);
   const toaster = useToaster();
   const localLL = LL.modals.deleteInstance;
   const queryClient = useQueryClient();
@@ -79,6 +81,8 @@ export const DeleteInstanceModal = () => {
             selectedLocation: undefined,
           });
           mutate(instance.id);
+          close();
+          closeUpdate();
         }
       }}
       onCancel={() => close()}
