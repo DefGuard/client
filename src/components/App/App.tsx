@@ -20,9 +20,7 @@ import { localStorageDetector } from 'typesafe-i18n/detectors';
 import TypesafeI18n from '../../i18n/i18n-react';
 import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
-import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
-import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
 import { ClientAddedPage } from '../../pages/client/pages/ClientAddedPage/ClientAddedPage';
 import { ClientAddInstancePage } from '../../pages/client/pages/ClientAddInstancePage/ClientAddInstnacePage';
@@ -33,6 +31,7 @@ import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/
 import { WireguardInstanceType } from '../../pages/client/types';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
+import { SplashPage } from '../../pages/splash/SplashPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
@@ -48,12 +47,10 @@ dayjs.extend(timezone);
 
 const queryClient = new QueryClient();
 
-const { getSettings, getInstances, getTunnels } = clientApi;
-
 const router = createBrowserRouter([
   {
     index: true,
-    element: <Navigate to={routes.client.base} />,
+    element: <SplashPage />,
   },
   {
     path: '/timeout',
@@ -120,13 +117,8 @@ const detectedLocale = detectLocale(localStorageDetector);
 
 export const App = () => {
   const [localeLoaded, setWasLoaded] = useState(false);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const setClientState = useClientStore((state) => state.setState);
 
-  const appLoaded = useMemo(
-    () => localeLoaded && settingsLoaded,
-    [localeLoaded, settingsLoaded],
-  );
+  const appLoaded = useMemo(() => localeLoaded, [localeLoaded]);
 
   // load locales
   useEffect(() => {
@@ -137,20 +129,6 @@ export const App = () => {
     });
     dayjs.locale(detectedLocale);
   }, []);
-
-  // load settings from tauri first time
-  useEffect(() => {
-    const loadTauriState = async () => {
-      debug('App init state from tauri');
-      const settings = await getSettings();
-      const instances = await getInstances();
-      const tunnels = await getTunnels();
-      setClientState({ settings, instances, tunnels });
-      debug('Tauri init data loaded');
-      setSettingsLoaded(true);
-    };
-    loadTauriState();
-  }, [setClientState, setSettingsLoaded]);
 
   if (!appLoaded) return null;
 

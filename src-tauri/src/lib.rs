@@ -1,5 +1,6 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
+pub mod app_config;
 pub mod appstate;
 pub mod commands;
 pub mod database;

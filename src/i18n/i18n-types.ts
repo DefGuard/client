@@ -123,6 +123,10 @@ type RootTranslation = {
 			 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​!
 			 */
 			error: string
+			/**
+			 * C​o​n​t​e​n​t​ ​c​o​p​i​e​d​ ​t​o​ ​c​l​i​p​b​o​a​r​d​.
+			 */
+			clipboardGeneric: string
 		}
 	}
 	components: {
@@ -1613,6 +1617,10 @@ export type TranslationFunctions = {
 			 * Unexpected error occurred!
 			 */
 			error: () => LocalizedString
+			/**
+			 * Content copied to clipboard.
+			 */
+			clipboardGeneric: () => LocalizedString
 		}
 	}
 	components: {

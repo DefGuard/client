@@ -12,6 +12,7 @@ import {
   Tunnel,
 } from '../types';
 import {
+  AppConfig,
   ConnectionRequest,
   GetLocationsRequest,
   LocationDetails,
@@ -114,7 +115,23 @@ const deleteTunnel = async (id: number): Promise<void> =>
 const getLatestAppVersion = async (): Promise<NewApplicationVersionInfo> =>
   invokeWrapper('get_latest_app_version');
 
+const getDatabaseConnectionStatus = async (): Promise<boolean> =>
+  invokeWrapper('command_db_conn_status');
+
+const unlockDatabase = async (password: string): Promise<void> =>
+  invokeWrapper('command_unlock_db', { password });
+
+const protectDatabase = async (password: string): Promise<void> =>
+  invokeWrapper('command_protect_db', { password });
+
+const getAppConfig = async (): Promise<AppConfig> =>
+  invokeWrapper('command_get_app_config');
+
 export const clientApi = {
+  getAppConfig,
+  getDatabaseConnectionStatus,
+  unlockDatabase,
+  protectDatabase,
   getInstances,
   getTunnels,
   getLocations,

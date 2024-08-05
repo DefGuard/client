@@ -1,4 +1,5 @@
 use std::{
+    fs,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     path::PathBuf,
     process::Command,
@@ -16,9 +17,11 @@ use crate::{
     commands::{LocationInterfaceDetails, Payload},
     database::{
         models::{location::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
-        ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
+        ActiveConnection, Connection, DbPool, Location, Settings, Tunnel, TunnelConnection,
+        WireguardKeys,
     },
     error::Error,
+    latest_app_version::fetch_latest_app_version_loop,
     service::{
         log_watcher::spawn_log_watcher_task,
         proto::{
@@ -26,6 +29,7 @@ use crate::{
             ReadInterfaceDataRequest, RemoveInterfaceRequest,
         },
     },
+    tray::configure_tray_icon,
     ConnectionType,
 };
 use local_ip_address::local_ip;
@@ -732,5 +736,38 @@ pub async fn disconnect_interface(
     }
 
     info!("Location {} {:?} disconnected", id, connection_type);
+    Ok(())
+}
+
+pub fn init_app_dirs(app: &AppHandle) {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    paths.push(
+        app.path_resolver()
+            .app_data_dir()
+            .expect("Failed to get app data path."),
+    );
+    paths.push(
+        app.path_resolver()
+            .app_local_data_dir()
+            .expect("Failed to get app data path."),
+    );
+    for path in paths.iter() {
+        if !path.exists() {
+            fs::create_dir_all(path.clone())
+                .expect("Failed to create required application directory");
+            debug!("Application dir {:?} , created.", path.to_str());
+        }
+    }
+}
+
+pub async fn after_db_app_setup(app_handle: AppHandle) -> Result<(), Error> {
+    let state = app_handle.state::<AppState>();
+    let db_pool = state.get_pool();
+    let settings = Settings::get(&db_pool).await?;
+    configure_tray_icon(&app_handle, &settings.tray_icon_theme)?;
+
+    tauri::async_runtime::spawn(
+        async move { fetch_latest_app_version_loop(app_handle.clone()).await },
+    );
     Ok(())
 }

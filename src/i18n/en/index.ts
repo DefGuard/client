@@ -42,6 +42,7 @@ const en = {
     },
     messages: {
       error: 'Unexpected error occurred!',
+      clipboardGeneric: 'Content copied to clipboard.',
     },
   },
   components: {

@@ -76,7 +76,10 @@ impl Settings {
         Ok(settings)
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query!(
             "UPDATE settings \
             SET theme = $1, log_level = $2, tray_icon_theme = $3, check_for_updates = $4 \
@@ -86,7 +89,7 @@ impl Settings {
             self.tray_icon_theme,
             self.check_for_updates,
         )
-        .execute(pool)
+        .execute(executor)
         .await?;
         Ok(())
     }

@@ -12,7 +12,7 @@ export const passwordValidator = (LL: TranslationFunctions) =>
   z
     .string()
     .trim()
-    .nonempty(LL.form.errors.required())
+    .min(1, LL.form.errors.required())
     .min(8, LL.form.errors.minLength({ length: 8 }))
     .max(128, LL.form.errors.maxLength({ length: 128 }))
     .regex(patternAtLeastOneDigit, LL.form.errors.numberRequired())

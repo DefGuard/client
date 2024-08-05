@@ -31,14 +31,14 @@ pub struct Location {
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct LocationStats {
-    id: Option<i64>,
-    location_id: i64,
-    upload: i64,
-    download: i64,
-    last_handshake: i64,
-    collected_at: NaiveDateTime,
-    listen_port: u32,
-    persistent_keepalive_interval: Option<u16>,
+    pub(crate) id: Option<i64>,
+    pub(crate) location_id: i64,
+    pub(crate) upload: i64,
+    pub(crate) download: i64,
+    pub(crate) last_handshake: i64,
+    pub(crate) collected_at: NaiveDateTime,
+    pub(crate) listen_port: u32,
+    pub(crate) persistent_keepalive_interval: Option<u16>,
 }
 
 impl From<LocationStats> for CommonLocationStats {
