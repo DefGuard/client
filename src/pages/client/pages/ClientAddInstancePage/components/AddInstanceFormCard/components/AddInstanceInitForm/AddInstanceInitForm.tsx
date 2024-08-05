@@ -198,9 +198,9 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
       })
       .catch((e: Error) => {
-        toaster.error(e.message);
+        toaster.error(LL.common.messages.error());
         setIsLoading(false);
-        error(e.message);
+        console.log(e);
       });
   };
 
