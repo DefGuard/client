@@ -27,7 +27,7 @@ const findLocationById = (
   id: number,
 ): CommonWireguardFields | undefined => locations.find((location) => location.id === id);
 
-const { getTunnels, getInstances } = clientApi;
+const { getTunnels } = clientApi;
 
 export const LocationsDetailView = ({
   locations,
