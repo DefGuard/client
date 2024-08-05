@@ -26,7 +26,7 @@ pub async fn command_protect_db(app_handle: AppHandle, password: String) -> Resu
         protect_db(&app_handle, &pool, &password)
             .await
             .map_err(|e| e.to_string())?;
-        let mut old_db_path = app_handle.path_resolver().app_data_dir()?;
+        let mut old_db_path = app_handle.path_resolver().app_data_dir().unwrap();
         old_db_path.push(DB_UNPROTECTED_NAME);
         std::fs::remove_file(&old_db_path).ok();
     }
@@ -40,8 +40,6 @@ pub async fn command_protect_db(app_handle: AppHandle, password: String) -> Resu
     }
     config.db_protected = true;
     config.save(&app_handle).map_err(|e| e.to_string())?;
-    //FIXME: this is a wip workaround to make sure everything is using new pool
-    app_handle.restart();
     Ok(())
 }
 
