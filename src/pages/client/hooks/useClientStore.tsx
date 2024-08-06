@@ -17,6 +17,7 @@ const defaultValues: StoreValues = {
   instances: [],
   tunnels: [],
   selectedInstance: undefined,
+  selectedLocation: undefined,
   statsFilter: 1,
   listChecked: false,
   settings: {
@@ -85,6 +86,7 @@ type StoreValues = {
   tunnels: CommonWireguardFields[];
   statsFilter: number;
   selectedInstance?: SelectedInstance;
+  selectedLocation?: number;
   // launch carousel page if there is no instances or/and tunnels for the first time after launching application
   listChecked: boolean;
   settings: Settings;

@@ -23,8 +23,9 @@ import {
 import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { WireguardInstanceType } from '../../../../../../types';
+import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
 const { getInstances, saveConfig } = clientApi;
@@ -46,6 +47,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
   const localLL = LL.pages.client.pages.addInstancePage.forms.device;
   const toaster = useToaster();
   const setClientStore = useClientStore((state) => state.setState);
+  const setCliengFlags = useClientFlags((state) => state.setValues);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -104,11 +106,16 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             setIsLoading(false);
             toaster.success(localLL.messages.addSuccess());
             const instances = await getInstances();
+            const _selectedInstance: SelectedInstance = {
+              id: res.instance.id,
+              type: WireguardInstanceType.DEFGUARD_INSTANCE,
+            };
+            setCliengFlags({
+              selectedLocation: 0,
+              selectedInstance: _selectedInstance,
+            });
             setClientStore({
-              selectedInstance: {
-                id: res.instance.id,
-                type: WireguardInstanceType.DEFGUARD_INSTANCE,
-              },
+              selectedInstance: _selectedInstance,
               instances,
             });
             navigate(routes.client.instancePage, { replace: true });
