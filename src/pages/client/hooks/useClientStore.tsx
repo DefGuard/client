@@ -19,6 +19,7 @@ const defaultValues: StoreValues = {
   selectedInstance: undefined,
   selectedLocation: undefined,
   statsFilter: 1,
+  listChecked: false,
   settings: {
     log_level: 'error',
     theme: 'light',
@@ -53,6 +54,9 @@ export const useClientStore = createWithEqualityFn<Store>(
       }
       return set({ tunnels: values });
     },
+    setListChecked: async (values: boolean) => {
+      return set({ listChecked: values });
+    },
     updateInstances: async () => {
       const res = await getInstances();
       let selected = get().selectedInstance;
@@ -81,15 +85,18 @@ type StoreValues = {
   instances: DefguardInstance[];
   tunnels: CommonWireguardFields[];
   statsFilter: number;
-  settings: Settings;
   selectedInstance?: SelectedInstance;
   selectedLocation?: number;
+  // launch carousel page if there is no instances or/and tunnels for the first time after launching application
+  listChecked: boolean;
+  settings: Settings;
 };
 
 type StoreMethods = {
   setState: (values: Partial<StoreValues>) => void;
   setInstances: (instances: DefguardInstance[]) => void;
   setTunnels: (tunnels: CommonWireguardFields[]) => void;
+  setListChecked: (listChecked: boolean) => void;
   updateInstances: () => Promise<void>;
   updateSettings: (data: Partial<Settings>) => Promise<void>;
 };
