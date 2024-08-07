@@ -93,7 +93,6 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       }).then((r) => {
         if (!r.ok) {
           setIsLoading(false);
-          toaster.error(LL.common.messages.error());
           error('Failed to create device check enrollment and defguard logs');
           throw Error('Failed to create device');
         }
@@ -127,8 +126,17 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       });
     } catch (e) {
       setIsLoading(false);
-      toaster.error(LL.common.messages.error());
       console.error(e);
+
+      if (typeof e === 'string') {
+        if (e.includes('Network Error')) {
+          toaster.error('You have lost connection with the other services...');
+          return;
+        }
+        toaster.error(LL.common.messages.error());
+      } else {
+        toaster.error((e as Error).message);
+      }
     }
   };
 

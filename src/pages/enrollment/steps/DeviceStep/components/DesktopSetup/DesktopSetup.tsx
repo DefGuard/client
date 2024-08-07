@@ -90,7 +90,6 @@ export const DesktopSetup = () => {
       pubkey: publicKey,
     }).then((res) => {
       if (!res.ok) {
-        toaster.error(LL.common.messages.error());
         error(
           `Failed to create device during the enrollment. Error details: ${JSON.stringify(
             res.data,
@@ -105,7 +104,6 @@ export const DesktopSetup = () => {
       phone_number: userInfo.phone_number,
     }).then((res) => {
       if (!res.ok) {
-        toaster.error(LL.common.messages.error());
         error(
           `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
             res.data,
@@ -133,8 +131,18 @@ export const DesktopSetup = () => {
           });
           next();
         })
-        .catch(() => {
+        .catch((e) => {
           setIsLoading(false);
+
+          if (typeof e === 'string') {
+            if (e.includes('Network Error')) {
+              toaster.error('You have lost connection with the other services...');
+              return;
+            }
+            toaster.error(LL.common.messages.error());
+          } else {
+            toaster.error((e as Error).message);
+          }
         });
     });
   };
