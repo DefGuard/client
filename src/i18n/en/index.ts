@@ -44,6 +44,7 @@ const en = {
       error: 'Unexpected error occurred!',
       tokenExpired:
         'Token has expired, please contact your administrator to issue a new enrollment token',
+      hasAlreadyPassword: "Can't do enrollment process if the user has already password.",
     },
   },
   components: {

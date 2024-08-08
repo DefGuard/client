@@ -105,7 +105,7 @@ export const DesktopSetup = () => {
       phone_number: userInfo.phone_number,
     }).then((res) => {
       if (!res.ok) {
-        toaster.error(LL.common.messages.error());
+        toaster.error(LL.common.messages.hasAlreadyPassword());
         error(
           `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
             res.data,

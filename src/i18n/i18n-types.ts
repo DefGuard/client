@@ -127,6 +127,10 @@ type RootTranslation = {
 			 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​i​s​s​u​e​ ​a​ ​n​e​w​ ​e​n​r​o​l​l​m​e​n​t​ ​t​o​k​e​n
 			 */
 			tokenExpired: string
+			/**
+			 * C​a​n​'​t​ ​d​o​ ​e​n​r​o​l​l​m​e​n​t​ ​p​r​o​c​e​s​s​ ​i​f​ ​t​h​e​ ​u​s​e​r​ ​h​a​s​ ​a​l​r​e​a​d​y​ ​p​a​s​s​w​o​r​d​.
+			 */
+			hasAlreadyPassword: string
 		}
 	}
 	components: {
@@ -1621,6 +1625,10 @@ export type TranslationFunctions = {
 			 * Token has expired, please contact your administrator to issue a new enrollment token
 			 */
 			tokenExpired: () => LocalizedString
+			/**
+			 * Can't do enrollment process if the user has already password.
+			 */
+			hasAlreadyPassword: () => LocalizedString
 		}
 	}
 	components: {
