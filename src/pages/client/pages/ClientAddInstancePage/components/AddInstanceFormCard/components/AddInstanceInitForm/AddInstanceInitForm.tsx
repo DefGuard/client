@@ -197,10 +197,18 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           navigate(routes.enrollment, { replace: true });
         }
       })
-      .catch((e: Error) => {
-        toaster.error(LL.common.messages.error());
+      .catch((e) => {
         setIsLoading(false);
         console.log(e);
+        if (typeof e === 'string') {
+          if (e.includes('Network Error')) {
+            toaster.error(LL.common.messages.networkError());
+            return;
+          }
+          toaster.error(LL.common.messages.error());
+        } else {
+          toaster.error((e as Error).message);
+        }
       });
   };
 
