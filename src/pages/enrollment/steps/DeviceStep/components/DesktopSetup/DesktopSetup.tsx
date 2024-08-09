@@ -136,7 +136,7 @@ export const DesktopSetup = () => {
 
           if (typeof e === 'string') {
             if (e.includes('Network Error')) {
-              toaster.error('You have lost connection with the other services...');
+              toaster.error(LL.common.messages.networkError());
               return;
             }
             toaster.error(LL.common.messages.error());

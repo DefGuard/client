@@ -44,6 +44,7 @@ const en = {
       error: 'Unexpected error occurred!',
       tokenExpired:
         'Token has expired, please contact your administrator to issue a new enrollment token',
+      networkError: 'There was a network error. Can\'t reach server."',
     },
   },
   components: {
