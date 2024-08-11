@@ -28,7 +28,17 @@ pub async fn command_protect_db(app_handle: AppHandle, password: String) -> Resu
             .map_err(|e| e.to_string())?;
         let mut old_db_path = app_handle.path_resolver().app_data_dir().unwrap();
         old_db_path.push(DB_UNPROTECTED_NAME);
-        std::fs::remove_file(&old_db_path).ok();
+        match std::fs::remove_file(&old_db_path) {
+            Ok(_) => {
+                info!("Unprotected database removed.")
+            }
+            Err(e) => {
+                error!(
+                    "Removal of unprotected database failed, cause: \n{0}",
+                    e.to_string()
+                );
+            }
+        }
     }
     let pool_option = {
         let mut guard = state.db.lock().expect("Failed to lock db mutex");
@@ -37,6 +47,21 @@ pub async fn command_protect_db(app_handle: AppHandle, password: String) -> Resu
     match pool_option {
         Some(pool) => pool.close().await,
         None => {}
+    }
+    // Clean old unprotected db file
+    // FIXME: Handle case if this fails, should we roll back ?
+    let mut old_db_path = app_handle.path_resolver().app_data_dir().unwrap();
+    old_db_path.push(DB_UNPROTECTED_NAME);
+    match std::fs::remove_file(&old_db_path) {
+        Ok(_) => {
+            info!("Unprotected database removed.")
+        }
+        Err(e) => {
+            error!(
+                "Removal of unprotected database failed, cause: \n{0}",
+                e.to_string()
+            );
+        }
     }
     config.db_protected = true;
     config.save(&app_handle).map_err(|e| e.to_string())?;

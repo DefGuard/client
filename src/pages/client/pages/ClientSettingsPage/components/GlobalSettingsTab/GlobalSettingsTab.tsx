@@ -14,37 +14,24 @@ import {
   SelectSizeVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
 import { ThemeKey } from '../../../../../../shared/defguard-ui/hooks/theme/types';
-import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { LogLevel, TrayIconTheme } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../query';
+import { EncryptDatabaseModal } from '../modals/EncryptDatabaseModal/EncryptDatabaseModal';
+import { useEncryptDatabaseModal } from '../modals/EncryptDatabaseModal/hooks/useEncryptDatabaseModal';
 
-const { getAppConfig, protectDatabase } = clientApi;
-
-//FIXME: get user input
-const protectionPassword = 'DefguardProtect32';
+const { getAppConfig } = clientApi;
 
 export const GlobalSettingsTab = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
-  const toaster = useToaster();
+  const openEncryptModal = useEncryptDatabaseModal((s) => s.open);
 
   const { data: appConfig } = useQuery({
     queryFn: getAppConfig,
-    queryKey: [clientQueryKeys],
+    queryKey: [clientQueryKeys.getAppConfig],
     refetchOnWindowFocus: false,
-  });
-
-  const { mutate: encryptDatabase, isPending } = useMutation({
-    mutationFn: protectDatabase,
-    onSuccess: () => {
-      toaster.success('Database is now protected.');
-    },
-    onError: (e) => {
-      toaster.error('Encryption failed, check console!');
-      console.error(e);
-    },
   });
 
   return (
@@ -72,10 +59,10 @@ export const GlobalSettingsTab = () => {
           <Button
             text="Encrypt Database"
             styleVariant={ButtonStyleVariant.PRIMARY}
-            onClick={() => encryptDatabase(protectionPassword)}
-            loading={isPending}
+            onClick={() => openEncryptModal()}
           />
         )}
+        <EncryptDatabaseModal />
       </section>
     </div>
   );
