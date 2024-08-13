@@ -42,6 +42,9 @@ const en = {
     },
     messages: {
       error: 'Unexpected error occurred!',
+      tokenExpired:
+        'Token has expired, please contact your administrator to issue a new enrollment token',
+      networkError: 'There was a network error. Can\'t reach server."',
     },
   },
   components: {
@@ -77,7 +80,7 @@ const en = {
               // md
               title: 'WireGuard **2FA with defguard**',
               // md
-              sideText: `Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).  
+              sideText: `Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).
 
 If you would like to secure your WireGuard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using WireGuard PSK keys and peers configuration by defguard gateway!`,
             },
@@ -94,7 +97,7 @@ If you would like to secure your WireGuard instance try **defguard** VPN & SSO s
               // md
               title: '**Multiple** instance & locations',
               // md
-              sideText: `**defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+              sideText: `**defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).
 
 If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!`,
             },
@@ -178,7 +181,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               label: 'Allowed traffic',
               helper: `
                 <p>
-                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br>
                   <b>All traffic</b> - route ALL your network traffic through this VPN location
                 </p>`,
             },
