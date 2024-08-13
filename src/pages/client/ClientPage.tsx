@@ -23,6 +23,10 @@ export const ClientPage = () => {
   ]);
   const navigate = useNavigate();
   const firstLaunch = useClientFlags((state) => state.firstStart);
+  const [listChecked, setListChecked] = useClientStore((state) => [
+    state.listChecked,
+    state.setListChecked,
+  ]);
   const location = useLocation();
 
   const { data: instances } = useQuery({
@@ -94,12 +98,14 @@ export const ClientPage = () => {
   // update store
   useEffect(() => {
     if (instances) {
+      setListChecked(true);
       setInstances(instances);
     }
     if (tunnels) {
+      setListChecked(true);
       setTunnels(tunnels);
     }
-  }, [instances, setInstances, tunnels, setTunnels]);
+  }, [instances, setInstances, tunnels, setTunnels, setListChecked]);
 
   // navigate to carousel on first app Launch
   useEffect(() => {
@@ -107,6 +113,12 @@ export const ClientPage = () => {
       navigate(routes.client.carousel, { replace: true });
     }
   }, [firstLaunch, navigate, location.pathname]);
+
+  useEffect(() => {
+    if (listChecked && instances?.length === 0 && tunnels?.length === 0) {
+      navigate(routes.client.carousel, { replace: true });
+    }
+  }, [navigate, listChecked, instances, tunnels]);
 
   return (
     <>
