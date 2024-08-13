@@ -91,7 +91,7 @@ export const ClientInstancePage = () => {
           <StatsFilterSelect />
           {isLocationPage && (
             <>
-              <StatsLayoutSelect locationsNumber={locations?.length} />
+              <StatsLayoutSelect locations={locations} />
               {selectedInstance && (
                 <Button
                   styleVariant={ButtonStyleVariant.STANDARD}

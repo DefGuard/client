@@ -10,12 +10,13 @@ import {
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
 import { ClientView } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
+import { CommonWireguardFields } from '../../../../types';
 
 interface StatsLayoutSelect {
-  locationsNumber: number | undefined;
+  locations: CommonWireguardFields[] | undefined;
 }
 
-export const StatsLayoutSelect = ({ locationsNumber }: StatsLayoutSelect) => {
+export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage;
   const settings = useClientStore((state) => state.settings);
@@ -44,8 +45,8 @@ export const StatsLayoutSelect = ({ locationsNumber }: StatsLayoutSelect) => {
           key: selected.key,
           displayValue: selected.label,
         };
-      } else if (selected === null && locationsNumber !== undefined) {
-        if (locationsNumber === 1) {
+      } else if (selected == null && locations != undefined) {
+        if (locations.length == 1) {
           return {
             key: 'detail',
             displayValue: localLL.header.filters.views.detail(),
@@ -61,7 +62,7 @@ export const StatsLayoutSelect = ({ locationsNumber }: StatsLayoutSelect) => {
         displayValue: 'None',
       };
     },
-    [options, locationsNumber, localLL.header.filters.views],
+    [options, locations, localLL.header.filters.views],
   );
 
   return (
