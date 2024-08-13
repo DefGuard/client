@@ -59,8 +59,8 @@ export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
         };
       }
       return {
-        key: 'ERROR',
-        displayValue: 'None',
+        key: 'grid',
+        displayValue: localLL.header.filters.views.grid(),
       };
     },
     [options, locations, localLL.header.filters.views],
