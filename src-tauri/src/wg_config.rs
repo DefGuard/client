@@ -88,7 +88,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
 
     // Create or modify the Tunnel struct with the parsed values using the `new` method
     let tunnel = Tunnel::new(
-        "".into(),
+        String::new(),
         pubkey,
         prvkey.into(),
         address.into(),
@@ -107,6 +107,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
 
     Ok(tunnel)
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -36,7 +36,7 @@ use proto::{
 };
 
 const DAEMON_HTTP_PORT: u16 = 54127;
-pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
+pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -64,8 +64,8 @@ impl DaemonService {
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
-    let wgapi = WGApi::new(ifname.clone(), IS_MACOS).map_err(|err| {
+fn setup_wgapi(ifname: &str) -> Result<WGApi, Status> {
+    let wgapi = WGApi::new(ifname.to_string(), IS_MACOS).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
@@ -91,7 +91,7 @@ impl DesktopDaemonService for DaemonService {
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
         info!("Creating interface {ifname}");
         // setup WireGuard API
-        let wgapi = setup_wgapi(ifname.clone())?;
+        let wgapi = setup_wgapi(ifname)?;
 
         if let Some(pre_up) = request.pre_up {
             debug!("Executing specified PreUp command: {pre_up}");
@@ -170,7 +170,7 @@ impl DesktopDaemonService for DaemonService {
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         info!("Removing interface {ifname}");
         // setup WireGuard API
-        let wgapi = setup_wgapi(ifname.clone())?;
+        let wgapi = setup_wgapi(&ifname)?;
         if let Some(pre_down) = request.pre_down {
             debug!("Executing specified PreDown command: {pre_down}");
             let _ = execute_command(&pre_down);
@@ -210,7 +210,7 @@ impl DesktopDaemonService for DaemonService {
             info!("Spawning stats thread for interface {ifname}");
             // setup WireGuard API
             let error_msg = format!("Failed to initialize WireGuard API for interface {ifname}");
-            let wgapi = setup_wgapi(ifname.clone()).expect(&error_msg);
+            let wgapi = setup_wgapi(&ifname).expect(&error_msg);
             let period = Duration::from_secs(stats_period);
             let mut interval = interval(period);
 
@@ -281,6 +281,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             address: config.address,
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
+            mtu: None,
         }
     }
 }

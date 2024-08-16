@@ -15,7 +15,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::{
     fs::{read_dir, File},
     io::{BufRead, BufReader},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, SystemTime},
 };
@@ -61,11 +61,11 @@ struct LogLineFields {
 }
 
 #[derive(Debug)]
-pub struct ServiceLogWatcher {
+pub struct ServiceLogWatcher<'a> {
     interface_name: String,
     log_level: Level,
     from: Option<DateTime<Utc>>,
-    log_dir: PathBuf,
+    log_dir: &'a Path,
     current_log_file: Option<PathBuf>,
     current_position: u64,
     handle: AppHandle,
@@ -73,7 +73,7 @@ pub struct ServiceLogWatcher {
     event_topic: String,
 }
 
-impl ServiceLogWatcher {
+impl<'a> ServiceLogWatcher<'a> {
     #[must_use]
     pub fn new(
         handle: AppHandle,
@@ -109,7 +109,7 @@ impl ServiceLogWatcher {
 
         debouncer
             .watcher()
-            .watch(&self.log_dir, RecursiveMode::Recursive)?;
+            .watch(self.log_dir, RecursiveMode::Recursive)?;
 
         // parse log dir initially before watching for changes
         self.parse_log_dir()?;
@@ -160,7 +160,7 @@ impl ServiceLogWatcher {
             let mut parsed_lines = Vec::new();
             for line in reader.lines() {
                 let line = line?;
-                if let Some(parsed_line) = self.parse_log_line(line)? {
+                if let Some(parsed_line) = self.parse_log_line(&line)? {
                     parsed_lines.push(parsed_line);
                 }
             }
@@ -179,9 +179,9 @@ impl ServiceLogWatcher {
     ///
     /// Deserializes the log line into a known struct and checks if the line is relevant
     /// to the specified interface. Also performs filtering by log level and optional timestamp.
-    fn parse_log_line(&self, line: String) -> Result<Option<LogLine>, LogWatcherError> {
+    fn parse_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
         trace!("Parsing log line: {line}");
-        let log_line = serde_json::from_str::<LogLine>(&line)?;
+        let log_line = serde_json::from_str::<LogLine>(line)?;
         trace!("Parsed log line into: {log_line:?}");
 
         // filter by log level
@@ -220,7 +220,7 @@ impl ServiceLogWatcher {
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         debug!("Getting latest log file from directory: {:?}", self.log_dir);
-        let entries = read_dir(&self.log_dir)?;
+        let entries = read_dir(self.log_dir)?;
 
         let mut latest_log = None;
         let mut latest_time = SystemTime::UNIX_EPOCH;
@@ -247,7 +247,10 @@ fn extract_timestamp(filename: &str) -> Option<SystemTime> {
     let timestamp = &filename[split_pos..];
     // parse and convert to `SystemTime`
     if let Ok(timestamp) = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d") {
-        let timestamp = timestamp.and_time(NaiveTime::default()).timestamp();
+        let timestamp = timestamp
+            .and_time(NaiveTime::default())
+            .and_utc()
+            .timestamp();
         return Some(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp as u64));
     }
     None
@@ -319,7 +322,7 @@ pub async fn spawn_log_watcher_task(
 }
 
 /// Stops the log watcher thread
-pub fn stop_log_watcher_task(handle: AppHandle, interface_name: String) -> Result<(), Error> {
+pub fn stop_log_watcher_task(handle: &AppHandle, interface_name: &str) -> Result<(), Error> {
     info!("Stopping log watcher task for interface {interface_name}");
     let app_state = handle.state::<AppState>();
 
@@ -329,7 +332,7 @@ pub fn stop_log_watcher_task(handle: AppHandle, interface_name: String) -> Resul
         .lock()
         .expect("Failed to lock log watchers mutex");
 
-    match log_watchers.remove(&interface_name) {
+    match log_watchers.remove(interface_name) {
         Some(token) => {
             debug!("Using cancellation token for log watcher on interface {interface_name}");
             token.cancel();

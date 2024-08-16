@@ -173,7 +173,7 @@ async fn main() {
         // prevent shutdown on window close
         tauri::RunEvent::ExitRequested { api, .. } => {
             debug!("Received exit request");
-            api.prevent_exit()
+            api.prevent_exit();
         }
         // handle shutdown
         tauri::RunEvent::Exit => {
@@ -187,7 +187,7 @@ async fn main() {
             });
         }
         _ => {
-            trace!("Received event: {event:?}")
+            trace!("Received event: {event:?}");
         }
     });
 }

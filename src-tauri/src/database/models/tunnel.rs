@@ -1,15 +1,17 @@
+use std::time::SystemTime;
+
+use chrono::{NaiveDateTime, Utc};
+use defguard_wireguard_rs::host::Peer;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, NoneAsEmptyString};
+use sqlx::{query, query_as, Error as SqlxError, FromRow};
+
 use crate::{
     commands::DateTimeAggregation,
     database::{ActiveConnection, DbPool},
     error::Error,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-use chrono::{NaiveDateTime, Utc};
-use defguard_wireguard_rs::host::Peer;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, NoneAsEmptyString};
-use sqlx::{query, query_as, Error as SqlxError, FromRow};
-use std::time::SystemTime;
 
 #[serde_as]
 #[derive(Debug, FromRow, Serialize, Deserialize)]
@@ -168,7 +170,7 @@ impl Tunnel {
     pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
            Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, 
+            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive,
             route_all_traffic, pre_up, post_up, pre_down, post_down \
             FROM tunnel WHERE server_pubkey = $1;",
             pubkey
@@ -282,8 +284,7 @@ impl TunnelStats {
             WHERE tunnel_id = $2
             AND collected_at >= $3
             GROUP BY collected_at
-            ORDER BY collected_at;
-            "#,
+            ORDER BY collected_at"#,
             aggregation,
             tunnel_id,
             from
@@ -357,11 +358,8 @@ impl TunnelConnection {
     pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
         let connections = query_as!(
             TunnelConnection,
-            r#"
-            SELECT id, tunnel_id, connected_from, start, end 
-            FROM tunnel_connection
-            WHERE tunnel_id = $1
-            "#,
+            "SELECT id, tunnel_id, connected_from, start, end \
+            FROM tunnel_connection WHERE tunnel_id = $1",
             tunnel_id
         )
         .fetch_all(pool)
@@ -372,13 +370,9 @@ impl TunnelConnection {
     pub async fn latest_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, Error> {
         let connection = query_as!(
             TunnelConnection,
-            r#"
-            SELECT id, tunnel_id, connected_from, start, end
-            FROM tunnel_connection
-            WHERE tunnel_id = $1
-            ORDER BY end DESC
-            LIMIT 1
-            "#,
+            "SELECT id, tunnel_id, connected_from, start, end \
+            FROM tunnel_connection WHERE tunnel_id = $1 \
+            ORDER BY end DESC LIMIT 1",
             tunnel_id
         )
         .fetch_optional(pool)
@@ -432,8 +426,7 @@ impl TunnelConnectionInfo {
                       LIMIT 1
                   ), 0) as "download: _"
               FROM tunnel_connection AS c WHERE tunnel_id = $1
-              ORDER BY start DESC;
-            "#,
+              ORDER BY start DESC"#,
             tunnel_id
         )
         .fetch_all(pool)
@@ -442,6 +435,7 @@ impl TunnelConnectionInfo {
         Ok(connections)
     }
 }
+
 impl From<ActiveConnection> for TunnelConnection {
     fn from(active_connection: ActiveConnection) -> Self {
         TunnelConnection {
@@ -467,6 +461,7 @@ impl From<TunnelConnection> for CommonConnection {
         }
     }
 }
+
 // Implement From trait for converting TunnelStats to CommonLocationStats
 impl From<TunnelStats> for CommonLocationStats {
     fn from(tunnel_stats: TunnelStats) -> Self {

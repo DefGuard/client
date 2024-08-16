@@ -39,13 +39,13 @@ pub async fn connect(
     let state = handle.state::<AppState>();
     if connection_type.eq(&ConnectionType::Location) {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
-            handle_connection_for_location(&location, preshared_key, handle).await?
+            handle_connection_for_location(&location, preshared_key, handle).await?;
         } else {
             error!("Location {location_id} not found");
             return Err(Error::NotFound);
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
-        handle_connection_for_tunnel(&tunnel, handle).await?
+        handle_connection_for_tunnel(&tunnel, handle).await?;
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);
@@ -74,7 +74,7 @@ pub async fn disconnect(
                 message: "Created new connection".into(),
             },
         )?;
-        stop_log_watcher_task(handle, interface_name)?;
+        stop_log_watcher_task(&handle, &interface_name)?;
         info!("Disconnected from location with id: {location_id}");
         Ok(())
     } else {
@@ -109,6 +109,7 @@ pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) 
         keepalive_interval: device_config.keepalive_interval.into(),
     }
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InstanceResponse {
     // uuid
@@ -395,12 +396,11 @@ pub enum DateTimeAggregation {
 impl DateTimeAggregation {
     /// Returns database format string for given aggregation variant
     #[must_use]
-    pub fn fstring(&self) -> String {
+    pub fn fstring(&self) -> &'static str {
         match self {
             Self::Hour => "%Y-%m-%d %H:00:00",
             Self::Second => "%Y-%m-%d %H:%M:%S",
         }
-        .into()
     }
 }
 
@@ -409,16 +409,15 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
         duration if duration < Duration::zero() => Err(Error::InternalError(format!(
-            "Negative duration between dates: now ({}) and {}",
+            "Negative duration between dates: now ({}) and {from}",
             Utc::now().naive_utc(),
-            from
         ))),
         _ => Ok(DateTimeAggregation::Second),
     }?;
     Ok(aggregation)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn location_stats(
     location_id: i64,
     connection_type: ConnectionType,
@@ -451,7 +450,7 @@ pub async fn location_stats(
     Ok(stats)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn all_connections(
     location_id: i64,
     connection_type: ConnectionType,
@@ -475,11 +474,11 @@ pub async fn all_connections(
         }
     };
     info!("Connections retrieved({})", connections.len());
-    trace!("Connections found:\n{:#?}", connections);
+    trace!("Connections found:\n{connections:#?}");
     Ok(connections)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn all_tunnel_connections(
     location_id: i64,
     app_state: State<'_, AppState>,
@@ -488,12 +487,12 @@ pub async fn all_tunnel_connections(
     let connections =
         TunnelConnectionInfo::all_by_tunnel_id(&app_state.get_pool(), location_id).await?;
     info!("Tunnel connections retrieved({})", connections.len());
-    trace!("Connections found:\n{:#?}", connections);
+    trace!("Connections found:\n{connections:#?}");
     Ok(connections)
 }
 
 #[tauri::command]
-pub async fn active_connection(
+pub fn active_connection(
     location_id: i64,
     connection_type: ConnectionType,
     handle: AppHandle,
@@ -505,12 +504,12 @@ pub async fn active_connection(
     if connection.is_some() {
         debug!("Active connection found");
     }
-    trace!("Connection retrieved:\n{:#?}", connection);
+    trace!("Connection retrieved:\n{connection:#?}");
     info!("Connection retrieved");
     Ok(connection)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn last_connection(
     location_id: i64,
     connection_type: ConnectionType,
@@ -537,7 +536,7 @@ pub async fn last_connection(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn update_location_routing(
     location_id: i64,
     route_all_traffic: bool,
@@ -590,7 +589,7 @@ pub async fn update_location_routing(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
     debug!("Retrieving settings");
     let app_state = handle.state::<AppState>();
@@ -599,7 +598,7 @@ pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
     Ok(settings)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
     let app_state = handle.state::<AppState>();
     let pool = &app_state.get_pool();
@@ -611,7 +610,7 @@ pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<S
     settings.save(pool).await?;
     debug!("Settings saved, reconfiguring tray icon.");
     match configure_tray_icon(&handle, &settings.tray_icon_theme) {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(e) => {
             error!(
                 "Tray configuration update failed during settings update. err : {}",
@@ -632,7 +631,7 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
     let pool = &app_state.get_pool();
     if let Some(instance) = Instance::find_by_id(pool, instance_id).await? {
         let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
-        for location in instance_locations.iter() {
+        for location in instance_locations {
             if let Some(location_id) = location.id {
                 if let Some(connection) =
                     app_state.find_and_remove_connection(location_id, &ConnectionType::Location)
@@ -664,16 +663,18 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
     info!("Instance {instance_id}, deleted");
     Ok(())
 }
-#[tauri::command(async)]
-pub async fn parse_tunnel_config(config: String) -> Result<Tunnel, Error> {
+
+#[tauri::command]
+pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
     debug!("Parsing config file");
-    let tunnel_config = parse_wireguard_config(&config).map_err(|error| {
+    let tunnel_config = parse_wireguard_config(config).map_err(|error| {
         error!("{error}");
         Error::ConfigParseError(error.to_string())
     })?;
     info!("Config file parsed");
     Ok(tunnel_config)
 }
+
 #[tauri::command(async)]
 pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
@@ -719,12 +720,13 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
             route_all_traffic: tunnel.route_all_traffic,
             active: active_tunnel_ids.contains(&tunnel.id.expect("Missing Tunnel ID")),
             connection_type: ConnectionType::Tunnel,
-        })
+        });
     }
 
     info!("Tunnels retrieved({})", tunnel_info.len());
     Ok(tunnel_info)
 }
+
 #[tauri::command(async)]
 pub async fn tunnel_details(
     tunnel_id: i64,
@@ -780,9 +782,9 @@ pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Erro
 }
 
 #[tauri::command]
-pub async fn open_link(link: &str) -> Result<(), Error> {
+pub fn open_link(link: &str) -> Result<(), Error> {
     match webbrowser::open(link) {
-        Ok(_) => Ok(()),
+        Ok(()) => Ok(()),
         Err(e) => Err(Error::CommandError(e.to_string())),
     }
 }
