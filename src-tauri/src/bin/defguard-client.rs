@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{api::process, Env};
-use tauri::{Manager, RunEvent, State};
+use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
@@ -71,13 +71,13 @@ async fn main() {
     }
 
     let tray_menu = create_tray_menu();
-    let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
+    let system_tray = SystemTray::new().with_menu(tray_menu);
 
     let log_level =
         LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
             .unwrap_or(LevelFilter::Info);
 
-    let app = tauri::Builder::default()
+    let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
             save_device_config,
@@ -103,15 +103,13 @@ async fn main() {
             get_latest_app_version,
         ])
         .on_window_event(|event| match event.event() {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
+            WindowEvent::CloseRequested { api, .. } => {
                 #[cfg(not(target_os = "macos"))]
-                {
-                    event.window().hide().unwrap();
-                }
+                let _ = event.window().hide();
+
                 #[cfg(target_os = "macos")]
-                {
-                    tauri::AppHandle::hide(&event.window().app_handle()).unwrap();
-                }
+                let _ = tauri::AppHandle::hide(&event.window().app_handle());
+
                 api.prevent_close();
             }
             _ => {}
@@ -119,8 +117,7 @@ async fn main() {
         .system_tray(system_tray)
         .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            app.emit_all("single-instance", Payload { args: argv, cwd })
-                .unwrap();
+            let _ = app.emit_all("single-instance", Payload { args: argv, cwd });
         }))
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -161,10 +158,20 @@ async fn main() {
     info!("Database info result: {result:#?}");
     // configure tray
     if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
-        configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
+        let _ = configure_tray_icon(&app_handle, &settings.tray_icon_theme);
     }
 
     tauri::async_runtime::spawn(fetch_latest_app_version_loop(app_handle.clone()));
+
+    // Handle Ctrl-C
+    tauri::async_runtime::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Signal handler failure");
+        debug!("Ctrl-C handler: quitting the app");
+        let app_state: State<AppState> = app_handle.state();
+        app_state.quit(&app_handle);
+    });
 
     // run app
     app.run(|app_handle, event| match event {

@@ -23,7 +23,5 @@ async fn main() -> anyhow::Result<()> {
 
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    use defguard_client::service::windows_service::defguard_windows_service;
-
-    defguard_windows_service::run()
+    defguard_client::service::windows::run()
 }

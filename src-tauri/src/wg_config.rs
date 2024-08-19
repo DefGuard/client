@@ -84,7 +84,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
         .get("PersistentKeepalive")
         .unwrap_or("25")
         .parse()
-        .unwrap();
+        .unwrap_or_default();
 
     // Create or modify the Tunnel struct with the parsed values using the `new` method
     let tunnel = Tunnel::new(

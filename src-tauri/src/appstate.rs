@@ -43,8 +43,7 @@ impl AppState {
         self.db
             .lock()
             .expect("Failed to lock dbpool mutex")
-            .as_ref()
-            .cloned()
+            .clone()
             .unwrap()
     }
 
@@ -72,7 +71,7 @@ impl AppState {
     pub async fn get_connection_id_by_type(&self, connection_type: &ConnectionType) -> Vec<i64> {
         let active_connections = self.active_connections.lock().await;
 
-        let connection_ids: Vec<i64> = active_connections
+        let connection_ids = active_connections
             .iter()
             .filter_map(|con| {
                 if con.connection_type.eq(connection_type) {

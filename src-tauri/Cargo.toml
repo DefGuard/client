@@ -57,7 +57,7 @@ tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-wo
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tokio-util = "0.7"
 tonic = "0.12"
 tracing = "0.1"
