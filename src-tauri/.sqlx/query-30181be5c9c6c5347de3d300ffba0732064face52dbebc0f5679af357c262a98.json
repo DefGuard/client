@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT last_handshake, listen_port as \"listen_port!: u32\",\n              persistent_keepalive_interval as \"persistent_keepalive_interval?: u16\"\n            FROM tunnel_stats\n            WHERE tunnel_id = $1 ORDER BY collected_at DESC LIMIT 1\n            ",
+  "query": "SELECT last_handshake, listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM tunnel_stats WHERE tunnel_id = $1 ORDER BY collected_at DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       false
     ]
   },
-  "hash": "ea81679acb33913c851077e7a2681479f26da26e445a636d7cf6690a9d7a720f"
+  "hash": "30181be5c9c6c5347de3d300ffba0732064face52dbebc0f5679af357c262a98"
 }

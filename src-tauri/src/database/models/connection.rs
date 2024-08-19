@@ -19,8 +19,7 @@ impl Connection {
     pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
         let result = query!(
             "INSERT INTO connection (location_id, connected_from, start, end) \
-            VALUES ($1, $2, $3, $4) \
-            RETURNING id;",
+            VALUES ($1, $2, $3, $4) RETURNING id;",
             self.location_id,
             self.connected_from,
             self.start,
@@ -35,11 +34,8 @@ impl Connection {
     pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
         let connections = query_as!(
             Connection,
-            r#"
-            SELECT id, location_id, connected_from, start, end 
-            FROM connection
-            WHERE location_id = $1
-            "#,
+            "SELECT id, location_id, connected_from, start, end \
+            FROM connection WHERE location_id = $1",
             location_id
         )
         .fetch_all(pool)
@@ -53,13 +49,9 @@ impl Connection {
     ) -> Result<Option<Self>, Error> {
         let connection = query_as!(
             Connection,
-            r#"
-            SELECT id, location_id, connected_from, start, end
-            FROM connection
-            WHERE location_id = $1
-            ORDER BY end DESC
-            LIMIT 1
-            "#,
+            "SELECT id, location_id, connected_from, start, end \
+            FROM connection WHERE location_id = $1 \
+            ORDER BY end DESC LIMIT 1",
             location_id
         )
         .fetch_optional(pool)
@@ -79,6 +71,7 @@ pub struct ConnectionInfo {
     pub upload: Option<i32>,
     pub download: Option<i32>,
 }
+
 impl From<ConnectionInfo> for CommonConnectionInfo {
     fn from(val: ConnectionInfo) -> Self {
         CommonConnectionInfo {
@@ -100,34 +93,27 @@ impl ConnectionInfo {
         // FIXME: Optimize query
         let connections = query_as!(
             ConnectionInfo,
-            r#"
-              SELECT
-                  c.id as "id!",
-                  c.location_id as "location_id!",
-                  c.connected_from as "connected_from!",
-                  c.start as "start!",
-                  c.end as "end!",
-                  COALESCE((
-                      SELECT ls.upload
-                      FROM location_stats AS ls
-                      WHERE ls.location_id = c.location_id
-                      AND ls.collected_at >= c.start
-                      AND ls.collected_at <= c.end
-                      ORDER BY ls.collected_at DESC
-                      LIMIT 1
-                  ), 0) as "upload: _",
-                  COALESCE((
-                      SELECT ls.download
-                      FROM location_stats AS ls
-                      WHERE ls.location_id = c.location_id
-                      AND ls.collected_at >= c.start
-                      AND ls.collected_at <= c.end
-                      ORDER BY ls.collected_at DESC
-                      LIMIT 1
-                  ), 0) as "download: _"
-              FROM connection AS c WHERE location_id = $1
-              ORDER BY start DESC;
-            "#,
+            "SELECT c.id \"id!\", c.location_id \"location_id!\", \
+            c.connected_from \"connected_from!\", c.start \"start!\", \
+            c.end \"end!\", \
+            COALESCE(( \
+                SELECT ls.upload \
+                FROM location_stats ls \
+                WHERE ls.location_id = c.location_id \
+                AND ls.collected_at >= c.start \
+                AND ls.collected_at <= c.end \
+                ORDER BY ls.collected_at DESC LIMIT 1 \
+            ), 0) \"upload: _\", \
+            COALESCE(( \
+                SELECT ls.download \
+                FROM location_stats ls \
+                WHERE ls.location_id = c.location_id \
+                AND ls.collected_at >= c.start \
+                AND ls.collected_at <= c.end \
+                ORDER BY ls.collected_at DESC LIMIT 1 \
+            ), 0) \"download: _\" \
+            FROM connection c WHERE location_id = $1 \
+            ORDER BY start DESC",
             location_id
         )
         .fetch_all(pool)
@@ -165,18 +151,18 @@ impl ActiveConnection {
     }
 }
 
-impl From<ActiveConnection> for Connection {
-    fn from(active_connection: ActiveConnection) -> Self {
+impl From<&ActiveConnection> for Connection {
+    fn from(active_connection: &ActiveConnection) -> Self {
         Connection {
             id: None,
             location_id: active_connection.location_id,
-            connected_from: active_connection.connected_from,
+            connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
             end: Utc::now().naive_utc(),
         }
     }
 }
-// Implementing From for Connection into CommonConnection
+
 impl From<Connection> for CommonConnection {
     fn from(connection: Connection) -> Self {
         CommonConnection {

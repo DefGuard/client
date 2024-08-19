@@ -62,11 +62,14 @@ pub async fn disconnect(
 ) -> Result<(), Error> {
     debug!("Disconnecting location {location_id}");
     let state = handle.state::<AppState>();
-    if let Some(connection) = state.find_and_remove_connection(location_id, &connection_type) {
+    if let Some(connection) = state
+        .find_and_remove_connection(location_id, &connection_type)
+        .await
+    {
         let interface_name = connection.interface_name.clone();
         debug!("Found active connection");
         trace!("Connection: {:#?}", connection);
-        disconnect_interface(connection, &state).await?;
+        disconnect_interface(&connection, &state).await?;
         debug!("Connection saved");
         handle.emit_all(
             "connection-changed",
@@ -180,8 +183,10 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     let instances = Instance::all(&app_state.get_pool()).await?;
     debug!("Found ({}) instances", instances.len());
     trace!("Instances found: {instances:#?}");
-    let mut instance_info: Vec<InstanceInfo> = vec![];
-    let connection_ids: Vec<i64> = app_state.get_connection_id_by_type(&ConnectionType::Location);
+    let mut instance_info: Vec<InstanceInfo> = Vec::new();
+    let connection_ids: Vec<i64> = app_state
+        .get_connection_id_by_type(&ConnectionType::Location)
+        .await;
     for instance in instances {
         let Some(instance_id) = instance.id else {
             continue;
@@ -234,9 +239,10 @@ pub async fn all_locations(
 ) -> Result<Vec<LocationInfo>, Error> {
     debug!("Retrieving all locations.");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
-    let active_locations_ids: Vec<i64> =
-        app_state.get_connection_id_by_type(&ConnectionType::Location);
-    let mut location_info = vec![];
+    let active_locations_ids: Vec<i64> = app_state
+        .get_connection_id_by_type(&ConnectionType::Location)
+        .await;
+    let mut location_info = Vec::new();
     for location in locations {
         let info = LocationInfo {
             id: location.id.expect("Missing location ID"),
@@ -491,8 +497,8 @@ pub async fn all_tunnel_connections(
     Ok(connections)
 }
 
-#[tauri::command]
-pub fn active_connection(
+#[tauri::command(async)]
+pub async fn active_connection(
     location_id: i64,
     connection_type: ConnectionType,
     handle: AppHandle,
@@ -500,7 +506,7 @@ pub fn active_connection(
     let state = handle.state::<AppState>();
     debug!("Retrieving active connection for location with id: {location_id}");
     debug!("Location found");
-    let connection = state.find_connection(location_id, connection_type);
+    let connection = state.find_connection(location_id, connection_type).await;
     if connection.is_some() {
         debug!("Active connection found");
     }
@@ -633,8 +639,9 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
         let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
         for location in instance_locations {
             if let Some(location_id) = location.id {
-                if let Some(connection) =
-                    app_state.find_and_remove_connection(location_id, &ConnectionType::Location)
+                if let Some(connection) = app_state
+                    .find_and_remove_connection(location_id, &ConnectionType::Location)
+                    .await
                 {
                     debug!("Found active connection for location({location_id}), closing...",);
                     let request = RemoveInterfaceRequest {
@@ -708,8 +715,10 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
     let tunnels = Tunnel::all(&app_state.get_pool()).await?;
     debug!("Found ({}) tunnels", tunnels.len());
     trace!("Tunnels found: {tunnels:#?}");
-    let mut tunnel_info: Vec<TunnelInfo> = vec![];
-    let active_tunnel_ids: Vec<i64> = app_state.get_connection_id_by_type(&ConnectionType::Tunnel);
+    let mut tunnel_info = Vec::new();
+    let active_tunnel_ids = app_state
+        .get_connection_id_by_type(&ConnectionType::Tunnel)
+        .await;
 
     for tunnel in tunnels {
         tunnel_info.push(TunnelInfo {
@@ -750,8 +759,9 @@ pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Erro
     let mut client = app_state.client.clone();
     let pool = &app_state.get_pool();
     if let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? {
-        if let Some(connection) =
-            app_state.find_and_remove_connection(tunnel_id, &ConnectionType::Tunnel)
+        if let Some(connection) = app_state
+            .find_and_remove_connection(tunnel_id, &ConnectionType::Tunnel)
+            .await
         {
             debug!("Found active connection for tunnel({tunnel_id}), closing...",);
             let request = RemoveInterfaceRequest {
@@ -820,8 +830,7 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         .await;
 
     if let Ok(response) = res {
-        let response_json: Result<AppVersionInfo, reqwest::Error> =
-            response.json::<AppVersionInfo>().await;
+        let response_json = response.json::<AppVersionInfo>().await;
 
         let response = response_json.map_err(|err| {
             error!("Failed to deserialize latest application version response {err}");

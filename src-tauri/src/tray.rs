@@ -1,5 +1,6 @@
 use tauri::{
-    AppHandle, CustomMenuItem, Manager, State, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    AppHandle, CustomMenuItem, Icon, Manager, State, SystemTrayEvent, SystemTrayMenu,
+    SystemTrayMenuItem,
 };
 
 use crate::{appstate::AppState, database::TrayIconTheme, error::Error};
@@ -10,13 +11,12 @@ static FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
 #[must_use]
 pub fn create_tray_menu() -> SystemTrayMenu {
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let show = CustomMenuItem::new("show".to_string(), "Show");
-    let hide = CustomMenuItem::new("hide".to_string(), "Hide");
-    let subscribe_updates =
-        CustomMenuItem::new("subscribe_updates".to_string(), "Subscribe for updates");
-    let join_community = CustomMenuItem::new("join_community".to_string(), "Join our Community");
-    let follow_us = CustomMenuItem::new("follow_us".to_string(), "Follow us");
+    let quit = CustomMenuItem::new("quit", "Quit");
+    let show = CustomMenuItem::new("show", "Show");
+    let hide = CustomMenuItem::new("hide", "Hide");
+    let subscribe_updates = CustomMenuItem::new("subscribe_updates", "Subscribe for updates");
+    let join_community = CustomMenuItem::new("join_community", "Join our Community");
+    let follow_us = CustomMenuItem::new("follow_us", "Follow us");
     SystemTrayMenu::new()
         .add_item(show)
         .add_item(hide)
@@ -31,15 +31,15 @@ pub fn create_tray_menu() -> SystemTrayMenu {
 fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_window("main") {
         // if this fails tauri has a problem
-        let minimized = main_window.is_minimizable().unwrap();
-        let visible = main_window.is_visible().unwrap();
+        let minimized = main_window.is_minimizable().unwrap_or_default();
+        let visible = main_window.is_visible().unwrap_or_default();
         if minimized {
-            main_window.unminimize().unwrap();
-            main_window.set_focus().unwrap();
+            let _ = main_window.unminimize();
+            let _ = main_window.set_focus();
         }
         if !visible {
-            main_window.show().unwrap();
-            main_window.set_focus().unwrap();
+            let _ = main_window.show();
+            let _ = main_window.set_focus();
         }
     }
 }
@@ -49,9 +49,9 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
     match event {
         SystemTrayEvent::LeftClick { .. } => {
             if let Some(main_window) = app.get_window("main") {
-                let visibility = main_window.is_visible().unwrap();
-                if visibility {
-                    main_window.hide().unwrap();
+                let visible = main_window.is_visible().unwrap_or_default();
+                if visible {
+                    let _ = main_window.hide();
                 } else {
                     show_main_window(app);
                 }
@@ -61,21 +61,13 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
             "quit" => {
                 info!("Received QUIT request. Initiating shutdown...");
                 let app_state: State<AppState> = app.state();
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let _ = app_state.close_all_connections().await;
-                        app.exit(0);
-                    });
-                });
+                app_state.quit(app);
             }
             "show" => show_main_window(app),
             "hide" => {
                 if let Some(main_window) = app.get_window("main") {
-                    if main_window
-                        .is_visible()
-                        .expect("Failed to check main window visibility")
-                    {
-                        main_window.hide().expect("Failed to hide main window");
+                    if main_window.is_visible().unwrap_or_default() {
+                        let _ = main_window.hide();
                     }
                 }
             }
@@ -96,20 +88,14 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(), Error> {
     let resource_str = format!("resources/icons/tray-32x32-{}.png", theme.as_ref());
-    debug!("Tray icon loading from {:?}", &resource_str);
-    match app.path_resolver().resolve_resource(&resource_str) {
-        Some(icon_path) => {
-            let icon = tauri::Icon::File(icon_path);
-            app.tray_handle().set_icon(icon)?;
-            info!("Tray icon changed");
-            Ok(())
-        }
-        None => {
-            error!(
-                "Loading tray icon resource {} failed! Resource not resolved.",
-                &resource_str
-            );
-            Err(Error::ResourceNotFound(resource_str))
-        }
+    debug!("Tray icon loading from {resource_str}");
+    if let Some(icon_path) = app.path_resolver().resolve_resource(&resource_str) {
+        let icon = Icon::File(icon_path);
+        app.tray_handle().set_icon(icon)?;
+        info!("Tray icon changed");
+        Ok(())
+    } else {
+        error!("Loading tray icon resource {resource_str} failed! Resource not resolved.",);
+        Err(Error::ResourceNotFound(resource_str))
     }
 }

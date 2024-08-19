@@ -261,30 +261,25 @@ impl TunnelStats {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             TunnelStats,
-            r#"
-            WITH cte AS (
-                SELECT
-                    id, tunnel_id,
-                    COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) as upload,
-                    COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) as download,
-                    last_handshake, strftime($1, collected_at) as collected_at, listen_port, persistent_keepalive_interval
-                FROM tunnel_stats
-                ORDER BY collected_at
-                LIMIT -1 OFFSET 1
-            )
-            SELECT
-                id, tunnel_id,
-                SUM(MAX(upload, 0)) as "upload!: i64",
-                SUM(MAX(download, 0)) as "download!: i64",
-                last_handshake,
-                collected_at as "collected_at!: NaiveDateTime",
-                listen_port as "listen_port!: u32",
-                persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM cte
-            WHERE tunnel_id = $2
-            AND collected_at >= $3
-            GROUP BY collected_at
-            ORDER BY collected_at"#,
+            "WITH cte AS ( \
+                SELECT \
+                    id, tunnel_id, \
+                    COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, \
+                    COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, \
+                    last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
+                FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1 \
+            ) \
+            SELECT \
+                id, tunnel_id, \
+                SUM(MAX(upload, 0)) \"upload!: i64\", \
+                SUM(MAX(download, 0)) \"download!: i64\", \
+                last_handshake, \
+                collected_at \"collected_at!: NaiveDateTime\", \
+                listen_port \"listen_port!: u32\", \
+                persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM cte \
+            WHERE tunnel_id = $2 AND collected_at >= $3 \
+            GROUP BY collected_at ORDER BY collected_at",
             aggregation,
             tunnel_id,
             from
@@ -294,6 +289,7 @@ impl TunnelStats {
         Ok(stats)
     }
 }
+
 pub async fn peer_to_tunnel_stats(
     peer: &Peer,
     listen_port: u32,
@@ -400,33 +396,27 @@ impl TunnelConnectionInfo {
         // FIXME: Optimize query
         let connections = query_as!(
             TunnelConnectionInfo,
-            r#"
-              SELECT
-                  c.id as "id!",
-                  c.tunnel_id as "tunnel_id!",
-                  c.connected_from as "connected_from!",
-                  c.start as "start!",
-                  c.end as "end!",
-                  COALESCE((
-                      SELECT ls.upload
-                      FROM tunnel_stats AS ls
-                      WHERE ls.tunnel_id = c.tunnel_id
-                      AND ls.collected_at >= c.start
-                      AND ls.collected_at <= c.end
-                      ORDER BY ls.collected_at DESC
-                      LIMIT 1
-                  ), 0) as "upload: _",
-                  COALESCE((
-                      SELECT ls.download
-                      FROM tunnel_stats AS ls
-                      WHERE ls.tunnel_id = c.tunnel_id
-                      AND ls.collected_at >= c.start
-                      AND ls.collected_at <= c.end
-                      ORDER BY ls.collected_at DESC
-                      LIMIT 1
-                  ), 0) as "download: _"
-              FROM tunnel_connection AS c WHERE tunnel_id = $1
-              ORDER BY start DESC"#,
+            "SELECT c.id \"id!\", c.tunnel_id \"tunnel_id!\", \
+            c.connected_from \"connected_from!\", c.start \"start!\", \
+            c.end \"end!\", \
+            COALESCE(( \
+                SELECT ls.upload \
+                FROM tunnel_stats ls \
+                WHERE ls.tunnel_id = c.tunnel_id \
+                AND ls.collected_at >= c.start \
+                AND ls.collected_at <= c.end \
+                ORDER BY ls.collected_at DESC LIMIT 1 \
+            ), 0) \"upload: _\", \
+            COALESCE(( \
+                SELECT ls.download \
+                FROM tunnel_stats ls \
+                WHERE ls.tunnel_id = c.tunnel_id \
+                AND ls.collected_at >= c.start \
+                AND ls.collected_at <= c.end \
+                ORDER BY ls.collected_at DESC LIMIT 1 \
+            ), 0) \"download: _\" \
+            FROM tunnel_connection c WHERE tunnel_id = $1 \
+            ORDER BY start DESC",
             tunnel_id
         )
         .fetch_all(pool)
@@ -436,12 +426,12 @@ impl TunnelConnectionInfo {
     }
 }
 
-impl From<ActiveConnection> for TunnelConnection {
-    fn from(active_connection: ActiveConnection) -> Self {
+impl From<&ActiveConnection> for TunnelConnection {
+    fn from(active_connection: &ActiveConnection) -> Self {
         TunnelConnection {
             id: None,
             tunnel_id: active_connection.location_id,
-            connected_from: active_connection.connected_from,
+            connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
             end: Utc::now().naive_utc(),
         }

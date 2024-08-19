@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{api::process, Env};
-use tauri::{Manager, State};
+use tauri::{Manager, RunEvent, State};
 use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
@@ -158,33 +158,26 @@ async fn main() {
     info!("Database initialization completed");
     info!("Starting main app thread.");
     let result = database::info(&app_state.get_pool()).await;
-    info!("Database info result: {:#?}", result);
+    info!("Database info result: {result:#?}");
     // configure tray
     if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
         configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
     }
 
-    tauri::async_runtime::spawn(
-        async move { fetch_latest_app_version_loop(app_handle.clone()).await },
-    );
+    tauri::async_runtime::spawn(fetch_latest_app_version_loop(app_handle.clone()));
 
     // run app
     app.run(|app_handle, event| match event {
         // prevent shutdown on window close
-        tauri::RunEvent::ExitRequested { api, .. } => {
+        RunEvent::ExitRequested { api, .. } => {
             debug!("Received exit request");
             api.prevent_exit();
         }
         // handle shutdown
-        tauri::RunEvent::Exit => {
+        RunEvent::Exit => {
             info!("Exiting event loop...");
             let app_state: State<AppState> = app_handle.state();
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let _ = app_state.close_all_connections().await;
-                    app_handle.exit(0);
-                });
-            });
+            app_state.quit(app_handle);
         }
         _ => {
             trace!("Received event: {event:?}");

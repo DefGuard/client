@@ -401,12 +401,9 @@ pub async fn get_tunnel_interface_details(
 
         debug!("Fetching tunnel stats for tunnel ID {tunnel_id}");
         let result = query!(
-            r#"
-            SELECT last_handshake, listen_port as "listen_port!: u32",
-              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM tunnel_stats
-            WHERE tunnel_id = $1 ORDER BY collected_at DESC LIMIT 1
-            "#,
+            "SELECT last_handshake, listen_port \"listen_port!: u32\", \
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM tunnel_stats WHERE tunnel_id = $1 ORDER BY collected_at DESC LIMIT 1",
             tunnel_id
         )
         .fetch_optional(pool)
@@ -466,12 +463,10 @@ pub async fn get_location_interface_details(
 
         debug!("Fetching location stats for location ID {location_id}");
         let result = query!(
-            r#"
-            SELECT last_handshake, listen_port as "listen_port!: u32",
-              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM location_stats
-            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1
-            "#,
+            "SELECT last_handshake, listen_port \"listen_port!: u32\", \
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM location_stats \
+            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1",
             location_id
         )
         .fetch_optional(pool)
@@ -538,21 +533,14 @@ pub async fn handle_connection_for_location(
         interface_name.clone(),
         ConnectionType::Location,
     );
-    state
-        .active_connections
-        .lock()
-        .map_err(|_| Error::MutexError)?
-        .push(connection);
+    state.active_connections.lock().await.push(connection);
     info!(
         "Finished creating new interface connection for location: {}",
         location.name
     );
     debug!(
         "Active connections: {:#?}",
-        state
-            .active_connections
-            .lock()
-            .map_err(|_| Error::MutexError)?
+        state.active_connections.lock().await
     );
     debug!("Sending event connection-changed...");
     handle.emit_all(
@@ -606,21 +594,14 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         interface_name.clone(),
         ConnectionType::Tunnel,
     );
-    state
-        .active_connections
-        .lock()
-        .map_err(|_| Error::MutexError)?
-        .push(connection);
+    state.active_connections.lock().await.push(connection);
     info!(
         "Finished creating new interface connection for tunnel: {}",
         tunnel.name
     );
     debug!(
         "Active connections: {:#?}",
-        state
-            .active_connections
-            .lock()
-            .map_err(|_| Error::MutexError)?
+        state.active_connections.lock().await
     );
     debug!("Sending event connection-changed.");
     handle.emit_all(
@@ -666,7 +647,7 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            info!("Command executed successfully. Stdout:\n{}", stdout);
+            info!("Command executed successfully. Stdout:\n{stdout}");
             if !stderr.is_empty() {
                 error!("Stderr:\n{stderr}");
             }
@@ -680,7 +661,7 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
 
 /// Helper function to remove interface and close connection
 pub async fn disconnect_interface(
-    active_connection: ActiveConnection,
+    active_connection: &ActiveConnection,
     state: &AppState,
 ) -> Result<(), Error> {
     debug!("Removing interface");
@@ -688,20 +669,18 @@ pub async fn disconnect_interface(
     let interface_name = active_connection.interface_name.clone();
     let (id, connection_type) = (
         active_connection.location_id,
-        active_connection.connection_type.clone(),
+        active_connection.connection_type,
     );
     match active_connection.connection_type {
         ConnectionType::Location => {
             let request = RemoveInterfaceRequest {
-                interface_name: interface_name.clone(),
+                interface_name,
                 pre_down: None,
                 post_down: None,
             };
             if let Err(error) = client.remove_interface(request).await {
                 error!("Failed to remove interface: {error}");
-                return Err(Error::InternalError(
-                    "Failed to remove interface".to_string(),
-                ));
+                return Err(Error::InternalError("Failed to remove interface".into()));
             }
             let mut connection: Connection = active_connection.into();
             connection.save(&state.get_pool()).await?;

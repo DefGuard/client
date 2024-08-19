@@ -344,7 +344,7 @@ impl From<proto::Peer> for Peer {
 impl From<Host> for InterfaceData {
     fn from(host: Host) -> Self {
         Self {
-            listen_port: host.listen_port as u32,
+            listen_port: u32::from(host.listen_port),
             peers: host.peers.into_values().map(Into::into).collect(),
         }
     }
