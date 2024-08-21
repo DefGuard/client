@@ -1,8 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
 
+use tauri::AppHandle;
+use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
@@ -16,10 +15,10 @@ use crate::{
 };
 
 pub struct AppState {
-    pub db: Arc<Mutex<Option<DbPool>>>,
+    pub db: Arc<std::sync::Mutex<Option<DbPool>>>,
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
     pub client: DesktopDaemonServiceClient<Channel>,
-    pub log_watchers: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    pub log_watchers: Arc<std::sync::Mutex<HashMap<String, CancellationToken>>>,
 }
 
 impl Default for AppState {
@@ -33,10 +32,10 @@ impl AppState {
     pub fn new() -> Self {
         let client = setup_client().expect("Failed to setup gRPC client");
         AppState {
-            db: Arc::new(Mutex::new(None)),
+            db: Arc::new(std::sync::Mutex::new(None)),
             active_connections: Arc::new(Mutex::new(Vec::new())),
             client,
-            log_watchers: Arc::new(Mutex::new(HashMap::new())),
+            log_watchers: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
     }
 
@@ -44,24 +43,17 @@ impl AppState {
         self.db
             .lock()
             .expect("Failed to lock dbpool mutex")
-            .as_ref()
-            .cloned()
+            .clone()
             .unwrap()
     }
 
-    pub fn get_connections(&self) -> Vec<ActiveConnection> {
-        self.active_connections
-            .lock()
-            .expect("Failed to lock active connections mutex")
-            .clone()
-    }
-    pub fn find_and_remove_connection(
+    pub async fn find_and_remove_connection(
         &self,
         location_id: i64,
         connection_type: &ConnectionType,
     ) -> Option<ActiveConnection> {
         debug!("Removing active connection for location with id: {location_id}");
-        let mut connections = self.active_connections.lock().unwrap();
+        let mut connections = self.active_connections.lock().await;
 
         if let Some(index) = connections.iter().position(|conn| {
             conn.location_id == location_id && conn.connection_type.eq(connection_type)
@@ -76,10 +68,10 @@ impl AppState {
         }
     }
 
-    pub fn get_connection_id_by_type(&self, connection_type: &ConnectionType) -> Vec<i64> {
-        let active_connections = self.active_connections.lock().unwrap();
+    pub async fn get_connection_id_by_type(&self, connection_type: &ConnectionType) -> Vec<i64> {
+        let active_connections = self.active_connections.lock().await;
 
-        let connection_ids: Vec<i64> = active_connections
+        let connection_ids = active_connections
             .iter()
             .filter_map(|con| {
                 if con.connection_type.eq(connection_type) {
@@ -95,9 +87,9 @@ impl AppState {
 
     pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
         info!("Closing all active connections...");
-        let active_connections = self.get_connections();
+        let active_connections = self.active_connections.lock().await;
         info!("Found {} active connections", active_connections.len());
-        for connection in active_connections {
+        for connection in active_connections.iter() {
             debug!(
                 "Found active connection with location {}",
                 connection.location_id
@@ -110,12 +102,12 @@ impl AppState {
         Ok(())
     }
 
-    pub fn find_connection(
+    pub async fn find_connection(
         &self,
         id: i64,
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
-        let connections = self.active_connections.lock().unwrap();
+        let connections = self.active_connections.lock().await;
         debug!(
         "Checking for active connection with id: {id}, connection_type: {connection_type:?} in active connections: {connections:#?}"
     );
@@ -131,5 +123,15 @@ impl AppState {
             error!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");
             None
         }
+    }
+
+    /// Close all connections, then terminate the application.
+    pub fn quit(&self, app_handle: &AppHandle) {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = self.close_all_connections().await;
+                app_handle.exit(0);
+            });
+        });
     }
 }

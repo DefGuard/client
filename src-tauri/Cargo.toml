@@ -7,32 +7,34 @@ homepage = "https://github.com/DefGuard/client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.80"
 authors = ["Defguard"]
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
-tonic-build = { version = "0.10" }
-prost-build = { version = "0.12" }
+tonic-build = { version = "0.12" }
+prost-build = { version = "0.13" }
 
 [dependencies]
 anyhow = "1.0"
 base64 = "0.22"
-clap = { version = "4.4", features = ["derive", "env"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.4.5" }
+dark-light = "1.1"
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.4.6" }
 dirs = "5.0"
-lazy_static = "1.4"
-local-ip-address = "0.5"
+lazy_static = "1.5"
+local-ip-address = "0.6"
 log = "0.4"
 notify-debouncer-mini = "0.4"
-prost = "0.12"
+prost = "0.13"
 rand = "0.8"
-rust-ini = "0.20"
+reqwest = { version = "0.12", features = ["json"] }
+rust-ini = "0.21"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_with = "3.5"
-sqlx = { version = "0.7.4", features = [
+serde_with = "3.9"
+sqlx = { version = "0.7", features = [
     "chrono",
     "sqlite",
     "runtime-tokio",
@@ -40,11 +42,8 @@ sqlx = { version = "0.7.4", features = [
     "macros",
 ] }
 struct-patch = "0.4"
-strum = { version = "0.25", features = ["derive"] }
-dark-light = "1.0"
-webbrowser = "0.8"
-
-tauri = { version = "1.5", features = [
+strum = { version = "0.26", features = ["derive"] }
+tauri = { version = "1.7", features = [
     "dialog-all",
     "clipboard-all",
     "http-all",
@@ -58,20 +57,20 @@ tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-wo
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tokio-util = "0.7"
-tonic = "0.10"
+tonic = "0.12"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+webbrowser = "1.0"
 x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
-reqwest = { version = "0.11", features = ["json"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-service = "0.6"
+windows-service = "0.7"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-nix = { version = "0.28", features = ["net"] }
+nix = { version = "0.29", features = ["net"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
@@ -80,4 +79,4 @@ nix = { version = "0.28", features = ["net"] }
 custom-protocol = ["tauri/custom-protocol"]
 
 [dev-dependencies]
-tokio = { version = "1.34", features = ["full"] }
+tokio = { version = "1", features = ["full"] }

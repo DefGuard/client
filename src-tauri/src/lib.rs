@@ -10,18 +10,12 @@ pub mod tray;
 pub mod utils;
 pub mod wg_config;
 
-pub mod proto {
+mod proto {
     tonic::include_proto!("defguard.proxy");
 }
 
-#[derive(Clone, serde::Serialize)]
-struct Payload {
-    args: Vec<String>,
-    cwd: String,
-}
-
 /// Location type used in commands to check if we using tunnel or location
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone, Copy)]
 pub enum ConnectionType {
     Tunnel,
     Location,

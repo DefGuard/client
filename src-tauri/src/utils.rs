@@ -1,15 +1,16 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
-    path::PathBuf,
+    path::Path,
     process::Command,
     str::FromStr,
 };
-use tauri::AppHandle;
 
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
+use local_ip_address::local_ip;
 use sqlx::query;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 use tonic::{codegen::tokio_stream::StreamExt, transport::Channel};
+use tracing::Level;
 
 use crate::{
     appstate::AppState,
@@ -28,12 +29,10 @@ use crate::{
     },
     ConnectionType,
 };
-use local_ip_address::local_ip;
-use tracing::Level;
 
-pub static IS_MACOS: bool = cfg!(target_os = "macos");
-pub static STATS_PERIOD: u64 = 60;
-pub static DEFAULT_ROUTE: &str = "0.0.0.0/0";
+pub const IS_MACOS: bool = cfg!(target_os = "macos");
+static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
+static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface
 pub async fn setup_interface(
@@ -66,8 +65,8 @@ pub async fn setup_interface(
 
         debug!("Parsing location allowed ips: {}", location.allowed_ips);
         let allowed_ips: Vec<String> = if location.route_all_traffic {
-            debug!("Using all traffic routing: {DEFAULT_ROUTE}");
-            vec![DEFAULT_ROUTE.into()]
+            debug!("Using all traffic routing: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
+            vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
         } else {
             debug!(
                 "Using predefined location traffic: {}",
@@ -105,6 +104,7 @@ pub async fn setup_interface(
                 address: location.address.clone(),
                 port: port.into(),
                 peers: vec![peer.clone()],
+                mtu: None,
             };
             debug!("Creating interface {interface_config:#?}");
             let request = CreateInterfaceRequest {
@@ -195,7 +195,7 @@ fn is_port_free(port: u16) -> bool {
     }
 }
 
-pub async fn spawn_stats_thread(
+pub fn spawn_stats_thread(
     handle: tauri::AppHandle,
     interface_name: String,
     connection_type: ConnectionType,
@@ -272,15 +272,17 @@ pub fn load_log_targets() -> Vec<String> {
 }
 
 // helper function to get log file directory for the defguard-service daemon
-pub fn get_service_log_dir() -> PathBuf {
+#[must_use]
+pub fn get_service_log_dir() -> &'static Path {
     #[cfg(target_os = "windows")]
-    let path = PathBuf::from("/Logs/defguard-service");
+    let path = "/Logs/defguard-service";
 
     #[cfg(not(target_os = "windows"))]
-    let path = PathBuf::from("/var/log/defguard-service");
+    let path = "/var/log/defguard-service";
 
-    path
+    Path::new(path)
 }
+
 /// Setup client interface
 pub async fn setup_interface_tunnel(
     tunnel: &Tunnel,
@@ -289,7 +291,7 @@ pub async fn setup_interface_tunnel(
 ) -> Result<(), Error> {
     // prepare peer config
     debug!("Decoding location public key: {}.", tunnel.server_pubkey);
-    let peer_key: Key = Key::from_str(&tunnel.server_pubkey)?;
+    let peer_key = Key::from_str(&tunnel.server_pubkey)?;
     info!("Location public key decoded.");
     debug!("Location public key: {peer_key}");
     let mut peer = Peer::new(peer_key);
@@ -314,8 +316,8 @@ pub async fn setup_interface_tunnel(
 
     debug!("Parsing location allowed ips: {:?}", tunnel.allowed_ips);
     let allowed_ips: Vec<String> = if tunnel.route_all_traffic {
-        debug!("Using all traffic routing: {DEFAULT_ROUTE}");
-        vec![DEFAULT_ROUTE.into()]
+        debug!("Using all traffic routing: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
+        vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         let msg = match &tunnel.allowed_ips {
             Some(ips) => format!("Using predefined location traffic: {ips}"),
@@ -354,6 +356,7 @@ pub async fn setup_interface_tunnel(
             address: tunnel.address.clone(),
             port: port.into(),
             peers: vec![peer.clone()],
+            mtu: None,
         };
         debug!("Creating interface {interface_config:#?}");
         let request = CreateInterfaceRequest {
@@ -398,12 +401,9 @@ pub async fn get_tunnel_interface_details(
 
         debug!("Fetching tunnel stats for tunnel ID {tunnel_id}");
         let result = query!(
-            r#"
-            SELECT last_handshake, listen_port as "listen_port!: u32",
-              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM tunnel_stats
-            WHERE tunnel_id = $1 ORDER BY collected_at DESC LIMIT 1
-            "#,
+            "SELECT last_handshake, listen_port \"listen_port!: u32\", \
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM tunnel_stats WHERE tunnel_id = $1 ORDER BY collected_at DESC LIMIT 1",
             tunnel_id
         )
         .fetch_optional(pool)
@@ -463,12 +463,10 @@ pub async fn get_location_interface_details(
 
         debug!("Fetching location stats for location ID {location_id}");
         let result = query!(
-            r#"
-            SELECT last_handshake, listen_port as "listen_port!: u32",
-              persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM location_stats
-            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1
-            "#,
+            "SELECT last_handshake, listen_port \"listen_port!: u32\", \
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM location_stats \
+            WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1",
             location_id
         )
         .fetch_optional(pool)
@@ -535,21 +533,14 @@ pub async fn handle_connection_for_location(
         interface_name.clone(),
         ConnectionType::Location,
     );
-    state
-        .active_connections
-        .lock()
-        .map_err(|_| Error::MutexError)?
-        .push(connection);
+    state.active_connections.lock().await.push(connection);
     info!(
         "Finished creating new interface connection for location: {}",
         location.name
     );
     debug!(
         "Active connections: {:#?}",
-        state
-            .active_connections
-            .lock()
-            .map_err(|_| Error::MutexError)?
+        state.active_connections.lock().await
     );
     debug!("Sending event connection-changed...");
     handle.emit_all(
@@ -566,8 +557,7 @@ pub async fn handle_connection_for_location(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Location,
-    )
-    .await;
+    );
     info!("Stats thread spawned.");
 
     // spawn log watcher
@@ -604,21 +594,14 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         interface_name.clone(),
         ConnectionType::Tunnel,
     );
-    state
-        .active_connections
-        .lock()
-        .map_err(|_| Error::MutexError)?
-        .push(connection);
+    state.active_connections.lock().await.push(connection);
     info!(
         "Finished creating new interface connection for tunnel: {}",
         tunnel.name
     );
     debug!(
         "Active connections: {:#?}",
-        state
-            .active_connections
-            .lock()
-            .map_err(|_| Error::MutexError)?
+        state.active_connections.lock().await
     );
     debug!("Sending event connection-changed.");
     handle.emit_all(
@@ -635,8 +618,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Tunnel,
-    )
-    .await;
+    );
     info!("Stats thread spawned");
 
     //spawn log watcher
@@ -653,6 +635,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     info!("Log watcher spawned");
     Ok(())
 }
+
 /// Execute command passed as argument.
 pub fn execute_command(command: &str) -> Result<(), Error> {
     let mut command_parts = command.split_whitespace();
@@ -664,7 +647,7 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            info!("Command executed successfully. Stdout:\n{}", stdout);
+            info!("Command executed successfully. Stdout:\n{stdout}");
             if !stderr.is_empty() {
                 error!("Stderr:\n{stderr}");
             }
@@ -675,9 +658,10 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
     }
     Ok(())
 }
+
 /// Helper function to remove interface and close connection
 pub async fn disconnect_interface(
-    active_connection: ActiveConnection,
+    active_connection: &ActiveConnection,
     state: &AppState,
 ) -> Result<(), Error> {
     debug!("Removing interface");
@@ -685,27 +669,25 @@ pub async fn disconnect_interface(
     let interface_name = active_connection.interface_name.clone();
     let (id, connection_type) = (
         active_connection.location_id,
-        active_connection.connection_type.clone(),
+        active_connection.connection_type,
     );
     match active_connection.connection_type {
         ConnectionType::Location => {
             let request = RemoveInterfaceRequest {
-                interface_name: interface_name.clone(),
+                interface_name,
                 pre_down: None,
                 post_down: None,
             };
             if let Err(error) = client.remove_interface(request).await {
                 error!("Failed to remove interface: {error}");
-                return Err(Error::InternalError(
-                    "Failed to remove interface".to_string(),
-                ));
+                return Err(Error::InternalError("Failed to remove interface".into()));
             }
             let mut connection: Connection = active_connection.into();
             connection.save(&state.get_pool()).await?;
             trace!("Saved connection: {connection:#?}");
             debug!("Removed interface");
             debug!("Saving connection");
-            trace!("Connection: {:#?}", connection);
+            trace!("Connection: {connection:#?}");
         }
         ConnectionType::Tunnel => {
             if let Some(tunnel) =
@@ -731,6 +713,6 @@ pub async fn disconnect_interface(
         }
     }
 
-    info!("Location {} {:?} disconnected", id, connection_type);
+    info!("Location {id} {connection_type:?} disconnected");
     Ok(())
 }

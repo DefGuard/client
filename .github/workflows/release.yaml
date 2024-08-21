@@ -1,4 +1,4 @@
-name: "Build app & create release"
+name: 'Build app & create release'
 on:
   push:
     tags:
@@ -18,9 +18,9 @@ jobs:
           ref: master
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.20'
+          go-version: '1.22'
       - name: Build wireguard-go binary
         run: make
         env:
@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
       - name: Write release version
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
@@ -67,10 +67,10 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: '20'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
           run_install: false
       - name: Get pnpm store directory
         shell: bash
@@ -162,7 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
       - name: Write release version
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
@@ -170,10 +170,10 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: '20'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
           run_install: false
       - name: Get pnpm store directory
         shell: bash
@@ -203,12 +203,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: "Developer ID Application: TEONITE (6WD6W6WQNV)"
+          APPLE_SIGNING_IDENTITY: 'Developer ID Application: TEONITE (6WD6W6WQNV)'
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: "admin@teonite.com"
+          APPLE_ID: 'admin@teonite.com'
           APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: "6WD6W6WQNV"
+          APPLE_TEAM_ID: '6WD6W6WQNV'
         with:
           args: --target ${{ matrix.target }} -v
       - name: Build installation package
@@ -240,7 +240,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
       - name: Write release version
         run: |
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
@@ -248,10 +248,10 @@ jobs:
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: '20'
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
           run_install: false
       - name: Get pnpm store directory
         shell: bash

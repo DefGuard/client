@@ -1,15 +1,17 @@
+use std::time::SystemTime;
+
+use chrono::{NaiveDateTime, Utc};
+use defguard_wireguard_rs::host::Peer;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, NoneAsEmptyString};
+use sqlx::{query, query_as, Error as SqlxError, FromRow};
+
 use crate::{
     commands::DateTimeAggregation,
     database::{ActiveConnection, DbPool},
     error::Error,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-use chrono::{NaiveDateTime, Utc};
-use defguard_wireguard_rs::host::Peer;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, NoneAsEmptyString};
-use sqlx::{query, query_as, Error as SqlxError, FromRow};
-use std::time::SystemTime;
 
 #[serde_as]
 #[derive(Debug, FromRow, Serialize, Deserialize)]
@@ -168,7 +170,7 @@ impl Tunnel {
     pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
            Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, 
+            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive,
             route_all_traffic, pre_up, post_up, pre_down, post_down \
             FROM tunnel WHERE server_pubkey = $1;",
             pubkey
@@ -259,31 +261,25 @@ impl TunnelStats {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             TunnelStats,
-            r#"
-            WITH cte AS (
-                SELECT
-                    id, tunnel_id,
-                    COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) as upload,
-                    COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) as download,
-                    last_handshake, strftime($1, collected_at) as collected_at, listen_port, persistent_keepalive_interval
-                FROM tunnel_stats
-                ORDER BY collected_at
-                LIMIT -1 OFFSET 1
-            )
-            SELECT
-                id, tunnel_id,
-                SUM(MAX(upload, 0)) as "upload!: i64",
-                SUM(MAX(download, 0)) as "download!: i64",
-                last_handshake,
-                collected_at as "collected_at!: NaiveDateTime",
-                listen_port as "listen_port!: u32",
-                persistent_keepalive_interval as "persistent_keepalive_interval?: u16"
-            FROM cte
-            WHERE tunnel_id = $2
-            AND collected_at >= $3
-            GROUP BY collected_at
-            ORDER BY collected_at;
-            "#,
+            "WITH cte AS ( \
+                SELECT \
+                    id, tunnel_id, \
+                    COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, \
+                    COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, \
+                    last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
+                FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1 \
+            ) \
+            SELECT \
+                id, tunnel_id, \
+                SUM(MAX(upload, 0)) \"upload!: i64\", \
+                SUM(MAX(download, 0)) \"download!: i64\", \
+                last_handshake, \
+                collected_at \"collected_at!: NaiveDateTime\", \
+                listen_port \"listen_port!: u32\", \
+                persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM cte \
+            WHERE tunnel_id = $2 AND collected_at >= $3 \
+            GROUP BY collected_at ORDER BY collected_at",
             aggregation,
             tunnel_id,
             from
@@ -293,6 +289,7 @@ impl TunnelStats {
         Ok(stats)
     }
 }
+
 pub async fn peer_to_tunnel_stats(
     peer: &Peer,
     listen_port: u32,
@@ -357,11 +354,8 @@ impl TunnelConnection {
     pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
         let connections = query_as!(
             TunnelConnection,
-            r#"
-            SELECT id, tunnel_id, connected_from, start, end 
-            FROM tunnel_connection
-            WHERE tunnel_id = $1
-            "#,
+            "SELECT id, tunnel_id, connected_from, start, end \
+            FROM tunnel_connection WHERE tunnel_id = $1",
             tunnel_id
         )
         .fetch_all(pool)
@@ -372,13 +366,9 @@ impl TunnelConnection {
     pub async fn latest_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, Error> {
         let connection = query_as!(
             TunnelConnection,
-            r#"
-            SELECT id, tunnel_id, connected_from, start, end
-            FROM tunnel_connection
-            WHERE tunnel_id = $1
-            ORDER BY end DESC
-            LIMIT 1
-            "#,
+            "SELECT id, tunnel_id, connected_from, start, end \
+            FROM tunnel_connection WHERE tunnel_id = $1 \
+            ORDER BY end DESC LIMIT 1",
             tunnel_id
         )
         .fetch_optional(pool)
@@ -406,34 +396,27 @@ impl TunnelConnectionInfo {
         // FIXME: Optimize query
         let connections = query_as!(
             TunnelConnectionInfo,
-            r#"
-              SELECT
-                  c.id as "id!",
-                  c.tunnel_id as "tunnel_id!",
-                  c.connected_from as "connected_from!",
-                  c.start as "start!",
-                  c.end as "end!",
-                  COALESCE((
-                      SELECT ls.upload
-                      FROM tunnel_stats AS ls
-                      WHERE ls.tunnel_id = c.tunnel_id
-                      AND ls.collected_at >= c.start
-                      AND ls.collected_at <= c.end
-                      ORDER BY ls.collected_at DESC
-                      LIMIT 1
-                  ), 0) as "upload: _",
-                  COALESCE((
-                      SELECT ls.download
-                      FROM tunnel_stats AS ls
-                      WHERE ls.tunnel_id = c.tunnel_id
-                      AND ls.collected_at >= c.start
-                      AND ls.collected_at <= c.end
-                      ORDER BY ls.collected_at DESC
-                      LIMIT 1
-                  ), 0) as "download: _"
-              FROM tunnel_connection AS c WHERE tunnel_id = $1
-              ORDER BY start DESC;
-            "#,
+            "SELECT c.id \"id!\", c.tunnel_id \"tunnel_id!\", \
+            c.connected_from \"connected_from!\", c.start \"start!\", \
+            c.end \"end!\", \
+            COALESCE(( \
+                SELECT ls.upload \
+                FROM tunnel_stats ls \
+                WHERE ls.tunnel_id = c.tunnel_id \
+                AND ls.collected_at >= c.start \
+                AND ls.collected_at <= c.end \
+                ORDER BY ls.collected_at DESC LIMIT 1 \
+            ), 0) \"upload: _\", \
+            COALESCE(( \
+                SELECT ls.download \
+                FROM tunnel_stats ls \
+                WHERE ls.tunnel_id = c.tunnel_id \
+                AND ls.collected_at >= c.start \
+                AND ls.collected_at <= c.end \
+                ORDER BY ls.collected_at DESC LIMIT 1 \
+            ), 0) \"download: _\" \
+            FROM tunnel_connection c WHERE tunnel_id = $1 \
+            ORDER BY start DESC",
             tunnel_id
         )
         .fetch_all(pool)
@@ -442,12 +425,13 @@ impl TunnelConnectionInfo {
         Ok(connections)
     }
 }
-impl From<ActiveConnection> for TunnelConnection {
-    fn from(active_connection: ActiveConnection) -> Self {
+
+impl From<&ActiveConnection> for TunnelConnection {
+    fn from(active_connection: &ActiveConnection) -> Self {
         TunnelConnection {
             id: None,
             tunnel_id: active_connection.location_id,
-            connected_from: active_connection.connected_from,
+            connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
             end: Utc::now().naive_utc(),
         }
@@ -467,6 +451,7 @@ impl From<TunnelConnection> for CommonConnection {
         }
     }
 }
+
 // Implement From trait for converting TunnelStats to CommonLocationStats
 impl From<TunnelStats> for CommonLocationStats {
     fn from(tunnel_stats: TunnelStats) -> Self {
