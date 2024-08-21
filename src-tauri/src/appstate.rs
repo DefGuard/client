@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use secrecy::Secret;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
@@ -20,6 +21,7 @@ pub struct AppState {
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
     pub client: DesktopDaemonServiceClient<Channel>,
     pub log_watchers: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    pub db_password: Arc<Mutex<Option<Secret<String>>>>,
 }
 
 impl Default for AppState {
@@ -37,6 +39,7 @@ impl AppState {
             active_connections: Arc::new(Mutex::new(Vec::new())),
             client,
             log_watchers: Arc::new(Mutex::new(HashMap::new())),
+            db_password: Arc::new(Mutex::new(None)),
         }
     }
 

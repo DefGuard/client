@@ -21,6 +21,11 @@ export default defineConfig({
     postcss: {
       plugins: [autoprefixer],
     },
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use "@scssutils" as *;\n`,
+      },
+    },
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
