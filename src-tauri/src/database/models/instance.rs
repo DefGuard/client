@@ -10,6 +10,7 @@ pub struct Instance {
     pub url: String,
     pub proxy_url: String,
     pub username: String,
+    pub token: String,
 }
 
 impl From<proto::InstanceInfo> for Instance {

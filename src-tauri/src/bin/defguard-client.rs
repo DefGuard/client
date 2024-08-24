@@ -26,8 +26,9 @@ use defguard_client::{
         parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
         update_location_routing, update_settings,
     },
-    database::{self, models::settings::Settings},
-    latest_app_version::fetch_latest_app_version_loop,
+    database::{self, models::settings::Settings, Instance},
+    error::Error,
+    periodic::{config::check_config, version::check_version},
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
     utils::load_log_targets,
 };
@@ -52,7 +53,7 @@ lazy_static! {
 // TODO: Refactor later
 #[allow(clippy::single_match)]
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     // add bundled `wireguard-go` binary to PATH
     #[cfg(target_os = "macos")]
     {
@@ -161,7 +162,9 @@ async fn main() {
         let _ = configure_tray_icon(&app_handle, &settings.tray_icon_theme);
     }
 
-    tauri::async_runtime::spawn(fetch_latest_app_version_loop(app_handle.clone()));
+    // run periodic tasks
+    tauri::async_runtime::spawn(check_version(&app_handle));
+    tauri::async_runtime::spawn(check_config(&app_handle));
 
     // Handle Ctrl-C
     tauri::async_runtime::spawn(async move {
@@ -190,4 +193,5 @@ async fn main() {
             trace!("Received event: {event:?}");
         }
     });
+    Ok(())
 }
