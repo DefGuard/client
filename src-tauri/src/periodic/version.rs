@@ -6,7 +6,7 @@ use crate::{appstate::AppState, commands::get_latest_app_version, database::Sett
 
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
-pub async fn check_version(app_handle: &AppHandle) {
+pub async fn check_version(app_handle: AppHandle) {
     let state = app_handle.state::<AppState>();
     let pool = &state.get_pool();
 

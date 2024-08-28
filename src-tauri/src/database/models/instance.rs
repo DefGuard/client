@@ -10,7 +10,7 @@ pub struct Instance {
     pub url: String,
     pub proxy_url: String,
     pub username: String,
-    pub token: String,
+    pub token: Option<String>,
 }
 
 impl From<proto::InstanceInfo> for Instance {
@@ -22,6 +22,7 @@ impl From<proto::InstanceInfo> for Instance {
             url: instance_info.url,
             proxy_url: instance_info.proxy_url,
             username: instance_info.username,
+            token: None,
         }
     }
 }
@@ -42,6 +43,7 @@ impl Instance {
             url,
             proxy_url,
             username,
+            token: None,
         }
     }
 
@@ -54,12 +56,13 @@ impl Instance {
         match self.id {
             None => {
                 let result = query!(
-                    "INSERT INTO instance (name, uuid, url, proxy_url, username) VALUES ($1, $2, $3, $4, $5) RETURNING id;",
+                    "INSERT INTO instance (name, uuid, url, proxy_url, username, token) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id;",
                     self.name,
                     self.uuid,
                     url,
                     proxy_url,
                     self.username,
+                    self.token,
                 )
                 .fetch_one(executor)
                 .await?;
@@ -87,7 +90,7 @@ impl Instance {
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let instances = query_as!(
             Self,
-            "SELECT id \"id?\", name, uuid, url, proxy_url, username FROM instance;"
+            "SELECT id \"id?\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance;"
         )
         .fetch_all(pool)
         .await?;
@@ -97,7 +100,7 @@ impl Instance {
     pub async fn find_by_id(pool: &DbPool, id: i64) -> Result<Option<Self>, Error> {
         let instance = query_as!(
             Self,
-            "SELECT id \"id?\", name, uuid, url, proxy_url, username FROM instance WHERE id = $1;",
+            "SELECT id \"id?\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance WHERE id = $1;",
             id
         )
         .fetch_optional(pool)

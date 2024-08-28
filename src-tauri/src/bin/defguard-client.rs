@@ -163,8 +163,8 @@ async fn main() -> Result<(), Error> {
     }
 
     // run periodic tasks
-    tauri::async_runtime::spawn(check_version(&app_handle));
-    tauri::async_runtime::spawn(check_config(&app_handle));
+    tauri::async_runtime::spawn(check_version(app_handle.clone()));
+    tauri::async_runtime::spawn(check_config(app_state.get_pool()));
 
     // Handle Ctrl-C
     tauri::async_runtime::spawn(async move {
