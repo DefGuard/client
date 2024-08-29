@@ -130,6 +130,7 @@ pub struct SaveDeviceConfigResponse {
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
+    token: String,
     response: DeviceConfigResponse,
     app_state: State<'_, AppState>,
     handle: AppHandle,
@@ -141,6 +142,7 @@ pub async fn save_device_config(
         .instance
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
+    instance.token = Some(token);
 
     instance.save(&mut *transaction).await?;
 
@@ -174,6 +176,29 @@ pub async fn save_device_config(
     };
     info!("Device configuration saved.");
     Ok(res)
+}
+
+#[tauri::command(async)]
+pub async fn save_token(
+    instance_uuid: String,
+    token: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), Error> {
+    debug!("Saving AUTH token for instance {instance_uuid}");
+    let pool = app_state.get_pool();
+    if let Some(mut instance) = Instance::find_by_uuid(&pool, &instance_uuid).await? {
+        instance.token = Some(token);
+        instance.save(&pool).await?;
+        info!(
+            "Saved AUTH token for instance {} ({})",
+            instance.name,
+            instance.id.expect("Instance from database missing id")
+        );
+        Ok(())
+    } else {
+        error!("Instance {instance_uuid} not found");
+        Err(Error::NotFound)
+    }
 }
 
 #[tauri::command(async)]

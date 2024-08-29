@@ -24,7 +24,7 @@ import { clientQueryKeys } from '../../../../../client/query';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
 
-const { saveConfig } = clientApi;
+const { saveConfig, saveToken } = clientApi;
 
 type FormFields = {
   name: string;
@@ -65,6 +65,15 @@ export const DesktopSetup = () => {
         error(String(e));
       },
     });
+
+  const { mutateAsync: saveTokenMutation, isPending: saveTokenPending } = useMutation({
+    mutationFn: saveToken,
+    onError: (e) => {
+      toaster.error(LL.common.messages.error());
+      console.error(e);
+      error(String(e));
+    },
+  });
 
   const schema = useMemo(
     () =>
@@ -112,10 +121,10 @@ export const DesktopSetup = () => {
         throw Error('Failed to activate user');
       }
       info('User activated');
-      setIsLoading(true);
       debug('Invoking save_device_config');
       saveConfig({
         privateKey,
+        token: res.data.token,
         response: deviceResponse.data as CreateDeviceResponse,
       })
         .then(() => {
@@ -123,7 +132,10 @@ export const DesktopSetup = () => {
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });
           toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
-          const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
+          const invalidate = [
+            clientQueryKeys.getInstances,
+            clientQueryKeys.getLocations,
+          ];
           invalidate.forEach((key) => {
             queryClient.invalidateQueries({
               queryKey: [key],
@@ -166,7 +178,7 @@ export const DesktopSetup = () => {
               : stepLL.desktopSetup.controls.create()
           }
           disabled={!isUndefined(deviceName)}
-          loading={isLoading || activationPending || createDevicePending}
+          loading={isLoading || activationPending || createDevicePending || saveTokenPending}
         />
       </form>
     </Card>

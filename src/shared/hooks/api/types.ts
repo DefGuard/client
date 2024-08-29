@@ -1,4 +1,5 @@
 import { Response } from '@tauri-apps/api/http';
+import { SaveTokenRequest } from 'src/pages/client/clientAPI/types';
 
 import { DefguardInstance } from '../../../pages/client/types';
 
@@ -37,6 +38,10 @@ export type EnrollmentStartResponse = {
 export type ActivateUserRequest = {
   phone_number: string;
   password: string;
+};
+
+export type ActivateUserResponse = {
+  token: string;
 };
 
 export type CreateDeviceRequest = {
@@ -104,7 +109,7 @@ export type NewApplicationVersionInfo = {
 export type UseApi = {
   enrollment: {
     start: (data: EnrollmentStartRequest) => Promise<Response<EnrollmentStartResponse>>;
-    activateUser: (data: ActivateUserRequest) => Promise<Response<EmptyApiResponse>>;
+    activateUser: (data: ActivateUserRequest) => Promise<Response<ActivateUserResponse>>;
     createDevice: (data: CreateDeviceRequest) => Promise<Response<CreateDeviceResponse>>;
   };
   getAppInfo: () => Promise<Response<AppInfo>>;

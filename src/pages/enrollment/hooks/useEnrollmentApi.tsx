@@ -2,6 +2,7 @@ import { Body, fetch } from '@tauri-apps/api/http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import {
+  ActivateUserResponse,
   AppInfo,
   CreateDeviceResponse,
   EmptyApiResponse,
@@ -31,7 +32,7 @@ export const useEnrollmentApi = (): UseApi => {
   };
 
   const activateUser: UseApi['enrollment']['activateUser'] = async (data) => {
-    const response = await fetch<EmptyApiResponse>(
+    const response = await fetch<ActivateUserResponse>(
       `${proxyUrl}/enrollment/activate_user`,
       {
         method: 'POST',

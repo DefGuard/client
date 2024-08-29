@@ -15,7 +15,7 @@ use defguard_client::{
     __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
     __cmd__disconnect, __cmd__get_latest_app_version, __cmd__get_settings, __cmd__last_connection,
     __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link,
-    __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
+    __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_token, __cmd__save_tunnel,
     __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
     __cmd__update_settings,
     appstate::AppState,
@@ -23,7 +23,7 @@ use defguard_client::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
         last_connection, location_interface_details, location_stats, open_link,
-        parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
+        parse_tunnel_config, save_device_config, save_token, save_tunnel, tunnel_details, update_instance,
         update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings, Instance},
@@ -82,6 +82,7 @@ async fn main() -> Result<(), Error> {
         .invoke_handler(tauri::generate_handler![
             all_locations,
             save_device_config,
+            save_token,
             all_instances,
             connect,
             disconnect,
@@ -163,8 +164,8 @@ async fn main() -> Result<(), Error> {
     }
 
     // run periodic tasks
-    tauri::async_runtime::spawn(check_version(app_handle.clone()));
-    tauri::async_runtime::spawn(check_config(app_state.get_pool()));
+    // tauri::async_runtime::spawn(check_version(app_handle.clone()));
+    // tauri::async_runtime::spawn(check_config(app_state.get_pool()));
 
     // Handle Ctrl-C
     tauri::async_runtime::spawn(async move {

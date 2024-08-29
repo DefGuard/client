@@ -1,8 +1,7 @@
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
-use crate::{appstate::AppState, database::{DbPool, Instance}, error::Error, proto::{DeviceConfig, ExistingDevice}};
+use crate::{database::{DbPool, Instance}, error::Error, proto::DeviceConfig};
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const NETWORK_INFO_ENTPOINT: &str = "api/v1/enrollment/network_info";
@@ -14,7 +13,7 @@ pub async fn check_config(pool: DbPool) {
         debug!("Polling for configuration updates",);
         for instance in &instances {
             match fetch_instance_confg(instance).await {
-                Ok(config) => todo!(),
+                Ok(_config) => println!("TEST TEST"),
                 Err(err) => error!("Failed to fetch instance {} config, {}", instance.name, err),
             }
         }

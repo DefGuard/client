@@ -27,6 +27,12 @@ export type StatsRequest = {
 export type SaveConfigRequest = {
   privateKey: string;
   response: CreateDeviceResponse;
+  token: string;
+};
+
+export type SaveTokenRequest = {
+  instanceUuid: string;
+  token: string;
 };
 
 export type UpdateInstnaceRequest = {
@@ -126,6 +132,7 @@ export type TauriCommandKey =
   | 'update_instance'
   | 'parse_tunnel_config'
   | 'save_tunnel'
+  | 'save_token'
   | 'all_tunnels'
   | 'tunnel_details'
   | 'delete_tunnel'
