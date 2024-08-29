@@ -24,7 +24,7 @@ import { clientQueryKeys } from '../../../../../client/query';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
 
-const { saveConfig, saveToken } = clientApi;
+const { saveConfig } = clientApi;
 
 type FormFields = {
   name: string;
@@ -65,15 +65,6 @@ export const DesktopSetup = () => {
         error(String(e));
       },
     });
-
-  const { mutateAsync: saveTokenMutation, isPending: saveTokenPending } = useMutation({
-    mutationFn: saveToken,
-    onError: (e) => {
-      toaster.error(LL.common.messages.error());
-      console.error(e);
-      error(String(e));
-    },
-  });
 
   const schema = useMemo(
     () =>
@@ -178,7 +169,7 @@ export const DesktopSetup = () => {
               : stepLL.desktopSetup.controls.create()
           }
           disabled={!isUndefined(deviceName)}
-          loading={isLoading || activationPending || createDevicePending || saveTokenPending}
+          loading={isLoading || activationPending || createDevicePending}
         />
       </form>
     </Card>

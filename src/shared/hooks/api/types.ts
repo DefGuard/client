@@ -1,5 +1,4 @@
 import { Response } from '@tauri-apps/api/http';
-import { SaveTokenRequest } from 'src/pages/client/clientAPI/types';
 
 import { DefguardInstance } from '../../../pages/client/types';
 

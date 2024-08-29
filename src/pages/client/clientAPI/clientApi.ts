@@ -19,7 +19,6 @@ import {
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
-  SaveTokenRequest,
   Settings,
   StatsRequest,
   TauriCommandKey,
@@ -49,9 +48,6 @@ async function invokeWrapper<T>(
 
 const saveConfig = async (data: SaveConfigRequest): Promise<SaveDeviceConfigResponse> =>
   invokeWrapper('save_device_config', data);
-
-const saveToken = async (data: SaveTokenRequest): Promise<void> =>
-  invokeWrapper('save_token', data);
 
 const getInstances = async (): Promise<DefguardInstance[]> =>
   invokeWrapper('all_instances');
@@ -129,7 +125,6 @@ export const clientApi = {
   getConnectionHistory,
   getActiveConnection,
   saveConfig,
-  saveToken,
   updateLocationRouting,
   getSettings,
   updateSettings,

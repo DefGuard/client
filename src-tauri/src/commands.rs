@@ -179,29 +179,6 @@ pub async fn save_device_config(
 }
 
 #[tauri::command(async)]
-pub async fn save_token(
-    instance_uuid: String,
-    token: String,
-    app_state: State<'_, AppState>,
-) -> Result<(), Error> {
-    debug!("Saving AUTH token for instance {instance_uuid}");
-    let pool = app_state.get_pool();
-    if let Some(mut instance) = Instance::find_by_uuid(&pool, &instance_uuid).await? {
-        instance.token = Some(token);
-        instance.save(&pool).await?;
-        info!(
-            "Saved AUTH token for instance {} ({})",
-            instance.name,
-            instance.id.expect("Instance from database missing id")
-        );
-        Ok(())
-    } else {
-        error!("Instance {instance_uuid} not found");
-        Err(Error::NotFound)
-    }
-}
-
-#[tauri::command(async)]
 pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo>, Error> {
     debug!("Retrieving all instances.");
 
