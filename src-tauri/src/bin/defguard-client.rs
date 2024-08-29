@@ -23,11 +23,10 @@ use defguard_client::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
         last_connection, location_interface_details, location_stats, open_link,
-        parse_tunnel_config, save_device_config, save_tunnel, tunnel_details,
-        update_instance, update_location_routing, update_settings,
+        parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
+        update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings},
-    error::Error,
     periodic::{config::check_config, version::check_version},
     tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
     utils::load_log_targets,
@@ -53,7 +52,7 @@ lazy_static! {
 // TODO: Refactor later
 #[allow(clippy::single_match)]
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() {
     // add bundled `wireguard-go` binary to PATH
     #[cfg(target_os = "macos")]
     {
@@ -193,5 +192,4 @@ async fn main() -> Result<(), Error> {
             trace!("Received event: {event:?}");
         }
     });
-    Ok(())
 }
