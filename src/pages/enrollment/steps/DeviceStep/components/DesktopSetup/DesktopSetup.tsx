@@ -112,6 +112,7 @@ export const DesktopSetup = () => {
         throw Error('Failed to activate user');
       }
       info('User activated');
+      setIsLoading(true);
       debug('Invoking save_device_config');
       saveConfig({
         privateKey,

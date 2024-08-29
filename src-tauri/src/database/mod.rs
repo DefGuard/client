@@ -37,12 +37,11 @@ fn prepare_db_url(app_handle: &AppHandle) -> Result<String, Error> {
         Ok(url)
     } else {
         debug!("Using production database");
-        // Check if a database file exists, and create one if it does not.
+        // Check if database directory and file exists, create if they don't.
         let app_dir = app_handle
             .path_resolver()
             .app_data_dir()
             .ok_or(Error::Config)?;
-        // Create app data directory if it doesnt exist
         debug!("Creating app data dir at: {}", app_dir.to_string_lossy());
         fs::create_dir_all(&app_dir)?;
         info!("Created app data dir at: {}", app_dir.to_string_lossy());
