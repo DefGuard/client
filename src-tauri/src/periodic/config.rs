@@ -6,7 +6,7 @@ use tracing::warn;
 use crate::{
     appstate::AppState,
     commands::{device_config_to_location, save_device_config},
-    database::{DbPool, Instance, Location, WireguardKeys},
+    database::{models::Id, DbPool, Instance, Location, WireguardKeys},
     error::Error,
     proto::{DeviceConfig, InstanceInfoRequest, InstanceInfoResponse},
 };
@@ -40,13 +40,13 @@ pub async fn check_config(handle: AppHandle) {
 
 async fn update_instance_config(
     pool: &DbPool,
-    instance: &Instance,
+    instance: &Instance<Id>,
     state: &State<'_, AppState>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
     // TODO(jck): unwraps
-    let WireguardKeys { pubkey, prvkey, .. } =
-        WireguardKeys::find_by_instance_id(pool, instance.id.unwrap())
+    let WireguardKeys { pubkey, .. } =
+        WireguardKeys::find_by_instance_id(pool, instance.id.0)
             .await?
             .unwrap();
     let url = format!("{}{}", instance.proxy_url, POLLING_ENDPOINT);
@@ -85,7 +85,7 @@ async fn update_instance_config(
         .await?
         .unwrap();
         // TODO(jck): unwrap
-        let db_locations = Location::find_by_instance_id(pool, instance.id.unwrap()).await?;
+        let db_locations = Location::find_by_instance_id(pool, instance.id.0).await?;
         let db_comparable_locations: Vec<ComparableLocation> = db_locations
             .into_iter()
             .map(ComparableLocation::from)
@@ -99,8 +99,9 @@ async fn update_instance_config(
             .unwrap()
             .configs
             .iter()
-            .map(|config| device_config_to_location(config.clone(), instance.id.unwrap()))
-            .map(ComparableLocation::from).collect();
+            .map(|config| device_config_to_location(config.clone(), instance.id.0))
+            .map(ComparableLocation::from)
+            .collect();
         let core_comparable_locations: HashSet<ComparableLocation> =
             HashSet::from_iter(core_locations);
 
@@ -118,7 +119,6 @@ async fn update_instance_config(
         } else {
             todo!();
         }
-
 
         // // TODO(jck): unwrap
         // let _ = save_device_config(

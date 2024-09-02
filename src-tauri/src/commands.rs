@@ -1,7 +1,7 @@
 use crate::{
     appstate::AppState,
     database::{
-        models::{instance::InstanceInfo, settings::SettingsPatch},
+        models::{instance::InstanceInfo, settings::SettingsPatch, Id},
         ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
         Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
     },
@@ -124,7 +124,7 @@ pub struct InstanceResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location>,
-    instance: Instance,
+    instance: Instance<Id>,
 }
 
 #[tauri::command(async)]
@@ -144,20 +144,20 @@ pub async fn save_device_config(
     let mut instance: Instance = instance_info.into();
     instance.token = Some(token);
 
-    instance.save(&mut *transaction).await?;
+    let instance = instance.save(&mut *transaction).await?;
 
     let device = response
         .device
         .expect("Missing device info in device config response");
     let mut keys = WireguardKeys::new(
-        instance.id.expect("Missing instance ID"),
+        instance.id.0,
         device.pubkey,
         private_key,
     );
     keys.save(&mut *transaction).await?;
     for location in response.configs {
         let mut new_location =
-            device_config_to_location(location, instance.id.expect("Missing instance ID"));
+            device_config_to_location(location, instance.id.0);
         new_location.save(&mut *transaction).await?;
     }
     transaction.commit().await?;
@@ -165,7 +165,7 @@ pub async fn save_device_config(
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(
         &app_state.get_pool(),
-        instance.id.expect("Missing instance ID"),
+        instance.id.0,
     )
     .await?;
     trace!("Created following locations: {locations:#?}");
@@ -190,10 +190,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .get_connection_id_by_type(&ConnectionType::Location)
         .await;
     for instance in instances {
-        let Some(instance_id) = instance.id else {
-            continue;
-        };
-        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
+        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.0).await?;
         let location_ids: Vec<i64> = locations
             .iter()
             .filter_map(|location| location.id)
@@ -201,11 +198,11 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance_id)
+        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id.0)
             .await?
             .ok_or(Error::NotFound)?;
         instance_info.push(InstanceInfo {
-            id: instance.id,
+            id: Some(instance.id.0),
             uuid: instance.uuid,
             name: instance.name,
             url: instance.url,

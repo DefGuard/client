@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
-    database::{ActiveConnection, DbPool, Instance, Location},
+    database::{models::Id, ActiveConnection, DbPool, Instance, Location},
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
@@ -131,11 +131,11 @@ impl AppState {
     /// Returns active connections for given instance
     pub async fn active_connections(
         &self,
-        instance: &Instance,
+        instance: &Instance<Id>,
     ) -> Result<Vec<ActiveConnection>, crate::error::Error> {
         // TODO(jck): unwrap
         let locations: HashSet<i64> = HashSet::from_iter(
-            Location::find_by_instance_id(&self.get_pool(), instance.id.unwrap())
+            Location::find_by_instance_id(&self.get_pool(), instance.id.0)
                 .await?
                 .iter()
                 .filter_map(|location| location.id),
