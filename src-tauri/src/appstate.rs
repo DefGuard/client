@@ -135,10 +135,10 @@ impl AppState {
     ) -> Result<Vec<ActiveConnection>, crate::error::Error> {
         // TODO(jck): unwrap
         let locations: HashSet<i64> = HashSet::from_iter(
-            Location::find_by_instance_id(&self.get_pool(), instance.id.0)
+            Location::find_by_instance_id(&self.get_pool(), instance.id)
                 .await?
                 .iter()
-                .map(|location| location.id.0),
+                .map(|location| location.id),
         );
         Ok(self
             .active_connections

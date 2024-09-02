@@ -149,16 +149,16 @@ pub async fn save_device_config(
     let device = response
         .device
         .expect("Missing device info in device config response");
-    let mut keys = WireguardKeys::new(instance.id.0, device.pubkey, private_key);
+    let mut keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
     keys.save(&mut *transaction).await?;
     for location in response.configs {
-        let new_location = device_config_to_location(location, instance.id.0);
+        let new_location = device_config_to_location(location, instance.id);
         new_location.save(&mut *transaction).await?;
     }
     transaction.commit().await?;
     info!("Instance created.");
     trace!("Created following instance: {instance:#?}");
-    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.0).await?;
+    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
     trace!("Created following locations: {locations:#?}");
     handle.emit_all("instance-update", ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
@@ -181,16 +181,16 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .get_connection_id_by_type(&ConnectionType::Location)
         .await;
     for instance in instances {
-        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.0).await?;
-        let location_ids: Vec<i64> = locations.iter().map(|location| location.id.0).collect();
+        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
+        let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id.0)
+        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id)
             .await?
             .ok_or(Error::NotFound)?;
         instance_info.push(InstanceInfo {
-            id: Some(instance.id.0),
+            id: Some(instance.id),
             uuid: instance.uuid,
             name: instance.name,
             url: instance.url,
@@ -232,12 +232,12 @@ pub async fn all_locations(
     let mut location_info = Vec::new();
     for location in locations {
         let info = LocationInfo {
-            id: location.id.0,
+            id: location.id,
             instance_id: location.instance_id,
             name: location.name,
             address: location.address,
             endpoint: location.endpoint,
-            active: active_locations_ids.contains(&location.id.0),
+            active: active_locations_ids.contains(&location.id),
             route_all_traffic: location.route_all_traffic,
             connection_type: ConnectionType::Location,
             pubkey: location.pubkey,
@@ -626,12 +626,12 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
         let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
         for location in instance_locations {
             if let Some(connection) = app_state
-                .find_and_remove_connection(location.id.0, &ConnectionType::Location)
+                .find_and_remove_connection(location.id, &ConnectionType::Location)
                 .await
             {
                 debug!(
                     "Found active connection for location {} ({}), closing...",
-                    location.name, location.id.0
+                    location.name, location.id
                 );
                 let request = RemoveInterfaceRequest {
                     interface_name: connection.interface_name.clone(),
@@ -641,7 +641,7 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
                 client.remove_interface(request).await.map_err(|status| {
                         let msg =
                             format!("Error occured while removing interface {} for location {} ({}), status: {status}",
-                            connection.interface_name, location.name, location.id.0
+                            connection.interface_name, location.name, location.id
                         );
                         error!("{msg}");
                         Error::InternalError(msg)

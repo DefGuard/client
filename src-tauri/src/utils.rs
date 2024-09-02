@@ -528,7 +528,7 @@ pub async fn handle_connection_for_location(
     .await?;
     let address = local_ip()?;
     let connection = ActiveConnection::new(
-        location.id.0,
+        location.id,
         address.to_string(),
         interface_name.clone(),
         ConnectionType::Location,
@@ -564,7 +564,7 @@ pub async fn handle_connection_for_location(
     debug!("Spawning log watcher...");
     spawn_log_watcher_task(
         handle,
-        location.id.0,
+        location.id,
         interface_name,
         ConnectionType::Location,
         Level::DEBUG,

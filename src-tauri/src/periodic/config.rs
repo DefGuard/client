@@ -46,7 +46,7 @@ async fn update_instance_config(
 ) -> Result<(), Error> {
     // TODO(jck): unwraps
     let WireguardKeys { pubkey, .. } =
-        WireguardKeys::find_by_instance_id(pool, instance.id.0)
+        WireguardKeys::find_by_instance_id(pool, instance.id)
             .await?
             .unwrap();
     let url = format!("{}{}", instance.proxy_url, POLLING_ENDPOINT);
@@ -85,7 +85,7 @@ async fn update_instance_config(
         .await?
         .unwrap();
         // TODO(jck): unwrap
-        let db_locations = Location::find_by_instance_id(pool, instance.id.0).await?;
+        let db_locations = Location::find_by_instance_id(pool, instance.id).await?;
         let db_comparable_locations: Vec<ComparableLocation> = db_locations
             .into_iter()
             .map(ComparableLocation::from)
@@ -99,7 +99,7 @@ async fn update_instance_config(
             .unwrap()
             .configs
             .iter()
-            .map(|config| device_config_to_location(config.clone(), instance.id.0))
+            .map(|config| device_config_to_location(config.clone(), instance.id))
             .map(ComparableLocation::from)
             .collect();
         let core_comparable_locations: HashSet<ComparableLocation> =

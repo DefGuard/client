@@ -44,7 +44,7 @@ impl Instance<Id> {
             url,
             proxy_url,
             self.username,
-            self.id.0,
+            self.id,
         )
         .execute(executor)
         .await?;
@@ -92,7 +92,7 @@ impl Instance<Id> {
     }
 
     pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
-        Instance::delete_by_id(pool, self.id.0).await?;
+        Instance::delete_by_id(pool, self.id).await?;
         Ok(())
     }
 }
@@ -135,7 +135,7 @@ impl Instance<NoId> {
         .fetch_one(executor)
         .await?;
         Ok(Instance::<Id> {
-            id: Id(result.id),
+            id: result.id,
             name: self.name,
             uuid: self.uuid,
             url: self.url,

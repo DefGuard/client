@@ -67,7 +67,7 @@ pub async fn peer_to_location_stats(
     let location = Location::find_by_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
         id: None,
-        location_id: location.id.0,
+        location_id: location.id,
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
         last_handshake: peer.last_handshake.map_or(0, |ts| {
@@ -82,7 +82,7 @@ pub async fn peer_to_location_stats(
 
 impl Display for Location<Id> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[ID {}] {}", self.id.0, self.name)
+        write!(f, "[ID {}] {}", self.id, self.name)
     }
 }
 
@@ -124,7 +124,7 @@ impl Location<Id> {
             self.route_all_traffic,
             self.mfa_enabled,
             self.keepalive_interval,
-            self.id.0,
+            self.id,
         )
         .execute(executor)
         .await?;
@@ -176,7 +176,7 @@ impl Location<Id> {
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         info!("Removing location {self:?}");
-        query!("DELETE FROM location WHERE id = $1;", self.id.0)
+        query!("DELETE FROM location WHERE id = $1;", self.id)
             .execute(executor)
             .await?;
         Ok(())
@@ -209,7 +209,7 @@ impl Location<NoId> {
             .await?;
 
         Ok(Location::<Id> {
-            id: Id(result.id),
+            id: result.id,
             instance_id: self.instance_id,
             name: self.name,
             address: self.address,
