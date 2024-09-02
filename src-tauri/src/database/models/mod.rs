@@ -13,7 +13,3 @@ pub mod wireguard_keys;
 pub struct Id(pub i64);
 #[derive(Debug, Clone)]
 pub struct NoId;
-
-pub trait HasId {
-    fn id(&self) -> u64;
-}

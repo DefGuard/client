@@ -151,8 +151,8 @@ struct ComparableLocation {
     pub keepalive_interval: i64,
 }
 
-impl From<Location> for ComparableLocation {
-    fn from(location: Location) -> Self {
+impl<I> From<Location<I>> for ComparableLocation {
+    fn from(location: Location<I>) -> Self {
         Self {
             instance_id: location.instance_id,
             network_id: location.network_id,

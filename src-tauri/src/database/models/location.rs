@@ -12,9 +12,11 @@ use crate::{
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 
+use super::{Id, NoId};
+
 #[derive(FromRow, Debug, Serialize, Deserialize)]
-pub struct Location {
-    pub id: Option<i64>,
+pub struct Location<I = NoId> {
+    pub id: I,
     pub instance_id: i64,
     // Native id of network from defguard
     pub network_id: i64,
@@ -65,7 +67,7 @@ pub async fn peer_to_location_stats(
     let location = Location::find_by_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
         id: None,
-        location_id: location.id.unwrap(),
+        location_id: location.id.0,
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
         last_handshake: peer.last_handshake.map_or(0, |ts| {
@@ -78,20 +80,23 @@ pub async fn peer_to_location_stats(
     })
 }
 
-impl Display for Location {
+impl Display for Location<Id> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.id {
-            Some(location_id) => write!(f, "[ID {location_id}] {}", self.name),
-            None => write!(f, "{}", self.name),
-        }
+        write!(f, "[ID {}] {}", self.id.0, self.name)
     }
 }
 
-impl Location {
+impl Display for Location<NoId> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl Location<Id> {
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let locations = query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
+            "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
              route_all_traffic, mfa_enabled, keepalive_interval \
         FROM location;"
         )
@@ -104,51 +109,25 @@ impl Location {
     where
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
-        match self.id {
-            None => {
-                // Insert a new record when there is no ID
-                let result = query!(
-                    "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
-                    RETURNING id;",
-                    self.instance_id,
-                    self.name,
-                    self.address,
-                    self.pubkey,
-                    self.endpoint,
-                    self.allowed_ips,
-                    self.dns,
-                    self.network_id,
-                    self.route_all_traffic,
-                    self.mfa_enabled,
-                    self.keepalive_interval
-            )
-            .fetch_one(executor)
-            .await?;
-                self.id = Some(result.id);
-            }
-            Some(id) => {
-                // Update the existing record when there is an ID
-                query!(
-                    "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
-                    network_id = $8, route_all_traffic = $9, mfa_enabled = $10, keepalive_interval = $11 WHERE id = $12;",
-                    self.instance_id,
-                    self.name,
-                    self.address,
-                    self.pubkey,
-                    self.endpoint,
-                    self.allowed_ips,
-                    self.dns,
-                    self.network_id,
-                    self.route_all_traffic,
-                    self.mfa_enabled,
-                    self.keepalive_interval,
-                    id,
-            )
-            .execute(executor)
-            .await?;
-            }
-        }
+        // Update the existing record when there is an ID
+        query!(
+            "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
+            network_id = $8, route_all_traffic = $9, mfa_enabled = $10, keepalive_interval = $11 WHERE id = $12;",
+            self.instance_id,
+            self.name,
+            self.address,
+            self.pubkey,
+            self.endpoint,
+            self.allowed_ips,
+            self.dns,
+            self.network_id,
+            self.route_all_traffic,
+            self.mfa_enabled,
+            self.keepalive_interval,
+            self.id.0,
+        )
+        .execute(executor)
+        .await?;
 
         Ok(())
     }
@@ -156,7 +135,7 @@ impl Location {
     pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
             route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE id = $1;",
             location_id
@@ -171,7 +150,7 @@ impl Location {
     ) -> Result<Vec<Self>, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
             route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE instance_id = $1;",
             instance_id
@@ -183,7 +162,7 @@ impl Location {
     pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
         query_as!(
             Self,
-            "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
             route_all_traffic, mfa_enabled, keepalive_interval \
             FROM location WHERE pubkey = $1;",
             pubkey
@@ -196,13 +175,53 @@ impl Location {
     where
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
-        info!("Removing location {self}");
-        if let Some(id) = self.id {
-            query!("DELETE FROM location WHERE id = $1;", id)
-                .execute(executor)
-                .await?;
-        }
+        info!("Removing location {self:?}");
+        query!("DELETE FROM location WHERE id = $1;", self.id.0)
+            .execute(executor)
+            .await?;
         Ok(())
+    }
+}
+
+impl Location<NoId> {
+    pub async fn save<'e, E>(self, executor: E) -> Result<Location<Id>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        // Insert a new record when there is no ID
+        let result = query!(
+                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
+                RETURNING id;",
+                self.instance_id,
+                self.name,
+                self.address,
+                self.pubkey,
+                self.endpoint,
+                self.allowed_ips,
+                self.dns,
+                self.network_id,
+                self.route_all_traffic,
+                self.mfa_enabled,
+                self.keepalive_interval
+            )
+            .fetch_one(executor)
+            .await?;
+
+        Ok(Location::<Id> {
+            id: Id(result.id),
+            instance_id: self.instance_id,
+            name: self.name,
+            address: self.address,
+            pubkey: self.pubkey,
+            endpoint: self.endpoint,
+            allowed_ips: self.allowed_ips,
+            dns: self.dns,
+            network_id: self.network_id,
+            route_all_traffic: self.route_all_traffic,
+            mfa_enabled: self.mfa_enabled,
+            keepalive_interval: self.keepalive_interval,
+        })
     }
 }
 

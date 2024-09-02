@@ -138,7 +138,7 @@ impl AppState {
             Location::find_by_instance_id(&self.get_pool(), instance.id.0)
                 .await?
                 .iter()
-                .filter_map(|location| location.id),
+                .map(|location| location.id.0),
         );
         Ok(self
             .active_connections

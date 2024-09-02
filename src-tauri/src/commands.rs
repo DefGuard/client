@@ -1,7 +1,7 @@
 use crate::{
     appstate::AppState,
     database::{
-        models::{instance::InstanceInfo, settings::SettingsPatch, Id},
+        models::{instance::InstanceInfo, settings::SettingsPatch, Id, NoId},
         ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
         Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
     },
@@ -96,9 +96,9 @@ pub struct Device {
 }
 
 #[must_use]
-pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location {
+pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location<NoId> {
     Location {
-        id: None,
+        id: NoId,
         instance_id,
         network_id: device_config.network_id,
         name: device_config.network_name,
@@ -123,7 +123,7 @@ pub struct InstanceResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SaveDeviceConfigResponse {
-    locations: Vec<Location>,
+    locations: Vec<Location<Id>>,
     instance: Instance<Id>,
 }
 
@@ -149,25 +149,16 @@ pub async fn save_device_config(
     let device = response
         .device
         .expect("Missing device info in device config response");
-    let mut keys = WireguardKeys::new(
-        instance.id.0,
-        device.pubkey,
-        private_key,
-    );
+    let mut keys = WireguardKeys::new(instance.id.0, device.pubkey, private_key);
     keys.save(&mut *transaction).await?;
     for location in response.configs {
-        let mut new_location =
-            device_config_to_location(location, instance.id.0);
+        let new_location = device_config_to_location(location, instance.id.0);
         new_location.save(&mut *transaction).await?;
     }
     transaction.commit().await?;
     info!("Instance created.");
     trace!("Created following instance: {instance:#?}");
-    let locations = Location::find_by_instance_id(
-        &app_state.get_pool(),
-        instance.id.0,
-    )
-    .await?;
+    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.0).await?;
     trace!("Created following locations: {locations:#?}");
     handle.emit_all("instance-update", ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
@@ -191,10 +182,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         .await;
     for instance in instances {
         let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id.0).await?;
-        let location_ids: Vec<i64> = locations
-            .iter()
-            .filter_map(|location| location.id)
-            .collect();
+        let location_ids: Vec<i64> = locations.iter().map(|location| location.id.0).collect();
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
@@ -244,12 +232,12 @@ pub async fn all_locations(
     let mut location_info = Vec::new();
     for location in locations {
         let info = LocationInfo {
-            id: location.id.expect("Missing location ID"),
+            id: location.id.0,
             instance_id: location.instance_id,
             name: location.name,
             address: location.address,
             endpoint: location.endpoint,
-            active: active_locations_ids.contains(&location.id.expect("Missing location ID")),
+            active: active_locations_ids.contains(&location.id.0),
             route_all_traffic: location.route_all_traffic,
             connection_type: ConnectionType::Location,
             pubkey: location.pubkey,
@@ -330,7 +318,7 @@ pub async fn update_instance(
         debug!("Updating locations for instance {instance_id}.");
         for location in response.configs {
             // parse device config
-            let mut new_location = device_config_to_location(location, instance_id);
+            let new_location = device_config_to_location(location, instance_id);
 
             // check if location is already present in current locations
             if let Some(position) = current_locations
@@ -637,27 +625,28 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
     if let Some(instance) = Instance::find_by_id(pool, instance_id).await? {
         let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
         for location in instance_locations {
-            if let Some(location_id) = location.id {
-                if let Some(connection) = app_state
-                    .find_and_remove_connection(location_id, &ConnectionType::Location)
-                    .await
-                {
-                    debug!("Found active connection for location({location_id}), closing...",);
-                    let request = RemoveInterfaceRequest {
-                        interface_name: connection.interface_name.clone(),
-                        pre_down: None,
-                        post_down: None,
-                    };
-                    client.remove_interface(request).await.map_err(|status| {
+            if let Some(connection) = app_state
+                .find_and_remove_connection(location.id.0, &ConnectionType::Location)
+                .await
+            {
+                debug!(
+                    "Found active connection for location {} ({}), closing...",
+                    location.name, location.id.0
+                );
+                let request = RemoveInterfaceRequest {
+                    interface_name: connection.interface_name.clone(),
+                    pre_down: None,
+                    post_down: None,
+                };
+                client.remove_interface(request).await.map_err(|status| {
                         let msg =
-                            format!("Error occured while removing interface {} for location {location_id}, status: {status}",
-                            connection.interface_name
+                            format!("Error occured while removing interface {} for location {} ({}), status: {status}",
+                            connection.interface_name, location.name, location.id.0
                         );
                         error!("{msg}");
                         Error::InternalError(msg)
                     })?;
-                    info!("Connection closed and interface removed");
-                }
+                info!("Connection closed and interface removed");
             }
         }
         instance.delete(pool).await?;
