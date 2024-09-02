@@ -43,7 +43,7 @@ async fn update_instance_config(
     instance: &Instance,
     state: &State<'_, AppState>,
     handle: &AppHandle,
-) -> Result<DeviceConfig, Error> {
+) -> Result<(), Error> {
     // TODO(jck): unwraps
     let WireguardKeys { pubkey, prvkey, .. } =
         WireguardKeys::find_by_instance_id(pool, instance.id.unwrap())
@@ -104,11 +104,21 @@ async fn update_instance_config(
         let core_comparable_locations: HashSet<ComparableLocation> =
             HashSet::from_iter(core_locations);
 
-        if core_comparable_locations != db_comparable_locations {
-            error!("NOT EQUAL!!!");
-        } else {
-            error!("EQUAL!!!");
+        if core_comparable_locations == db_comparable_locations {
+            // config remains unchanged, return early
+            return Ok(());
         }
+
+        // Config changed
+
+        // If there are no active connections for this instance, then update the database.
+        // Otherwise just display the message to reconnect.
+        if state.active_connections(&instance).await?.is_empty() {
+            todo!();
+        } else {
+            todo!();
+        }
+
 
         // // TODO(jck): unwrap
         // let _ = save_device_config(
@@ -119,7 +129,7 @@ async fn update_instance_config(
         //     handle.clone(),
         // )
         // .await;
-        Ok(DeviceConfig::default())
+        Ok(())
     } else {
         Err(Error::InternalError("TODO(jck)".to_string()))
     }
