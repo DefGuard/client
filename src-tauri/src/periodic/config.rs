@@ -42,13 +42,12 @@ async fn update_instance_config(
     pool: &DbPool,
     instance: &Instance<Id>,
     state: &State<'_, AppState>,
-    handle: &AppHandle,
+    _handle: &AppHandle,
 ) -> Result<(), Error> {
     // TODO(jck): unwraps
-    let WireguardKeys { pubkey, .. } =
-        WireguardKeys::find_by_instance_id(pool, instance.id)
-            .await?
-            .unwrap();
+    let WireguardKeys { pubkey, .. } = WireguardKeys::find_by_instance_id(pool, instance.id)
+        .await?
+        .unwrap();
     let url = format!("{}{}", instance.proxy_url, POLLING_ENDPOINT);
     let token = if let Some(token) = &instance.token {
         token.to_string()

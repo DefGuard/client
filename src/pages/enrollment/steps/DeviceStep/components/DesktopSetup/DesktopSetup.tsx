@@ -124,10 +124,7 @@ export const DesktopSetup = () => {
           setIsLoading(false);
           setEnrollmentStore({ deviceName: values.name });
           toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
-          const invalidate = [
-            clientQueryKeys.getInstances,
-            clientQueryKeys.getLocations,
-          ];
+          const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
           invalidate.forEach((key) => {
             queryClient.invalidateQueries({
               queryKey: [key],
