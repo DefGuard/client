@@ -73,7 +73,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
-    info!("Successfully sets trau menu");
+    info!("Successfully sets tray menu");
     Ok(tray_menu)
 }
 
@@ -82,7 +82,7 @@ pub async fn reload_tray_menu(app_handle: &AppHandle) {
         .await
         .unwrap();
     if let Err(err) = app_handle.tray_handle().set_menu(system_menu) {
-        warn!("Unable to update tray menu {:?}", err);
+        warn!("Unable to update tray menu {err:?}");
     }
 }
 
