@@ -16,10 +16,11 @@ use crate::{
     appstate::AppState,
     commands::{LocationInterfaceDetails, Payload},
     database::{
-        models::{location::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
+        models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
         ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
     },
     error::Error,
+    events::CONNECTION_CHANGED,
     service::{
         log_watcher::spawn_log_watcher_task,
         proto::{
@@ -544,7 +545,7 @@ pub async fn handle_connection_for_location(
     );
     debug!("Sending event connection-changed...");
     handle.emit_all(
-        "connection-changed",
+        CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
@@ -605,7 +606,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     );
     debug!("Sending event connection-changed.");
     handle.emit_all(
-        "connection-changed",
+        CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },

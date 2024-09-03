@@ -7,7 +7,8 @@ use crate::error::Error;
 pub use models::{
     connection::{ActiveConnection, Connection, ConnectionInfo},
     instance::{Instance, InstanceInfo},
-    location::{Location, LocationStats},
+    location::Location,
+    location_stats::LocationStats,
     settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
     tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
     wireguard_keys::WireguardKeys,

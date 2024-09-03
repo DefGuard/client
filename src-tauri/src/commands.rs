@@ -1,20 +1,12 @@
 use crate::{
-    appstate::AppState,
-    database::{
-        models::{instance::InstanceInfo, settings::SettingsPatch, Id, NoId},
-        ActiveConnection, Connection, ConnectionInfo, Instance, Location, LocationStats, Settings,
+    appstate::AppState, database::{
+        models::{instance::InstanceInfo, location_stats::LocationStats, settings::SettingsPatch, Id, NoId},
+        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Settings,
         Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
-    },
-    error::Error,
-    proto::{DeviceConfig, DeviceConfigResponse},
-    service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest},
-    tray::configure_tray_icon,
-    utils::{
+    }, error::Error, events::{CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE}, proto::{DeviceConfig, DeviceConfigResponse}, service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest}, tray::configure_tray_icon, utils::{
         disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
         handle_connection_for_location, handle_connection_for_tunnel,
-    },
-    wg_config::parse_wireguard_config,
-    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+    }, wg_config::parse_wireguard_config, CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -72,7 +64,7 @@ pub async fn disconnect(
         disconnect_interface(&connection, &state).await?;
         debug!("Connection saved");
         handle.emit_all(
-            "connection-changed",
+            CONNECTION_CHANGED,
             Payload {
                 message: "Created new connection".into(),
             },
@@ -160,7 +152,7 @@ pub async fn save_device_config(
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
     trace!("Created following locations: {locations:#?}");
-    handle.emit_all("instance-update", ())?;
+    handle.emit_all(INSTANCE_UPDATE, ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -365,7 +357,7 @@ pub async fn update_instance(
         transaction.commit().await?;
 
         info!("Instance {instance_id} updated");
-        app_handle.emit_all("instance-update", ())?;
+        app_handle.emit_all(INSTANCE_UPDATE, ())?;
         Ok(())
     } else {
         error!("Instance with id {instance_id} not found");
@@ -548,7 +540,7 @@ pub async fn update_location_routing(
                 location.save(&app_state.get_pool()).await?;
                 info!("Location routing updated for location {location_id}");
                 handle.emit_all(
-                    "location-update",
+                    LOCATION_UPDATE,
                     Payload {
                         message: "Location routing updated".into(),
                     },
@@ -568,7 +560,7 @@ pub async fn update_location_routing(
                 tunnel.save(&app_state.get_pool()).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
                 handle.emit_all(
-                    "location-update",
+                    LOCATION_UPDATE,
                     Payload {
                         message: "Tunnel routing updated".into(),
                     },
@@ -654,7 +646,7 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
         error!("Instance {instance_id} not found");
         return Err(Error::NotFound);
     }
-    handle.emit_all("instance-update", ())?;
+    handle.emit_all(INSTANCE_UPDATE, ())?;
     info!("Instance {instance_id}, deleted");
     Ok(())
 }
@@ -677,7 +669,7 @@ pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Er
     tunnel.save(&app_state.get_pool()).await?;
     info!("Saved tunnel {tunnel:#?}");
     handle.emit_all(
-        "location-update",
+        LOCATION_UPDATE,
         Payload {
             message: "Tunnel saved".into(),
         },
