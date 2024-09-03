@@ -149,11 +149,11 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                         .await;
 
                     if active_locations_ids.contains(&location_id) {
-                        info!("Disconnect location with id {}", id);
+                        info!("Disconnect location with id {id}");
                         let _ =
                             disconnect(location_id, ConnectionType::Location, handle.clone()).await;
                     } else {
-                        info!("Connect location with id {}", id);
+                        info!("Connect location with id {id}");
                         let _ = connect(
                             location_id,
                             ConnectionType::Location,
