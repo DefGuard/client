@@ -11,8 +11,6 @@ use crate::{
     ConnectionType,
 };
 
-use regex::Regex;
-
 static SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 static JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
 static FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
@@ -105,14 +103,8 @@ fn show_main_window(app: &AppHandle) {
 // handle tray actions
 pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
     let handle = app.clone();
-    let regx = Regex::new(r"^\d+$").unwrap();
-    match event {
-        SystemTrayEvent::LeftClick { .. } | SystemTrayEvent::RightClick { .. } => {
-            tauri::async_runtime::spawn(async move {
-                reload_tray_menu(&handle).await;
-            });
-        }
-        SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+    if let SystemTrayEvent::MenuItemClick { id, .. } = event {
+        match id.as_str() {
             "quit" => {
                 info!("Received QUIT request. Initiating shutdown...");
                 let app_state: State<AppState> = app.state();
@@ -135,40 +127,13 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
             "follow_us" => {
                 let _ = webbrowser::open(FOLLOW_US_LINK);
             }
-            _ if regx.is_match(&id) => {
+            _ if id.chars().all(char::is_numeric) => {
                 tauri::async_runtime::spawn(async move {
-                    let location_id = id.parse::<i64>().unwrap();
-                    let location =
-                        Location::find_by_id(&handle.state::<AppState>().get_pool(), location_id)
-                            .await
-                            .unwrap();
-
-                    let active_locations_ids: Vec<i64> = handle
-                        .state::<AppState>()
-                        .get_connection_id_by_type(&ConnectionType::Location)
-                        .await;
-
-                    if active_locations_ids.contains(&location_id) {
-                        info!("Disconnect location with id {id}");
-                        let _ =
-                            disconnect(location_id, ConnectionType::Location, handle.clone()).await;
-                    } else {
-                        info!("Connect location with id {id}");
-                        let _ = connect(
-                            location_id,
-                            ConnectionType::Location,
-                            Some(location.unwrap().pubkey),
-                            handle.clone(),
-                        )
-                        .await;
-                    }
-
-                    reload_tray_menu(&handle).await;
+                    handle_location_tray_menu(id, &handle).await;
                 });
             }
             _ => {}
-        },
-        _ => {}
+        }
     }
 }
 
@@ -183,5 +148,38 @@ pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(),
     } else {
         error!("Loading tray icon resource {resource_str} failed! Resource not resolved.",);
         Err(Error::ResourceNotFound(resource_str))
+    }
+}
+
+async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
+    match id.parse::<i64>() {
+        Ok(location_id) => {
+            match Location::find_by_id(&handle.state::<AppState>().get_pool(), location_id).await {
+                Ok(Some(location)) => {
+                    let active_locations_ids: Vec<i64> = handle
+                        .state::<AppState>()
+                        .get_connection_id_by_type(&ConnectionType::Location)
+                        .await;
+
+                    if active_locations_ids.contains(&location_id) {
+                        info!("Disconnect location with id {}", id);
+                        let _ =
+                            disconnect(location_id, ConnectionType::Location, handle.clone()).await;
+                    } else {
+                        info!("Connect location with id {}", id);
+                        let _ = connect(
+                            location_id,
+                            ConnectionType::Location,
+                            Some(location.pubkey),
+                            handle.clone(),
+                        )
+                        .await;
+                    }
+                }
+                Ok(None) => warn!("Location does not exist"),
+                Err(e) => warn!("Unable to find location: {e:?}"),
+            };
+        }
+        Err(e) => warn!("Can't handle event due to: {e:?}"),
     }
 }

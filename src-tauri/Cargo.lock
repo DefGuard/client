@@ -1263,7 +1263,6 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.5",
- "regex",
  "reqwest 0.12.5",
  "rust-ini 0.21.1",
  "serde",
