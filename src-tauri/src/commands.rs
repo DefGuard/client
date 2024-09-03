@@ -8,7 +8,7 @@ use crate::{
     error::Error,
     proto::{DeviceConfig, DeviceConfigResponse},
     service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest},
-    tray::configure_tray_icon,
+    tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
         handle_connection_for_location, handle_connection_for_tunnel,
@@ -39,7 +39,8 @@ pub async fn connect(
     let state = handle.state::<AppState>();
     if connection_type.eq(&ConnectionType::Location) {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
-            handle_connection_for_location(&location, preshared_key, handle).await?;
+            handle_connection_for_location(&location, preshared_key, handle.clone()).await?;
+            reload_tray_menu(&handle).await;
         } else {
             error!("Location {location_id} not found");
             return Err(Error::NotFound);
@@ -79,6 +80,7 @@ pub async fn disconnect(
         )?;
         stop_log_watcher_task(&handle, &interface_name)?;
         info!("Disconnected from location with id: {location_id}");
+        reload_tray_menu(&handle).await;
         Ok(())
     } else {
         error!("Error while disconnecting from location with id: {location_id} not found");
