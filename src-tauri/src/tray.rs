@@ -107,12 +107,7 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
     let handle = app.clone();
     let regx = Regex::new(r"^\d+$").unwrap();
     match event {
-        SystemTrayEvent::LeftClick { .. } => {
-            tauri::async_runtime::spawn(async move {
-                reload_tray_menu(&handle).await;
-            });
-        }
-        SystemTrayEvent::RightClick { .. } => {
+        SystemTrayEvent::LeftClick { .. } | SystemTrayEvent::RightClick { .. } => {
             tauri::async_runtime::spawn(async move {
                 reload_tray_menu(&handle).await;
             });
