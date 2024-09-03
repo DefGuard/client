@@ -54,7 +54,7 @@ pub async fn poll_config(handle: AppHandle) {
 
 /// Retrieves configuration for given [`Instance`].
 /// Updates the instance if there are no active connections, otherwise displays UI message.
-async fn poll_instance(
+pub async fn poll_instance(
     pool: &DbPool,
     instance: &Instance<Id>,
     handle: AppHandle,

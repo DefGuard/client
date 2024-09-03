@@ -1,12 +1,25 @@
 use crate::{
-    appstate::AppState, database::{
-        models::{instance::InstanceInfo, location_stats::LocationStats, settings::SettingsPatch, Id, NoId},
-        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Settings,
-        Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
-    }, error::Error, events::{CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE}, proto::{DeviceConfig, DeviceConfigResponse}, service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest}, tray::configure_tray_icon, utils::{
+    appstate::AppState,
+    database::{
+        models::{
+            instance::InstanceInfo, location_stats::LocationStats, settings::SettingsPatch, Id,
+            NoId,
+        },
+        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Settings, Tunnel,
+        TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
+    },
+    error::Error,
+    events::{CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
+    periodic::config::poll_instance,
+    proto::{DeviceConfig, DeviceConfigResponse},
+    service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest},
+    tray::configure_tray_icon,
+    utils::{
         disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
         handle_connection_for_location, handle_connection_for_tunnel,
-    }, wg_config::parse_wireguard_config, CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType
+    },
+    wg_config::parse_wireguard_config,
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -70,12 +83,29 @@ pub async fn disconnect(
             },
         )?;
         stop_log_watcher_task(&handle, &interface_name)?;
+        maybe_update_instance_config(location_id, &handle).await?;
         info!("Disconnected from location with id: {location_id}");
         Ok(())
     } else {
         error!("Error while disconnecting from location with id: {location_id} not found");
         Err(Error::NotFound)
     }
+}
+
+/// Triggers poll on location's instance config. Config will be updated if there are no more active
+/// connections for this instance.
+async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> Result<(), Error> {
+    let state: State<'_, AppState> = handle.state();
+    let pool = state.get_pool();
+    let Some(location) = Location::find_by_id(&pool, location_id).await? else {
+            error!("Location {location_id} not found, skipping config update check");
+            return Err(Error::NotFound);
+        };
+    let Some(instance) = Instance::find_by_id(&pool, location.instance_id).await? else {
+            error!("Instance {} not found, skipping config update check", location.instance_id);
+            return Err(Error::NotFound);
+        };
+    poll_instance(&state.get_pool(), &instance, handle.clone()).await
 }
 
 #[derive(Debug, Serialize, Deserialize)]
