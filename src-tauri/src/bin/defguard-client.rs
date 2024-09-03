@@ -28,7 +28,7 @@ use defguard_client::{
     },
     database::{self, models::settings::Settings},
     latest_app_version::fetch_latest_app_version_loop,
-    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu },
+    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
 };
 use std::{env, str::FromStr};
