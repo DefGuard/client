@@ -21,6 +21,7 @@ import { useClientStore } from '../../hooks/useClientStore';
 import { WireguardInstanceType } from '../../types';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 import { NewApplicationVersionAvailableInfo } from './components/NewApplicationVersionAvailableInfo/NewApplicationVersionAvailableInfo';
+import { Notification } from './components/Notification/Notification';
 
 const { openLink } = clientApi;
 
@@ -105,6 +106,7 @@ export const ClientSideBar = () => {
         <AddTunnel />
         <div className="client-bar-bottom-menu-container">
           <NewApplicationVersionAvailableInfo />
+          <Notification />
           <SettingsNav />
           <Divider />
           <FooterApplicationInfo />

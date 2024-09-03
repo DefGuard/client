@@ -145,7 +145,15 @@ async fn poll_instance(
                 instance.name, instance.id
             );
         } else {
+            debug!(
+                "Emitting config-changed event for instance {}({})",
+                instance.name, instance.id,
+            );
             let _ = handle.emit_all(CONFIG_CHANGED, &instance.name);
+            info!(
+                "Emitted config-changed event for instance {}({})",
+                instance.name, instance.id,
+            );
         }
 
         Ok(())
