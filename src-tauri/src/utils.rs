@@ -9,7 +9,7 @@ use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConf
 use local_ip_address::local_ip;
 use sqlx::query;
 use tauri::{AppHandle, Manager};
-use tonic::{codegen::tokio_stream::StreamExt, transport::Channel};
+use tonic::transport::Channel;
 use tracing::Level;
 
 use crate::{
@@ -64,7 +64,7 @@ pub async fn setup_interface(
         }
 
         debug!("Parsing location allowed ips: {}", location.allowed_ips);
-        let allowed_ips: Vec<String> = if location.route_all_traffic {
+        let allowed_ips = if location.route_all_traffic {
             debug!("Using all traffic routing: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
         } else {
@@ -212,9 +212,9 @@ pub fn spawn_stats_thread(
             .expect("Failed to connect to interface stats stream")
             .into_inner();
 
-        while let Some(item) = stream.next().await {
-            match item {
-                Ok(interface_data) => {
+        loop {
+            match stream.message().await {
+                Ok(Some(interface_data)) => {
                     debug!("Received interface data update: {interface_data:?}");
                     let peers: Vec<Peer> =
                         interface_data.peers.into_iter().map(Into::into).collect();
@@ -244,8 +244,13 @@ pub fn spawn_stats_thread(
                         }
                     }
                 }
+                Ok(None) => {
+                    info!("gRPC stream has been closed");
+                    break;
+                }
                 Err(err) => {
-                    error!("Failed to receive interface data update: {err}");
+                    error!("gRPC client error:: {err}");
+                    break;
                 }
             }
         }
