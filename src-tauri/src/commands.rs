@@ -152,7 +152,6 @@ pub struct SaveDeviceConfigResponse {
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
-    token: String,
     response: DeviceConfigResponse,
     app_state: State<'_, AppState>,
     handle: AppHandle,
@@ -164,7 +163,7 @@ pub async fn save_device_config(
         .instance
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
-    instance.token = Some(token);
+    instance.token = response.token;
 
     let instance = instance.save(&mut *transaction).await?;
 

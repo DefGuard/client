@@ -27,7 +27,6 @@ export type StatsRequest = {
 export type SaveConfigRequest = {
   privateKey: string;
   response: CreateDeviceResponse;
-  token: string;
 };
 
 export type UpdateInstnaceRequest = {

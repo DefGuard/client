@@ -116,7 +116,6 @@ export const DesktopSetup = () => {
       debug('Invoking save_device_config');
       saveConfig({
         privateKey,
-        token: res.data.token,
         response: deviceResponse.data as CreateDeviceResponse,
       })
         .then(() => {
