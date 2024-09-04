@@ -174,8 +174,18 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                         info!("Connect location with id {}", id);
                         // check is mfa enabled and trigger modal on frontend
                         if location.mfa_enabled {
-                            debug!("mfa enabled for location with id {:?}, trigger mfa modal", location.id.expect("Missing location id"));
-                            handle.emit_all("mfa-trigger", Payload { message: "Trigger mfa event".into() }).unwrap();
+                            info!(
+                                "mfa enabled for location with id {:?}, trigger mfa modal",
+                                location.id.expect("Missing location id")
+                            );
+                            handle
+                                .emit_all(
+                                    "mfa-trigger",
+                                    Payload {
+                                        message: "Trigger mfa event".into(),
+                                    },
+                                )
+                                .unwrap();
                         } else {
                             let _ = connect(
                                 location_id,
