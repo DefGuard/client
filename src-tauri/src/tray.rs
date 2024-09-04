@@ -151,6 +151,11 @@ pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(),
     }
 }
 
+#[derive(Clone, serde::Serialize)]
+struct Payload {
+    message: String,
+}
+
 async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
     match id.parse::<i64>() {
         Ok(location_id) => {
@@ -167,13 +172,19 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                             disconnect(location_id, ConnectionType::Location, handle.clone()).await;
                     } else {
                         info!("Connect location with id {}", id);
-                        let _ = connect(
-                            location_id,
-                            ConnectionType::Location,
-                            Some(location.pubkey),
-                            handle.clone(),
-                        )
-                        .await;
+                        // check is mfa enabled and trigger modal on frontend
+                        if location.mfa_enabled {
+                            debug!("mfa enabled for location with id {:?}, trigger mfa modal", location.id.expect("Missing location id"));
+                            handle.emit_all("mfa-trigger", Payload { message: "Trigger mfa event".into() }).unwrap();
+                        } else {
+                            let _ = connect(
+                                location_id,
+                                ConnectionType::Location,
+                                Some(location.pubkey),
+                                handle.clone(),
+                            )
+                            .await;
+                        }
                     }
                 }
                 Ok(None) => warn!("Location does not exist"),

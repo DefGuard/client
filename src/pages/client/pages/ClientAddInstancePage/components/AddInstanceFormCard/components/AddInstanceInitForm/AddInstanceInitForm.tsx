@@ -199,7 +199,6 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       })
       .catch((e) => {
         setIsLoading(false);
-        console.log(e);
         if (typeof e === 'string') {
           if (e.includes('Network Error')) {
             toaster.error(LL.common.messages.networkError());
