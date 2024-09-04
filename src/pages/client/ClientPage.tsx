@@ -97,12 +97,15 @@ export const ClientPage = () => {
     listen(TauriEventKey.CONFIG_CHANGED, (data) => {
       const instance = data.payload as string;
       toaster.info(LL.common.messages.configChanged({ instance }));
+    }).then((cleanup) => {
+      subs.push(cleanup);
     });
 
     return () => {
       subs.forEach((sub) => sub());
     };
-  }, [queryClient, toaster, LL.common]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient]);
 
   // update store
   useEffect(() => {
