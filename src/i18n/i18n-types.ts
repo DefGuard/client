@@ -131,6 +131,11 @@ type RootTranslation = {
 			 * T​h​e​r​e​ ​w​a​s​ ​a​ ​n​e​t​w​o​r​k​ ​e​r​r​o​r​.​ ​C​a​n​'​t​ ​r​e​a​c​h​ ​s​e​r​v​e​r​.​"
 			 */
 			networkError: string
+			/**
+			 * C​o​n​f​g​u​r​a​t​i​o​n​ ​f​o​r​ ​i​n​s​t​a​n​c​e​ ​{​i​n​s​t​a​n​c​e​}​ ​h​a​s​ ​c​h​a​n​g​e​d​.​ ​D​i​s​c​o​n​n​e​c​t​ ​f​r​o​m​ ​a​l​l​ ​l​o​c​a​t​i​o​n​s​ ​t​o​ ​a​p​p​l​y​ ​c​h​a​n​g​e​s​.
+			 * @param {string} instance
+			 */
+			configChanged: RequiredParams<'instance'>
 		}
 	}
 	components: {
@@ -1629,6 +1634,10 @@ export type TranslationFunctions = {
 			 * There was a network error. Can't reach server."
 			 */
 			networkError: () => LocalizedString
+			/**
+			 * Confguration for instance {instance} has changed. Disconnect from all locations to apply changes.
+			 */
+			configChanged: (arg: { instance: string }) => LocalizedString
 		}
 	}
 	components: {

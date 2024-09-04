@@ -45,6 +45,8 @@ const en = {
       tokenExpired:
         'Token has expired, please contact your administrator to issue a new enrollment token',
       networkError: 'There was a network error. Can\'t reach server."',
+      configChanged:
+        'Confguration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
     },
   },
   components: {

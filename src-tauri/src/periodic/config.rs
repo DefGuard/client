@@ -1,5 +1,5 @@
-use std::{collections::HashSet, time::Duration};
-use tauri::{AppHandle, Manager, State};
+use std::{collections::HashSet, str::FromStr, time::Duration};
+use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
 
 use crate::{
@@ -19,7 +19,7 @@ const POLLING_ENDPOINT: &str = "/api/v1/poll";
 
 /// Periodically retrieves and updates configuration for all [`Instance`]s.
 /// Updates are only performed if no connections are established to the [`Instance`],
-/// otherwise UI message is displayed.
+/// otherwise event is emmited and UI message is displayed.
 pub async fn poll_config(handle: AppHandle) {
     let state: State<AppState> = handle.state();
     let pool = state.get_pool();
@@ -64,7 +64,14 @@ pub async fn poll_instance(
 ) -> Result<(), Error> {
     // Query proxy api
     let request = build_request(pool, instance).await?;
-    let url = format!("{}{}", instance.proxy_url, POLLING_ENDPOINT);
+    let url = Url::from_str(&instance.proxy_url)
+        .and_then(|url| url.join(POLLING_ENDPOINT))
+        .map_err(|_| {
+            Error::InternalError(format!(
+                "Can't build polling url: {}/{}",
+                instance.proxy_url, POLLING_ENDPOINT
+            ))
+        })?;
     let response = reqwest::Client::new().post(url).json(&request).send().await;
     let response = response.map_err(|err| {
         Error::InternalError(format!(
@@ -88,8 +95,17 @@ pub async fn poll_instance(
 
     // Early return if config didn't change
     if !config_changed(pool, instance, device_config).await? {
+        debug!(
+            "Config for instance {}({}) didn't change",
+            instance.name, instance.id
+        );
         return Ok(());
     }
+
+    debug!(
+        "Config for instance {}({}) changed",
+        instance.name, instance.id
+    );
 
     // Config changed. If there are no active connections for this instance, update the database.
     // Otherwise just display a message to reconnect.
@@ -156,13 +172,14 @@ async fn build_request(
             );
             return Err(Error::NotFound);
         };
-    let Some(token) = &instance.token else {
-        let msg = format!("Instance {} missing token", instance.name);
-        error!("{msg}");
-        return Err(Error::InternalError(msg));
-    };
+    let token = &instance.token.as_ref().ok_or_else(|| {
+        Error::InternalError(format!(
+            "Instance {}({}) missing token",
+            instance.name, instance.id
+        ))
+    })?;
     Ok(InstanceInfoRequest {
-        token: token.clone(),
+        token: token.to_string(),
         pubkey,
     })
 }

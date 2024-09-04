@@ -5,6 +5,8 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
+import { useI18nContext } from '../../i18n/i18n-react';
+import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
@@ -28,6 +30,8 @@ export const ClientPage = () => {
     state.setListChecked,
   ]);
   const location = useLocation();
+  const toaster = useToaster();
+  const { LL } = useI18nContext();
 
   const { data: instances } = useQuery({
     queryFn: getInstances,
@@ -90,10 +94,15 @@ export const ClientPage = () => {
       subs.push(cleanup);
     });
 
+    listen(TauriEventKey.CONFIG_CHANGED, (data) => {
+      const instance = data.payload as string;
+      toaster.info(LL.common.messages.configChanged({ instance }));
+    });
+
     return () => {
       subs.forEach((sub) => sub());
     };
-  }, [queryClient]);
+  }, [queryClient, toaster, LL.common]);
 
   // update store
   useEffect(() => {
