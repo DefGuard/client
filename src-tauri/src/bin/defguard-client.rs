@@ -28,7 +28,7 @@ use defguard_client::{
     },
     database::{self, models::settings::Settings},
     latest_app_version::fetch_latest_app_version_loop,
-    tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
+    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
 };
 use std::{env, str::FromStr};
@@ -69,9 +69,6 @@ async fn main() {
         );
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
-
-    let tray_menu = create_tray_menu();
-    let system_tray = SystemTray::new().with_menu(tray_menu);
 
     let log_level =
         LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
@@ -114,7 +111,7 @@ async fn main() {
             }
             _ => {}
         })
-        .system_tray(system_tray)
+        .system_tray(SystemTray::new())
         .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let _ = app.emit_all("single-instance", Payload { args: argv, cwd });
@@ -162,6 +159,9 @@ async fn main() {
     }
 
     tauri::async_runtime::spawn(fetch_latest_app_version_loop(app_handle.clone()));
+
+    // load tray menu after database initialization to show all instance and locations
+    reload_tray_menu(&app_handle).await;
 
     // Handle Ctrl-C
     tauri::async_runtime::spawn(async move {
