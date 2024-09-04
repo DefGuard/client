@@ -967,20 +967,6 @@ type RootTranslation = {
 				 */
 				releaseNotes: string
 			}
-			notification: {
-				/**
-				 * I​n​s​t​a​n​c​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​u​p​d​a​t​e​d
-				 */
-				header: string
-				/**
-				 * D​i​s​m​i​s​s
-				 */
-				dismiss: string
-				/**
-				 * D​i​s​c​o​n​n​e​c​t​ ​f​r​o​m​ ​a​l​l​ ​l​o​c​a​t​i​o​n​s​ ​t​o​ ​u​p​d​a​t​e​ ​c​o​n​f​i​g​u​r​a​t​i​o​n
-				 */
-				content: string
-			}
 		}
 		enrollment: {
 			sideBar: {
@@ -2476,20 +2462,6 @@ export type TranslationFunctions = {
 				 * See what's new
 				 */
 				releaseNotes: () => LocalizedString
-			}
-			notification: {
-				/**
-				 * Instance configuration updated
-				 */
-				header: () => LocalizedString
-				/**
-				 * Dismiss
-				 */
-				dismiss: () => LocalizedString
-				/**
-				 * Disconnect from all locations to update configuration
-				 */
-				content: () => LocalizedString
 			}
 		}
 		enrollment: {

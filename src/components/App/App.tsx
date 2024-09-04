@@ -38,7 +38,6 @@ import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastMa
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
-import { NotificationManager } from '../NotificationManager/NotificationManager';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -172,7 +171,6 @@ export const App = () => {
       </QueryClientProvider>
       <ToastManager />
       <ApplicationUpdateManager />
-      <NotificationManager />
     </TypesafeI18n>
   );
 };

@@ -430,11 +430,6 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
         dismiss: 'Dismiss',
         releaseNotes: "See what's new",
       },
-      notification: {
-        header: 'Instance configuration updated',
-        dismiss: 'Dismiss',
-        content: 'Disconnect from all locations to update configuration',
-      },
     },
     enrollment: {
       sideBar: {

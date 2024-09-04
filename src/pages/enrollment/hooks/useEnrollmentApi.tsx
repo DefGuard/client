@@ -5,6 +5,7 @@ import {
   ActivateUserResponse,
   AppInfo,
   CreateDeviceResponse,
+  EmptyApiResponse,
   EnrollmentStartResponse,
   UseApi,
 } from '../../../shared/hooks/api/types';
