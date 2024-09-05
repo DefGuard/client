@@ -87,6 +87,27 @@ The app launches but the window is blank. Set the `WEBKIT_DISABLE_DMABUF_RENDERE
 WEBKIT_DISABLE_DMABUF_RENDERER=1 defguard-client
 ```
 
+## Failed to run `pnpm tauri dev`
+
+`pnpm tauri dev` command may result in the following error:
+
+```
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js from /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js not supported.
+Instead change the require of /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js in /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js to a dynamic import() which is available in all CommonJS modules.
+    at TracingChannel.traceSync (node:diagnostics_channel:315:14)
+    at Object.<anonymous> (/home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js:4:18) {
+  code: 'ERR_REQUIRE_ESM'
+}
+
+Node.js v22.7.0
+ ELIFECYCLE  Command failed with exit code 1.
+       Error The "beforeDevCommand" terminated with a non-zero status code.
+ ELIFECYCLE  Command failed with exit code 1.
+```
+
+To fix this remove node_modules and rerun `pnpm install`.
+
 # Legal
 
   - *defguard is not an official WireGuard project, and WireGuard is a registered trademark of Jason A. Donenfeld.*
+

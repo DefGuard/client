@@ -11,13 +11,26 @@ use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
 
 use defguard_client::{
-    __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations, __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel, __cmd__disconnect, __cmd__get_latest_app_version, __cmd__get_settings, __cmd__last_connection, __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link, __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel, __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing, __cmd__update_settings, appstate::AppState, commands::{
+    __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
+    __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
+    __cmd__disconnect, __cmd__get_latest_app_version, __cmd__get_settings, __cmd__last_connection,
+    __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link,
+    __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
+    __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
+    __cmd__update_settings,
+    appstate::AppState,
+    commands::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
         last_connection, location_interface_details, location_stats, open_link,
         parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
         update_location_routing, update_settings,
-    }, database::{self, models::settings::Settings}, events::SINGLE_INSTANCE, periodic::{config::poll_config, version::poll_version}, tray::{configure_tray_icon, create_tray_menu, handle_tray_event}, utils::load_log_targets
+    },
+    database::{self, models::settings::Settings},
+    events::SINGLE_INSTANCE,
+    periodic::{config::poll_config, version::poll_version},
+    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
+    utils::load_log_targets,
 };
 use std::{env, str::FromStr};
 
@@ -57,9 +70,6 @@ async fn main() {
         );
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
-
-    let tray_menu = create_tray_menu();
-    let system_tray = SystemTray::new().with_menu(tray_menu);
 
     let log_level =
         LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
@@ -102,7 +112,7 @@ async fn main() {
             }
             _ => {}
         })
-        .system_tray(system_tray)
+        .system_tray(SystemTray::new())
         .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });
@@ -152,6 +162,9 @@ async fn main() {
     // run periodic tasks
     tauri::async_runtime::spawn(poll_version(app_handle.clone()));
     tauri::async_runtime::spawn(poll_config(app_handle.clone()));
+
+    // load tray menu after database initialization to show all instance and locations
+    reload_tray_menu(&app_handle).await;
 
     // Handle Ctrl-C
     tauri::async_runtime::spawn(async move {
