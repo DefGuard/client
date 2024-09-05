@@ -187,13 +187,19 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                                 )
                                 .unwrap();
                         } else {
-                            let _ = connect(
+                            if let Err(e) = connect(
                                 location_id,
                                 ConnectionType::Location,
-                                Some(location.pubkey),
+                                None,
                                 handle.clone(),
                             )
-                            .await;
+                            .await
+                            {
+                                info!(
+                                    "Unable to connect location with id {}, error: {e:?}",
+                                    location.id.expect("Missing location id")
+                                );
+                            }
                         }
                     }
                 }
