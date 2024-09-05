@@ -37,6 +37,21 @@ Make sure you have [protoc](https://grpc.io/docs/protoc-installation/) available
 pnpm install
 ```
 
+### Sqlx and local database file
+
+To work with sqlx on a local db file, you'll have to set `DATABASE_URL` env variable.
+It's best to set it to absolute path since `pnpm tauri dev` runs with weird paths.
+
+Init the file with:
+
+```bash
+export DATABASE_URL=sqlite://<full-path-to-project-dir>/dev.db`
+sqlx db create
+sqlx migrate run --source src-tauri/migrations/
+```
+
+Then keep the `$DATABASE_URL` set during development (use direnv etc.)
+
 ### Dev server command
 
 ```bash
@@ -52,20 +67,6 @@ Built packages are available after in `src-tauri/target/release/bundle`.
 ### Windows
 
 Remove `default-run` line from `[package]` section in `Cargo.toml` to build the project.
-
-### Sqlx and local database file
-
-To work with sqlx on a local db file, you'll have to set `DEFGUARD_URL` env variable to absolute path of the db file.
-
-Init the file with:
-
-```bash
-export DEFGUARD_URL=sqlite://<full-path-to-project-dir>/dev.db`
-sqlx db create --database-url sqlite://<full-path-to-project-dir>/dev.db
-sqlx migrate run --source src-tauri/migrations/
-```
-
-Then keep the `$DEFGUARD_URL` set during development (use direnv etc.)
 
 # Known issues
 
