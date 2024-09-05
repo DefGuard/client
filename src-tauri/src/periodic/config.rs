@@ -72,7 +72,7 @@ pub async fn poll_instance(
                 instance.proxy_url, POLLING_ENDPOINT
             ))
         })?;
-    let response = reqwest::Client::new().post(url).json(&request).send().await;
+    let response = reqwest::Client::new().post(url).json(&request).timeout(Duration::from_secs(5)).send().await;
     let response = response.map_err(|err| {
         Error::InternalError(format!(
             "HTTP request failed for instance {}({}), url: {}, {}",
