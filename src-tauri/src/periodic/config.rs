@@ -25,7 +25,10 @@ pub async fn poll_config(handle: AppHandle) {
     let pool = state.get_pool();
     loop {
         let Ok(instances) = Instance::all(&pool).await else {
-            error!("Failed to retireve instances, retrying in {}s", INTERVAL_SECONDS.as_secs());
+            error!(
+                "Failed to retireve instances, retrying in {}s",
+                INTERVAL_SECONDS.as_secs()
+            );
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
@@ -72,7 +75,12 @@ pub async fn poll_instance(
                 instance.proxy_url, POLLING_ENDPOINT
             ))
         })?;
-    let response = reqwest::Client::new().post(url).json(&request).timeout(Duration::from_secs(5)).send().await;
+    let response = reqwest::Client::new()
+        .post(url)
+        .json(&request)
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await;
     let response = response.map_err(|err| {
         Error::InternalError(format!(
             "HTTP request failed for instance {}({}), url: {}, {}",
@@ -165,13 +173,14 @@ async fn build_request(
     instance: &Instance<Id>,
 ) -> Result<InstanceInfoRequest, Error> {
     let Some(WireguardKeys { pubkey, .. }) =
-        WireguardKeys::find_by_instance_id(pool, instance.id).await? else {
-            error!(
-                "WireguardKeys for instance {}({}) not found",
-                instance.name, instance.id
-            );
-            return Err(Error::NotFound);
-        };
+        WireguardKeys::find_by_instance_id(pool, instance.id).await?
+    else {
+        error!(
+            "WireguardKeys for instance {}({}) not found",
+            instance.name, instance.id
+        );
+        return Err(Error::NotFound);
+    };
     let token = &instance.token.as_ref().ok_or_else(|| {
         Error::InternalError(format!(
             "Instance {}({}) missing token",

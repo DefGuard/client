@@ -2,7 +2,10 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
-use crate::{appstate::AppState, commands::get_latest_app_version, database::Settings, events::APP_VERSION_FETCH};
+use crate::{
+    appstate::AppState, commands::get_latest_app_version, database::Settings,
+    events::APP_VERSION_FETCH,
+};
 
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
