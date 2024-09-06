@@ -38,6 +38,10 @@ type FormFields = {
   name: string;
 };
 
+type ErrorData = {
+  error: string;
+};
+
 const defaultValues: FormFields = {
   name: '',
 };
@@ -93,8 +97,13 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       }).then((r) => {
         if (!r.ok) {
           setIsLoading(false);
-          error('Failed to create device check enrollment and defguard logs');
-          throw Error('Failed to create device');
+          const details = `${
+            (r.data as ErrorData)?.error ? (r.data as ErrorData).error + ', ' : ''
+          }`;
+          error(
+            `Failed to create device check enrollment and defguard logs, details: ${details}Error status code: ${r.status}`,
+          );
+          throw Error(`Failed to create device, details: ${details}`);
         }
         const deviceResp = r.data as CreateDeviceResponse;
         saveConfig({
@@ -152,6 +161,14 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             type="submit"
             text={localLL.submit()}
             loading={isLoading}
+          />
+          <Button
+            size={ButtonSize.LARGE}
+            styleVariant={ButtonStyleVariant.STANDARD}
+            type="button"
+            text={LL.common.controls.cancel()}
+            loading={isLoading}
+            onClick={() => navigate(routes.client.instancePage)}
           />
         </div>
       </form>

@@ -93,9 +93,8 @@ export const DesktopSetup = () => {
         error(
           `Failed to create device during the enrollment. Error details: ${JSON.stringify(
             res.data,
-          )} Error status code: ${JSON.stringify(res.status)}`,
+          )} Error status code: ${res.status}`,
         );
-        throw Error('Failed to create device');
       }
       return res;
     });
@@ -107,7 +106,7 @@ export const DesktopSetup = () => {
         error(
           `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
             res.data,
-          )} Error status code: ${JSON.stringify(res.status)}`,
+          )} Error status code: ${res.status}`,
         );
         throw Error('Failed to activate user');
       }
