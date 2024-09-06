@@ -88,22 +88,16 @@ export const DesktopSetup = () => {
     const deviceResponse = await createDeviceMutation({
       name: values.name,
       pubkey: publicKey,
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw Error(
-            `${JSON.stringify(res.data)} Error status code: ${JSON.stringify(
-              res.status,
-            )}`,
-          );
-        }
-        return res;
-      })
-      .catch((e) => {
+    }).then((res) => {
+      if (!res.ok) {
         error(
-          `Failed to create device during the enrollment. Error details: ${e?.message}`,
+          `Failed to create device during the enrollment. Error details: ${JSON.stringify(
+            res.data,
+          )} Error status code: ${res.status}`,
         );
-      });
+      }
+      return res;
+    });
     mutateUserActivation({
       password: userPassword,
       phone_number: userInfo.phone_number,
@@ -112,7 +106,7 @@ export const DesktopSetup = () => {
         error(
           `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
             res.data,
-          )} Error status code: ${JSON.stringify(res.status)}`,
+          )} Error status code: ${res.status}`,
         );
         throw Error('Failed to activate user');
       }
