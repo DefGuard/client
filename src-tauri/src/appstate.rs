@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use tauri::AppHandle;
 use tokio::sync::Mutex;
@@ -6,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
-    database::{ActiveConnection, DbPool},
+    database::{models::Id, ActiveConnection, DbPool, Instance, Location},
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
@@ -123,6 +126,27 @@ impl AppState {
             error!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");
             None
         }
+    }
+
+    /// Returns active connections for given instance
+    pub async fn active_connections(
+        &self,
+        instance: &Instance<Id>,
+    ) -> Result<Vec<ActiveConnection>, crate::error::Error> {
+        let locations: HashSet<i64> = HashSet::from_iter(
+            Location::find_by_instance_id(&self.get_pool(), instance.id)
+                .await?
+                .iter()
+                .map(|location| location.id),
+        );
+        Ok(self
+            .active_connections
+            .lock()
+            .await
+            .iter()
+            .filter(|connection| locations.contains(&connection.location_id))
+            .cloned()
+            .collect())
     }
 
     /// Close all connections, then terminate the application.

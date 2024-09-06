@@ -27,7 +27,8 @@ use defguard_client::{
         update_location_routing, update_settings,
     },
     database::{self, models::settings::Settings},
-    latest_app_version::fetch_latest_app_version_loop,
+    events::SINGLE_INSTANCE,
+    periodic::{config::poll_config, version::poll_version},
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
 };
@@ -114,7 +115,7 @@ async fn main() {
         .system_tray(SystemTray::new())
         .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            let _ = app.emit_all("single-instance", Payload { args: argv, cwd });
+            let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -158,7 +159,9 @@ async fn main() {
         let _ = configure_tray_icon(&app_handle, &settings.tray_icon_theme);
     }
 
-    tauri::async_runtime::spawn(fetch_latest_app_version_loop(app_handle.clone()));
+    // run periodic tasks
+    tauri::async_runtime::spawn(poll_version(app_handle.clone()));
+    tauri::async_runtime::spawn(poll_config(app_handle.clone()));
 
     // load tray menu after database initialization to show all instance and locations
     reload_tray_menu(&app_handle).await;

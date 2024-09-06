@@ -176,7 +176,7 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                         if location.mfa_enabled {
                             info!(
                                 "mfa enabled for location with id {:?}, trigger mfa modal",
-                                location.id.expect("Missing location id")
+                                location.id
                             );
                             handle
                                 .emit_all(
@@ -192,7 +192,7 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                         {
                             info!(
                                 "Unable to connect location with id {}, error: {e:?}",
-                                location.id.expect("Missing location id")
+                                location.id
                             );
                         }
                     }

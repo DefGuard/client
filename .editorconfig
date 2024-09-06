@@ -26,3 +26,8 @@ rulers = 90
 indent_style = space
 indent_size = 2
 rulers = 80
+
+[*.{rs}]
+indent_style = space
+indent_size = 4
+rulers = 90

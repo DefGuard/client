@@ -16,10 +16,11 @@ use crate::{
     appstate::AppState,
     commands::{LocationInterfaceDetails, Payload},
     database::{
-        models::{location::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
+        models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
         ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
     },
     error::Error,
+    events::CONNECTION_CHANGED,
     service::{
         log_watcher::spawn_log_watcher_task,
         proto::{
@@ -36,7 +37,7 @@ static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface
 pub async fn setup_interface(
-    location: &Location,
+    location: &Location<Id>,
     interface_name: String,
     preshared_key: Option<String>,
     pool: &DbPool,
@@ -505,7 +506,7 @@ pub async fn get_location_interface_details(
 
 /// Setup new connection for location
 pub async fn handle_connection_for_location(
-    location: &Location,
+    location: &Location<Id>,
     preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
@@ -528,7 +529,7 @@ pub async fn handle_connection_for_location(
     .await?;
     let address = local_ip()?;
     let connection = ActiveConnection::new(
-        location.id.expect("Missing Location ID"),
+        location.id,
         address.to_string(),
         interface_name.clone(),
         ConnectionType::Location,
@@ -544,7 +545,7 @@ pub async fn handle_connection_for_location(
     );
     debug!("Sending event connection-changed...");
     handle.emit_all(
-        "connection-changed",
+        CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
@@ -564,7 +565,7 @@ pub async fn handle_connection_for_location(
     debug!("Spawning log watcher...");
     spawn_log_watcher_task(
         handle,
-        location.id.expect("Missing Location ID"),
+        location.id,
         interface_name,
         ConnectionType::Location,
         Level::DEBUG,
@@ -605,7 +606,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     );
     debug!("Sending event connection-changed.");
     handle.emit_all(
-        "connection-changed",
+        CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
