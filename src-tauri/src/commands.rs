@@ -84,11 +84,11 @@ pub async fn disconnect(
             },
         )?;
         stop_log_watcher_task(&handle, &interface_name)?;
+        info!("Disconnected from location with id: {location_id}");
+        reload_tray_menu(&handle).await;
         if connection_type == ConnectionType::Location {
             maybe_update_instance_config(location_id, &handle).await?;
         }
-        info!("Disconnected from location with id: {location_id}");
-        reload_tray_menu(&handle).await;
         Ok(())
     } else {
         error!("Error while disconnecting from location with id: {location_id} not found");
