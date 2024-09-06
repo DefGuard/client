@@ -394,6 +394,7 @@ pub async fn update_instance(
 
         info!("Instance {instance_id} updated");
         app_handle.emit_all(INSTANCE_UPDATE, ())?;
+        reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
         error!("Instance with id {instance_id} not found");
@@ -678,6 +679,7 @@ pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), 
             }
         }
         instance.delete(pool).await?;
+        reload_tray_menu(&handle).await;
     } else {
         error!("Instance {instance_id} not found");
         return Err(Error::NotFound);
