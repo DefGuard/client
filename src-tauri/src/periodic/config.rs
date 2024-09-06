@@ -7,7 +7,7 @@ use crate::{
     commands::{device_config_to_location, update_instance},
     database::{
         models::{Id, NoId},
-        DbPool, Instance, Location, WireguardKeys,
+        DbPool, Instance, Location,
     },
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
@@ -66,7 +66,7 @@ pub async fn poll_instance(
     handle: AppHandle,
 ) -> Result<(), Error> {
     // Query proxy api
-    let request = build_request(pool, instance).await?;
+    let request = build_request(instance).await?;
     let url = Url::from_str(&instance.proxy_url)
         .and_then(|url| url.join(POLLING_ENDPOINT))
         .map_err(|_| {
@@ -168,19 +168,7 @@ async fn config_changed(
 }
 
 /// Retrieves pubkey & token to build InstanceInfoRequest
-async fn build_request(
-    pool: &DbPool,
-    instance: &Instance<Id>,
-) -> Result<InstanceInfoRequest, Error> {
-    let Some(WireguardKeys { pubkey, .. }) =
-        WireguardKeys::find_by_instance_id(pool, instance.id).await?
-    else {
-        error!(
-            "WireguardKeys for instance {}({}) not found",
-            instance.name, instance.id
-        );
-        return Err(Error::NotFound);
-    };
+async fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
     let token = &instance.token.as_ref().ok_or_else(|| {
         Error::InternalError(format!(
             "Instance {}({}) missing token",
@@ -189,6 +177,5 @@ async fn build_request(
     })?;
     Ok(InstanceInfoRequest {
         token: token.to_string(),
-        pubkey,
     })
 }
