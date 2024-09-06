@@ -450,7 +450,7 @@ pub async fn get_location_interface_details(
         let keys = WireguardKeys::find_by_instance_id(pool, location.instance_id)
             .await?
             .ok_or(Error::NotFound)?;
-        info!(
+        debug!(
             "Successfully fetched WireGuard keys for location {}",
             location.name
         );
