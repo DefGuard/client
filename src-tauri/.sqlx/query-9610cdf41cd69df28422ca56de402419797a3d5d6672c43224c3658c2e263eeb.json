@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance;",
   "describe": {
     "columns": [
       {
-        "name": "id?",
+        "name": "id: _",
         "ordinal": 0,
         "type_info": "Int64"
       },
@@ -52,5 +52,5 @@
       true
     ]
   },
-  "hash": "68a797ae50a2d9da17379c18473eb1c0b661fb0b8cce636a2e3b97d7840537f1"
+  "hash": "9610cdf41cd69df28422ca56de402419797a3d5d6672c43224c3658c2e263eeb"
 }
