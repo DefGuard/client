@@ -194,6 +194,7 @@ pub async fn save_device_config(
         instance,
     };
     info!("Device configuration saved.");
+    reload_tray_menu(&handle).await;
     Ok(res)
 }
 
