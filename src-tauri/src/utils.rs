@@ -221,7 +221,7 @@ pub fn spawn_stats_thread(
                         interface_data.peers.into_iter().map(Into::into).collect();
                     for peer in peers {
                         if connection_type.eq(&ConnectionType::Location) {
-                            let mut location_stats = peer_to_location_stats(
+                            let location_stats = peer_to_location_stats(
                                 &peer,
                                 interface_data.listen_port,
                                 &state.get_pool(),
@@ -229,10 +229,10 @@ pub fn spawn_stats_thread(
                             .await
                             .unwrap();
                             debug!("Saving location stats: {location_stats:#?}");
-                            let _ = location_stats.save(&state.get_pool()).await;
-                            debug!("Saved location stats: {location_stats:#?}");
+                            let result = location_stats.save(&state.get_pool()).await;
+                            debug!("Saved location stats: {result:#?}");
                         } else {
-                            let mut tunnel_stats = peer_to_tunnel_stats(
+                            let tunnel_stats = peer_to_tunnel_stats(
                                 &peer,
                                 interface_data.listen_port,
                                 &state.get_pool(),
@@ -240,8 +240,8 @@ pub fn spawn_stats_thread(
                             .await
                             .unwrap();
                             debug!("Saving tunnel stats: {tunnel_stats:#?}");
-                            let _ = tunnel_stats.save(&state.get_pool()).await;
-                            debug!("Saved location stats: {tunnel_stats:#?}");
+                            let result = tunnel_stats.save(&state.get_pool()).await;
+                            debug!("Saved location stats: {result:#?}");
                         }
                     }
                 }

@@ -210,8 +210,8 @@ impl Tunnel<NoId> {
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
-pub struct TunnelStats {
-    id: Option<i64>,
+pub struct TunnelStats<I = NoId> {
+    id: I,
     tunnel_id: i64,
     upload: i64,
     download: i64,
@@ -221,7 +221,7 @@ pub struct TunnelStats {
     persistent_keepalive_interval: Option<u16>,
 }
 
-impl TunnelStats {
+impl TunnelStats<NoId> {
     #[must_use]
     pub fn new(
         tunnel_id: i64,
@@ -233,7 +233,7 @@ impl TunnelStats {
         persistent_keepalive_interval: Option<u16>,
     ) -> Self {
         TunnelStats {
-            id: None,
+            id: NoId,
             tunnel_id,
             upload,
             download,
@@ -244,7 +244,7 @@ impl TunnelStats {
         }
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), SqlxError> {
+    pub async fn save(self, pool: &DbPool) -> Result<TunnelStats<Id>, SqlxError> {
         let result = query!(
             "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
             VALUES ($1, $2, $3, $4, $5, $6, $7) \
@@ -259,10 +259,20 @@ impl TunnelStats {
         )
         .fetch_one(pool)
         .await?;
-        self.id = Some(result.id);
-        Ok(())
+        Ok(TunnelStats::<Id> {
+            id: result.id,
+            tunnel_id: self.tunnel_id,
+            upload: self.upload,
+            download: self.download,
+            last_handshake: self.last_handshake,
+            collected_at: self.collected_at,
+            listen_port: self.listen_port,
+            persistent_keepalive_interval: self.persistent_keepalive_interval,
+        })
     }
+}
 
+impl TunnelStats<Id> {
     pub async fn all_by_tunnel_id(
         pool: &DbPool,
         tunnel_id: i64,
@@ -305,10 +315,10 @@ pub async fn peer_to_tunnel_stats(
     peer: &Peer,
     listen_port: u32,
     pool: &DbPool,
-) -> Result<TunnelStats, Error> {
+) -> Result<TunnelStats<NoId>, Error> {
     let tunnel = Tunnel::find_by_server_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(TunnelStats {
-        id: None,
+        id: NoId,
         tunnel_id: tunnel.id,
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
@@ -478,8 +488,8 @@ impl From<TunnelConnection<Id>> for CommonConnection<Id> {
 }
 
 // Implement From trait for converting TunnelStats to CommonLocationStats
-impl From<TunnelStats> for CommonLocationStats {
-    fn from(tunnel_stats: TunnelStats) -> Self {
+impl From<TunnelStats<Id>> for CommonLocationStats<Id> {
+    fn from(tunnel_stats: TunnelStats<Id>) -> Self {
         CommonLocationStats {
             id: tunnel_stats.id,
             location_id: tunnel_stats.tunnel_id,

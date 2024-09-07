@@ -446,11 +446,11 @@ pub async fn location_stats(
     connection_type: ConnectionType,
     from: Option<String>,
     app_state: State<'_, AppState>,
-) -> Result<Vec<CommonLocationStats>, Error> {
+) -> Result<Vec<CommonLocationStats<Id>>, Error> {
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
-    let stats: Vec<CommonLocationStats> = match connection_type {
+    let stats: Vec<CommonLocationStats<Id>> = match connection_type {
         ConnectionType::Location => LocationStats::all_by_location_id(
             &app_state.get_pool(),
             location_id,

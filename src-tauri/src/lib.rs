@@ -54,8 +54,8 @@ pub struct CommonConnection<I = NoId> {
 
 // Common fields for LocationStats and TunnelStats due to shared command
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CommonLocationStats {
-    pub id: Option<i64>,
+pub struct CommonLocationStats<I = NoId> {
+    pub id: I,
     pub location_id: i64,
     pub upload: i64,
     pub download: i64,
