@@ -17,8 +17,8 @@ impl WireguardKeys<Id> {
         executor: E,
         instance_id: i64,
     ) -> Result<Option<Self>, SqlxError>
-        where
-            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         query_as!(
             Self,
