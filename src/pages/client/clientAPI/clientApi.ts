@@ -137,6 +137,7 @@ export const clientApi = {
   updateInstance,
   parseTunnelConfig,
   saveTunnel,
+  updateTunnel,
   openLink,
   getTunnelDetails,
   getLatestAppVersion,
