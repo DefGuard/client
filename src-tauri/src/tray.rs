@@ -31,12 +31,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
     if let Ok(instances) = all_instances {
         for instance in instances {
             let mut instance_menu = SystemTrayMenu::new();
-            let all_locations = all_locations(
-                instance.id,
-                app_state.clone(),
-            )
-            .await
-            .unwrap();
+            let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
             debug!(
                 "All locations {:?} in instance {:?}",
                 all_locations, instance
