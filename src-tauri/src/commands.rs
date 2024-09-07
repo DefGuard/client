@@ -702,10 +702,25 @@ pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
 }
 
 #[tauri::command(async)]
-pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Error> {
+pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
     debug!("Received tunnel configuration: {tunnel:#?}");
     tunnel.save(&app_state.get_pool()).await?;
+    info!("Saved tunnel {tunnel:#?}");
+    handle.emit_all(
+        LOCATION_UPDATE,
+        Payload {
+            message: "Tunnel saved".into(),
+        },
+    )?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
+    let app_state = handle.state::<AppState>();
+    debug!("Received tunnel configuration: {tunnel:#?}");
+    let tunnel = tunnel.save(&app_state.get_pool()).await?;
     info!("Saved tunnel {tunnel:#?}");
     handle.emit_all(
         LOCATION_UPDATE,
@@ -741,12 +756,12 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
 
     for tunnel in tunnels {
         tunnel_info.push(TunnelInfo {
-            id: tunnel.id.expect("Missing Tunnel ID"),
+            id: tunnel.id,
             name: tunnel.name,
             address: tunnel.address,
             endpoint: tunnel.endpoint,
             route_all_traffic: tunnel.route_all_traffic,
-            active: active_tunnel_ids.contains(&tunnel.id.expect("Missing Tunnel ID")),
+            active: active_tunnel_ids.contains(&tunnel.id),
             connection_type: ConnectionType::Tunnel,
         });
     }
@@ -759,7 +774,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
 pub async fn tunnel_details(
     tunnel_id: i64,
     app_state: State<'_, AppState>,
-) -> Result<Tunnel, Error> {
+) -> Result<Tunnel<Id>, Error> {
     debug!("Retrieving Tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&app_state.get_pool(), tunnel_id).await? {

@@ -286,7 +286,7 @@ pub fn get_service_log_dir() -> &'static Path {
 
 /// Setup client interface
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel,
+    tunnel: &Tunnel<Id>,
     interface_name: String,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
@@ -577,7 +577,10 @@ pub async fn handle_connection_for_location(
 }
 
 /// Setup new connection for tunnel
-pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) -> Result<(), Error> {
+pub async fn handle_connection_for_tunnel(
+    tunnel: &Tunnel<Id>,
+    handle: AppHandle,
+) -> Result<(), Error> {
     debug!(
         "Creating new interface connection for tunnel: {}",
         tunnel.name
@@ -590,7 +593,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
     let address = local_ip()?;
     let connection = ActiveConnection::new(
-        tunnel.id.expect("Missing Tunnel ID"),
+        tunnel.id,
         address.to_string(),
         interface_name.clone(),
         ConnectionType::Tunnel,
@@ -626,7 +629,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     debug!("Spawning log watcher");
     spawn_log_watcher_task(
         handle,
-        tunnel.id.expect("Missing Tunnel ID"),
+        tunnel.id,
         interface_name,
         ConnectionType::Tunnel,
         Level::DEBUG,
@@ -704,8 +707,8 @@ pub async fn disconnect_interface(
                     error!("{msg}");
                     return Err(Error::InternalError(msg));
                 }
-                let mut connection: TunnelConnection = active_connection.into();
-                connection.save(&state.get_pool()).await?;
+                let connection: TunnelConnection = active_connection.into();
+                let connection = connection.save(&state.get_pool()).await?;
                 trace!("Saved connection: {connection:#?}");
             } else {
                 error!("Tunnel with ID {} not found", active_connection.location_id);

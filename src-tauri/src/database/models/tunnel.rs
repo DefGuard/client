@@ -1,3 +1,4 @@
+use super::{Id, NoId};
 use std::time::SystemTime;
 
 use chrono::{NaiveDateTime, Utc};
@@ -15,8 +16,8 @@ use crate::{
 
 #[serde_as]
 #[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct Tunnel {
-    pub id: Option<i64>,
+pub struct Tunnel<I = NoId> {
+    pub id: I,
     pub name: String,
     // user keys
     pub pubkey: String,
@@ -45,7 +46,42 @@ pub struct Tunnel {
     pub post_down: Option<String>,
 }
 
-impl Tunnel {
+impl Tunnel<Id> {
+    pub async fn save(&mut self, pool: &DbPool) -> Result<(), SqlxError> {
+        query!(
+            "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
+            server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, \
+            persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 \
+            WHERE id = $16;",
+            self.name,
+            self.pubkey,
+            self.prvkey,
+            self.address,
+            self.server_pubkey,
+            self.preshared_key,
+            self.allowed_ips,
+            self.endpoint,
+            self.dns,
+            self.persistent_keep_alive,
+            self.route_all_traffic,
+            self.pre_up,
+            self.post_up,
+            self.pre_down,
+            self.post_down,
+            self.id,
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
+        Tunnel::delete_by_id(pool, self.id).await?;
+        Ok(())
+    }
+}
+
+impl Tunnel<NoId> {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new(
@@ -66,7 +102,7 @@ impl Tunnel {
         post_down: Option<String>,
     ) -> Self {
         Tunnel {
-            id: None,
+            id: NoId,
             name,
             pubkey,
             prvkey,
@@ -85,70 +121,58 @@ impl Tunnel {
         }
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), SqlxError> {
-        match self.id {
-            None => {
-                // Insert a new record when there is no ID
-                let result = query!(
-                    "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, preshared_key, \
-                    endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down) \
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id;",
-                    self.name,
-                    self.pubkey,
-                    self.prvkey,
-                    self.address,
-                    self.server_pubkey,
-                    self.allowed_ips,
-                    self.preshared_key,
-                    self.endpoint,
-                    self.dns,
-                    self.persistent_keep_alive,
-                    self.route_all_traffic,
-                    self.pre_up,
-                    self.post_up,
-                    self.pre_down,
-                    self.post_down,
-                )
-                .fetch_one(pool)
-                .await?;
-                self.id = Some(result.id);
-            }
-            Some(id) => {
-                // Update the existing record when there is an ID
-                query!(
-                    "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
-                    server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, \
-                    persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 \
-                    WHERE id = $16;",
-                    self.name,
-                    self.pubkey,
-                    self.prvkey,
-                    self.address,
-                    self.server_pubkey,
-                    self.preshared_key,
-                    self.allowed_ips,
-                    self.endpoint,
-                    self.dns,
-                    self.persistent_keep_alive,
-                    self.route_all_traffic,
-                    self.pre_up,
-                    self.post_up,
-                    self.pre_down,
-                    self.post_down,
-                    id,
-                )
-                .execute(pool)
-                .await?;
-            }
-        }
+    pub async fn save(self, pool: &DbPool) -> Result<Tunnel<Id>, SqlxError> {
+        // Insert a new record when there is no ID
+        let result = query!(
+            "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, preshared_key, \
+            endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id;",
+            self.name,
+            self.pubkey,
+            self.prvkey,
+            self.address,
+            self.server_pubkey,
+            self.allowed_ips,
+            self.preshared_key,
+            self.endpoint,
+            self.dns,
+            self.persistent_keep_alive,
+            self.route_all_traffic,
+            self.pre_up,
+            self.post_up,
+            self.pre_down,
+            self.post_down,
+        )
+        .fetch_one(pool)
+        .await?;
 
-        Ok(())
+        Ok(Tunnel::<Id> {
+            id: result.id,
+            name: self.name,
+            pubkey: self.pubkey,
+            prvkey: self.prvkey,
+            address: self.address,
+            server_pubkey: self.server_pubkey,
+            allowed_ips: self.allowed_ips,
+            preshared_key: self.preshared_key,
+            endpoint: self.endpoint,
+            dns: self.dns,
+            persistent_keep_alive: self.persistent_keep_alive,
+            route_all_traffic: self.route_all_traffic,
+            pre_up: self.pre_up,
+            post_up: self.post_up,
+            pre_down: self.pre_down,
+            post_down: self.post_down,
+        })
     }
 
-    pub async fn find_by_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, SqlxError> {
+    pub async fn find_by_id(
+        pool: &DbPool,
+        tunnel_id: i64,
+    ) -> Result<Option<Tunnel<Id>>, SqlxError> {
         query_as!(
-            Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
+            Tunnel::<Id>,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
             persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
             tunnel_id
         )
@@ -156,10 +180,10 @@ impl Tunnel {
         .await
     }
 
-    pub async fn all(pool: &DbPool) -> Result<Vec<Self>, SqlxError> {
+    pub async fn all(pool: &DbPool) -> Result<Vec<Tunnel<Id>>, SqlxError> {
         let tunnels = query_as!(
-            Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
+            Tunnel::<Id>,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
             persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
         )
         .fetch_all(pool)
@@ -167,10 +191,13 @@ impl Tunnel {
         Ok(tunnels)
     }
 
-    pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
+    pub async fn find_by_server_public_key(
+        pool: &DbPool,
+        pubkey: &str,
+    ) -> Result<Tunnel<Id>, SqlxError> {
         query_as!(
-           Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive,
+           Tunnel::<Id>,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, \
             route_all_traffic, pre_up, post_up, pre_down, post_down \
             FROM tunnel WHERE server_pubkey = $1;",
             pubkey
@@ -185,16 +212,6 @@ impl Tunnel {
             .execute(pool)
             .await?;
         Ok(())
-    }
-
-    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
-        match self.id {
-            Some(id) => {
-                Tunnel::delete_by_id(pool, id).await?;
-                Ok(())
-            }
-            None => Err(Error::NotFound),
-        }
     }
 }
 
@@ -298,7 +315,7 @@ pub async fn peer_to_tunnel_stats(
     let tunnel = Tunnel::find_by_server_public_key(pool, &peer.public_key.to_string()).await?;
     Ok(TunnelStats {
         id: None,
-        tunnel_id: tunnel.id.unwrap(),
+        tunnel_id: tunnel.id,
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
         last_handshake: peer.last_handshake.map_or(0, |ts| {
@@ -312,8 +329,8 @@ pub async fn peer_to_tunnel_stats(
 }
 
 #[derive(FromRow, Debug, Serialize, Clone)]
-pub struct TunnelConnection {
-    pub id: Option<i64>,
+pub struct TunnelConnection<I = NoId> {
+    pub id: I,
     pub tunnel_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,
@@ -334,24 +351,11 @@ impl From<TunnelConnectionInfo> for CommonConnectionInfo {
     }
 }
 
-impl TunnelConnection {
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
-        let result = query!(
-            "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
-            VALUES ($1, $2, $3, $4) \
-            RETURNING id;",
-            self.tunnel_id,
-            self.connected_from,
-            self.start,
-            self.end,
-        )
-        .fetch_one(pool)
-        .await?;
-        self.id = Some(result.id);
-        Ok(())
-    }
-
-    pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
+impl TunnelConnection<Id> {
+    pub async fn all_by_tunnel_id(
+        pool: &DbPool,
+        tunnel_id: i64,
+    ) -> Result<Vec<TunnelConnection<Id>>, Error> {
         let connections = query_as!(
             TunnelConnection,
             "SELECT id, tunnel_id, connected_from, start, end \
@@ -363,7 +367,10 @@ impl TunnelConnection {
         Ok(connections)
     }
 
-    pub async fn latest_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, Error> {
+    pub async fn latest_by_tunnel_id(
+        pool: &DbPool,
+        tunnel_id: i64,
+    ) -> Result<Option<TunnelConnection<Id>>, Error> {
         let connection = query_as!(
             TunnelConnection,
             "SELECT id, tunnel_id, connected_from, start, end \
@@ -374,6 +381,30 @@ impl TunnelConnection {
         .fetch_optional(pool)
         .await?;
         Ok(connection)
+    }
+}
+
+impl TunnelConnection<NoId> {
+    pub async fn save(self, pool: &DbPool) -> Result<TunnelConnection<Id>, Error> {
+        let result = query!(
+            "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
+            VALUES ($1, $2, $3, $4) \
+            RETURNING id;",
+            self.tunnel_id,
+            self.connected_from,
+            self.start,
+            self.end,
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(TunnelConnection::<Id> {
+            id: result.id,
+            tunnel_id: self.tunnel_id,
+            connected_from: self.connected_from,
+            start: self.start,
+            end: self.end,
+        })
     }
 }
 
@@ -426,10 +457,10 @@ impl TunnelConnectionInfo {
     }
 }
 
-impl From<&ActiveConnection> for TunnelConnection {
+impl From<&ActiveConnection> for TunnelConnection<NoId> {
     fn from(active_connection: &ActiveConnection) -> Self {
         TunnelConnection {
-            id: None,
+            id: NoId,
             tunnel_id: active_connection.location_id,
             connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
@@ -439,9 +470,9 @@ impl From<&ActiveConnection> for TunnelConnection {
 }
 
 // Implementing From for TunnelConnection into CommonConnection
-impl From<TunnelConnection> for CommonConnection {
-    fn from(tunnel_connection: TunnelConnection) -> Self {
-        CommonConnection {
+impl From<TunnelConnection<Id>> for CommonConnection<Id> {
+    fn from(tunnel_connection: TunnelConnection<Id>) -> Self {
+        CommonConnection::<Id> {
             id: tunnel_connection.id,
             location_id: tunnel_connection.tunnel_id, // Assuming you want to map tunnel_id to location_id
             connected_from: tunnel_connection.connected_from,
