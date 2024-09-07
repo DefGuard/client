@@ -87,10 +87,13 @@ impl Location<Id> {
         .await
     }
 
-    pub async fn find_by_instance_id(
-        pool: &DbPool,
+    pub async fn find_by_instance_id<'e, E>(
+        executor: E,
         instance_id: i64,
-    ) -> Result<Vec<Self>, SqlxError> {
+    ) -> Result<Vec<Self>, SqlxError>
+        where
+            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
@@ -98,7 +101,7 @@ impl Location<Id> {
             FROM location WHERE instance_id = $1;",
             instance_id
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await
     }
 

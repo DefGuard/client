@@ -1,3 +1,4 @@
+use sqlx::{Sqlite, Transaction};
 use std::{collections::HashSet, str::FromStr, time::Duration};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
@@ -7,7 +8,7 @@ use crate::{
     commands::{device_config_to_location, update_instance},
     database::{
         models::{Id, NoId},
-        DbPool, Instance, Location,
+        Instance, Location,
     },
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
@@ -24,7 +25,12 @@ pub async fn poll_config(handle: AppHandle) {
     let state: State<AppState> = handle.state();
     let pool = state.get_pool();
     loop {
-        let Ok(instances) = Instance::all(&pool).await else {
+        let Ok(mut transaction) = pool.begin().await else {
+            error!("Failed to begin db transaction, retrying in {}s", INTERVAL_SECONDS.as_secs());
+            sleep(INTERVAL_SECONDS).await;
+            continue;
+        };
+        let Ok(instances) = Instance::all(&mut *transaction).await else {
             error!(
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
@@ -37,7 +43,7 @@ pub async fn poll_config(handle: AppHandle) {
             instances.len(),
         );
         for instance in &instances {
-            if let Err(err) = poll_instance(&pool, instance, handle.clone()).await {
+            if let Err(err) = poll_instance(&mut transaction, instance, handle.clone()).await {
                 error!(
                     "Failed to retrieve instance {}({}) config: {}",
                     instance.name, instance.id, err
@@ -61,10 +67,13 @@ pub async fn poll_config(handle: AppHandle) {
 /// Retrieves configuration for given [`Instance`].
 /// Updates the instance if there are no active connections, otherwise displays UI message.
 pub async fn poll_instance(
-    pool: &DbPool,
+    tx: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
     handle: AppHandle,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+// where
+//     E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
     // Query proxy api
     let request = build_request(instance).await?;
     let url = Url::from_str(&instance.proxy_url)
@@ -102,7 +111,7 @@ pub async fn poll_instance(
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
 
     // Early return if config didn't change
-    if !config_changed(pool, instance, device_config).await? {
+    if !config_changed(tx, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -146,11 +155,14 @@ pub async fn poll_instance(
 
 /// Returns true if configuration in instance_info differs from current configuration
 async fn config_changed(
-    pool: &DbPool,
+    tx: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
-) -> Result<bool, Error> {
-    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(pool, instance.id)
+) -> Result<bool, Error>
+// where
+    // E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
+    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(&mut **tx, instance.id)
         .await?
         .into_iter()
         .map(Location::<NoId>::from)

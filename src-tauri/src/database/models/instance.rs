@@ -51,12 +51,15 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+        where
+            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance;"
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
         Ok(instances)
     }
