@@ -112,8 +112,7 @@ async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> R
         );
         return Err(Error::NotFound);
     };
-    // poll_instance(&state.get_pool(), &instance, handle.clone()).await
-    Ok(())
+    poll_instance(&state.get_pool(), &instance, handle.clone()).await
 }
 
 #[derive(Debug, Serialize, Deserialize)]

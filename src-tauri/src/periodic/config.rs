@@ -1,4 +1,3 @@
-use sqlx::{Sqlite, Transaction};
 use std::{collections::HashSet, str::FromStr, time::Duration};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
@@ -43,7 +42,7 @@ pub async fn poll_config(handle: AppHandle) {
             instances.len(),
         );
         for instance in &instances {
-            if let Err(err) = poll_instance(&mut transaction, instance, handle.clone()).await {
+            if let Err(err) = poll_instance(&mut *transaction, instance, handle.clone()).await {
                 error!(
                     "Failed to retrieve instance {}({}) config: {}",
                     instance.name, instance.id, err
@@ -66,13 +65,13 @@ pub async fn poll_config(handle: AppHandle) {
 
 /// Retrieves configuration for given [`Instance`].
 /// Updates the instance if there are no active connections, otherwise displays UI message.
-pub async fn poll_instance(
-    tx: &mut Transaction<'_, Sqlite>,
+pub async fn poll_instance<'e, E>(
+    executor: E,
     instance: &Instance<Id>,
     handle: AppHandle,
 ) -> Result<(), Error>
-// where
-//     E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
 {
     // Query proxy api
     let request = build_request(instance).await?;
@@ -111,7 +110,7 @@ pub async fn poll_instance(
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
 
     // Early return if config didn't change
-    if !config_changed(tx, instance, device_config).await? {
+    if !config_changed(executor, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -154,15 +153,15 @@ pub async fn poll_instance(
 }
 
 /// Returns true if configuration in instance_info differs from current configuration
-async fn config_changed(
-    tx: &mut Transaction<'_, Sqlite>,
+async fn config_changed<'e, E>(
+    executor: E,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error>
-// where
-    // E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
 {
-    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(&mut **tx, instance.id)
+    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(executor, instance.id)
         .await?
         .into_iter()
         .map(Location::<NoId>::from)
