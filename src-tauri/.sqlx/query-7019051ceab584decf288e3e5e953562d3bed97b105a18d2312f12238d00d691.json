@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", instance_id, pubkey, prvkey FROM wireguard_keys WHERE instance_id = $1;",
+  "query": "SELECT id \"id: _\", instance_id, pubkey, prvkey FROM wireguard_keys WHERE instance_id = $1;",
   "describe": {
     "columns": [
       {
-        "name": "id?",
+        "name": "id: _",
         "ordinal": 0,
         "type_info": "Int64"
       },
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "501754dcc5d012c155b1881f8f623ea7028fc6c0b4184d81a922c11d73779dd9"
+  "hash": "7019051ceab584decf288e3e5e953562d3bed97b105a18d2312f12238d00d691"
 }
