@@ -1,4 +1,4 @@
-use crate::{database::DbPool, error::Error, proto};
+use crate::{error::Error, proto};
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow};
 
@@ -64,38 +64,50 @@ impl Instance<Id> {
         Ok(instances)
     }
 
-    pub async fn find_by_id(pool: &DbPool, id: i64) -> Result<Option<Self>, Error> {
+    pub async fn find_by_id<'e, E>(executor: E, id: i64) -> Result<Option<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance WHERE id = $1;",
             id
         )
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await?;
         Ok(instance)
     }
 
-    pub async fn find_by_uuid(pool: &DbPool, uuid: &str) -> Result<Option<Self>, Error> {
+    pub async fn find_by_uuid<'e, E>(executor: E, uuid: &str) -> Result<Option<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance WHERE uuid = $1;",
             uuid
         )
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await?;
         Ok(instance)
     }
 
-    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
+    pub async fn delete_by_id<'e, E>(executor: E, id: i64) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         // delete instance
         query!("DELETE FROM instance WHERE id = $1", id)
-            .execute(pool)
+            .execute(executor)
             .await?;
         Ok(())
     }
 
-    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
-        Instance::delete_by_id(pool, self.id).await?;
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        Instance::delete_by_id(executor, self.id).await?;
         Ok(())
     }
 }

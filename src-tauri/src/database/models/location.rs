@@ -1,7 +1,7 @@
 use sqlx::{query, query_as, Error as SqlxError, FromRow};
 use std::fmt::{Display, Formatter};
 
-use crate::{database::DbPool, error::Error};
+use crate::error::Error;
 use serde::{Deserialize, Serialize};
 
 use super::{Id, NoId};
@@ -36,14 +36,17 @@ impl Display for Location<NoId> {
 }
 
 impl Location<Id> {
-    pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let locations = query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
              route_all_traffic, mfa_enabled, keepalive_interval \
         FROM location;"
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
         Ok(locations)
     }
@@ -75,7 +78,10 @@ impl Location<Id> {
         Ok(())
     }
 
-    pub async fn find_by_id(pool: &DbPool, location_id: i64) -> Result<Option<Self>, SqlxError> {
+    pub async fn find_by_id<'e, E>(executor: E, location_id: i64) -> Result<Option<Self>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
@@ -83,7 +89,7 @@ impl Location<Id> {
             FROM location WHERE id = $1;",
             location_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await
     }
 
@@ -105,7 +111,10 @@ impl Location<Id> {
         .await
     }
 
-    pub async fn find_by_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
+    pub async fn find_by_public_key<'e, E>(executor: E, pubkey: &str) -> Result<Self, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
@@ -113,7 +122,7 @@ impl Location<Id> {
             FROM location WHERE pubkey = $1;",
             pubkey
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
     }
 

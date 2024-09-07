@@ -2,9 +2,7 @@ use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query, query_as, FromRow};
 
-use crate::{
-    database::DbPool, error::Error, CommonConnection, CommonConnectionInfo, ConnectionType,
-};
+use crate::{error::Error, CommonConnection, CommonConnectionInfo, ConnectionType};
 
 use super::{Id, NoId};
 
@@ -18,7 +16,10 @@ pub struct Connection<I = NoId> {
 }
 
 impl Connection<NoId> {
-    pub async fn save(self, pool: &DbPool) -> Result<Connection<Id>, Error> {
+    pub async fn save<'e, E>(self, executor: E) -> Result<Connection<Id>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO connection (location_id, connected_from, start, end) \
             VALUES ($1, $2, $3, $4) RETURNING id;",
@@ -27,7 +28,7 @@ impl Connection<NoId> {
             self.start,
             self.end,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
         Ok(Connection::<Id> {
             id: result.id,
@@ -38,25 +39,31 @@ impl Connection<NoId> {
         })
     }
 
-    pub async fn all_by_location_id(
-        pool: &DbPool,
+    pub async fn all_by_location_id<'e, E>(
+        executor: E,
         location_id: i64,
-    ) -> Result<Vec<Connection<Id>>, Error> {
+    ) -> Result<Vec<Connection<Id>>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let connections = query_as!(
             Connection,
             "SELECT id, location_id, connected_from, start, end \
             FROM connection WHERE location_id = $1",
             location_id
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
         Ok(connections)
     }
 
-    pub async fn latest_by_location_id(
-        pool: &DbPool,
+    pub async fn latest_by_location_id<'e, E>(
+        executor: E,
         location_id: i64,
-    ) -> Result<Option<Connection<Id>>, Error> {
+    ) -> Result<Option<Connection<Id>>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let connection = query_as!(
             Connection,
             "SELECT id, location_id, connected_from, start, end \
@@ -64,7 +71,7 @@ impl Connection<NoId> {
             ORDER BY end DESC LIMIT 1",
             location_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await?;
         Ok(connection)
     }
@@ -97,7 +104,13 @@ impl From<ConnectionInfo> for CommonConnectionInfo {
 }
 
 impl ConnectionInfo {
-    pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+    pub async fn all_by_location_id<'e, E>(
+        executor: E,
+        location_id: i64,
+    ) -> Result<Vec<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         // Because we store interface information for given timestamp select last upload and download
         // before connection ended
         // FIXME: Optimize query
@@ -126,7 +139,7 @@ impl ConnectionInfo {
             ORDER BY start DESC",
             location_id
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
 
         Ok(connections)

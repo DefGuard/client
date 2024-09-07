@@ -85,9 +85,12 @@ impl Default for Settings {
 }
 
 impl Settings {
-    pub async fn get(pool: &DbPool) -> Result<Self, Error> {
+    pub async fn get<'e, E>(executor: E) -> Result<Self, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let query_res = query!("SELECT * FROM settings WHERE id = 1;")
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await?;
         let settings = Self {
             id: Some(query_res.id),
@@ -103,7 +106,10 @@ impl Settings {
         Ok(settings)
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query!(
             "UPDATE settings \
             SET theme = $1, log_level = $2, tray_icon_theme = $3, check_for_updates = $4, selected_view = $5 \
@@ -114,7 +120,7 @@ impl Settings {
             self.check_for_updates,
             self.selected_view
         )
-        .execute(pool)
+        .execute(executor)
         .await?;
         Ok(())
     }

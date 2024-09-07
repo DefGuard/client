@@ -1,4 +1,4 @@
-use crate::{database::DbPool, error::Error};
+use crate::error::Error;
 use sqlx::{query, query_as, Error as SqlxError};
 
 use super::{Id, NoId};
@@ -13,17 +13,20 @@ pub struct WireguardKeys<I = NoId> {
 }
 
 impl WireguardKeys<Id> {
-    pub async fn find_by_instance_id(
-        pool: &DbPool,
+    pub async fn find_by_instance_id<'e, E>(
+        executor: E,
         instance_id: i64,
-    ) -> Result<Option<Self>, SqlxError> {
+    ) -> Result<Option<Self>, SqlxError>
+        where
+            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, pubkey, prvkey \
             FROM wireguard_keys WHERE instance_id = $1;",
             instance_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await
     }
 }

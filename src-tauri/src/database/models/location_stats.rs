@@ -3,10 +3,8 @@ use sqlx::{query, query_as, FromRow};
 use std::time::SystemTime;
 
 use crate::{
-    commands::DateTimeAggregation,
-    database::{DbPool, Location},
-    error::Error,
-    CommonLocationStats, ConnectionType,
+    commands::DateTimeAggregation, database::Location, error::Error, CommonLocationStats,
+    ConnectionType,
 };
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
@@ -41,12 +39,15 @@ impl From<LocationStats<Id>> for CommonLocationStats<Id> {
     }
 }
 
-pub async fn peer_to_location_stats(
+pub async fn peer_to_location_stats<'e, E>(
     peer: &Peer,
     listen_port: u32,
-    pool: &DbPool,
-) -> Result<LocationStats<NoId>, Error> {
-    let location = Location::find_by_public_key(pool, &peer.public_key.to_string()).await?;
+    executor: E,
+) -> Result<LocationStats<NoId>, Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
+    let location = Location::find_by_public_key(executor, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
         id: NoId,
         location_id: location.id,
@@ -85,7 +86,10 @@ impl LocationStats<NoId> {
         }
     }
 
-    pub async fn save(self, pool: &DbPool) -> Result<LocationStats<Id>, Error> {
+    pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO location_stats (location_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
             VALUES ($1, $2, $3, $4, $5, $6, $7) \
@@ -98,7 +102,7 @@ impl LocationStats<NoId> {
             self.listen_port,
             self.persistent_keepalive_interval,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
 
         Ok(LocationStats::<Id> {
@@ -115,12 +119,15 @@ impl LocationStats<NoId> {
 }
 
 impl LocationStats<Id> {
-    pub async fn all_by_location_id(
-        pool: &DbPool,
+    pub async fn all_by_location_id<'e, E>(
+        executor: E,
         location_id: i64,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<Vec<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             LocationStats,
@@ -149,7 +156,7 @@ impl LocationStats<Id> {
             location_id,
             from
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
         Ok(stats)
     }
