@@ -142,6 +142,7 @@ pub struct ActiveConnection {
     pub interface_name: String,
     pub connection_type: ConnectionType,
 }
+
 impl ActiveConnection {
     #[must_use]
     pub fn new(

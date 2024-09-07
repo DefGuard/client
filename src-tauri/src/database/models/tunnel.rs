@@ -79,6 +79,48 @@ impl Tunnel<Id> {
         Tunnel::delete_by_id(pool, self.id).await?;
         Ok(())
     }
+
+    pub async fn find_by_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, SqlxError> {
+        query_as!(
+            Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
+            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
+            tunnel_id
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
+    pub async fn all(pool: &DbPool) -> Result<Vec<Self>, SqlxError> {
+        let tunnels = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
+            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(tunnels)
+    }
+
+    pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
+        query_as!(
+           Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, \
+            route_all_traffic, pre_up, post_up, pre_down, post_down \
+            FROM tunnel WHERE server_pubkey = $1;",
+            pubkey
+        )
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
+        // delete instance
+        query!("DELETE FROM tunnel WHERE id = $1", id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }
 
 impl Tunnel<NoId> {
@@ -164,54 +206,6 @@ impl Tunnel<NoId> {
             pre_down: self.pre_down,
             post_down: self.post_down,
         })
-    }
-
-    pub async fn find_by_id(
-        pool: &DbPool,
-        tunnel_id: i64,
-    ) -> Result<Option<Tunnel<Id>>, SqlxError> {
-        query_as!(
-            Tunnel::<Id>,
-            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
-            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
-            tunnel_id
-        )
-        .fetch_optional(pool)
-        .await
-    }
-
-    pub async fn all(pool: &DbPool) -> Result<Vec<Tunnel<Id>>, SqlxError> {
-        let tunnels = query_as!(
-            Tunnel::<Id>,
-            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
-            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
-        )
-        .fetch_all(pool)
-        .await?;
-        Ok(tunnels)
-    }
-
-    pub async fn find_by_server_public_key(
-        pool: &DbPool,
-        pubkey: &str,
-    ) -> Result<Tunnel<Id>, SqlxError> {
-        query_as!(
-           Tunnel::<Id>,
-            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, \
-            route_all_traffic, pre_up, post_up, pre_down, post_down \
-            FROM tunnel WHERE server_pubkey = $1;",
-            pubkey
-        )
-        .fetch_one(pool)
-        .await
-    }
-
-    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
-        // delete instance
-        query!("DELETE FROM tunnel WHERE id = $1", id)
-            .execute(pool)
-            .await?;
-        Ok(())
     }
 }
 
