@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use database::models::NoId;
 use serde::{Deserialize, Serialize};
 pub mod appstate;
 pub mod commands;
@@ -42,8 +43,8 @@ pub struct CommonWireguardFields {
 
 /// Common fields for Connection and TunnelConnection due to shared command
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CommonConnection {
-    pub id: Option<i64>,
+pub struct CommonConnection<I = NoId> {
+    pub id: I,
     pub location_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,

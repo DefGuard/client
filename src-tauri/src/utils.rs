@@ -16,7 +16,7 @@ use crate::{
     appstate::AppState,
     commands::{LocationInterfaceDetails, Payload},
     database::{
-        models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
+        models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id, NoId},
         ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
     },
     error::Error,
@@ -683,8 +683,8 @@ pub async fn disconnect_interface(
                 error!("Failed to remove interface: {error}");
                 return Err(Error::InternalError("Failed to remove interface".into()));
             }
-            let mut connection: Connection = active_connection.into();
-            connection.save(&state.get_pool()).await?;
+            let connection: Connection<NoId> = active_connection.into();
+            let connection = connection.save(&state.get_pool()).await?;
             trace!("Saved connection: {connection:#?}");
             debug!("Removed interface");
             debug!("Saving connection");

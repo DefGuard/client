@@ -537,7 +537,7 @@ pub async fn last_connection(
     location_id: i64,
     connection_type: ConnectionType,
     app_state: State<'_, AppState>,
-) -> Result<Option<CommonConnection>, Error> {
+) -> Result<Option<CommonConnection<Id>>, Error> {
     debug!("Retrieving last connection for location {location_id} with type {connection_type:?}");
     if connection_type == ConnectionType::Location {
         if let Some(connection) =
@@ -717,8 +717,8 @@ pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Er
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TunnelInfo {
-    pub id: Option<i64>,
+pub struct TunnelInfo<I = NoId> {
+    pub id: I,
     pub name: String,
     pub address: String,
     pub endpoint: String,
@@ -728,7 +728,7 @@ pub struct TunnelInfo {
 }
 
 #[tauri::command(async)]
-pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo>, Error> {
+pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo<Id>>, Error> {
     debug!("Retrieving all instances.");
 
     let tunnels = Tunnel::all(&app_state.get_pool()).await?;
@@ -741,7 +741,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
 
     for tunnel in tunnels {
         tunnel_info.push(TunnelInfo {
-            id: tunnel.id,
+            id: tunnel.id.expect("Missing Tunnel ID"),
             name: tunnel.name,
             address: tunnel.address,
             endpoint: tunnel.endpoint,

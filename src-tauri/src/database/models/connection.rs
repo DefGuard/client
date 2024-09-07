@@ -6,17 +6,19 @@ use crate::{
     database::DbPool, error::Error, CommonConnection, CommonConnectionInfo, ConnectionType,
 };
 
+use super::{Id, NoId};
+
 #[derive(FromRow, Debug, Serialize, Clone)]
-pub struct Connection {
-    pub id: Option<i64>,
+pub struct Connection<I = NoId> {
+    pub id: I,
     pub location_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
 }
 
-impl Connection {
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+impl Connection<NoId> {
+    pub async fn save(self, pool: &DbPool) -> Result<Connection<Id>, Error> {
         let result = query!(
             "INSERT INTO connection (location_id, connected_from, start, end) \
             VALUES ($1, $2, $3, $4) RETURNING id;",
@@ -27,11 +29,19 @@ impl Connection {
         )
         .fetch_one(pool)
         .await?;
-        self.id = Some(result.id);
-        Ok(())
+        Ok(Connection::<Id> {
+            id: result.id,
+            location_id: self.location_id,
+            connected_from: self.connected_from,
+            start: self.start,
+            end: self.end,
+        })
     }
 
-    pub async fn all_by_location_id(pool: &DbPool, location_id: i64) -> Result<Vec<Self>, Error> {
+    pub async fn all_by_location_id(
+        pool: &DbPool,
+        location_id: i64,
+    ) -> Result<Vec<Connection<Id>>, Error> {
         let connections = query_as!(
             Connection,
             "SELECT id, location_id, connected_from, start, end \
@@ -46,7 +56,7 @@ impl Connection {
     pub async fn latest_by_location_id(
         pool: &DbPool,
         location_id: i64,
-    ) -> Result<Option<Self>, Error> {
+    ) -> Result<Option<Connection<Id>>, Error> {
         let connection = query_as!(
             Connection,
             "SELECT id, location_id, connected_from, start, end \
@@ -151,10 +161,10 @@ impl ActiveConnection {
     }
 }
 
-impl From<&ActiveConnection> for Connection {
+impl From<&ActiveConnection> for Connection<NoId> {
     fn from(active_connection: &ActiveConnection) -> Self {
         Connection {
-            id: None,
+            id: NoId,
             location_id: active_connection.location_id,
             connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
@@ -163,8 +173,8 @@ impl From<&ActiveConnection> for Connection {
     }
 }
 
-impl From<Connection> for CommonConnection {
-    fn from(connection: Connection) -> Self {
+impl From<Connection<Id>> for CommonConnection<Id> {
+    fn from(connection: Connection<Id>) -> Self {
         CommonConnection {
             id: connection.id,
             location_id: connection.location_id,
