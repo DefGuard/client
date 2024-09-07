@@ -91,8 +91,8 @@ impl Location<Id> {
         executor: E,
         instance_id: i64,
     ) -> Result<Vec<Self>, SqlxError>
-        where
-            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         query_as!(
             Self,

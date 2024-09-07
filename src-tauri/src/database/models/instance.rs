@@ -52,8 +52,8 @@ impl Instance<Id> {
     }
 
     pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
-        where
-            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         let instances = query_as!(
             Self,

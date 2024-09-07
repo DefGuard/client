@@ -25,7 +25,10 @@ pub async fn poll_config(handle: AppHandle) {
     let pool = state.get_pool();
     loop {
         let Ok(mut transaction) = pool.begin().await else {
-            error!("Failed to begin db transaction, retrying in {}s", INTERVAL_SECONDS.as_secs());
+            error!(
+                "Failed to begin db transaction, retrying in {}s",
+                INTERVAL_SECONDS.as_secs()
+            );
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
@@ -53,6 +56,9 @@ pub async fn poll_config(handle: AppHandle) {
                     instance.name, instance.id,
                 );
             }
+        }
+        if let Err(err) = transaction.commit().await {
+            error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
         }
         info!(
             "Retrieved configuration for {} instances, sleeping {}s",
