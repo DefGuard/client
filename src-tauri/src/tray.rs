@@ -32,7 +32,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
         for instance in instances {
             let mut instance_menu = SystemTrayMenu::new();
             let all_locations = all_locations(
-                instance.id.expect("Missing instannce id"),
+                instance.id,
                 app_state.clone(),
             )
             .await

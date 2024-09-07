@@ -199,13 +199,13 @@ pub async fn save_device_config(
 }
 
 #[tauri::command(async)]
-pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo>, Error> {
+pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo<Id>>, Error> {
     debug!("Retrieving all instances.");
 
     let instances = Instance::all(&app_state.get_pool()).await?;
     debug!("Found ({}) instances", instances.len());
     trace!("Instances found: {instances:#?}");
-    let mut instance_info: Vec<InstanceInfo> = Vec::new();
+    let mut instance_info: Vec<InstanceInfo<Id>> = Vec::new();
     let connection_ids: Vec<i64> = app_state
         .get_connection_id_by_type(&ConnectionType::Location)
         .await;
@@ -218,8 +218,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id)
             .await?
             .ok_or(Error::NotFound)?;
-        instance_info.push(InstanceInfo {
-            id: Some(instance.id),
+        instance_info.push(InstanceInfo::<Id> {
+            id: instance.id,
             uuid: instance.uuid,
             name: instance.name,
             url: instance.url,

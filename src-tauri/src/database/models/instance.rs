@@ -147,8 +147,8 @@ impl Instance<NoId> {
 }
 
 #[derive(FromRow, Debug, Serialize, Deserialize)]
-pub struct InstanceInfo {
-    pub id: Option<i64>,
+pub struct InstanceInfo<I = NoId> {
+    pub id: I,
     pub name: String,
     pub uuid: String,
     pub url: String,
