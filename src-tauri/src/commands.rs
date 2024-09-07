@@ -177,7 +177,7 @@ pub async fn save_device_config(
     let device = response
         .device
         .expect("Missing device info in device config response");
-    let mut keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
+    let keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
     keys.save(&mut *transaction).await?;
     for location in response.configs {
         let new_location = device_config_to_location(location, instance.id);
