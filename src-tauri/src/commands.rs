@@ -255,7 +255,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             proxy_url: instance.proxy_url,
             active: connected,
             pubkey: keys.pubkey,
-            disable_route_all_traffic: instance.disable_route_all_traffic,
+            disable_all_traffic: instance.disable_all_traffic,
         });
     }
     info!("Instances retrieved({})", instance_info.len());
@@ -608,7 +608,7 @@ pub async fn update_location_routing(
                 let instance = Instance::find_by_id(&app_state.get_pool(), location.instance_id)
                     .await?
                     .ok_or(Error::NotFound)?;
-                if instance.disable_route_all_traffic && route_all_traffic {
+                if instance.disable_all_traffic && route_all_traffic {
                     error!(
                         "Couldn't update location routing: instance with id {} has route_all_traffic disabled.", instance.id
                     );

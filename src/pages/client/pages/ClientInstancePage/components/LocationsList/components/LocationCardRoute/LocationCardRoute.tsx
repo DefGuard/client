@@ -41,11 +41,11 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),
         value: 1,
-        disabled: selectedDefguardInstance?.disable_route_all_traffic,
+        disabled: selectedDefguardInstance?.disable_all_traffic,
       },
     ];
     return res;
-  }, [LL.pages, selectedDefguardInstance?.disable_route_all_traffic]);
+  }, [LL.pages, selectedDefguardInstance?.disable_all_traffic]);
 
   return (
     <Toggle
