@@ -94,6 +94,9 @@ const parseTunnelConfig = async (config: string) =>
 const saveTunnel = async (tunnel: TunnelRequest) =>
   invokeWrapper('save_tunnel', { tunnel: tunnel });
 
+const updateTunnel = async (tunnel: TunnelRequest) =>
+  invokeWrapper('update_tunnel', { tunnel: tunnel });
+
 const getLocationDetails = async (
   data: LocationDetailsRequest,
 ): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
@@ -134,6 +137,7 @@ export const clientApi = {
   updateInstance,
   parseTunnelConfig,
   saveTunnel,
+  updateTunnel,
   openLink,
   getTunnelDetails,
   getLatestAppVersion,

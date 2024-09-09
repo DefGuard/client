@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;",
+  "query": "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;",
   "describe": {
     "columns": [
       {
-        "name": "id?",
+        "name": "id: _",
         "ordinal": 0,
         "type_info": "Int64"
       },
@@ -106,5 +106,5 @@
       true
     ]
   },
-  "hash": "25e253a71c188be173e3dce3c640e3028e88be06d10c112e4b4a16b1599f8657"
+  "hash": "f76a3953576d685d4057541b04aabfafdb61c86b0e9486ff0561a7bd80fd6ba8"
 }
