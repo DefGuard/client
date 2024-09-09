@@ -163,37 +163,66 @@ pub async fn save_device_config(
     app_state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
-    debug!("Received device configuration: {response:#?}.");
+    debug!("Saving device configuration: {response:#?}.");
 
     let mut transaction = app_state.get_pool().begin().await?;
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
+    if response.token.is_some() {
+        info!("Received polling token for instance {}", instance.name);
+    } else {
+        warn!(
+            "Missing polling token for instance {}, core and/or proxy services may need an update, configuration polling won't work",
+            instance.name,
+        );
+    }
     instance.token = response.token;
 
+    debug!("Saving instance {}", instance.name);
     let instance = instance.save(&mut *transaction).await?;
+    info!("Saved instance {}", instance.name);
 
     let device = response
         .device
         .expect("Missing device info in device config response");
+    debug!(
+        "Saving wireguard key {} for instance {}({})",
+        device.pubkey, instance.name, instance.id
+    );
     let mut keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
     keys.save(&mut *transaction).await?;
+    info!(
+        "Saved wireguard key {} for instance {}({})",
+        keys.pubkey, instance.name, instance.id
+    );
     for location in response.configs {
         let new_location = device_config_to_location(location, instance.id);
-        new_location.save(&mut *transaction).await?;
+        debug!(
+            "Saving location {} for instance {}({})",
+            new_location.name, instance.name, instance.id
+        );
+        let new_location = new_location.save(&mut *transaction).await?;
+        info!(
+            "Saved location {} for instance {}({})",
+            new_location.name, instance.name, instance.id
+        );
     }
     transaction.commit().await?;
-    info!("Instance created.");
+    info!("Instance {}({:?}) created.", instance.name, instance.id);
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
     trace!("Created following locations: {locations:#?}");
     handle.emit_all(INSTANCE_UPDATE, ())?;
+    info!(
+        "Device configuration saved for instance {}({})",
+        instance.name, instance.id,
+    );
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
     };
-    info!("Device configuration saved.");
     reload_tray_menu(&handle).await;
     Ok(res)
 }
