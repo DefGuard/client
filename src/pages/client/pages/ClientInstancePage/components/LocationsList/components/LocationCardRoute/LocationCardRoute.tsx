@@ -7,14 +7,15 @@ import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
 import { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { CommonWireguardFields } from '../../../../../../types';
+import { CommonWireguardFields, DefguardInstance } from '../../../../../../types';
 
 type Props = {
   location?: CommonWireguardFields;
+  selectedDefguardInstance?: DefguardInstance;
 };
 const { updateLocationRouting } = clientApi;
 
-export const LocationCardRoute = ({ location }: Props) => {
+export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props) => {
   const handleChange = async (value: boolean) => {
     try {
       if (location && location.connection_type) {
@@ -40,10 +41,11 @@ export const LocationCardRoute = ({ location }: Props) => {
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),
         value: 1,
+        disabled: selectedDefguardInstance?.disable_route_all_traffic,
       },
     ];
     return res;
-  }, [LL.pages]);
+  }, [LL.pages, selectedDefguardInstance?.disable_route_all_traffic]);
 
   return (
     <Toggle

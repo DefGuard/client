@@ -13,6 +13,7 @@ pub struct Instance<I = NoId> {
     pub proxy_url: String,
     pub username: String,
     pub token: Option<String>,
+    pub disable_route_all_traffic: bool,
 }
 
 impl From<proto::InstanceInfo> for Instance<NoId> {
@@ -25,6 +26,7 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
             proxy_url: instance_info.proxy_url,
             username: instance_info.username,
             token: None,
+            disable_route_all_traffic: false,
         }
     }
 }
@@ -38,23 +40,25 @@ impl Instance<Id> {
         let proxy_url = self.proxy_url.to_string();
         // Update the existing record when there is an ID
         query!(
-            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5 WHERE id = $6;",
+            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_route_all_traffic = $6 WHERE id = $7;",
             self.name,
             self.uuid,
             url,
             proxy_url,
             self.username,
-            self.id,
+            self.disable_route_all_traffic,
+            self.id
         )
         .execute(executor)
         .await?;
+        info!("Instance: {self:?}");
         Ok(())
     }
 
     pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
         let instances = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance;"
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_route_all_traffic FROM instance;"
         )
         .fetch_all(pool)
         .await?;
@@ -64,7 +68,7 @@ impl Instance<Id> {
     pub async fn find_by_id(pool: &DbPool, id: i64) -> Result<Option<Self>, Error> {
         let instance = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance WHERE id = $1;",
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_route_all_traffic FROM instance WHERE id = $1;",
             id
         )
         .fetch_optional(pool)
@@ -75,7 +79,7 @@ impl Instance<Id> {
     pub async fn find_by_uuid(pool: &DbPool, uuid: &str) -> Result<Option<Self>, Error> {
         let instance = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\" FROM instance WHERE uuid = $1;",
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_route_all_traffic FROM instance WHERE uuid = $1;",
             uuid
         )
         .fetch_optional(pool)
@@ -114,6 +118,7 @@ impl Instance<NoId> {
             proxy_url,
             username,
             token: None,
+            disable_route_all_traffic: false,
         }
     }
 
@@ -124,13 +129,14 @@ impl Instance<NoId> {
         let url = self.url.to_string();
         let proxy_url = self.proxy_url.to_string();
         let result = query!(
-            "INSERT INTO instance (name, uuid, url, proxy_url, username, token) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id;",
+            "INSERT INTO instance (name, uuid, url, proxy_url, username, token, disable_route_all_traffic) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;",
             self.name,
             self.uuid,
             url,
             proxy_url,
             self.username,
             self.token,
+            self.disable_route_all_traffic
         )
         .fetch_one(executor)
         .await?;
@@ -142,6 +148,7 @@ impl Instance<NoId> {
             proxy_url: self.proxy_url,
             username: self.username,
             token: self.token,
+            disable_route_all_traffic: self.disable_route_all_traffic,
         })
     }
 }
@@ -155,4 +162,5 @@ pub struct InstanceInfo {
     pub proxy_url: String,
     pub active: bool,
     pub pubkey: String,
+    pub disable_route_all_traffic: bool,
 }

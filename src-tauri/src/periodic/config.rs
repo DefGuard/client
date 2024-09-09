@@ -24,7 +24,7 @@ pub async fn poll_config(handle: AppHandle) {
     let state: State<AppState> = handle.state();
     let pool = state.get_pool();
     loop {
-        let Ok(instances) = Instance::all(&pool).await else {
+        let Ok(mut instances) = Instance::all(&pool).await else {
             error!(
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
@@ -36,7 +36,7 @@ pub async fn poll_config(handle: AppHandle) {
             "Polling configuration updates for {} instances",
             instances.len(),
         );
-        for instance in &instances {
+        for instance in &mut instances {
             if let Err(err) = poll_instance(&pool, instance, handle.clone()).await {
                 error!(
                     "Failed to retrieve instance {}({}) config: {}",
@@ -62,7 +62,7 @@ pub async fn poll_config(handle: AppHandle) {
 /// Updates the instance if there are no active connections, otherwise displays UI message.
 pub async fn poll_instance(
     pool: &DbPool,
-    instance: &Instance<Id>,
+    instance: &mut Instance<Id>,
     handle: AppHandle,
 ) -> Result<(), Error> {
     // Query proxy api
@@ -100,6 +100,18 @@ pub async fn poll_instance(
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    let instance_config = response.instance_config.as_ref().ok_or_else(|| {
+        Error::InternalError("Instance config not present in response".to_string())
+    })?;
+    if instance.disable_route_all_traffic != instance_config.disable_route_all_traffic {
+        debug!(
+            "Instance {}({}) disable_route_all_traffic changed from {} to {}",
+            instance.name, instance.id, instance.disable_route_all_traffic, instance_config.disable_route_all_traffic
+        );
+        instance.disable_route_all_traffic = instance_config.disable_route_all_traffic;
+        instance.save(pool).await?;
+        handle.emit_all(INSTANCE_UPDATE, ())?;
+    }
 
     // Early return if config didn't change
     if !config_changed(pool, instance, device_config).await? {
