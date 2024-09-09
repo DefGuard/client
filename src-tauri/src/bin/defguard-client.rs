@@ -31,6 +31,7 @@ use defguard_client::{
     periodic::{config::poll_config, version::poll_version},
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
+    VERSION,
 };
 use std::{env, str::FromStr};
 
@@ -142,6 +143,7 @@ async fn main() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
+    info!("Starting ... version v{}", VERSION);
     // initialize database
     let app_handle = app.handle();
     debug!("Initializing database connection");
