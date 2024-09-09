@@ -106,7 +106,10 @@ pub async fn poll_instance(
     if instance.disable_route_all_traffic != instance_config.disable_route_all_traffic {
         debug!(
             "Instance {}({}) disable_route_all_traffic changed from {} to {}",
-            instance.name, instance.id, instance.disable_route_all_traffic, instance_config.disable_route_all_traffic
+            instance.name,
+            instance.id,
+            instance.disable_route_all_traffic,
+            instance_config.disable_route_all_traffic
         );
         instance.disable_route_all_traffic = instance_config.disable_route_all_traffic;
         instance.save(pool).await?;
