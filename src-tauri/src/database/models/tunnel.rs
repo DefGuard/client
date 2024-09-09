@@ -5,7 +5,7 @@ use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
-use sqlx::{query, query_as, Error as SqlxError, FromRow};
+use sqlx::{query, query_as, Error as SqlxError};
 
 use crate::{
     commands::DateTimeAggregation, database::ActiveConnection, error::Error, CommonConnection,
@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[serde_as]
-#[derive(Debug, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Tunnel<I = NoId> {
     pub id: I,
     pub name: String,
@@ -231,7 +231,7 @@ impl Tunnel<NoId> {
     }
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelStats<I = NoId> {
     id: I,
     tunnel_id: i64,
@@ -363,7 +363,7 @@ where
     })
 }
 
-#[derive(FromRow, Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct TunnelConnection<I = NoId> {
     pub id: I,
     pub tunnel_id: i64,
@@ -453,7 +453,7 @@ impl TunnelConnection<NoId> {
 }
 
 /// Historical connection
-#[derive(FromRow, Debug, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TunnelConnectionInfo {
     pub id: i64,
     pub tunnel_id: i64,

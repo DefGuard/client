@@ -1,10 +1,10 @@
-use crate::{error::Error, proto};
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow};
+use sqlx::{query, query_as};
 
 use super::{Id, NoId};
+use crate::{error::Error, proto};
 
-#[derive(FromRow, Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Instance<I = NoId> {
     pub id: I,
     pub name: String,
@@ -136,8 +136,8 @@ impl Instance<NoId> {
     where
         E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
-        let url = self.url.to_string();
-        let proxy_url = self.proxy_url.to_string();
+        let url = self.url.clone();
+        let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id;",
             self.name,
@@ -161,7 +161,7 @@ impl Instance<NoId> {
     }
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct InstanceInfo<I = NoId> {
     pub id: I,
     pub name: String,

@@ -80,7 +80,7 @@ where
     E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
 {
     // Query proxy api
-    let request = build_request(instance).await?;
+    let request = build_request(instance)?;
     let url = Url::from_str(&instance.proxy_url)
         .and_then(|url| url.join(POLLING_ENDPOINT))
         .map_err(|_| {
@@ -185,7 +185,7 @@ where
 }
 
 /// Retrieves pubkey & token to build InstanceInfoRequest
-async fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
+fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
     let token = &instance.token.as_ref().ok_or_else(|| {
         Error::InternalError(format!(
             "Instance {}({}) missing token",
@@ -193,6 +193,6 @@ async fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, E
         ))
     })?;
     Ok(InstanceInfoRequest {
-        token: token.to_string(),
+        token: (*token).to_string(),
     })
 }

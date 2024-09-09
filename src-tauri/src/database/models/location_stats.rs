@@ -1,17 +1,17 @@
-use chrono::{NaiveDateTime, Utc};
-use sqlx::{query, query_as, FromRow};
 use std::time::SystemTime;
 
+use chrono::{NaiveDateTime, Utc};
+use defguard_wireguard_rs::host::Peer;
+use serde::{Deserialize, Serialize};
+use sqlx::{query, query_as};
+
+use super::{Id, NoId};
 use crate::{
     commands::DateTimeAggregation, database::Location, error::Error, CommonLocationStats,
     ConnectionType,
 };
-use defguard_wireguard_rs::host::Peer;
-use serde::{Deserialize, Serialize};
 
-use super::{Id, NoId};
-
-#[derive(FromRow, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {
     id: I,
     location_id: i64,

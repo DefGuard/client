@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{query, FromRow, Type};
+use sqlx::{query, Type};
 use struct_patch::Patch;
 use strum::{AsRefStr, EnumString};
 use tracing::Level;
@@ -59,7 +59,7 @@ pub enum ClientView {
     Detail,
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize, Patch)]
+#[derive(Debug, Serialize, Deserialize, Patch)]
 #[patch_derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(skip)]
@@ -125,7 +125,7 @@ impl Settings {
         Ok(())
     }
 
-    /// Checks if settings are empty and inserts default settings if they not exist, this should be called before app start
+    /// Checks if settings are empty and inserts default settings if they do not exist. This should be called before app starts.
     pub async fn init_defaults(pool: &DbPool) -> Result<(), Error> {
         let current_config = query!("SELECT * FROM settings WHERE id = 1;")
             .fetch_optional(pool)
@@ -134,8 +134,7 @@ impl Settings {
             debug!("No settings found on app init, inserting defaults.");
             // check what system theme is currently in use and default to it.
             let theme = match dark_light::detect() {
-                dark_light::Mode::Default => SettingsTheme::Light,
-                dark_light::Mode::Light => SettingsTheme::Light,
+                dark_light::Mode::Default | dark_light::Mode::Light => SettingsTheme::Light,
                 dark_light::Mode::Dark => {
                     debug!("Detected system theme dark, init theme adjusted.");
                     SettingsTheme::Dark

@@ -1,12 +1,12 @@
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use sqlx::{query, query_as, FromRow};
+use sqlx::{query, query_as};
 
 use crate::{error::Error, CommonConnection, CommonConnectionInfo, ConnectionType};
 
 use super::{Id, NoId};
 
-#[derive(FromRow, Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Connection<I = NoId> {
     pub id: I,
     pub location_id: i64,
@@ -78,7 +78,7 @@ impl Connection<NoId> {
 }
 
 /// Historical connection
-#[derive(FromRow, Debug, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ConnectionInfo {
     pub id: i64,
     pub location_id: i64,

@@ -205,8 +205,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     let instances = Instance::all(&app_state.get_pool()).await?;
     debug!("Found ({}) instances", instances.len());
     trace!("Instances found: {instances:#?}");
-    let mut instance_info: Vec<InstanceInfo<Id>> = Vec::new();
-    let connection_ids: Vec<i64> = app_state
+    let mut instance_info = Vec::new();
+    let connection_ids = app_state
         .get_connection_id_by_type(&ConnectionType::Location)
         .await;
     for instance in instances {
@@ -218,7 +218,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
         let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id)
             .await?
             .ok_or(Error::NotFound)?;
-        instance_info.push(InstanceInfo::<Id> {
+        instance_info.push(InstanceInfo {
             id: instance.id,
             uuid: instance.uuid,
             name: instance.name,
@@ -450,7 +450,7 @@ pub async fn location_stats(
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
-    let stats: Vec<CommonLocationStats<Id>> = match connection_type {
+    let stats = match connection_type {
         ConnectionType::Location => LocationStats::all_by_location_id(
             &app_state.get_pool(),
             location_id,
