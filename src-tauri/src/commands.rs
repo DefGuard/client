@@ -163,50 +163,79 @@ pub async fn save_device_config(
     app_state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
-    debug!("Received device configuration: {response:#?}.");
+    debug!("Saving device configuration: {response:#?}.");
 
     let mut transaction = app_state.get_pool().begin().await?;
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
+    if response.token.is_some() {
+        info!("Received polling token for instance {}", instance.name);
+    } else {
+        warn!(
+            "Missing polling token for instance {}, core and/or proxy services may need an update, configuration polling won't work",
+            instance.name,
+        );
+    }
     instance.token = response.token;
 
+    debug!("Saving instance {}", instance.name);
     let instance = instance.save(&mut *transaction).await?;
+    info!("Saved instance {}", instance.name);
 
     let device = response
         .device
         .expect("Missing device info in device config response");
-    let mut keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
-    keys.save(&mut *transaction).await?;
+    let keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
+    debug!(
+        "Saving wireguard key {} for instance {}({})",
+        keys.pubkey, instance.name, instance.id
+    );
+    let keys = keys.save(&mut *transaction).await?;
+    info!(
+        "Saved wireguard key {} for instance {}({})",
+        keys.pubkey, instance.name, instance.id
+    );
     for location in response.configs {
         let new_location = device_config_to_location(location, instance.id);
-        new_location.save(&mut *transaction).await?;
+        debug!(
+            "Saving location {} for instance {}({})",
+            new_location.name, instance.name, instance.id
+        );
+        let new_location = new_location.save(&mut *transaction).await?;
+        info!(
+            "Saved location {} for instance {}({})",
+            new_location.name, instance.name, instance.id
+        );
     }
     transaction.commit().await?;
-    info!("Instance created.");
+    info!("Instance {}({:?}) created.", instance.name, instance.id);
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
     trace!("Created following locations: {locations:#?}");
     handle.emit_all(INSTANCE_UPDATE, ())?;
+    info!(
+        "Device configuration saved for instance {}({})",
+        instance.name, instance.id,
+    );
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
     };
-    info!("Device configuration saved.");
     reload_tray_menu(&handle).await;
     Ok(res)
 }
 
 #[tauri::command(async)]
-pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo>, Error> {
+pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo<Id>>, Error> {
     debug!("Retrieving all instances.");
 
     let instances = Instance::all(&app_state.get_pool()).await?;
     debug!("Found ({}) instances", instances.len());
     trace!("Instances found: {instances:#?}");
-    let mut instance_info: Vec<InstanceInfo> = Vec::new();
-    let connection_ids: Vec<i64> = app_state
+    let mut instance_info = Vec::new();
+    let connection_ids = app_state
         .get_connection_id_by_type(&ConnectionType::Location)
         .await;
     for instance in instances {
@@ -219,7 +248,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             .await?
             .ok_or(Error::NotFound)?;
         instance_info.push(InstanceInfo {
-            id: Some(instance.id),
+            id: instance.id,
             uuid: instance.uuid,
             name: instance.name,
             url: instance.url,
@@ -447,11 +476,11 @@ pub async fn location_stats(
     connection_type: ConnectionType,
     from: Option<String>,
     app_state: State<'_, AppState>,
-) -> Result<Vec<CommonLocationStats>, Error> {
+) -> Result<Vec<CommonLocationStats<Id>>, Error> {
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
-    let stats: Vec<CommonLocationStats> = match connection_type {
+    let stats = match connection_type {
         ConnectionType::Location => LocationStats::all_by_location_id(
             &app_state.get_pool(),
             location_id,
@@ -538,7 +567,7 @@ pub async fn last_connection(
     location_id: i64,
     connection_type: ConnectionType,
     app_state: State<'_, AppState>,
-) -> Result<Option<CommonConnection>, Error> {
+) -> Result<Option<CommonConnection<Id>>, Error> {
     debug!("Retrieving last connection for location {location_id} with type {connection_type:?}");
     if connection_type == ConnectionType::Location {
         if let Some(connection) =
@@ -716,7 +745,7 @@ pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
 }
 
 #[tauri::command(async)]
-pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Error> {
+pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
     debug!("Received tunnel configuration: {tunnel:#?}");
     tunnel.save(&app_state.get_pool()).await?;
@@ -730,9 +759,24 @@ pub async fn save_tunnel(mut tunnel: Tunnel, handle: AppHandle) -> Result<(), Er
     Ok(())
 }
 
+#[tauri::command(async)]
+pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
+    let app_state = handle.state::<AppState>();
+    debug!("Received tunnel configuration: {tunnel:#?}");
+    let tunnel = tunnel.save(&app_state.get_pool()).await?;
+    info!("Saved tunnel {tunnel:#?}");
+    handle.emit_all(
+        LOCATION_UPDATE,
+        Payload {
+            message: "Tunnel saved".into(),
+        },
+    )?;
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TunnelInfo {
-    pub id: Option<i64>,
+pub struct TunnelInfo<I = NoId> {
+    pub id: I,
     pub name: String,
     pub address: String,
     pub endpoint: String,
@@ -742,7 +786,7 @@ pub struct TunnelInfo {
 }
 
 #[tauri::command(async)]
-pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo>, Error> {
+pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo<Id>>, Error> {
     debug!("Retrieving all instances.");
 
     let tunnels = Tunnel::all(&app_state.get_pool()).await?;
@@ -760,7 +804,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
             address: tunnel.address,
             endpoint: tunnel.endpoint,
             route_all_traffic: tunnel.route_all_traffic,
-            active: active_tunnel_ids.contains(&tunnel.id.expect("Missing Tunnel ID")),
+            active: active_tunnel_ids.contains(&tunnel.id),
             connection_type: ConnectionType::Tunnel,
         });
     }
@@ -773,7 +817,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
 pub async fn tunnel_details(
     tunnel_id: i64,
     app_state: State<'_, AppState>,
-) -> Result<Tunnel, Error> {
+) -> Result<Tunnel<Id>, Error> {
     debug!("Retrieving Tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&app_state.get_pool(), tunnel_id).await? {

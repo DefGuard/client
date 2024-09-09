@@ -1,22 +1,21 @@
+use super::{Id, NoId};
 use std::time::SystemTime;
 
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
-use sqlx::{query, query_as, Error as SqlxError, FromRow};
+use sqlx::{query, query_as, Error as SqlxError};
 
 use crate::{
-    commands::DateTimeAggregation,
-    database::{ActiveConnection, DbPool},
-    error::Error,
-    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+    commands::DateTimeAggregation, database::ActiveConnection, error::Error, CommonConnection,
+    CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 
 #[serde_as]
-#[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct Tunnel {
-    pub id: Option<i64>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Tunnel<I = NoId> {
+    pub id: I,
     pub name: String,
     // user keys
     pub pubkey: String,
@@ -45,7 +44,105 @@ pub struct Tunnel {
     pub post_down: Option<String>,
 }
 
-impl Tunnel {
+impl Tunnel<Id> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        query!(
+            "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
+            server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, \
+            persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 \
+            WHERE id = $16;",
+            self.name,
+            self.pubkey,
+            self.prvkey,
+            self.address,
+            self.server_pubkey,
+            self.preshared_key,
+            self.allowed_ips,
+            self.endpoint,
+            self.dns,
+            self.persistent_keep_alive,
+            self.route_all_traffic,
+            self.pre_up,
+            self.post_up,
+            self.pre_down,
+            self.post_down,
+            self.id,
+        )
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        Tunnel::delete_by_id(executor, self.id).await?;
+        Ok(())
+    }
+
+    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: i64) -> Result<Option<Self>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        query_as!(
+            Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
+            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
+            tunnel_id
+        )
+        .fetch_optional(executor)
+        .await
+    }
+
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let tunnels = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
+            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
+        )
+        .fetch_all(executor)
+        .await?;
+        Ok(tunnels)
+    }
+
+    pub async fn find_by_server_public_key<'e, E>(
+        executor: E,
+        pubkey: &str,
+    ) -> Result<Self, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        query_as!(
+           Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, \
+            route_all_traffic, pre_up, post_up, pre_down, post_down \
+            FROM tunnel WHERE server_pubkey = $1;",
+            pubkey
+        )
+        .fetch_one(executor)
+        .await
+    }
+
+    pub async fn delete_by_id<'e, E>(executor: E, id: i64) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        // delete instance
+        query!("DELETE FROM tunnel WHERE id = $1", id)
+            .execute(executor)
+            .await?;
+        Ok(())
+    }
+}
+
+impl Tunnel<NoId> {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new(
@@ -66,7 +163,7 @@ impl Tunnel {
         post_down: Option<String>,
     ) -> Self {
         Tunnel {
-            id: None,
+            id: NoId,
             name,
             pubkey,
             prvkey,
@@ -85,122 +182,58 @@ impl Tunnel {
         }
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), SqlxError> {
-        match self.id {
-            None => {
-                // Insert a new record when there is no ID
-                let result = query!(
-                    "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, preshared_key, \
-                    endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down) \
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id;",
-                    self.name,
-                    self.pubkey,
-                    self.prvkey,
-                    self.address,
-                    self.server_pubkey,
-                    self.allowed_ips,
-                    self.preshared_key,
-                    self.endpoint,
-                    self.dns,
-                    self.persistent_keep_alive,
-                    self.route_all_traffic,
-                    self.pre_up,
-                    self.post_up,
-                    self.pre_down,
-                    self.post_down,
-                )
-                .fetch_one(pool)
-                .await?;
-                self.id = Some(result.id);
-            }
-            Some(id) => {
-                // Update the existing record when there is an ID
-                query!(
-                    "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
-                    server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, \
-                    persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 \
-                    WHERE id = $16;",
-                    self.name,
-                    self.pubkey,
-                    self.prvkey,
-                    self.address,
-                    self.server_pubkey,
-                    self.preshared_key,
-                    self.allowed_ips,
-                    self.endpoint,
-                    self.dns,
-                    self.persistent_keep_alive,
-                    self.route_all_traffic,
-                    self.pre_up,
-                    self.post_up,
-                    self.pre_down,
-                    self.post_down,
-                    id,
-                )
-                .execute(pool)
-                .await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn find_by_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, SqlxError> {
-        query_as!(
-            Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
-            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
-            tunnel_id
+    pub async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        // Insert a new record when there is no ID
+        let result = query!(
+            "INSERT INTO tunnel (name, pubkey, prvkey, address, server_pubkey, allowed_ips, preshared_key, \
+            endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id;",
+            self.name,
+            self.pubkey,
+            self.prvkey,
+            self.address,
+            self.server_pubkey,
+            self.allowed_ips,
+            self.preshared_key,
+            self.endpoint,
+            self.dns,
+            self.persistent_keep_alive,
+            self.route_all_traffic,
+            self.pre_up,
+            self.post_up,
+            self.pre_down,
+            self.post_down,
         )
-        .fetch_optional(pool)
-        .await
-    }
-
-    pub async fn all(pool: &DbPool) -> Result<Vec<Self>, SqlxError> {
-        let tunnels = query_as!(
-            Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
-            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
-        )
-        .fetch_all(pool)
+        .fetch_one(executor)
         .await?;
-        Ok(tunnels)
-    }
 
-    pub async fn find_by_server_public_key(pool: &DbPool, pubkey: &str) -> Result<Self, SqlxError> {
-        query_as!(
-           Self,
-            "SELECT id \"id?\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive,
-            route_all_traffic, pre_up, post_up, pre_down, post_down \
-            FROM tunnel WHERE server_pubkey = $1;",
-            pubkey
-        )
-        .fetch_one(pool)
-        .await
-    }
-
-    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
-        // delete instance
-        query!("DELETE FROM tunnel WHERE id = $1", id)
-            .execute(pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
-        match self.id {
-            Some(id) => {
-                Tunnel::delete_by_id(pool, id).await?;
-                Ok(())
-            }
-            None => Err(Error::NotFound),
-        }
+        Ok(Tunnel::<Id> {
+            id: result.id,
+            name: self.name,
+            pubkey: self.pubkey,
+            prvkey: self.prvkey,
+            address: self.address,
+            server_pubkey: self.server_pubkey,
+            allowed_ips: self.allowed_ips,
+            preshared_key: self.preshared_key,
+            endpoint: self.endpoint,
+            dns: self.dns,
+            persistent_keep_alive: self.persistent_keep_alive,
+            route_all_traffic: self.route_all_traffic,
+            pre_up: self.pre_up,
+            post_up: self.post_up,
+            pre_down: self.pre_down,
+            post_down: self.post_down,
+        })
     }
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
-pub struct TunnelStats {
-    id: Option<i64>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TunnelStats<I = NoId> {
+    id: I,
     tunnel_id: i64,
     upload: i64,
     download: i64,
@@ -210,7 +243,7 @@ pub struct TunnelStats {
     persistent_keepalive_interval: Option<u16>,
 }
 
-impl TunnelStats {
+impl TunnelStats<NoId> {
     #[must_use]
     pub fn new(
         tunnel_id: i64,
@@ -222,7 +255,7 @@ impl TunnelStats {
         persistent_keepalive_interval: Option<u16>,
     ) -> Self {
         TunnelStats {
-            id: None,
+            id: NoId,
             tunnel_id,
             upload,
             download,
@@ -233,7 +266,10 @@ impl TunnelStats {
         }
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), SqlxError> {
+    pub async fn save<'e, E>(self, executor: E) -> Result<TunnelStats<Id>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
             VALUES ($1, $2, $3, $4, $5, $6, $7) \
@@ -246,18 +282,31 @@ impl TunnelStats {
             self.listen_port,
             self.persistent_keepalive_interval,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
-        self.id = Some(result.id);
-        Ok(())
+        Ok(TunnelStats::<Id> {
+            id: result.id,
+            tunnel_id: self.tunnel_id,
+            upload: self.upload,
+            download: self.download,
+            last_handshake: self.last_handshake,
+            collected_at: self.collected_at,
+            listen_port: self.listen_port,
+            persistent_keepalive_interval: self.persistent_keepalive_interval,
+        })
     }
+}
 
-    pub async fn all_by_tunnel_id(
-        pool: &DbPool,
+impl TunnelStats<Id> {
+    pub async fn all_by_tunnel_id<'e, E>(
+        executor: E,
         tunnel_id: i64,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
-    ) -> Result<Vec<Self>, SqlxError> {
+    ) -> Result<Vec<Self>, SqlxError>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             TunnelStats,
@@ -284,21 +333,24 @@ impl TunnelStats {
             tunnel_id,
             from
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
         Ok(stats)
     }
 }
 
-pub async fn peer_to_tunnel_stats(
+pub async fn peer_to_tunnel_stats<'e, E>(
     peer: &Peer,
     listen_port: u32,
-    pool: &DbPool,
-) -> Result<TunnelStats, Error> {
-    let tunnel = Tunnel::find_by_server_public_key(pool, &peer.public_key.to_string()).await?;
+    executor: E,
+) -> Result<TunnelStats<NoId>, Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
+    let tunnel = Tunnel::find_by_server_public_key(executor, &peer.public_key.to_string()).await?;
     Ok(TunnelStats {
-        id: None,
-        tunnel_id: tunnel.id.unwrap(),
+        id: NoId,
+        tunnel_id: tunnel.id,
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
         last_handshake: peer.last_handshake.map_or(0, |ts| {
@@ -311,9 +363,9 @@ pub async fn peer_to_tunnel_stats(
     })
 }
 
-#[derive(FromRow, Debug, Serialize, Clone)]
-pub struct TunnelConnection {
-    pub id: Option<i64>,
+#[derive(Debug, Serialize, Clone)]
+pub struct TunnelConnection<I = NoId> {
+    pub id: I,
     pub tunnel_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,
@@ -334,8 +386,50 @@ impl From<TunnelConnectionInfo> for CommonConnectionInfo {
     }
 }
 
-impl TunnelConnection {
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+impl TunnelConnection<Id> {
+    pub async fn all_by_tunnel_id<'e, E>(
+        executor: E,
+        tunnel_id: i64,
+    ) -> Result<Vec<TunnelConnection<Id>>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let connections = query_as!(
+            TunnelConnection,
+            "SELECT id, tunnel_id, connected_from, start, end \
+            FROM tunnel_connection WHERE tunnel_id = $1",
+            tunnel_id
+        )
+        .fetch_all(executor)
+        .await?;
+        Ok(connections)
+    }
+
+    pub async fn latest_by_tunnel_id<'e, E>(
+        executor: E,
+        tunnel_id: i64,
+    ) -> Result<Option<TunnelConnection<Id>>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let connection = query_as!(
+            TunnelConnection,
+            "SELECT id, tunnel_id, connected_from, start, end \
+            FROM tunnel_connection WHERE tunnel_id = $1 \
+            ORDER BY end DESC LIMIT 1",
+            tunnel_id
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(connection)
+    }
+}
+
+impl TunnelConnection<NoId> {
+    pub async fn save<'e, E>(self, executor: E) -> Result<TunnelConnection<Id>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
             VALUES ($1, $2, $3, $4) \
@@ -345,40 +439,21 @@ impl TunnelConnection {
             self.start,
             self.end,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
-        self.id = Some(result.id);
-        Ok(())
-    }
 
-    pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
-        let connections = query_as!(
-            TunnelConnection,
-            "SELECT id, tunnel_id, connected_from, start, end \
-            FROM tunnel_connection WHERE tunnel_id = $1",
-            tunnel_id
-        )
-        .fetch_all(pool)
-        .await?;
-        Ok(connections)
-    }
-
-    pub async fn latest_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Option<Self>, Error> {
-        let connection = query_as!(
-            TunnelConnection,
-            "SELECT id, tunnel_id, connected_from, start, end \
-            FROM tunnel_connection WHERE tunnel_id = $1 \
-            ORDER BY end DESC LIMIT 1",
-            tunnel_id
-        )
-        .fetch_optional(pool)
-        .await?;
-        Ok(connection)
+        Ok(TunnelConnection::<Id> {
+            id: result.id,
+            tunnel_id: self.tunnel_id,
+            connected_from: self.connected_from,
+            start: self.start,
+            end: self.end,
+        })
     }
 }
 
 /// Historical connection
-#[derive(FromRow, Debug, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TunnelConnectionInfo {
     pub id: i64,
     pub tunnel_id: i64,
@@ -390,7 +465,10 @@ pub struct TunnelConnectionInfo {
 }
 
 impl TunnelConnectionInfo {
-    pub async fn all_by_tunnel_id(pool: &DbPool, tunnel_id: i64) -> Result<Vec<Self>, Error> {
+    pub async fn all_by_tunnel_id<'e, E>(executor: E, tunnel_id: i64) -> Result<Vec<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         // Because we store interface information for given timestamp select last upload and download
         // before connection ended
         // FIXME: Optimize query
@@ -419,17 +497,17 @@ impl TunnelConnectionInfo {
             ORDER BY start DESC",
             tunnel_id
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
 
         Ok(connections)
     }
 }
 
-impl From<&ActiveConnection> for TunnelConnection {
+impl From<&ActiveConnection> for TunnelConnection<NoId> {
     fn from(active_connection: &ActiveConnection) -> Self {
         TunnelConnection {
-            id: None,
+            id: NoId,
             tunnel_id: active_connection.location_id,
             connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
@@ -439,9 +517,9 @@ impl From<&ActiveConnection> for TunnelConnection {
 }
 
 // Implementing From for TunnelConnection into CommonConnection
-impl From<TunnelConnection> for CommonConnection {
-    fn from(tunnel_connection: TunnelConnection) -> Self {
-        CommonConnection {
+impl From<TunnelConnection<Id>> for CommonConnection<Id> {
+    fn from(tunnel_connection: TunnelConnection<Id>) -> Self {
+        CommonConnection::<Id> {
             id: tunnel_connection.id,
             location_id: tunnel_connection.tunnel_id, // Assuming you want to map tunnel_id to location_id
             connected_from: tunnel_connection.connected_from,
@@ -453,8 +531,8 @@ impl From<TunnelConnection> for CommonConnection {
 }
 
 // Implement From trait for converting TunnelStats to CommonLocationStats
-impl From<TunnelStats> for CommonLocationStats {
-    fn from(tunnel_stats: TunnelStats) -> Self {
+impl From<TunnelStats<Id>> for CommonLocationStats<Id> {
+    fn from(tunnel_stats: TunnelStats<Id>) -> Self {
         CommonLocationStats {
             id: tunnel_stats.id,
             location_id: tunnel_stats.tunnel_id,

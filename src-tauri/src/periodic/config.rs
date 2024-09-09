@@ -7,7 +7,7 @@ use crate::{
     commands::{device_config_to_location, update_instance},
     database::{
         models::{Id, NoId},
-        DbPool, Instance, Location,
+        Instance, Location,
     },
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
@@ -24,7 +24,15 @@ pub async fn poll_config(handle: AppHandle) {
     let state: State<AppState> = handle.state();
     let pool = state.get_pool();
     loop {
-        let Ok(mut instances) = Instance::all(&pool).await else {
+        let Ok(mut transaction) = pool.begin().await else {
+            error!(
+                "Failed to begin db transaction, retrying in {}s",
+                INTERVAL_SECONDS.as_secs()
+            );
+            sleep(INTERVAL_SECONDS).await;
+            continue;
+        };
+        let Ok(mut instances) = Instance::all(&mut *transaction).await else {
             error!(
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
@@ -37,7 +45,7 @@ pub async fn poll_config(handle: AppHandle) {
             instances.len(),
         );
         for instance in &mut instances {
-            if let Err(err) = poll_instance(&pool, instance, handle.clone()).await {
+            if let Err(err) = poll_instance(&mut *transaction, instance, handle.clone()).await {
                 error!(
                     "Failed to retrieve instance {}({}) config: {}",
                     instance.name, instance.id, err
@@ -48,6 +56,9 @@ pub async fn poll_config(handle: AppHandle) {
                     instance.name, instance.id,
                 );
             }
+        }
+        if let Err(err) = transaction.commit().await {
+            error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
         }
         info!(
             "Retrieved configuration for {} instances, sleeping {}s",
@@ -60,13 +71,16 @@ pub async fn poll_config(handle: AppHandle) {
 
 /// Retrieves configuration for given [`Instance`].
 /// Updates the instance if there are no active connections, otherwise displays UI message.
-pub async fn poll_instance(
-    pool: &DbPool,
+pub async fn poll_instance<'e, E>(
+    executor: E,
     instance: &mut Instance<Id>,
     handle: AppHandle,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
     // Query proxy api
-    let request = build_request(instance).await?;
+    let request = build_request(instance)?;
     let url = Url::from_str(&instance.proxy_url)
         .and_then(|url| url.join(POLLING_ENDPOINT))
         .map_err(|_| {
@@ -117,7 +131,7 @@ pub async fn poll_instance(
     }
 
     // Early return if config didn't change
-    if !config_changed(pool, instance, device_config).await? {
+    if !config_changed(executor, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -160,12 +174,15 @@ pub async fn poll_instance(
 }
 
 /// Returns true if configuration in instance_info differs from current configuration
-async fn config_changed(
-    pool: &DbPool,
+async fn config_changed<'e, E>(
+    executor: E,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
-) -> Result<bool, Error> {
-    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(pool, instance.id)
+) -> Result<bool, Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
+    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(executor, instance.id)
         .await?
         .into_iter()
         .map(Location::<NoId>::from)
@@ -183,7 +200,7 @@ async fn config_changed(
 }
 
 /// Retrieves pubkey & token to build InstanceInfoRequest
-async fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
+fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
     let token = &instance.token.as_ref().ok_or_else(|| {
         Error::InternalError(format!(
             "Instance {}({}) missing token",
@@ -191,6 +208,6 @@ async fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, E
         ))
     })?;
     Ok(InstanceInfoRequest {
-        token: token.to_string(),
+        token: (*token).to_string(),
     })
 }

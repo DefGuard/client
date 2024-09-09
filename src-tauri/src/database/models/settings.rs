@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{query, FromRow, Type};
+use sqlx::{query, Type};
 use struct_patch::Patch;
 use strum::{AsRefStr, EnumString};
 use tracing::Level;
@@ -59,7 +59,7 @@ pub enum ClientView {
     Detail,
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize, Patch)]
+#[derive(Debug, Serialize, Deserialize, Patch)]
 #[patch_derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(skip)]
@@ -71,10 +71,26 @@ pub struct Settings {
     pub selected_view: Option<ClientView>,
 }
 
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            id: None,
+            log_level: SettingsLogLevel::Info,
+            theme: SettingsTheme::Light,
+            tray_icon_theme: TrayIconTheme::Color,
+            check_for_updates: true,
+            selected_view: None,
+        }
+    }
+}
+
 impl Settings {
-    pub async fn get(pool: &DbPool) -> Result<Self, Error> {
+    pub async fn get<'e, E>(executor: E) -> Result<Self, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let query_res = query!("SELECT * FROM settings WHERE id = 1;")
-            .fetch_one(pool)
+            .fetch_one(executor)
             .await?;
         let settings = Self {
             id: Some(query_res.id),
@@ -90,7 +106,10 @@ impl Settings {
         Ok(settings)
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         query!(
             "UPDATE settings \
             SET theme = $1, log_level = $2, tray_icon_theme = $3, check_for_updates = $4, selected_view = $5 \
@@ -101,39 +120,37 @@ impl Settings {
             self.check_for_updates,
             self.selected_view
         )
-        .execute(pool)
+        .execute(executor)
         .await?;
         Ok(())
     }
 
-    // checks if settings is empty and insert default settings if they not exist, this should be called before app start
+    /// Checks if settings are empty and inserts default settings if they do not exist. This should be called before app starts.
     pub async fn init_defaults(pool: &DbPool) -> Result<(), Error> {
         let current_config = query!("SELECT * FROM settings WHERE id = 1;")
             .fetch_optional(pool)
             .await?;
         if current_config.is_none() {
-            debug!("No settings found on app init.");
-            let mut init_theme = SettingsTheme::Light;
+            debug!("No settings found on app init, inserting defaults.");
             // check what system theme is currently in use and default to it.
-            if dark_light::detect() == dark_light::Mode::Dark {
-                debug!("Detected system theme dark, init theme ajusted.");
-                init_theme = SettingsTheme::Dark;
+            let theme = match dark_light::detect() {
+                dark_light::Mode::Default | dark_light::Mode::Light => SettingsTheme::Light,
+                dark_light::Mode::Dark => {
+                    debug!("Detected system theme dark, init theme adjusted.");
+                    SettingsTheme::Dark
+                }
             };
-            let default_settings = Settings {
-                id: None,
-                log_level: SettingsLogLevel::Info,
-                theme: init_theme,
-                tray_icon_theme: TrayIconTheme::Color,
-                check_for_updates: true,
-                selected_view: None,
+            let settings = Settings {
+                theme,
+                ..Default::default()
             };
             query!(
                 "INSERT INTO settings (log_level, theme, tray_icon_theme, check_for_updates, selected_view) VALUES ($1, $2, $3, $4, $5);",
-                default_settings.log_level,
-                default_settings.theme,
-                default_settings.tray_icon_theme,
-                default_settings.check_for_updates,
-                default_settings.selected_view
+                settings.log_level,
+                settings.theme,
+                settings.tray_icon_theme,
+                settings.check_for_updates,
+                settings.selected_view
             )
             .execute(pool)
             .await?;

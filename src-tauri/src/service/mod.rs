@@ -300,9 +300,7 @@ impl From<Peer> for proto::Peer {
             }),
             tx_bytes: peer.tx_bytes,
             rx_bytes: peer.rx_bytes,
-            persistent_keepalive_interval: peer
-                .persistent_keepalive_interval
-                .map(|interval| interval as u32),
+            persistent_keepalive_interval: peer.persistent_keepalive_interval.map(u32::from),
             allowed_ips: peer
                 .allowed_ips
                 .into_iter()

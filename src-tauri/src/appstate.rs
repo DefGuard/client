@@ -133,12 +133,11 @@ impl AppState {
         &self,
         instance: &Instance<Id>,
     ) -> Result<Vec<ActiveConnection>, crate::error::Error> {
-        let locations: HashSet<i64> = HashSet::from_iter(
-            Location::find_by_instance_id(&self.get_pool(), instance.id)
-                .await?
-                .iter()
-                .map(|location| location.id),
-        );
+        let locations: HashSet<i64> = Location::find_by_instance_id(&self.get_pool(), instance.id)
+            .await?
+            .iter()
+            .map(|location| location.id)
+            .collect();
         Ok(self
             .active_connections
             .lock()

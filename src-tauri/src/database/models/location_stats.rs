@@ -1,19 +1,19 @@
-use chrono::{NaiveDateTime, Utc};
-use sqlx::{query, query_as, FromRow};
 use std::time::SystemTime;
 
-use crate::{
-    commands::DateTimeAggregation,
-    database::{DbPool, Location},
-    error::Error,
-    CommonLocationStats, ConnectionType,
-};
+use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
+use sqlx::{query, query_as};
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
-pub struct LocationStats {
-    id: Option<i64>,
+use super::{Id, NoId};
+use crate::{
+    commands::DateTimeAggregation, database::Location, error::Error, CommonLocationStats,
+    ConnectionType,
+};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LocationStats<I = NoId> {
+    id: I,
     location_id: i64,
     upload: i64,
     download: i64,
@@ -23,8 +23,8 @@ pub struct LocationStats {
     persistent_keepalive_interval: Option<u16>,
 }
 
-impl From<LocationStats> for CommonLocationStats {
-    fn from(location_stats: LocationStats) -> Self {
+impl From<LocationStats<Id>> for CommonLocationStats<Id> {
+    fn from(location_stats: LocationStats<Id>) -> Self {
         CommonLocationStats {
             id: location_stats.id,
             location_id: location_stats.location_id,
@@ -39,14 +39,17 @@ impl From<LocationStats> for CommonLocationStats {
     }
 }
 
-pub async fn peer_to_location_stats(
+pub async fn peer_to_location_stats<'e, E>(
     peer: &Peer,
     listen_port: u32,
-    pool: &DbPool,
-) -> Result<LocationStats, Error> {
-    let location = Location::find_by_public_key(pool, &peer.public_key.to_string()).await?;
+    executor: E,
+) -> Result<LocationStats<NoId>, Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
+    let location = Location::find_by_public_key(executor, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
-        id: None,
+        id: NoId,
         location_id: location.id,
         upload: peer.tx_bytes as i64,
         download: peer.rx_bytes as i64,
@@ -60,7 +63,7 @@ pub async fn peer_to_location_stats(
     })
 }
 
-impl LocationStats {
+impl LocationStats<NoId> {
     #[must_use]
     pub fn new(
         location_id: i64,
@@ -72,7 +75,7 @@ impl LocationStats {
         persistent_keepalive_interval: Option<u16>,
     ) -> Self {
         LocationStats {
-            id: None,
+            id: NoId,
             location_id,
             upload,
             download,
@@ -83,7 +86,10 @@ impl LocationStats {
         }
     }
 
-    pub async fn save(&mut self, pool: &DbPool) -> Result<(), Error> {
+    pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let result = query!(
             "INSERT INTO location_stats (location_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
             VALUES ($1, $2, $3, $4, $5, $6, $7) \
@@ -96,18 +102,32 @@ impl LocationStats {
             self.listen_port,
             self.persistent_keepalive_interval,
         )
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await?;
-        self.id = Some(result.id);
-        Ok(())
-    }
 
-    pub async fn all_by_location_id(
-        pool: &DbPool,
+        Ok(LocationStats::<Id> {
+            id: result.id,
+            location_id: self.location_id,
+            upload: self.upload,
+            download: self.download,
+            last_handshake: self.last_handshake,
+            collected_at: self.collected_at,
+            listen_port: self.listen_port,
+            persistent_keepalive_interval: self.persistent_keepalive_interval,
+        })
+    }
+}
+
+impl LocationStats<Id> {
+    pub async fn all_by_location_id<'e, E>(
+        executor: E,
         location_id: i64,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<Vec<Self>, Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             LocationStats,
@@ -136,7 +156,7 @@ impl LocationStats {
             location_id,
             from
         )
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?;
         Ok(stats)
     }

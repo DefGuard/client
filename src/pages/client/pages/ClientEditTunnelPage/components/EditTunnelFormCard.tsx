@@ -67,7 +67,7 @@ const defaultValues: FormFields = {
   pre_down: '',
   post_down: '',
 };
-const { saveTunnel } = clientApi;
+const { updateTunnel } = clientApi;
 
 const tunnelToForm = (tunnel: Tunnel): FormFields => {
   const {
@@ -186,7 +186,7 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
   );
 
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
-    saveTunnel(values)
+    updateTunnel(values)
       .then(() => {
         navigate(routes.client.base, { replace: true });
         toaster.success(LL.pages.client.pages.editTunnelPage.messages.editSuccess());

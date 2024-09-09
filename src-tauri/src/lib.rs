@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use database::models::NoId;
 use serde::{Deserialize, Serialize};
 pub mod appstate;
 pub mod commands;
@@ -14,6 +15,8 @@ pub mod wg_config;
 mod proto {
     tonic::include_proto!("defguard.proxy");
 }
+
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 
 /// Location type used in commands to check if we using tunnel or location
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone, Copy)]
@@ -42,8 +45,8 @@ pub struct CommonWireguardFields {
 
 /// Common fields for Connection and TunnelConnection due to shared command
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CommonConnection {
-    pub id: Option<i64>,
+pub struct CommonConnection<I = NoId> {
+    pub id: I,
     pub location_id: i64,
     pub connected_from: String,
     pub start: NaiveDateTime,
@@ -53,8 +56,8 @@ pub struct CommonConnection {
 
 // Common fields for LocationStats and TunnelStats due to shared command
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CommonLocationStats {
-    pub id: Option<i64>,
+pub struct CommonLocationStats<I = NoId> {
+    pub id: I,
     pub location_id: i64,
     pub upload: i64,
     pub download: i64,
