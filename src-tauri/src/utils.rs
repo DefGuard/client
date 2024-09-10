@@ -245,11 +245,13 @@ pub fn spawn_stats_thread(
                     }
                 }
                 Ok(None) => {
-                    info!("gRPC stream has been closed");
+                    info!(
+                        "gRPC stream to the defguard-service managing connections has been closed"
+                    );
                     break;
                 }
                 Err(err) => {
-                    error!("gRPC client error:: {err}");
+                    error!("gRPC stream to the defguard-service managing connections error: {err}");
                     break;
                 }
             }
