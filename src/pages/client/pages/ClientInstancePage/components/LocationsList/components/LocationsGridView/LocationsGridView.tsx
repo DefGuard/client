@@ -12,7 +12,11 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
+import {
+  CommonWireguardFields,
+  DefguardInstance,
+  WireguardInstanceType,
+} from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
 import { LocationCardConnectButton } from '../LocationCardConnectButton/LocationCardConnectButton';
@@ -24,13 +28,18 @@ import { LocationCardTitle } from '../LocationCardTitle/LocationCardTitle';
 
 type Props = {
   locations: CommonWireguardFields[];
+  selectedDefguardInstance?: DefguardInstance;
 };
 
-export const LocationsGridView = ({ locations }: Props) => {
+export const LocationsGridView = ({ locations, selectedDefguardInstance }: Props) => {
   return (
     <div id="locations-grid-view">
       {locations.map((l) => (
-        <GridItem location={l} key={`${l.name}${l.id}`} />
+        <GridItem
+          location={l}
+          selectedDefguardInstance={selectedDefguardInstance}
+          key={`${l.name}${l.id}`}
+        />
       ))}
     </div>
   );
@@ -38,9 +47,10 @@ export const LocationsGridView = ({ locations }: Props) => {
 
 type GridItemProps = {
   location: CommonWireguardFields;
+  selectedDefguardInstance?: DefguardInstance;
 };
 
-const GridItem = ({ location }: GridItemProps) => {
+const GridItem = ({ location, selectedDefguardInstance }: GridItemProps) => {
   const { LL } = useI18nContext();
   const cn = classNames(
     'grid-item',
@@ -115,7 +125,10 @@ const GridItem = ({ location }: GridItemProps) => {
             {parser(LL.pages.client.pages.instancePage.controls.traffic.helper())}
           </Helper>
         </div>
-        <LocationCardRoute location={location} />
+        <LocationCardRoute
+          location={location}
+          selectedDefguardInstance={selectedDefguardInstance}
+        />
       </div>
       {lastConnection && location && (
         <div className="info">

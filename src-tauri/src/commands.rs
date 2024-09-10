@@ -103,24 +103,22 @@ pub async fn disconnect(
 /// connections for this instance.
 async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> Result<(), Error> {
     let state: State<'_, AppState> = handle.state();
-    let pool = state.get_pool();
-    let Some(location) = Location::find_by_id(&pool, location_id).await? else {
+    let mut transaction = state.get_pool().begin().await?;
+    let Some(location) = Location::find_by_id(&mut *transaction, location_id).await? else {
         error!("Location {location_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
-    let Some(mut instance) = Instance::find_by_id(&pool, location.instance_id).await? else {
+    let Some(mut instance) = Instance::find_by_id(&mut *transaction, location.instance_id).await?
+    else {
         error!(
             "Instance {} not found, skipping config update check",
             location.instance_id
         );
         return Err(Error::NotFound);
     };
-
-    let mut transaction = pool.begin().await?;
-    let result = poll_instance(&mut transaction, &mut instance, handle).await;
+    poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
-
-    result
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -263,6 +261,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             proxy_url: instance.proxy_url,
             active: connected,
             pubkey: keys.pubkey,
+            disable_all_traffic: instance.disable_all_traffic,
         });
     }
     info!("Instances retrieved({})", instance_info.len());
@@ -636,6 +635,19 @@ pub async fn update_location_routing(
             if let Some(mut location) =
                 Location::find_by_id(&app_state.get_pool(), location_id).await?
             {
+                // Check if the instance has route_all_traffic disabled
+                let instance = Instance::find_by_id(&app_state.get_pool(), location.instance_id)
+                    .await?
+                    .ok_or(Error::NotFound)?;
+                if instance.disable_all_traffic && route_all_traffic {
+                    error!(
+                        "Couldn't update location routing: instance with id {} has route_all_traffic disabled.", instance.id
+                    );
+                    return Err(Error::InternalError(
+                        "Instance has route_all_traffic disabled".into(),
+                    ));
+                }
+
                 location.route_all_traffic = route_all_traffic;
                 location.save(&app_state.get_pool()).await?;
                 info!("Location routing updated for location {location_id}");

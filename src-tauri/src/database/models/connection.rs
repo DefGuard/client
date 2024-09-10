@@ -2,9 +2,8 @@ use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query_as, query_scalar, SqliteExecutor};
 
-use crate::{error::Error, CommonConnection, CommonConnectionInfo, ConnectionType};
-
 use super::{Id, NoId};
+use crate::{error::Error, CommonConnection, CommonConnectionInfo, ConnectionType};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Connection<I = NoId> {

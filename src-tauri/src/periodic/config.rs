@@ -114,6 +114,22 @@ pub async fn poll_instance(
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    let instance_config = response.instance_config.as_ref().ok_or_else(|| {
+        Error::InternalError("Instance config not present in response".to_string())
+    })?;
+
+    if instance.disable_all_traffic != instance_config.disable_all_traffic {
+        debug!(
+            "Instance {}({}) disable_all_traffic changed from {} to {}",
+            instance.name,
+            instance.id,
+            instance.disable_all_traffic,
+            instance_config.disable_all_traffic
+        );
+        instance.disable_all_traffic = instance_config.disable_all_traffic;
+        instance.save(&mut **transaction).await?;
+        handle.emit_all(INSTANCE_UPDATE, ())?;
+    }
 
     // Early return if config didn't change
     if !config_changed(transaction, instance, device_config).await? {
