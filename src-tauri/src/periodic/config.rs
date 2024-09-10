@@ -4,7 +4,7 @@ use tokio::time::sleep;
 
 use crate::{
     appstate::AppState,
-    commands::{device_config_to_location, update_instance},
+    commands::{device_config_to_location, do_update_instance},
     database::{
         models::{Id, NoId},
         Instance, Location,
@@ -138,7 +138,7 @@ where
             "Updating instance {}({}) configuration: {device_config:?}",
             instance.name, instance.id,
         );
-        update_instance(instance.id, device_config.clone(), state, handle.clone()).await?;
+        do_update_instance(executor, &mut instance, device_config.clone()).await?;
         handle.emit_all(INSTANCE_UPDATE, ())?;
         info!(
             "Updated instance {}({}) configuration",
