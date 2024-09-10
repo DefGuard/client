@@ -16,10 +16,11 @@ use crate::{
     appstate::AppState,
     commands::{LocationInterfaceDetails, Payload},
     database::{
-        models::{location::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
+        models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id, NoId},
         ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
     },
     error::Error,
+    events::CONNECTION_CHANGED,
     service::{
         log_watcher::spawn_log_watcher_task,
         proto::{
@@ -36,7 +37,7 @@ static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface
 pub async fn setup_interface(
-    location: &Location,
+    location: &Location<Id>,
     interface_name: String,
     preshared_key: Option<String>,
     pool: &DbPool,
@@ -220,7 +221,7 @@ pub fn spawn_stats_thread(
                         interface_data.peers.into_iter().map(Into::into).collect();
                     for peer in peers {
                         if connection_type.eq(&ConnectionType::Location) {
-                            let mut location_stats = peer_to_location_stats(
+                            let location_stats = peer_to_location_stats(
                                 &peer,
                                 interface_data.listen_port,
                                 &state.get_pool(),
@@ -228,10 +229,10 @@ pub fn spawn_stats_thread(
                             .await
                             .unwrap();
                             debug!("Saving location stats: {location_stats:#?}");
-                            let _ = location_stats.save(&state.get_pool()).await;
-                            debug!("Saved location stats: {location_stats:#?}");
+                            let result = location_stats.save(&state.get_pool()).await;
+                            debug!("Saved location stats: {result:#?}");
                         } else {
-                            let mut tunnel_stats = peer_to_tunnel_stats(
+                            let tunnel_stats = peer_to_tunnel_stats(
                                 &peer,
                                 interface_data.listen_port,
                                 &state.get_pool(),
@@ -239,8 +240,8 @@ pub fn spawn_stats_thread(
                             .await
                             .unwrap();
                             debug!("Saving tunnel stats: {tunnel_stats:#?}");
-                            let _ = tunnel_stats.save(&state.get_pool()).await;
-                            debug!("Saved location stats: {tunnel_stats:#?}");
+                            let result = tunnel_stats.save(&state.get_pool()).await;
+                            debug!("Saved location stats: {result:#?}");
                         }
                     }
                 }
@@ -292,7 +293,7 @@ pub fn get_service_log_dir() -> &'static Path {
 
 /// Setup client interface
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel,
+    tunnel: &Tunnel<Id>,
     interface_name: String,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
@@ -456,7 +457,7 @@ pub async fn get_location_interface_details(
         let keys = WireguardKeys::find_by_instance_id(pool, location.instance_id)
             .await?
             .ok_or(Error::NotFound)?;
-        info!(
+        debug!(
             "Successfully fetched WireGuard keys for location {}",
             location.name
         );
@@ -512,7 +513,7 @@ pub async fn get_location_interface_details(
 
 /// Setup new connection for location
 pub async fn handle_connection_for_location(
-    location: &Location,
+    location: &Location<Id>,
     preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
@@ -535,7 +536,7 @@ pub async fn handle_connection_for_location(
     .await?;
     let address = local_ip()?;
     let connection = ActiveConnection::new(
-        location.id.expect("Missing Location ID"),
+        location.id,
         address.to_string(),
         interface_name.clone(),
         ConnectionType::Location,
@@ -551,7 +552,7 @@ pub async fn handle_connection_for_location(
     );
     debug!("Sending event connection-changed...");
     handle.emit_all(
-        "connection-changed",
+        CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
@@ -571,7 +572,7 @@ pub async fn handle_connection_for_location(
     debug!("Spawning log watcher...");
     spawn_log_watcher_task(
         handle,
-        location.id.expect("Missing Location ID"),
+        location.id,
         interface_name,
         ConnectionType::Location,
         Level::DEBUG,
@@ -583,7 +584,10 @@ pub async fn handle_connection_for_location(
 }
 
 /// Setup new connection for tunnel
-pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) -> Result<(), Error> {
+pub async fn handle_connection_for_tunnel(
+    tunnel: &Tunnel<Id>,
+    handle: AppHandle,
+) -> Result<(), Error> {
     debug!(
         "Creating new interface connection for tunnel: {}",
         tunnel.name
@@ -596,7 +600,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
     let address = local_ip()?;
     let connection = ActiveConnection::new(
-        tunnel.id.expect("Missing Tunnel ID"),
+        tunnel.id,
         address.to_string(),
         interface_name.clone(),
         ConnectionType::Tunnel,
@@ -612,7 +616,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     );
     debug!("Sending event connection-changed.");
     handle.emit_all(
-        "connection-changed",
+        CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
@@ -632,7 +636,7 @@ pub async fn handle_connection_for_tunnel(tunnel: &Tunnel, handle: AppHandle) ->
     debug!("Spawning log watcher");
     spawn_log_watcher_task(
         handle,
-        tunnel.id.expect("Missing Tunnel ID"),
+        tunnel.id,
         interface_name,
         ConnectionType::Tunnel,
         Level::DEBUG,
@@ -689,8 +693,8 @@ pub async fn disconnect_interface(
                 error!("Failed to remove interface: {error}");
                 return Err(Error::InternalError("Failed to remove interface".into()));
             }
-            let mut connection: Connection = active_connection.into();
-            connection.save(&state.get_pool()).await?;
+            let connection: Connection<NoId> = active_connection.into();
+            let connection = connection.save(&state.get_pool()).await?;
             trace!("Saved connection: {connection:#?}");
             debug!("Removed interface");
             debug!("Saving connection");
@@ -710,8 +714,8 @@ pub async fn disconnect_interface(
                     error!("{msg}");
                     return Err(Error::InternalError(msg));
                 }
-                let mut connection: TunnelConnection = active_connection.into();
-                connection.save(&state.get_pool()).await?;
+                let connection: TunnelConnection = active_connection.into();
+                let connection = connection.save(&state.get_pool()).await?;
                 trace!("Saved connection: {connection:#?}");
             } else {
                 error!("Tunnel with ID {} not found", active_connection.location_id);

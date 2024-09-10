@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id?\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE instance_id = $1;",
+  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE id = $1;",
   "describe": {
     "columns": [
       {
-        "name": "id?",
+        "name": "id: _",
         "ordinal": 0,
         "type_info": "Int64"
       },
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "368814ed137d486c51e412c386ccd82ebaa96f1d438388521b4761da5bb93ce4"
+  "hash": "c885383320590c9f41758991653c90737d7262a70c31318e3eeb3ed42de0f993"
 }

@@ -17,19 +17,21 @@ use defguard_client::{
     __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link,
     __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
     __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
-    __cmd__update_settings,
+    __cmd__update_settings, __cmd__update_tunnel,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
         last_connection, location_interface_details, location_stats, open_link,
         parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
-        update_location_routing, update_settings,
+        update_location_routing, update_settings, update_tunnel,
     },
     database::{self, models::settings::Settings},
-    latest_app_version::fetch_latest_app_version_loop,
-    tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
+    events::SINGLE_INSTANCE,
+    periodic::{config::poll_config, version::poll_version},
+    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
+    VERSION,
 };
 use std::{env, str::FromStr};
 
@@ -70,9 +72,6 @@ async fn main() {
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
 
-    let tray_menu = create_tray_menu();
-    let system_tray = SystemTray::new().with_menu(tray_menu);
-
     let log_level =
         LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
             .unwrap_or(LevelFilter::Info);
@@ -99,6 +98,7 @@ async fn main() {
             all_tunnels,
             open_link,
             tunnel_details,
+            update_tunnel,
             delete_tunnel,
             get_latest_app_version,
         ])
@@ -114,10 +114,10 @@ async fn main() {
             }
             _ => {}
         })
-        .system_tray(system_tray)
+        .system_tray(SystemTray::new())
         .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            let _ = app.emit_all("single-instance", Payload { args: argv, cwd });
+            let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -144,6 +144,7 @@ async fn main() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
+    info!("Starting ... version v{}", VERSION);
     // initialize database
     let app_handle = app.handle();
     debug!("Initializing database connection");
@@ -161,7 +162,12 @@ async fn main() {
         let _ = configure_tray_icon(&app_handle, &settings.tray_icon_theme);
     }
 
-    tauri::async_runtime::spawn(fetch_latest_app_version_loop(app_handle.clone()));
+    // run periodic tasks
+    tauri::async_runtime::spawn(poll_version(app_handle.clone()));
+    tauri::async_runtime::spawn(poll_config(app_handle.clone()));
+
+    // load tray menu after database initialization to show all instance and locations
+    reload_tray_menu(&app_handle).await;
 
     // Handle Ctrl-C
     tauri::async_runtime::spawn(async move {

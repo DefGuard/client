@@ -110,6 +110,8 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
 
 #[cfg(test)]
 mod test {
+    use crate::database::models::NoId;
+
     use super::*;
 
     #[test]
@@ -136,7 +138,7 @@ mod test {
             tunnel.prvkey,
             "GAA2X3DW0WakGVx+DsGjhDpTgg50s1MlmrLf24Psrlg="
         );
-        assert_eq!(tunnel.id, None);
+        assert_eq!(tunnel.id, NoId);
         assert_eq!(tunnel.name, "");
         assert_eq!(tunnel.address, "10.0.0.1/24");
         assert_eq!(

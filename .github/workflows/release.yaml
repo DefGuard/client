@@ -1,4 +1,4 @@
-name: 'Build app & create release'
+name: 'Build app and create release'
 on:
   push:
     tags:
@@ -56,6 +56,7 @@ jobs:
     runs-on:
       - self-hosted
       - Linux
+      - X64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -83,10 +84,10 @@ jobs:
           key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-build-store-
-      - name: Install deps
+      - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
       - uses: dtolnay/rust-toolchain@stable
-      - name: install linux deps
+      - name: Install Linux dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
@@ -299,6 +300,7 @@ jobs:
     runs-on:
       - self-hosted
       - Linux
+      - X64
     steps:
       - name: Write release version
         run: |
@@ -323,7 +325,7 @@ jobs:
       - sign-burn-engine
     runs-on: windows-latest
     steps:
-      - name: Download unsigned bundle & signed burn-engine
+      - name: Download unsigned bundle and signed burn-engine
         uses: actions/download-artifact@v4
         with:
           name: unsigned-bundle-and-signed-burnengine
@@ -346,6 +348,7 @@ jobs:
     runs-on:
       - self-hosted
       - Linux
+      - X64
     steps:
       - name: Write release version
         run: |

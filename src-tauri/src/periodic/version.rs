@@ -2,11 +2,14 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
-use crate::{appstate::AppState, commands::get_latest_app_version, database::Settings};
+use crate::{
+    appstate::AppState, commands::get_latest_app_version, database::Settings,
+    events::APP_VERSION_FETCH,
+};
 
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
-pub async fn fetch_latest_app_version_loop(app_handle: AppHandle) {
+pub async fn poll_version(app_handle: AppHandle) {
     let state = app_handle.state::<AppState>();
     let pool = &state.get_pool();
 
@@ -23,7 +26,7 @@ pub async fn fetch_latest_app_version_loop(app_handle: AppHandle) {
                 if let Ok(result) = response {
                     debug!("Fetched latest application version info: {result:?}");
 
-                    let _ = app_handle.emit_all("app-version-fetch", &result);
+                    let _ = app_handle.emit_all(APP_VERSION_FETCH, &result);
                 } else {
                     let err = response.err().unwrap();
                     error!("Error while fetching latest application version: {err}");
