@@ -4,14 +4,6 @@
 //! The watcher monitors a given directory for any changes. Whenever a change is detected
 //! it parses the log files and sends logs relevant to a specified interface to the fronted.
 
-use crate::{appstate::AppState, error::Error, utils::get_service_log_dir, ConnectionType};
-use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use notify_debouncer_mini::{
-    new_debouncer,
-    notify::{self, RecursiveMode},
-};
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::{
     fs::{read_dir, File},
     io::{BufRead, BufReader},
@@ -19,10 +11,20 @@ use std::{
     str::FromStr,
     time::{Duration, SystemTime},
 };
+
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
+use notify_debouncer_mini::{
+    new_debouncer,
+    notify::{self, RecursiveMode},
+};
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
+
+use crate::{appstate::AppState, error::Error, utils::get_service_log_dir, ConnectionType};
 
 #[derive(Error, Debug)]
 pub enum LogWatcherError {

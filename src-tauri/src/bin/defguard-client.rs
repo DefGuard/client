@@ -3,12 +3,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use lazy_static::lazy_static;
-use log::{Level, LevelFilter};
-#[cfg(target_os = "macos")]
-use tauri::{api::process, Env};
-use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
-use tauri_plugin_log::LogTarget;
+use std::{env, str::FromStr};
 
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
@@ -33,7 +28,12 @@ use defguard_client::{
     utils::load_log_targets,
     VERSION,
 };
-use std::{env, str::FromStr};
+use lazy_static::lazy_static;
+use log::{Level, LevelFilter};
+#[cfg(target_os = "macos")]
+use tauri::{api::process, Env};
+use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
+use tauri_plugin_log::LogTarget;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {

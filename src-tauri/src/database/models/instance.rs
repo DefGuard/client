@@ -51,7 +51,6 @@ impl Instance<Id> {
         )
         .execute(executor)
         .await?;
-        info!("Instance: {self:?}");
         Ok(())
     }
 

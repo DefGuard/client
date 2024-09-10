@@ -1,10 +1,10 @@
-use sqlx::{query, query_as, Error as SqlxError};
 use std::fmt::{Display, Formatter};
 
-use crate::error::Error;
 use serde::{Deserialize, Serialize};
+use sqlx::{query, query_as, Error as SqlxError};
 
 use super::{Id, NoId};
+use crate::error::Error;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Location<I = NoId> {

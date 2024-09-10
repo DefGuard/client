@@ -1,3 +1,10 @@
+use std::{collections::HashMap, env, str::FromStr};
+
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use serde::{Deserialize, Serialize};
+use struct_patch::Patch;
+use tauri::{AppHandle, Manager, State};
+
 use crate::{
     appstate::AppState,
     database::{
@@ -21,11 +28,6 @@ use crate::{
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, str::FromStr};
-use struct_patch::Patch;
-use tauri::{AppHandle, Manager, State};
 
 #[derive(Clone, serde::Serialize)]
 pub struct Payload {
@@ -100,19 +102,22 @@ pub async fn disconnect(
 /// connections for this instance.
 async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> Result<(), Error> {
     let state: State<'_, AppState> = handle.state();
-    let pool = state.get_pool();
-    let Some(location) = Location::find_by_id(&pool, location_id).await? else {
+    let mut transaction = state.get_pool().begin().await?;
+    let Some(location) = Location::find_by_id(&mut *transaction, location_id).await? else {
         error!("Location {location_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
-    let Some(mut instance) = Instance::find_by_id(&pool, location.instance_id).await? else {
+    let Some(mut instance) = Instance::find_by_id(&mut *transaction, location.instance_id).await?
+    else {
         error!(
             "Instance {} not found, skipping config update check",
             location.instance_id
         );
         return Err(Error::NotFound);
     };
-    poll_instance(&state.get_pool(), &mut instance, handle.clone()).await
+    poll_instance(&mut transaction, &mut instance, handle.clone()).await?;
+    transaction.commit().await?;
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,8 +1,10 @@
-use crate::database::Tunnel;
-use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
 use std::{array::TryFromSliceError, net::IpAddr};
+
+use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
+
+use crate::database::Tunnel;
 
 #[derive(Debug, Error)]
 pub enum WireguardConfigParseError {
@@ -110,9 +112,8 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
 
 #[cfg(test)]
 mod test {
-    use crate::database::models::NoId;
-
     use super::*;
+    use crate::database::models::NoId;
 
     #[test]
     fn test_parse_config() {
