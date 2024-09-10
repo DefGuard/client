@@ -37,6 +37,7 @@ pub async fn poll_config(handle: AppHandle) {
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
             );
+            let _ = transaction.rollback().await;
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
@@ -47,8 +48,8 @@ pub async fn poll_config(handle: AppHandle) {
         for instance in &instances {
             if let Err(err) = poll_instance(&mut *transaction, instance, handle.clone()).await {
                 error!(
-                    "Failed to retrieve instance {}({}) config: {}",
-                    instance.name, instance.id, err
+                    "Failed to retrieve instance {}({}) config: {err}",
+                    instance.name, instance.id,
                 );
             } else {
                 debug!(
