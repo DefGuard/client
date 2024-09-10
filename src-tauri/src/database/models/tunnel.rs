@@ -1,4 +1,3 @@
-use super::{Id, NoId};
 use std::time::SystemTime;
 
 use chrono::{NaiveDateTime, Utc};
@@ -7,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::{query, query_as, Error as SqlxError};
 
+use super::{Id, NoId};
 use crate::{
     commands::DateTimeAggregation, database::ActiveConnection, error::Error, CommonConnection,
     CommonConnectionInfo, CommonLocationStats, ConnectionType,

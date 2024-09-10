@@ -7,6 +7,7 @@ export type DefguardInstance = {
   // connected
   active: boolean;
   pubkey: string;
+  disable_all_traffic: boolean;
 };
 
 export type DefguardLocation = {

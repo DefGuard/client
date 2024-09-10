@@ -1,7 +1,7 @@
-use crate::error::Error;
 use sqlx::{query, query_as, Error as SqlxError};
 
 use super::{Id, NoId};
+use crate::error::Error;
 
 // User key pair
 #[derive(Debug)]
