@@ -1,4 +1,4 @@
-use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use sqlx::{query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::error::Error;
