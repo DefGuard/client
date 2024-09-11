@@ -6,7 +6,7 @@
       {
         "name": "id: _",
         "ordinal": 0,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "name",
@@ -56,7 +56,7 @@
       {
         "name": "persistent_keep_alive",
         "ordinal": 10,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "route_all_traffic",

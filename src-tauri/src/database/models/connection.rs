@@ -1,6 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
-use sqlx::{query, query_as};
+use sqlx::{query_as, query_scalar, SqliteExecutor};
 
 use crate::{error::Error, CommonConnection, CommonConnectionInfo, ConnectionType};
 
@@ -18,11 +18,11 @@ pub struct Connection<I = NoId> {
 impl Connection<NoId> {
     pub async fn save<'e, E>(self, executor: E) -> Result<Connection<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
-        let result = query!(
+        let id = query_scalar!(
             "INSERT INTO connection (location_id, connected_from, start, end) \
-            VALUES ($1, $2, $3, $4) RETURNING id;",
+            VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
             self.location_id,
             self.connected_from,
             self.start,
@@ -30,8 +30,9 @@ impl Connection<NoId> {
         )
         .fetch_one(executor)
         .await?;
+
         Ok(Connection::<Id> {
-            id: result.id,
+            id,
             location_id: self.location_id,
             connected_from: self.connected_from,
             start: self.start,
@@ -44,7 +45,7 @@ impl Connection<NoId> {
         location_id: i64,
     ) -> Result<Vec<Connection<Id>>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let connections = query_as!(
             Connection,
@@ -62,7 +63,7 @@ impl Connection<NoId> {
         location_id: i64,
     ) -> Result<Option<Connection<Id>>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let connection = query_as!(
             Connection,
@@ -109,7 +110,7 @@ impl ConnectionInfo {
         location_id: i64,
     ) -> Result<Vec<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // Because we store interface information for given timestamp select last upload and download
         // before connection ended

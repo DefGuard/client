@@ -1,12 +1,12 @@
-use super::{Id, NoId};
 use std::time::SystemTime;
 
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
-use sqlx::{query, query_as, Error as SqlxError};
+use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
+use super::{Id, NoId};
 use crate::{
     commands::DateTimeAggregation, database::ActiveConnection, error::Error, CommonConnection,
     CommonConnectionInfo, CommonLocationStats, ConnectionType,
@@ -47,7 +47,7 @@ pub struct Tunnel<I = NoId> {
 impl Tunnel<Id> {
     pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query!(
             "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
@@ -73,12 +73,13 @@ impl Tunnel<Id> {
         )
         .execute(executor)
         .await?;
+
         Ok(())
     }
 
     pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         Tunnel::delete_by_id(executor, self.id).await?;
         Ok(())
@@ -86,7 +87,7 @@ impl Tunnel<Id> {
 
     pub async fn find_by_id<'e, E>(executor: E, tunnel_id: i64) -> Result<Option<Self>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query_as!(
             Self,
@@ -100,7 +101,7 @@ impl Tunnel<Id> {
 
     pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let tunnels = query_as!(
             Self,
@@ -117,7 +118,7 @@ impl Tunnel<Id> {
         pubkey: &str,
     ) -> Result<Self, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query_as!(
            Self,
@@ -132,7 +133,7 @@ impl Tunnel<Id> {
 
     pub async fn delete_by_id<'e, E>(executor: E, id: i64) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // delete instance
         query!("DELETE FROM tunnel WHERE id = $1", id)
@@ -184,7 +185,7 @@ impl Tunnel<NoId> {
 
     pub async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // Insert a new record when there is no ID
         let result = query!(
@@ -268,12 +269,12 @@ impl TunnelStats<NoId> {
 
     pub async fn save<'e, E>(self, executor: E) -> Result<TunnelStats<Id>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
-        let result = query!(
-            "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7) \
-            RETURNING id;",
+        let id = query_scalar!(
+            "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, \
+            listen_port, persistent_keepalive_interval) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id \"id!\"",
             self.tunnel_id,
             self.upload,
             self.download,
@@ -284,8 +285,9 @@ impl TunnelStats<NoId> {
         )
         .fetch_one(executor)
         .await?;
+
         Ok(TunnelStats::<Id> {
-            id: result.id,
+            id,
             tunnel_id: self.tunnel_id,
             upload: self.upload,
             download: self.download,
@@ -305,7 +307,7 @@ impl TunnelStats<Id> {
         aggregation: &DateTimeAggregation,
     ) -> Result<Vec<Self>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
@@ -345,7 +347,7 @@ pub async fn peer_to_tunnel_stats<'e, E>(
     executor: E,
 ) -> Result<TunnelStats<NoId>, Error>
 where
-    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    E: SqliteExecutor<'e>,
 {
     let tunnel = Tunnel::find_by_server_public_key(executor, &peer.public_key.to_string()).await?;
     Ok(TunnelStats {
@@ -392,7 +394,7 @@ impl TunnelConnection<Id> {
         tunnel_id: i64,
     ) -> Result<Vec<TunnelConnection<Id>>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let connections = query_as!(
             TunnelConnection,
@@ -410,7 +412,7 @@ impl TunnelConnection<Id> {
         tunnel_id: i64,
     ) -> Result<Option<TunnelConnection<Id>>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let connection = query_as!(
             TunnelConnection,
@@ -428,12 +430,11 @@ impl TunnelConnection<Id> {
 impl TunnelConnection<NoId> {
     pub async fn save<'e, E>(self, executor: E) -> Result<TunnelConnection<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
-        let result = query!(
+        let id = query_scalar!(
             "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
-            VALUES ($1, $2, $3, $4) \
-            RETURNING id;",
+            VALUES ($1, $2, $3, $4) RETURNING id \"id!\";",
             self.tunnel_id,
             self.connected_from,
             self.start,
@@ -443,7 +444,7 @@ impl TunnelConnection<NoId> {
         .await?;
 
         Ok(TunnelConnection::<Id> {
-            id: result.id,
+            id,
             tunnel_id: self.tunnel_id,
             connected_from: self.connected_from,
             start: self.start,
@@ -467,7 +468,7 @@ pub struct TunnelConnectionInfo {
 impl TunnelConnectionInfo {
     pub async fn all_by_tunnel_id<'e, E>(executor: E, tunnel_id: i64) -> Result<Vec<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // Because we store interface information for given timestamp select last upload and download
         // before connection ended

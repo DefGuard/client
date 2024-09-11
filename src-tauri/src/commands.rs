@@ -1,3 +1,11 @@
+use std::{collections::HashMap, env, str::FromStr};
+
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::{Sqlite, Transaction};
+use struct_patch::Patch;
+use tauri::{AppHandle, Manager, State};
+
 use crate::{
     appstate::AppState,
     database::{
@@ -21,12 +29,6 @@ use crate::{
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::{Sqlite, Transaction};
-use std::{collections::HashMap, env, str::FromStr};
-use struct_patch::Patch;
-use tauri::{AppHandle, Manager, State};
 
 #[derive(Clone, serde::Serialize)]
 pub struct Payload {
@@ -75,7 +77,7 @@ pub async fn disconnect(
     {
         let interface_name = connection.interface_name.clone();
         debug!("Found active connection");
-        trace!("Connection: {:#?}", connection);
+        trace!("Connection: {connection:#?}");
         disconnect_interface(&connection, &state).await?;
         debug!("Connection saved");
         handle.emit_all(
@@ -106,14 +108,19 @@ async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> R
         error!("Location {location_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
-    let Some(instance) = Instance::find_by_id(&pool, location.instance_id).await? else {
+    let Some(mut instance) = Instance::find_by_id(&pool, location.instance_id).await? else {
         error!(
             "Instance {} not found, skipping config update check",
             location.instance_id
         );
         return Err(Error::NotFound);
     };
-    poll_instance(&state.get_pool(), &instance, handle.clone()).await
+
+    let mut transaction = pool.begin().await?;
+    let result = poll_instance(&mut transaction, &mut instance, handle).await;
+    transaction.commit().await?;
+
+    result
 }
 
 #[derive(Debug, Serialize, Deserialize)]

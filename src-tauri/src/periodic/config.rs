@@ -1,4 +1,6 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
+
+use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
 
@@ -32,7 +34,7 @@ pub async fn poll_config(handle: AppHandle) {
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
-        let Ok(instances) = Instance::all(&mut *transaction).await else {
+        let Ok(mut instances) = Instance::all(&mut *transaction).await else {
             error!(
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
@@ -45,8 +47,8 @@ pub async fn poll_config(handle: AppHandle) {
             "Polling configuration updates for {} instances",
             instances.len(),
         );
-        for instance in &instances {
-            if let Err(err) = poll_instance(&mut *transaction, instance, handle.clone()).await {
+        for instance in &mut instances {
+            if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
                 error!(
                     "Failed to retrieve instance {}({}) config: {err}",
                     instance.name, instance.id,
@@ -71,23 +73,20 @@ pub async fn poll_config(handle: AppHandle) {
 }
 
 /// Retrieves configuration for given [`Instance`].
-/// Updates the instance if there are no active connections, otherwise displays UI message.
-pub async fn poll_instance<'e, E>(
-    executor: E,
-    instance: &Instance<Id>,
-    handle: AppHandle,
-) -> Result<(), Error>
-where
-    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
-{
+/// Updates the instance if there aren't any active connections, otherwise displays UI message.
+pub async fn poll_instance(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &mut Instance<Id>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
     // Query proxy api
     let request = build_request(instance)?;
     let url = Url::from_str(&instance.proxy_url)
         .and_then(|url| url.join(POLLING_ENDPOINT))
         .map_err(|_| {
             Error::InternalError(format!(
-                "Can't build polling url: {}/{}",
-                instance.proxy_url, POLLING_ENDPOINT
+                "Can't build polling url: {}/{POLLING_ENDPOINT}",
+                instance.proxy_url
             ))
         })?;
     let response = reqwest::Client::new()
@@ -98,17 +97,17 @@ where
         .await;
     let response = response.map_err(|err| {
         Error::InternalError(format!(
-            "HTTP request failed for instance {}({}), url: {}, {}",
-            instance.name, instance.id, instance.proxy_url, err
+            "HTTP request failed for instance {}({}), url: {}, {err}",
+            instance.name, instance.id, instance.proxy_url
         ))
     })?;
-    debug!("InstanceInfoResponse: {:?}", response);
+    debug!("InstanceInfoResponse: {response:?}");
 
     // Parse the response
     let response: InstanceInfoResponse = response.json().await.map_err(|err| {
         Error::InternalError(format!(
-            "Failed to parse InstanceInfoResponse for instance {}({}): {}",
-            instance.name, instance.id, err,
+            "Failed to parse InstanceInfoResponse for instance {}({}): {err}",
+            instance.name, instance.id,
         ))
     })?;
     let device_config = response
@@ -117,7 +116,7 @@ where
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
 
     // Early return if config didn't change
-    if !config_changed(executor, instance, device_config).await? {
+    if !config_changed(transaction, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -138,7 +137,7 @@ where
             "Updating instance {}({}) configuration: {device_config:?}",
             instance.name, instance.id,
         );
-        do_update_instance(executor, &mut instance, device_config.clone()).await?;
+        do_update_instance(transaction, instance, device_config.clone()).await?;
         handle.emit_all(INSTANCE_UPDATE, ())?;
         info!(
             "Updated instance {}({}) configuration",
@@ -160,19 +159,17 @@ where
 }
 
 /// Returns true if configuration in instance_info differs from current configuration
-async fn config_changed<'e, E>(
-    executor: E,
+async fn config_changed(
+    transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
-) -> Result<bool, Error>
-where
-    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
-{
-    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(executor, instance.id)
-        .await?
-        .into_iter()
-        .map(Location::<NoId>::from)
-        .collect();
+) -> Result<bool, Error> {
+    let db_locations: Vec<Location<NoId>> =
+        Location::find_by_instance_id(transaction.as_mut(), instance.id)
+            .await?
+            .into_iter()
+            .map(Location::<NoId>::from)
+            .collect();
     let db_locations: HashSet<Location<NoId>> = HashSet::from_iter(db_locations);
     let core_locations: Vec<Location<NoId>> = device_config
         .configs
@@ -193,6 +190,7 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
             instance.name, instance.id
         ))
     })?;
+
     Ok(InstanceInfoRequest {
         token: (*token).to_string(),
     })

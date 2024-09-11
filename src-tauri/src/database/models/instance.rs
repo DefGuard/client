@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as};
+use sqlx::{query, query_as, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::{error::Error, proto};
@@ -32,7 +32,7 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
 impl Instance<Id> {
     pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let url = self.url.to_string();
         let proxy_url = self.proxy_url.to_string();
@@ -53,7 +53,7 @@ impl Instance<Id> {
 
     pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let instances = query_as!(
             Self,
@@ -66,7 +66,7 @@ impl Instance<Id> {
 
     pub async fn find_by_id<'e, E>(executor: E, id: i64) -> Result<Option<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let instance = query_as!(
             Self,
@@ -80,7 +80,7 @@ impl Instance<Id> {
 
     pub async fn find_by_uuid<'e, E>(executor: E, uuid: &str) -> Result<Option<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let instance = query_as!(
             Self,
@@ -94,7 +94,7 @@ impl Instance<Id> {
 
     pub async fn delete_by_id<'e, E>(executor: E, id: i64) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // delete instance
         query!("DELETE FROM instance WHERE id = $1", id)
@@ -105,7 +105,7 @@ impl Instance<Id> {
 
     pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         Instance::delete_by_id(executor, self.id).await?;
         Ok(())
@@ -134,7 +134,7 @@ impl Instance<NoId> {
 
     pub async fn save<'e, E>(self, executor: E) -> Result<Instance<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let url = self.url.clone();
         let proxy_url = self.proxy_url.clone();

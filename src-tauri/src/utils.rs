@@ -440,6 +440,7 @@ pub async fn get_tunnel_interface_details(
         Err(Error::NotFound)
     }
 }
+
 pub async fn get_location_interface_details(
     location_id: i64,
     pool: &DbPool,
