@@ -14,8 +14,14 @@ use std::{
 };
 
 use defguard_wireguard_rs::{
-    error::WireguardInterfaceError, host::Host, host::Peer, key::Key, InterfaceConfiguration,
-    WGApi, WireguardInterfaceApi,
+    error::WireguardInterfaceError,
+    host::{Host, Peer},
+    key::Key,
+    InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+};
+use proto::{
+    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+    CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
 use thiserror::Error;
 use tokio::{sync::mpsc, time::interval};
@@ -28,11 +34,6 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use crate::utils::{execute_command, IS_MACOS};
-
-use proto::{
-    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-    CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
-};
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
@@ -349,10 +350,12 @@ impl From<Host> for InterfaceData {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use defguard_wireguard_rs::{key::Key, net::IpAddrMask};
     use std::{str::FromStr, time::SystemTime};
+
+    use defguard_wireguard_rs::{key::Key, net::IpAddrMask};
     use x25519_dalek::{EphemeralSecret, PublicKey};
+
+    use super::*;
 
     #[test]
     fn convert_peer() {

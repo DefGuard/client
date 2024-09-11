@@ -12,7 +12,11 @@ import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import { CommonWireguardFields, WireguardInstanceType } from '../../../../../../types';
+import {
+  CommonWireguardFields,
+  DefguardInstance,
+  WireguardInstanceType,
+} from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
 import { LocationDetails } from './components/LocationDetails/LocationDetails';
@@ -20,6 +24,7 @@ import { LocationDetails } from './components/LocationDetails/LocationDetails';
 type Props = {
   locations: CommonWireguardFields[];
   connectionType?: WireguardInstanceType;
+  selectedDefguardInstance?: DefguardInstance;
 };
 
 const findLocationById = (
@@ -32,6 +37,7 @@ const { getTunnels } = clientApi;
 export const LocationsDetailView = ({
   locations,
   connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
+  selectedDefguardInstance,
 }: Props) => {
   const selectedLocationId = useClientFlags((state) => state.selectedLocation);
   const setClientFlags = useClientFlags((state) => state.setValues);
@@ -101,7 +107,13 @@ export const LocationsDetailView = ({
       {connectionType === WireguardInstanceType.DEFGUARD_INSTANCE && (
         <>
           <CardTabs tabs={tabs} />
-          {activeLocation && <LocationDetailCard location={activeLocation} tabbed />}
+          {activeLocation && (
+            <LocationDetailCard
+              location={activeLocation}
+              tabbed
+              selectedDefguardInstance={selectedDefguardInstance}
+            />
+          )}
           {activeLocation && (
             <LocationConnectionHistory
               locationId={activeLocation.id}

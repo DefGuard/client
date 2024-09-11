@@ -1,4 +1,5 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
+
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
 
@@ -32,7 +33,7 @@ pub async fn poll_config(handle: AppHandle) {
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
-        let Ok(instances) = Instance::all(&mut *transaction).await else {
+        let Ok(mut instances) = Instance::all(&mut *transaction).await else {
             error!(
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
@@ -44,8 +45,8 @@ pub async fn poll_config(handle: AppHandle) {
             "Polling configuration updates for {} instances",
             instances.len(),
         );
-        for instance in &instances {
-            if let Err(err) = poll_instance(&mut *transaction, instance, handle.clone()).await {
+        for instance in &mut instances {
+            if let Err(err) = poll_instance(&mut transaction, instance, handle.clone()).await {
                 error!(
                     "Failed to retrieve instance {}({}) config: {}",
                     instance.name, instance.id, err
@@ -71,14 +72,11 @@ pub async fn poll_config(handle: AppHandle) {
 
 /// Retrieves configuration for given [`Instance`].
 /// Updates the instance if there are no active connections, otherwise displays UI message.
-pub async fn poll_instance<'e, E>(
-    executor: E,
-    instance: &Instance<Id>,
+pub async fn poll_instance(
+    conn: &mut sqlx::SqliteConnection,
+    instance: &mut Instance<Id>,
     handle: AppHandle,
-) -> Result<(), Error>
-where
-    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
-{
+) -> Result<(), Error> {
     // Query proxy api
     let request = build_request(instance)?;
     let url = Url::from_str(&instance.proxy_url)
@@ -114,9 +112,25 @@ where
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    let instance_config = response.instance_config.as_ref().ok_or_else(|| {
+        Error::InternalError("Instance config not present in response".to_string())
+    })?;
+
+    if instance.disable_all_traffic != instance_config.disable_all_traffic {
+        debug!(
+            "Instance {}({}) disable_all_traffic changed from {} to {}",
+            instance.name,
+            instance.id,
+            instance.disable_all_traffic,
+            instance_config.disable_all_traffic
+        );
+        instance.disable_all_traffic = instance_config.disable_all_traffic;
+        instance.save(&mut *conn).await?;
+        handle.emit_all(INSTANCE_UPDATE, ())?;
+    }
 
     // Early return if config didn't change
-    if !config_changed(executor, instance, device_config).await? {
+    if !config_changed(&mut *conn, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id

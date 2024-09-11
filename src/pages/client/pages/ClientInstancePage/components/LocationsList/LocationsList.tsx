@@ -5,7 +5,11 @@ import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { CommonWireguardFields, WireguardInstanceType } from '../../../../types';
+import {
+  CommonWireguardFields,
+  DefguardInstance,
+  WireguardInstanceType,
+} from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 import { MFAModal } from './modals/MFAModal/MFAModal';
@@ -13,9 +17,14 @@ import { MFAModal } from './modals/MFAModal/MFAModal';
 interface LocationsListProps {
   locations: CommonWireguardFields[] | undefined;
   isError: boolean;
+  selectedDefguardInstance: DefguardInstance | undefined;
 }
 
-export const LocationsList = ({ locations, isError }: LocationsListProps) => {
+export const LocationsList = ({
+  locations,
+  isError,
+  selectedDefguardInstance,
+}: LocationsListProps) => {
   const { LL } = useI18nContext();
 
   const selectedView = useClientStore((state) => state.settings.selected_view);
@@ -49,16 +58,21 @@ export const LocationsList = ({ locations, isError }: LocationsListProps) => {
         <LocationsDetailView
           locations={locations}
           connectionType={selectedInstance?.type}
+          selectedDefguardInstance={selectedDefguardInstance}
         />
       )}
       {(selectedView === 'grid' || selectedView === null || isTunnelType) && (
-        <LocationsGridView locations={locations} />
+        <LocationsGridView
+          locations={locations}
+          selectedDefguardInstance={selectedDefguardInstance}
+        />
       )}
 
       {selectedView === 'detail' && !isTunnelType && (
         <LocationsDetailView
           locations={locations}
           connectionType={selectedInstance.type}
+          selectedDefguardInstance={selectedDefguardInstance}
         />
       )}
 
