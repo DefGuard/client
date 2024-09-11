@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as};
+use sqlx::{query_as, query_scalar, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::{
@@ -45,7 +45,7 @@ pub async fn peer_to_location_stats<'e, E>(
     executor: E,
 ) -> Result<LocationStats<NoId>, Error>
 where
-    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    E: SqliteExecutor<'e>,
 {
     let location = Location::find_by_public_key(executor, &peer.public_key.to_string()).await?;
     Ok(LocationStats {
@@ -88,12 +88,13 @@ impl LocationStats<NoId> {
 
     pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
-        let result = query!(
-            "INSERT INTO location_stats (location_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
+        let id = query_scalar!(
+            "INSERT INTO location_stats (location_id, upload, download, last_handshake, \
+            collected_at, listen_port, persistent_keepalive_interval) \
             VALUES ($1, $2, $3, $4, $5, $6, $7) \
-            RETURNING id;",
+            RETURNING id \"id!\"",
             self.location_id,
             self.upload,
             self.download,
@@ -106,7 +107,7 @@ impl LocationStats<NoId> {
         .await?;
 
         Ok(LocationStats::<Id> {
-            id: result.id,
+            id,
             location_id: self.location_id,
             upload: self.upload,
             download: self.download,
@@ -126,7 +127,7 @@ impl LocationStats<Id> {
         aggregation: &DateTimeAggregation,
     ) -> Result<Vec<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let aggregation = aggregation.fstring();
         let stats = query_as!(

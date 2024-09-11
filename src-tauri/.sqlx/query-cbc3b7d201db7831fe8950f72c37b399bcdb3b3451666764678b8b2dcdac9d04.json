@@ -6,12 +6,12 @@
       {
         "name": "id!",
         "ordinal": 0,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "tunnel_id!",
         "ordinal": 1,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "connected_from!",
@@ -31,25 +31,25 @@
       {
         "name": "upload: _",
         "ordinal": 5,
-        "type_info": "Null"
+        "type_info": "Integer"
       },
       {
         "name": "download: _",
         "ordinal": 6,
-        "type_info": "Null"
+        "type_info": "Integer"
       }
     ],
     "parameters": {
       "Right": 1
     },
     "nullable": [
-      true,
       false,
       false,
       false,
       false,
-      null,
-      null
+      false,
+      false,
+      false
     ]
   },
   "hash": "cbc3b7d201db7831fe8950f72c37b399bcdb3b3451666764678b8b2dcdac9d04"

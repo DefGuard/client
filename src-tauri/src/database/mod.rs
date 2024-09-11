@@ -50,17 +50,17 @@ fn prepare_db_url(app_handle: &AppHandle) -> Result<String, Error> {
         let db_path = app_dir.join(DB_NAME);
         if db_path.exists() {
             info!(
-                "Database exists skipping creating database. Database path: {}",
+                "Database exists skipping database creation. Database path: {}",
                 db_path.to_string_lossy()
             );
         } else {
             debug!(
-                "Database not found creating database file at: {}",
+                "Database not found. Creating database file at: {}",
                 db_path.to_string_lossy()
             );
             fs::File::create(&db_path)?;
             info!(
-                "Database file succesfully created at: {}",
+                "Database file successfully created at: {}",
                 db_path.to_string_lossy()
             );
         }

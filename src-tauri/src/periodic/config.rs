@@ -1,11 +1,12 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
+use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
 
 use crate::{
     appstate::AppState,
-    commands::{device_config_to_location, update_instance},
+    commands::{device_config_to_location, do_update_instance},
     database::{
         models::{Id, NoId},
         Instance, Location,
@@ -38,6 +39,7 @@ pub async fn poll_config(handle: AppHandle) {
                 "Failed to retireve instances, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
             );
+            let _ = transaction.rollback().await;
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
@@ -46,10 +48,10 @@ pub async fn poll_config(handle: AppHandle) {
             instances.len(),
         );
         for instance in &mut instances {
-            if let Err(err) = poll_instance(&mut transaction, instance, handle.clone()).await {
+            if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
                 error!(
-                    "Failed to retrieve instance {}({}) config: {}",
-                    instance.name, instance.id, err
+                    "Failed to retrieve instance {}({}) config: {err}",
+                    instance.name, instance.id,
                 );
             } else {
                 debug!(
@@ -71,11 +73,11 @@ pub async fn poll_config(handle: AppHandle) {
 }
 
 /// Retrieves configuration for given [`Instance`].
-/// Updates the instance if there are no active connections, otherwise displays UI message.
+/// Updates the instance if there aren't any active connections, otherwise displays UI message.
 pub async fn poll_instance(
-    conn: &mut sqlx::SqliteConnection,
+    transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
-    handle: AppHandle,
+    handle: &AppHandle,
 ) -> Result<(), Error> {
     // Query proxy api
     let request = build_request(instance)?;
@@ -83,8 +85,8 @@ pub async fn poll_instance(
         .and_then(|url| url.join(POLLING_ENDPOINT))
         .map_err(|_| {
             Error::InternalError(format!(
-                "Can't build polling url: {}/{}",
-                instance.proxy_url, POLLING_ENDPOINT
+                "Can't build polling url: {}/{POLLING_ENDPOINT}",
+                instance.proxy_url
             ))
         })?;
     let response = reqwest::Client::new()
@@ -95,17 +97,17 @@ pub async fn poll_instance(
         .await;
     let response = response.map_err(|err| {
         Error::InternalError(format!(
-            "HTTP request failed for instance {}({}), url: {}, {}",
-            instance.name, instance.id, instance.proxy_url, err
+            "HTTP request failed for instance {}({}), url: {}, {err}",
+            instance.name, instance.id, instance.proxy_url
         ))
     })?;
-    debug!("InstanceInfoResponse: {:?}", response);
+    debug!("InstanceInfoResponse: {response:?}");
 
     // Parse the response
     let response: InstanceInfoResponse = response.json().await.map_err(|err| {
         Error::InternalError(format!(
-            "Failed to parse InstanceInfoResponse for instance {}({}): {}",
-            instance.name, instance.id, err,
+            "Failed to parse InstanceInfoResponse for instance {}({}): {err}",
+            instance.name, instance.id,
         ))
     })?;
     let device_config = response
@@ -125,13 +127,13 @@ pub async fn poll_instance(
             instance_config.disable_all_traffic
         );
         instance.disable_all_traffic = instance_config.disable_all_traffic;
-        instance.save(&mut *conn).await?;
-        Location::disable_all_traffic_for_all(&mut *conn, instance.id).await?;
+        instance.save(&mut **transaction).await?;
+        Location::disable_all_traffic_for_all(&mut **transaction, instance.id).await?;
         handle.emit_all(INSTANCE_UPDATE, ())?;
     }
 
     // Early return if config didn't change
-    if !config_changed(&mut *conn, instance, device_config).await? {
+    if !config_changed(transaction, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -152,7 +154,7 @@ pub async fn poll_instance(
             "Updating instance {}({}) configuration: {device_config:?}",
             instance.name, instance.id,
         );
-        update_instance(instance.id, device_config.clone(), state, handle.clone()).await?;
+        do_update_instance(transaction, instance, device_config.clone()).await?;
         handle.emit_all(INSTANCE_UPDATE, ())?;
         info!(
             "Updated instance {}({}) configuration",
@@ -174,19 +176,17 @@ pub async fn poll_instance(
 }
 
 /// Returns true if configuration in instance_info differs from current configuration
-async fn config_changed<'e, E>(
-    executor: E,
+async fn config_changed(
+    transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
-) -> Result<bool, Error>
-where
-    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
-{
-    let db_locations: Vec<Location<NoId>> = Location::find_by_instance_id(executor, instance.id)
-        .await?
-        .into_iter()
-        .map(Location::<NoId>::from)
-        .collect();
+) -> Result<bool, Error> {
+    let db_locations: Vec<Location<NoId>> =
+        Location::find_by_instance_id(transaction.as_mut(), instance.id)
+            .await?
+            .into_iter()
+            .map(Location::<NoId>::from)
+            .collect();
     let db_locations: HashSet<Location<NoId>> = HashSet::from_iter(db_locations);
     let core_locations: Vec<Location<NoId>> = device_config
         .configs
@@ -207,6 +207,7 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
             instance.name, instance.id
         ))
     })?;
+
     Ok(InstanceInfoRequest {
         token: (*token).to_string(),
     })

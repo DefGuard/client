@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, Error as SqlxError};
+use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::error::Error;
@@ -38,7 +38,7 @@ impl Display for Location<NoId> {
 impl Location<Id> {
     pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let locations = query_as!(
             Self,
@@ -48,17 +48,18 @@ impl Location<Id> {
         )
         .fetch_all(executor)
         .await?;
+
         Ok(locations)
     }
 
     pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // Update the existing record when there is an ID
         query!(
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, \
-            network_id = $8, route_all_traffic = $9, mfa_enabled = $10, keepalive_interval = $11 WHERE id = $12;",
+            network_id = $8, route_all_traffic = $9, mfa_enabled = $10, keepalive_interval = $11 WHERE id = $12",
             self.instance_id,
             self.name,
             self.address,
@@ -80,13 +81,12 @@ impl Location<Id> {
 
     pub async fn find_by_id<'e, E>(executor: E, location_id: i64) -> Result<Option<Self>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
-            route_all_traffic, mfa_enabled, keepalive_interval \
-            FROM location WHERE id = $1;",
+            route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE id = $1",
             location_id
         )
         .fetch_optional(executor)
@@ -98,13 +98,12 @@ impl Location<Id> {
         instance_id: i64,
     ) -> Result<Vec<Self>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
-            route_all_traffic, mfa_enabled, keepalive_interval \
-            FROM location WHERE instance_id = $1;",
+            route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE instance_id = $1",
             instance_id
         )
         .fetch_all(executor)
@@ -113,13 +112,12 @@ impl Location<Id> {
 
     pub async fn find_by_public_key<'e, E>(executor: E, pubkey: &str) -> Result<Self, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
-            route_all_traffic, mfa_enabled, keepalive_interval \
-            FROM location WHERE pubkey = $1;",
+            route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE pubkey = $1;",
             pubkey
         )
         .fetch_one(executor)
@@ -128,7 +126,7 @@ impl Location<Id> {
 
     pub async fn delete<'e, E>(&self, executor: E) -> Result<(), SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         info!("Removing location {self:?}");
         query!("DELETE FROM location WHERE id = $1;", self.id)
@@ -158,13 +156,14 @@ impl Location<Id> {
 impl Location<NoId> {
     pub async fn save<'e, E>(self, executor: E) -> Result<Location<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         // Insert a new record when there is no ID
-        let result = query!(
-                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
+        let id = query_scalar!(
+                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
+                network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
-                RETURNING id;",
+                RETURNING id \"id!\"",
                 self.instance_id,
                 self.name,
                 self.address,
@@ -181,7 +180,7 @@ impl Location<NoId> {
             .await?;
 
         Ok(Location::<Id> {
-            id: result.id,
+            id,
             instance_id: self.instance_id,
             name: self.name,
             address: self.address,
