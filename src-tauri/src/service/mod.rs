@@ -9,7 +9,6 @@ pub mod windows;
 
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Add,
     pin::Pin,
     time::{Duration, UNIX_EPOCH},
 };
@@ -221,7 +220,7 @@ impl DesktopDaemonService for DaemonService {
                 debug!("Sending stats update for interface {ifname}");
                 match wgapi.read_interface_data() {
                     Ok(host) => {
-                        if let Err(err) = tx.send(Result::<_, Status>::Ok(host.into())).await {
+                        if let Err(err) = tx.send(Ok(host.into())).await {
                             error!(
                                 "Failed to send stats update for interface {ifname}. Error: {err}"
                             );
@@ -325,12 +324,12 @@ impl From<proto::Peer> for Peer {
             }),
             last_handshake: peer
                 .last_handshake
-                .map(|timestamp| UNIX_EPOCH.add(Duration::from_secs(timestamp))),
+                .map(|timestamp| UNIX_EPOCH + Duration::from_secs(timestamp)),
             tx_bytes: peer.tx_bytes,
             rx_bytes: peer.rx_bytes,
             persistent_keepalive_interval: peer
                 .persistent_keepalive_interval
-                .map(|interval| interval as u16),
+                .and_then(|interval| u16::try_from(interval).ok()),
             allowed_ips: peer
                 .allowed_ips
                 .into_iter()
