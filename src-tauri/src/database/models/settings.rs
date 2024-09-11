@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{query, Type};
+use sqlx::{query, SqliteExecutor, Type};
 use struct_patch::Patch;
 use strum::{AsRefStr, EnumString};
 use tracing::Level;
@@ -87,7 +87,7 @@ impl Default for Settings {
 impl Settings {
     pub async fn get<'e, E>(executor: E) -> Result<Self, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         let query_res = query!("SELECT * FROM settings WHERE id = 1;")
             .fetch_one(executor)
@@ -108,7 +108,7 @@ impl Settings {
 
     pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query!(
             "UPDATE settings \

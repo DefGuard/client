@@ -1,4 +1,4 @@
-use sqlx::{query, query_as, Error as SqlxError};
+use sqlx::{query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::error::Error;
@@ -18,12 +18,12 @@ impl WireguardKeys<Id> {
         instance_id: i64,
     ) -> Result<Option<Self>, SqlxError>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, pubkey, prvkey \
-            FROM wireguard_keys WHERE instance_id = $1;",
+            FROM wireguard_keys WHERE instance_id = $1",
             instance_id
         )
         .fetch_optional(executor)
@@ -44,13 +44,11 @@ impl WireguardKeys<NoId> {
 
     pub async fn save<'e, E>(self, executor: E) -> Result<WireguardKeys<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
-        let result = query!(
+        let id = query_scalar!(
             "INSERT INTO wireguard_keys (instance_id, pubkey, prvkey) \
-            VALUES ($1, $2, $3) \
-            RETURNING id;
-            ",
+            VALUES ($1, $2, $3) RETURNING id \"id!\"",
             self.instance_id,
             self.pubkey,
             self.prvkey,
@@ -58,7 +56,7 @@ impl WireguardKeys<NoId> {
         .fetch_one(executor)
         .await?;
         Ok(WireguardKeys::<Id> {
-            id: result.id,
+            id,
             instance_id: self.instance_id,
             pubkey: self.pubkey,
             prvkey: self.prvkey,

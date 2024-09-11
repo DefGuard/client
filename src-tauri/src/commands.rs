@@ -2,6 +2,7 @@ use std::{collections::HashMap, env, str::FromStr};
 
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
@@ -76,7 +77,7 @@ pub async fn disconnect(
     {
         let interface_name = connection.interface_name.clone();
         debug!("Found active connection");
-        trace!("Connection: {:#?}", connection);
+        trace!("Connection: {connection:#?}");
         disconnect_interface(&connection, &state).await?;
         debug!("Connection saved");
         handle.emit_all(
@@ -115,7 +116,7 @@ async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> R
         );
         return Err(Error::NotFound);
     };
-    poll_instance(&mut transaction, &mut instance, handle.clone()).await?;
+    poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
     Ok(())
 }
@@ -362,73 +363,10 @@ pub async fn update_instance(
     let pool = app_state.get_pool();
 
     if let Some(mut instance) = Instance::find_by_id(&pool, instance_id).await? {
-        // fetch existing locations for given instance
-        let mut current_locations = Location::find_by_instance_id(&pool, instance_id).await?;
-
         let mut transaction = pool.begin().await?;
-
-        // update instance
-        debug!("Updating instance {instance_id}.");
-        let instance_info = response
-            .instance
-            .expect("Missing instance info in device config response");
-        instance.name = instance_info.name;
-        instance.url = instance_info.url;
-        instance.proxy_url = instance_info.proxy_url;
-        instance.username = instance_info.username;
-        instance.save(&mut *transaction).await?;
-
-        // process locations received in response
-        debug!("Updating locations for instance {instance_id}.");
-        for location in response.configs {
-            // parse device config
-            let new_location = device_config_to_location(location, instance_id);
-
-            // check if location is already present in current locations
-            if let Some(position) = current_locations
-                .iter()
-                .position(|loc| loc.network_id == new_location.network_id)
-            {
-                // remove from list of existing locations
-                let mut current_location = current_locations.remove(position);
-                debug!(
-                    "Updating existing location {} for instance {instance_id}.",
-                    current_location.name
-                );
-                // update existing location
-                current_location.name = new_location.name;
-                current_location.address = new_location.address;
-                current_location.pubkey = new_location.pubkey;
-                current_location.endpoint = new_location.endpoint;
-                current_location.allowed_ips = new_location.allowed_ips;
-                current_location.mfa_enabled = new_location.mfa_enabled;
-                current_location.keepalive_interval = new_location.keepalive_interval;
-                current_location.dns = new_location.dns;
-                current_location.save(&mut *transaction).await?;
-                info!(
-                    "Location {} updated for instance {instance_id}.",
-                    current_location.name
-                );
-            } else {
-                // create new location
-                debug!("Creating new location for instance {instance_id}.");
-                new_location.save(&mut *transaction).await?;
-                info!("New location created for instance {instance_id}.");
-            }
-        }
-        info!("Locations updated for instance {instance_id}.");
-
-        // remove locations which were present in current locations
-        // but no longer found in core response
-        debug!("Removing locations for instance {instance_id}.");
-        for removed_location in current_locations {
-            removed_location.delete(&mut *transaction).await?;
-        }
-        info!("Locations removed for instance {instance_id}.");
-
+        do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        info!("Instance {instance_id} updated");
         app_handle.emit_all(INSTANCE_UPDATE, ())?;
         reload_tray_menu(&app_handle).await;
         Ok(())
@@ -436,6 +374,94 @@ pub async fn update_instance(
         error!("Instance with id {instance_id} not found");
         Err(Error::NotFound)
     }
+}
+
+pub async fn do_update_instance(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &mut Instance<Id>,
+    response: DeviceConfigResponse,
+) -> Result<(), Error> {
+    // update instance
+    debug!("Updating instance {}({}).", instance.name, instance.id);
+    let instance_info = response
+        .instance
+        .expect("Missing instance info in device config response");
+    instance.name = instance_info.name;
+    instance.url = instance_info.url;
+    instance.proxy_url = instance_info.proxy_url;
+    instance.username = instance_info.username;
+    instance.save(transaction.as_mut()).await?;
+
+    // process locations received in response
+    debug!(
+        "Updating locations for instance {}({}).",
+        instance.name, instance.id
+    );
+    // fetch existing locations for given instance
+    let mut current_locations =
+        Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
+    for location in response.configs {
+        // parse device config
+        let new_location = device_config_to_location(location, instance.id);
+
+        // check if location is already present in current locations
+        if let Some(position) = current_locations
+            .iter()
+            .position(|loc| loc.network_id == new_location.network_id)
+        {
+            // remove from list of existing locations
+            let mut current_location = current_locations.remove(position);
+            debug!(
+                "Updating existing location {}({}) for instance {}({}).",
+                current_location.name, current_location.id, instance.name, instance.id,
+            );
+            // update existing location
+            current_location.name = new_location.name;
+            current_location.address = new_location.address;
+            current_location.pubkey = new_location.pubkey;
+            current_location.endpoint = new_location.endpoint;
+            current_location.allowed_ips = new_location.allowed_ips;
+            current_location.mfa_enabled = new_location.mfa_enabled;
+            current_location.keepalive_interval = new_location.keepalive_interval;
+            current_location.dns = new_location.dns;
+            current_location.save(transaction.as_mut()).await?;
+            info!(
+                "Location {}({}) updated for instance {}({}).",
+                current_location.name, current_location.id, instance.name, instance.id,
+            );
+        } else {
+            // create new location
+            debug!(
+                "Creating new location for instance {}({}).",
+                instance.name, instance.id
+            );
+            let new_location = new_location.save(transaction.as_mut()).await?;
+            info!(
+                "New location {}({}) created for instance {}({})",
+                new_location.name, new_location.id, instance.name, instance.id
+            );
+        }
+    }
+    info!(
+        "Locations updated for instance {}({}).",
+        instance.name, instance.id
+    );
+
+    // remove locations which were present in current locations
+    // but no longer found in core response
+    debug!(
+        "Removing locations for instance {}({}).",
+        instance.name, instance.id
+    );
+    for removed_location in current_locations {
+        removed_location.delete(transaction.as_mut()).await?;
+    }
+    info!(
+        "Locations removed for instance {}({}).",
+        instance.name, instance.id
+    );
+    info!("Instance {}({}) updated", instance.name, instance.id);
+    Ok(())
 }
 
 /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
