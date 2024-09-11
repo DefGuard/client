@@ -126,6 +126,7 @@ pub async fn poll_instance(
         );
         instance.disable_all_traffic = instance_config.disable_all_traffic;
         instance.save(&mut *conn).await?;
+        Location::disable_all_traffic_for_all(&mut *conn, instance.id).await?;
         handle.emit_all(INSTANCE_UPDATE, ())?;
     }
 
