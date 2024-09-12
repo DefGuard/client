@@ -1,16 +1,14 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
+use reqwest::StatusCode;
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
 
 use crate::{
     appstate::AppState,
-    commands::{device_config_to_location, do_update_instance},
-    database::{
-        models::{Id, NoId},
-        Instance, Location,
-    },
+    commands::{do_update_instance, locations_changed},
+    database::{models::Id, Instance},
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
@@ -103,6 +101,30 @@ pub async fn poll_instance(
     })?;
     debug!("InstanceInfoResponse: {response:?}");
 
+    // Return early if the enterprise features are disabled in the core
+    if response.status() == StatusCode::PAYMENT_REQUIRED {
+        debug!(
+            "Instance {}({}) has enterprise features disabled, checking if this state is reflected on our end...",
+            instance.name, instance.id
+        );
+        if instance.enterprise_enabled {
+            info!(
+                "Instance {}({}) has enterprise features disabled, but we have them enabled, disabling...",
+                instance.name, instance.id
+            );
+            instance
+                .disable_enterprise_features(transaction.as_mut())
+                .await?;
+            handle.emit_all(INSTANCE_UPDATE, ())?;
+        } else {
+            debug!(
+                "Instance {}({}) has enterprise features disabled, and we have them disabled as well, no action needed",
+                instance.name, instance.id
+            );
+        }
+        return Ok(());
+    }
+
     // Parse the response
     let response: InstanceInfoResponse = response.json().await.map_err(|err| {
         Error::InternalError(format!(
@@ -114,23 +136,6 @@ pub async fn poll_instance(
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
-    let instance_config = response.instance_config.as_ref().ok_or_else(|| {
-        Error::InternalError("Instance config not present in response".to_string())
-    })?;
-
-    if instance.disable_all_traffic != instance_config.disable_all_traffic {
-        debug!(
-            "Instance {}({}) disable_all_traffic changed from {} to {}",
-            instance.name,
-            instance.id,
-            instance.disable_all_traffic,
-            instance_config.disable_all_traffic
-        );
-        instance.disable_all_traffic = instance_config.disable_all_traffic;
-        instance.save(&mut **transaction).await?;
-        Location::disable_all_traffic_for_all(&mut **transaction, instance.id).await?;
-        handle.emit_all(INSTANCE_UPDATE, ())?;
-    }
 
     // Early return if config didn't change
     if !config_changed(transaction, instance, device_config).await? {
@@ -175,28 +180,25 @@ pub async fn poll_instance(
     Ok(())
 }
 
-/// Returns true if configuration in instance_info differs from current configuration
 async fn config_changed(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
-    let db_locations: Vec<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id)
-            .await?
-            .into_iter()
-            .map(Location::<NoId>::from)
-            .collect();
-    let db_locations: HashSet<Location<NoId>> = HashSet::from_iter(db_locations);
-    let core_locations: Vec<Location<NoId>> = device_config
-        .configs
-        .iter()
-        .map(|config| device_config_to_location(config.clone(), instance.id))
-        .map(Location::<NoId>::from)
-        .collect();
-    let core_locations: HashSet<Location<NoId>> = HashSet::from_iter(core_locations);
-
-    Ok(db_locations != core_locations)
+    debug!(
+        "Checking if config changed for instance {}({})",
+        instance.name, instance.id
+    );
+    let locations_changed = locations_changed(transaction, instance, device_config).await?;
+    let info_changed = match &device_config.instance {
+        Some(info) => instance != info,
+        None => false,
+    };
+    debug!(
+        "Did the locations change: {}. Did the instance information change: {}",
+        locations_changed, info_changed
+    );
+    Ok(locations_changed || info_changed)
 }
 
 /// Retrieves pubkey & token to build InstanceInfoRequest

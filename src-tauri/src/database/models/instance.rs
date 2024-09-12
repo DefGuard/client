@@ -14,6 +14,7 @@ pub struct Instance<I = NoId> {
     pub username: String,
     pub token: Option<String>,
     pub disable_all_traffic: bool,
+    pub enterprise_enabled: bool,
 }
 
 impl From<proto::InstanceInfo> for Instance<NoId> {
@@ -26,7 +27,8 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
             proxy_url: instance_info.proxy_url,
             username: instance_info.username,
             token: None,
-            disable_all_traffic: false,
+            disable_all_traffic: instance_info.disable_all_traffic,
+            enterprise_enabled: instance_info.enterprise_enabled,
         }
     }
 }
@@ -40,13 +42,14 @@ impl Instance<Id> {
         let proxy_url = self.proxy_url.to_string();
         // Update the existing record when there is an ID
         query!(
-            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6 WHERE id = $7;",
+            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6, enterprise_enabled = $7 WHERE id = $8;",
             self.name,
             self.uuid,
             url,
             proxy_url,
             self.username,
             self.disable_all_traffic,
+            self.enterprise_enabled,
             self.id
         )
         .execute(executor)
@@ -60,7 +63,7 @@ impl Instance<Id> {
     {
         let instances = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic FROM instance;"
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance;"
         )
         .fetch_all(executor)
         .await?;
@@ -73,7 +76,7 @@ impl Instance<Id> {
     {
         let instance = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic FROM instance WHERE id = $1;",
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE id = $1;",
             id
         )
         .fetch_optional(executor)
@@ -87,7 +90,7 @@ impl Instance<Id> {
     {
         let instance = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic FROM instance WHERE uuid = $1;",
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE uuid = $1;",
             uuid
         )
         .fetch_optional(executor)
@@ -113,6 +116,37 @@ impl Instance<Id> {
         Instance::delete_by_id(executor, self.id).await?;
         Ok(())
     }
+
+    pub async fn disable_enterprise_features<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        debug!(
+            "Disabling enterprise features for instance {}({})",
+            self.name, self.id
+        );
+        self.enterprise_enabled = false;
+        self.disable_all_traffic = false;
+        self.save(executor).await?;
+        debug!(
+            "Disabled enterprise features for instance {}({})",
+            self.name, self.id
+        );
+        Ok(())
+    }
+}
+
+// This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
+impl PartialEq<proto::InstanceInfo> for Instance<Id> {
+    fn eq(&self, other: &proto::InstanceInfo) -> bool {
+        self.name == other.name
+            && self.uuid == other.id
+            && self.url == other.url
+            && self.proxy_url == other.proxy_url
+            && self.username == other.username
+            && self.disable_all_traffic == other.disable_all_traffic
+            && self.enterprise_enabled == other.enterprise_enabled
+    }
 }
 
 impl Instance<NoId> {
@@ -133,6 +167,7 @@ impl Instance<NoId> {
             username,
             token: None,
             disable_all_traffic: false,
+            enterprise_enabled: false,
         }
     }
 
@@ -143,14 +178,15 @@ impl Instance<NoId> {
         let url = self.url.clone();
         let proxy_url = self.proxy_url.clone();
         let result = query!(
-            "INSERT INTO instance (name, uuid, url, proxy_url, username, token, disable_all_traffic) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;",
+            "INSERT INTO instance (name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
             self.name,
             self.uuid,
             url,
             proxy_url,
             self.username,
             self.token,
-            self.disable_all_traffic
+            self.disable_all_traffic,
+            self.enterprise_enabled
         )
         .fetch_one(executor)
         .await?;
@@ -163,6 +199,7 @@ impl Instance<NoId> {
             username: self.username,
             token: self.token,
             disable_all_traffic: self.disable_all_traffic,
+            enterprise_enabled: self.enterprise_enabled,
         })
     }
 }
@@ -177,4 +214,5 @@ pub struct InstanceInfo<I = NoId> {
     pub active: bool,
     pub pubkey: String,
     pub disable_all_traffic: bool,
+    pub enterprise_enabled: bool,
 }
