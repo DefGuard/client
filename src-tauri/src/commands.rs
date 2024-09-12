@@ -437,8 +437,8 @@ pub async fn do_update_instance(
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
     instance.save(transaction.as_mut()).await?;
-    info!(
-        "Instance {}({}) main config updated.",
+    debug!(
+        "Instance {}({}) main config applied from core's response.",
         instance.name, instance.id
     );
 
