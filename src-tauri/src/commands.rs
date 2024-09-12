@@ -437,6 +437,10 @@ pub async fn do_update_instance(
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
     instance.save(transaction.as_mut()).await?;
+    info!(
+        "Instance {}({}) main config updated.",
+        instance.name, instance.id
+    );
 
     // check if locations have changed
     if locations_changed {
@@ -509,12 +513,15 @@ pub async fn do_update_instance(
             instance.name, instance.id
         );
     } else {
-        debug!(
+        info!(
             "Locations for instance {}({}) didn't change. Not updating them.",
             instance.name, instance.id
         );
     }
-    info!("Instance {}({}) updated", instance.name, instance.id);
+    info!(
+        "Instance {}({}) update is done.",
+        instance.name, instance.id
+    );
     Ok(())
 }
 

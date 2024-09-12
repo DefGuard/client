@@ -1,4 +1,4 @@
-use std::{collections::HashSet, str::FromStr, time::Duration};
+use std::{str::FromStr, time::Duration};
 
 use reqwest::StatusCode;
 use sqlx::{Sqlite, Transaction};
