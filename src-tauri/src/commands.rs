@@ -1,4 +1,8 @@
-use std::{collections::HashMap, env, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    env,
+    str::FromStr,
+};
 
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -262,6 +266,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             active: connected,
             pubkey: keys.pubkey,
             disable_all_traffic: instance.disable_all_traffic,
+            enterprise_enabled: instance.enterprise_enabled,
         });
     }
     info!("Instances retrieved({})", instance_info.len());
@@ -376,6 +381,30 @@ pub async fn update_instance(
     }
 }
 
+/// Returns true if configuration in instance_info differs from current configuration
+pub async fn locations_changed(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &Instance<Id>,
+    device_config: &DeviceConfigResponse,
+) -> Result<bool, Error> {
+    let db_locations: Vec<Location<NoId>> =
+        Location::find_by_instance_id(transaction.as_mut(), instance.id)
+            .await?
+            .into_iter()
+            .map(Location::<NoId>::from)
+            .collect();
+    let db_locations: HashSet<Location<NoId>> = HashSet::from_iter(db_locations);
+    let core_locations: Vec<Location<NoId>> = device_config
+        .configs
+        .iter()
+        .map(|config| device_config_to_location(config.clone(), instance.id))
+        .map(Location::<NoId>::from)
+        .collect();
+    let core_locations: HashSet<Location<NoId>> = HashSet::from_iter(core_locations);
+
+    Ok(db_locations != core_locations)
+}
+
 pub async fn do_update_instance(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
@@ -383,6 +412,7 @@ pub async fn do_update_instance(
 ) -> Result<(), Error> {
     // update instance
     debug!("Updating instance {}({}).", instance.name, instance.id);
+    let locations_changed = locations_changed(transaction, instance, &response).await?;
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
@@ -390,77 +420,108 @@ pub async fn do_update_instance(
     instance.url = instance_info.url;
     instance.proxy_url = instance_info.proxy_url;
     instance.username = instance_info.username;
+    // Make sure to update the locations too if we are disabling all traffic
+    if instance.disable_all_traffic != instance_info.disable_all_traffic
+        && instance_info.disable_all_traffic
+    {
+        debug!(
+            "Disabling all traffic for all locations of instance {}({}).",
+            instance.name, instance.id
+        );
+        Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
+        debug!(
+            "Disabled all traffic for all locations of instance {}({}).",
+            instance.name, instance.id
+        );
+    }
+    instance.disable_all_traffic = instance_info.disable_all_traffic;
+    instance.enterprise_enabled = instance_info.enterprise_enabled;
     instance.save(transaction.as_mut()).await?;
-
-    // process locations received in response
     debug!(
-        "Updating locations for instance {}({}).",
+        "Instance {}({}) main config applied from core's response.",
         instance.name, instance.id
     );
-    // fetch existing locations for given instance
-    let mut current_locations =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
-    for location in response.configs {
-        // parse device config
-        let new_location = device_config_to_location(location, instance.id);
 
-        // check if location is already present in current locations
-        if let Some(position) = current_locations
-            .iter()
-            .position(|loc| loc.network_id == new_location.network_id)
-        {
-            // remove from list of existing locations
-            let mut current_location = current_locations.remove(position);
-            debug!(
-                "Updating existing location {}({}) for instance {}({}).",
-                current_location.name, current_location.id, instance.name, instance.id,
-            );
-            // update existing location
-            current_location.name = new_location.name;
-            current_location.address = new_location.address;
-            current_location.pubkey = new_location.pubkey;
-            current_location.endpoint = new_location.endpoint;
-            current_location.allowed_ips = new_location.allowed_ips;
-            current_location.mfa_enabled = new_location.mfa_enabled;
-            current_location.keepalive_interval = new_location.keepalive_interval;
-            current_location.dns = new_location.dns;
-            current_location.save(transaction.as_mut()).await?;
-            info!(
-                "Location {}({}) updated for instance {}({}).",
-                current_location.name, current_location.id, instance.name, instance.id,
-            );
-        } else {
-            // create new location
-            debug!(
-                "Creating new location for instance {}({}).",
-                instance.name, instance.id
-            );
-            let new_location = new_location.save(transaction.as_mut()).await?;
-            info!(
-                "New location {}({}) created for instance {}({})",
-                new_location.name, new_location.id, instance.name, instance.id
-            );
+    // check if locations have changed
+    if locations_changed {
+        // process locations received in response
+        debug!(
+            "Updating locations for instance {}({}).",
+            instance.name, instance.id
+        );
+        // fetch existing locations for given instance
+        let mut current_locations =
+            Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
+        for location in response.configs {
+            // parse device config
+            let new_location = device_config_to_location(location, instance.id);
+
+            // check if location is already present in current locations
+            if let Some(position) = current_locations
+                .iter()
+                .position(|loc| loc.network_id == new_location.network_id)
+            {
+                // remove from list of existing locations
+                let mut current_location = current_locations.remove(position);
+                debug!(
+                    "Updating existing location {}({}) for instance {}({}).",
+                    current_location.name, current_location.id, instance.name, instance.id,
+                );
+                // update existing location
+                current_location.name = new_location.name;
+                current_location.address = new_location.address;
+                current_location.pubkey = new_location.pubkey;
+                current_location.endpoint = new_location.endpoint;
+                current_location.allowed_ips = new_location.allowed_ips;
+                current_location.mfa_enabled = new_location.mfa_enabled;
+                current_location.keepalive_interval = new_location.keepalive_interval;
+                current_location.dns = new_location.dns;
+                current_location.save(transaction.as_mut()).await?;
+                info!(
+                    "Location {}({}) updated for instance {}({}).",
+                    current_location.name, current_location.id, instance.name, instance.id,
+                );
+            } else {
+                // create new location
+                debug!(
+                    "Creating new location for instance {}({}).",
+                    instance.name, instance.id
+                );
+                let new_location = new_location.save(transaction.as_mut()).await?;
+                info!(
+                    "New location {}({}) created for instance {}({})",
+                    new_location.name, new_location.id, instance.name, instance.id
+                );
+            }
         }
-    }
-    info!(
-        "Locations updated for instance {}({}).",
-        instance.name, instance.id
-    );
+        info!(
+            "Locations updated for instance {}({}).",
+            instance.name, instance.id
+        );
 
-    // remove locations which were present in current locations
-    // but no longer found in core response
-    debug!(
-        "Removing locations for instance {}({}).",
-        instance.name, instance.id
-    );
-    for removed_location in current_locations {
-        removed_location.delete(transaction.as_mut()).await?;
+        // remove locations which were present in current locations
+        // but no longer found in core response
+        debug!(
+            "Removing locations for instance {}({}).",
+            instance.name, instance.id
+        );
+        for removed_location in current_locations {
+            removed_location.delete(transaction.as_mut()).await?;
+        }
+        info!(
+            "Locations removed for instance {}({}).",
+            instance.name, instance.id
+        );
+    } else {
+        info!(
+            "Locations for instance {}({}) didn't change. Not updating them.",
+            instance.name, instance.id
+        );
     }
     info!(
-        "Locations removed for instance {}({}).",
+        "Instance {}({}) update is done.",
         instance.name, instance.id
     );
-    info!("Instance {}({}) updated", instance.name, instance.id);
     Ok(())
 }
 

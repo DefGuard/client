@@ -134,6 +134,23 @@ impl Location<Id> {
             .await?;
         Ok(())
     }
+
+    /// Disables all traffic for locations related to the given instance
+    pub async fn disable_all_traffic_for_all<'e, E>(
+        executor: E,
+        instance_id: i64,
+    ) -> Result<(), Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    {
+        query!(
+            "UPDATE location SET route_all_traffic = 0 WHERE instance_id = $1;",
+            instance_id
+        )
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
 }
 
 impl Location<NoId> {

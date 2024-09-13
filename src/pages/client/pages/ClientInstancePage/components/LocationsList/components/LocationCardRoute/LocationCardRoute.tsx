@@ -51,7 +51,11 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
     <Toggle
       className="location-traffic-toggle"
       options={toggleOptions}
-      selected={Number(location?.route_all_traffic)}
+      selected={
+        selectedDefguardInstance?.disable_all_traffic
+          ? 0
+          : Number(location?.route_all_traffic)
+      }
       disabled={location?.active}
       onChange={(v) => {
         if (!location?.active) {

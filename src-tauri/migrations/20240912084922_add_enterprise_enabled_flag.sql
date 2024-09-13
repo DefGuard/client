@@ -1,0 +1,1 @@
+ALTER TABLE instance ADD COLUMN enterprise_enabled BOOLEAN NOT NULL DEFAULT FALSE;
