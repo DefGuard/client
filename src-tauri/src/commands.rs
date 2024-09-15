@@ -94,7 +94,9 @@ pub async fn disconnect(
         info!("Disconnected from location with id: {location_id}");
         reload_tray_menu(&handle).await;
         if connection_type == ConnectionType::Location {
-            maybe_update_instance_config(location_id, &handle).await?;
+            if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
+                warn!("Failed to update instance for location {location_id}: {err}");
+            };
         }
         Ok(())
     } else {
