@@ -25,7 +25,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
     let mut tray_menu = SystemTrayMenu::new();
 
     // INSTANCE SECTION
-    info!("Load all instances for tray menu");
+    debug!("Loading all instances for tray menu");
     let all_instances = all_instances(app_state.clone()).await;
     debug!("All instances: {:?}", all_instances);
     if let Ok(instances) = all_instances {
@@ -53,6 +53,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
     } else if let Err(err) = all_instances {
         warn!("Cannot load instance menu: {:?}", err);
     }
+    info!("Loaded all instances for tray menu");
 
     // Load rest of tray menu options
     tray_menu = tray_menu
@@ -66,7 +67,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
-    info!("Successfully sets tray menu");
+    info!("Successfully set tray menu");
     Ok(tray_menu)
 }
 

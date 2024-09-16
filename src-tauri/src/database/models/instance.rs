@@ -42,7 +42,7 @@ impl Instance<Id> {
         let proxy_url = self.proxy_url.to_string();
         // Update the existing record when there is an ID
         query!(
-            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6, enterprise_enabled = $7 WHERE id = $8;",
+            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6, enterprise_enabled = $7, token = $8 WHERE id = $9;",
             self.name,
             self.uuid,
             url,
@@ -50,6 +50,7 @@ impl Instance<Id> {
             self.username,
             self.disable_all_traffic,
             self.enterprise_enabled,
+            self.token,
             self.id
         )
         .execute(executor)
