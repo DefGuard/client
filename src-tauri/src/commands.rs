@@ -124,6 +124,7 @@ async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> R
     };
     poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
+    handle.emit_all(INSTANCE_UPDATE, ())?;
     Ok(())
 }
 
