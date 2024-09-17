@@ -124,6 +124,7 @@ async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> R
     };
     poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
+    handle.emit_all(INSTANCE_UPDATE, ())?;
     Ok(())
 }
 
@@ -438,6 +439,17 @@ pub async fn do_update_instance(
     }
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
+    // Token may be empty if it was not issued
+    // This happens during polling, as core doesn't issue a new token for polling request
+    if response.token.is_some() {
+        instance.token = response.token;
+        info!("Set polling token for instance {}", instance.name);
+    } else {
+        debug!(
+            "No polling token received for instance {}, not updating",
+            instance.name
+        );
+    }
     instance.save(transaction.as_mut()).await?;
     debug!(
         "Instance {}({}) main config applied from core's response.",

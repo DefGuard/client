@@ -61,6 +61,9 @@ pub async fn poll_config(handle: AppHandle) {
         if let Err(err) = transaction.commit().await {
             error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
         }
+        if let Err(err) = handle.emit_all(INSTANCE_UPDATE, ()) {
+            error!("Failed to emit instance update event: {err}");
+        }
         info!(
             "Retrieved configuration for {} instances, sleeping {}s",
             instances.len(),
@@ -115,7 +118,6 @@ pub async fn poll_instance(
             instance
                 .disable_enterprise_features(transaction.as_mut())
                 .await?;
-            handle.emit_all(INSTANCE_UPDATE, ())?;
         } else {
             debug!(
                 "Instance {}({}) has enterprise features disabled, and we have them disabled as well, no action needed",
@@ -160,7 +162,6 @@ pub async fn poll_instance(
             instance.name, instance.id,
         );
         do_update_instance(transaction, instance, device_config.clone()).await?;
-        handle.emit_all(INSTANCE_UPDATE, ())?;
         info!(
             "Updated instance {}({}) configuration",
             instance.name, instance.id
