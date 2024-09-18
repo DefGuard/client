@@ -110,11 +110,23 @@ impl DesktopDaemonService for DaemonService {
             })?;
         }
 
-        let dns: Vec<IpAddr> = request
-            .dns
-            .into_iter()
-            .filter_map(|s| s.parse().ok())
-            .collect();
+        // The wireguard dns config value can be a list of IP addresses and domain names, which will be
+        // used as DNS servers and search domains respectively.
+        let dns_string = request.dns.unwrap_or_default();
+        let dns_entries = dns_string
+            .split(',')
+            .map(|s| s.trim())
+            .collect::<Vec<&str>>();
+        // We assume that every entry that can't be parsed as an IP address is a domain name.
+        let mut dns = Vec::new();
+        let mut search_domains = Vec::new();
+        for entry in dns_entries {
+            if let Ok(ip) = entry.parse::<IpAddr>() {
+                dns.push(ip);
+            } else {
+                search_domains.push(entry);
+            }
+        }
 
         // configure interface
         debug!("Configuring new interface {ifname} with configuration: {config:?}");
@@ -122,7 +134,7 @@ impl DesktopDaemonService for DaemonService {
         #[cfg(not(windows))]
         let configure_interface_result = wgapi.configure_interface(&config);
         #[cfg(windows)]
-        let configure_interface_result = wgapi.configure_interface(&config, &dns);
+        let configure_interface_result = wgapi.configure_interface(&config, &dns, &search_domains);
 
         configure_interface_result.map_err(|err| {
             let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
@@ -144,7 +156,7 @@ impl DesktopDaemonService for DaemonService {
             // Configure DNS
             if !dns.is_empty() {
                 debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
-                wgapi.configure_dns(&dns).map_err(|err| {
+                wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
                     let msg =
                         format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
                     error!("{msg}");
