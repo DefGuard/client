@@ -110,7 +110,7 @@ impl DesktopDaemonService for DaemonService {
             })?;
         }
 
-        // The wireguard dns config value can be a list of IP addresses and domain names, which will be
+        // The WireGuard DNS config value can be a list of IP addresses and domain names, which will be
         // used as DNS servers and search domains respectively.
         let dns_string = request.dns.unwrap_or_default();
         let dns_entries = dns_string
