@@ -58,11 +58,13 @@ jobs:
     runs-on:
       - self-hosted
       - Linux
-      - ${{ matrix.architecture }}
+      - X64
     strategy:
       fail-fast: false
       matrix:
-        architecture: [ARM64, X64]
+        include:
+          - tauri-args: '--target x86_64-unknown-linux-gnu'
+          - tauri-args: '--target aarch64-unknown-linux-gnu'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,6 +103,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.tauri-args }}
       # - name: Upload DEB
       #   uses: actions/upload-release-asset@v1.0.2
       #   env:
