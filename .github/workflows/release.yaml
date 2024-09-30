@@ -62,7 +62,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        architecture: [ARM64, X64]
+        # architecture: [ARM64, X64]
+        architecture: [ARM64]
     steps:
       - uses: actions/checkout@v4
         with:
