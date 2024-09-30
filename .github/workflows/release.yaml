@@ -108,8 +108,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_arm64.deb
-          asset_name: defguard-client_${{ env.VERSION }}_arm64.deb
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_0.4.0_arm64.deb
+          asset_name: defguard-client_0.4.0_arm64.deb
           asset_content_type: application/octet-stream
       # - name: Upload AppImage
       #   uses: actions/upload-release-asset@v1.0.2
