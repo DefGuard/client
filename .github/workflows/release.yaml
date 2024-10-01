@@ -40,21 +40,21 @@ jobs:
   #       with:
   #         name: wireguard-go-x86_64-apple-darwin
   #         path: wireguard-go
-  # create-release:
-  #   name: create-release
-  #   runs-on: self-hosted
-  #   outputs:
-  #     upload_url: ${{ steps.release.outputs.upload_url }}
-  #   steps:
-  #     - name: Create GitHub release
-  #       id: release
-  #       uses: softprops/action-gh-release@v1
-  #       with:
-  #         draft: true
-  #         generate_release_notes: true
+  create-release:
+    name: create-release
+    runs-on: self-hosted
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+    steps:
+      - name: Create GitHub release
+        id: release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          generate_release_notes: true
   build-linux:
-    # needs:
-    #   - create-release
+    needs:
+      - create-release
     runs-on:
       - self-hosted
       - Linux
@@ -62,8 +62,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # architecture: [ARM64, X64]
-        architecture: [ARM64]
+        architecture: [ARM64, X64]
+        include:
+          - architecture: ARM64
+            name: arm64
+          - architecture: X64
+            name: amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,20 +101,20 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip protobuf-compiler
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip protobuf-compiler libprotobuf-dev
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Upload DEB
-      #   uses: actions/upload-release-asset@v1.0.2
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ needs.create-release.outputs.upload_url }}
-      #     asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_amd64.deb
-      #     asset_name: defguard-client_${{ env.VERSION }}_amd64.deb
-      #     asset_content_type: application/octet-stream
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.name }}.deb
+          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.name }}.deb
+          asset_content_type: application/octet-stream
       # - name: Upload AppImage
       #   uses: actions/upload-release-asset@v1.0.2
       #   env:
