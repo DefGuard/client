@@ -13,6 +13,10 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+#[cfg(not(target_os = "macos"))]
+use defguard_wireguard_rs::Kernel;
+#[cfg(target_os = "macos")]
+use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError,
     host::{Host, Peer},
@@ -33,7 +37,7 @@ use tonic::{
 use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
-use crate::utils::{execute_command, IS_MACOS};
+use crate::utils::execute_command;
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
@@ -64,12 +68,25 @@ impl DaemonService {
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-fn setup_wgapi(ifname: &str) -> Result<WGApi, Status> {
-    let wgapi = WGApi::new(ifname.to_string(), IS_MACOS).map_err(|err| {
+#[cfg(not(target_os = "macos"))]
+fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
+    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
+
+    Ok(wgapi)
+}
+
+#[cfg(target_os = "macos")]
+fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
+    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
+        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
+        error!("{msg}");
+        Status::new(Code::Internal, msg)
+    })?;
+
     Ok(wgapi)
 }
 

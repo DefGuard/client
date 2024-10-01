@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     // Make all messages serde-serializable
     config.type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]");
-    tonic_build::configure().compile_with_config(
+    tonic_build::configure().compile_protos_with_config(
         config,
         &["proto/client/client.proto", "proto/core/proxy.proto"],
         &["proto/client", "proto/core"],
