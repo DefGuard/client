@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
@@ -9,9 +9,9 @@ use crate::error::Error;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Location<I = NoId> {
     pub id: I,
-    pub instance_id: i64,
-    // Native id of network from defguard
-    pub network_id: i64,
+    pub instance_id: Id,
+    // Native ID of network from Defguard
+    pub network_id: Id,
     pub name: String,
     pub address: String,
     pub pubkey: String,
@@ -23,36 +23,34 @@ pub struct Location<I = NoId> {
     pub keepalive_interval: i64,
 }
 
-impl Display for Location<Id> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Location<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[ID {}] {}", self.id, self.name)
     }
 }
 
-impl Display for Location<NoId> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Location<NoId> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
 impl Location<Id> {
-    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
-        let locations = query_as!(
+        query_as!(
             Self,
-            "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
-             route_all_traffic, mfa_enabled, keepalive_interval \
-        FROM location;"
+            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
+            route_all_traffic, mfa_enabled, keepalive_interval \
+            FROM location;"
         )
         .fetch_all(executor)
-        .await?;
-
-        Ok(locations)
+        .await
     }
 
-    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -79,7 +77,7 @@ impl Location<Id> {
         Ok(())
     }
 
-    pub async fn find_by_id<'e, E>(executor: E, location_id: i64) -> Result<Option<Self>, SqlxError>
+    pub async fn find_by_id<'e, E>(executor: E, location_id: Id) -> Result<Option<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -95,7 +93,7 @@ impl Location<Id> {
 
     pub async fn find_by_instance_id<'e, E>(
         executor: E,
-        instance_id: i64,
+        instance_id: Id,
     ) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
@@ -124,7 +122,7 @@ impl Location<Id> {
         .await
     }
 
-    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), SqlxError>
+    pub async fn delete<'e, E>(self, executor: E) -> Result<(), SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -138,10 +136,10 @@ impl Location<Id> {
     /// Disables all traffic for locations related to the given instance
     pub async fn disable_all_traffic_for_all<'e, E>(
         executor: E,
-        instance_id: i64,
+        instance_id: Id,
     ) -> Result<(), Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
         query!(
             "UPDATE location SET route_all_traffic = 0 WHERE instance_id = $1;",
@@ -154,30 +152,30 @@ impl Location<Id> {
 }
 
 impl Location<NoId> {
-    pub async fn save<'e, E>(self, executor: E) -> Result<Location<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> Result<Location<Id>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
         // Insert a new record when there is no ID
         let id = query_scalar!(
-                "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-                network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
-                RETURNING id \"id!\"",
-                self.instance_id,
-                self.name,
-                self.address,
-                self.pubkey,
-                self.endpoint,
-                self.allowed_ips,
-                self.dns,
-                self.network_id,
-                self.route_all_traffic,
-                self.mfa_enabled,
-                self.keepalive_interval
-            )
-            .fetch_one(executor)
-            .await?;
+            "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
+            network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
+            RETURNING id \"id!\"",
+            self.instance_id,
+            self.name,
+            self.address,
+            self.pubkey,
+            self.endpoint,
+            self.allowed_ips,
+            self.dns,
+            self.network_id,
+            self.route_all_traffic,
+            self.mfa_enabled,
+            self.keepalive_interval
+        )
+        .fetch_one(executor)
+        .await?;
 
         Ok(Location::<Id> {
             id,

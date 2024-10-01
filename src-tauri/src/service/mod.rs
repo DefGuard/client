@@ -130,10 +130,7 @@ impl DesktopDaemonService for DaemonService {
         // The WireGuard DNS config value can be a list of IP addresses and domain names, which will be
         // used as DNS servers and search domains respectively.
         let dns_string = request.dns.unwrap_or_default();
-        let dns_entries = dns_string
-            .split(',')
-            .map(|s| s.trim())
-            .collect::<Vec<&str>>();
+        let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
         // We assume that every entry that can't be parsed as an IP address is a domain name.
         let mut dns = Vec::new();
         let mut search_domains = Vec::new();
@@ -161,7 +158,6 @@ impl DesktopDaemonService for DaemonService {
 
         #[cfg(not(windows))]
         {
-            // configure routing
             debug!("Configuring interface {ifname} routing");
             wgapi.configure_peer_routing(&config.peers).map_err(|err| {
                 let msg =
@@ -170,7 +166,6 @@ impl DesktopDaemonService for DaemonService {
                 Status::new(Code::Internal, msg)
             })?;
 
-            // Configure DNS
             if !dns.is_empty() {
                 debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
                 wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
@@ -198,14 +193,29 @@ impl DesktopDaemonService for DaemonService {
         let ifname = request.interface_name;
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         info!("Removing interface {ifname}");
-        // setup WireGuard API
+
         let wgapi = setup_wgapi(&ifname)?;
         if let Some(pre_down) = request.pre_down {
             debug!("Executing specified PreDown command: {pre_down}");
             let _ = execute_command(&pre_down);
             info!("Executed specified PreDown command: {pre_down}");
         }
-        // remove interface
+
+        #[cfg(not(windows))]
+        {
+            debug!("Cleaning up interface {ifname} routing");
+            wgapi
+                .remove_endpoint_routing(&request.endpoint)
+                .map_err(|err| {
+                    let msg = format!(
+                        "Failed to remove routing for endpoint {}: {err}",
+                        request.endpoint
+                    );
+                    error!("{msg}");
+                    Status::new(Code::Internal, msg)
+                })?;
+        }
+
         wgapi.remove_interface().map_err(|err| {
             let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
             error!("{msg}");

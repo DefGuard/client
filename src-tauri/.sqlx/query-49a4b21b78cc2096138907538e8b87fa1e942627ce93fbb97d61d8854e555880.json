@@ -1,15 +1,15 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT c.id \"id!\", c.location_id \"location_id!\", c.connected_from \"connected_from!\", c.start \"start!\", c.end \"end!\", COALESCE(( SELECT ls.upload FROM location_stats ls WHERE ls.location_id = c.location_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"upload: _\", COALESCE(( SELECT ls.download FROM location_stats ls WHERE ls.location_id = c.location_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"download: _\" FROM connection c WHERE location_id = $1 ORDER BY start DESC",
+  "query": "SELECT c.id, c.location_id, c.connected_from \"connected_from!\", c.start \"start!\", c.end \"end!\", COALESCE(( SELECT ls.upload FROM location_stats ls WHERE ls.location_id = c.location_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"upload: _\", COALESCE(( SELECT ls.download FROM location_stats ls WHERE ls.location_id = c.location_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"download: _\" FROM connection c WHERE location_id = $1 ORDER BY start DESC",
   "describe": {
     "columns": [
       {
-        "name": "id!",
+        "name": "id",
         "ordinal": 0,
         "type_info": "Integer"
       },
       {
-        "name": "location_id!",
+        "name": "location_id",
         "ordinal": 1,
         "type_info": "Integer"
       },
@@ -52,5 +52,5 @@
       false
     ]
   },
-  "hash": "496274733f697dd82abd8027ce9f3ea45c523806fc9b702aefb52b03dd5063b8"
+  "hash": "49a4b21b78cc2096138907538e8b87fa1e942627ce93fbb97d61d8854e555880"
 }

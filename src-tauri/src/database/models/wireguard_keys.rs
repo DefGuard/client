@@ -7,7 +7,7 @@ use crate::error::Error;
 #[derive(Debug)]
 pub struct WireguardKeys<I = NoId> {
     pub id: I,
-    pub instance_id: i64,
+    pub instance_id: Id,
     pub pubkey: String,
     pub prvkey: String,
 }
@@ -15,7 +15,7 @@ pub struct WireguardKeys<I = NoId> {
 impl WireguardKeys<Id> {
     pub async fn find_by_instance_id<'e, E>(
         executor: E,
-        instance_id: i64,
+        instance_id: Id,
     ) -> Result<Option<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
@@ -33,7 +33,7 @@ impl WireguardKeys<Id> {
 
 impl WireguardKeys<NoId> {
     #[must_use]
-    pub fn new(instance_id: i64, pubkey: String, prvkey: String) -> Self {
+    pub fn new(instance_id: Id, pubkey: String, prvkey: String) -> Self {
         WireguardKeys {
             id: NoId,
             instance_id,

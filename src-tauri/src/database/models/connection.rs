@@ -8,7 +8,7 @@ use crate::{error::Error, CommonConnection, CommonConnectionInfo, ConnectionType
 #[derive(Debug, Serialize, Clone)]
 pub struct Connection<I = NoId> {
     pub id: I,
-    pub location_id: i64,
+    pub location_id: Id,
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
@@ -41,7 +41,7 @@ impl Connection<NoId> {
 
     pub async fn all_by_location_id<'e, E>(
         executor: E,
-        location_id: i64,
+        location_id: Id,
     ) -> Result<Vec<Connection<Id>>, Error>
     where
         E: SqliteExecutor<'e>,
@@ -59,7 +59,7 @@ impl Connection<NoId> {
 
     pub async fn latest_by_location_id<'e, E>(
         executor: E,
-        location_id: i64,
+        location_id: Id,
     ) -> Result<Option<Connection<Id>>, Error>
     where
         E: SqliteExecutor<'e>,
@@ -80,8 +80,8 @@ impl Connection<NoId> {
 /// Historical connection
 #[derive(Debug, Serialize)]
 pub struct ConnectionInfo {
-    pub id: i64,
-    pub location_id: i64,
+    pub id: Id,
+    pub location_id: Id,
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
@@ -104,10 +104,7 @@ impl From<ConnectionInfo> for CommonConnectionInfo {
 }
 
 impl ConnectionInfo {
-    pub async fn all_by_location_id<'e, E>(
-        executor: E,
-        location_id: i64,
-    ) -> Result<Vec<Self>, Error>
+    pub async fn all_by_location_id<'e, E>(executor: E, location_id: Id) -> Result<Vec<Self>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -116,7 +113,7 @@ impl ConnectionInfo {
         // FIXME: Optimize query
         let connections = query_as!(
             ConnectionInfo,
-            "SELECT c.id \"id!\", c.location_id \"location_id!\", \
+            "SELECT c.id, c.location_id, \
             c.connected_from \"connected_from!\", c.start \"start!\", \
             c.end \"end!\", \
             COALESCE(( \
@@ -149,7 +146,7 @@ impl ConnectionInfo {
 /// Connections stored in memory after creating interface
 #[derive(Debug, Serialize, Clone)]
 pub struct ActiveConnection {
-    pub location_id: i64,
+    pub location_id: Id,
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub interface_name: String,
@@ -159,7 +156,7 @@ pub struct ActiveConnection {
 impl ActiveConnection {
     #[must_use]
     pub fn new(
-        location_id: i64,
+        location_id: Id,
         connected_from: String,
         interface_name: String,
         connection_type: ConnectionType,

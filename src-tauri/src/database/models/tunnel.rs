@@ -77,7 +77,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    pub async fn delete<'e, E>(self, executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -85,7 +85,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: i64) -> Result<Option<Self>, SqlxError>
+    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: Id) -> Result<Option<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -131,7 +131,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub async fn delete_by_id<'e, E>(executor: E, id: i64) -> Result<(), Error>
+    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -235,7 +235,7 @@ impl Tunnel<NoId> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelStats<I = NoId> {
     id: I,
-    tunnel_id: i64,
+    tunnel_id: Id,
     upload: i64,
     download: i64,
     last_handshake: i64,
@@ -247,7 +247,7 @@ pub struct TunnelStats<I = NoId> {
 impl TunnelStats<NoId> {
     #[must_use]
     pub fn new(
-        tunnel_id: i64,
+        tunnel_id: Id,
         upload: i64,
         download: i64,
         last_handshake: i64,
@@ -302,7 +302,7 @@ impl TunnelStats<NoId> {
 impl TunnelStats<Id> {
     pub async fn all_by_tunnel_id<'e, E>(
         executor: E,
-        tunnel_id: i64,
+        tunnel_id: Id,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
     ) -> Result<Vec<Self>, SqlxError>
@@ -368,7 +368,7 @@ where
 #[derive(Debug, Serialize, Clone)]
 pub struct TunnelConnection<I = NoId> {
     pub id: I,
-    pub tunnel_id: i64,
+    pub tunnel_id: Id,
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
@@ -391,7 +391,7 @@ impl From<TunnelConnectionInfo> for CommonConnectionInfo {
 impl TunnelConnection<Id> {
     pub async fn all_by_tunnel_id<'e, E>(
         executor: E,
-        tunnel_id: i64,
+        tunnel_id: Id,
     ) -> Result<Vec<TunnelConnection<Id>>, Error>
     where
         E: SqliteExecutor<'e>,
@@ -409,7 +409,7 @@ impl TunnelConnection<Id> {
 
     pub async fn latest_by_tunnel_id<'e, E>(
         executor: E,
-        tunnel_id: i64,
+        tunnel_id: Id,
     ) -> Result<Option<TunnelConnection<Id>>, Error>
     where
         E: SqliteExecutor<'e>,
@@ -434,7 +434,7 @@ impl TunnelConnection<NoId> {
     {
         let id = query_scalar!(
             "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
-            VALUES ($1, $2, $3, $4) RETURNING id \"id!\";",
+            VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
             self.tunnel_id,
             self.connected_from,
             self.start,
@@ -456,8 +456,8 @@ impl TunnelConnection<NoId> {
 /// Historical connection
 #[derive(Debug, Serialize)]
 pub struct TunnelConnectionInfo {
-    pub id: i64,
-    pub tunnel_id: i64,
+    pub id: Id,
+    pub tunnel_id: Id,
     pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
@@ -466,7 +466,7 @@ pub struct TunnelConnectionInfo {
 }
 
 impl TunnelConnectionInfo {
-    pub async fn all_by_tunnel_id<'e, E>(executor: E, tunnel_id: i64) -> Result<Vec<Self>, Error>
+    pub async fn all_by_tunnel_id<'e, E>(executor: E, tunnel_id: Id) -> Result<Vec<Self>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -475,7 +475,7 @@ impl TunnelConnectionInfo {
         // FIXME: Optimize query
         let connections = query_as!(
             TunnelConnectionInfo,
-            "SELECT c.id \"id!\", c.tunnel_id \"tunnel_id!\", \
+            "SELECT c.id, c.tunnel_id, \
             c.connected_from \"connected_from!\", c.start \"start!\", \
             c.end \"end!\", \
             COALESCE(( \
@@ -507,7 +507,7 @@ impl TunnelConnectionInfo {
 
 impl From<&ActiveConnection> for TunnelConnection<NoId> {
     fn from(active_connection: &ActiveConnection) -> Self {
-        TunnelConnection {
+        Self {
             id: NoId,
             tunnel_id: active_connection.location_id,
             connected_from: active_connection.connected_from.clone(),
@@ -517,10 +517,9 @@ impl From<&ActiveConnection> for TunnelConnection<NoId> {
     }
 }
 
-// Implementing From for TunnelConnection into CommonConnection
 impl From<TunnelConnection<Id>> for CommonConnection<Id> {
     fn from(tunnel_connection: TunnelConnection<Id>) -> Self {
-        CommonConnection::<Id> {
+        Self {
             id: tunnel_connection.id,
             location_id: tunnel_connection.tunnel_id, // Assuming you want to map tunnel_id to location_id
             connected_from: tunnel_connection.connected_from,
@@ -531,10 +530,9 @@ impl From<TunnelConnection<Id>> for CommonConnection<Id> {
     }
 }
 
-// Implement From trait for converting TunnelStats to CommonLocationStats
 impl From<TunnelStats<Id>> for CommonLocationStats<Id> {
     fn from(tunnel_stats: TunnelStats<Id>) -> Self {
-        CommonLocationStats {
+        Self {
             id: tunnel_stats.id,
             location_id: tunnel_stats.tunnel_id,
             upload: tunnel_stats.upload,

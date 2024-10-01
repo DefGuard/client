@@ -42,7 +42,7 @@ pub struct Payload {
 // Create new WireGuard interface
 #[tauri::command(async)]
 pub async fn connect(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     preshared_key: Option<String>,
     handle: AppHandle,
@@ -69,17 +69,13 @@ pub async fn connect(
 
 #[tauri::command]
 pub async fn disconnect(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Disconnecting location {location_id}");
     let state = handle.state::<AppState>();
-    if let Some(connection) = state
-        .find_and_remove_connection(location_id, &connection_type)
-        .await
-    {
-        let interface_name = connection.interface_name.clone();
+    if let Some(connection) = state.remove_connection(location_id, &connection_type).await {
         debug!("Found active connection");
         trace!("Connection: {connection:#?}");
         disconnect_interface(&connection, &state).await?;
@@ -90,7 +86,7 @@ pub async fn disconnect(
                 message: "Created new connection".into(),
             },
         )?;
-        stop_log_watcher_task(&handle, &interface_name)?;
+        stop_log_watcher_task(&handle, &connection.interface_name)?;
         info!("Disconnected from location with id: {location_id}");
         reload_tray_menu(&handle).await;
         if connection_type == ConnectionType::Location {
@@ -107,7 +103,7 @@ pub async fn disconnect(
 
 /// Triggers poll on location's instance config. Config will be updated if there are no more active
 /// connections for this instance.
-async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> Result<(), Error> {
+async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
     let state: State<'_, AppState> = handle.state();
     let mut transaction = state.get_pool().begin().await?;
     let Some(location) = Location::find_by_id(&mut *transaction, location_id).await? else {
@@ -130,15 +126,15 @@ async fn maybe_update_instance_config(location_id: i64, handle: &AppHandle) -> R
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
-    pub id: i64,
+    pub id: Id,
     pub name: String,
     pub pubkey: String,
-    pub user_id: i64,
+    pub user_id: Id,
     pub created_at: i64,
 }
 
 #[must_use]
-pub fn device_config_to_location(device_config: DeviceConfig, instance_id: i64) -> Location<NoId> {
+pub fn device_config_to_location(device_config: DeviceConfig, instance_id: Id) -> Location<NoId> {
     Location {
         id: NoId,
         instance_id,
@@ -279,8 +275,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
 
 #[derive(Serialize, Debug)]
 pub struct LocationInfo {
-    pub id: i64,
-    pub instance_id: i64,
+    pub id: Id,
+    pub instance_id: Id,
     pub name: String,
     pub address: String,
     pub endpoint: String,
@@ -289,12 +285,12 @@ pub struct LocationInfo {
     pub connection_type: ConnectionType,
     pub pubkey: String,
     pub mfa_enabled: bool,
-    pub network_id: i64,
+    pub network_id: Id,
 }
 
 #[tauri::command(async)]
 pub async fn all_locations(
-    instance_id: i64,
+    instance_id: Id,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, Error> {
     debug!("Retrieving all locations.");
@@ -331,7 +327,7 @@ pub async fn all_locations(
 
 #[derive(Serialize, Debug)]
 pub struct LocationInterfaceDetails {
-    pub location_id: i64,
+    pub location_id: Id,
     // client interface config
     pub name: String,    // interface name generated from location name
     pub pubkey: String,  // own pubkey of client interface
@@ -348,7 +344,7 @@ pub struct LocationInterfaceDetails {
 
 #[tauri::command(async)]
 pub async fn location_interface_details(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     app_state: State<'_, AppState>,
 ) -> Result<LocationInterfaceDetails, Error> {
@@ -361,7 +357,7 @@ pub async fn location_interface_details(
 
 #[tauri::command(async)]
 pub async fn update_instance(
-    instance_id: i64,
+    instance_id: Id,
     response: DeviceConfigResponse,
     app_state: State<'_, AppState>,
     app_handle: AppHandle,
@@ -578,7 +574,7 @@ fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
 
 #[tauri::command(async)]
 pub async fn location_stats(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     from: Option<String>,
     app_state: State<'_, AppState>,
@@ -611,7 +607,7 @@ pub async fn location_stats(
 
 #[tauri::command(async)]
 pub async fn all_connections(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<CommonConnectionInfo>, Error> {
@@ -639,7 +635,7 @@ pub async fn all_connections(
 
 #[tauri::command(async)]
 pub async fn all_tunnel_connections(
-    location_id: i64,
+    location_id: Id,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<TunnelConnectionInfo>, Error> {
     debug!("Retrieving connections for location {location_id}");
@@ -652,7 +648,7 @@ pub async fn all_tunnel_connections(
 
 #[tauri::command(async)]
 pub async fn active_connection(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     handle: AppHandle,
 ) -> Result<Option<ActiveConnection>, Error> {
@@ -670,7 +666,7 @@ pub async fn active_connection(
 
 #[tauri::command(async)]
 pub async fn last_connection(
-    location_id: i64,
+    location_id: Id,
     connection_type: ConnectionType,
     app_state: State<'_, AppState>,
 ) -> Result<Option<CommonConnection<Id>>, Error> {
@@ -697,7 +693,7 @@ pub async fn last_connection(
 
 #[tauri::command(async)]
 pub async fn update_location_routing(
-    location_id: i64,
+    location_id: Id,
     route_all_traffic: bool,
     connection_type: ConnectionType,
     handle: AppHandle,
@@ -796,44 +792,46 @@ pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<S
 }
 
 #[tauri::command(async)]
-pub async fn delete_instance(instance_id: i64, handle: AppHandle) -> Result<(), Error> {
+pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance {instance_id}");
     let app_state = handle.state::<AppState>();
     let mut client = app_state.client.clone();
     let pool = &app_state.get_pool();
-    if let Some(instance) = Instance::find_by_id(pool, instance_id).await? {
-        let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
-        for location in instance_locations {
-            if let Some(connection) = app_state
-                .find_and_remove_connection(location.id, &ConnectionType::Location)
-                .await
-            {
-                debug!(
-                    "Found active connection for location {} ({}), closing...",
-                    location.name, location.id
-                );
-                let request = RemoveInterfaceRequest {
-                    interface_name: connection.interface_name.clone(),
-                    pre_down: None,
-                    post_down: None,
-                };
-                client.remove_interface(request).await.map_err(|status| {
-                        let msg =
-                            format!("Error occured while removing interface {} for location {} ({}), status: {status}",
-                            connection.interface_name, location.name, location.id
-                        );
-                        error!("{msg}");
-                        Error::InternalError(msg)
-                    })?;
-                info!("Connection closed and interface removed");
-            }
-        }
-        instance.delete(pool).await?;
-        reload_tray_menu(&handle).await;
-    } else {
+    let Some(instance) = Instance::find_by_id(pool, instance_id).await? else {
         error!("Instance {instance_id} not found");
         return Err(Error::NotFound);
+    };
+
+    let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
+    for location in instance_locations {
+        if let Some(connection) = app_state
+            .remove_connection(location.id, &ConnectionType::Location)
+            .await
+        {
+            debug!(
+                "Found active connection for location {} ({}), closing...",
+                location.name, location.id
+            );
+            let request = RemoveInterfaceRequest {
+                interface_name: connection.interface_name.clone(),
+                pre_down: None,
+                post_down: None,
+                endpoint: location.endpoint,
+            };
+            client.remove_interface(request).await.map_err(|status| {
+                    let msg =
+                        format!("Error occured while removing interface {} for location {} ({}), status: {status}",
+                        connection.interface_name, location.name, location.id
+                    );
+                    error!("{msg}");
+                    Error::InternalError(msg)
+                })?;
+            info!("Connection closed and interface removed");
+        }
     }
+    instance.delete(pool).await?;
+    reload_tray_menu(&handle).await;
+
     handle.emit_all(INSTANCE_UPDATE, ())?;
     info!("Instance {instance_id}, deleted");
     Ok(())
@@ -921,7 +919,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
 
 #[tauri::command(async)]
 pub async fn tunnel_details(
-    tunnel_id: i64,
+    tunnel_id: Id,
     app_state: State<'_, AppState>,
 ) -> Result<Tunnel<Id>, Error> {
     debug!("Retrieving Tunnel with ID {tunnel_id}.");
@@ -936,40 +934,42 @@ pub async fn tunnel_details(
 }
 
 #[tauri::command(async)]
-pub async fn delete_tunnel(tunnel_id: i64, handle: AppHandle) -> Result<(), Error> {
+pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting tunnel {tunnel_id}");
     let app_state = handle.state::<AppState>();
     let mut client = app_state.client.clone();
     let pool = &app_state.get_pool();
-    if let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? {
-        if let Some(connection) = app_state
-            .find_and_remove_connection(tunnel_id, &ConnectionType::Tunnel)
-            .await
-        {
-            debug!("Found active connection for tunnel({tunnel_id}), closing...",);
-            let request = RemoveInterfaceRequest {
-                interface_name: connection.interface_name.clone(),
-                pre_down: tunnel.pre_down.clone(),
-                post_down: tunnel.post_up.clone(),
-            };
-            client
-                .remove_interface(request)
-                .await
-                .map_err(|status| {
-                    let msg =
-                        format!("Error occured while removing interface {} for tunnel {tunnel_id}, status: {status}",
-                        connection.interface_name
-                    );
-                    error!("{msg}");
-                    Error::InternalError(msg)
-                })?;
-            info!("Connection closed and interface removed");
-        }
-        tunnel.delete(pool).await?;
-    } else {
+    let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? else {
         error!("Tunnel {tunnel_id} not found");
         return Err(Error::NotFound);
+    };
+
+    if let Some(connection) = app_state
+        .remove_connection(tunnel_id, &ConnectionType::Tunnel)
+        .await
+    {
+        debug!("Found active connection for tunnel({tunnel_id}), closing...",);
+        let request = RemoveInterfaceRequest {
+            interface_name: connection.interface_name.clone(),
+            pre_down: tunnel.pre_down.clone(),
+            post_down: tunnel.post_up.clone(),
+            endpoint: tunnel.endpoint.clone(),
+        };
+        client
+            .remove_interface(request)
+            .await
+            .map_err(|status| {
+                let msg =
+                    format!("Error occured while removing interface {} for tunnel {tunnel_id}, status: {status}",
+                    connection.interface_name
+                );
+                error!("{msg}");
+                Error::InternalError(msg)
+            })?;
+        info!("Connection closed and interface removed");
     }
+    tunnel.delete(pool).await?;
+
     info!("Tunnel {tunnel_id}, deleted");
     Ok(())
 }

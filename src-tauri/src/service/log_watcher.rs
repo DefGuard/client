@@ -24,7 +24,10 @@ use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
-use crate::{appstate::AppState, error::Error, utils::get_service_log_dir, ConnectionType};
+use crate::{
+    appstate::AppState, database::models::Id, error::Error, utils::get_service_log_dir,
+    ConnectionType,
+};
 
 #[derive(Error, Debug)]
 pub enum LogWatcherError {
@@ -266,7 +269,7 @@ fn extract_timestamp(filename: &str) -> Option<SystemTime> {
 /// Returned value is the name of an event topic to monitor.
 pub async fn spawn_log_watcher_task(
     handle: AppHandle,
-    location_id: i64,
+    location_id: Id,
     interface_name: String,
     connection_type: ConnectionType,
     log_level: Level,

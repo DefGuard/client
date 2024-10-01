@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) VALUES ($1, $2, $3, $4) RETURNING id \"id!\";",
+  "query": "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       true
     ]
   },
-  "hash": "57aac4270a9dd5eb9a48521d3ae9fc31cbf78b9aa70a9da740148f3196c4d9fe"
+  "hash": "88160affcd4bcd0d74ac816b7a975996902572e5ca3d365235a86e3464215cc1"
 }
