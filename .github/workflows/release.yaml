@@ -56,7 +56,18 @@ jobs:
     runs-on:
       - self-hosted
       - Linux
-      - X64
+      - ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [ARM64, X64]
+        include:
+          - architecture: ARM64
+            deb_arch: arm64
+            binary_arch: aarch64
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,7 +101,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip protobuf-compiler libprotobuf-dev
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
@@ -101,53 +112,44 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_amd64.deb
-          asset_name: defguard-client_${{ env.VERSION }}_amd64.deb
-          asset_content_type: application/octet-stream
-      - name: Upload AppImage
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/appimage/defguard-client_${{ env.VERSION }}_amd64.AppImage
-          asset_name: defguard-client_${{ env.VERSION }}_amd64.AppImage
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_content_type: application/octet-stream
       - name: Rename client binary
-        run: mv src-tauri/target/release/defguard-client defguard-client-linux-x86_64-${{ github.ref_name }}
+        run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
       - name: Tar client binary
         uses: a7ul/tar-action@v1.1.0
         with:
           command: c
           files: |
-            defguard-client-linux-x86_64-${{ github.ref_name }}
-          outPath: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
+            defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          outPath: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
       - name: Upload client archive
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-client-linux-x86_64-${{ github.ref_name }}.tar.gz
+          asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
       - name: Rename daemon binary
-        run: mv src-tauri/target/release/defguard-service defguard-service-linux-x86_64-${{ github.ref_name }}
+        run: mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
       - name: Tar daemon binary
         uses: a7ul/tar-action@v1.1.0
         with:
           command: c
           files: |
-            defguard-service-linux-x86_64-${{ github.ref_name }}
-          outPath: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
+            defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          outPath: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
       - name: Upload daemon archive
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-service-linux-x86_64-${{ github.ref_name }}.tar.gz
+          asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
   build-macos:
     needs:
