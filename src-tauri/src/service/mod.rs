@@ -414,6 +414,6 @@ mod tests {
 
         let converted_peer: Peer = proto_peer.into();
 
-        assert_eq!(base_peer, converted_peer)
+        assert_eq!(base_peer, converted_peer);
     }
 }
