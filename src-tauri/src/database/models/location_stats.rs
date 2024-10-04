@@ -14,7 +14,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {
     id: I,
-    location_id: i64,
+    location_id: Id,
     upload: i64,
     download: i64,
     last_handshake: i64,
@@ -66,7 +66,7 @@ where
 impl LocationStats<NoId> {
     #[must_use]
     pub fn new(
-        location_id: i64,
+        location_id: Id,
         upload: i64,
         download: i64,
         last_handshake: i64,
@@ -122,7 +122,7 @@ impl LocationStats<NoId> {
 impl LocationStats<Id> {
     pub async fn all_by_location_id<'e, E>(
         executor: E,
-        location_id: i64,
+        location_id: Id,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
     ) -> Result<Vec<Self>, Error>

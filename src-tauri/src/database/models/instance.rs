@@ -71,7 +71,7 @@ impl Instance<Id> {
         Ok(instances)
     }
 
-    pub async fn find_by_id<'e, E>(executor: E, id: i64) -> Result<Option<Self>, Error>
+    pub async fn find_by_id<'e, E>(executor: E, id: Id) -> Result<Option<Self>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -99,7 +99,7 @@ impl Instance<Id> {
         Ok(instance)
     }
 
-    pub async fn delete_by_id<'e, E>(executor: E, id: i64) -> Result<(), Error>
+    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -110,7 +110,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    pub async fn delete<'e, E>(self, executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {

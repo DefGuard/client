@@ -50,9 +50,11 @@ impl AppState {
             .unwrap()
     }
 
-    pub async fn find_and_remove_connection(
+    /// Try to remove a connection from the list of active connections.
+    /// Return removed connection, or `None` if not found.
+    pub async fn remove_connection(
         &self,
-        location_id: i64,
+        location_id: Id,
         connection_type: &ConnectionType,
     ) -> Option<ActiveConnection> {
         debug!("Removing active connection for location with id: {location_id}");
@@ -71,7 +73,7 @@ impl AppState {
         }
     }
 
-    pub async fn get_connection_id_by_type(&self, connection_type: &ConnectionType) -> Vec<i64> {
+    pub async fn get_connection_id_by_type(&self, connection_type: &ConnectionType) -> Vec<Id> {
         let active_connections = self.active_connections.lock().await;
 
         let connection_ids = active_connections
@@ -107,7 +109,7 @@ impl AppState {
 
     pub async fn find_connection(
         &self,
-        id: i64,
+        id: Id,
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().await;
@@ -128,12 +130,12 @@ impl AppState {
         }
     }
 
-    /// Returns active connections for given instance
+    /// Returns active connections for a given instance.
     pub async fn active_connections(
         &self,
         instance: &Instance<Id>,
     ) -> Result<Vec<ActiveConnection>, crate::error::Error> {
-        let locations: HashSet<i64> = Location::find_by_instance_id(&self.get_pool(), instance.id)
+        let locations: HashSet<Id> = Location::find_by_instance_id(&self.get_pool(), instance.id)
             .await?
             .iter()
             .map(|location| location.id)

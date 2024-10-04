@@ -13,6 +13,10 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+#[cfg(not(target_os = "macos"))]
+use defguard_wireguard_rs::Kernel;
+#[cfg(target_os = "macos")]
+use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError,
     host::{Host, Peer},
@@ -33,7 +37,7 @@ use tonic::{
 use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
-use crate::utils::{execute_command, IS_MACOS};
+use crate::utils::execute_command;
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
@@ -64,12 +68,25 @@ impl DaemonService {
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-fn setup_wgapi(ifname: &str) -> Result<WGApi, Status> {
-    let wgapi = WGApi::new(ifname.to_string(), IS_MACOS).map_err(|err| {
+#[cfg(not(target_os = "macos"))]
+fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
+    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
+
+    Ok(wgapi)
+}
+
+#[cfg(target_os = "macos")]
+fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
+    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
+        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
+        error!("{msg}");
+        Status::new(Code::Internal, msg)
+    })?;
+
     Ok(wgapi)
 }
 
@@ -113,10 +130,7 @@ impl DesktopDaemonService for DaemonService {
         // The WireGuard DNS config value can be a list of IP addresses and domain names, which will be
         // used as DNS servers and search domains respectively.
         let dns_string = request.dns.unwrap_or_default();
-        let dns_entries = dns_string
-            .split(',')
-            .map(|s| s.trim())
-            .collect::<Vec<&str>>();
+        let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
         // We assume that every entry that can't be parsed as an IP address is a domain name.
         let mut dns = Vec::new();
         let mut search_domains = Vec::new();
@@ -144,7 +158,6 @@ impl DesktopDaemonService for DaemonService {
 
         #[cfg(not(windows))]
         {
-            // configure routing
             debug!("Configuring interface {ifname} routing");
             wgapi.configure_peer_routing(&config.peers).map_err(|err| {
                 let msg =
@@ -153,7 +166,6 @@ impl DesktopDaemonService for DaemonService {
                 Status::new(Code::Internal, msg)
             })?;
 
-            // Configure DNS
             if !dns.is_empty() {
                 debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
                 wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
@@ -181,14 +193,29 @@ impl DesktopDaemonService for DaemonService {
         let ifname = request.interface_name;
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         info!("Removing interface {ifname}");
-        // setup WireGuard API
+
         let wgapi = setup_wgapi(&ifname)?;
         if let Some(pre_down) = request.pre_down {
             debug!("Executing specified PreDown command: {pre_down}");
             let _ = execute_command(&pre_down);
             info!("Executed specified PreDown command: {pre_down}");
         }
-        // remove interface
+
+        #[cfg(not(windows))]
+        {
+            debug!("Cleaning up interface {ifname} routing");
+            wgapi
+                .remove_endpoint_routing(&request.endpoint)
+                .map_err(|err| {
+                    let msg = format!(
+                        "Failed to remove routing for endpoint {}: {err}",
+                        request.endpoint
+                    );
+                    error!("{msg}");
+                    Status::new(Code::Internal, msg)
+                })?;
+        }
+
         wgapi.remove_interface().map_err(|err| {
             let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
             error!("{msg}");
@@ -387,6 +414,6 @@ mod tests {
 
         let converted_peer: Peer = proto_peer.into();
 
-        assert_eq!(base_peer, converted_peer)
+        assert_eq!(base_peer, converted_peer);
     }
 }

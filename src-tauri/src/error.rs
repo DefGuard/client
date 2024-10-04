@@ -1,9 +1,6 @@
 use std::net::AddrParseError;
 
-use base64;
 use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
-use local_ip_address::Error as LocalIpError;
-use sqlx;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -25,7 +22,7 @@ pub enum Error {
     #[error("IP address parse error: {0}")]
     AddrParse(#[from] AddrParseError),
     #[error("Local Ip Error: {0}")]
-    LocalIpError(#[from] LocalIpError),
+    LocalIpError(#[from] local_ip_address::Error),
     #[error("Internal error: {0}")]
     InternalError(String),
     #[error("Failed to parse timestamp")]
