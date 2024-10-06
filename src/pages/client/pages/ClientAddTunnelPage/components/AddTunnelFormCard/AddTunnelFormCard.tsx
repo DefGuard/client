@@ -136,7 +136,7 @@ export const AddTunnelFormCard = () => {
           }
           return true;
         }, LL.form.errors.invalid()),
-        persistent_keep_alive: z.number(),
+        persistent_keep_alive: z.coerce.number(),
         route_all_traffic: z.boolean(),
         pre_up: z.string().nullable(),
         post_up: z.string().nullable(),
