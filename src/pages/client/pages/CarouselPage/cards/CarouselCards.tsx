@@ -100,7 +100,9 @@ const MoreSection = () => {
 
   return (
     <>
-      <Markdown>{localLL.isMore()}</Markdown>
+      <div className="more">
+        <Markdown>{localLL.isMore()}</Markdown>
+      </div>
       <GithubButton />
     </>
   );
