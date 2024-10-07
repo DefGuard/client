@@ -14,5 +14,7 @@ http://www.apple.com/DTDs/PropertyList-1.0.dtd >
 	<string>/usr/local/bin/defguard-service</string>
     <key>KeepAlive</key>
     <true/>
+    <key>RunAtLoad</key>
+    <true/>
 </dict>
 </plist>

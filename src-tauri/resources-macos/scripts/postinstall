@@ -22,6 +22,7 @@ ln -sf ${BINARY_PATH}/${SERVICE_BINARY} /usr/local/bin/${SERVICE_BINARY}
 # Launch daemon
 ln -sf ${RESOURCES_PATH}/${DAEMON_PROPERTY_FILE} /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
 sudo launchctl load /Library/LaunchDaemons/${DAEMON_PROPERTY_FILE}
-sudo launchctl start ${DAEMON_NAME}
+# Restart
+sudo launchctl stop ${DAEMON_NAME}
 
 echo "Post installation process finished"
