@@ -9,14 +9,11 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
     str::FromStr,
-    time::{Duration, SystemTime},
+    thread::sleep,
+    time::Duration,
 };
 
-use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use notify_debouncer_mini::{
-    new_debouncer,
-    notify::{self, RecursiveMode},
-};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
@@ -29,14 +26,14 @@ use crate::{
     ConnectionType,
 };
 
-#[derive(Error, Debug)]
+const DELAY: Duration = Duration::from_secs(2);
+
+#[derive(Debug, Error)]
 pub enum LogWatcherError {
     #[error(transparent)]
     TauriError(#[from] tauri::Error),
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
-    #[error(transparent)]
-    NotifyError(#[from] notify::Error),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 }
@@ -72,7 +69,6 @@ pub struct ServiceLogWatcher<'a> {
     from: Option<DateTime<Utc>>,
     log_dir: &'a Path,
     current_log_file: Option<PathBuf>,
-    current_position: u64,
     handle: AppHandle,
     cancellation_token: CancellationToken,
     event_topic: String,
@@ -97,7 +93,6 @@ impl<'a> ServiceLogWatcher<'a> {
             from,
             log_dir,
             current_log_file: None,
-            current_position: 0,
             handle,
             cancellation_token,
             event_topic,
@@ -108,33 +103,15 @@ impl<'a> ServiceLogWatcher<'a> {
     ///
     /// Setup a directory watcher with a 2 second debounce and parse the log dir on each change.
     pub fn run(&mut self) -> Result<(), LogWatcherError> {
-        // setup debouncer
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut debouncer = new_debouncer(Duration::from_secs(2), tx)?;
+        // get latest log file
+        let latest_log_file = self.get_latest_log_file()?;
+        debug!("found latest log file: {latest_log_file:?}");
+        self.current_log_file = latest_log_file;
 
-        debouncer
-            .watcher()
-            .watch(self.log_dir, RecursiveMode::Recursive)?;
-
-        // parse log dir initially before watching for changes
-        self.parse_log_dir()?;
-
-        for result in rx {
-            if self.cancellation_token.is_cancelled() {
-                info!(
-                    "Received cancellation request. Stopping log watcher for interface {}",
-                    self.interface_name
-                );
-                break;
-            }
-            match result {
-                Ok(_events) => {
-                    self.parse_log_dir()?;
-                }
-                Err(error) => println!("Error {error:?}"),
-            }
+        // indefinitely watch for changes
+        loop {
+            self.parse_log_dir()?;
         }
-        Ok(())
     }
 
     /// Parse the log file directory
@@ -145,38 +122,44 @@ impl<'a> ServiceLogWatcher<'a> {
     /// so only new log lines are sent to the frontend whenever a change in
     /// the directory is detected.
     fn parse_log_dir(&mut self) -> Result<(), LogWatcherError> {
-        // get latest log file
-        let latest_log_file = self.get_latest_log_file()?;
-        debug!("found latest log file: {latest_log_file:?}");
-
-        // check if latest file changed
-        if latest_log_file.is_some() && latest_log_file != self.current_log_file {
-            self.current_log_file = latest_log_file;
-            // reset read position
-            self.current_position = 0;
-        }
-
         // read and parse file from last position
         if let Some(log_file) = &self.current_log_file {
             let file = File::open(log_file)?;
-            let size = file.metadata()?.len();
             let mut reader = BufReader::new(file);
-            reader.seek_relative(self.current_position as i64)?;
+            let mut line = String::new();
             let mut parsed_lines = Vec::new();
-            for line in reader.lines() {
-                let line = line?;
+            loop {
+                let size = reader.read_line(&mut line)?;
+                eprintln!("===> {size}");
+                if size == 0 {
+                    // emit event with all relevant log lines
+                    if !parsed_lines.is_empty() {
+                        self.handle.emit_all(&self.event_topic, &parsed_lines)?;
+                    }
+                    parsed_lines.clear();
+
+                    sleep(DELAY);
+
+                    let latest_log_file = self.get_latest_log_file()?;
+                    if latest_log_file.is_some() && latest_log_file != self.current_log_file {
+                        self.current_log_file = latest_log_file;
+                        break;
+                    }
+                }
+                if self.cancellation_token.is_cancelled() {
+                    info!(
+                        "Received cancellation request. Stopping log watcher for interface {}",
+                        self.interface_name
+                    );
+                    break;
+                }
                 if let Some(parsed_line) = self.parse_log_line(&line)? {
                     parsed_lines.push(parsed_line);
                 }
+                line.clear();
             }
-            // emit event with all relevant log lines
-            if !parsed_lines.is_empty() {
-                self.handle.emit_all(&self.event_topic, parsed_lines)?;
-            }
-
-            // update read position to end of file
-            self.current_position = size;
         }
+
         Ok(())
     }
 
@@ -228,7 +211,7 @@ impl<'a> ServiceLogWatcher<'a> {
         let entries = read_dir(self.log_dir)?;
 
         let mut latest_log = None;
-        let mut latest_time = SystemTime::UNIX_EPOCH;
+        let mut latest_time = NaiveDate::MIN;
         for entry in entries.flatten() {
             // skip directories
             if entry.metadata()?.is_file() {
@@ -241,24 +224,18 @@ impl<'a> ServiceLogWatcher<'a> {
                 }
             }
         }
+
         Ok(latest_log)
     }
 }
 
-fn extract_timestamp(filename: &str) -> Option<SystemTime> {
+fn extract_timestamp(filename: &str) -> Option<NaiveDate> {
     trace!("Extracting timestamp from log file name: {filename}");
     // we know that the date is always in the last 10 characters
     let split_pos = filename.char_indices().nth_back(9)?.0;
     let timestamp = &filename[split_pos..];
-    // parse and convert to `SystemTime`
-    if let Ok(timestamp) = NaiveDate::parse_from_str(timestamp, "%Y-%m-%d") {
-        let timestamp = timestamp
-            .and_time(NaiveTime::default())
-            .and_utc()
-            .timestamp();
-        return Some(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp as u64));
-    }
-    None
+    // parse and convert to `NaiveDate`
+    NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()
 }
 
 /// Starts a log watcher in a separate thread
