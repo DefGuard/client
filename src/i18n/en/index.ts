@@ -42,6 +42,7 @@ const en = {
     },
     messages: {
       error: 'Unexpected error occurred!',
+      errorWithMessage: 'An error occurred, details: {message}',
       tokenExpired:
         'Token has expired, please contact your administrator to issue a new enrollment token',
       networkError: 'There was a network error. Can\'t reach server."',

@@ -51,7 +51,11 @@ export const DesktopSetup = () => {
     {
       mutationFn: activateUser,
       onError: (e) => {
-        toaster.error(LL.common.messages.error());
+        toaster.error(
+          LL.common.messages.errorWithMessage({
+            message: String(e),
+          }),
+        );
         console.error(e);
         error(String(e));
       },
@@ -138,9 +142,13 @@ export const DesktopSetup = () => {
               toaster.error(LL.common.messages.networkError());
               return;
             }
-            toaster.error(LL.common.messages.error());
+            toaster.error(LL.common.messages.errorWithMessage({ message: String(e) }));
           } else {
-            toaster.error((e as Error).message);
+            toaster.error(
+              LL.common.messages.errorWithMessage({
+                message: String(e),
+              }),
+            );
           }
         });
     });

@@ -124,6 +124,11 @@ type RootTranslation = {
 			 */
 			error: string
 			/**
+			 * A​n​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​,​ ​d​e​t​a​i​l​s​:​ ​{​m​e​s​s​a​g​e​}
+			 * @param {unknown} message
+			 */
+			errorWithMessage: RequiredParams<'message'>
+			/**
 			 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​i​s​s​u​e​ ​a​ ​n​e​w​ ​e​n​r​o​l​l​m​e​n​t​ ​t​o​k​e​n
 			 */
 			tokenExpired: string
@@ -1626,6 +1631,10 @@ export type TranslationFunctions = {
 			 * Unexpected error occurred!
 			 */
 			error: () => LocalizedString
+			/**
+			 * An error occurred, details: {message}
+			 */
+			errorWithMessage: (arg: { message: unknown }) => LocalizedString
 			/**
 			 * Token has expired, please contact your administrator to issue a new enrollment token
 			 */

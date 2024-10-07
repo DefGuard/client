@@ -61,7 +61,11 @@ export const LocationCardConnectButton = ({ location }: Props) => {
       }
     } catch (e) {
       setIsLoading(false);
-      toaster.error(LL.common.messages.error());
+      toaster.error(
+        LL.common.messages.errorWithMessage({
+          message: String(e),
+        }),
+      );
       error(`Error handling interface: ${e}`);
       console.error(e);
     }
