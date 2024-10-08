@@ -111,7 +111,12 @@ impl<'a> ServiceLogWatcher<'a> {
         // indefinitely watch for changes
         loop {
             self.parse_log_dir()?;
+            if self.cancellation_token.is_cancelled() {
+                break;
+            };
         }
+
+        Ok(())
     }
 
     /// Parse the log file directory
@@ -130,7 +135,6 @@ impl<'a> ServiceLogWatcher<'a> {
             let mut parsed_lines = Vec::new();
             loop {
                 let size = reader.read_line(&mut line)?;
-                eprintln!("===> {size}");
                 if size == 0 {
                     // emit event with all relevant log lines
                     if !parsed_lines.is_empty() {
@@ -145,6 +149,11 @@ impl<'a> ServiceLogWatcher<'a> {
                         self.current_log_file = latest_log_file;
                         break;
                     }
+                } else {
+                    if let Some(parsed_line) = self.parse_log_line(&line)? {
+                        parsed_lines.push(parsed_line);
+                    }
+                    line.clear();
                 }
                 if self.cancellation_token.is_cancelled() {
                     info!(
@@ -153,10 +162,6 @@ impl<'a> ServiceLogWatcher<'a> {
                     );
                     break;
                 }
-                if let Some(parsed_line) = self.parse_log_line(&line)? {
-                    parsed_lines.push(parsed_line);
-                }
-                line.clear();
             }
         }
 
