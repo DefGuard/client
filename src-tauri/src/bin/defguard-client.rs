@@ -11,15 +11,17 @@ use defguard_client::{
     __cmd__disconnect, __cmd__get_latest_app_version, __cmd__get_settings, __cmd__last_connection,
     __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link,
     __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
-    __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
-    __cmd__update_settings, __cmd__update_tunnel,
+    __cmd__start_global_logwatcher, __cmd__stop_global_logwatcher, __cmd__tunnel_details,
+    __cmd__update_instance, __cmd__update_location_routing, __cmd__update_settings,
+    __cmd__update_tunnel,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
         last_connection, location_interface_details, location_stats, open_link,
-        parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
-        update_location_routing, update_settings, update_tunnel,
+        parse_tunnel_config, save_device_config, save_tunnel, start_global_logwatcher,
+        stop_global_logwatcher, tunnel_details, update_instance, update_location_routing,
+        update_settings, update_tunnel,
     },
     database::{self, models::settings::Settings},
     events::SINGLE_INSTANCE,
@@ -34,6 +36,7 @@ use log::{Level, LevelFilter};
 use tauri::{api::process, Env};
 use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
+use tracing;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -101,6 +104,8 @@ async fn main() {
             update_tunnel,
             delete_tunnel,
             get_latest_app_version,
+            start_global_logwatcher,
+            stop_global_logwatcher
         ])
         .on_window_event(|event| match event.event() {
             WindowEvent::CloseRequested { api, .. } => {

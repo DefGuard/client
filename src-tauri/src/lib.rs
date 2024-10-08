@@ -6,6 +6,7 @@ pub mod commands;
 pub mod database;
 pub mod error;
 pub mod events;
+pub mod global_log_watcher;
 pub mod periodic;
 pub mod service;
 pub mod tray;

@@ -117,6 +117,12 @@ const deleteTunnel = async (id: number): Promise<void> =>
 const getLatestAppVersion = async (): Promise<NewApplicationVersionInfo> =>
   invokeWrapper('get_latest_app_version');
 
+const startGlobalLogWatcher = async (): Promise<void> =>
+  invokeWrapper('start_global_logwatcher');
+
+const stopGlobalLogWatcher = async (): Promise<void> =>
+  invokeWrapper('stop_global_logwatcher');
+
 export const clientApi = {
   getInstances,
   getTunnels,
@@ -141,4 +147,6 @@ export const clientApi = {
   openLink,
   getTunnelDetails,
   getLatestAppVersion,
+  startGlobalLogWatcher,
+  stopGlobalLogWatcher,
 };
