@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub mod appstate;
 pub mod commands;
 pub mod database;
+pub mod enterprise;
 pub mod error;
 pub mod events;
 pub mod periodic;
