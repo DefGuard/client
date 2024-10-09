@@ -271,6 +271,7 @@ impl GlobalLogWatcher {
                                 trace!("Couldn't parse client log line: {client_line:?}: {err}");
                             }
                         }
+                        client_line.clear();
                     } else {
                         break;
                     }
