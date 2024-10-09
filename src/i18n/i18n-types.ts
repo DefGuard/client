@@ -124,11 +124,16 @@ type RootTranslation = {
 			 */
 			error: string
 			/**
+			 * A​n​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​:​ ​{​m​e​s​s​a​g​e​}
+			 * @param {unknown} message
+			 */
+			errorWithMessage: RequiredParams<'message'>
+			/**
 			 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​i​s​s​u​e​ ​a​ ​n​e​w​ ​e​n​r​o​l​l​m​e​n​t​ ​t​o​k​e​n
 			 */
 			tokenExpired: string
 			/**
-			 * T​h​e​r​e​ ​w​a​s​ ​a​ ​n​e​t​w​o​r​k​ ​e​r​r​o​r​.​ ​C​a​n​'​t​ ​r​e​a​c​h​ ​s​e​r​v​e​r​.​"
+			 * T​h​e​r​e​ ​w​a​s​ ​a​ ​n​e​t​w​o​r​k​ ​e​r​r​o​r​.​ ​C​a​n​'​t​ ​r​e​a​c​h​ ​p​r​o​x​y​.
 			 */
 			networkError: string
 			/**
@@ -1627,11 +1632,15 @@ export type TranslationFunctions = {
 			 */
 			error: () => LocalizedString
 			/**
+			 * An error occurred: {message}
+			 */
+			errorWithMessage: (arg: { message: unknown }) => LocalizedString
+			/**
 			 * Token has expired, please contact your administrator to issue a new enrollment token
 			 */
 			tokenExpired: () => LocalizedString
 			/**
-			 * There was a network error. Can't reach server."
+			 * There was a network error. Can't reach proxy.
 			 */
 			networkError: () => LocalizedString
 			/**

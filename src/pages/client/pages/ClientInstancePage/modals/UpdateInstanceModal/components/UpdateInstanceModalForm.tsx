@@ -157,7 +157,11 @@ export const UpdateInstanceModalForm = () => {
       }
     } else {
       // Token or URL is invalid.
-      toaster.error(localLL.messages.error());
+      toaster.error(
+        LL.common.messages.errorWithMessage({
+          message: 'Token or URL is invalid',
+        }),
+      );
       setError(
         'token',
         {

@@ -101,7 +101,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             (r.data as ErrorData)?.error ? (r.data as ErrorData).error + ', ' : ''
           }`;
           error(
-            `Failed to create device check enrollment and defguard logs, details: ${details}Error status code: ${r.status}`,
+            `Failed to create device check enrollment and defguard logs, details: ${details} Error status code: ${r.status}`,
           );
           throw Error(`Failed to create device, details: ${details}`);
         }
@@ -128,8 +128,12 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             });
             navigate(routes.client.instancePage, { replace: true });
           })
-          .catch(() => {
-            toaster.error(LL.common.messages.error());
+          .catch((e) => {
+            toaster.error(
+              LL.common.messages.errorWithMessage({
+                message: String(e),
+              }),
+            );
             setIsLoading(false);
           });
       });
@@ -142,9 +146,17 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
           toaster.error(LL.common.messages.networkError());
           return;
         }
-        toaster.error(LL.common.messages.error());
+        toaster.error(
+          LL.common.messages.errorWithMessage({
+            message: String(e),
+          }),
+        );
       } else {
-        toaster.error((e as Error).message);
+        toaster.error(
+          LL.common.messages.errorWithMessage({
+            message: (e as Error).message,
+          }),
+        );
       }
     }
   };

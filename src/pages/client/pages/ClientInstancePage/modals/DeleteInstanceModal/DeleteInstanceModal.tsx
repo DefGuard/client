@@ -51,7 +51,11 @@ export const DeleteInstanceModal = () => {
       });
     },
     onError: (e) => {
-      toaster.error(localLL.messages.error());
+      toaster.error(
+        LL.common.messages.errorWithMessage({
+          message: String(e),
+        }),
+      );
       console.error(e);
     },
   });
