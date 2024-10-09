@@ -109,13 +109,18 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           setIsLoading(false);
           error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
+          const errorMessage = (res.data as EnrollmentError).error;
 
-          switch ((res.data as EnrollmentError).error) {
+          switch (errorMessage) {
             case 'token expired': {
               throw Error(LL.common.messages.tokenExpired());
             }
             default: {
-              throw Error(LL.common.messages.error());
+              throw Error(
+                LL.common.messages.errorWithMessage({
+                  message: errorMessage,
+                }),
+              );
             }
           }
         }
@@ -166,7 +171,11 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
               })
               .catch((e) => {
                 error(e);
-                toaster.error(LL.common.messages.error());
+                toaster.error(
+                  LL.common.messages.errorWithMessage({
+                    message: String(e),
+                  }),
+                );
               });
           });
         }
@@ -204,9 +213,17 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
             toaster.error(LL.common.messages.networkError());
             return;
           }
-          toaster.error(LL.common.messages.error());
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: String(e),
+            }),
+          );
         } else {
-          toaster.error((e as Error).message);
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: (e as Error).message,
+            }),
+          );
         }
       });
   };
