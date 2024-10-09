@@ -124,7 +124,7 @@ type RootTranslation = {
 			 */
 			error: string
 			/**
-			 * A​n​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​,​ ​d​e​t​a​i​l​s​:​ ​{​m​e​s​s​a​g​e​}
+			 * A​n​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​:​ ​{​m​e​s​s​a​g​e​}
 			 * @param {unknown} message
 			 */
 			errorWithMessage: RequiredParams<'message'>
@@ -133,7 +133,7 @@ type RootTranslation = {
 			 */
 			tokenExpired: string
 			/**
-			 * T​h​e​r​e​ ​w​a​s​ ​a​ ​n​e​t​w​o​r​k​ ​e​r​r​o​r​.​ ​C​a​n​'​t​ ​r​e​a​c​h​ ​s​e​r​v​e​r​.​"
+			 * T​h​e​r​e​ ​w​a​s​ ​a​ ​n​e​t​w​o​r​k​ ​e​r​r​o​r​.​ ​C​a​n​'​t​ ​r​e​a​c​h​ ​p​r​o​x​y​.
 			 */
 			networkError: string
 			/**
@@ -1632,7 +1632,7 @@ export type TranslationFunctions = {
 			 */
 			error: () => LocalizedString
 			/**
-			 * An error occurred, details: {message}
+			 * An error occurred: {message}
 			 */
 			errorWithMessage: (arg: { message: unknown }) => LocalizedString
 			/**
@@ -1640,7 +1640,7 @@ export type TranslationFunctions = {
 			 */
 			tokenExpired: () => LocalizedString
 			/**
-			 * There was a network error. Can't reach server."
+			 * There was a network error. Can't reach proxy.
 			 */
 			networkError: () => LocalizedString
 			/**

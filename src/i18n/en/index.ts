@@ -42,10 +42,10 @@ const en = {
     },
     messages: {
       error: 'Unexpected error occurred!',
-      errorWithMessage: 'An error occurred, details: {message}',
+      errorWithMessage: 'An error occurred: {message}',
       tokenExpired:
         'Token has expired, please contact your administrator to issue a new enrollment token',
-      networkError: 'There was a network error. Can\'t reach server."',
+      networkError: "There was a network error. Can't reach proxy.",
       configChanged:
         'Confguration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
     },
