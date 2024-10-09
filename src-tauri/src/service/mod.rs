@@ -2,7 +2,6 @@ pub mod config;
 pub mod proto {
     tonic::include_proto!("client");
 }
-pub mod log_watcher;
 pub mod utils;
 #[cfg(windows)]
 pub mod windows;

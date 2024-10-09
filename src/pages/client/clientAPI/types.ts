@@ -132,4 +132,6 @@ export type TauriCommandKey =
   | 'delete_tunnel'
   | 'location_interface_details'
   | 'open_link'
-  | 'get_latest_app_version';
+  | 'get_latest_app_version'
+  | 'start_global_logwatcher'
+  | 'stop_global_logwatcher';

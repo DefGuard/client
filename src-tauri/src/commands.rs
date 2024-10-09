@@ -23,8 +23,12 @@ use crate::{
     enterprise::periodic::config::poll_instance,
     error::Error,
     events::{CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
+    log_watcher::{
+        global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
+        service_log_watcher::stop_log_watcher_task,
+    },
     proto::{DeviceConfig, DeviceConfigResponse},
-    service::{log_watcher::stop_log_watcher_task, proto::RemoveInterfaceRequest},
+    service::proto::RemoveInterfaceRequest,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
@@ -65,6 +69,20 @@ pub async fn connect(
     }
     info!("Connected to location with id: {location_id}");
     Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn start_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
+    let result = spawn_global_log_watcher_task(&handle, tracing::Level::DEBUG).await;
+    if let Err(err) = result {
+        error!("Error while spawning the global log watcher task: {}", err)
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn stop_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
+    stop_global_log_watcher_task(&handle)
 }
 
 #[tauri::command]

@@ -7,6 +7,7 @@ pub mod database;
 pub mod enterprise;
 pub mod error;
 pub mod events;
+pub mod log_watcher;
 pub mod periodic;
 pub mod service;
 pub mod tray;
