@@ -4,17 +4,15 @@ import { clipboard } from '@tauri-apps/api';
 import { save } from '@tauri-apps/api/dialog';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { writeTextFile } from '@tauri-apps/api/fs';
-import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { LocationLogsSelect } from '../../../ClientInstancePage/components/LocationsList/components/LocationsDetailView/components/LocationLogs/LocationLogsSelect';
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
-import { useClientStore } from '../../../../hooks/useClientStore';
-import { LogItem, LogLevel } from '../../../../clientAPI/types';
-import { ActionButtonVariant } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { ActionButton } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
+import { ActionButtonVariant } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { clientApi } from '../../../../clientAPI/clientApi';
+import { LogItem, LogLevel } from '../../../../clientAPI/types';
+import { useClientStore } from '../../../../hooks/useClientStore';
 import { GlobalLogsSelect } from './GlobalLogsSelect';
 
 export const GlobalLogs = () => {

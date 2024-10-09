@@ -21,12 +21,10 @@ use crate::{
     },
     error::Error,
     events::CONNECTION_CHANGED,
-    service::{
-        log_watcher::spawn_log_watcher_task,
-        proto::{
-            desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
-            ReadInterfaceDataRequest, RemoveInterfaceRequest,
-        },
+    log_watcher::service_log_watcher::spawn_log_watcher_task,
+    service::proto::{
+        desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
+        ReadInterfaceDataRequest, RemoveInterfaceRequest,
     },
     ConnectionType,
 };

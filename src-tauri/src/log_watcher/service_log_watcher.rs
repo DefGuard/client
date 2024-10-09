@@ -22,45 +22,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
 use crate::{
-    appstate::AppState, database::models::Id, error::Error, utils::get_service_log_dir,
-    ConnectionType,
+    appstate::AppState, database::models::Id, error::Error, log_watcher::extract_timestamp,
+    utils::get_service_log_dir, ConnectionType,
 };
 
+use super::{LogLine, LogWatcherError};
+
 const DELAY: Duration = Duration::from_secs(2);
-
-#[derive(Debug, Error)]
-pub enum LogWatcherError {
-    #[error(transparent)]
-    TauriError(#[from] tauri::Error),
-    #[error(transparent)]
-    SerdeJsonError(#[from] serde_json::Error),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-}
-
-/// Represents a single line in log file
-#[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct LogLine {
-    timestamp: DateTime<Utc>,
-    #[serde_as(as = "DisplayFromStr")]
-    level: Level,
-    target: String,
-    fields: LogLineFields,
-    span: Option<Span>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct Span {
-    interface_name: Option<String>,
-    name: Option<String>,
-    peer: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct LogLineFields {
-    message: String,
-}
 
 #[derive(Debug)]
 pub struct ServiceLogWatcher<'a> {
@@ -138,6 +106,7 @@ impl<'a> ServiceLogWatcher<'a> {
                 if size == 0 {
                     // emit event with all relevant log lines
                     if !parsed_lines.is_empty() {
+                        trace!("Emitting {} log lines for the frontend", parsed_lines.len());
                         self.handle.emit_all(&self.event_topic, &parsed_lines)?;
                     }
                     parsed_lines.clear();
@@ -146,6 +115,9 @@ impl<'a> ServiceLogWatcher<'a> {
 
                     let latest_log_file = self.get_latest_log_file()?;
                     if latest_log_file.is_some() && latest_log_file != self.current_log_file {
+                        debug!(
+                            "New log file detected. Switching to new log file: {latest_log_file:?}"
+                        );
                         self.current_log_file = latest_log_file;
                         break;
                     }
@@ -212,7 +184,7 @@ impl<'a> ServiceLogWatcher<'a> {
     /// Log files are rotated daily and have a knows naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        debug!("Getting latest log file from directory: {:?}", self.log_dir);
+        trace!("Getting latest log file from directory: {:?}", self.log_dir);
         let entries = read_dir(self.log_dir)?;
 
         let mut latest_log = None;
@@ -232,15 +204,6 @@ impl<'a> ServiceLogWatcher<'a> {
 
         Ok(latest_log)
     }
-}
-
-fn extract_timestamp(filename: &str) -> Option<NaiveDate> {
-    trace!("Extracting timestamp from log file name: {filename}");
-    // we know that the date is always in the last 10 characters
-    let split_pos = filename.char_indices().nth_back(9)?.0;
-    let timestamp = &filename[split_pos..];
-    // parse and convert to `NaiveDate`
-    NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()
 }
 
 /// Starts a log watcher in a separate thread

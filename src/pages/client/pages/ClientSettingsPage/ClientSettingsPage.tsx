@@ -2,9 +2,9 @@ import './style.scss';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { GlobalLogs } from './components/GlobalLogs/GlobalLogs';
 import { GlobalSettingsTab } from './components/GlobalSettingsTab/GlobalSettingsTab';
 import { InfoCard } from './components/InfoCard/InfoCard';
-import { GlobalLogs } from './components/GlobalLogs/GlobalLogs';
 
 export const ClientSettingsPage = () => {
   const { LL } = useI18nContext();

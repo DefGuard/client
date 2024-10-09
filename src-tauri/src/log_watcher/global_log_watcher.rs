@@ -1,73 +1,30 @@
-//! Log watcher for observing and parsing `defguard-service` log files
+//! Global log watcher that monitors both the service and client logs.
 //!
-//! This is meant to handle passing relevant logs from `defguard-service` daemon to the client GUI.
-//! The watcher monitors a given directory for any changes. Whenever a change is detected
-//! it parses the log files and sends logs relevant to a specified interface to the fronted.
+// FIXME: Some of the code here overlaps with the `log_watcher` module and could be refactored to avoid duplication.
 
 use std::{
     fs::{read_dir, File},
     io::{BufRead, BufReader},
-    path::{Path, PathBuf},
+    path::PathBuf,
     str::FromStr,
     thread::sleep,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
-use tauri_plugin_log::LogTarget;
-use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
 use crate::{
-    appstate::AppState, database::models::Id, error::Error, utils::get_service_log_dir,
-    ConnectionType,
+    appstate::AppState,
+    error::Error,
+    log_watcher::{extract_timestamp, LogLine, LogLineFields, LogWatcherError},
+    utils::get_service_log_dir,
 };
 
-#[derive(Error, Debug)]
-pub enum LogWatcherError {
-    #[error(transparent)]
-    TauriError(#[from] tauri::Error),
-    #[error(transparent)]
-    SerdeJsonError(#[from] serde_json::Error),
-    #[error(transparent)]
-    TokioError(#[from] regex::Error),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    #[error("Error while accessing the log file: {0}")]
-    LogPathError(String),
-    #[error("Failed to parse log line: {0}")]
-    LogParseError(String),
-}
-
-/// Represents a single line in log file
-#[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct LogLine {
-    timestamp: DateTime<Utc>,
-    #[serde_as(as = "DisplayFromStr")]
-    level: Level,
-    target: String,
-    fields: LogLineFields,
-    span: Option<Span>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct Span {
-    interface_name: Option<String>,
-    name: Option<String>,
-    peer: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct LogLineFields {
-    message: String,
-}
-
+/// Helper struct to handle log directory logic
 #[derive(Debug)]
 pub struct LogDirs {
     // Service
@@ -82,6 +39,7 @@ const DELAY: Duration = Duration::from_secs(2);
 impl LogDirs {
     #[must_use]
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
+        debug!("Getting log directories.");
         let service_log_dir = get_service_log_dir().to_path_buf();
         let client_log_dir =
             handle
@@ -90,8 +48,8 @@ impl LogDirs {
                 .ok_or(LogWatcherError::LogPathError(
                     "Path to client logs directory is empty.".to_string(),
                 ))?;
-        println!(
-            "Log dirs are: {:?} and {:?}",
+        debug!(
+            "Log directories of service and client are: {:?} and {:?}",
             service_log_dir, client_log_dir
         );
 
@@ -201,29 +159,19 @@ impl GlobalLogWatcher {
         })
     }
 
-    /// Run the log watcher
-    ///
-    /// Setup a directory watcher with a 2 second debounce and parse the log dir on each change.
+    /// Start log watching, calls the [`parse_log_dirs`] function.
     pub fn run(&mut self) -> Result<(), LogWatcherError> {
-        loop {
-            self.parse_log_dirs()?;
-            if self.cancellation_token.is_cancelled() {
-                break;
-            };
-        }
-        Ok(())
+        self.parse_log_dirs()
     }
 
-    /// Parse the log file directory
+    /// Parse the log files
     ///
-    /// Analyzing the directory consists of finding the latest log file,
-    /// parsing log lines and emitting tauri events whenever relevant logs are found.
-    /// Current log file and latest read position are stored between runs
-    /// so only new log lines are sent to the frontend whenever a change in
-    /// the directory is detected.
+    /// This function will open the log files and read them line by line, parsing each line
+    /// into a [`LogLine`] struct and emitting it to the frontend. It can be stopped by cancelling
+    /// the token by calling [`stop_global_log_watcher_task()`]
     fn parse_log_dirs(&mut self) -> Result<(), LogWatcherError> {
         debug!("Parsing log directories");
-        self.log_dirs.current_service_log_file = self.get_latest_log_file()?;
+        self.log_dirs.current_service_log_file = self.log_dirs.get_latest_log_file()?;
         debug!(
             "Latest service log file found: {:?}",
             self.log_dirs.current_service_log_file
@@ -258,19 +206,24 @@ impl GlobalLogWatcher {
         let mut service_line = String::new();
         let mut client_line = String::new();
         let mut parsed_lines = Vec::new();
-        let mut service_line_read: usize = 0;
-        let mut client_line_read: usize = 0;
+
+        // Track the amount of bytes read from the log lines
+        let mut service_line_read;
+        let mut client_line_read;
 
         debug!("Starting the log reading loop");
         loop {
             // Service
+            // If the reader is present, read the log file to the end.
+            // Parse every line. If we hit EOF, check if there's a new log file.
+            // If there is, switch to it and leave the loop.
             if let Some(reader) = &mut service_reader {
                 trace!("Reading service log lines");
                 loop {
                     service_line_read = reader.read_line(&mut service_line)?;
                     if service_line_read == 0 {
                         trace!("Read 0 bytes from service log file, probably reached EOF.");
-                        let latest_log_file = self.get_latest_log_file()?;
+                        let latest_log_file = self.log_dirs.get_latest_log_file()?;
                         if latest_log_file.is_some()
                             && latest_log_file != self.log_dirs.current_service_log_file
                         {
@@ -297,34 +250,31 @@ impl GlobalLogWatcher {
             }
 
             // Client
+            // If the reader is present, read the log file to the end.
+            // Parse every line.
+            // Warning: don't use anything other than a trace log level in this loop for logs that would appear on every iteration (or very often)
+            // This could result in the reader constantly producing and consuming logs without any progress.
             if let Some(reader) = &mut client_reader {
-                // read to the eof
-                let mut client_raw_lines = Vec::new();
-                let mut raw_line = String::new();
-
                 loop {
-                    client_line_read = reader.read_line(&mut raw_line)?;
+                    client_line_read = reader.read_line(&mut client_line)?;
                     if client_line_read > 0 {
-                        client_raw_lines.push(raw_line.clone());
-                        raw_line.clear();
+                        match self.parse_client_log_line(&client_line) {
+                            Ok(Some(parsed_line)) => {
+                                trace!("Parsed client log line: {parsed_line:?}");
+                                parsed_lines.push(parsed_line);
+                            }
+                            Ok(None) => {
+                                trace!("The following log line was filtered out: {client_line:?}");
+                            }
+                            Err(err) => {
+                                // trace here is intentional, adding error logs would loop the reader infinitely
+                                trace!("Couldn't parse client log line: {client_line:?}: {err}");
+                            }
+                        }
                     } else {
                         break;
                     }
                 }
-
-                client_raw_lines
-                    .iter()
-                    .for_each(|line| match self.parse_client_log_line(&line) {
-                        Ok(Some(parsed_line)) => {
-                            trace!("Parsed client log line: {parsed_line:?}");
-                            parsed_lines.push(parsed_line);
-                        }
-                        Ok(None) => {
-                            trace!("The following log line was filtered out: {line:?}");
-                        }
-                        // silently ignore errors
-                        Err(_) => (),
-                    });
             }
 
             trace!("Read 0 bytes from both log files, we've reached EOF in both cases.");
@@ -387,9 +337,12 @@ impl GlobalLogWatcher {
         Ok(Some(log_line))
     }
 
+    /// Parse a client log line into a known struct using regex.
+    /// If the line doesn't match the regex, it's filtered out.
     fn parse_client_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
         trace!("Parsing client log line: {line}");
-        trace!("Preparing regex to parse a line...");
+        // Example log:
+        // [2024-10-09][09:08:41][DEBUG][defguard_client::commands] Retrieving all locations.
         let regex = Regex::new(r"\[(.*?)\]\[(.*?)\]\[(.*?)\]\[(.*?)\] (.*)")?;
         let captures = regex
             .captures(line)
@@ -468,58 +421,20 @@ impl GlobalLogWatcher {
         );
         Ok(Some(log_line))
     }
-
-    /// Find the latest log file in directory
-    ///
-    /// Log files are rotated daily and have a knows naming format,
-    /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
-    fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        let entries = read_dir(&self.log_dirs.service_log_dir)?;
-
-        let mut latest_log = None;
-        let mut latest_time = NaiveDate::MIN;
-        for entry in entries.flatten() {
-            // skip directories
-            if entry.metadata()?.is_file() {
-                let filename = entry.file_name().to_string_lossy().into_owned();
-                if let Some(timestamp) = extract_timestamp(&filename) {
-                    if timestamp > latest_time {
-                        latest_time = timestamp;
-                        latest_log = Some(entry.path());
-                    }
-                }
-            }
-        }
-
-        Ok(latest_log)
-    }
-}
-
-fn extract_timestamp(filename: &str) -> Option<NaiveDate> {
-    trace!("Extracting timestamp from log file name: {filename}");
-    // we know that the date is always in the last 10 characters
-    let split_pos = filename.char_indices().nth_back(9)?.0;
-    let timestamp = &filename[split_pos..];
-    // parse and convert to `NaiveDate`
-    NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()
 }
 
 /// Starts a global log watcher in a separate thread
 pub async fn spawn_global_log_watcher_task(
     handle: &AppHandle,
     log_level: Level,
-    from: Option<String>,
 ) -> Result<String, Error> {
     debug!("Spawning global log watcher.");
     let app_state = handle.state::<AppState>();
 
-    // parse `from` timestamp
-    // let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
-    // set from as from 1 hour ago
+    // Show logs only from the last hour
     let from = Some(Utc::now() - Duration::from_secs(60 * 60));
 
     let event_topic = format!("log-update-global");
-    debug!("Using event topic: {event_topic}");
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();
@@ -529,11 +444,9 @@ pub async fn spawn_global_log_watcher_task(
     let token = CancellationToken::new();
     let token_clone = token.clone();
 
-    // spawn task
+    // spawn the task
     let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        let mut log_watcher =
-            GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?;
-        log_watcher.run()?;
+        GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?.run()?;
         Ok(())
     });
 
@@ -549,13 +462,11 @@ pub async fn spawn_global_log_watcher_task(
     }
 
     info!("Global log watcher spawned");
-
     Ok(event_topic)
 }
 
-/// Stops the log watcher thread
 pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
-    info!("Stopping global log watcher task");
+    debug!("Cancelling global log watcher task");
     let app_state = handle.state::<AppState>();
 
     // get `CancellationToken` to manually stop watcher thread
@@ -567,9 +478,10 @@ pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
     if let Some(token) = log_watchers.remove("GLOBAL") {
         debug!("Using cancellation token for global log watcher");
         token.cancel();
+        info!("Global log watcher cancelled");
         Ok(())
     } else {
-        error!("Global log watcher not found.");
+        error!("Global log watcher not found, cannot cancel");
         Err(Error::NotFound)
     }
 }
