@@ -146,5 +146,7 @@ const filterLogByLevel = (target: LogLevel, log: LogLevel): boolean => {
       return ['info', 'error'].includes(log_level);
     case 'debug':
       return ['error', 'info', 'debug'].includes(log_level);
+    default:
+      return true;
   }
 };
