@@ -138,6 +138,7 @@ impl<'a> ServiceLogWatcher<'a> {
                 if size == 0 {
                     // emit event with all relevant log lines
                     if !parsed_lines.is_empty() {
+                        trace!("Emitting {} log lines for the frontend", parsed_lines.len());
                         self.handle.emit_all(&self.event_topic, &parsed_lines)?;
                     }
                     parsed_lines.clear();
@@ -146,6 +147,9 @@ impl<'a> ServiceLogWatcher<'a> {
 
                     let latest_log_file = self.get_latest_log_file()?;
                     if latest_log_file.is_some() && latest_log_file != self.current_log_file {
+                        debug!(
+                            "New log file detected. Switching to new log file: {latest_log_file:?}"
+                        );
                         self.current_log_file = latest_log_file;
                         break;
                     }
@@ -212,7 +216,7 @@ impl<'a> ServiceLogWatcher<'a> {
     /// Log files are rotated daily and have a knows naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        debug!("Getting latest log file from directory: {:?}", self.log_dir);
+        trace!("Getting latest log file from directory: {:?}", self.log_dir);
         let entries = read_dir(self.log_dir)?;
 
         let mut latest_log = None;
