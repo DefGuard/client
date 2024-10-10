@@ -286,7 +286,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             enterprise_enabled: instance.enterprise_enabled,
         });
     }
-    info!("Instances retrieved({})", instance_info.len());
+    debug!("Instances retrieved({})", instance_info.len());
     trace!("Returning following instances: {instance_info:#?}");
     Ok(instance_info)
 }
@@ -909,7 +909,7 @@ pub struct TunnelInfo<I = NoId> {
 
 #[tauri::command(async)]
 pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo<Id>>, Error> {
-    debug!("Retrieving all instances.");
+    debug!("Retrieving all tunnels.");
 
     let tunnels = Tunnel::all(&app_state.get_pool()).await?;
     debug!("Found ({}) tunnels", tunnels.len());
@@ -931,7 +931,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
         });
     }
 
-    info!("Tunnels retrieved({})", tunnel_info.len());
+    debug!("All tunnels retrieved.");
     Ok(tunnel_info)
 }
 

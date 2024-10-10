@@ -120,17 +120,17 @@ pub async fn setup_interface(
         };
         if let Err(error) = client.create_interface(request).await {
             let msg = format!(
-                "Failed to create interface with config {interface_config:?}. Error: {error}"
+                "There was an error while sending the request to the defguard background service to create an interface with the following configuration: {interface_config:?}. Error details: {error}"
             );
             error!("{msg}");
             Err(Error::InternalError(msg))
         } else {
-            info!("Created interface {interface_config:#?}");
+            info!("Interface creation request has been sent to the defguard background service, created the {} interface.", interface_config.name);
             Ok(())
         }
     } else {
         let msg = format!(
-            "Error finding free port during interface {interface_name} setup for location {}",
+            "Couldn't find free port during interface {interface_name} setup for location {}",
             location.name
         );
         error!("{msg}");

@@ -290,7 +290,7 @@ impl GlobalLogWatcher {
             sleep(DELAY);
 
             if self.cancellation_token.is_cancelled() {
-                info!("Received cancellation request. Stopping global log watcher");
+                debug!("Received cancellation request. Stopping global log watcher");
                 break;
             }
         }
@@ -462,7 +462,7 @@ pub async fn spawn_global_log_watcher_task(
         old_token.cancel();
     }
 
-    info!("Global log watcher spawned");
+    debug!("Global log watcher spawned");
     Ok(event_topic)
 }
 
