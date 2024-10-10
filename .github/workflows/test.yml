@@ -6,22 +6,22 @@ on:
       - main
       - dev
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
   pull_request:
     branches:
       - main
       - dev
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   test:
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, X64]
     container: rust:1.74
     defaults:
       run:
