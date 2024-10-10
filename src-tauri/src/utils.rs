@@ -360,14 +360,24 @@ pub async fn setup_interface_tunnel(
             config: Some(interface_config.clone().into()),
             allowed_ips,
             dns: tunnel.dns.clone(),
-            pre_up: tunnel.pre_up.clone(),
-            post_up: tunnel.post_up.clone(),
+            pre_up: None,
+            post_up: None,
         };
+        if let Some(pre_up) = &tunnel.pre_up {
+            debug!("Executing specified PreUp command: {pre_up}");
+            let _ = execute_command(pre_up);
+            info!("Executed specified PreUp command: {pre_up}");
+        }
         if let Err(error) = client.create_interface(request).await {
             let msg = format!("Failed to create interface: {error}");
             error!("{msg}");
             Err(Error::InternalError(msg))
         } else {
+            if let Some(post_up) = &tunnel.post_up {
+                debug!("Executing specified PreUp command: {post_up}");
+                let _ = execute_command(post_up);
+                info!("Executed specified PreUp command: {post_up}");
+            }
             info!("Created interface {}", interface_config.name);
             debug!("Created interface with config: {interface_config:?}");
             Ok(())
@@ -664,13 +674,16 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            info!("Command executed successfully. Stdout:\n{}", stdout);
+            info!(
+                "Command {command} executed successfully. Stdout: {}",
+                stdout
+            );
             if !stderr.is_empty() {
-                error!("Stderr:\n{stderr}");
+                error!("Command produced the following output on stderr: {stderr}");
             }
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("Error executing command. Stderr:\n{stderr}");
+            error!("Error while executing command: {command}. Stderr: {stderr}");
         }
     }
     Ok(())
@@ -713,13 +726,23 @@ pub async fn disconnect_interface(
             {
                 let request = RemoveInterfaceRequest {
                     interface_name: interface_name.clone(),
-                    pre_down: tunnel.pre_down,
-                    post_down: tunnel.post_down,
+                    pre_down: None,
+                    post_down: None,
                 };
+                if let Some(pre_down) = tunnel.pre_down {
+                    debug!("Executing specified PreDown command: {pre_down}");
+                    let _ = execute_command(&pre_down);
+                    info!("Executed specified PreDown command: {pre_down}");
+                }
                 if let Err(error) = client.remove_interface(request).await {
                     let msg = format!("Failed to remove interface: {error}");
                     error!("{msg}");
                     return Err(Error::InternalError(msg));
+                }
+                if let Some(post_down) = tunnel.post_down {
+                    debug!("Executing specified PostDown command: {post_down}");
+                    let _ = execute_command(&post_down);
+                    info!("Executed specified PostDown command: {post_down}");
                 }
                 let mut connection: TunnelConnection = active_connection.into();
                 connection.save(&state.get_pool()).await?;
