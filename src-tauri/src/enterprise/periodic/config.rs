@@ -46,16 +46,18 @@ pub async fn poll_config(handle: AppHandle) {
             instances.len(),
         );
         for instance in &mut instances {
-            if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
-                error!(
-                    "Failed to retrieve instance {}({}) config: {err}",
-                    instance.name, instance.id,
-                );
-            } else {
-                debug!(
-                    "Retrieved config for instance {}({})",
-                    instance.name, instance.id,
-                );
+            if instance.token.is_some() {
+                if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
+                    error!(
+                        "Failed to retrieve instance {}({}) config: {err}",
+                        instance.name, instance.id,
+                    );
+                } else {
+                    debug!(
+                        "Retrieved config for instance {}({})",
+                        instance.name, instance.id,
+                    );
+                }
             }
         }
         if let Err(err) = transaction.commit().await {
