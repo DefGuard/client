@@ -968,9 +968,9 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     {
         debug!("Found active connection for tunnel({tunnel_id}), closing...",);
         if let Some(pre_down) = &tunnel.pre_down {
-          debug!("Executing specified PreDown command: {pre_down}");
-          let _ = execute_command(pre_down);
-          info!("Executed specified PreDown command: {pre_down}");
+            debug!("Executing specified PreDown command: {pre_down}");
+            let _ = execute_command(pre_down);
+            info!("Executed specified PreDown command: {pre_down}");
         }
         let request = RemoveInterfaceRequest {
             interface_name: connection.interface_name.clone(),
@@ -990,9 +990,9 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                 Error::InternalError(msg)
             })?;
         if let Some(post_down) = &tunnel.post_down {
-          debug!("Executing specified PostDown command: {post_down}");
-          let _ = execute_command(post_down);
-          info!("Executed specified PostDown command: {post_down}");
+            debug!("Executing specified PostDown command: {post_down}");
+            let _ = execute_command(post_down);
+            info!("Executed specified PostDown command: {post_down}");
         }
         info!("Connection closed and interface removed");
     }

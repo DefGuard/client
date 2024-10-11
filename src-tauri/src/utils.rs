@@ -720,10 +720,10 @@ pub async fn disconnect_interface(
                 return Err(Error::NotFound);
             };
             if let Some(pre_down) = tunnel.pre_down {
-              debug!("Executing specified PreDown command: {pre_down}");
-              let _ = execute_command(&pre_down);
-              info!("Executed specified PreDown command: {pre_down}");
-          }
+                debug!("Executing specified PreDown command: {pre_down}");
+                let _ = execute_command(&pre_down);
+                info!("Executed specified PreDown command: {pre_down}");
+            }
             let request = RemoveInterfaceRequest {
                 interface_name,
                 pre_down: None,
@@ -736,10 +736,10 @@ pub async fn disconnect_interface(
                 return Err(Error::InternalError(msg));
             }
             if let Some(post_down) = tunnel.post_down {
-              debug!("Executing specified PostDown command: {post_down}");
-              let _ = execute_command(&post_down);
-              info!("Executed specified PostDown command: {post_down}");
-          }
+                debug!("Executing specified PostDown command: {post_down}");
+                let _ = execute_command(&post_down);
+                info!("Executed specified PostDown command: {post_down}");
+            }
             let connection: TunnelConnection = active_connection.into();
             let connection = connection.save(&state.get_pool()).await?;
             trace!("Saved connection: {connection:#?}");
