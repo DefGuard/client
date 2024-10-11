@@ -333,7 +333,7 @@ pub async fn all_locations(
         };
         location_info.push(info);
     }
-    info!("Locations retrieved({})", location_info.len());
+    debug!("Locations retrieved({})", location_info.len());
     debug!(
         "Returning {} locations for instance {instance_id}",
         location_info.len(),
@@ -780,7 +780,7 @@ pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
     debug!("Retrieving settings");
     let app_state = handle.state::<AppState>();
     let settings = Settings::get(&app_state.get_pool()).await?;
-    info!("Settings retrieved");
+    debug!("Settings retrieved");
     Ok(settings)
 }
 

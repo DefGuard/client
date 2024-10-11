@@ -67,7 +67,7 @@ pub async fn poll_config(handle: AppHandle) {
             error!("Failed to emit instance update event: {err}");
         }
         info!(
-            "Retrieved configuration for {} instances, sleeping {}s",
+            "Retrieved configuration from core for {} instances, sleeping {}s",
             instances.len(),
             INTERVAL_SECONDS.as_secs(),
         );
