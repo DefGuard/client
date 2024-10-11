@@ -31,8 +31,8 @@ use crate::{
     service::proto::RemoveInterfaceRequest,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
-        handle_connection_for_location, handle_connection_for_tunnel,
+        disconnect_interface, execute_command, get_location_interface_details,
+        get_tunnel_interface_details, handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
@@ -967,10 +967,15 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
         .await
     {
         debug!("Found active connection for tunnel({tunnel_id}), closing...",);
+        if let Some(pre_down) = &tunnel.pre_down {
+          debug!("Executing specified PreDown command: {pre_down}");
+          let _ = execute_command(pre_down);
+          info!("Executed specified PreDown command: {pre_down}");
+        }
         let request = RemoveInterfaceRequest {
             interface_name: connection.interface_name.clone(),
-            pre_down: tunnel.pre_down.clone(),
-            post_down: tunnel.post_up.clone(),
+            pre_down: None,
+            post_down: None,
             endpoint: tunnel.endpoint.clone(),
         };
         client
@@ -984,6 +989,11 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                 error!("{msg}");
                 Error::InternalError(msg)
             })?;
+        if let Some(post_down) = &tunnel.post_down {
+          debug!("Executing specified PostDown command: {post_down}");
+          let _ = execute_command(post_down);
+          info!("Executed specified PostDown command: {post_down}");
+        }
         info!("Connection closed and interface removed");
     }
     tunnel.delete(pool).await?;
