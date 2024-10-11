@@ -213,6 +213,10 @@ impl GlobalLogWatcher {
 
         debug!("Starting the log reading loop");
         loop {
+            if self.cancellation_token.is_cancelled() {
+                debug!("Received cancellation request. Stopping global log watcher");
+                break;
+            }
             // Service
             // If the reader is present, read the log file to the end.
             // Parse every line. If we hit EOF, check if there's a new log file.
@@ -284,15 +288,10 @@ impl GlobalLogWatcher {
                 trace!("Emitting parsed lines for the frontend");
                 self.handle.emit_all(&self.event_topic, &parsed_lines)?;
                 trace!("Emitted {} lines to the frontend", parsed_lines.len());
+                parsed_lines.clear();
             }
-            parsed_lines.clear();
             trace!("Sleeping for {DELAY:?} seconds before reading again");
             sleep(DELAY);
-
-            if self.cancellation_token.is_cancelled() {
-                debug!("Received cancellation request. Stopping global log watcher");
-                break;
-            }
         }
 
         Ok(())
@@ -479,7 +478,7 @@ pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
     if let Some(token) = log_watchers.remove("GLOBAL") {
         debug!("Using cancellation token for global log watcher");
         token.cancel();
-        info!("Global log watcher cancelled");
+        debug!("Global log watcher cancelled");
         Ok(())
     } else {
         error!("Global log watcher not found, cannot cancel");
