@@ -28,7 +28,7 @@ use tonic::{
 use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
-use crate::utils::{execute_command, IS_MACOS};
+use crate::utils::IS_MACOS;
 
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
@@ -93,12 +93,6 @@ impl DesktopDaemonService for DaemonService {
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
 
-        if let Some(pre_up) = request.pre_up {
-            debug!("Executing specified PreUp command: {pre_up}");
-            let _ = execute_command(&pre_up);
-            info!("Executed specified PreUp command: {pre_up}");
-        }
-
         #[cfg(not(windows))]
         {
             // create new interface
@@ -152,11 +146,6 @@ impl DesktopDaemonService for DaemonService {
                 })?;
             }
         }
-        if let Some(post_up) = request.post_up {
-            debug!("Executing specified PostUp command: {post_up}");
-            let _ = execute_command(&post_up);
-            info!("Executed specified PostUp command: {post_up}");
-        }
 
         Ok(Response::new(()))
     }
@@ -171,23 +160,12 @@ impl DesktopDaemonService for DaemonService {
         info!("Removing interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname.clone())?;
-        if let Some(pre_down) = request.pre_down {
-            debug!("Executing specified PreDown command: {pre_down}");
-            let _ = execute_command(&pre_down);
-            info!("Executed specified PreDown command: {pre_down}");
-        }
         // remove interface
         wgapi.remove_interface().map_err(|err| {
             let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
-        if let Some(post_down) = request.post_down {
-            debug!("Executing specified PostDown command: {post_down}");
-            let _ = execute_command(&post_down);
-            info!("Executed specified PostDown command: {post_down}");
-        }
-
         Ok(Response::new(()))
     }
 
