@@ -115,8 +115,6 @@ pub async fn setup_interface(
             config: Some(interface_config.clone().into()),
             allowed_ips,
             dns: location.dns.clone(),
-            pre_up: None,
-            post_up: None,
         };
         if let Err(error) = client.create_interface(request).await {
             let msg = format!(
@@ -366,8 +364,6 @@ pub async fn setup_interface_tunnel(
             config: Some(interface_config.clone().into()),
             allowed_ips,
             dns: tunnel.dns.clone(),
-            pre_up: None,
-            post_up: None,
         };
         if let Some(pre_up) = &tunnel.pre_up {
             debug!("Executing specified PreUp command: {pre_up}");
@@ -700,8 +696,6 @@ pub async fn disconnect_interface(
             };
             let request = RemoveInterfaceRequest {
                 interface_name,
-                pre_down: None,
-                post_down: None,
                 endpoint: location.endpoint,
             };
             if let Err(error) = client.remove_interface(request).await {
@@ -726,8 +720,6 @@ pub async fn disconnect_interface(
             }
             let request = RemoveInterfaceRequest {
                 interface_name,
-                pre_down: None,
-                post_down: None,
                 endpoint: tunnel.endpoint,
             };
             if let Err(error) = client.remove_interface(request).await {

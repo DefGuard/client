@@ -832,8 +832,6 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             );
             let request = RemoveInterfaceRequest {
                 interface_name: connection.interface_name.clone(),
-                pre_down: None,
-                post_down: None,
                 endpoint: location.endpoint,
             };
             client.remove_interface(request).await.map_err(|status| {
@@ -974,8 +972,6 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
         }
         let request = RemoveInterfaceRequest {
             interface_name: connection.interface_name.clone(),
-            pre_down: None,
-            post_down: None,
             endpoint: tunnel.endpoint.clone(),
         };
         client
