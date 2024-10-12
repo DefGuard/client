@@ -68,6 +68,15 @@ Built packages are available after in `src-tauri/target/release/bundle`.
 
 Remove `default-run` line from `[package]` section in `Cargo.toml` to build the project.
 
+# Built and sponsored by
+
+<p align="center">
+      <a href="https://teonite.com/services/rust/" target="_blank"><img src="https://drive.google.com/uc?export=view&id=1z0fxSsZztoaeVWxHw2MbPbuOHMe3OsqN" alt="build by teonite" /></a>
+</p>
+
+# Legal
+WireGuard® is [registered trademarks](https://www.wireguard.com/trademark-policy/) of Jason A. Donenfeld.
+
 # Known issues
 
 ## Failed to bundle project
@@ -106,8 +115,3 @@ Node.js v22.7.0
 ```
 
 To fix this remove node_modules and rerun `pnpm install`.
-
-# Legal
-
-  - *defguard is not an official WireGuard project, and WireGuard is a registered trademark of Jason A. Donenfeld.*
-

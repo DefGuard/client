@@ -36,7 +36,6 @@ use tonic::{
 use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
-use crate::utils::execute_command;
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
@@ -109,12 +108,6 @@ impl DesktopDaemonService for DaemonService {
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname)?;
 
-        if let Some(pre_up) = request.pre_up {
-            debug!("Executing specified PreUp command: {pre_up}");
-            let _ = execute_command(&pre_up);
-            info!("Executed specified PreUp command: {pre_up}");
-        }
-
         #[cfg(not(windows))]
         {
             // create new interface
@@ -175,11 +168,6 @@ impl DesktopDaemonService for DaemonService {
                 })?;
             }
         }
-        if let Some(post_up) = request.post_up {
-            debug!("Executing specified PostUp command: {post_up}");
-            let _ = execute_command(&post_up);
-            info!("Executed specified PostUp command: {post_up}");
-        }
 
         Ok(Response::new(()))
     }
@@ -194,11 +182,6 @@ impl DesktopDaemonService for DaemonService {
         info!("Removing interface {ifname}");
 
         let wgapi = setup_wgapi(&ifname)?;
-        if let Some(pre_down) = request.pre_down {
-            debug!("Executing specified PreDown command: {pre_down}");
-            let _ = execute_command(&pre_down);
-            info!("Executed specified PreDown command: {pre_down}");
-        }
 
         #[cfg(not(windows))]
         {
@@ -220,12 +203,6 @@ impl DesktopDaemonService for DaemonService {
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
-        if let Some(post_down) = request.post_down {
-            debug!("Executing specified PostDown command: {post_down}");
-            let _ = execute_command(&post_down);
-            info!("Executed specified PostDown command: {post_down}");
-        }
-
         Ok(Response::new(()))
     }
 
