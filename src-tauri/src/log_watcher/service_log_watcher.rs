@@ -14,10 +14,7 @@ use std::{
 };
 
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
-use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -220,7 +217,7 @@ pub async fn spawn_log_watcher_task(
     log_level: Level,
     from: Option<String>,
 ) -> Result<String, Error> {
-    info!("Spawning log watcher task for location ID {location_id}, interface {interface_name}");
+    debug!("Spawning log watcher task for location ID {location_id}, interface {interface_name}");
     let app_state = handle.state::<AppState>();
 
     // parse `from` timestamp
@@ -232,7 +229,7 @@ pub async fn spawn_log_watcher_task(
         "Location"
     };
     let event_topic = format!("log-update-{connection_type}-{location_id}");
-    debug!("Using event topic: {event_topic}");
+    debug!("Using the following event topic for the service log watcher: {event_topic}");
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();
@@ -268,12 +265,13 @@ pub async fn spawn_log_watcher_task(
         old_token.cancel();
     }
 
+    info!("Service log watcher task for interface {interface_name} started");
     Ok(event_topic)
 }
 
 /// Stops the log watcher thread
 pub fn stop_log_watcher_task(handle: &AppHandle, interface_name: &str) -> Result<(), Error> {
-    info!("Stopping log watcher task for interface {interface_name}");
+    debug!("Stopping service log watcher task for interface {interface_name}");
     let app_state = handle.state::<AppState>();
 
     // get `CancellationToken` to manually stop watcher thread
@@ -283,11 +281,14 @@ pub fn stop_log_watcher_task(handle: &AppHandle, interface_name: &str) -> Result
         .expect("Failed to lock log watchers mutex");
 
     if let Some(token) = log_watchers.remove(interface_name) {
-        debug!("Using cancellation token for log watcher on interface {interface_name}");
+        debug!("Using cancellation token for service log watcher on interface {interface_name}");
         token.cancel();
+        debug!("Service log watcher for interface {interface_name} stopped");
         Ok(())
     } else {
-        error!("Log watcher for interface {interface_name} not found.");
+        debug!(
+            "Service log watcher for interface {interface_name} couldn't be found, nothing to stop"
+        );
         Err(Error::NotFound)
     }
 }

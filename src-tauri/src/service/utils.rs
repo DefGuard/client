@@ -28,7 +28,7 @@ pub fn logging_setup(config: &Config) -> WorkerGuard {
 
     // prepare log level filter for stdout
     let stdout_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| format!("{},hyper=info", config.log_level).into());
+        .unwrap_or_else(|_| format!("{},hyper=info,h2=info", config.log_level).into());
 
     // prepare log level filter for json file
     let json_filter = EnvFilter::new(format!("{},hyper=info", Level::DEBUG));

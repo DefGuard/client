@@ -9,7 +9,7 @@ use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConf
 use local_ip_address::local_ip;
 use sqlx::query;
 use tauri::{AppHandle, Manager};
-use tonic::transport::Channel;
+use tonic::{transport::Channel, Code};
 use tracing::Level;
 
 use crate::{
@@ -41,40 +41,51 @@ pub async fn setup_interface(
     pool: &DbPool,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
+    debug!("Setting up interface for location: {location}");
+
+    debug!("Looking for wireguard keys for location {location} instance");
     let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? else {
         error!("No keys found for instance: {}", location.instance_id);
         return Err(Error::InternalError(
             "No keys found for instance".to_string(),
         ));
     };
+    debug!("Wireguard keys found for location {location} instance");
 
     // prepare peer config
-    debug!("Decoding location public key: {}.", location.pubkey);
+    debug!(
+        "Decoding location {location} public key: {}.",
+        location.pubkey
+    );
     let peer_key: Key = Key::from_str(&location.pubkey)?;
-    info!("Location public key decoded.");
-    debug!("Location public key: {peer_key}");
+    debug!("Location {location} public key decoded: {peer_key}");
     let mut peer = Peer::new(peer_key);
 
-    debug!("Parsing location endpoint: {}", location.endpoint);
+    debug!(
+        "Parsing location {location} endpoint: {}",
+        location.endpoint
+    );
     peer.set_endpoint(&location.endpoint)?;
     peer.persistent_keepalive_interval = Some(25);
-    info!("Parsed location endpoint.");
-    debug!("Location endpoint: {}", location.endpoint);
+    debug!("Parsed location {location} endpoint: {}", location.endpoint);
 
     if let Some(psk) = preshared_key {
-        debug!("Decoding preshared key.");
+        debug!("Decoding location {location} preshared key.");
         let peer_psk = Key::from_str(&psk)?;
-        info!("Preshared key decoded.");
+        info!("Location {location} preshared key decoded.");
         peer.preshared_key = Some(peer_psk);
     }
 
-    debug!("Parsing location allowed ips: {}", location.allowed_ips);
+    debug!(
+        "Parsing location {location} allowed ips: {}",
+        location.allowed_ips
+    );
     let allowed_ips = if location.route_all_traffic {
-        debug!("Using all traffic routing: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
+        debug!("Using all traffic routing for location {location}: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         debug!(
-            "Using predefined location traffic: {}",
+            "Using predefined location {location} traffic: {}",
             location.allowed_ips
         );
         location
@@ -90,18 +101,20 @@ pub async fn setup_interface(
             }
             Err(err) => {
                 // Handle the error from IpAddrMask::from_str, if needed
-                error!("Error parsing IP address {allowed_ip}: {err}");
+                error!("Error parsing IP address {allowed_ip} while setting up interface for location {location}, error details: {err}");
                 continue;
             }
         }
     }
-    info!("Parsed allowed IPs for location.");
-    debug!("Allowed IPs: {:#?}", peer.allowed_ips);
+    debug!(
+        "Parsed allowed IPs for location {location}: {:?}",
+        peer.allowed_ips
+    );
 
     // request interface configuration
     debug!("Looking for a free port for interface {interface_name}...");
     if let Some(port) = find_random_free_port() {
-        info!("Found free port: {port} for interface {interface_name}.");
+        debug!("Found free port: {port} for interface {interface_name}.");
         let interface_config = InterfaceConfiguration {
             name: interface_name,
             prvkey: keys.prvkey,
@@ -110,26 +123,36 @@ pub async fn setup_interface(
             peers: vec![peer.clone()],
             mtu: None,
         };
-        debug!("Creating interface {interface_config:#?}");
+        debug!(
+            "Creating interface for location {location} with configuration {interface_config:?}"
+        );
         let request = CreateInterfaceRequest {
             config: Some(interface_config.clone().into()),
             allowed_ips,
             dns: location.dns.clone(),
         };
         if let Err(error) = client.create_interface(request).await {
-            let msg = format!(
-                "Failed to create interface with config {interface_config:?}. Error: {error}"
-            );
-            error!("{msg}");
-            Err(Error::InternalError(msg))
+            match error.code() {
+                Code::Unavailable => {
+                    error!("There was an error while setting up connection for location {location}, Defguard background service is unavailable. Please make sure the service is running. Error details: {error}, Interface configuration: {interface_config:?}");
+                    return Err(Error::InternalError(
+                        "Defguard background service is unavailable. Please make sure the service is running.".to_string(),
+                    ));
+                }
+                _ => {
+                    error!("There was an error while sending the request to the defguard background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error details: {error}");
+                    Err(Error::InternalError(
+                        format!("There was an error while sending the request to the defguard background service to create an interface for location {location}. Error details: {}. Check logs for a more detailed information.", error.message())
+                    ))
+                }
+            }
         } else {
-            info!("Created interface {interface_config:#?}");
+            info!("Interface creation request for location {location} has been sent to the defguard background service, created the {} interface.", interface_config.name);
             Ok(())
         }
     } else {
         let msg = format!(
-            "Error finding free port during interface {interface_name} setup for location {}",
-            location.name
+            "Couldn't find free port during interface {interface_name} setup for location {location}"
         );
         error!("{msg}");
         Err(Error::InternalError(msg))
@@ -290,14 +313,17 @@ pub async fn setup_interface_tunnel(
     interface_name: String,
     mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
+    debug!("Setting up interface for tunnel {tunnel}");
     // prepare peer config
-    debug!("Decoding location public key: {}.", tunnel.server_pubkey);
+    debug!(
+        "Decoding tunnel {tunnel} public key: {}.",
+        tunnel.server_pubkey
+    );
     let peer_key = Key::from_str(&tunnel.server_pubkey)?;
-    info!("Location public key decoded.");
-    debug!("Location public key: {peer_key}");
+    debug!("Tunnel {tunnel} public key decoded.");
     let mut peer = Peer::new(peer_key);
 
-    debug!("Parsing location endpoint: {}", tunnel.endpoint);
+    debug!("Parsing tunnel {tunnel} endpoint: {}", tunnel.endpoint);
     peer.set_endpoint(&tunnel.endpoint)?;
     peer.persistent_keepalive_interval = Some(
         tunnel
@@ -305,24 +331,26 @@ pub async fn setup_interface_tunnel(
             .try_into()
             .expect("Failed to parse persistent keep alive"),
     );
-    info!("Parsed location endpoint.");
-    debug!("Location endpoint: {}", tunnel.endpoint);
+    debug!("Parsed tunnel {tunnel} endpoint: {}", tunnel.endpoint);
 
     if let Some(psk) = &tunnel.preshared_key {
-        debug!("Decoding preshared key.");
+        debug!("Decoding tunnel {tunnel} preshared key.");
         let peer_psk = Key::from_str(psk)?;
-        debug!("Preshared key decoded.");
+        debug!("Preshared key for tunnel {tunnel} decoded.");
         peer.preshared_key = Some(peer_psk);
     }
 
-    debug!("Parsing location allowed ips: {:?}", tunnel.allowed_ips);
+    debug!(
+        "Parsing tunnel {tunnel} allowed ips: {:?}",
+        tunnel.allowed_ips
+    );
     let allowed_ips: Vec<String> = if tunnel.route_all_traffic {
-        debug!("Using all traffic routing: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
+        debug!("Using all traffic routing for tunnel {tunnel}: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         let msg = match &tunnel.allowed_ips {
-            Some(ips) => format!("Using predefined location traffic: {ips}"),
-            None => "No allowed IPs found".to_string(),
+            Some(ips) => format!("Using predefined location traffic for tunnel {tunnel}: {ips}"),
+            None => "No allowed IPs found in tunnel {tunnel} configuration".to_string(),
         };
         debug!("{msg}");
         tunnel
@@ -344,8 +372,7 @@ pub async fn setup_interface_tunnel(
             }
         }
     }
-    info!("Parsed allowed IPs.");
-    debug!("Allowed IPs: {:?}", peer.allowed_ips);
+    debug!("Parsed tunnel {tunnel} allowed IPs: {:?}", peer.allowed_ips);
 
     // request interface configuration
     debug!("Looking for a free port for interface {interface_name}...");
@@ -359,7 +386,7 @@ pub async fn setup_interface_tunnel(
             peers: vec![peer.clone()],
             mtu: None,
         };
-        debug!("Creating interface {interface_config:#?}");
+        debug!("Creating interface {interface_config:?}");
         let request = CreateInterfaceRequest {
             config: Some(interface_config.clone().into()),
             allowed_ips,
@@ -380,14 +407,13 @@ pub async fn setup_interface_tunnel(
                 let _ = execute_command(post_up);
                 info!("Executed specified PreUp command: {post_up}");
             }
-            info!("Created interface {}", interface_config.name);
+            info!("Interface {} created successfully.", interface_config.name);
             debug!("Created interface with config: {interface_config:?}");
             Ok(())
         }
     } else {
         let msg = format!(
-            "Error finding free port during tunnel {} setup for interface {interface_name}",
-            tunnel.name
+            "Error finding free port during tunnel {tunnel} setup for interface {interface_name}"
         );
         error!("{msg}");
         Err(Error::InternalError(msg))
@@ -481,7 +507,7 @@ pub async fn get_location_interface_details(
         )
         .fetch_optional(pool)
         .await?;
-        info!("Fetched location stats for location ID {location_id}");
+        debug!("Fetched location stats for location ID {location_id}");
 
         let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
             Some(record) => (
@@ -492,7 +518,7 @@ pub async fn get_location_interface_details(
             None => (None, None, None),
         };
 
-        info!("Fetched location details for location ID {location_id}");
+        debug!("Fetched location details for location ID {location_id}");
 
         Ok(LocationInterfaceDetails {
             location_id,
@@ -519,10 +545,7 @@ pub async fn handle_connection_for_location(
     preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!(
-        "Creating new interface connection for location: {}",
-        location.name
-    );
+    debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
@@ -544,34 +567,31 @@ pub async fn handle_connection_for_location(
         ConnectionType::Location,
     );
     state.active_connections.lock().await.push(connection);
-    info!(
-        "Finished creating new interface connection for location: {}",
-        location.name
-    );
+    debug!("Created a new interface for location {}", location.name);
     debug!(
-        "Active connections: {:#?}",
+        "Active connections: {:?}",
         state.active_connections.lock().await
     );
-    debug!("Sending event connection-changed...");
+    debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit_all(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
     )?;
-    debug!("Event connection-changed sent.");
+    debug!("Event sent for location {}", location.name);
 
     // Spawn stats threads
-    debug!("Spawning stats thread...");
+    debug!("Spawning stats thread for location {}...", location.name);
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Location,
     );
-    info!("Stats thread spawned.");
+    debug!("Stats thread for location {} spawned.", location.name);
 
     // spawn log watcher
-    debug!("Spawning log watcher...");
+    debug!("Spawning log watcher for location {}...", location.name);
     spawn_log_watcher_task(
         handle,
         location.id,
@@ -581,7 +601,7 @@ pub async fn handle_connection_for_location(
         None,
     )
     .await?;
-    info!("Log watcher spawned.");
+    debug!("Log watcher for location {} spawned.", location.name);
     Ok(())
 }
 
@@ -590,10 +610,7 @@ pub async fn handle_connection_for_tunnel(
     tunnel: &Tunnel<Id>,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!(
-        "Creating new interface connection for tunnel: {}",
-        tunnel.name
-    );
+    debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
@@ -608,34 +625,31 @@ pub async fn handle_connection_for_tunnel(
         ConnectionType::Tunnel,
     );
     state.active_connections.lock().await.push(connection);
-    info!(
-        "Finished creating new interface connection for tunnel: {}",
-        tunnel.name
-    );
+    debug!("Created a new interface for tunnel {}", tunnel.name);
     debug!(
-        "Active connections: {:#?}",
+        "Active connections: {:?}",
         state.active_connections.lock().await
     );
-    debug!("Sending event connection-changed.");
+    debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit_all(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
         },
     )?;
-    debug!("Event connection-changed sent.");
+    debug!("Event sent for tunnel {}", tunnel.name);
 
     // Spawn stats threads
-    debug!("Spawning stats thread");
+    debug!("Spawning stats thread for tunnel {}", tunnel.name);
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Tunnel,
     );
-    info!("Stats thread spawned");
+    debug!("Stats thread for tunnel {} spawned", tunnel.name);
 
     //spawn log watcher
-    debug!("Spawning log watcher");
+    debug!("Spawning log watcher for tunnel {}", tunnel.name);
     spawn_log_watcher_task(
         handle,
         tunnel.id,
@@ -645,12 +659,13 @@ pub async fn handle_connection_for_tunnel(
         None,
     )
     .await?;
-    info!("Log watcher spawned");
+    debug!("Log watcher for tunnel {} spawned", tunnel.name);
     Ok(())
 }
 
 /// Execute command passed as argument.
 pub fn execute_command(command: &str) -> Result<(), Error> {
+    debug!("Executing command: {command}");
     let mut command_parts = command.split_whitespace();
 
     if let Some(command) = command_parts.next() {
@@ -680,37 +695,57 @@ pub async fn disconnect_interface(
     active_connection: &ActiveConnection,
     state: &AppState,
 ) -> Result<(), Error> {
-    debug!("Removing interface");
-    let mut client = state.client.clone();
-    let (location_id, connection_type) = (
-        active_connection.location_id,
-        active_connection.connection_type,
+    debug!(
+        "Disconnecting interface {}...",
+        active_connection.interface_name
     );
+    let mut client = state.client.clone();
+    let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
     match active_connection.connection_type {
         ConnectionType::Location => {
             let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? else {
-                error!("Location with ID {location_id} not found");
+                error!("Error while disconnecting interface {interface_name}, location with ID {location_id} not found");
                 return Err(Error::NotFound);
             };
             let request = RemoveInterfaceRequest {
                 interface_name,
                 endpoint: location.endpoint,
             };
+            debug!("Sending request to the background service to remove interface {} for location {}...", active_connection.interface_name, location.name);
             if let Err(error) = client.remove_interface(request).await {
-                let msg = format!("Failed to remove interface: {error}");
-                error!("{msg}");
-                return Err(Error::InternalError(msg));
+                match error.code() {
+                    Code::Unavailable => {
+                        error!("Couldn't remove interface {}. Defguard background service is unavailable. Please make sure the service is running. Error details: {error}.", active_connection.interface_name);
+                        return Err(Error::InternalError(
+                            format!("Couldn't remove interface {}. Defguard background service is unavailable. Please make sure the service is running.", active_connection.interface_name),
+                        ));
+                    }
+                    _ => {
+                        error!("There was an error while sending the request to the defguard background service to remove an interface {}. Error details: {error}", active_connection.interface_name);
+                        return Err(Error::InternalError(
+                            format!("There was an error while sending the request to the defguard background service to remove an interface {}. Error details: {}.", active_connection.interface_name, error.message())
+                        ));
+                    }
+                }
             }
             let connection: Connection = active_connection.into();
             let connection = connection.save(&state.get_pool()).await?;
-            trace!("Saved connection: {connection:#?}");
-            debug!("Interface removed");
+            debug!(
+                "Saved location {} new connection status in the database",
+                location.name
+            );
+            trace!("Saved connection: {connection:?}");
+            debug!(
+                "Interface {} removed successfully",
+                active_connection.interface_name
+            );
+            info!("Disconnected from location {}", location.name);
         }
         ConnectionType::Tunnel => {
             let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? else {
-                error!("Tunnel with ID {location_id} not found");
+                error!("Error while disconnecting interface {interface_name}, tunnel with ID {location_id} not found");
                 return Err(Error::NotFound);
             };
             if let Some(pre_down) = tunnel.pre_down {
@@ -723,9 +758,14 @@ pub async fn disconnect_interface(
                 endpoint: tunnel.endpoint,
             };
             if let Err(error) = client.remove_interface(request).await {
-                let msg = format!("Failed to remove interface: {error}");
-                error!("{msg}");
-                return Err(Error::InternalError(msg));
+                error!(
+                    "Error while removing interface {}, error details: {:?}",
+                    active_connection.interface_name, error
+                );
+                return Err(Error::InternalError(format!(
+                    "Failed to remove interface, error message: {}",
+                    error.message()
+                )));
             }
             if let Some(post_down) = tunnel.post_down {
                 debug!("Executing specified PostDown command: {post_down}");
@@ -734,11 +774,37 @@ pub async fn disconnect_interface(
             }
             let connection: TunnelConnection = active_connection.into();
             let connection = connection.save(&state.get_pool()).await?;
+            debug!(
+                "Saved new tunnel {} connection status in the database",
+                tunnel.name
+            );
             trace!("Saved connection: {connection:#?}");
-            debug!("Interface removed");
+            debug!(
+                "Interface {} removed successfully",
+                active_connection.interface_name
+            );
+            info!("Disconnected from tunnel {}", tunnel.name);
         }
     }
 
-    info!("Location {location_id} {connection_type:?} disconnected");
     Ok(())
+}
+
+/// Helper function to get the name of a tunnel or location by its ID
+/// Returns the name of the tunnel or location if it exists, otherwise None
+pub async fn get_tunnel_or_location_name(
+    id: Id,
+    connection_type: ConnectionType,
+    appstate: &AppState,
+) -> Option<String> {
+    match connection_type {
+        ConnectionType::Location => Location::find_by_id(&appstate.get_pool(), id)
+            .await
+            .ok()
+            .and_then(|l| l.map(|l| l.name)),
+        ConnectionType::Tunnel => Tunnel::find_by_id(&appstate.get_pool(), id)
+            .await
+            .ok()
+            .and_then(|t| t.map(|t| t.name)),
+    }
 }

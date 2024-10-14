@@ -21,54 +21,73 @@ const POLLING_ENDPOINT: &str = "/api/v1/poll";
 /// Updates are only performed if no connections are established to the [`Instance`],
 /// otherwise event is emmited and UI message is displayed.
 pub async fn poll_config(handle: AppHandle) {
+    debug!("Starting the configuration polling loop...");
     let state: State<AppState> = handle.state();
     let pool = state.get_pool();
     loop {
         let Ok(mut transaction) = pool.begin().await else {
             error!(
-                "Failed to begin db transaction, retrying in {}s",
+                "Failed to begin database transaction for config polling, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
             );
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
-        let Ok(mut instances) = Instance::all(&mut *transaction).await else {
+        let Ok(mut instances) = Instance::all_with_token(&mut *transaction).await else {
             error!(
-                "Failed to retireve instances, retrying in {}s",
+                "Failed to retireve instances for config polling, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
             );
             let _ = transaction.rollback().await;
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
-        debug!(
-            "Polling configuration updates for {} instances",
-            instances.len(),
-        );
+        debug!("Found {} instances with a config polling token, proceeding with polling their configuration...", instances.len());
+        let mut config_retrieved = 0;
         for instance in &mut instances {
-            if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
-                error!(
-                    "Failed to retrieve instance {}({}) config: {err}",
-                    instance.name, instance.id,
-                );
-            } else {
-                debug!(
-                    "Retrieved config for instance {}({})",
-                    instance.name, instance.id,
-                );
+            if instance.token.is_some() {
+                if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
+                    match err {
+                        Error::CoreNotEnterprise => {
+                            debug!(
+                                "Tried to contact core for instance {}({}) config but it's not enterprise, can't retrieve config",
+                                instance.name, instance.id,
+                            );
+                        }
+                        _ => {
+                            error!(
+                                "Failed to retrieve instance {}({}) config from core: {err}",
+                                instance.name, instance.id,
+                            );
+                        }
+                    }
+                } else {
+                    config_retrieved += 1;
+                    debug!(
+                        "Retrieved config for instance {}({}) from core",
+                        instance.name, instance.id,
+                    );
+                }
             }
         }
         if let Err(err) = transaction.commit().await {
             error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
         }
         if let Err(err) = handle.emit_all(INSTANCE_UPDATE, ()) {
-            error!("Failed to emit instance update event: {err}");
+            error!("Failed to emit instance update event to the frontend: {err}");
         }
-        info!(
-            "Retrieved configuration for {} instances, sleeping {}s",
-            instances.len(),
-            INTERVAL_SECONDS.as_secs(),
-        );
+        if config_retrieved > 0 {
+            info!(
+                "Retrieved configuration from core for {} instances, sleeping {}s",
+                config_retrieved,
+                INTERVAL_SECONDS.as_secs(),
+            );
+        } else {
+            debug!(
+                "No configuration updates retrieved, sleeping {}s",
+                INTERVAL_SECONDS.as_secs(),
+            );
+        }
         sleep(INTERVAL_SECONDS).await;
     }
 }
@@ -80,6 +99,7 @@ pub async fn poll_instance(
     instance: &mut Instance<Id>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
+    debug!("Getting config from core for instance {}", instance.name);
     // Query proxy api
     let request = build_request(instance)?;
     let url = Url::from_str(&instance.proxy_url)
@@ -102,7 +122,10 @@ pub async fn poll_instance(
             instance.name, instance.id, instance.proxy_url
         ))
     })?;
-    debug!("InstanceInfoResponse: {response:?}");
+    debug!(
+        "Got the following config response for instance {} from core: {response:?}",
+        instance.name
+    );
 
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
@@ -124,10 +147,14 @@ pub async fn poll_instance(
                 instance.name, instance.id
             );
         }
-        return Ok(());
+        return Err(Error::CoreNotEnterprise);
     }
 
     // Parse the response
+    debug!(
+        "Parsing the config response for instance {}...",
+        instance.name
+    );
     let response: InstanceInfoResponse = response.json().await.map_err(|err| {
         Error::InternalError(format!(
             "Failed to parse InstanceInfoResponse for instance {}({}): {err}",
@@ -138,6 +165,10 @@ pub async fn poll_instance(
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    debug!(
+        "Parsed the following config for instance {}: {device_config:?}",
+        instance.name
+    );
 
     // Early return if config didn't change
     if !config_changed(transaction, instance, device_config).await? {
@@ -163,7 +194,7 @@ pub async fn poll_instance(
         );
         do_update_instance(transaction, instance, device_config.clone()).await?;
         info!(
-            "Updated instance {}({}) configuration",
+            "Updated instance {}({}) configuration based on core's response",
             instance.name, instance.id
         );
     } else {
@@ -196,7 +227,7 @@ async fn config_changed(
         None => false,
     };
     debug!(
-        "Did the locations change: {}. Did the instance information change: {}",
+        "Did the locations change?: {}. Did the instance information change?: {}",
         locations_changed, info_changed
     );
     Ok(locations_changed || info_changed)
@@ -206,7 +237,7 @@ async fn config_changed(
 fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
     let token = &instance.token.as_ref().ok_or_else(|| {
         Error::InternalError(format!(
-            "Instance {}({}) missing token",
+            "Instance {}({}) is missing token, can't build request for config polling",
             instance.name, instance.id
         ))
     })?;

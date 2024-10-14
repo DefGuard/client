@@ -37,7 +37,6 @@ use log::{Level, LevelFilter};
 use tauri::{api::process, Env};
 use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
-use tracing;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -148,34 +147,50 @@ async fn main() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(AppState::default())
         .build(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("error while building tauri application");
 
-    info!("Starting ... version v{}", VERSION);
+    info!("Starting version v{}...", VERSION);
     // initialize database
     let app_handle = app.handle();
-    debug!("Initializing database connection");
+    debug!("Initializing database connection...");
     let app_state: State<AppState> = app_handle.state();
     let db = database::init_db(&app_handle)
         .await
         .expect("Database initialization failed");
     *app_state.db.lock().unwrap() = Some(db);
     info!("Database initialization completed");
-    info!("Starting main app thread.");
+    debug!("Getting database info to check if the connection is working...");
     let result = database::info(&app_state.get_pool()).await;
-    info!("Database info result: {result:#?}");
+    if let Err(e) = result {
+        error!(
+            "There was an error while getting the database info: {:?}. The database connection might not be working.",
+            e
+        );
+    }
+    info!(
+        "Database info has been fetched successfully. The connection with the database is working."
+    );
+
     // configure tray
+    debug!("Configuring tray icon...");
     if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
         let _ = configure_tray_icon(&app_handle, &settings.tray_icon_theme);
     }
+    debug!("Tray icon has been configured successfully");
 
     // run periodic tasks
+    debug!("Starting periodic tasks...");
     tauri::async_runtime::spawn(poll_version(app_handle.clone()));
     tauri::async_runtime::spawn(poll_config(app_handle.clone()));
+    debug!("Periodic tasks have been started");
 
     // load tray menu after database initialization to show all instance and locations
+    debug!("Reloading tray menu to show all instances and locations...");
     reload_tray_menu(&app_handle).await;
+    debug!("Tray menu has been reloaded successfully");
 
     // Handle Ctrl-C
+    debug!("Setting up Ctrl-C handler...");
     tauri::async_runtime::spawn(async move {
         tokio::signal::ctrl_c()
             .await
@@ -184,8 +199,10 @@ async fn main() {
         let app_state: State<AppState> = app_handle.state();
         app_state.quit(&app_handle);
     });
+    debug!("Ctrl-C handler has been set up successfully");
 
     // run app
+    info!("Running the application...");
     app.run(|app_handle, event| match event {
         // prevent shutdown on window close
         RunEvent::ExitRequested { api, .. } => {

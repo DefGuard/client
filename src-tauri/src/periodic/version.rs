@@ -11,11 +11,12 @@ use crate::{
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
 pub async fn poll_version(app_handle: AppHandle) {
+    debug!("Starting the latest application version polling loop...");
     let state = app_handle.state::<AppState>();
     let pool = &state.get_pool();
 
     loop {
-        debug!("Waiting to fetch latest application version");
+        debug!("Waiting to fetch latest application version for {INTERVAL_IN_SECONDS:?}...");
         sleep(INTERVAL_IN_SECONDS).await;
 
         let settings = Settings::get(pool).await;
@@ -37,7 +38,9 @@ pub async fn poll_version(app_handle: AppHandle) {
             }
         } else {
             let err = settings.err().unwrap();
-            error!("Error while fetching settings: {err}");
+            error!(
+                "Couldn't fetch settings while checking for the latest application version: {err}"
+            );
         }
     }
 }

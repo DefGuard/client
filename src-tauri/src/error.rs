@@ -39,6 +39,8 @@ pub enum Error {
     ConfigParseError(String),
     #[error("Command failed: {0}")]
     CommandError(String),
+    #[error("Core is not enterprise")]
+    CoreNotEnterprise,
 }
 
 // we must manually implement serde::Serialize

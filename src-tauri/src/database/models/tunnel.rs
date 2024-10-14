@@ -1,3 +1,4 @@
+use core::fmt;
 use std::time::SystemTime;
 
 use chrono::{NaiveDateTime, Utc};
@@ -42,6 +43,12 @@ pub struct Tunnel<I = NoId> {
     pub pre_down: Option<String>,
     #[serde_as(as = "NoneAsEmptyString")]
     pub post_down: Option<String>,
+}
+
+impl fmt::Display for Tunnel<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}(ID: {})", self.name, self.id)
+    }
 }
 
 impl Tunnel<Id> {

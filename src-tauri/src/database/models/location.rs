@@ -25,7 +25,7 @@ pub struct Location<I = NoId> {
 
 impl fmt::Display for Location<Id> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[ID {}] {}", self.id, self.name)
+        write!(f, "{}(ID: {})", self.id, self.name)
     }
 }
 

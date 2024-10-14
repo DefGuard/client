@@ -16,6 +16,7 @@ static JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
 static FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
 pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<SystemTrayMenu, Error> {
+    debug!("Generating tray menu...");
     let quit = CustomMenuItem::new("quit", "Quit");
     let show = CustomMenuItem::new("show", "Show");
     let hide = CustomMenuItem::new("hide", "Hide");
@@ -53,7 +54,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
     } else if let Err(err) = all_instances {
         warn!("Cannot load instance menu: {:?}", err);
     }
-    info!("Loaded all instances for tray menu");
+    debug!("Loaded all instances for tray menu");
 
     // Load rest of tray menu options
     tray_menu = tray_menu
@@ -67,16 +68,19 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
-    info!("Successfully set tray menu");
+    info!("Successfully generated tray menu");
     Ok(tray_menu)
 }
 
 pub async fn reload_tray_menu(app_handle: &AppHandle) {
+    debug!("Reloading tray menu...");
     let system_menu = generate_tray_menu(app_handle.state::<AppState>())
         .await
         .unwrap();
     if let Err(err) = app_handle.tray_handle().set_menu(system_menu) {
         warn!("Unable to update tray menu {err:?}");
+    } else {
+        debug!("Successfully reloaded tray menu");
     }
 }
 
@@ -139,7 +143,7 @@ pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(),
     if let Some(icon_path) = app.path_resolver().resolve_resource(&resource_str) {
         let icon = Icon::File(icon_path);
         app.tray_handle().set_icon(icon)?;
-        info!("Tray icon changed");
+        debug!("Tray icon changed");
         Ok(())
     } else {
         error!("Loading tray icon resource {resource_str} failed! Resource not resolved.",);

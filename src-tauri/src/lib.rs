@@ -13,6 +13,7 @@ pub mod service;
 pub mod tray;
 pub mod utils;
 pub mod wg_config;
+use std::fmt;
 
 mod proto {
     tonic::include_proto!("defguard.proxy");
@@ -25,6 +26,15 @@ pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_G
 pub enum ConnectionType {
     Tunnel,
     Location,
+}
+
+impl fmt::Display for ConnectionType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ConnectionType::Tunnel => write!(f, "tunnel"),
+            ConnectionType::Location => write!(f, "location"),
+        }
+    }
 }
 
 #[macro_use]
