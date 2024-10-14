@@ -700,10 +700,7 @@ pub async fn disconnect_interface(
         active_connection.interface_name
     );
     let mut client = state.client.clone();
-    let (location_id, connection_type) = (
-        active_connection.location_id,
-        active_connection.connection_type,
-    );
+    let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
     match active_connection.connection_type {
