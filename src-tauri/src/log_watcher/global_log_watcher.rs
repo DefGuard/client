@@ -481,7 +481,8 @@ pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
         debug!("Global log watcher cancelled");
         Ok(())
     } else {
-        error!("Global log watcher not found, cannot cancel");
-        Err(Error::NotFound)
+        // Silently ignore if global log watcher is not found, as there is nothing to cancel
+        debug!("Global log watcher not found, cannot cancel");
+        Ok(())
     }
 }

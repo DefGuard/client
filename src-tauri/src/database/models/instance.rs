@@ -135,6 +135,19 @@ impl Instance<Id> {
         );
         Ok(())
     }
+
+    pub async fn all_with_token<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let instances = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled FROM instance WHERE token IS NOT NULL;"
+        )
+        .fetch_all(executor)
+        .await?;
+        Ok(instances)
+    }
 }
 
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below

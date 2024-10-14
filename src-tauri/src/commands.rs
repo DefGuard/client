@@ -32,7 +32,8 @@ use crate::{
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         disconnect_interface, execute_command, get_location_interface_details,
-        get_tunnel_interface_details, handle_connection_for_location, handle_connection_for_tunnel,
+        get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
+        handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
@@ -51,23 +52,32 @@ pub async fn connect(
     preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!("Connecting location {location_id} using connection type {connection_type:?}");
+    debug!("Received a command to connect to a {connection_type} with ID {location_id}");
     let state = handle.state::<AppState>();
-    if connection_type.eq(&ConnectionType::Location) {
+    if connection_type == ConnectionType::Location {
         if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
+            debug!(
+                "Identified location with ID {location_id} as \"{}\", handling connection...",
+                location.name
+            );
             handle_connection_for_location(&location, preshared_key, handle.clone()).await?;
             reload_tray_menu(&handle).await;
+            info!("Connected to location {} successfully", location.name);
         } else {
-            error!("Location {location_id} not found");
+            error!("Location with ID {location_id} not found in the database, aborting connection attempt");
             return Err(Error::NotFound);
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
+        debug!(
+            "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
+            tunnel.name
+        );
         handle_connection_for_tunnel(&tunnel, handle).await?;
+        info!("Connected to tunnel {} successfully", tunnel.name);
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);
     }
-    info!("Connected to location with id: {location_id}");
     Ok(())
 }
 
@@ -91,30 +101,44 @@ pub async fn disconnect(
     connection_type: ConnectionType,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!("Disconnecting location {location_id}");
+    debug!("Received a command to disconnect from a {connection_type} with ID {location_id}");
     let state = handle.state::<AppState>();
+
+    let name = match get_tunnel_or_location_name(location_id, connection_type, &state).await {
+        Some(name) => {
+            debug!("Identified {connection_type} with ID {location_id} as \"{name}\", handling disconnection...");
+            name
+        }
+        None => {
+            debug!("Could not identify {connection_type} with ID {location_id}, this {connection_type} will be referred to as UNKNOWN, trying to disconnect anyway...");
+            "UNKNOWN".to_string()
+        }
+    };
+
     if let Some(connection) = state.remove_connection(location_id, &connection_type).await {
-        debug!("Found active connection");
-        trace!("Connection: {connection:#?}");
+        debug!("Found active connection for {connection_type} {name}({location_id})");
+        trace!("Connection: {connection:?}");
         disconnect_interface(&connection, &state).await?;
-        debug!("Connection saved");
+        debug!("Emitting the event informing the frontend about the disconnection from {connection_type} {name}({location_id})");
         handle.emit_all(
             CONNECTION_CHANGED,
             Payload {
                 message: "Created new connection".into(),
             },
         )?;
+        debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
-        info!("Disconnected from location with id: {location_id}");
         reload_tray_menu(&handle).await;
         if connection_type == ConnectionType::Location {
             if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
                 warn!("Failed to update instance for location {location_id}: {err}");
             };
         }
+
+        info!("Finished disconnecting from {connection_type} {name}({location_id})");
         Ok(())
     } else {
-        error!("Error while disconnecting from location with id: {location_id} not found");
+        error!("Error while disconnecting from {connection_type} {name}({location_id}): connection not found");
         Err(Error::NotFound)
     }
 }
@@ -646,7 +670,7 @@ pub async fn all_connections(
                 .collect()
         }
     };
-    info!("Connections retrieved({})", connections.len());
+    debug!("Connections retrieved({})", connections.len());
     trace!("Connections found:\n{connections:#?}");
     Ok(connections)
 }
@@ -659,7 +683,7 @@ pub async fn all_tunnel_connections(
     debug!("Retrieving connections for location {location_id}");
     let connections =
         TunnelConnectionInfo::all_by_tunnel_id(&app_state.get_pool(), location_id).await?;
-    info!("Tunnel connections retrieved({})", connections.len());
+    debug!("Tunnel connections retrieved({})", connections.len());
     trace!("Connections found:\n{connections:#?}");
     Ok(connections)
 }
@@ -678,7 +702,7 @@ pub async fn active_connection(
         debug!("Active connection found");
     }
     trace!("Connection retrieved:\n{connection:#?}");
-    info!("Connection retrieved");
+    debug!("Active connection information for location has been retrieved");
     Ok(connection)
 }
 
@@ -1027,7 +1051,7 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     request_data.insert("client_version", current_version);
     request_data.insert("operating_system", operating_system);
 
-    info!("Fetching latest application version with args: current version {current_version} and operating system {operating_system}");
+    debug!("Fetching latest application version with args: current version {current_version} and operating system {operating_system}");
 
     let client = reqwest::Client::new();
     let res = client
@@ -1044,7 +1068,10 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
             Error::CommandError(err.to_string())
         })?;
 
-        info!("Latest application version fetched: {}", response.version);
+        info!(
+            "The latest application release version avaialble for download is: {}",
+            response.version
+        );
         Ok(response)
     } else {
         let err = res.err().unwrap();

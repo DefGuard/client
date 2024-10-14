@@ -65,7 +65,7 @@ impl AppState {
         }) {
             // Found a connection with the specified location_id
             let removed_connection = connections.remove(index);
-            info!("Removed connection from active connections: {removed_connection:#?}");
+            info!("Active connection has been removed from the active connections list.");
             Some(removed_connection)
         } else {
             debug!("No active connection found with location_id: {location_id}");
@@ -114,7 +114,7 @@ impl AppState {
     ) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().await;
         debug!(
-        "Checking for active connection with id: {id}, connection_type: {connection_type:?} in active connections: {connections:#?}"
+        "Checking for active connection with id: {id}, connection_type: {connection_type:?} in active connections: {connections:?}"
     );
 
         if let Some(connection) = connections
@@ -122,10 +122,10 @@ impl AppState {
             .find(|conn| conn.location_id == id && conn.connection_type == connection_type)
         {
             // 'connection' now contains the first element with the specified id and connection_type
-            debug!("Found connection: {connection:#?}");
+            debug!("Found connection: {connection:?}");
             Some(connection.to_owned())
         } else {
-            error!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");
+            debug!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");
             None
         }
     }

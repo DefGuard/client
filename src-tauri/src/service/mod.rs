@@ -69,7 +69,7 @@ type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Statu
 #[cfg(not(target_os = "macos"))]
 fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
     let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
-        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
+        let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
@@ -80,7 +80,7 @@ fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
 #[cfg(target_os = "macos")]
 fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
     let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
-        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
+        let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
@@ -94,6 +94,7 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
     ) -> Result<Response<()>, Status> {
+        debug!("Received a request to create a new interface");
         let request = request.into_inner();
         let config: InterfaceConfiguration = request
             .config
@@ -104,7 +105,6 @@ impl DesktopDaemonService for DaemonService {
             .into();
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
-        info!("Creating interface {ifname}");
         // setup WireGuard API
         let wgapi = setup_wgapi(ifname)?;
 
@@ -117,10 +117,12 @@ impl DesktopDaemonService for DaemonService {
                 error!("{msg}");
                 Status::new(Code::Internal, msg)
             })?;
+            debug!("Done creating a new interface {ifname}");
         }
 
         // The WireGuard DNS config value can be a list of IP addresses and domain names, which will be
         // used as DNS servers and search domains respectively.
+        debug!("Preparing DNS configuration for interface {ifname}");
         let dns_string = request.dns.unwrap_or_default();
         let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
         // We assume that every entry that can't be parsed as an IP address is a domain name.
@@ -133,9 +135,10 @@ impl DesktopDaemonService for DaemonService {
                 search_domains.push(entry);
             }
         }
+        debug!("DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: {search_domains:?}");
 
         // configure interface
-        debug!("Configuring new interface {ifname} with configuration: {config:?}");
+        debug!("Configuring new interface {ifname} with the following configuration: {config:?}");
 
         #[cfg(not(windows))]
         let configure_interface_result = wgapi.configure_interface(&config);
@@ -166,9 +169,12 @@ impl DesktopDaemonService for DaemonService {
                     error!("{msg}");
                     Status::new(Code::Internal, msg)
                 })?;
+            } else {
+                debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
             }
         }
 
+        info!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
     }
 
@@ -176,10 +182,11 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<RemoveInterfaceRequest>,
     ) -> Result<Response<()>, Status> {
+        debug!("Received a request to remove an interface");
         let request = request.into_inner();
         let ifname = request.interface_name;
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
-        info!("Removing interface {ifname}");
+        debug!("Removing interface {ifname}");
 
         let wgapi = setup_wgapi(&ifname)?;
 
@@ -203,6 +210,8 @@ impl DesktopDaemonService for DaemonService {
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
+
+        info!("Finished removing interface {ifname}");
         Ok(Response::new(()))
     }
 
@@ -212,6 +221,7 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
+        debug!("Received a request to read interface data");
         let request = request.into_inner();
         let ifname = request.interface_name;
         let span = info_span!("read_interface_data", interface_name = &ifname);
@@ -231,6 +241,7 @@ impl DesktopDaemonService for DaemonService {
 
             loop {
                 // wait till next iteration
+                debug!("Waiting for next stats update for interface {ifname}");
                 interval.tick().await;
                 debug!("Sending stats update for interface {ifname}");
                 match wgapi.read_interface_data() {
@@ -266,6 +277,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     let daemon_service = DaemonService::new(&config);
 
     info!("defguard daemon listening on {addr}");
+    debug!("Daemon configuration: {config:?}");
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_service"))
