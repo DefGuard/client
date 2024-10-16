@@ -160,7 +160,6 @@ impl DesktopDaemonService for DaemonService {
             })?;
 
             if !dns.is_empty() {
-                // debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
                 debug!("The following DNS servers will be set: {dns:?}, search domains: {search_domains:?}");
                 wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
                     let msg =
