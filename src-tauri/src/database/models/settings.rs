@@ -131,7 +131,7 @@ impl Settings {
             .fetch_optional(pool)
             .await?;
         if current_config.is_none() {
-            debug!("No settings found on app init, inserting defaults.");
+            debug!("No previous application settings found, inserting defaults.");
             // check what system theme is currently in use and default to it.
             let theme = match dark_light::detect() {
                 dark_light::Mode::Default | dark_light::Mode::Light => SettingsTheme::Light,
@@ -154,6 +154,9 @@ impl Settings {
             )
             .execute(pool)
             .await?;
+        } else {
+            debug!("Found previous app settings, using them.");
+            debug!("Found settings: {:?}", current_config);
         }
         Ok(())
     }

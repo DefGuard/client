@@ -27,6 +27,7 @@ use defguard_client::{
     enterprise::periodic::config::poll_config,
     events::SINGLE_INSTANCE,
     periodic::version::poll_version,
+    service,
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
     VERSION,
@@ -37,6 +38,7 @@ use log::{Level, LevelFilter};
 use tauri::{api::process, Env};
 use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
+use time;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -49,6 +51,7 @@ extern crate log;
 
 // for tauri log plugin
 const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
+const LOG_FILTER: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
 
 lazy_static! {
     static ref LOG_INCLUDES: Vec<String> = load_log_targets();
@@ -76,8 +79,15 @@ async fn main() {
     }
 
     let log_level =
-        LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
+        LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("debug".into()))
             .unwrap_or(LevelFilter::Info);
+
+    // Sets the time format. Service's logs have a subsecond part, so we also need to include it here,
+    // otherwise the logs couldn't be sorted correctly when displayed together in the UI.
+    let format = time::format_description::parse(
+        "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]",
+    )
+    .unwrap();
 
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -126,6 +136,18 @@ async fn main() {
         }))
         .plugin(
             tauri_plugin_log::Builder::default()
+                .format(move |out, message, record| {
+                    out.finish(format_args!(
+                        "{}[{}][{}] {}",
+                        tauri_plugin_log::TimezoneStrategy::UseUtc
+                            .get_now()
+                            .format(&format)
+                            .unwrap(),
+                        record.level(),
+                        record.target(),
+                        message
+                    ))
+                })
                 .targets(LOG_TARGETS)
                 .level(log_level)
                 .filter(|metadata| {
@@ -142,6 +164,22 @@ async fn main() {
                     }
                     true
                 })
+                .filter(|metadata| {
+                    // Log all errors, warnings and infos
+                    if metadata.level() == LevelFilter::Error
+                        || metadata.level() == LevelFilter::Warn
+                        || metadata.level() == LevelFilter::Info
+                    {
+                        return true;
+                    }
+                    // Otherwise do not log the following targets
+                    for target in LOG_FILTER.iter() {
+                        if metadata.target().contains(target) {
+                            return false;
+                        }
+                    }
+                    true
+                })
                 .build(),
         )
         .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -149,27 +187,37 @@ async fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    info!("Starting version v{}...", VERSION);
+    info!("Starting Defguard client version {}", VERSION);
     // initialize database
     let app_handle = app.handle();
-    debug!("Initializing database connection...");
-    let app_state: State<AppState> = app_handle.state();
-    let db = database::init_db(&app_handle)
-        .await
-        .expect("Database initialization failed");
-    *app_state.db.lock().unwrap() = Some(db);
-    info!("Database initialization completed");
-    debug!("Getting database info to check if the connection is working...");
-    let result = database::info(&app_state.get_pool()).await;
-    if let Err(e) = result {
-        error!(
-            "There was an error while getting the database info: {:?}. The database connection might not be working.",
-            e
-        );
-    }
+
     info!(
-        "Database info has been fetched successfully. The connection with the database is working."
+        "The application data (database file) will be stored in: {:?} \
+        and the application logs in: {:?}. Logs of the background defguard service responsible for \
+        managing the VPN connections at the network level will be stored in: {:?}.",
+        // display the path to the app data direcory, convert option<pathbuf> to option<&str>
+        app_handle
+            .path_resolver()
+            .app_data_dir()
+            .unwrap_or("UNDEFINED DATA DIRECTORY".into()),
+        app_handle
+            .path_resolver()
+            .app_log_dir()
+            .unwrap_or("UNDEFINED LOG DIRECTORY".into()),
+        service::config::DEFAULT_LOG_DIR
     );
+
+    debug!("Performing database setup...");
+    let app_state: State<AppState> = app_handle.state();
+    let db = match database::init_db(&app_handle).await {
+        Ok(db) => db,
+        Err(e) => {
+            error!("Failed to initialize database: {}", e);
+            return;
+        }
+    };
+    *app_state.db.lock().unwrap() = Some(db);
+    debug!("Database setup has been completed successfully.");
 
     // configure tray
     debug!("Configuring tray icon...");
@@ -179,15 +227,15 @@ async fn main() {
     debug!("Tray icon has been configured successfully");
 
     // run periodic tasks
-    debug!("Starting periodic tasks...");
+    debug!("Starting periodic tasks (config and version polling)...");
     tauri::async_runtime::spawn(poll_version(app_handle.clone()));
     tauri::async_runtime::spawn(poll_config(app_handle.clone()));
     debug!("Periodic tasks have been started");
 
     // load tray menu after database initialization to show all instance and locations
-    debug!("Reloading tray menu to show all instances and locations...");
+    debug!("Re-generating tray menu to show all available instances and locations as we have connected to the database...");
     reload_tray_menu(&app_handle).await;
-    debug!("Tray menu has been reloaded successfully");
+    debug!("Tray menu has been re-generated successfully");
 
     // Handle Ctrl-C
     debug!("Setting up Ctrl-C handler...");
@@ -202,7 +250,7 @@ async fn main() {
     debug!("Ctrl-C handler has been set up successfully");
 
     // run app
-    info!("Running the application...");
+    debug!("Starting the main application event loop...");
     app.run(|app_handle, event| match event {
         // prevent shutdown on window close
         RunEvent::ExitRequested { api, .. } => {
@@ -211,7 +259,7 @@ async fn main() {
         }
         // handle shutdown
         RunEvent::Exit => {
-            info!("Exiting event loop...");
+            debug!("Exiting the application's main event loop...");
             let app_state: State<AppState> = app_handle.state();
             app_state.quit(app_handle);
         }

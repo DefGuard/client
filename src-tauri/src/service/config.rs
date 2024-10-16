@@ -1,9 +1,9 @@
 use clap::Parser;
 
 #[cfg(target_os = "windows")]
-const DEFAULT_LOG_DIR: &str = "/Logs/defguard-service";
+pub const DEFAULT_LOG_DIR: &str = "/Logs/defguard-service";
 #[cfg(not(target_os = "windows"))]
-const DEFAULT_LOG_DIR: &str = "/var/log/defguard-service";
+pub const DEFAULT_LOG_DIR: &str = "/var/log/defguard-service";
 
 #[derive(Debug, Parser, Clone)]
 #[clap(about = "Defguard VPN client interface management service")]

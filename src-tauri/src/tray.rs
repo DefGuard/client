@@ -26,16 +26,21 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
     let mut tray_menu = SystemTrayMenu::new();
 
     // INSTANCE SECTION
-    debug!("Loading all instances for tray menu");
+    debug!("Getting all instances information for the tray menu");
     let all_instances = all_instances(app_state.clone()).await;
-    debug!("All instances: {:?}", all_instances);
     if let Ok(instances) = all_instances {
+        let instance_count = instances.len();
+        debug!(
+            "Got {} instances to display in the tray menu",
+            instance_count
+        );
         for instance in instances {
             let mut instance_menu = SystemTrayMenu::new();
             let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
             debug!(
-                "All locations {:?} in instance {:?}",
-                all_locations, instance
+                "Found {} locations for the {} instance to display in the tray menu",
+                all_locations.len(),
+                instance
             );
 
             // TODO: apply icons instead of Connect/Disconnect when defguard utilizes tauri v2
@@ -47,14 +52,13 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
                 };
                 instance_menu =
                     instance_menu.add_item(CustomMenuItem::new(location.id.to_string(), item_name));
-                debug!("Added new menu item for {:?}", location);
+                debug!("Added new tray menu item (instance {instance}) for location: {location}");
             }
             tray_menu = tray_menu.add_submenu(SystemTraySubmenu::new(instance.name, instance_menu));
         }
     } else if let Err(err) = all_instances {
         warn!("Cannot load instance menu: {:?}", err);
     }
-    debug!("Loaded all instances for tray menu");
 
     // Load rest of tray menu options
     tray_menu = tray_menu
@@ -68,19 +72,16 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
-    info!("Successfully generated tray menu");
+    debug!("Successfully generated tray menu");
     Ok(tray_menu)
 }
 
 pub async fn reload_tray_menu(app_handle: &AppHandle) {
-    debug!("Reloading tray menu...");
     let system_menu = generate_tray_menu(app_handle.state::<AppState>())
         .await
         .unwrap();
     if let Err(err) = app_handle.tray_handle().set_menu(system_menu) {
         warn!("Unable to update tray menu {err:?}");
-    } else {
-        debug!("Successfully reloaded tray menu");
     }
 }
 
@@ -139,11 +140,11 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &TrayIconTheme) -> Result<(), Error> {
     let resource_str = format!("resources/icons/tray-32x32-{}.png", theme.as_ref());
-    debug!("Tray icon loading from {resource_str}");
+    debug!("Trying to load the tray icon from {resource_str}");
     if let Some(icon_path) = app.path_resolver().resolve_resource(&resource_str) {
         let icon = Icon::File(icon_path);
         app.tray_handle().set_icon(icon)?;
-        debug!("Tray icon changed");
+        debug!("Tray icon set to {resource_str} successfully.");
         Ok(())
     } else {
         error!("Loading tray icon resource {resource_str} failed! Resource not resolved.",);

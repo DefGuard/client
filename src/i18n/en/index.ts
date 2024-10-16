@@ -141,6 +141,15 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   trace: 'Trace',
                 },
               },
+              globalLogs: {
+                logSources: {
+                  cliet: 'Client',
+                  service: 'Service',
+                  all: 'All',
+                },
+                logSourceHelper:
+                  'The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.',
+              },
               theme: {
                 title: 'Theme',
                 options: {
@@ -361,7 +370,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 </ul>
                 </div>
                 <p>
-                For more help, please visit defguard help (https://defguard.gitbook.io/)
+                For more help, please visit defguard help (https://docs.defguard.net)
                 </p>
               `,
             },
@@ -409,7 +418,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 </p>
                 </div>
                 <p>
-                For more help, please visit defguard help (https://defguard.gitbook.io/)
+                For more help, please visit defguard help (https://docs.defguard.net)
                 </p>
               `,
             },

@@ -25,7 +25,7 @@ pub struct Location<I = NoId> {
 
 impl fmt::Display for Location<Id> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}(ID: {})", self.id, self.name)
+        write!(f, "{}(ID: {})", self.name, self.id)
     }
 }
 
@@ -122,11 +122,10 @@ impl Location<Id> {
         .await
     }
 
-    pub async fn delete<'e, E>(self, executor: E) -> Result<(), SqlxError>
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
-        info!("Removing location {self:?}");
         query!("DELETE FROM location WHERE id = $1;", self.id)
             .execute(executor)
             .await?;

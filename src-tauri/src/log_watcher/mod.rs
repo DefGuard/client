@@ -23,6 +23,12 @@ pub enum LogWatcherError {
     LogParseError(String),
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum LogSource {
+    Service,
+    Client,
+}
+
 /// Represents a single line in log file
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -33,6 +39,7 @@ struct LogLine {
     target: String,
     fields: LogLineFields,
     span: Option<Span>,
+    source: Option<LogSource>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

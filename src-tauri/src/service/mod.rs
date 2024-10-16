@@ -12,6 +12,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+use super::VERSION;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -137,9 +138,6 @@ impl DesktopDaemonService for DaemonService {
         }
         debug!("DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: {search_domains:?}");
 
-        // configure interface
-        debug!("Configuring new interface {ifname} with the following configuration: {config:?}");
-
         #[cfg(not(windows))]
         let configure_interface_result = wgapi.configure_interface(&config);
         #[cfg(windows)]
@@ -162,7 +160,7 @@ impl DesktopDaemonService for DaemonService {
             })?;
 
             if !dns.is_empty() {
-                debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
+                debug!("The following DNS servers will be set: {dns:?}, search domains: {search_domains:?}");
                 wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
                     let msg =
                         format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
@@ -174,7 +172,7 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
-        info!("Finished creating a new interface {ifname}");
+        debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
     }
 
@@ -211,7 +209,7 @@ impl DesktopDaemonService for DaemonService {
             Status::new(Code::Internal, msg)
         })?;
 
-        info!("Finished removing interface {ifname}");
+        debug!("Finished removing interface {ifname}");
         Ok(Response::new(()))
     }
 
@@ -221,46 +219,59 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
-        debug!("Received a request to read interface data");
         let request = request.into_inner();
+        debug!(
+            "Received a request to start a new network usage stats data stream for interface {}",
+            request.interface_name
+        );
         let ifname = request.interface_name;
         let span = info_span!("read_interface_data", interface_name = &ifname);
         span.in_scope(|| {
-            info!("Starting interface data stream for {ifname}");
+            debug!("Starting network usage stats stream for interface {ifname}");
         });
 
         let stats_period = self.stats_period;
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(async move {
-            info!("Spawning stats thread for interface {ifname}");
+            debug!("Spawning network usage stats collection task for interface {ifname}");
             // setup WireGuard API
-            let error_msg = format!("Failed to initialize WireGuard API for interface {ifname}");
+            let error_msg = format!("Failed to initialize WireGuard API for interface {ifname} during the creation of the network usage stats collection task.");
             let wgapi = setup_wgapi(&ifname).expect(&error_msg);
             let period = Duration::from_secs(stats_period);
             let mut interval = interval(period);
 
             loop {
                 // wait till next iteration
-                debug!("Waiting for next stats update for interface {ifname}");
+                debug!("Waiting for next network usage stats update for interface {ifname}");
                 interval.tick().await;
-                debug!("Sending stats update for interface {ifname}");
+                debug!("Gathering network usage stats to send to the client about network activity for interface {ifname}");
                 match wgapi.read_interface_data() {
                     Ok(host) => {
                         if let Err(err) = tx.send(Ok(host.into())).await {
                             error!(
-                                "Failed to send stats update for interface {ifname}. Error: {err}"
+                                "Couldn't send network usage stats update for interface {ifname}. Error: {err}"
                             );
                             break;
                         }
                     }
                     Err(err) => {
-                        error!("Failed to retrieve stats for WireGuard interface {ifname}. Error: {err}");
-                        break;
+                        match err {
+                            WireguardInterfaceError::SocketClosed(err) => {
+                                warn!(
+                                    "Failed to retrieve network usage stats for WireGuard interface {ifname}. Error: {err}"
+                                );
+                                break;
+                            }
+                            _ => {
+                                error!("Failed to retrieve network usage stats for WireGuard interface {ifname}. Error: {err}");
+                                break;
+                            }
+                        }
                     }
                 }
-                debug!("Finished sending stats update for interface {ifname}");
+                debug!("Network activity statistics for interface {ifname} have been sent to the client");
             }
-            warn!("Client disconnected from stats update stream for interface {ifname}");
+            debug!("The client has disconnected from the network usage statistics data stream for interface {ifname}, stopping the statistics data collection task.");
         }.instrument(span));
 
         let output_stream = ReceiverStream::new(rx);
@@ -271,13 +282,16 @@ impl DesktopDaemonService for DaemonService {
 }
 
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
-    info!("Starting defguard interface management daemon");
+    debug!("Starting defguard interface management daemon");
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let daemon_service = DaemonService::new(&config);
 
-    info!("defguard daemon listening on {addr}");
-    debug!("Daemon configuration: {config:?}");
+    info!(
+        "Defguard daemon version {} started, listening on {addr}",
+        VERSION
+    );
+    debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_service"))
