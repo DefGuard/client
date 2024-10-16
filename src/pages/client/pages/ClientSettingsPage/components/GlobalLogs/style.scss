@@ -11,6 +11,19 @@
     padding: 10px 20px;
     border-bottom: 1px solid var(--border-primary);
 
+    #selects {
+      display: flex;
+      gap: 5px;
+      flex-grow: 1;
+    }
+
+    .select-with-helper {
+      display: flex;
+      gap: 5px;
+      flex-grow: 1;
+      align-items: center;
+    }
+
     svg {
       path {
         fill: var(--surface-icon-primary);

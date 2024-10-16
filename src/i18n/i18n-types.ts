@@ -324,6 +324,26 @@ type RootTranslation = {
 									trace: string
 								}
 							}
+							globalLogs: {
+								logSources: {
+									/**
+									 * C​l​i​e​n​t
+									 */
+									cliet: string
+									/**
+									 * S​e​r​v​i​c​e
+									 */
+									service: string
+									/**
+									 * A​l​l
+									 */
+									all: string
+								}
+								/**
+								 * T​h​e​ ​s​o​u​r​c​e​ ​o​f​ ​t​h​e​ ​l​o​g​s​.​ ​L​o​g​s​ ​c​a​n​ ​c​o​m​e​ ​f​r​o​m​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​c​l​i​e​n​t​ ​o​r​ ​t​h​e​ ​b​a​c​k​g​r​o​u​n​d​ ​D​e​f​g​u​a​r​d​ ​s​e​r​v​i​c​e​ ​t​h​a​t​ ​m​a​n​a​g​e​s​ ​V​P​N​ ​c​o​n​n​c​e​t​i​o​n​s​ ​a​t​ ​t​h​e​ ​n​e​t​w​o​r​k​ ​l​e​v​e​l​.
+								 */
+								logSourceHelper: string
+							}
 							theme: {
 								/**
 								 * T​h​e​m​e
@@ -831,7 +851,7 @@ type RootTranslation = {
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​o​c​s​.​d​e​f​g​u​a​r​d​.​n​e​t​)​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
 							 */
@@ -917,7 +937,7 @@ type RootTranslation = {
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​o​c​s​.​d​e​f​g​u​a​r​d​.​n​e​t​)​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
 							 */
@@ -1830,6 +1850,26 @@ export type TranslationFunctions = {
 									trace: () => LocalizedString
 								}
 							}
+							globalLogs: {
+								logSources: {
+									/**
+									 * Client
+									 */
+									cliet: () => LocalizedString
+									/**
+									 * Service
+									 */
+									service: () => LocalizedString
+									/**
+									 * All
+									 */
+									all: () => LocalizedString
+								}
+								/**
+								 * The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.
+								 */
+								logSourceHelper: () => LocalizedString
+							}
 							theme: {
 								/**
 								 * Theme
@@ -2336,7 +2376,7 @@ export type TranslationFunctions = {
 						                </ul>
 						                </div>
 						                <p>
-						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                For more help, please visit defguard help (https://docs.defguard.net)
 						                </p>
 						              
 							 */
@@ -2422,7 +2462,7 @@ export type TranslationFunctions = {
 						                </p>
 						                </div>
 						                <p>
-						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                For more help, please visit defguard help (https://docs.defguard.net)
 						                </p>
 						              
 							 */

@@ -32,12 +32,12 @@ async function invokeWrapper<T>(
   args?: InvokeArgs,
   timeout: number = 5000,
 ): Promise<T> {
-  debug(`Invoking command '${command}'`);
+  debug(`Invoking command '${command}' on the frontend`);
   try {
     const res = await pTimeout(invoke<T>(command, args), {
       milliseconds: timeout,
     });
-    debug(`Invoke ${command} completed`);
+    debug(`Invoke ${command} completed on the frontend`);
     trace(`${command} completed with data: ${JSON.stringify(res)}`);
     return res;
   } catch (e) {

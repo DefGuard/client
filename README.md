@@ -17,7 +17,7 @@ Desktop client for managing WireGuard VPN connections (any WireGuard server and 
 - Multiple instances & locations - When combining with [defguard](https://github.com/DefGuard/defguard) VPN & SSO you can have multiple defguard instances (sites/installations) and multiple Locations (VPN tunnels in that location/site) in <strong>one client</strong>! If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
 - Fast! - Built with Rust, [tauri](https://tauri.app/) and [React.js](https://react.dev/).
 
-To learn more about the system see our [documentation](https://defguard.gitbook.io).
+To learn more about the system see our [documentation](https://docs.defguard.net).
 
 ## Development
 

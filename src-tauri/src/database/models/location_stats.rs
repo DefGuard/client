@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
-use sqlx::{query_as, query_scalar, SqliteExecutor};
+use sqlx::{query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::{
@@ -61,6 +61,19 @@ where
         listen_port,
         persistent_keepalive_interval: peer.persistent_keepalive_interval,
     })
+}
+
+impl LocationStats {
+    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, SqlxError>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        Ok(
+            query_scalar!("SELECT name FROM location WHERE id = $1", self.location_id)
+                .fetch_one(executor)
+                .await?,
+        )
+    }
 }
 
 impl LocationStats<NoId> {

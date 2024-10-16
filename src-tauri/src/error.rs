@@ -7,8 +7,8 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("Config directory error")]
-    Config,
+    #[error("Application config directory error: {0}")]
+    Config(String),
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
     #[error("Migrate error: {0}")]
@@ -41,6 +41,8 @@ pub enum Error {
     CommandError(String),
     #[error("Core is not enterprise")]
     CoreNotEnterprise,
+    #[error("Instance has no config polling token")]
+    NoToken,
 }
 
 // we must manually implement serde::Serialize

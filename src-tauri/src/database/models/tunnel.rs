@@ -84,7 +84,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(self, executor: E) -> Result<(), Error>
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -249,6 +249,17 @@ pub struct TunnelStats<I = NoId> {
     collected_at: NaiveDateTime,
     listen_port: u32,
     persistent_keepalive_interval: Option<u16>,
+}
+
+impl TunnelStats {
+    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, SqlxError>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        query_scalar!("SELECT name FROM tunnel WHERE id = $1;", self.tunnel_id)
+            .fetch_one(executor)
+            .await
+    }
 }
 
 impl TunnelStats<NoId> {

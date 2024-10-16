@@ -13,7 +13,7 @@ use crate::{
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
-    utils::disconnect_interface,
+    utils::{disconnect_interface, get_tunnel_or_location_name},
     ConnectionType,
 };
 
@@ -57,7 +57,7 @@ impl AppState {
         location_id: Id,
         connection_type: &ConnectionType,
     ) -> Option<ActiveConnection> {
-        debug!("Removing active connection for location with id: {location_id}");
+        trace!("Removing active connection for location with id: {location_id}");
         let mut connections = self.active_connections.lock().await;
 
         if let Some(index) = connections.iter().position(|conn| {
@@ -65,7 +65,7 @@ impl AppState {
         }) {
             // Found a connection with the specified location_id
             let removed_connection = connections.remove(index);
-            info!("Active connection has been removed from the active connections list.");
+            trace!("Active connection has been removed from the active connections list.");
             Some(removed_connection)
         } else {
             debug!("No active connection found with location_id: {location_id}");
@@ -91,9 +91,10 @@ impl AppState {
     }
 
     pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
-        info!("Closing all active connections...");
+        debug!("Closing all active connections...");
         let active_connections = self.active_connections.lock().await;
-        info!("Found {} active connections", active_connections.len());
+        let active_connections_count = active_connections.len();
+        debug!("Found {} active connections", active_connections_count);
         for connection in active_connections.iter() {
             debug!(
                 "Found active connection with location {}",
@@ -103,7 +104,11 @@ impl AppState {
             debug!("Removing interface {}", connection.interface_name);
             disconnect_interface(connection, self).await?;
         }
-        info!("All active connections closed");
+        if active_connections_count > 0 {
+            info!("All active connections ({active_connections_count}) have been closed.");
+        } else {
+            debug!("There were no active connections to close, nothing to do.");
+        }
         Ok(())
     }
 
@@ -113,8 +118,8 @@ impl AppState {
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().await;
-        debug!(
-        "Checking for active connection with id: {id}, connection_type: {connection_type:?} in active connections: {connections:?}"
+        trace!(
+        "Checking for active connection with id: {id}, connection_type: {connection_type:?} in active connections."
     );
 
         if let Some(connection) = connections
@@ -122,7 +127,7 @@ impl AppState {
             .find(|conn| conn.location_id == id && conn.connection_type == connection_type)
         {
             // 'connection' now contains the first element with the specified id and connection_type
-            debug!("Found connection: {connection:?}");
+            trace!("Found connection: {connection:?}");
             Some(connection.to_owned())
         } else {
             debug!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");

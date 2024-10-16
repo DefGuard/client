@@ -50,22 +50,28 @@ pub async fn poll_config(handle: AppHandle) {
                     match err {
                         Error::CoreNotEnterprise => {
                             debug!(
-                                "Tried to contact core for instance {}({}) config but it's not enterprise, can't retrieve config",
-                                instance.name, instance.id,
+                                "Tried to contact core for instance {} config but it's not enterprise, can't retrieve config",
+                                instance,
+                            );
+                        }
+                        Error::NoToken => {
+                            debug!(
+                                "Instance {} has no token, can't retrieve its config from the core",
+                                instance,
                             );
                         }
                         _ => {
                             error!(
-                                "Failed to retrieve instance {}({}) config from core: {err}",
-                                instance.name, instance.id,
+                                "Failed to retrieve instance {} config from core: {err}",
+                                instance
                             );
                         }
                     }
                 } else {
                     config_retrieved += 1;
                     debug!(
-                        "Retrieved config for instance {}({}) from core",
-                        instance.name, instance.id,
+                        "Finished processing configuration polling request for instance {}",
+                        instance
                     );
                 }
             }
@@ -78,10 +84,11 @@ pub async fn poll_config(handle: AppHandle) {
         }
         if config_retrieved > 0 {
             info!(
-                "Retrieved configuration from core for {} instances, sleeping {}s",
+                "Automatically retrieved the newest instance configuration from core for {} instances, sleeping for {}s",
                 config_retrieved,
                 INTERVAL_SECONDS.as_secs(),
             );
+            debug!("Instances for which configuration was retrieved from core: {instances:?}");
         } else {
             debug!(
                 "No configuration updates retrieved, sleeping {}s",
@@ -165,10 +172,8 @@ pub async fn poll_instance(
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
-    debug!(
-        "Parsed the following config for instance {}: {device_config:?}",
-        instance.name
-    );
+    debug!("Parsed the config for instance {}", instance.name);
+    trace!("Parsed config: {device_config:?}");
 
     // Early return if config didn't change
     if !config_changed(transaction, instance, device_config).await? {
@@ -218,7 +223,7 @@ async fn config_changed(
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
     debug!(
-        "Checking if config changed for instance {}({})",
+        "Checking if config and any of the locations changed for instance {}({})",
         instance.name, instance.id
     );
     let locations_changed = locations_changed(transaction, instance, device_config).await?;
@@ -235,12 +240,7 @@ async fn config_changed(
 
 /// Retrieves pubkey & token to build InstanceInfoRequest
 fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
-    let token = &instance.token.as_ref().ok_or_else(|| {
-        Error::InternalError(format!(
-            "Instance {}({}) is missing token, can't build request for config polling",
-            instance.name, instance.id
-        ))
-    })?;
+    let token = &instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
 
     Ok(InstanceInfoRequest {
         token: (*token).to_string(),

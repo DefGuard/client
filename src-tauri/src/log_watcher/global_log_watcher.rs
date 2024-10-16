@@ -20,7 +20,7 @@ use tracing::Level;
 use crate::{
     appstate::AppState,
     error::Error,
-    log_watcher::{extract_timestamp, LogLine, LogLineFields, LogWatcherError},
+    log_watcher::{extract_timestamp, LogLine, LogLineFields, LogSource, LogWatcherError},
     utils::get_service_log_dir,
 };
 
@@ -39,7 +39,7 @@ const DELAY: Duration = Duration::from_secs(2);
 impl LogDirs {
     #[must_use]
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
-        debug!("Getting log directories.");
+        debug!("Getting log directories for service and client to watch.");
         let service_log_dir = get_service_log_dir().to_path_buf();
         let client_log_dir =
             handle
@@ -49,7 +49,7 @@ impl LogDirs {
                     "Path to client logs directory is empty.".to_string(),
                 ))?;
         debug!(
-            "Log directories of service and client are: {:?} and {:?}",
+            "Log directories of service and client have been identified by the global log watcher: {:?} and {:?}",
             service_log_dir, client_log_dir
         );
 
@@ -90,14 +90,14 @@ impl LogDirs {
     }
 
     fn get_current_service_file(&self) -> Result<File, LogWatcherError> {
-        debug!(
+        trace!(
             "Opening service log file: {:?}",
             self.current_service_log_file
         );
         match &self.current_service_log_file {
             Some(path) => {
                 let file = File::open(path)?;
-                debug!(
+                trace!(
                     "Successfully opened service log file at {:?}",
                     self.current_service_log_file
                 );
@@ -111,7 +111,7 @@ impl LogDirs {
     }
 
     fn get_client_file(&self) -> Result<File, LogWatcherError> {
-        debug!(
+        trace!(
             "Opening the log file for the client, using directory: {:?}",
             self.client_log_dir
         );
@@ -123,9 +123,9 @@ impl LogDirs {
                 self.client_log_dir
             )))?;
         let path = format!("{}/defguard-client.log", dir_str);
-        debug!("Constructed client log file path: {path}");
+        trace!("Constructed client log file path: {path}");
         let file = File::open(&path)?;
-        debug!("Client log file at {:?} opened successfully", path);
+        trace!("Client log file at {:?} opened successfully", path);
         Ok(file)
     }
 }
@@ -170,28 +170,25 @@ impl GlobalLogWatcher {
     /// into a [`LogLine`] struct and emitting it to the frontend. It can be stopped by cancelling
     /// the token by calling [`stop_global_log_watcher_task()`]
     fn parse_log_dirs(&mut self) -> Result<(), LogWatcherError> {
-        debug!("Parsing log directories");
+        trace!("Processing log directories for service and client.");
         self.log_dirs.current_service_log_file = self.log_dirs.get_latest_log_file()?;
-        debug!(
+        trace!(
             "Latest service log file found: {:?}",
             self.log_dirs.current_service_log_file
         );
 
-        debug!("Opening log files");
         let mut service_reader = if let Ok(file) = self.log_dirs.get_current_service_file() {
-            debug!("Service log file opened successfully");
             Some(BufReader::new(file))
         } else {
             None
         };
         let mut client_reader = if let Ok(file) = self.log_dirs.get_client_file() {
-            debug!("Client log file opened successfully");
             Some(BufReader::new(file))
         } else {
             None
         };
 
-        debug!("Checking if log files are available");
+        trace!("Checking if log files are available");
         if service_reader.is_none() && client_reader.is_none() {
             warn!(
                 "Couldn't read files at {:?} and {:?}, there will be no logs reported in the client.",
@@ -201,7 +198,7 @@ impl GlobalLogWatcher {
             sleep(DELAY);
             return Ok(());
         }
-        debug!("Log files are available, starting to read lines.");
+        trace!("Log files are available, starting to read lines.");
 
         let mut service_line = String::new();
         let mut client_line = String::new();
@@ -211,7 +208,7 @@ impl GlobalLogWatcher {
         let mut service_line_read;
         let mut client_line_read;
 
-        debug!("Starting the log reading loop");
+        debug!("Global log watcher is starting the loop for reading client and service log files");
         loop {
             if self.cancellation_token.is_cancelled() {
                 debug!("Received cancellation request. Stopping global log watcher");
@@ -251,6 +248,8 @@ impl GlobalLogWatcher {
                         break;
                     }
                 }
+            } else {
+                debug!("Service log reader is not present, not reading service log lines.");
             }
 
             // Client
@@ -280,6 +279,8 @@ impl GlobalLogWatcher {
                         break;
                     }
                 }
+            } else {
+                debug!("Client log file reader is not present, not reading client logs.");
             }
 
             trace!("Read 0 bytes from both log files, we've reached EOF in both cases.");
@@ -303,7 +304,7 @@ impl GlobalLogWatcher {
     /// Also performs filtering by log level and optional timestamp.
     fn parse_service_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
         trace!("Parsing service log line: {line}");
-        let log_line = if let Ok(line) = serde_json::from_str::<LogLine>(line) {
+        let mut log_line = if let Ok(line) = serde_json::from_str::<LogLine>(line) {
             line
         } else {
             warn!("Failed to parse service log line: {line}");
@@ -332,6 +333,8 @@ impl GlobalLogWatcher {
             }
         }
 
+        log_line.source = Some(LogSource::Service);
+
         trace!("Successfully parsed service log line.");
 
         Ok(Some(log_line))
@@ -358,7 +361,7 @@ impl GlobalLogWatcher {
 
         let timestamp = format!("{} {}", timestamp_date, timestamp_time);
         let timestamp = Utc.from_utc_datetime(
-            &NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S").map_err(|e| {
+            &NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S%.f").map_err(|e| {
                 LogWatcherError::LogParseError(format!(
                     "Failed to parse timestamp {} with error: {}",
                     timestamp, e
@@ -397,6 +400,7 @@ impl GlobalLogWatcher {
             target,
             fields,
             span: None,
+            source: Some(LogSource::Client),
         };
 
         if log_line.level > self.log_level {
@@ -482,7 +486,7 @@ pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
         Ok(())
     } else {
         // Silently ignore if global log watcher is not found, as there is nothing to cancel
-        debug!("Global log watcher not found, cannot cancel");
+        debug!("Global log watcher not found, nothing to cancel");
         Ok(())
     }
 }

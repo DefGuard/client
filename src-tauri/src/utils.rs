@@ -147,7 +147,7 @@ pub async fn setup_interface(
                 }
             }
         } else {
-            info!("Interface creation request for location {location} has been sent to the defguard background service, created the {} interface.", interface_config.name);
+            info!("The interface for location {location} has been created successfully, interface name: {}.", interface_config.name);
             Ok(())
         }
     } else {
@@ -222,17 +222,20 @@ pub fn spawn_stats_thread(
     tokio::spawn(async move {
         let state = handle.state::<AppState>();
         let mut client = state.client.clone();
-        let request = ReadInterfaceDataRequest { interface_name };
+        let request = ReadInterfaceDataRequest {
+            interface_name: interface_name.clone(),
+        };
         let mut stream = client
             .read_interface_data(request)
             .await
-            .expect("Failed to connect to interface stats stream")
+            .expect("Failed to connect to interface stats stream for interface {interface_name}")
             .into_inner();
 
         loop {
             match stream.message().await {
                 Ok(Some(interface_data)) => {
-                    debug!("Received interface data update: {interface_data:?}");
+                    debug!("Received new network usage statistics for interface {interface_name}.");
+                    trace!("Received interface data: {interface_data:?}");
                     let peers: Vec<Peer> =
                         interface_data.peers.into_iter().map(Into::into).collect();
                     for peer in peers {
@@ -244,9 +247,25 @@ pub fn spawn_stats_thread(
                             )
                             .await
                             .unwrap();
-                            debug!("Saving location stats: {location_stats:#?}");
-                            let result = location_stats.save(&state.get_pool()).await;
-                            debug!("Saved location stats: {result:#?}");
+                            let location_name = location_stats
+                                .get_name(&state.get_pool())
+                                .await
+                                .unwrap_or("UNKNOWN".to_string());
+
+                            debug!("Saving network usage stats related to location {location_name} (interface {interface_name}).");
+                            trace!("Stats: {location_stats:?}");
+                            match location_stats.save(&state.get_pool()).await {
+                                Ok(_) => {
+                                    debug!(
+                                        "Saved network usage stats for location {location_name}"
+                                    );
+                                }
+                                Err(err) => {
+                                    error!(
+                                        "Failed to save network usage stats for location {location_name}: {err}"
+                                    );
+                                }
+                            }
                         } else {
                             let tunnel_stats = peer_to_tunnel_stats(
                                 &peer,
@@ -255,14 +274,24 @@ pub fn spawn_stats_thread(
                             )
                             .await
                             .unwrap();
-                            debug!("Saving tunnel stats: {tunnel_stats:#?}");
-                            let result = tunnel_stats.save(&state.get_pool()).await;
-                            debug!("Saved location stats: {result:#?}");
+                            let tunnel_name = tunnel_stats
+                                .get_name(&state.get_pool())
+                                .await
+                                .unwrap_or("UNKNOWN".to_string());
+                            debug!("Saving network usage stats related to tunnel {tunnel_name} (interface {interface_name}): {tunnel_stats:?}");
+                            match tunnel_stats.save(&state.get_pool()).await {
+                                Ok(_) => {
+                                    debug!("Saved stats for tunnel {tunnel_name}");
+                                }
+                                Err(err) => {
+                                    error!("Failed to save stats for tunnel {tunnel_name}: {err}");
+                                }
+                            }
                         }
                     }
                 }
                 Ok(None) => {
-                    info!(
+                    debug!(
                         "gRPC stream to the defguard-service managing connections has been closed"
                     );
                     break;
@@ -273,7 +302,7 @@ pub fn spawn_stats_thread(
                 }
             }
         }
-        warn!("Interface data stream disconnected");
+        debug!("Network usage stats thread for interface {interface_name} has been terminated");
     });
 }
 
@@ -377,7 +406,7 @@ pub async fn setup_interface_tunnel(
     // request interface configuration
     debug!("Looking for a free port for interface {interface_name}...");
     if let Some(port) = find_random_free_port() {
-        info!("Found free port: {port} for interface {interface_name}.");
+        debug!("Found free port: {port} for interface {interface_name}.");
         let interface_config = InterfaceConfiguration {
             name: interface_name,
             prvkey: tunnel.prvkey.clone(),
@@ -393,27 +422,40 @@ pub async fn setup_interface_tunnel(
             dns: tunnel.dns.clone(),
         };
         if let Some(pre_up) = &tunnel.pre_up {
-            debug!("Executing specified PreUp command: {pre_up}");
+            debug!("Executing defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name);
             let _ = execute_command(pre_up);
-            info!("Executed specified PreUp command: {pre_up}");
+            info!(
+                "Executed defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name
+            );
         }
         if let Err(error) = client.create_interface(request).await {
-            let msg = format!("Failed to create interface: {error}");
-            error!("{msg}");
-            Err(Error::InternalError(msg))
+            error!(
+                "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
+                interface_config.name
+            );
+            Err(Error::InternalError(format!(
+                "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. Check logs for more details.",
+                interface_config.name, error.message()
+            )))
         } else {
+            info!(
+                "Network interface {} for tunnel {tunnel} created successfully.",
+                interface_config.name
+            );
             if let Some(post_up) = &tunnel.post_up {
-                debug!("Executing specified PreUp command: {post_up}");
+                debug!("Executing defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
                 let _ = execute_command(post_up);
-                info!("Executed specified PreUp command: {post_up}");
+                info!("Executed defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
             }
-            info!("Interface {} created successfully.", interface_config.name);
-            debug!("Created interface with config: {interface_config:?}");
+            debug!(
+                "Created interface {} with config: {interface_config:?}",
+                interface_config.name
+            );
             Ok(())
         }
     } else {
         let msg = format!(
-            "Error finding free port during tunnel {tunnel} setup for interface {interface_name}"
+            "Couldn't find free port for interface {interface_name} while setting up tunnel {tunnel}"
         );
         error!("{msg}");
         Err(Error::InternalError(msg))
@@ -426,7 +468,8 @@ pub async fn get_tunnel_interface_details(
 ) -> Result<LocationInterfaceDetails, Error> {
     debug!("Fetching tunnel details for tunnel ID {tunnel_id}");
     if let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? {
-        let peer_pubkey = tunnel.pubkey;
+        debug!("The tunnel with ID {tunnel_id} has been found and identified as {tunnel}.");
+        let peer_pubkey = &tunnel.pubkey;
 
         // generate interface name
         #[cfg(target_os = "macos")]
@@ -443,7 +486,7 @@ pub async fn get_tunnel_interface_details(
         )
         .fetch_optional(pool)
         .await?;
-        info!("Fetched tunnel stats for tunnel ID {tunnel_id}");
+        debug!("Fetched tunnel connection statistics for tunnel {tunnel}");
 
         let (listen_port, persistent_keepalive_interval, last_handshake) = match result {
             Some(record) => (
@@ -454,7 +497,7 @@ pub async fn get_tunnel_interface_details(
             None => (None, None, None),
         };
 
-        info!("Fetched tunnel details for tunnel ID {tunnel_id}");
+        debug!("Fetched tunnel configuration details for tunnel {tunnel}.");
 
         Ok(LocationInterfaceDetails {
             location_id: tunnel_id,
@@ -463,7 +506,7 @@ pub async fn get_tunnel_interface_details(
             address: tunnel.address,
             dns: tunnel.dns,
             listen_port,
-            peer_pubkey,
+            peer_pubkey: peer_pubkey.to_string(),
             peer_endpoint: tunnel.endpoint,
             allowed_ips: tunnel.allowed_ips.unwrap_or_default(),
             persistent_keepalive_interval,
@@ -567,8 +610,7 @@ pub async fn handle_connection_for_location(
         ConnectionType::Location,
     );
     state.active_connections.lock().await.push(connection);
-    debug!("Created a new interface for location {}", location.name);
-    debug!(
+    trace!(
         "Active connections: {:?}",
         state.active_connections.lock().await
     );
@@ -579,19 +621,25 @@ pub async fn handle_connection_for_location(
             message: "Created new connection".into(),
         },
     )?;
-    debug!("Event sent for location {}", location.name);
+    debug!("Event informing the frontend that a new connection has been created sent.");
 
     // Spawn stats threads
-    debug!("Spawning stats thread for location {}...", location.name);
+    debug!(
+        "Spawning network usage stats thread for location {}...",
+        location
+    );
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Location,
     );
-    debug!("Stats thread for location {} spawned.", location.name);
+    debug!(
+        "Network usage stats thread for location {} spawned.",
+        location
+    );
 
     // spawn log watcher
-    debug!("Spawning log watcher for location {}...", location.name);
+    debug!("Spawning service log watcher for location {}...", location);
     spawn_log_watcher_task(
         handle,
         location.id,
@@ -601,7 +649,7 @@ pub async fn handle_connection_for_location(
         None,
     )
     .await?;
-    debug!("Log watcher for location {} spawned.", location.name);
+    debug!("Service log watcher for location {} spawned.", location);
     Ok(())
 }
 
@@ -625,7 +673,6 @@ pub async fn handle_connection_for_tunnel(
         ConnectionType::Tunnel,
     );
     state.active_connections.lock().await.push(connection);
-    debug!("Created a new interface for tunnel {}", tunnel.name);
     debug!(
         "Active connections: {:?}",
         state.active_connections.lock().await
@@ -637,7 +684,7 @@ pub async fn handle_connection_for_tunnel(
             message: "Created new connection".into(),
         },
     )?;
-    debug!("Event sent for tunnel {}", tunnel.name);
+    debug!("Event informing the frontend that a new connection has been created sent.");
 
     // Spawn stats threads
     debug!("Spawning stats thread for tunnel {}", tunnel.name);
@@ -675,7 +722,7 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            info!(
+            debug!(
                 "Command {command} executed successfully. Stdout: {}",
                 stdout
             );
@@ -711,7 +758,7 @@ pub async fn disconnect_interface(
             };
             let request = RemoveInterfaceRequest {
                 interface_name,
-                endpoint: location.endpoint,
+                endpoint: location.endpoint.clone(),
             };
             debug!("Sending request to the background service to remove interface {} for location {}...", active_connection.interface_name, location.name);
             if let Err(error) = client.remove_interface(request).await {
@@ -737,25 +784,25 @@ pub async fn disconnect_interface(
                 location.name
             );
             trace!("Saved connection: {connection:?}");
-            debug!(
-                "Interface {} removed successfully",
+            info!(
+                "Network interface {} for location {location} has been removed",
                 active_connection.interface_name
             );
-            info!("Disconnected from location {}", location.name);
+            debug!("Finished disconnecting from location {}", location.name);
         }
         ConnectionType::Tunnel => {
             let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? else {
                 error!("Error while disconnecting interface {interface_name}, tunnel with ID {location_id} not found");
                 return Err(Error::NotFound);
             };
-            if let Some(pre_down) = tunnel.pre_down {
-                debug!("Executing specified PreDown command: {pre_down}");
-                let _ = execute_command(&pre_down);
-                info!("Executed specified PreDown command: {pre_down}");
+            if let Some(pre_down) = &tunnel.pre_down {
+                debug!("Executing defined PreDown command before setting up the interface {} for the tunnel {tunnel}: {pre_down}", active_connection.interface_name);
+                let _ = execute_command(pre_down);
+                info!("Executed defined PreDown command before setting up the interface {} for the tunnel {tunnel}: {pre_down}", active_connection.interface_name);
             }
             let request = RemoveInterfaceRequest {
                 interface_name,
-                endpoint: tunnel.endpoint,
+                endpoint: tunnel.endpoint.clone(),
             };
             if let Err(error) = client.remove_interface(request).await {
                 error!(
@@ -767,10 +814,10 @@ pub async fn disconnect_interface(
                     error.message()
                 )));
             }
-            if let Some(post_down) = tunnel.post_down {
-                debug!("Executing specified PostDown command: {post_down}");
-                let _ = execute_command(&post_down);
-                info!("Executed specified PostDown command: {post_down}");
+            if let Some(post_down) = &tunnel.post_down {
+                debug!("Executing defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", active_connection.interface_name);
+                let _ = execute_command(post_down);
+                info!("Executed defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", active_connection.interface_name);
             }
             let connection: TunnelConnection = active_connection.into();
             let connection = connection.save(&state.get_pool()).await?;
@@ -779,11 +826,11 @@ pub async fn disconnect_interface(
                 tunnel.name
             );
             trace!("Saved connection: {connection:#?}");
-            debug!(
-                "Interface {} removed successfully",
+            info!(
+                "Network interface {} for tunnel {tunnel} has been removed",
                 active_connection.interface_name
             );
-            info!("Disconnected from tunnel {}", tunnel.name);
+            debug!("Finished disconnecting from tunnel {}", tunnel.name);
         }
     }
 
@@ -791,13 +838,14 @@ pub async fn disconnect_interface(
 }
 
 /// Helper function to get the name of a tunnel or location by its ID
-/// Returns the name of the tunnel or location if it exists, otherwise None
+/// Returns the name of the tunnel or location if it exists, otherwise "UNKNOWN"
+/// This is for logging purposes.
 pub async fn get_tunnel_or_location_name(
     id: Id,
     connection_type: ConnectionType,
     appstate: &AppState,
-) -> Option<String> {
-    match connection_type {
+) -> String {
+    let name = match connection_type {
         ConnectionType::Location => Location::find_by_id(&appstate.get_pool(), id)
             .await
             .ok()
@@ -806,5 +854,15 @@ pub async fn get_tunnel_or_location_name(
             .await
             .ok()
             .and_then(|t| t.map(|t| t.name)),
+    };
+
+    match name {
+        Some(name) => name,
+        None => {
+            debug!(
+                "Couldn't identify {connection_type}'s name for logging purposes, it will be referred to as UNKNOWN",
+            );
+            "UNKNOWN".to_string()
+        }
     }
 }

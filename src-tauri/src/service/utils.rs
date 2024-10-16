@@ -31,7 +31,7 @@ pub fn logging_setup(config: &Config) -> WorkerGuard {
         .unwrap_or_else(|_| format!("{},hyper=info,h2=info", config.log_level).into());
 
     // prepare log level filter for json file
-    let json_filter = EnvFilter::new(format!("{},hyper=info", Level::DEBUG));
+    let json_filter = EnvFilter::new(format!("{},hyper=info,h2=info", Level::DEBUG));
 
     // prepare tracing layers
     let stdout_layer = fmt::layer()

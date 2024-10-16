@@ -11,14 +11,20 @@ import { ActionButton } from '../../../../../../shared/defguard-ui/components/La
 import { ActionButtonVariant } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { clientApi } from '../../../../clientAPI/clientApi';
-import { LogItem, LogLevel } from '../../../../clientAPI/types';
-import { useClientStore } from '../../../../hooks/useClientStore';
+import {
+  GlobalLogLevel,
+  LogSource,
+  LogItem,
+  LogLevel,
+} from '../../../../clientAPI/types';
 import { GlobalLogsSelect } from './GlobalLogsSelect';
+import { GlobalLogsSourceSelect } from './GlobalLogsSourceSelect';
+import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 
 export const GlobalLogs = () => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);
-  const appLogLevel = useClientStore((state) => state.settings.log_level);
-  const locationLogLevelRef = useRef<LogLevel>(appLogLevel);
+  const globalLogLevelRef = useRef<GlobalLogLevel>('info');
+  const logSourceRef = useRef<LogSource>('All');
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details.logs;
   const { startGlobalLogWatcher, stopGlobalLogWatcher } = clientApi;
@@ -53,9 +59,11 @@ export const GlobalLogs = () => {
             logItems.forEach((item) => {
               if (
                 logsContainerElement.current &&
-                filterLogByLevel(locationLogLevelRef.current, item.level)
+                filterLogByLevel(globalLogLevelRef.current, item.level) &&
+                filterLogBySource(logSourceRef.current, item.source)
               ) {
-                const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
+                const dateTime = new Date(item.timestamp).toLocaleString();
+                const messageString = `[${dateTime}][${item.level}][${item.source}] ${item.fields.message}`;
                 const element = createLogLineElement(messageString);
                 const scrollAfterAppend =
                   logsContainerElement.current.scrollHeight -
@@ -101,15 +109,33 @@ export const GlobalLogs = () => {
     <Card shaded={false} id="global-logs" bordered>
       <div className="top">
         <h3>{localLL.title()}</h3>
-        <GlobalLogsSelect
-          initSelected={appLogLevel}
-          onChange={(level) => {
-            locationLogLevelRef.current = level;
-            clearLogs();
-            stopGlobalLogWatcher();
-            startGlobalLogWatcher();
-          }}
-        />
+        <div id="selects">
+          <GlobalLogsSelect
+            initSelected={'info'}
+            onChange={(level) => {
+              globalLogLevelRef.current = level;
+              clearLogs();
+              stopGlobalLogWatcher();
+              startGlobalLogWatcher();
+            }}
+          />
+          <div className="select-with-helper">
+            <GlobalLogsSourceSelect
+              initSelected={'All'}
+              onChange={(source) => {
+                logSourceRef.current = source;
+                clearLogs();
+                stopGlobalLogWatcher();
+                startGlobalLogWatcher();
+              }}
+            />
+            <Helper>
+              <p>
+                {LL.pages.client.pages.settingsPage.tabs.global.globalLogs.logSourceHelper()}
+              </p>
+            </Helper>
+          </div>
+        </div>
         <ActionButton
           variant={ActionButtonVariant.COPY}
           onClick={() => {
@@ -149,4 +175,8 @@ const filterLogByLevel = (target: LogLevel, log: LogLevel): boolean => {
     default:
       return true;
   }
+};
+
+const filterLogBySource = (target: LogSource, log: LogSource): boolean => {
+  return target === 'All' || target === log;
 };

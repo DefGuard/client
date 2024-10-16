@@ -7,40 +7,40 @@ import {
   SelectSelectedValue,
   SelectSizeVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
-import { GlobalLogLevel } from '../../../../clientAPI/types';
+import { LogSource } from '../../../../clientAPI/types';
 
 type Props = {
-  initSelected: GlobalLogLevel;
-  onChange: (selected: GlobalLogLevel) => void;
+  initSelected: LogSource;
+  onChange: (selected: LogSource) => void;
 };
 
-export const GlobalLogsSelect = ({ initSelected, onChange }: Props) => {
+export const GlobalLogsSourceSelect = ({ initSelected, onChange }: Props) => {
   const { LL } = useI18nContext();
-  const localLL = LL.pages.client.pages.settingsPage.tabs.global.logging.options;
+  const localLL = LL.pages.client.pages.settingsPage.tabs.global.globalLogs.logSources;
   const [selected, setSelected] = useState(initSelected);
 
-  const options = useMemo((): SelectOption<GlobalLogLevel>[] => {
+  const options = useMemo((): SelectOption<LogSource>[] => {
     return [
       {
         key: 0,
-        label: localLL.error(),
-        value: 'error',
+        label: localLL.all(),
+        value: 'All',
       },
       {
         key: 1,
-        label: localLL.info(),
-        value: 'info',
+        label: localLL.cliet(),
+        value: 'Client',
       },
       {
         key: 2,
-        label: localLL.debug(),
-        value: 'debug',
+        label: localLL.service(),
+        value: 'Service',
       },
     ];
   }, [localLL]);
 
   const renderSelected = useCallback(
-    (value: GlobalLogLevel): SelectSelectedValue => {
+    (value: LogSource): SelectSelectedValue => {
       const option = options.find((o) => o.value === value);
       if (option) {
         return {

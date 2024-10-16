@@ -1,3 +1,5 @@
+use core::fmt;
+
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, SqliteExecutor};
 
@@ -15,6 +17,12 @@ pub struct Instance<I = NoId> {
     pub token: Option<String>,
     pub disable_all_traffic: bool,
     pub enterprise_enabled: bool,
+}
+
+impl fmt::Display for Instance<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(ID: {})", self.name, self.id)
+    }
 }
 
 impl From<proto::InstanceInfo> for Instance<NoId> {
@@ -110,7 +118,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(self, executor: E) -> Result<(), Error>
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -229,4 +237,10 @@ pub struct InstanceInfo<I = NoId> {
     pub pubkey: String,
     pub disable_all_traffic: bool,
     pub enterprise_enabled: bool,
+}
+
+impl fmt::Display for InstanceInfo<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(ID: {})", self.name, self.id)
+    }
 }

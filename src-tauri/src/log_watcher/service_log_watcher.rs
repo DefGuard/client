@@ -19,8 +19,12 @@ use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
 use crate::{
-    appstate::AppState, database::models::Id, error::Error, log_watcher::extract_timestamp,
-    utils::get_service_log_dir, ConnectionType,
+    appstate::AppState,
+    database::models::Id,
+    error::Error,
+    log_watcher::extract_timestamp,
+    utils::{get_service_log_dir, get_tunnel_or_location_name},
+    ConnectionType,
 };
 
 use super::{LogLine, LogWatcherError};
@@ -48,10 +52,8 @@ impl<'a> ServiceLogWatcher<'a> {
         interface_name: String,
         log_level: Level,
         from: Option<DateTime<Utc>>,
+        log_dir: &'a Path,
     ) -> Self {
-        // get log file directory
-        let log_dir = get_service_log_dir();
-        info!("Log dir: {log_dir:?}");
         Self {
             interface_name,
             log_level,
@@ -126,8 +128,7 @@ impl<'a> ServiceLogWatcher<'a> {
                 }
                 if self.cancellation_token.is_cancelled() {
                     info!(
-                        "Received cancellation request. Stopping log watcher for interface {}",
-                        self.interface_name
+                        "The background task responsible for watching the defguard service log file for interface {} is being stopped.", self.interface_name
                     );
                     break;
                 }
@@ -223,13 +224,13 @@ pub async fn spawn_log_watcher_task(
     // parse `from` timestamp
     let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
 
-    let connection_type = if connection_type.eq(&ConnectionType::Tunnel) {
+    let connection_type_str = if connection_type.eq(&ConnectionType::Tunnel) {
         "Tunnel"
     } else {
         "Location"
     };
-    let event_topic = format!("log-update-{connection_type}-{location_id}");
-    debug!("Using the following event topic for the service log watcher: {event_topic}");
+    let event_topic = format!("log-update-{connection_type_str}-{location_id}");
+    debug!("Using the following event topic for the service log watcher for communicating with the frontend: {event_topic}");
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();
@@ -240,32 +241,40 @@ pub async fn spawn_log_watcher_task(
     let token = CancellationToken::new();
     let token_clone = token.clone();
 
+    let log_dir = get_service_log_dir(); // get log file directory
+    let mut log_watcher = ServiceLogWatcher::new(
+        handle_clone,
+        token_clone,
+        topic_clone,
+        interface_name_clone,
+        log_level,
+        from,
+        log_dir,
+    );
+
     // spawn task
     let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        let mut log_watcher = ServiceLogWatcher::new(
-            handle_clone,
-            token_clone,
-            topic_clone,
-            interface_name_clone,
-            log_level,
-            from,
-        );
         log_watcher.run()?;
         Ok(())
     });
 
     // store `CancellationToken` to manually stop watcher thread
-    let mut log_watchers = app_state
-        .log_watchers
-        .lock()
-        .expect("Failed to lock log watchers mutex");
-    if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
-        // cancel previous log watcher for this interface
-        debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
-        old_token.cancel();
+    // keep this in a block as we .await later, which should not be done while holding a lock like this
+    {
+        let mut log_watchers = app_state
+            .log_watchers
+            .lock()
+            .expect("Failed to lock log watchers mutex");
+        if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
+            // cancel previous log watcher for this interface
+            debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
+            old_token.cancel();
+        }
     }
 
-    info!("Service log watcher task for interface {interface_name} started");
+    let name = get_tunnel_or_location_name(location_id, connection_type, &app_state).await;
+    info!("A background task has been spawned to watch the defguard service log file for {connection_type} {name} (interface {interface_name}), \
+        location's specific collected logs will be displayed in the {connection_type}'s detailed view.");
     Ok(event_topic)
 }
 
