@@ -139,7 +139,7 @@ async fn main() {
                 .format(move |out, message, record| {
                     out.finish(format_args!(
                         "{}[{}][{}] {}",
-                        tauri_plugin_log::TimezoneStrategy::UseLocal
+                        tauri_plugin_log::TimezoneStrategy::UseUtc
                             .get_now()
                             .format(&format)
                             .unwrap(),

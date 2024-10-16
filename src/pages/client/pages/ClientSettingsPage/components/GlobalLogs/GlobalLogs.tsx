@@ -10,16 +10,16 @@ import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
 import { ActionButtonVariant } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
+import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import {
   GlobalLogLevel,
-  LogSource,
   LogItem,
   LogLevel,
+  LogSource,
 } from '../../../../clientAPI/types';
 import { GlobalLogsSelect } from './GlobalLogsSelect';
 import { GlobalLogsSourceSelect } from './GlobalLogsSourceSelect';
-import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 
 export const GlobalLogs = () => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);

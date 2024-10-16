@@ -13,7 +13,7 @@ use crate::{
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
-    utils::{disconnect_interface, get_tunnel_or_location_name},
+    utils::disconnect_interface,
     ConnectionType,
 };
 
