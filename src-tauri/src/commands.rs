@@ -433,6 +433,11 @@ pub async fn locations_changed(
             .await?
             .into_iter()
             .map(Location::<NoId>::from)
+            // ignore route_all_traffic flag as core does not have it
+            .map(|mut location| {
+                location.route_all_traffic = false;
+                location
+            })
             .collect();
     let db_locations: HashSet<Location<NoId>> = HashSet::from_iter(db_locations);
     let core_locations: Vec<Location<NoId>> = device_config
@@ -440,6 +445,11 @@ pub async fn locations_changed(
         .iter()
         .map(|config| device_config_to_location(config.clone(), instance.id))
         .map(Location::<NoId>::from)
+        // just to make sure we are really on the same page
+        .map(|mut location| {
+            location.route_all_traffic = false;
+            location
+        })
         .collect();
     let core_locations: HashSet<Location<NoId>> = HashSet::from_iter(core_locations);
 
