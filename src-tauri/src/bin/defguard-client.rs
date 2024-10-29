@@ -5,6 +5,8 @@
 
 use std::{env, str::FromStr};
 
+#[cfg(target_os = "windows")]
+use defguard_client::utils::sync_connections;
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
@@ -29,7 +31,7 @@ use defguard_client::{
     periodic::version::poll_version,
     service,
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
-    utils::{load_log_targets, sync_connections},
+    utils::load_log_targets,
     VERSION,
 };
 use lazy_static::lazy_static;
