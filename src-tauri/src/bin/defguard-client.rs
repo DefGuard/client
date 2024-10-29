@@ -29,7 +29,7 @@ use defguard_client::{
     periodic::version::poll_version,
     service,
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
-    utils::load_log_targets,
+    utils::{load_log_targets, sync_connections},
     VERSION,
 };
 use lazy_static::lazy_static;
@@ -218,6 +218,27 @@ async fn main() {
     };
     *app_state.db.lock().unwrap() = Some(db);
     debug!("Database setup has been completed successfully.");
+
+    // Sync already active connections on windows.
+    // When windows is restarted, the app doesn't close the active connections
+    // and they are still running after the restart. We sync them here to
+    // reflect the real system's state.
+    // TODO: Find a way to intercept the shutdown event and close all connections
+    #[cfg(target_os = "windows")]
+    {
+        match sync_connections(&app_handle).await {
+            Ok(_) => {
+                info!("Synchronized application's active connections with the connections already open on the system, if there were any.")
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to synchronize application's active connections with the connections already open on the system. \
+                    The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error details: {}",
+                    e
+                )
+            }
+        };
+    }
 
     // configure tray
     debug!("Configuring tray icon...");
