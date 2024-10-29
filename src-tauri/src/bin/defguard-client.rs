@@ -5,6 +5,8 @@
 
 use std::{env, str::FromStr};
 
+#[cfg(target_os = "windows")]
+use defguard_client::utils::sync_connections;
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
@@ -218,6 +220,27 @@ async fn main() {
     };
     *app_state.db.lock().unwrap() = Some(db);
     debug!("Database setup has been completed successfully.");
+
+    // Sync already active connections on windows.
+    // When windows is restarted, the app doesn't close the active connections
+    // and they are still running after the restart. We sync them here to
+    // reflect the real system's state.
+    // TODO: Find a way to intercept the shutdown event and close all connections
+    #[cfg(target_os = "windows")]
+    {
+        match sync_connections(&app_handle).await {
+            Ok(_) => {
+                info!("Synchronized application's active connections with the connections already open on the system, if there were any.")
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to synchronize application's active connections with the connections already open on the system. \
+                    The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error details: {}",
+                    e
+                )
+            }
+        };
+    }
 
     // configure tray
     debug!("Configuring tray icon...");

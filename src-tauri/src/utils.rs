@@ -28,6 +28,21 @@ use crate::{
     },
     ConnectionType,
 };
+#[cfg(target_os = "windows")]
+use std::ptr::null_mut;
+#[cfg(target_os = "windows")]
+use widestring::U16CString;
+#[cfg(target_os = "windows")]
+use winapi::{
+    shared::{minwindef::DWORD, winerror::ERROR_SERVICE_DOES_NOT_EXIST},
+    um::{
+        errhandlingapi::GetLastError,
+        winsvc::{
+            OpenSCManagerW, OpenServiceW, QueryServiceStatus, SC_HANDLE__, SC_MANAGER_CONNECT,
+            SERVICE_QUERY_STATUS, SERVICE_RUNNING,
+        },
+    },
+};
 
 pub const IS_MACOS: bool = cfg!(target_os = "macos");
 static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
@@ -865,4 +880,293 @@ pub async fn get_tunnel_or_location_name(
             "UNKNOWN".to_string()
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn open_service_manager() -> Result<*mut SC_HANDLE__, DWORD> {
+    let sc_manager_handle = unsafe { OpenSCManagerW(null_mut(), null_mut(), SC_MANAGER_CONNECT) };
+    if sc_manager_handle.is_null() {
+        Err(unsafe { GetLastError() })
+    } else {
+        Ok(sc_manager_handle)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn open_service(
+    sc_manager_handle: *mut SC_HANDLE__,
+    service_name: &str,
+    desired_access: DWORD,
+) -> Result<*mut SC_HANDLE__, DWORD> {
+    let service_name_wstr = match U16CString::from_str(service_name) {
+        Ok(service_name_wstr) => service_name_wstr,
+        Err(err) => {
+            error!(
+                "Failed to convert service name {} to a wide string: {err}",
+                service_name
+            );
+            return Err(1);
+        }
+    };
+    let service_handle = unsafe {
+        OpenServiceW(
+            sc_manager_handle,
+            service_name_wstr.as_ptr(),
+            desired_access,
+        )
+    };
+    if service_handle.is_null() {
+        Err(unsafe { GetLastError() })
+    } else {
+        Ok(service_handle)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn get_service_status(service_handle: *mut SC_HANDLE__) -> Result<DWORD, DWORD> {
+    let mut service_status = unsafe { std::mem::zeroed() };
+    let result = unsafe { QueryServiceStatus(service_handle, &mut service_status) };
+    if result == 0 {
+        Err(unsafe { GetLastError() })
+    } else {
+        Ok(service_status.dwCurrentState)
+    }
+}
+
+// TODO: Move the connection handling to a seperate, common function,
+// so `handle_connection_for_location` and `handle_connection_for_tunnel` are not
+// partially duplicated here.
+#[cfg(target_os = "windows")]
+pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
+    debug!("Synchronizing active connections with the systems' state...");
+    let appstate = apphandle.state::<AppState>();
+    let all_locations = Location::all(&appstate.get_pool()).await?;
+    let service_control_manager = open_service_manager().map_err(|err| {
+        error!("Failed to open service control manager while trying to sync client's connections with the host state: {}", err);
+        Error::InternalError("Failed to open service control manager while trying to sync client's connections with the host state".to_string())
+    })?;
+
+    debug!("Opened service control manager, starting to synchronize active connections for locations...");
+    // Go through all locations and check if they are connected (if the windows service is running)
+    // If we encounter any errors, continue with the next iteration of the loop, it's not a big deal
+    // if we skip some locations, as the user can always reconnect to them manually
+    for location in all_locations {
+        let interface_name = get_interface_name(&location.name);
+        let service_name = format!("WireGuardTunnel${}", interface_name);
+        let service = match open_service(
+            service_control_manager,
+            &service_name,
+            SERVICE_QUERY_STATUS,
+        ) {
+            Ok(service) => service,
+            Err(err) => match err {
+                ERROR_SERVICE_DOES_NOT_EXIST => {
+                    debug!(
+                        "WireGuard tunnel {} is not installed, nothing to synchronize",
+                        interface_name
+                    );
+                    continue;
+                }
+                _ => {
+                    warn!(
+                            "Failed to open service {service_name} for interface {interface_name} while synchronizing active connections. \
+                            This may cause the location {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}", location.name
+                        );
+                    continue;
+                }
+            },
+        };
+        match get_service_status(service) {
+            Ok(status) => {
+                // Only point where we don't jump to the next iteration of the loop and continue with the rest of the code below the match
+                if status == SERVICE_RUNNING {
+                    debug!("WireGuard tunnel {} is running, ", interface_name);
+                } else {
+                    debug!(
+                        "WireGuard tunnel {} is not running, status code: {status}. Refer to Windows documentation for more information about the code.",
+                        interface_name
+                    );
+                    continue;
+                }
+            }
+            Err(err) => {
+                warn!(
+                    "Failed to query service status for interface {} while synchronizing active connections. \
+                    This may cause the location {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}",
+                    interface_name, location.name
+                );
+                continue;
+            }
+        }
+
+        if appstate
+            .find_connection(location.id, ConnectionType::Location)
+            .await
+            .is_some()
+        {
+            debug!(
+                "Location {} has already a connected state, skipping synchronization",
+                location.name
+            );
+            continue;
+        }
+
+        let address = local_ip()?;
+        let connection = ActiveConnection::new(
+            location.id,
+            address.to_string(),
+            interface_name.clone(),
+            ConnectionType::Location,
+        );
+        appstate.active_connections.lock().await.push(connection);
+        trace!(
+            "Active connections: {:?}",
+            appstate.active_connections.lock().await
+        );
+        debug!("Sending event informing the frontend that a new connection has been created.");
+        apphandle.emit_all(
+            CONNECTION_CHANGED,
+            Payload {
+                message: "Created new connection".into(),
+            },
+        )?;
+        debug!("Event informing the frontend that a new connection has been created sent.");
+
+        debug!(
+            "Spawning network usage stats thread for location {}...",
+            location
+        );
+        spawn_stats_thread(
+            apphandle.clone(),
+            interface_name.clone(),
+            ConnectionType::Location,
+        );
+        debug!(
+            "Network usage stats thread for location {} spawned.",
+            location
+        );
+
+        debug!("Spawning service log watcher for location {}...", location);
+        spawn_log_watcher_task(
+            apphandle.clone(),
+            location.id,
+            interface_name,
+            ConnectionType::Location,
+            Level::DEBUG,
+            None,
+        )
+        .await?;
+        debug!("Service log watcher for location {} spawned.", location);
+    }
+
+    debug!("Synchronizing active connections for tunnels...");
+    // Do the same for tunnels
+    for tunnel in Tunnel::all(&appstate.get_pool()).await? {
+        let interface_name = get_interface_name(&tunnel.name);
+        let service_name = format!("WireGuardTunnel${}", interface_name);
+        let service = match open_service(
+            service_control_manager,
+            &service_name,
+            SERVICE_QUERY_STATUS,
+        ) {
+            Ok(service) => service,
+            Err(err) => match err {
+                ERROR_SERVICE_DOES_NOT_EXIST => {
+                    debug!(
+                        "WireGuard tunnel {} is not installed, nothing to synchronize",
+                        interface_name
+                    );
+                    continue;
+                }
+                _ => {
+                    error!(
+                            "Failed to open service {service_name} for interface {interface_name}. \
+                            This may cause the tunnel {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}", tunnel.name
+                        );
+                    continue;
+                }
+            },
+        };
+        match get_service_status(service) {
+            Ok(status) => {
+                // Only point where we don't jump to the next iteration of the loop and continue with the rest of the code below the match
+                if status == SERVICE_RUNNING {
+                    debug!("WireGuard tunnel {} is running", interface_name);
+                } else {
+                    debug!(
+                        "WireGuard tunnel {} is not running, status code: {status}. Refer to Windows documentation for more information about the code.",
+                        interface_name
+                    );
+                    continue;
+                }
+            }
+            Err(err) => {
+                warn!(
+                    "Failed to query service status for interface {}. \
+                    This may cause the tunnel {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}",
+                    interface_name, tunnel.name
+                );
+                continue;
+            }
+        }
+
+        if appstate
+            .find_connection(tunnel.id, ConnectionType::Tunnel)
+            .await
+            .is_some()
+        {
+            debug!(
+                "Tunnel {} has already a connected state, skipping synchronization",
+                tunnel.name
+            );
+            continue;
+        }
+
+        let address = local_ip()?;
+        let connection = ActiveConnection::new(
+            tunnel.id,
+            address.to_string(),
+            interface_name.clone(),
+            ConnectionType::Tunnel,
+        );
+        appstate.active_connections.lock().await.push(connection);
+        debug!(
+            "Active connections: {:?}",
+            appstate.active_connections.lock().await
+        );
+        debug!("Sending event informing the frontend that a new connection has been created.");
+        apphandle.emit_all(
+            CONNECTION_CHANGED,
+            Payload {
+                message: "Created new connection".into(),
+            },
+        )?;
+        debug!("Event informing the frontend that a new connection has been created sent.");
+
+        // Spawn stats threads
+        debug!("Spawning stats thread for tunnel {}", tunnel.name);
+        spawn_stats_thread(
+            apphandle.clone(),
+            interface_name.clone(),
+            ConnectionType::Tunnel,
+        );
+        debug!("Stats thread for tunnel {} spawned", tunnel.name);
+
+        //spawn log watcher
+        debug!("Spawning log watcher for tunnel {}", tunnel.name);
+        spawn_log_watcher_task(
+            apphandle.clone(),
+            tunnel.id,
+            interface_name,
+            ConnectionType::Tunnel,
+            Level::DEBUG,
+            None,
+        )
+        .await?;
+        debug!("Log watcher for tunnel {} spawned", tunnel.name);
+    }
+
+    debug!("Active connections synchronized with the system state");
+
+    Ok(())
 }
