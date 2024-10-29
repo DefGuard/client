@@ -28,8 +28,11 @@ use crate::{
     },
     ConnectionType,
 };
+#[cfg(target_os = "windows")]
 use std::ptr::null_mut;
+#[cfg(target_os = "windows")]
 use widestring::U16CString;
+#[cfg(target_os = "windows")]
 use winapi::{
     shared::{minwindef::DWORD, winerror::ERROR_SERVICE_DOES_NOT_EXIST},
     um::{
