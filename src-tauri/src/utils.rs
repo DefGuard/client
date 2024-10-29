@@ -961,7 +961,10 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
             Ok(service) => service,
             Err(err) => match err {
                 ERROR_SERVICE_DOES_NOT_EXIST => {
-                    debug!("WireGuard tunnel {} is not installed", interface_name);
+                    debug!(
+                        "WireGuard tunnel {} is not installed, nothing to synchronize",
+                        interface_name
+                    );
                     continue;
                 }
                 _ => {
