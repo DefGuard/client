@@ -1,3 +1,4 @@
+import { useMutation } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -7,24 +8,29 @@ import {
   SelectProps,
   SelectSelectedValue,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
+import { ClientView } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { ClientView } from '../../../../types';
+import { CommonWireguardFields } from '../../../../types';
 
-export const StatsLayoutSelect = () => {
+interface StatsLayoutSelect {
+  locations: CommonWireguardFields[] | undefined;
+}
+
+export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
   const { LL } = useI18nContext();
-
-  const selectedView = useClientStore((state) => state.selectedView);
-
-  const setClientStore = useClientStore((state) => state.setState);
-
   const localLL = LL.pages.client.pages.instancePage;
+  const settings = useClientStore((state) => state.settings);
+  const updateClientSettings = useClientStore((state) => state.updateSettings);
+  const { mutate, isPending } = useMutation({
+    mutationFn: updateClientSettings,
+  });
 
   const options = useMemo(
     (): SelectOption<ClientView>[] => [
-      { key: 0, value: ClientView.GRID, label: localLL.header.filters.views.grid() },
+      { key: 0, value: 'grid', label: localLL.header.filters.views.grid() },
       {
         key: 1,
-        value: ClientView.DETAIL,
+        value: 'detail',
         label: localLL.header.filters.views.detail(),
       },
     ],
@@ -39,21 +45,33 @@ export const StatsLayoutSelect = () => {
           key: selected.key,
           displayValue: selected.label,
         };
+      } else if (selected == null && locations != undefined) {
+        if (locations.length == 1) {
+          return {
+            key: 'detail',
+            displayValue: localLL.header.filters.views.detail(),
+          };
+        }
+        return {
+          key: 'grid',
+          displayValue: localLL.header.filters.views.grid(),
+        };
       }
       return {
-        key: 'ERROR',
-        displayValue: 'None',
+        key: 'grid',
+        displayValue: localLL.header.filters.views.grid(),
       };
     },
-    [options],
+    [options, locations, localLL.header.filters.views],
   );
 
   return (
     <Select<ClientView>
       options={options}
       renderSelected={renderSelected}
-      selected={selectedView}
-      onChangeSingle={(val) => setClientStore({ selectedView: val })}
+      selected={settings.selected_view}
+      onChangeSingle={(view) => mutate({ selected_view: view })}
+      loading={isPending}
     />
   );
 };

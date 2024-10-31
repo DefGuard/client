@@ -20,13 +20,15 @@ import {
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import {
   CreateDeviceResponse,
+  EnrollmentError,
   EnrollmentStartResponse,
 } from '../../../../../../../../shared/hooks/api/types';
 import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { WireguardInstanceType } from '../../../../../../types';
+import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
 type Props = {
@@ -51,6 +53,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const initEnrollment = useEnrollmentStore((state) => state.init);
   const setClientState = useClientStore((state) => state.setState);
+  const setClientFlags = useClientFlags((state) => state.setValues);
 
   const schema = useMemo(
     () =>
@@ -100,17 +103,29 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       headers,
       body: Body.json(data),
     })
-      .then(async (res: Response<EnrollmentStartResponse>) => {
+      .then(async (res: Response<EnrollmentStartResponse | EnrollmentError>) => {
         const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
-          toaster.error(LL.common.messages.error());
           setIsLoading(false);
           error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
-          return;
+          const errorMessage = (res.data as EnrollmentError).error;
+
+          switch (errorMessage) {
+            case 'token expired': {
+              throw Error(LL.common.messages.tokenExpired());
+            }
+            default: {
+              throw Error(
+                LL.common.messages.errorWithMessage({
+                  message: errorMessage,
+                }),
+              );
+            }
+          }
         }
         debug('Response received with status OK');
-        const r = res.data;
+        const r = res.data as EnrollmentStartResponse;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
         const instance = clientInstances.find((i) => i.uuid === r.instance.id);
@@ -141,17 +156,26 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
                 toaster.success(
                   LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
                 );
+                const _selectedInstace: SelectedInstance = {
+                  id: instance.id,
+                  type: WireguardInstanceType.DEFGUARD_INSTANCE,
+                };
+                setClientFlags({
+                  selectedLocation: 0,
+                  selectedInstance: _selectedInstace,
+                });
                 setClientState({
-                  selectedInstance: {
-                    id: instance.id,
-                    type: WireguardInstanceType.DEFGUARD_INSTANCE,
-                  },
+                  selectedInstance: _selectedInstace,
                 });
                 navigate(routes.client.base, { replace: true });
               })
               .catch((e) => {
                 error(e);
-                toaster.error(LL.common.messages.error());
+                toaster.error(
+                  LL.common.messages.errorWithMessage({
+                    message: String(e),
+                  }),
+                );
               });
           });
         }
@@ -183,9 +207,24 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
       })
       .catch((e) => {
-        toaster.error(LL.common.messages.error());
         setIsLoading(false);
-        error(e);
+        if (typeof e === 'string') {
+          if (e.includes('Network Error')) {
+            toaster.error(LL.common.messages.networkError());
+            return;
+          }
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: String(e),
+            }),
+          );
+        } else {
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: (e as Error).message,
+            }),
+          );
+        }
       });
   };
 

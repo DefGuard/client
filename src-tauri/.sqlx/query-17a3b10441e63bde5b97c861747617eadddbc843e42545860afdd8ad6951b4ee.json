@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, listen_port, persistent_keepalive_interval) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "17a3b10441e63bde5b97c861747617eadddbc843e42545860afdd8ad6951b4ee"
+}

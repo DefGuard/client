@@ -1,0 +1,62 @@
+@use '@scssutils' as *;
+
+#global-logs {
+  & > .top {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    box-sizing: border-box;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border-primary);
+
+    #selects {
+      display: flex;
+      gap: 5px;
+      flex-grow: 1;
+    }
+
+    .select-with-helper {
+      display: flex;
+      gap: 5px;
+      flex-grow: 1;
+      align-items: center;
+    }
+
+    svg {
+      path {
+        fill: var(--surface-icon-primary);
+      }
+    }
+
+    .select {
+      width: 100%;
+      max-width: 110px;
+      margin-left: 10px;
+    }
+
+    :nth-child(3) {
+      margin-left: auto;
+    }
+  }
+
+  h3 {
+    @include typography(app-side-bar);
+  }
+
+  & > .logs-container {
+    contain: paint;
+    height: 300px;
+    max-height: 300px;
+    max-width: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    margin: 20px 5px 20px 20px;
+
+    p {
+      @include typography(app-code);
+      color: var(--text-body-primary);
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "88160affcd4bcd0d74ac816b7a975996902572e5ca3d365235a86e3464215cc1"
+}

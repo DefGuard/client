@@ -36,6 +36,7 @@ import { validateIpOrDomainList } from '../../../../../../shared/validators/tunn
 import { clientApi } from '../../../../clientAPI/clientApi';
 
 type FormFields = {
+  id: null;
   name: string;
   pubkey: string;
   prvkey: string;
@@ -53,6 +54,7 @@ type FormFields = {
   post_down?: string;
 };
 const defaultValues: FormFields = {
+  id: null,
   name: '',
   pubkey: '',
   prvkey: '',
@@ -81,6 +83,7 @@ export const AddTunnelFormCard = () => {
   const schema = useMemo(
     () =>
       z.object({
+        id: z.null(),
         name: z.string().trim().min(1, LL.form.errors.required()),
         pubkey: z
           .string()
@@ -136,7 +139,7 @@ export const AddTunnelFormCard = () => {
           }
           return true;
         }, LL.form.errors.invalid()),
-        persistent_keep_alive: z.number(),
+        persistent_keep_alive: z.coerce.number(),
         route_all_traffic: z.boolean(),
         pre_up: z.string().nullable(),
         post_up: z.string().nullable(),

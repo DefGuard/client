@@ -17,7 +17,7 @@ Desktop client for managing WireGuard VPN connections (any WireGuard server and 
 - Multiple instances & locations - When combining with [defguard](https://github.com/DefGuard/defguard) VPN & SSO you can have multiple defguard instances (sites/installations) and multiple Locations (VPN tunnels in that location/site) in <strong>one client</strong>! If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
 - Fast! - Built with Rust, [tauri](https://tauri.app/) and [React.js](https://react.dev/).
 
-To learn more about the system see our [documentation](https://defguard.gitbook.io).
+To learn more about the system see our [documentation](https://docs.defguard.net).
 
 ## Development
 
@@ -26,9 +26,11 @@ To learn more about the system see our [documentation](https://defguard.gitbook.
 Make sure to install prerequisites from [tauri](https://tauri.app/v1/guides/getting-started/prerequisites/).
 
 ### Proto submodule
+
 Make sure you have cloned, and up to date, proto submodule in `src-tauri/proto`
 
 ### Protoc compiler
+
 Make sure you have [protoc](https://grpc.io/docs/protoc-installation/) available.
 
 ### Install pnpm and node deps
@@ -37,6 +39,21 @@ Make sure you have [protoc](https://grpc.io/docs/protoc-installation/) available
 pnpm install
 ```
 
+### Sqlx and local database file
+
+To work with sqlx on a local db file, you'll have to set `DATABASE_URL` env variable.
+It's best to set it to absolute path since `pnpm tauri dev` runs with weird paths.
+
+Init the file with:
+
+```bash
+export DATABASE_URL=sqlite://<full-path-to-project-dir>/dev.db`
+sqlx db create
+sqlx migrate run --source src-tauri/migrations/
+```
+
+Then keep the `$DATABASE_URL` set during development (use direnv etc.)
+
 ### Dev server command
 
 ```bash
@@ -44,9 +61,11 @@ pnpm tauri dev
 ```
 
 ### Build command
+
 ```bash
 pnpm tauri build
 ```
+
 Built packages are available after in `src-tauri/target/release/bundle`.
 
 ### Windows
@@ -60,6 +79,7 @@ Remove `default-run` line from `[package]` section in `Cargo.toml` to build the 
 </p>
 
 # Legal
+
 WireGuard® is [registered trademarks](https://www.wireguard.com/trademark-policy/) of Jason A. Donenfeld.
 
 # Known issues
@@ -80,3 +100,23 @@ The app launches but the window is blank. Set the `WEBKIT_DISABLE_DMABUF_RENDERE
 ```
 WEBKIT_DISABLE_DMABUF_RENDERER=1 defguard-client
 ```
+
+## Failed to run `pnpm tauri dev`
+
+`pnpm tauri dev` command may result in the following error:
+
+```
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js from /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js not supported.
+Instead change the require of /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js in /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js to a dynamic import() which is available in all CommonJS modules.
+    at TracingChannel.traceSync (node:diagnostics_channel:315:14)
+    at Object.<anonymous> (/home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js:4:18) {
+  code: 'ERR_REQUIRE_ESM'
+}
+
+Node.js v22.7.0
+ ELIFECYCLE  Command failed with exit code 1.
+       Error The "beforeDevCommand" terminated with a non-zero status code.
+ ELIFECYCLE  Command failed with exit code 1.
+```
+
+To fix this remove node_modules and rerun `pnpm install`.

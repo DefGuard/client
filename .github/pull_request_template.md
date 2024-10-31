@@ -7,17 +7,17 @@
 
 #### Documentation ###
 
-- [ ] If testing requires changes in the environment or deployment, please **update the documentation** (https://defguard.gitbook.io) first and **attach the link to the documentation** section in this pull request
+- [ ] If testing requires changes in the environment or deployment, please **update the documentation** (https://docs.defguard.net) first and **attach the link to the documentation** section in this pull request
 - [ ] I have commented on my code, particularly in hard-to-understand areas
 
-#### Testing ### 
+#### Testing ###
 
 - [ ] I have performed manual tests manually and all changes work
 - [ ] New and existing unit tests pass locally with my changes
 
 ### 🏚️ Main Branch Merge Checklist:
 
-#### Testing ### 
+#### Testing ###
 
 - [ ] I have merged my changes before to dev and the dev checklist is done
 - [ ] I have tested all functionalities on the dev instance and they work

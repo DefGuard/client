@@ -1,51 +1,38 @@
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../../../../../shared/routes';
-import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { clientQueryKeys } from '../../../../query';
-import { ClientView, WireguardInstanceType } from '../../../../types';
+import {
+  CommonWireguardFields,
+  DefguardInstance,
+  WireguardInstanceType,
+} from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
 import { MFAModal } from './modals/MFAModal/MFAModal';
 
-const { getLocations, getTunnels } = clientApi;
+interface LocationsListProps {
+  locations: CommonWireguardFields[] | undefined;
+  isError: boolean;
+  selectedDefguardInstance: DefguardInstance | undefined;
+}
 
-export const LocationsList = () => {
+export const LocationsList = ({
+  locations,
+  isError,
+  selectedDefguardInstance,
+}: LocationsListProps) => {
   const { LL } = useI18nContext();
+
+  const selectedView = useClientStore((state) => state.settings.selected_view);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
-
-  const selectedView = useClientStore((state) => state.selectedView);
-
   const toaster = useToaster();
-
   const navigate = useNavigate();
 
-  const queryKey = useMemo(() => {
-    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
-      return [clientQueryKeys.getLocations, selectedInstance?.id as number];
-    } else {
-      return [clientQueryKeys.getTunnels];
-    }
-  }, [selectedInstance]);
-
-  const queryFn = useCallback(() => {
-    if (selectedInstance?.type === WireguardInstanceType.DEFGUARD_INSTANCE) {
-      return getLocations({ instanceId: selectedInstance?.id as number });
-    } else {
-      return getTunnels();
-    }
-  }, [selectedInstance]);
-
-  const { data: locations, isError } = useQuery({
-    queryKey,
-    queryFn,
-    enabled: !!selectedInstance,
-  });
+  const isTunnelType = selectedInstance?.type === WireguardInstanceType.TUNNEL;
 
   useEffect(() => {
     if (isError) {
@@ -67,12 +54,25 @@ export const LocationsList = () => {
 
   return (
     <>
-      {selectedView === ClientView.GRID && <LocationsGridView locations={locations} />}
+      {locations.length === 1 && selectedView === null && !isTunnelType && (
+        <LocationsDetailView
+          locations={locations}
+          connectionType={selectedInstance?.type}
+          selectedDefguardInstance={selectedDefguardInstance}
+        />
+      )}
+      {(selectedView === 'grid' || selectedView === null || isTunnelType) && (
+        <LocationsGridView
+          locations={locations}
+          selectedDefguardInstance={selectedDefguardInstance}
+        />
+      )}
 
-      {selectedView === ClientView.DETAIL && (
+      {selectedView === 'detail' && !isTunnelType && (
         <LocationsDetailView
           locations={locations}
           connectionType={selectedInstance.type}
+          selectedDefguardInstance={selectedDefguardInstance}
         />
       )}
 

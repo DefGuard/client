@@ -46,6 +46,10 @@ export type SaveTunnelRequest = {
 export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
 export type LogLevel = 'error' | 'info' | 'debug' | 'trace';
+export type GlobalLogLevel = 'error' | 'info' | 'debug';
+export type LogSource = 'Client' | 'Service' | 'All';
+
+export type ClientView = 'grid' | 'detail' | null;
 
 export type LogItemField = {
   message: string;
@@ -58,6 +62,7 @@ export type LogItem = {
   level: LogLevel;
   target: string;
   fields: LogItemField;
+  source: LogSource;
 };
 
 export type InterfaceLogsRequest = {
@@ -69,6 +74,7 @@ export type Settings = {
   log_level: LogLevel;
   tray_icon_theme: TrayIconTheme;
   check_for_updates: boolean;
+  selected_view: ClientView;
 };
 
 export type LocationDetails = {
@@ -123,9 +129,12 @@ export type TauriCommandKey =
   | 'update_instance'
   | 'parse_tunnel_config'
   | 'save_tunnel'
+  | 'update_tunnel'
   | 'all_tunnels'
   | 'tunnel_details'
   | 'delete_tunnel'
   | 'location_interface_details'
   | 'open_link'
-  | 'get_latest_app_version';
+  | 'get_latest_app_version'
+  | 'start_global_logwatcher'
+  | 'stop_global_logwatcher';

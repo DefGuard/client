@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "pubkey",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "prvkey",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "address",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "server_pubkey",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "preshared_key",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "allowed_ips",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "endpoint",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "dns",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "persistent_keep_alive",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "route_all_traffic",
+        "ordinal": 11,
+        "type_info": "Bool"
+      },
+      {
+        "name": "pre_up",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "post_up",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "pre_down",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "post_down",
+        "ordinal": 15,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f76a3953576d685d4057541b04aabfafdb61c86b0e9486ff0561a7bd80fd6ba8"
+}

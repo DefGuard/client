@@ -1,8 +1,10 @@
-use crate::database::Tunnel;
-use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
 use std::{array::TryFromSliceError, net::IpAddr};
+
+use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
+
+use crate::database::Tunnel;
 
 #[derive(Debug, Error)]
 pub enum WireguardConfigParseError {
@@ -84,11 +86,11 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
         .get("PersistentKeepalive")
         .unwrap_or("25")
         .parse()
-        .unwrap();
+        .unwrap_or_default();
 
     // Create or modify the Tunnel struct with the parsed values using the `new` method
     let tunnel = Tunnel::new(
-        "".into(),
+        String::new(),
         pubkey,
         prvkey.into(),
         address.into(),
@@ -107,9 +109,11 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
 
     Ok(tunnel)
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::database::models::NoId;
 
     #[test]
     fn test_parse_config() {
@@ -135,7 +139,7 @@ mod test {
             tunnel.prvkey,
             "GAA2X3DW0WakGVx+DsGjhDpTgg50s1MlmrLf24Psrlg="
         );
-        assert_eq!(tunnel.id, None);
+        assert_eq!(tunnel.id, NoId);
         assert_eq!(tunnel.name, "");
         assert_eq!(tunnel.address, "10.0.0.1/24");
         assert_eq!(

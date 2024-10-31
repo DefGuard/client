@@ -2,21 +2,30 @@ pub mod config;
 pub mod proto {
     tonic::include_proto!("client");
 }
-pub mod log_watcher;
 pub mod utils;
 #[cfg(windows)]
-pub mod windows_service;
+pub mod windows;
 
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Add,
     pin::Pin,
     time::{Duration, UNIX_EPOCH},
 };
 
+use super::VERSION;
+#[cfg(not(target_os = "macos"))]
+use defguard_wireguard_rs::Kernel;
+#[cfg(target_os = "macos")]
+use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
-    error::WireguardInterfaceError, host::Host, host::Peer, key::Key, InterfaceConfiguration,
-    WGApi, WireguardInterfaceApi,
+    error::WireguardInterfaceError,
+    host::{Host, Peer},
+    key::Key,
+    InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+};
+use proto::{
+    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+    CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
 use thiserror::Error;
 use tokio::{sync::mpsc, time::interval};
@@ -28,15 +37,9 @@ use tonic::{
 use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
-use crate::utils::IS_MACOS;
-
-use proto::{
-    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-    CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
-};
 
 const DAEMON_HTTP_PORT: u16 = 54127;
-pub const DAEMON_BASE_URL: &str = "http://localhost:54127";
+pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -64,12 +67,25 @@ impl DaemonService {
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-fn setup_wgapi(ifname: String) -> Result<WGApi, Status> {
-    let wgapi = WGApi::new(ifname.clone(), IS_MACOS).map_err(|err| {
-        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
+#[cfg(not(target_os = "macos"))]
+fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
+    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
+        let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
+
+    Ok(wgapi)
+}
+
+#[cfg(target_os = "macos")]
+fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
+    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
+        let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
+        error!("{msg}");
+        Status::new(Code::Internal, msg)
+    })?;
+
     Ok(wgapi)
 }
 
@@ -79,6 +95,7 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
     ) -> Result<Response<()>, Status> {
+        debug!("Received a request to create a new interface");
         let request = request.into_inner();
         let config: InterfaceConfiguration = request
             .config
@@ -89,9 +106,8 @@ impl DesktopDaemonService for DaemonService {
             .into();
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
-        info!("Creating interface {ifname}");
         // setup WireGuard API
-        let wgapi = setup_wgapi(ifname.clone())?;
+        let wgapi = setup_wgapi(ifname)?;
 
         #[cfg(not(windows))]
         {
@@ -102,21 +118,30 @@ impl DesktopDaemonService for DaemonService {
                 error!("{msg}");
                 Status::new(Code::Internal, msg)
             })?;
+            debug!("Done creating a new interface {ifname}");
         }
 
-        let dns: Vec<IpAddr> = request
-            .dns
-            .into_iter()
-            .filter_map(|s| s.parse().ok())
-            .collect();
-
-        // configure interface
-        debug!("Configuring new interface {ifname} with configuration: {config:?}");
+        // The WireGuard DNS config value can be a list of IP addresses and domain names, which will be
+        // used as DNS servers and search domains respectively.
+        debug!("Preparing DNS configuration for interface {ifname}");
+        let dns_string = request.dns.unwrap_or_default();
+        let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
+        // We assume that every entry that can't be parsed as an IP address is a domain name.
+        let mut dns = Vec::new();
+        let mut search_domains = Vec::new();
+        for entry in dns_entries {
+            if let Ok(ip) = entry.parse::<IpAddr>() {
+                dns.push(ip);
+            } else {
+                search_domains.push(entry);
+            }
+        }
+        debug!("DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: {search_domains:?}");
 
         #[cfg(not(windows))]
         let configure_interface_result = wgapi.configure_interface(&config);
         #[cfg(windows)]
-        let configure_interface_result = wgapi.configure_interface(&config, &dns);
+        let configure_interface_result = wgapi.configure_interface(&config, &dns, &search_domains);
 
         configure_interface_result.map_err(|err| {
             let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
@@ -126,7 +151,6 @@ impl DesktopDaemonService for DaemonService {
 
         #[cfg(not(windows))]
         {
-            // configure routing
             debug!("Configuring interface {ifname} routing");
             wgapi.configure_peer_routing(&config.peers).map_err(|err| {
                 let msg =
@@ -135,18 +159,20 @@ impl DesktopDaemonService for DaemonService {
                 Status::new(Code::Internal, msg)
             })?;
 
-            // Configure DNS
             if !dns.is_empty() {
-                debug!("Configuring DNS for interface {ifname} with config: {dns:?}");
-                wgapi.configure_dns(&dns).map_err(|err| {
+                debug!("The following DNS servers will be set: {dns:?}, search domains: {search_domains:?}");
+                wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
                     let msg =
                         format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
                     error!("{msg}");
                     Status::new(Code::Internal, msg)
                 })?;
+            } else {
+                debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
             }
         }
 
+        debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
     }
 
@@ -154,18 +180,36 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<RemoveInterfaceRequest>,
     ) -> Result<Response<()>, Status> {
+        debug!("Received a request to remove an interface");
         let request = request.into_inner();
         let ifname = request.interface_name;
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
-        info!("Removing interface {ifname}");
-        // setup WireGuard API
-        let wgapi = setup_wgapi(ifname.clone())?;
-        // remove interface
+        debug!("Removing interface {ifname}");
+
+        let wgapi = setup_wgapi(&ifname)?;
+
+        #[cfg(not(windows))]
+        {
+            debug!("Cleaning up interface {ifname} routing");
+            wgapi
+                .remove_endpoint_routing(&request.endpoint)
+                .map_err(|err| {
+                    let msg = format!(
+                        "Failed to remove routing for endpoint {}: {err}",
+                        request.endpoint
+                    );
+                    error!("{msg}");
+                    Status::new(Code::Internal, msg)
+                })?;
+        }
+
         wgapi.remove_interface().map_err(|err| {
             let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
+
+        debug!("Finished removing interface {ifname}");
         Ok(Response::new(()))
     }
 
@@ -176,43 +220,58 @@ impl DesktopDaemonService for DaemonService {
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
+        debug!(
+            "Received a request to start a new network usage stats data stream for interface {}",
+            request.interface_name
+        );
         let ifname = request.interface_name;
         let span = info_span!("read_interface_data", interface_name = &ifname);
         span.in_scope(|| {
-            info!("Starting interface data stream for {ifname}");
+            debug!("Starting network usage stats stream for interface {ifname}");
         });
 
         let stats_period = self.stats_period;
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(async move {
-            info!("Spawning stats thread for interface {ifname}");
+            debug!("Spawning network usage stats collection task for interface {ifname}");
             // setup WireGuard API
-            let error_msg = format!("Failed to initialize WireGuard API for interface {ifname}");
-            let wgapi = setup_wgapi(ifname.clone()).expect(&error_msg);
+            let error_msg = format!("Failed to initialize WireGuard API for interface {ifname} during the creation of the network usage stats collection task.");
+            let wgapi = setup_wgapi(&ifname).expect(&error_msg);
             let period = Duration::from_secs(stats_period);
             let mut interval = interval(period);
 
             loop {
                 // wait till next iteration
+                debug!("Waiting for next network usage stats update for interface {ifname}");
                 interval.tick().await;
-                debug!("Sending stats update for interface {ifname}");
+                debug!("Gathering network usage stats to send to the client about network activity for interface {ifname}");
                 match wgapi.read_interface_data() {
                     Ok(host) => {
-                        if let Err(err) = tx.send(Result::<_, Status>::Ok(host.into())).await {
+                        if let Err(err) = tx.send(Ok(host.into())).await {
                             error!(
-                                "Failed to send stats update for interface {ifname}. Error: {err}"
+                                "Couldn't send network usage stats update for interface {ifname}. Error: {err}"
                             );
                             break;
                         }
                     }
                     Err(err) => {
-                        error!("Failed to retrieve stats for WireGuard interface {ifname}. Error: {err}");
-                        break;
+                        match err {
+                            WireguardInterfaceError::SocketClosed(err) => {
+                                warn!(
+                                    "Failed to retrieve network usage stats for WireGuard interface {ifname}. Error: {err}"
+                                );
+                                break;
+                            }
+                            _ => {
+                                error!("Failed to retrieve network usage stats for WireGuard interface {ifname}. Error: {err}");
+                                break;
+                            }
+                        }
                     }
                 }
-                debug!("Finished sending stats update for interface {ifname}");
+                debug!("Network activity statistics for interface {ifname} have been sent to the client");
             }
-            warn!("Client disconnected from stats update stream for interface {ifname}");
+            debug!("The client has disconnected from the network usage statistics data stream for interface {ifname}, stopping the statistics data collection task.");
         }.instrument(span));
 
         let output_stream = ReceiverStream::new(rx);
@@ -223,12 +282,16 @@ impl DesktopDaemonService for DaemonService {
 }
 
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
-    info!("Starting defguard interface management daemon");
+    debug!("Starting defguard interface management daemon");
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let daemon_service = DaemonService::new(&config);
 
-    info!("defguard daemon listening on {addr}");
+    info!(
+        "Defguard daemon version {} started, listening on {addr}",
+        VERSION
+    );
+    debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_service"))
@@ -259,6 +322,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             address: config.address,
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
+            mtu: None,
         }
     }
 }
@@ -277,9 +341,7 @@ impl From<Peer> for proto::Peer {
             }),
             tx_bytes: peer.tx_bytes,
             rx_bytes: peer.rx_bytes,
-            persistent_keepalive_interval: peer
-                .persistent_keepalive_interval
-                .map(|interval| interval as u32),
+            persistent_keepalive_interval: peer.persistent_keepalive_interval.map(u32::from),
             allowed_ips: peer
                 .allowed_ips
                 .into_iter()
@@ -303,12 +365,12 @@ impl From<proto::Peer> for Peer {
             }),
             last_handshake: peer
                 .last_handshake
-                .map(|timestamp| UNIX_EPOCH.add(Duration::from_secs(timestamp))),
+                .map(|timestamp| UNIX_EPOCH + Duration::from_secs(timestamp)),
             tx_bytes: peer.tx_bytes,
             rx_bytes: peer.rx_bytes,
             persistent_keepalive_interval: peer
                 .persistent_keepalive_interval
-                .map(|interval| interval as u16),
+                .and_then(|interval| u16::try_from(interval).ok()),
             allowed_ips: peer
                 .allowed_ips
                 .into_iter()
@@ -321,7 +383,7 @@ impl From<proto::Peer> for Peer {
 impl From<Host> for InterfaceData {
     fn from(host: Host) -> Self {
         Self {
-            listen_port: host.listen_port as u32,
+            listen_port: u32::from(host.listen_port),
             peers: host.peers.into_values().map(Into::into).collect(),
         }
     }
@@ -329,10 +391,12 @@ impl From<Host> for InterfaceData {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use defguard_wireguard_rs::{key::Key, net::IpAddrMask};
     use std::{str::FromStr, time::SystemTime};
+
+    use defguard_wireguard_rs::{key::Key, net::IpAddrMask};
     use x25519_dalek::{EphemeralSecret, PublicKey};
+
+    use super::*;
 
     #[test]
     fn convert_peer() {
@@ -352,6 +416,6 @@ mod tests {
 
         let converted_peer: Peer = proto_peer.into();
 
-        assert_eq!(base_peer, converted_peer)
+        assert_eq!(base_peer, converted_peer);
     }
 }

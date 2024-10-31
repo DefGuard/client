@@ -1,31 +1,159 @@
-use crate::{database::DbPool, error::Error, proto};
-use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow};
+use core::fmt;
 
-#[derive(FromRow, Serialize, Deserialize, Debug)]
-pub struct Instance {
-    pub id: Option<i64>,
+use serde::{Deserialize, Serialize};
+use sqlx::{query, query_as, SqliteExecutor};
+
+use super::{Id, NoId};
+use crate::{error::Error, proto};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Instance<I = NoId> {
+    pub id: I,
     pub name: String,
     pub uuid: String,
     pub url: String,
     pub proxy_url: String,
     pub username: String,
+    pub token: Option<String>,
+    pub disable_all_traffic: bool,
+    pub enterprise_enabled: bool,
 }
 
-impl From<proto::InstanceInfo> for Instance {
+impl fmt::Display for Instance<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(ID: {})", self.name, self.id)
+    }
+}
+
+impl From<proto::InstanceInfo> for Instance<NoId> {
     fn from(instance_info: proto::InstanceInfo) -> Self {
         Self {
-            id: None,
+            id: NoId,
             name: instance_info.name,
             uuid: instance_info.id,
             url: instance_info.url,
             proxy_url: instance_info.proxy_url,
             username: instance_info.username,
+            token: None,
+            disable_all_traffic: instance_info.disable_all_traffic,
+            enterprise_enabled: instance_info.enterprise_enabled,
         }
     }
 }
 
-impl Instance {
+impl Instance<Id> {
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let url = self.url.to_string();
+        let proxy_url = self.proxy_url.to_string();
+        // Update the existing record when there is an ID
+        query!(
+            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6, enterprise_enabled = $7, token = $8 WHERE id = $9;",
+            self.name,
+            self.uuid,
+            url,
+            proxy_url,
+            self.username,
+            self.disable_all_traffic,
+            self.enterprise_enabled,
+            self.token,
+            self.id
+        )
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let instances = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance;"
+        )
+        .fetch_all(executor)
+        .await?;
+        Ok(instances)
+    }
+
+    pub async fn find_by_id<'e, E>(executor: E, id: Id) -> Result<Option<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let instance = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE id = $1;",
+            id
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(instance)
+    }
+
+    pub async fn find_by_uuid<'e, E>(executor: E, uuid: &str) -> Result<Option<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let instance = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE uuid = $1;",
+            uuid
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(instance)
+    }
+
+    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        // delete instance
+        query!("DELETE FROM instance WHERE id = $1", id)
+            .execute(executor)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        Instance::delete_by_id(executor, self.id).await?;
+        Ok(())
+    }
+
+    pub async fn all_with_token<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let instances = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled FROM instance WHERE token IS NOT NULL;"
+        )
+        .fetch_all(executor)
+        .await?;
+        Ok(instances)
+    }
+}
+
+// This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
+impl PartialEq<proto::InstanceInfo> for Instance<Id> {
+    fn eq(&self, other: &proto::InstanceInfo) -> bool {
+        self.name == other.name
+            && self.uuid == other.id
+            && self.url == other.url
+            && self.proxy_url == other.proxy_url
+            && self.username == other.username
+            && self.disable_all_traffic == other.disable_all_traffic
+            && self.enterprise_enabled == other.enterprise_enabled
+    }
+}
+
+impl Instance<NoId> {
     #[must_use]
     pub fn new(
         name: String,
@@ -33,103 +161,68 @@ impl Instance {
         url: String,
         proxy_url: String,
         username: String,
-    ) -> Self {
+    ) -> Instance<NoId> {
         Instance {
-            id: None,
+            id: NoId,
             name,
             uuid,
             url,
             proxy_url,
             username,
+            token: None,
+            disable_all_traffic: false,
+            enterprise_enabled: false,
         }
     }
 
-    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    pub async fn save<'e, E>(self, executor: E) -> Result<Instance<Id>, Error>
     where
-        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        E: SqliteExecutor<'e>,
     {
-        let url = self.url.to_string();
-        let proxy_url = self.proxy_url.to_string();
-        match self.id {
-            None => {
-                let result = query!(
-                    "INSERT INTO instance (name, uuid, url, proxy_url, username) VALUES ($1, $2, $3, $4, $5) RETURNING id;",
-                    self.name,
-                    self.uuid,
-                    url,
-                    proxy_url,
-                    self.username,
-                )
-                .fetch_one(executor)
-                .await?;
-                self.id = Some(result.id);
-                Ok(())
-            }
-            Some(id) => {
-                // Update the existing record when there is an ID
-                query!(
-                    "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5 WHERE id = $6;",
-                    self.name,
-                    self.uuid,
-                    url,
-                    proxy_url,
-                    self.username,
-                    id
-                )
-                .execute(executor)
-                .await?;
-                Ok(())
-            }
-        }
-    }
-
-    pub async fn all(pool: &DbPool) -> Result<Vec<Self>, Error> {
-        let instances = query_as!(
-            Self,
-            "SELECT id \"id?\", name, uuid, url, proxy_url, username FROM instance;"
+        let url = self.url.clone();
+        let proxy_url = self.proxy_url.clone();
+        let result = query!(
+            "INSERT INTO instance (name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+            self.name,
+            self.uuid,
+            url,
+            proxy_url,
+            self.username,
+            self.token,
+            self.disable_all_traffic,
+            self.enterprise_enabled
         )
-        .fetch_all(pool)
+        .fetch_one(executor)
         .await?;
-        Ok(instances)
-    }
-
-    pub async fn find_by_id(pool: &DbPool, id: i64) -> Result<Option<Self>, Error> {
-        let instance = query_as!(
-            Self,
-            "SELECT id \"id?\", name, uuid, url, proxy_url, username FROM instance WHERE id = $1;",
-            id
-        )
-        .fetch_optional(pool)
-        .await?;
-        Ok(instance)
-    }
-
-    pub async fn delete_by_id(pool: &DbPool, id: i64) -> Result<(), Error> {
-        // delete instance
-        query!("DELETE FROM instance WHERE id = $1", id)
-            .execute(pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn delete(&self, pool: &DbPool) -> Result<(), Error> {
-        match self.id {
-            Some(id) => {
-                Instance::delete_by_id(pool, id).await?;
-                Ok(())
-            }
-            None => Err(Error::NotFound),
-        }
+        Ok(Instance::<Id> {
+            id: result.id,
+            name: self.name,
+            uuid: self.uuid,
+            url: self.url,
+            proxy_url: self.proxy_url,
+            username: self.username,
+            token: self.token,
+            disable_all_traffic: self.disable_all_traffic,
+            enterprise_enabled: self.enterprise_enabled,
+        })
     }
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
-pub struct InstanceInfo {
-    pub id: Option<i64>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InstanceInfo<I = NoId> {
+    pub id: I,
     pub name: String,
     pub uuid: String,
     pub url: String,
     pub proxy_url: String,
     pub active: bool,
     pub pubkey: String,
+    pub disable_all_traffic: bool,
+    pub enterprise_enabled: bool,
+}
+
+impl fmt::Display for InstanceInfo<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(ID: {})", self.name, self.id)
+    }
 }

@@ -1,14 +1,17 @@
 import './style.scss';
 
+import { useQuery } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Button } from '../../../../shared/defguard-ui/components/Layout/Button/Button';
 import { ButtonStyleVariant } from '../../../../shared/defguard-ui/components/Layout/Button/types';
 import { routes } from '../../../../shared/routes';
+import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
+import { clientQueryKeys } from '../../query';
 import { DefguardInstance, WireguardInstanceType } from '../../types';
 import { LocationsList } from './components/LocationsList/LocationsList';
 import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
@@ -16,6 +19,8 @@ import { StatsLayoutSelect } from './components/StatsLayoutSelect/StatsLayoutSel
 import { DeleteInstanceModal } from './modals/DeleteInstanceModal/DeleteInstanceModal';
 import { UpdateInstanceModal } from './modals/UpdateInstanceModal/UpdateInstanceModal';
 import { useUpdateInstanceModal } from './modals/UpdateInstanceModal/useUpdateInstanceModal';
+
+const { getLocations, getTunnels } = clientApi;
 
 export const ClientInstancePage = () => {
   const { LL } = useI18nContext();
@@ -44,6 +49,28 @@ export const ClientInstancePage = () => {
 
   const openUpdateInstanceModal = useUpdateInstanceModal((state) => state.open);
 
+  const queryKey = useMemo(() => {
+    if (selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE) {
+      return [clientQueryKeys.getLocations, selectedInstanceId as number];
+    } else {
+      return [clientQueryKeys.getTunnels];
+    }
+  }, [selectedInstanceId, selectedInstanceType]);
+
+  const queryFn = useCallback(() => {
+    if (selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE) {
+      return getLocations({ instanceId: selectedInstanceId as number });
+    } else {
+      return getTunnels();
+    }
+  }, [selectedInstanceType, selectedInstanceId]);
+
+  const { data: locations, isError } = useQuery({
+    queryKey,
+    queryFn,
+    enabled: !!selectedInstance,
+  });
+
   useEffect(() => {
     const isDefguardInstance =
       selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE;
@@ -64,7 +91,7 @@ export const ClientInstancePage = () => {
           <StatsFilterSelect />
           {isLocationPage && (
             <>
-              <StatsLayoutSelect />
+              <StatsLayoutSelect locations={locations} />
               {selectedInstance && (
                 <Button
                   styleVariant={ButtonStyleVariant.STANDARD}
@@ -91,7 +118,11 @@ export const ClientInstancePage = () => {
           )}
         </div>
       </header>
-      <LocationsList />
+      <LocationsList
+        locations={locations}
+        isError={isError}
+        selectedDefguardInstance={selectedInstance}
+      />
       <UpdateInstanceModal />
       <DeleteInstanceModal />
     </section>

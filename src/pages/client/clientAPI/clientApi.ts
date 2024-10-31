@@ -32,12 +32,12 @@ async function invokeWrapper<T>(
   args?: InvokeArgs,
   timeout: number = 5000,
 ): Promise<T> {
-  debug(`Invoking command '${command}'`);
+  debug(`Invoking command '${command}' on the frontend`);
   try {
     const res = await pTimeout(invoke<T>(command, args), {
       milliseconds: timeout,
     });
-    debug(`Invoke ${command} completed`);
+    debug(`Invoke ${command} completed on the frontend`);
     trace(`${command} completed with data: ${JSON.stringify(res)}`);
     return res;
   } catch (e) {
@@ -94,6 +94,9 @@ const parseTunnelConfig = async (config: string) =>
 const saveTunnel = async (tunnel: TunnelRequest) =>
   invokeWrapper('save_tunnel', { tunnel: tunnel });
 
+const updateTunnel = async (tunnel: TunnelRequest) =>
+  invokeWrapper('update_tunnel', { tunnel: tunnel });
+
 const getLocationDetails = async (
   data: LocationDetailsRequest,
 ): Promise<LocationDetails> => invokeWrapper('location_interface_details', data);
@@ -113,6 +116,12 @@ const deleteTunnel = async (id: number): Promise<void> =>
 
 const getLatestAppVersion = async (): Promise<NewApplicationVersionInfo> =>
   invokeWrapper('get_latest_app_version');
+
+const startGlobalLogWatcher = async (): Promise<void> =>
+  invokeWrapper('start_global_logwatcher');
+
+const stopGlobalLogWatcher = async (): Promise<void> =>
+  invokeWrapper('stop_global_logwatcher');
 
 export const clientApi = {
   getInstances,
@@ -134,7 +143,10 @@ export const clientApi = {
   updateInstance,
   parseTunnelConfig,
   saveTunnel,
+  updateTunnel,
   openLink,
   getTunnelDetails,
   getLatestAppVersion,
+  startGlobalLogWatcher,
+  stopGlobalLogWatcher,
 };

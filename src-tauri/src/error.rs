@@ -1,17 +1,14 @@
 use std::net::AddrParseError;
 
-use base64;
 use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
-use local_ip_address::Error as LocalIpError;
-use sqlx;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("Config directory error")]
-    Config,
+    #[error("Application config directory error: {0}")]
+    Config(String),
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
     #[error("Migrate error: {0}")]
@@ -25,7 +22,7 @@ pub enum Error {
     #[error("IP address parse error: {0}")]
     AddrParse(#[from] AddrParseError),
     #[error("Local Ip Error: {0}")]
-    LocalIpError(#[from] LocalIpError),
+    LocalIpError(#[from] local_ip_address::Error),
     #[error("Internal error: {0}")]
     InternalError(String),
     #[error("Failed to parse timestamp")]
@@ -40,10 +37,12 @@ pub enum Error {
     ResourceNotFound(String),
     #[error("Config parse error {0}")]
     ConfigParseError(String),
-    #[error("Failed to acquire mutex lock")]
-    MutexError,
     #[error("Command failed: {0}")]
     CommandError(String),
+    #[error("Core is not enterprise")]
+    CoreNotEnterprise,
+    #[error("Instance has no config polling token")]
+    NoToken,
 }
 
 // we must manually implement serde::Serialize

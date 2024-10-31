@@ -7,6 +7,7 @@ export type DefguardInstance = {
   // connected
   active: boolean;
   pubkey: string;
+  disable_all_traffic: boolean;
 };
 
 export type DefguardLocation = {
@@ -63,11 +64,6 @@ export type CommonWireguardFields = {
   network_id: number;
 };
 
-export enum ClientView {
-  GRID = 0,
-  DETAIL = 1,
-}
-
 export enum WireguardInstanceType {
   TUNNEL = 'Tunnel',
   DEFGUARD_INSTANCE = 'Instance',
@@ -84,4 +80,5 @@ export enum TauriEventKey {
   INSTANCE_UPDATE = 'instance-update',
   LOCATION_UPDATE = 'location-update',
   APP_VERSION_FETCH = 'app-version-fetch',
+  CONFIG_CHANGED = 'config-changed',
 }

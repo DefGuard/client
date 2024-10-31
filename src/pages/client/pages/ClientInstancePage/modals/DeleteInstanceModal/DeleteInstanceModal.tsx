@@ -10,7 +10,9 @@ import { ConfirmModal } from '../../../../../../shared/defguard-ui/components/La
 import { ConfirmModalType } from '../../../../../../shared/defguard-ui/components/Layout/modals/ConfirmModal/types';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../hooks/useClientFlags';
 import { clientQueryKeys } from '../../../../query';
+import { useUpdateInstanceModal } from '../UpdateInstanceModal/useUpdateInstanceModal';
 import { useDeleteInstanceModal } from './useDeleteInstanceModal';
 
 const { deleteInstance } = clientApi;
@@ -31,9 +33,11 @@ export const DeleteInstanceModal = () => {
     (state) => [state.close, state.reset],
     shallow,
   );
+  const [closeUpdate] = useUpdateInstanceModal((state) => [state.close], shallow);
   const toaster = useToaster();
   const localLL = LL.modals.deleteInstance;
   const queryClient = useQueryClient();
+  const setClientFlags = useClientFlags((state) => state.setValues);
 
   const { mutate, isPending } = useMutation({
     mutationFn: deleteInstance,
@@ -47,7 +51,11 @@ export const DeleteInstanceModal = () => {
       });
     },
     onError: (e) => {
-      toaster.error(localLL.messages.error());
+      toaster.error(
+        LL.common.messages.errorWithMessage({
+          message: String(e),
+        }),
+      );
       console.error(e);
     },
   });
@@ -72,7 +80,13 @@ export const DeleteInstanceModal = () => {
       cancelText={LL.common.controls.cancel()}
       onSubmit={() => {
         if (instance) {
+          setClientFlags({
+            selectedInstance: undefined,
+            selectedLocation: undefined,
+          });
           mutate(instance.id);
+          close();
+          closeUpdate();
         }
       }}
       onCancel={() => close()}

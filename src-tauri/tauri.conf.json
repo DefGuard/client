@@ -8,13 +8,12 @@
   },
   "package": {
     "productName": "defguard-client",
-    "version": "0.4.1"
+    "version": "1.0.0"
   },
   "tauri": {
     "systemTray": {
       "iconPath": "resources/icons/tray-32x32-color.png",
-      "iconAsTemplate": false,
-      "menuOnLeftClick": false
+      "iconAsTemplate": false
     },
     "allowlist": {
       "all": false,

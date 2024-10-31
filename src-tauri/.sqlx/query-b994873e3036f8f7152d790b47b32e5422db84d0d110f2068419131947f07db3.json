@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT c.id, c.tunnel_id, c.connected_from \"connected_from!\", c.start \"start!\", c.end \"end!\", COALESCE(( SELECT ls.upload FROM tunnel_stats ls WHERE ls.tunnel_id = c.tunnel_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"upload: _\", COALESCE(( SELECT ls.download FROM tunnel_stats ls WHERE ls.tunnel_id = c.tunnel_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"download: _\" FROM tunnel_connection c WHERE tunnel_id = $1 ORDER BY start DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tunnel_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "connected_from!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "start!",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "end!",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "upload: _",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "download: _",
+        "ordinal": 6,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b994873e3036f8f7152d790b47b32e5422db84d0d110f2068419131947f07db3"
+}

@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "uuid",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "url",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "proxy_url",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "username",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "token?",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "disable_all_traffic",
+        "ordinal": 7,
+        "type_info": "Bool"
+      },
+      {
+        "name": "enterprise_enabled",
+        "ordinal": 8,
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "76998bbd9e0096deb957c8e60df4b7f10eb86c8341e3cc0bc081e5c4dcbcee44"
+}

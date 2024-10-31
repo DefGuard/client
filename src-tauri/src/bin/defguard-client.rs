@@ -3,35 +3,44 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use lazy_static::lazy_static;
-use log::{Level, LevelFilter};
-#[cfg(target_os = "macos")]
-use tauri::{api::process, Env};
-use tauri::{Manager, State};
-use tauri_plugin_log::LogTarget;
+use std::{env, str::FromStr};
 
+#[cfg(target_os = "windows")]
+use defguard_client::utils::sync_connections;
 use defguard_client::{
     __cmd__active_connection, __cmd__all_connections, __cmd__all_instances, __cmd__all_locations,
     __cmd__all_tunnels, __cmd__connect, __cmd__delete_instance, __cmd__delete_tunnel,
     __cmd__disconnect, __cmd__get_latest_app_version, __cmd__get_settings, __cmd__last_connection,
     __cmd__location_interface_details, __cmd__location_stats, __cmd__open_link,
     __cmd__parse_tunnel_config, __cmd__save_device_config, __cmd__save_tunnel,
-    __cmd__tunnel_details, __cmd__update_instance, __cmd__update_location_routing,
-    __cmd__update_settings,
+    __cmd__start_global_logwatcher, __cmd__stop_global_logwatcher, __cmd__tunnel_details,
+    __cmd__update_instance, __cmd__update_location_routing, __cmd__update_settings,
+    __cmd__update_tunnel,
     appstate::AppState,
     commands::{
         active_connection, all_connections, all_instances, all_locations, all_tunnels, connect,
         delete_instance, delete_tunnel, disconnect, get_latest_app_version, get_settings,
         last_connection, location_interface_details, location_stats, open_link,
-        parse_tunnel_config, save_device_config, save_tunnel, tunnel_details, update_instance,
-        update_location_routing, update_settings,
+        parse_tunnel_config, save_device_config, save_tunnel, start_global_logwatcher,
+        stop_global_logwatcher, tunnel_details, update_instance, update_location_routing,
+        update_settings, update_tunnel,
     },
     database::{self, models::settings::Settings},
-    latest_app_version::fetch_latest_app_version_loop,
-    tray::{configure_tray_icon, create_tray_menu, handle_tray_event},
+    enterprise::periodic::config::poll_config,
+    events::SINGLE_INSTANCE,
+    periodic::version::poll_version,
+    service,
+    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
+    VERSION,
 };
-use std::{env, str::FromStr};
+use lazy_static::lazy_static;
+use log::{Level, LevelFilter};
+#[cfg(target_os = "macos")]
+use tauri::{api::process, Env};
+use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
+use tauri_plugin_log::LogTarget;
+use time;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -44,6 +53,7 @@ extern crate log;
 
 // for tauri log plugin
 const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
+const LOG_FILTER: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
 
 lazy_static! {
     static ref LOG_INCLUDES: Vec<String> = load_log_targets();
@@ -70,14 +80,18 @@ async fn main() {
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
 
-    let tray_menu = create_tray_menu();
-    let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
-
     let log_level =
-        LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("info".into()))
+        LevelFilter::from_str(&env::var("DEFGUARD_CLIENT_LOG_LEVEL").unwrap_or("debug".into()))
             .unwrap_or(LevelFilter::Info);
 
-    let app = tauri::Builder::default()
+    // Sets the time format. Service's logs have a subsecond part, so we also need to include it here,
+    // otherwise the logs couldn't be sorted correctly when displayed together in the UI.
+    let format = time::format_description::parse(
+        "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]",
+    )
+    .unwrap();
+
+    let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
             save_device_config,
@@ -99,24 +113,43 @@ async fn main() {
             all_tunnels,
             open_link,
             tunnel_details,
+            update_tunnel,
             delete_tunnel,
             get_latest_app_version,
+            start_global_logwatcher,
+            stop_global_logwatcher
         ])
         .on_window_event(|event| match event.event() {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
-                event.window().hide().unwrap();
+            WindowEvent::CloseRequested { api, .. } => {
+                #[cfg(not(target_os = "macos"))]
+                let _ = event.window().hide();
+
+                #[cfg(target_os = "macos")]
+                let _ = tauri::AppHandle::hide(&event.window().app_handle());
+
                 api.prevent_close();
             }
             _ => {}
         })
-        .system_tray(system_tray)
+        .system_tray(SystemTray::new())
         .on_system_tray_event(handle_tray_event)
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            app.emit_all("single-instance", Payload { args: argv, cwd })
-                .unwrap();
+            let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
         .plugin(
             tauri_plugin_log::Builder::default()
+                .format(move |out, message, record| {
+                    out.finish(format_args!(
+                        "{}[{}][{}] {}",
+                        tauri_plugin_log::TimezoneStrategy::UseUtc
+                            .get_now()
+                            .format(&format)
+                            .unwrap(),
+                        record.level(),
+                        record.target(),
+                        message
+                    ))
+                })
                 .targets(LOG_TARGETS)
                 .level(log_level)
                 .filter(|metadata| {
@@ -133,54 +166,128 @@ async fn main() {
                     }
                     true
                 })
+                .filter(|metadata| {
+                    // Log all errors, warnings and infos
+                    if metadata.level() == LevelFilter::Error
+                        || metadata.level() == LevelFilter::Warn
+                        || metadata.level() == LevelFilter::Info
+                    {
+                        return true;
+                    }
+                    // Otherwise do not log the following targets
+                    for target in LOG_FILTER.iter() {
+                        if metadata.target().contains(target) {
+                            return false;
+                        }
+                    }
+                    true
+                })
                 .build(),
         )
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(AppState::default())
         .build(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("error while building tauri application");
 
+    info!("Starting Defguard client version {}", VERSION);
     // initialize database
     let app_handle = app.handle();
-    debug!("Initializing database connection");
-    let app_state: State<AppState> = app_handle.state();
-    let db = database::init_db(&app_handle)
-        .await
-        .expect("Database initialization failed");
-    *app_state.db.lock().unwrap() = Some(db);
-    info!("Database initialization completed");
-    info!("Starting main app thread.");
-    let result = database::info(&app_state.get_pool()).await;
-    info!("Database info result: {:#?}", result);
-    // configure tray
-    if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
-        configure_tray_icon(&app_handle, &settings.tray_icon_theme).unwrap();
-    }
 
-    tauri::async_runtime::spawn(
-        async move { fetch_latest_app_version_loop(app_handle.clone()).await },
+    info!(
+        "The application data (database file) will be stored in: {:?} \
+        and the application logs in: {:?}. Logs of the background defguard service responsible for \
+        managing the VPN connections at the network level will be stored in: {:?}.",
+        // display the path to the app data direcory, convert option<pathbuf> to option<&str>
+        app_handle
+            .path_resolver()
+            .app_data_dir()
+            .unwrap_or("UNDEFINED DATA DIRECTORY".into()),
+        app_handle
+            .path_resolver()
+            .app_log_dir()
+            .unwrap_or("UNDEFINED LOG DIRECTORY".into()),
+        service::config::DEFAULT_LOG_DIR
     );
 
+    debug!("Performing database setup...");
+    let app_state: State<AppState> = app_handle.state();
+    let db = match database::init_db(&app_handle).await {
+        Ok(db) => db,
+        Err(e) => {
+            error!("Failed to initialize database: {}", e);
+            return;
+        }
+    };
+    *app_state.db.lock().unwrap() = Some(db);
+    debug!("Database setup has been completed successfully.");
+
+    // Sync already active connections on windows.
+    // When windows is restarted, the app doesn't close the active connections
+    // and they are still running after the restart. We sync them here to
+    // reflect the real system's state.
+    // TODO: Find a way to intercept the shutdown event and close all connections
+    #[cfg(target_os = "windows")]
+    {
+        match sync_connections(&app_handle).await {
+            Ok(_) => {
+                info!("Synchronized application's active connections with the connections already open on the system, if there were any.")
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to synchronize application's active connections with the connections already open on the system. \
+                    The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error details: {}",
+                    e
+                )
+            }
+        };
+    }
+
+    // configure tray
+    debug!("Configuring tray icon...");
+    if let Ok(settings) = Settings::get(&app_state.get_pool()).await {
+        let _ = configure_tray_icon(&app_handle, &settings.tray_icon_theme);
+    }
+    debug!("Tray icon has been configured successfully");
+
+    // run periodic tasks
+    debug!("Starting periodic tasks (config and version polling)...");
+    tauri::async_runtime::spawn(poll_version(app_handle.clone()));
+    tauri::async_runtime::spawn(poll_config(app_handle.clone()));
+    debug!("Periodic tasks have been started");
+
+    // load tray menu after database initialization to show all instance and locations
+    debug!("Re-generating tray menu to show all available instances and locations as we have connected to the database...");
+    reload_tray_menu(&app_handle).await;
+    debug!("Tray menu has been re-generated successfully");
+
+    // Handle Ctrl-C
+    debug!("Setting up Ctrl-C handler...");
+    tauri::async_runtime::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Signal handler failure");
+        debug!("Ctrl-C handler: quitting the app");
+        let app_state: State<AppState> = app_handle.state();
+        app_state.quit(&app_handle);
+    });
+    debug!("Ctrl-C handler has been set up successfully");
+
     // run app
+    debug!("Starting the main application event loop...");
     app.run(|app_handle, event| match event {
         // prevent shutdown on window close
-        tauri::RunEvent::ExitRequested { api, .. } => {
+        RunEvent::ExitRequested { api, .. } => {
             debug!("Received exit request");
-            api.prevent_exit()
+            api.prevent_exit();
         }
         // handle shutdown
-        tauri::RunEvent::Exit => {
-            info!("Exiting event loop...");
+        RunEvent::Exit => {
+            debug!("Exiting the application's main event loop...");
             let app_state: State<AppState> = app_handle.state();
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let _ = app_state.close_all_connections().await;
-                    app_handle.exit(0);
-                });
-            });
+            app_state.quit(app_handle);
         }
         _ => {
-            trace!("Received event: {event:?}")
+            trace!("Received event: {event:?}");
         }
     });
 }

@@ -1,7 +1,16 @@
 pub mod models;
 
-use std::fs;
+use std::{env, fs};
 
+pub use models::{
+    connection::{ActiveConnection, Connection, ConnectionInfo},
+    instance::{Instance, InstanceInfo},
+    location::Location,
+    location_stats::LocationStats,
+    settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
+    tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
+    wireguard_keys::WireguardKeys,
+};
 use tauri::AppHandle;
 
 use crate::error::Error;
@@ -10,64 +19,73 @@ const DB_NAME: &str = "defguard.db";
 
 pub type DbPool = sqlx::SqlitePool;
 
-// Check if a database file exists, and create one if it does not.
+/// Initializes the database
 pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
-    let app_dir = app_handle
-        .path_resolver()
-        .app_data_dir()
-        .ok_or(Error::Config)?;
-    // Create app data directory if it doesnt exist
-    debug!("Creating app data dir at: {}", app_dir.to_string_lossy());
-    fs::create_dir_all(&app_dir)?;
-    info!("Created app data dir at: {}", app_dir.to_string_lossy());
-    let db_path = app_dir.join(DB_NAME);
-    if db_path.exists() {
-        info!(
-            "Database exists skipping creating database. Database path: {}",
-            db_path.to_string_lossy()
-        );
-    } else {
-        debug!(
-            "Database not found creating database file at: {}",
-            db_path.to_string_lossy()
-        );
-        fs::File::create(&db_path)?;
-        info!(
-            "Database file succesfully created at: {}",
-            db_path.to_string_lossy()
-        );
-    }
-    debug!("Connecting to database: {}", db_path.to_string_lossy());
-    let pool = DbPool::connect(&format!(
-        "sqlite://{}",
-        db_path.to_str().expect("Failed to format DB path")
-    ))
-    .await?;
-    debug!("Running migrations.");
+    let db_url = prepare_db_url(app_handle)?;
+    debug!("Connecting to database: {}", db_url);
+    let pool = DbPool::connect(&db_url).await?;
+    debug!("Running database migrations, if there are any.");
     sqlx::migrate!().run(&pool).await?;
+    debug!("Applied all database migrations that were pending. If any.");
     Settings::init_defaults(&pool).await?;
-    info!("Applied migrations.");
     Ok(pool)
 }
 
-pub async fn info(pool: &DbPool) -> Result<(), Error> {
-    let instances = Instance::all(pool).await?;
-    let locations = Location::all(pool).await?;
-    debug!(
-        "Found {} locations in {} instances",
-        locations.len(),
-        instances.len()
-    );
-    trace!("Instances Found:\n {instances:#?}");
-    trace!("Locations Found:\n {locations:#?}");
-    Ok(())
+/// Returns database url. Checks for custom url in `DATABASE_URL` env variable.
+/// Handles creating appropriate directories if they don't exist.
+fn prepare_db_url(app_handle: &AppHandle) -> Result<String, Error> {
+    if let Ok(url) = env::var("DATABASE_URL") {
+        info!("The default database location has been just overridden by the DATABASE_URL environment variable. The application will use the database located at: {url}");
+        Ok(url)
+    } else {
+        debug!("A production database will be used as no custom DATABASE_URL was provided.");
+        // Check if database directory and file exists, create if they don't.
+        let app_dir = app_handle
+            .path_resolver()
+            .app_data_dir()
+            .ok_or(Error::Config(
+                "Application data directory is not defined. Cannot proceed. Is the application running on a supported platform?".to_string()
+            ))?;
+        if app_dir.exists() {
+            debug!(
+                "Application data directory already exists at: {}, skipping its creation.",
+                app_dir.to_string_lossy()
+            );
+        } else {
+            debug!(
+                "Creating application data directory at: {}",
+                app_dir.to_string_lossy()
+            );
+            fs::create_dir_all(&app_dir)?;
+            debug!(
+                "Created application data directory at: {}",
+                app_dir.to_string_lossy()
+            );
+        }
+        let db_path = app_dir.join(DB_NAME);
+        if db_path.exists() {
+            debug!(
+                "Database file already exists at: {}. Skipping its creation.",
+                db_path.to_string_lossy()
+            );
+        } else {
+            debug!(
+                "Database file not found at {}. Creating a new one.",
+                db_path.to_string_lossy()
+            );
+            fs::File::create(&db_path)?;
+            info!(
+                "A new, empty database file has been created at: {} as no previous database file was found. This file will be used to store application data.",
+                db_path.to_string_lossy()
+            );
+        }
+        debug!(
+            "Application's database file is located at: {}",
+            db_path.to_string_lossy()
+        );
+        Ok(format!(
+            "sqlite://{}",
+            db_path.to_str().expect("Failed to format DB path")
+        ))
+    }
 }
-
-pub use models::{
-    connection::{ActiveConnection, Connection, ConnectionInfo},
-    instance::{Instance, InstanceInfo},
-    location::{Location, LocationStats},
-    settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
-    tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
-    wireguard_keys::WireguardKeys,
-};

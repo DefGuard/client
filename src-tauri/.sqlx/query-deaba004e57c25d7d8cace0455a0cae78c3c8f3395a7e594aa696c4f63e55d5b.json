@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id: _\", instance_id, pubkey, prvkey FROM wireguard_keys WHERE instance_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "instance_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "pubkey",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "prvkey",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "deaba004e57c25d7d8cace0455a0cae78c3c8f3395a7e594aa696c4f63e55d5b"
+}

@@ -6,7 +6,7 @@
       {
         "name": "id",
         "ordinal": 0,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "theme",
@@ -27,6 +27,11 @@
         "name": "check_for_updates",
         "ordinal": 4,
         "type_info": "Bool"
+      },
+      {
+        "name": "selected_view",
+        "ordinal": 5,
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -37,7 +42,8 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
   "hash": "d7e7897382881aa2f7633b86790d217b7e37fb90d7d343637bf7d00845fcfdf2"

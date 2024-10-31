@@ -123,6 +123,24 @@ type RootTranslation = {
 			 * U​n​e​x​p​e​c​t​e​d​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​!
 			 */
 			error: string
+			/**
+			 * A​n​ ​e​r​r​o​r​ ​o​c​c​u​r​r​e​d​:​ ​{​m​e​s​s​a​g​e​}
+			 * @param {unknown} message
+			 */
+			errorWithMessage: RequiredParams<'message'>
+			/**
+			 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​t​o​ ​i​s​s​u​e​ ​a​ ​n​e​w​ ​e​n​r​o​l​l​m​e​n​t​ ​t​o​k​e​n
+			 */
+			tokenExpired: string
+			/**
+			 * T​h​e​r​e​ ​w​a​s​ ​a​ ​n​e​t​w​o​r​k​ ​e​r​r​o​r​.​ ​C​a​n​'​t​ ​r​e​a​c​h​ ​p​r​o​x​y​.
+			 */
+			networkError: string
+			/**
+			 * C​o​n​f​g​u​r​a​t​i​o​n​ ​f​o​r​ ​i​n​s​t​a​n​c​e​ ​{​i​n​s​t​a​n​c​e​}​ ​h​a​s​ ​c​h​a​n​g​e​d​.​ ​D​i​s​c​o​n​n​e​c​t​ ​f​r​o​m​ ​a​l​l​ ​l​o​c​a​t​i​o​n​s​ ​t​o​ ​a​p​p​l​y​ ​c​h​a​n​g​e​s​.
+			 * @param {string} instance
+			 */
+			configChanged: RequiredParams<'instance'>
 		}
 	}
 	components: {
@@ -180,7 +198,7 @@ type RootTranslation = {
 							 */
 							title: string
 							/**
-							 * S​i​n​c​e​ ​W​i​r​e​G​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​)​.​ ​ ​
+							 * S​i​n​c​e​ ​W​i​r​e​G​u​a​r​d​ ​p​r​o​t​o​c​o​l​ ​d​o​e​s​n​'​t​ ​s​u​p​p​o​r​t​ ​2​F​A​/​M​F​A​ ​-​ ​m​o​s​t​ ​(​i​f​ ​n​o​t​ ​a​l​l​)​ ​c​u​r​r​e​n​t​l​y​ ​a​v​a​i​l​a​b​l​e​ ​W​i​r​e​G​u​a​r​d​ ​c​l​i​e​n​t​s​ ​d​o​ ​n​o​t​ ​s​u​p​p​o​r​t​ ​r​e​a​l​ ​M​u​l​t​i​-​F​a​c​t​o​r​ ​A​u​t​h​e​n​t​i​c​a​t​i​o​n​/​2​F​A​ ​-​ ​a​n​d​ ​u​s​e​ ​2​F​A​ ​j​u​s​t​ ​a​s​ ​a​u​t​h​o​r​i​z​a​t​i​o​n​ ​t​o​ ​t​h​e​ ​"​a​p​p​l​i​c​a​t​i​o​n​"​ ​i​t​s​e​l​f​ ​(​a​n​d​ ​n​o​t​ ​W​i​r​e​G​u​a​r​d​ ​t​u​n​n​e​l​)​.​
 						​
 						​I​f​ ​y​o​u​ ​w​o​u​l​d​ ​l​i​k​e​ ​t​o​ ​s​e​c​u​r​e​ ​y​o​u​r​ ​W​i​r​e​G​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​t​r​y​ ​*​*​d​e​f​g​u​a​r​d​*​*​ ​V​P​N​ ​&​ ​S​S​O​ ​s​e​r​v​e​r​ ​(​w​h​i​c​h​ ​i​s​ ​a​l​s​o​ ​f​r​e​e​ ​&​ ​o​p​e​n​ ​s​o​u​r​c​e​)​ ​t​o​ ​g​e​t​ ​r​e​a​l​ ​2​F​A​ ​u​s​i​n​g​ ​W​i​r​e​G​u​a​r​d​ ​P​S​K​ ​k​e​y​s​ ​a​n​d​ ​p​e​e​r​s​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​b​y​ ​d​e​f​g​u​a​r​d​ ​g​a​t​e​w​a​y​!
 							 */
@@ -205,7 +223,7 @@ type RootTranslation = {
 							 */
 							title: string
 							/**
-							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​ ​ ​
+							 * *​*​d​e​f​g​u​a​r​d​*​*​ ​(​b​o​t​h​ ​s​e​r​v​e​r​ ​n​a​d​ ​t​h​i​s​ ​c​l​i​e​n​t​)​ ​s​u​p​p​o​r​t​ ​m​u​l​t​i​p​l​e​ ​i​n​s​t​a​n​c​e​s​ ​(​i​n​s​t​a​l​l​a​t​i​o​n​s​)​ ​a​n​d​ ​m​u​l​t​i​p​l​e​ ​L​o​c​a​t​i​o​n​s​ ​(​V​P​N​ ​t​u​n​n​e​l​s​)​.​
 						​
 						​I​f​ ​y​o​u​ ​a​r​e​ ​a​n​ ​a​d​m​i​n​/​d​e​v​o​p​s​ ​-​ ​a​l​l​ ​y​o​u​r​ ​c​u​s​t​o​m​e​r​s​ ​(​i​n​s​t​a​n​c​e​s​)​ ​a​n​d​ ​a​l​l​ ​t​h​e​i​r​ ​t​u​n​n​e​l​s​ ​(​l​o​c​a​t​i​o​n​s​)​ ​c​a​n​ ​b​e​ ​i​n​ ​o​n​e​ ​p​l​a​c​e​!
 							 */
@@ -306,6 +324,26 @@ type RootTranslation = {
 									trace: string
 								}
 							}
+							globalLogs: {
+								logSources: {
+									/**
+									 * C​l​i​e​n​t
+									 */
+									cliet: string
+									/**
+									 * S​e​r​v​i​c​e
+									 */
+									service: string
+									/**
+									 * A​l​l
+									 */
+									all: string
+								}
+								/**
+								 * T​h​e​ ​s​o​u​r​c​e​ ​o​f​ ​t​h​e​ ​l​o​g​s​.​ ​L​o​g​s​ ​c​a​n​ ​c​o​m​e​ ​f​r​o​m​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​c​l​i​e​n​t​ ​o​r​ ​t​h​e​ ​b​a​c​k​g​r​o​u​n​d​ ​D​e​f​g​u​a​r​d​ ​s​e​r​v​i​c​e​ ​t​h​a​t​ ​m​a​n​a​g​e​s​ ​V​P​N​ ​c​o​n​n​c​e​t​i​o​n​s​ ​a​t​ ​t​h​e​ ​n​e​t​w​o​r​k​ ​l​e​v​e​l​.
+								 */
+								logSourceHelper: string
+							}
 							theme: {
 								/**
 								 * T​h​e​m​e
@@ -399,7 +437,7 @@ type RootTranslation = {
 							/**
 							 * 
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​ ​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​P​r​e​d​e​f​i​n​e​d​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​o​n​l​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​n​e​t​w​o​r​k​s​ ​d​e​f​i​n​e​d​ ​b​y​ ​A​d​m​i​n​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​<​/​b​r​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​b​>​A​l​l​ ​t​r​a​f​f​i​c​<​/​b​>​ ​-​ ​r​o​u​t​e​ ​A​L​L​ ​y​o​u​r​ ​n​e​t​w​o​r​k​ ​t​r​a​f​f​i​c​ ​t​h​r​o​u​g​h​ ​t​h​i​s​ ​V​P​N​ ​l​o​c​a​t​i​o​n​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>
 							 */
@@ -813,7 +851,7 @@ type RootTranslation = {
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​u​l​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​o​c​s​.​d​e​f​g​u​a​r​d​.​n​e​t​)​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
 							 */
@@ -899,7 +937,7 @@ type RootTranslation = {
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​d​i​v​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​p​>​
-						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​e​f​g​u​a​r​d​.​g​i​t​b​o​o​k​.​i​o​/​)​
+						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​F​o​r​ ​m​o​r​e​ ​h​e​l​p​,​ ​p​l​e​a​s​e​ ​v​i​s​i​t​ ​d​e​f​g​u​a​r​d​ ​h​e​l​p​ ​(​h​t​t​p​s​:​/​/​d​o​c​s​.​d​e​f​g​u​a​r​d​.​n​e​t​)​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​<​/​p​>​
 						​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ ​ 
 							 */
@@ -1613,6 +1651,22 @@ export type TranslationFunctions = {
 			 * Unexpected error occurred!
 			 */
 			error: () => LocalizedString
+			/**
+			 * An error occurred: {message}
+			 */
+			errorWithMessage: (arg: { message: unknown }) => LocalizedString
+			/**
+			 * Token has expired, please contact your administrator to issue a new enrollment token
+			 */
+			tokenExpired: () => LocalizedString
+			/**
+			 * There was a network error. Can't reach proxy.
+			 */
+			networkError: () => LocalizedString
+			/**
+			 * Confguration for instance {instance} has changed. Disconnect from all locations to apply changes.
+			 */
+			configChanged: (arg: { instance: string }) => LocalizedString
 		}
 	}
 	components: {
@@ -1670,7 +1724,7 @@ export type TranslationFunctions = {
 							 */
 							title: () => LocalizedString
 							/**
-							 * Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).  
+							 * Since WireGuard protocol doesn't support 2FA/MFA - most (if not all) currently available WireGuard clients do not support real Multi-Factor Authentication/2FA - and use 2FA just as authorization to the "application" itself (and not WireGuard tunnel).
 					
 						If you would like to secure your WireGuard instance try **defguard** VPN & SSO server (which is also free & open source) to get real 2FA using WireGuard PSK keys and peers configuration by defguard gateway!
 							 */
@@ -1695,7 +1749,7 @@ export type TranslationFunctions = {
 							 */
 							title: () => LocalizedString
 							/**
-							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).  
+							 * **defguard** (both server nad this client) support multiple instances (installations) and multiple Locations (VPN tunnels).
 					
 						If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
 							 */
@@ -1796,6 +1850,26 @@ export type TranslationFunctions = {
 									trace: () => LocalizedString
 								}
 							}
+							globalLogs: {
+								logSources: {
+									/**
+									 * Client
+									 */
+									cliet: () => LocalizedString
+									/**
+									 * Service
+									 */
+									service: () => LocalizedString
+									/**
+									 * All
+									 */
+									all: () => LocalizedString
+								}
+								/**
+								 * The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.
+								 */
+								logSourceHelper: () => LocalizedString
+							}
 							theme: {
 								/**
 								 * Theme
@@ -1889,7 +1963,7 @@ export type TranslationFunctions = {
 							/**
 							 * 
 						                <p>
-						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br> 
+						                  <b>Predefined traffic</b> - route only traffic for networks defined by Admin through this VPN location</br>
 						                  <b>All traffic</b> - route ALL your network traffic through this VPN location
 						                </p>
 							 */
@@ -2302,7 +2376,7 @@ export type TranslationFunctions = {
 						                </ul>
 						                </div>
 						                <p>
-						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                For more help, please visit defguard help (https://docs.defguard.net)
 						                </p>
 						              
 							 */
@@ -2388,7 +2462,7 @@ export type TranslationFunctions = {
 						                </p>
 						                </div>
 						                <p>
-						                For more help, please visit defguard help (https://defguard.gitbook.io/)
+						                For more help, please visit defguard help (https://docs.defguard.net)
 						                </p>
 						              
 							 */

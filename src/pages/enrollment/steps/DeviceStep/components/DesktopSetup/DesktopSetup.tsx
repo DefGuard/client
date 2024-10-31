@@ -51,7 +51,11 @@ export const DesktopSetup = () => {
     {
       mutationFn: activateUser,
       onError: (e) => {
-        toaster.error(LL.common.messages.error());
+        toaster.error(
+          LL.common.messages.errorWithMessage({
+            message: String(e),
+          }),
+        );
         console.error(e);
         error(String(e));
       },
@@ -90,13 +94,11 @@ export const DesktopSetup = () => {
       pubkey: publicKey,
     }).then((res) => {
       if (!res.ok) {
-        toaster.error(LL.common.messages.error());
         error(
           `Failed to create device during the enrollment. Error details: ${JSON.stringify(
             res.data,
-          )} Error status code: ${JSON.stringify(res.status)}`,
+          )} Error status code: ${res.status}`,
         );
-        throw Error('Failed to create device');
       }
       return res;
     });
@@ -105,11 +107,10 @@ export const DesktopSetup = () => {
       phone_number: userInfo.phone_number,
     }).then((res) => {
       if (!res.ok) {
-        toaster.error(LL.common.messages.error());
         error(
           `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
             res.data,
-          )} Error status code: ${JSON.stringify(res.status)}`,
+          )} Error status code: ${res.status}`,
         );
         throw Error('Failed to activate user');
       }
@@ -133,8 +134,22 @@ export const DesktopSetup = () => {
           });
           next();
         })
-        .catch(() => {
+        .catch((e) => {
           setIsLoading(false);
+
+          if (typeof e === 'string') {
+            if (e.includes('Network Error')) {
+              toaster.error(LL.common.messages.networkError());
+              return;
+            }
+            toaster.error(LL.common.messages.errorWithMessage({ message: String(e) }));
+          } else {
+            toaster.error(
+              LL.common.messages.errorWithMessage({
+                message: String(e),
+              }),
+            );
+          }
         });
     });
   };

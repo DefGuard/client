@@ -1,7 +1,8 @@
 import './style.scss';
 
+import { listen } from '@tauri-apps/api/event';
 import classNames from 'classnames';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
@@ -20,6 +21,10 @@ import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
 const { connect, disconnect } = clientApi;
 
 type Props = {
+  location?: CommonWireguardFields;
+};
+
+type Payload = {
   location?: CommonWireguardFields;
 };
 
@@ -56,11 +61,26 @@ export const LocationCardConnectButton = ({ location }: Props) => {
       }
     } catch (e) {
       setIsLoading(false);
-      toaster.error(LL.common.messages.error());
+      toaster.error(
+        LL.common.messages.errorWithMessage({
+          message: String(e),
+        }),
+      );
       error(`Error handling interface: ${e}`);
       console.error(e);
     }
   };
+
+  useEffect(() => {
+    async function listenMFAEvent() {
+      await listen<Payload>('mfa-trigger', () => {
+        if (location) {
+          openMFAModal(location);
+        }
+      });
+    }
+    listenMFAEvent();
+  }, [openMFAModal, location]);
 
   return (
     <Button

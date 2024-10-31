@@ -23,11 +23,12 @@ import {
 import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { WireguardInstanceType } from '../../../../../../types';
+import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
 import { AddInstanceInitResponse } from '../../types';
 
-const { saveConfig } = clientApi;
+const { getInstances, saveConfig } = clientApi;
 
 type Props = {
   response: AddInstanceInitResponse;
@@ -35,6 +36,10 @@ type Props = {
 
 type FormFields = {
   name: string;
+};
+
+type ErrorData = {
+  error: string;
 };
 
 const defaultValues: FormFields = {
@@ -46,6 +51,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
   const localLL = LL.pages.client.pages.addInstancePage.forms.device;
   const toaster = useToaster();
   const setClientStore = useClientStore((state) => state.setState);
+  const setCliengFlags = useClientFlags((state) => state.setValues);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -91,35 +97,67 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       }).then((r) => {
         if (!r.ok) {
           setIsLoading(false);
-          toaster.error(LL.common.messages.error());
-          error('Failed to create device check enrollment and defguard logs');
-          throw Error('Failed to create device');
+          const details = `${
+            (r.data as ErrorData)?.error ? (r.data as ErrorData).error + ', ' : ''
+          }`;
+          error(
+            `Failed to create device check enrollment and defguard logs, details: ${details} Error status code: ${r.status}`,
+          );
+          throw Error(`Failed to create device, details: ${details}`);
         }
         const deviceResp = r.data as CreateDeviceResponse;
         saveConfig({
           privateKey: privateKey,
           response: deviceResp,
         })
-          .then((res) => {
+          .then(async (res) => {
             setIsLoading(false);
             toaster.success(localLL.messages.addSuccess());
-            setClientStore({
-              selectedInstance: {
-                id: res.instance.id,
-                type: WireguardInstanceType.DEFGUARD_INSTANCE,
-              },
+            const instances = await getInstances();
+            const _selectedInstance: SelectedInstance = {
+              id: res.instance.id,
+              type: WireguardInstanceType.DEFGUARD_INSTANCE,
+            };
+            setCliengFlags({
+              selectedLocation: 0,
+              selectedInstance: _selectedInstance,
             });
-            navigate(routes.client.instanceCreated, { replace: true });
+            setClientStore({
+              selectedInstance: _selectedInstance,
+              instances,
+            });
+            navigate(routes.client.instancePage, { replace: true });
           })
-          .catch(() => {
-            toaster.error(LL.common.messages.error());
+          .catch((e) => {
+            toaster.error(
+              LL.common.messages.errorWithMessage({
+                message: String(e),
+              }),
+            );
             setIsLoading(false);
           });
       });
     } catch (e) {
       setIsLoading(false);
-      toaster.error(LL.common.messages.error());
       console.error(e);
+
+      if (typeof e === 'string') {
+        if (e.includes('Network Error')) {
+          toaster.error(LL.common.messages.networkError());
+          return;
+        }
+        toaster.error(
+          LL.common.messages.errorWithMessage({
+            message: String(e),
+          }),
+        );
+      } else {
+        toaster.error(
+          LL.common.messages.errorWithMessage({
+            message: (e as Error).message,
+          }),
+        );
+      }
     }
   };
 
@@ -135,6 +173,14 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             type="submit"
             text={localLL.submit()}
             loading={isLoading}
+          />
+          <Button
+            size={ButtonSize.LARGE}
+            styleVariant={ButtonStyleVariant.STANDARD}
+            type="button"
+            text={LL.common.controls.cancel()}
+            loading={isLoading}
+            onClick={() => navigate(routes.client.instancePage)}
           />
         </div>
       </form>

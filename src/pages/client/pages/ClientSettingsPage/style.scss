@@ -36,6 +36,13 @@
     grid-template-columns: 1fr;
     gap: 50px;
 
+    .col {
+      display: flex;
+      flex-flow: column;
+      gap: 25px;
+      box-sizing: border-box;
+    }
+
     @include media-breakpoint-up(xxl) {
       grid-template-columns: minmax(400px, 1fr) 1fr;
     }
