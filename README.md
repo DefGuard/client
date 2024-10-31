@@ -26,9 +26,11 @@ To learn more about the system see our [documentation](https://docs.defguard.net
 Make sure to install prerequisites from [tauri](https://tauri.app/v1/guides/getting-started/prerequisites/).
 
 ### Proto submodule
+
 Make sure you have cloned, and up to date, proto submodule in `src-tauri/proto`
 
 ### Protoc compiler
+
 Make sure you have [protoc](https://grpc.io/docs/protoc-installation/) available.
 
 ### Install pnpm and node deps
@@ -59,9 +61,11 @@ pnpm tauri dev
 ```
 
 ### Build command
+
 ```bash
 pnpm tauri build
 ```
+
 Built packages are available after in `src-tauri/target/release/bundle`.
 
 ### Windows
@@ -75,6 +79,7 @@ Remove `default-run` line from `[package]` section in `Cargo.toml` to build the 
 </p>
 
 # Legal
+
 WireGuard® is [registered trademarks](https://www.wireguard.com/trademark-policy/) of Jason A. Donenfeld.
 
 # Known issues
