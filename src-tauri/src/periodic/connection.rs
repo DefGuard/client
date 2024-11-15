@@ -237,7 +237,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         &aggregation,
                     )
                     .await?;
-                    if let Some(latest_stat) = stats.get(0) {
+                    if let Some(latest_stat) = stats.fist() {
                         trace!("Latest stat for checked tunnel: {:?}", latest_stat);
                         if !check_last_active_connection(
                             latest_stat.persistent_keepalive_interval,
