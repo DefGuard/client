@@ -166,7 +166,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         Some(1),
                     )
                     .await?;
-                    if let Some(latest_stat) = stats.get(0) {
+                    if let Some(latest_stat) = stats.fist() {
                         trace!(
                             "Latest stat for checked location connection: {:?}",
                             latest_stat
