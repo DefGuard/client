@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #client-settings-page {
   h1 {
     @include typography(app-title);

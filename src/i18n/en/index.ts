@@ -47,7 +47,8 @@ const en = {
         'Token has expired, please contact your administrator to issue a new enrollment token',
       networkError: "There was a network error. Can't reach proxy.",
       configChanged:
-        'Confguration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
+        'Configuration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
+      deadConDropped: '{con_type: string} {interface_name: string} disconnected.',
     },
   },
   components: {
@@ -57,6 +58,17 @@ const en = {
   },
   pages: {
     client: {
+      modals: {
+        deadConDropped: {
+          title: '{conType: string} disconnected',
+          tunnel: 'Tunnel',
+          location: 'Location',
+          body: '{conType: string} {instanceName: string} was disconnected due to lack of handshake in expected time window.',
+          controls: {
+            close: 'Close',
+          },
+        },
+      },
       pages: {
         carouselPage: {
           slides: {

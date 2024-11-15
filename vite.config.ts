@@ -18,6 +18,11 @@ export default defineConfig({
     },
   },
   css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use "@scssutils" as *;\n`,
+      },
+    },
     postcss: {
       plugins: [autoprefixer],
     },

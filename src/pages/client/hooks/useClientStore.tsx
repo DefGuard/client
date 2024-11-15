@@ -37,9 +37,10 @@ export const useClientStore = createWithEqualityFn<Store>(
       if (isUndefined(get().selectedInstance)) {
         return set({
           instances: values,
-          selectedInstance:
-            { id: values[0]?.id, type: WireguardInstanceType.DEFGUARD_INSTANCE } ??
-            undefined,
+          selectedInstance: {
+            id: values[0]?.id,
+            type: WireguardInstanceType.DEFGUARD_INSTANCE,
+          },
         });
       }
       return set({ instances: values });
@@ -48,8 +49,7 @@ export const useClientStore = createWithEqualityFn<Store>(
       if (isUndefined(get().selectedInstance)) {
         return set({
           tunnels: values,
-          selectedInstance:
-            { id: values[0]?.id, type: WireguardInstanceType.TUNNEL } ?? undefined,
+          selectedInstance: { id: values[0]?.id, type: WireguardInstanceType.TUNNEL },
         });
       }
       return set({ tunnels: values });

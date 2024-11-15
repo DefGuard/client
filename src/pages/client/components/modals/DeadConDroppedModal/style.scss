@@ -1,0 +1,32 @@
+#dead-con-dropped-modal {
+  .content {
+    padding: 20px;
+
+    @include media-breakpoint-up(lg) {
+      padding: 20px 30px 40px;
+    }
+
+    & > .message {
+      min-height: 100px;
+
+      p {
+        @include typography(app-input);
+        color: var(--text-body-primary);
+        padding-bottom: 30px;
+      }
+    }
+
+    .controls {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: center;
+
+      .btn {
+        height: 50px;
+        width: 100%;
+        max-width: 280px;
+      }
+    }
+  }
+}

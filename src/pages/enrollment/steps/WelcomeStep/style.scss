@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #enrollment {
   #enrollment-welcome-card {
     box-sizing: border-box;
@@ -15,6 +13,7 @@
     & > .explenation {
       user-select: none;
       margin-bottom: 30px;
+
       p,
       ul,
       ol,
@@ -31,11 +30,13 @@
 
     & > .admin-info {
       user-select: text;
+
       & > p {
         &:not(.title) {
           font-weight: 700;
         }
       }
+
       & > .title {
         user-select: none;
       }

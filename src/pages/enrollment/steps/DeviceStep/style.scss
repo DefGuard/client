@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #enrollment-device-step {
   width: 100%;
   height: auto;
@@ -15,6 +13,7 @@
 
     .message {
       width: 100%;
+
       & > * {
         text-align: center;
       }
@@ -28,6 +27,7 @@
     row-gap: 25px;
     align-items: flex-start;
     justify-content: center;
+
     & > .card {
       width: 100%;
       max-width: 750px;

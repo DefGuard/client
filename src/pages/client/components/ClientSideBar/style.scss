@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #client-page-side {
   z-index: 2;
   position: fixed;
@@ -71,8 +69,10 @@
     justify-content: flex-start;
     box-sizing: border-box;
     row-gap: 15px;
+
     &.flex-end {
       justify-content: flex-end;
+
       @media (min-height: 600px) {
         padding-bottom: 70px;
       }

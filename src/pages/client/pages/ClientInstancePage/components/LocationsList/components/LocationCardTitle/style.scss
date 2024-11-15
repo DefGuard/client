@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 .location-card-title {
   display: flex;
   flex-flow: row nowrap;
@@ -11,6 +9,7 @@
   & > svg {
     width: 24px;
     height: 24px;
+
     path {
       stroke: var(--surface-important);
     }

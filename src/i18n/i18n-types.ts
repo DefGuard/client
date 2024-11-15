@@ -137,10 +137,16 @@ type RootTranslation = {
 			 */
 			networkError: string
 			/**
-			 * C​o​n​f​g​u​r​a​t​i​o​n​ ​f​o​r​ ​i​n​s​t​a​n​c​e​ ​{​i​n​s​t​a​n​c​e​}​ ​h​a​s​ ​c​h​a​n​g​e​d​.​ ​D​i​s​c​o​n​n​e​c​t​ ​f​r​o​m​ ​a​l​l​ ​l​o​c​a​t​i​o​n​s​ ​t​o​ ​a​p​p​l​y​ ​c​h​a​n​g​e​s​.
+			 * C​o​n​f​i​g​u​r​a​t​i​o​n​ ​f​o​r​ ​i​n​s​t​a​n​c​e​ ​{​i​n​s​t​a​n​c​e​}​ ​h​a​s​ ​c​h​a​n​g​e​d​.​ ​D​i​s​c​o​n​n​e​c​t​ ​f​r​o​m​ ​a​l​l​ ​l​o​c​a​t​i​o​n​s​ ​t​o​ ​a​p​p​l​y​ ​c​h​a​n​g​e​s​.
 			 * @param {string} instance
 			 */
 			configChanged: RequiredParams<'instance'>
+			/**
+			 * {​c​o​n​_​t​y​p​e​}​ ​{​i​n​t​e​r​f​a​c​e​_​n​a​m​e​}​ ​d​i​s​c​o​n​n​e​c​t​e​d​.
+			 * @param {string} con_type
+			 * @param {string} interface_name
+			 */
+			deadConDropped: RequiredParams<'con_type' | 'interface_name'>
 		}
 	}
 	components: {
@@ -153,6 +159,35 @@ type RootTranslation = {
 	}
 	pages: {
 		client: {
+			modals: {
+				deadConDropped: {
+					/**
+					 * {​c​o​n​T​y​p​e​}​ ​d​i​s​c​o​n​n​e​c​t​e​d
+					 * @param {string} conType
+					 */
+					title: RequiredParams<'conType'>
+					/**
+					 * T​u​n​n​e​l
+					 */
+					tunnel: string
+					/**
+					 * L​o​c​a​t​i​o​n
+					 */
+					location: string
+					/**
+					 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​l​a​c​k​ ​o​f​ ​h​a​n​d​s​h​a​k​e​ ​i​n​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​w​i​n​d​o​w​.
+					 * @param {string} conType
+					 * @param {string} instanceName
+					 */
+					body: RequiredParams<'conType' | 'instanceName'>
+					controls: {
+						/**
+						 * C​l​o​s​e
+						 */
+						close: string
+					}
+				}
+			}
 			pages: {
 				carouselPage: {
 					slides: {
@@ -1664,9 +1699,13 @@ export type TranslationFunctions = {
 			 */
 			networkError: () => LocalizedString
 			/**
-			 * Confguration for instance {instance} has changed. Disconnect from all locations to apply changes.
+			 * Configuration for instance {instance} has changed. Disconnect from all locations to apply changes.
 			 */
 			configChanged: (arg: { instance: string }) => LocalizedString
+			/**
+			 * {con_type} {interface_name} disconnected.
+			 */
+			deadConDropped: (arg: { con_type: string, interface_name: string }) => LocalizedString
 		}
 	}
 	components: {
@@ -1679,6 +1718,32 @@ export type TranslationFunctions = {
 	}
 	pages: {
 		client: {
+			modals: {
+				deadConDropped: {
+					/**
+					 * {conType} disconnected
+					 */
+					title: (arg: { conType: string }) => LocalizedString
+					/**
+					 * Tunnel
+					 */
+					tunnel: () => LocalizedString
+					/**
+					 * Location
+					 */
+					location: () => LocalizedString
+					/**
+					 * {conType} {instanceName} was disconnected due to lack of handshake in expected time window.
+					 */
+					body: (arg: { conType: string, instanceName: string }) => LocalizedString
+					controls: {
+						/**
+						 * Close
+						 */
+						close: () => LocalizedString
+					}
+				}
+			}
 			pages: {
 				carouselPage: {
 					slides: {

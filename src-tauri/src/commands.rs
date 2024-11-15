@@ -141,7 +141,6 @@ pub async fn disconnect(
                 }
             };
         }
-
         info!("Disconnected from {connection_type} {name}(ID: {location_id})");
         Ok(())
     } else {
@@ -629,7 +628,7 @@ impl DateTimeAggregation {
     }
 }
 
-fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
+pub fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     // Use hourly aggregation for longer periods
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
@@ -658,6 +657,7 @@ pub async fn location_stats(
             location_id,
             &from,
             &aggregation,
+            None,
         )
         .await?
         .into_iter()
