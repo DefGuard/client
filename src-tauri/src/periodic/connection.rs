@@ -200,6 +200,16 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                         }
                                     }
                                 }
+                                Ok(None) => {
+                                    warn!("Attempt to reconnect the location {}({}) cannot be made, as location was not found in the database, connection will be dropped instead.", con.interface_name, con.location_id);
+                                    disconnect_dead_connection(
+                                        con.location_id,
+                                        &con.interface_name,
+                                        app_handle.clone(),
+                                        con.connection_type,
+                                    )
+                                    .await;
+                                }
                                 Err(e) => {
                                     warn!("Could not retrieve location {}({}) because of a database error. Automatic reconnection cannot be done, interface will be disconnected. Error details: {}", con.interface_name, con.location_id, e.to_string());
                                     disconnect_dead_connection(
