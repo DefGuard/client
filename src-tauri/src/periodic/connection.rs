@@ -51,14 +51,11 @@ fn check_last_active_connection(
 
 fn handle_disconnect_effects(app_handle: &AppHandle, payload: DeadConOut) {
     trace!("{} Event payload: {:?}", DEAD_CONNECTION_DROPPED, payload);
-    match app_handle.emit_all(DEAD_CONNECTION_DROPPED, &payload) {
-        Err(e) => {
-            warn!(
-                "Connection verification: Dead connection dropped event emit failed. Reason: {}",
-                e.to_string()
-            );
-        }
-        _ => {}
+    if let Err(e) = app_handle.emit_all(DEAD_CONNECTION_DROPPED, &payload) {
+        warn!(
+            "Connection verification: Dead connection dropped event emit failed. Reason: {}",
+            e.to_string()
+        );
     }
     match Notification::new(&app_handle.config().tauri.bundle.identifier)
         .title(format!(
