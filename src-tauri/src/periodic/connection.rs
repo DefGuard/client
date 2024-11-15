@@ -234,8 +234,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                             latest_stat.last_handshake,
                         ) {
                             match Tunnel::find_by_id(db_pool, con.location_id).await {
-                                Ok(tunnel_option) => {
-                                    let tunnel = tunnel_option.unwrap();
+                                Ok(Some(tunnel)) => {
                                     reconnect(
                                         tunnel.id,
                                         &tunnel.name,
