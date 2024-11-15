@@ -242,13 +242,13 @@ impl Tunnel<NoId> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelStats<I = NoId> {
     id: I,
-    tunnel_id: Id,
+    pub tunnel_id: Id,
     upload: i64,
     download: i64,
-    last_handshake: i64,
+    pub last_handshake: i64,
     collected_at: NaiveDateTime,
     listen_port: u32,
-    persistent_keepalive_interval: Option<u16>,
+    pub persistent_keepalive_interval: Option<u16>,
 }
 
 impl TunnelStats {

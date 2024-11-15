@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #add-tunnel-guide {
   display: flex;
   flex-flow: column;
@@ -12,11 +10,13 @@
 
     color: var(--text-body-primary);
   }
+
   a {
     @include typography(app-body-2);
 
     color: var(--text-body-primary);
   }
+
   li {
     @include typography(app-body-2);
 

@@ -14,13 +14,13 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {
     id: I,
-    location_id: Id,
+    pub(crate) location_id: Id,
     upload: i64,
     download: i64,
-    last_handshake: i64,
+    pub(crate) last_handshake: i64,
     collected_at: NaiveDateTime,
     listen_port: u32,
-    persistent_keepalive_interval: Option<u16>,
+    pub(crate) persistent_keepalive_interval: Option<u16>,
 }
 
 impl From<LocationStats<Id>> for CommonLocationStats<Id> {
@@ -138,11 +138,13 @@ impl LocationStats<Id> {
         location_id: Id,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
+        limit: Option<i32>,
     ) -> Result<Vec<Self>, Error>
     where
         E: SqliteExecutor<'e>,
     {
         let aggregation = aggregation.fstring();
+        let query_limit = limit.unwrap_or(-1);
         let stats = query_as!(
             LocationStats,
             "WITH cte AS ( \
@@ -165,10 +167,12 @@ impl LocationStats<Id> {
             	persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
             FROM cte \
             WHERE location_id = $2 AND collected_at >= $3 \
-            GROUP BY collected_at ORDER BY collected_at",
+            GROUP BY collected_at ORDER BY collected_at \
+            LIMIT $4",
             aggregation,
             location_id,
-            from
+            from,
+            query_limit
         )
         .fetch_all(executor)
         .await?;

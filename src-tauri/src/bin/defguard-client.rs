@@ -28,7 +28,7 @@ use defguard_client::{
     database::{self, models::settings::Settings},
     enterprise::periodic::config::poll_config,
     events::SINGLE_INSTANCE,
-    periodic::version::poll_version,
+    periodic::{connection::verify_active_connections, version::poll_version},
     service,
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
@@ -53,7 +53,7 @@ extern crate log;
 
 // for tauri log plugin
 const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
-const LOG_FILTER: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
+const LOG_FILTER: [&str; 6] = ["tauri", "sqlx", "hyper", "h2", "tower", "webview"];
 
 lazy_static! {
     static ref LOG_INCLUDES: Vec<String> = load_log_targets();
@@ -253,6 +253,7 @@ async fn main() {
     debug!("Starting periodic tasks (config and version polling)...");
     tauri::async_runtime::spawn(poll_version(app_handle.clone()));
     tauri::async_runtime::spawn(poll_config(app_handle.clone()));
+    tauri::async_runtime::spawn(verify_active_connections(app_handle.clone()));
     debug!("Periodic tasks have been started");
 
     // load tray menu after database initialization to show all instance and locations

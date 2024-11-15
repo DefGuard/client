@@ -1,10 +1,8 @@
-@use '@scssutils' as *;
-
 #locations-grid-view {
   display: grid;
   grid-template-columns: repeat(auto-fill, 445px);
   grid-auto-rows: auto;
-  align-items: center;
+  align-items: start;
   align-content: center;
   justify-content: center;
   gap: 20px;
@@ -25,12 +23,14 @@
       display: flex;
       flex-flow: row nowrap;
       align-items: flex-start;
+      column-gap: 10px;
 
       & > .btn {
         margin-left: auto;
         height: 40px;
       }
     }
+
     & > .route {
       width: 100%;
       display: flex;
@@ -38,12 +38,14 @@
       row-gap: 8px;
       justify-content: space-between;
       padding-top: 20px;
+
       .top {
         display: flex;
         flex-flow: row nowrap;
         align-items: center;
         justify-content: flex-start;
       }
+
       .toggle {
         .toggle-option {
           height: 32px;
@@ -77,11 +79,13 @@
         justify-content: space-between;
       }
     }
+
     .location-no-stats {
       padding-top: 32px;
       height: max-content;
       width: 100%;
     }
+
     .location-no-connections {
       padding-top: 32px;
       height: max-content;

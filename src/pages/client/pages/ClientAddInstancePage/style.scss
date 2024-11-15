@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #client-add-instnace-page {
   h1 {
     @include typography(app-title);

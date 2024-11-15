@@ -1,11 +1,10 @@
-@use '@scssutils' as *;
-
 #enrollment {
   @include media-breakpoint-down(lg) {
     padding: 0;
     margin: 0;
     margin-bottom: 140px;
   }
+
   @include media-breakpoint-up(lg) {
     margin-left: 270px;
 

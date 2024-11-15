@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #enrollment-side-bar {
   box-sizing: border-box;
   width: 270px;
@@ -34,6 +32,7 @@
 
   .divider {
     background-color: var(--border-primary);
+
     &.push {
       margin-top: auto;
     }
@@ -60,6 +59,7 @@
   & > .admin-info {
     box-sizing: border-box;
     padding: 20px 10px 20px 40px;
+
     & > p {
       @include typography(app-body-2);
       @include text-overflow-dots;

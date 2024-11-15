@@ -74,6 +74,17 @@ export type SelectedInstance = {
   type: WireguardInstanceType;
 };
 
+export enum ClientConnectionType {
+  LOCATION = 'Location',
+  TUNNEL = 'Tunnel',
+}
+
+export type DeadConDroppedPayload = {
+  id: number;
+  con_type: ClientConnectionType;
+  interface_name: string;
+};
+
 export enum TauriEventKey {
   SINGLE_INSTANCE = 'single-instance',
   CONNECTION_CHANGED = 'connection-changed',
@@ -81,4 +92,5 @@ export enum TauriEventKey {
   LOCATION_UPDATE = 'location-update',
   APP_VERSION_FETCH = 'app-version-fetch',
   CONFIG_CHANGED = 'config-changed',
+  DEAD_CONNECTION_DROPPED = 'dead-connection-dropped',
 }

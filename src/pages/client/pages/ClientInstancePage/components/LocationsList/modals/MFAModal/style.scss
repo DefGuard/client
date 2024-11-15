@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 #mfa-modal {
   & > .header > .title {
     @include typography(welcome-h1);

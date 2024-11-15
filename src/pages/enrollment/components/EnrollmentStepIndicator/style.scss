@@ -1,5 +1,3 @@
-@use '@scssutils' as *;
-
 .step-indicator {
   width: 100%;
   height: auto;
@@ -9,6 +7,7 @@
     @include typography(app-avatar-s);
 
     color: var(--text-body-primary);
+
     & > span {
       color: var(--text-body-tertiary);
     }
