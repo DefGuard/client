@@ -1,6 +1,6 @@
 [package]
 name = "defguard-client"
-version = "1.0.1"
+version = "1.1.0"
 description = "Defguard desktop client"
 license = ""
 homepage = "https://github.com/DefGuard/client"
@@ -44,7 +44,8 @@ sqlx = { version = "0.8", features = [
 ] }
 struct-patch = "0.4"
 strum = { version = "0.26", features = ["derive"] }
-tauri = { version = "1.8", features = [ "notification-all",
+tauri = { version = "1.8", features = [
+  "notification-all",
   "dialog-all",
   "clipboard-all",
   "http-all",
