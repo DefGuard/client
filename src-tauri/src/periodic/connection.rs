@@ -57,7 +57,7 @@ fn handle_disconnect_effects(app_handle: &AppHandle, payload: DeadConOut) {
             e.to_string()
         );
     }
-    match Notification::new(&app_handle.config().tauri.bundle.identifier)
+    if let Err(e) = Notification::new(&app_handle.config().tauri.bundle.identifier)
         .title(format!(
             "{} {} disconnected.",
             payload.con_type, payload.interface_name
@@ -65,13 +65,10 @@ fn handle_disconnect_effects(app_handle: &AppHandle, payload: DeadConOut) {
         .body("Interface was disconnected.")
         .show()
     {
-        Err(e) => {
-            warn!(
-                "System notification for disconnect was not shown. Reason: {}",
-                e.to_string()
-            );
-        }
-        _ => {}
+        warn!(
+            "System notification for disconnect was not shown. Reason: {}",
+            e.to_string()
+        );
     }
 }
 
