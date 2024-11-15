@@ -176,8 +176,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                             latest_stat.last_handshake,
                         ) {
                             match Location::find_by_id(db_pool, con.location_id).await {
-                                Ok(location_option) => {
-                                    let location = location_option.unwrap();
+                                Ok(Some(location)) => {
                                     // only try to reconnect when location is not protected behind MFA
                                     match location.mfa_enabled {
                                         true => {
