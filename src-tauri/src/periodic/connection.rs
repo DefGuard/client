@@ -255,7 +255,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                     .await;
                                 }
                                 Err(e) => {
-                                    warn!("Attempt to reconnect the tunnel {}({}) cannot be made, tunnel was not found in db. Reason: {} , connection will be dropped instead.", con.interface_name, con.location_id, e.to_string());
+                                    warn!("Attempt to reconnect the tunnel {}({}) cannot be made, because of a database error. Error details: {} , connection will be dropped instead.", con.interface_name, con.location_id, e.to_string());
                                     disconnect_dead_connection(
                                         con.location_id,
                                         &con.interface_name,
