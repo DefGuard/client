@@ -3,7 +3,6 @@ use std::{
     path::Path,
     process::Command,
     str::FromStr,
-    thread::panicking,
 };
 
 use chrono::Utc;
@@ -16,7 +15,7 @@ use tracing::Level;
 
 use crate::{
     appstate::AppState,
-    commands::{active_connection, disconnect, LocationInterfaceDetails, Payload},
+    commands::{disconnect, LocationInterfaceDetails, Payload},
     database::{
         models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
         ActiveConnection, Connection, DbPool, Location, LocationStats, Tunnel, TunnelConnection,

@@ -1,5 +1,3 @@
-use std::path::Display;
-
 use serde::Serialize;
 use strum::Display;
 use tauri::{api::notification::Notification, AppHandle, Manager};
