@@ -366,7 +366,7 @@ impl TunnelStats<Id> {
         E: SqliteExecutor<'e>,
     {
         let res = query_as!(
-            TunnelStats::<i64>,
+            TunnelStats::<Id>,
             "SELECT id, tunnel_id, \
            upload \"upload!: i64\", \
            download \"download!: i64\", \

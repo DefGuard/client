@@ -187,7 +187,7 @@ impl LocationStats<Id> {
         E: SqliteExecutor<'e>,
     {
         let res = query_as!(
-            LocationStats::<i64>,
+            LocationStats::<Id>,
             "SELECT id, location_id, \
              upload \"upload!: i64\", \
              download \"download!: i64\", \
