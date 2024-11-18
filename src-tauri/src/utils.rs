@@ -1250,12 +1250,12 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                 .await
                 .clone()
                 .iter()
-                .find(|x| {
-                    x.location_id == *&location.id && x.connection_type == ConnectionType::Location
+                .find(|&x| {
+                    x.location_id == location.id && x.connection_type == ConnectionType::Location
                 }) {
                 Some(active_connection) => {
                     debug!("Verifying connection to location {location}");
-                    trace!("Verifying connection {:?}", active_connection);
+                    trace!("Verifying connection {active_connection:?}");
                     let payload = DeadConnDroppedOut {
                         con_type: ConnectionType::Location,
                         id: location.id,
@@ -1328,8 +1328,8 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                 .await
                 .clone()
                 .iter()
-                .find(|x| {
-                    x.location_id == *&tunnel.id && x.connection_type == ConnectionType::Tunnel
+                .find(|&x| {
+                    x.location_id == tunnel.id && x.connection_type == ConnectionType::Tunnel
                 }) {
                 Some(active_connection) => {
                     trace!("Verifying connection {:?}", active_connection);
