@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 use database::models::NoId;
 use serde::{Deserialize, Serialize};
+pub mod app_config;
 pub mod appstate;
 pub mod commands;
 pub mod database;

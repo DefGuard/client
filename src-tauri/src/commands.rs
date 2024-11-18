@@ -12,18 +12,16 @@ use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
 use crate::{
+    app_config::{self, AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
-        models::{
-            instance::InstanceInfo, location_stats::LocationStats, settings::SettingsPatch, Id,
-            NoId,
-        },
-        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Settings, Tunnel,
-        TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
+        models::{instance::InstanceInfo, location_stats::LocationStats, Id, NoId},
+        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Tunnel, TunnelConnection,
+        TunnelConnectionInfo, TunnelStats, WireguardKeys,
     },
     enterprise::periodic::config::poll_instance,
     error::Error,
-    events::{CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
+    events::{CONFIG_CHANGED, CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
@@ -861,38 +859,6 @@ pub async fn update_location_routing(
 }
 
 #[tauri::command(async)]
-pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
-    let app_state = handle.state::<AppState>();
-    let settings = Settings::get(&app_state.get_pool()).await?;
-    Ok(settings)
-}
-
-#[tauri::command(async)]
-pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
-    debug!("Updating settings");
-    let app_state = handle.state::<AppState>();
-    let pool = &app_state.get_pool();
-    trace!("Pool received");
-    let mut settings = Settings::get(pool).await?;
-    trace!("Settings read from table");
-    settings.apply(data);
-    debug!("Saving settings");
-    settings.save(pool).await?;
-    debug!("Settings saved, resetting the tray icon.");
-    match configure_tray_icon(&handle, &settings.tray_icon_theme) {
-        Ok(()) => {}
-        Err(e) => {
-            error!(
-                "Tray configuration update failed during settings update. err : {}",
-                e.to_string()
-            );
-        }
-    }
-    debug!("Tray icon reset.");
-    Ok(settings)
-}
-
-#[tauri::command(async)]
 pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance with ID {instance_id}");
     let app_state = handle.state::<AppState>();
@@ -921,7 +887,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
                 endpoint: location.endpoint.clone(),
             };
             client.remove_interface(request).await.map_err(|status| {
-                    error!("Error occured while removing interface {} for location {location}, status: {status}", connection.interface_name);
+                    error!("Error occurred while removing interface {} for location {location}, status: {status}", connection.interface_name);
                     Error::InternalError(format!(
                         "There was an error while removing interface for location {location}, error message: {}. Check logs for more details.", status.message()
                     ))
@@ -1066,11 +1032,11 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
             .remove_interface(request)
             .await
             .map_err(|status| {
-                error!("An error occured while removing interface {} for tunnel {tunnel}, status: {status}",
+                error!("An error occurred while removing interface {} for tunnel {tunnel}, status: {status}",
                 connection.interface_name);
                 Error::InternalError(
                     format!(
-                        "An error occured while removing interface {} for tunnel {tunnel}, error message: {}. Check logs for more details.", connection.interface_name, status.message()
+                        "An error occurred while removing interface {} for tunnel {tunnel}, error message: {}. Check logs for more details.", connection.interface_name, status.message()
                     )
                 )
             })?;
@@ -1143,4 +1109,68 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         error!("Failed to fetch latest application version {err}");
         Err(Error::CommandError(err.to_string()))
     }
+}
+
+#[tauri::command(async)]
+pub async fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
+    match app_state.app_config.lock() {
+        Ok(res) => {
+            debug!("Config retrieved from sate successfully");
+            Ok(res.clone())
+        }
+        Err(e) => {
+            error!(
+                "Failed to lock app config during get app config command. Reason: {}",
+                e.to_string()
+            );
+            Err(Error::StateLockFail)
+        }
+    }
+}
+
+#[tauri::command(async)]
+pub async fn command_set_app_config(
+    config_patch: AppConfigPatch,
+    app_handle: AppHandle,
+) -> Result<(), Error> {
+    let app_state: State<AppState> = app_handle.state();
+    debug!("Command set app config received.");
+    trace!("Command payload: {config_patch:?}");
+    let mut app_config = match app_state.app_config.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            error!(
+                "Failed to lock app config during set app config command. Reason: {}",
+                e.to_string()
+            );
+            return Err(Error::StateLockFail);
+        }
+    };
+    let tray_changed = config_patch.tray_theme.clone();
+    app_config.apply(config_patch);
+    app_config.save(&app_handle);
+    info!("Config changed successfully");
+    if let Some(_) = tray_changed {
+        debug!("Tray theme included in config change, tray will be updated.");
+        match configure_tray_icon(&app_handle, &app_config.tray_theme) {
+            Ok(_) => {
+                debug!("Tray updated upon config change");
+            }
+            Err(e) => {
+                error!("Tray change failed. Reason: {}", e.to_string());
+            }
+        }
+    }
+    match app_handle.emit_all(CONFIG_CHANGED, {}) {
+        Ok(_) => {
+            debug!("Config changed event emitted successfully");
+        }
+        Err(e) => {
+            error!(
+                "Emission of config changed event failed. Reason: {}",
+                e.to_string()
+            );
+        }
+    }
+    Ok(())
 }

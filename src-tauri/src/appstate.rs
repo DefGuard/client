@@ -9,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 use crate::{
+    app_config::AppConfig,
     database::{models::Id, ActiveConnection, DbPool, Instance, Location},
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
@@ -22,23 +23,19 @@ pub struct AppState {
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
     pub client: DesktopDaemonServiceClient<Channel>,
     pub log_watchers: Arc<std::sync::Mutex<HashMap<String, CancellationToken>>>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub app_config: Arc<std::sync::Mutex<AppConfig>>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(app_handle: &AppHandle) -> Self {
         let client = setup_client().expect("Failed to setup gRPC client");
         AppState {
             db: Arc::new(std::sync::Mutex::new(None)),
             active_connections: Arc::new(Mutex::new(Vec::new())),
             client,
             log_watchers: Arc::new(std::sync::Mutex::new(HashMap::new())),
+            app_config: Arc::new(std::sync::Mutex::new(AppConfig::new(app_handle))),
         }
     }
 

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api';
 import { InvokeArgs } from '@tauri-apps/api/tauri';
-import pTimeout from 'p-timeout';
+import pTimeout, { TimeoutError } from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
 import { NewApplicationVersionInfo } from '../../../shared/hooks/api/types';
@@ -23,7 +23,7 @@ import {
   StatsRequest,
   TauriCommandKey,
   TunnelRequest,
-  UpdateInstnaceRequest,
+  UpdateInstanceRequest,
 } from './types';
 
 // Streamlines logging for invokes
@@ -40,9 +40,15 @@ async function invokeWrapper<T>(
     debug(`Invoke ${command} completed on the frontend`);
     trace(`${command} completed with data: ${JSON.stringify(res)}`);
     return res;
+    // TODO: handle more error types ?
   } catch (e) {
-    error(`Invoking ${command} FAILED\n${JSON.stringify(e)}`);
-    return Promise.reject(e);
+    let message: string = `Invoking command ${command} failed due to unknown error: ${JSON.stringify(e)}`;
+    trace(message);
+    if (e instanceof TimeoutError) {
+      message = `Invoking command ${command} timeout out after ${timeout / 1000} seconds`;
+    }
+    error(message);
+    return Promise.reject(message);
   }
 }
 
@@ -85,7 +91,7 @@ const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
 const deleteInstance = async (id: number): Promise<void> =>
   invokeWrapper('delete_instance', { instanceId: id });
 
-const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
+const updateInstance = async (data: UpdateInstanceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
 
 const parseTunnelConfig = async (config: string) =>

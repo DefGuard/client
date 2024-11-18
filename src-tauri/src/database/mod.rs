@@ -7,7 +7,6 @@ pub use models::{
     instance::{Instance, InstanceInfo},
     location::Location,
     location_stats::LocationStats,
-    settings::{Settings, SettingsLogLevel, SettingsTheme, TrayIconTheme},
     tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
     wireguard_keys::WireguardKeys,
 };
@@ -27,7 +26,6 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
     debug!("Running database migrations, if there are any.");
     sqlx::migrate!().run(&pool).await?;
     debug!("Applied all database migrations that were pending. If any.");
-    Settings::init_defaults(&pool).await?;
     Ok(pool)
 }
 

@@ -43,6 +43,8 @@ pub enum Error {
     CoreNotEnterprise,
     #[error("Instance has no config polling token")]
     NoToken,
+    #[error("Failed to lock app state member.")]
+    StateLockFail,
 }
 
 // we must manually implement serde::Serialize

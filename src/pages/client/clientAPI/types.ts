@@ -29,7 +29,7 @@ export type SaveConfigRequest = {
   response: CreateDeviceResponse;
 };
 
-export type UpdateInstnaceRequest = {
+export type UpdateInstanceRequest = {
   instanceId: number;
   response: CreateDeviceResponse;
 };
