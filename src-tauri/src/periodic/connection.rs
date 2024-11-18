@@ -1,16 +1,15 @@
 use std::time::Duration;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use serde::Serialize;
-use tauri::{api::notification::Notification, AppHandle, Manager};
+use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
 use crate::{
     appstate::AppState,
-    commands::{connect, disconnect, get_aggregation},
+    commands::{connect, disconnect},
     database::{Location, LocationStats, Tunnel, TunnelStats},
     error::Error,
-    events::DEAD_CONNECTION_DROPPED,
+    events::DeadConnDroppedOut,
     ConnectionType,
 };
 
@@ -19,14 +18,6 @@ const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(30);
 //TODO: retrieve from location config
 // keep it above 200 cuz WG sometimes goes as high as 190 even if interval is set at 25
 const PER_DROP_PERIOD: TimeDelta = TimeDelta::seconds(300);
-
-/// Used as payload for [`DEAD_CONNECTION_DROPPED`] event
-#[derive(Serialize, Clone, Debug)]
-struct DeadConOut {
-    id: i64,
-    con_type: ConnectionType,
-    interface_name: String,
-}
 
 /// Returns true if connection is valid
 fn check_last_active_connection(
@@ -49,29 +40,6 @@ fn check_last_active_connection(
     true
 }
 
-fn handle_disconnect_effects(app_handle: &AppHandle, payload: DeadConOut) {
-    trace!("{} Event payload: {:?}", DEAD_CONNECTION_DROPPED, payload);
-    if let Err(e) = app_handle.emit_all(DEAD_CONNECTION_DROPPED, &payload) {
-        warn!(
-            "Connection verification: Dead connection dropped event emit failed. Reason: {}",
-            e.to_string()
-        );
-    }
-    if let Err(e) = Notification::new(&app_handle.config().tauri.bundle.identifier)
-        .title(format!(
-            "{} {} disconnected.",
-            payload.con_type, payload.interface_name
-        ))
-        .body("Interface was disconnected.")
-        .show()
-    {
-        warn!(
-            "System notification for disconnect was not shown. Reason: {}",
-            e.to_string()
-        );
-    }
-}
-
 async fn reconnect(
     con_id: i64,
     con_interface_name: &str,
@@ -88,12 +56,13 @@ async fn reconnect(
                 }
                 Err(e) => {
                     error!("Reconnect attempt failed, disconnect succeeded but connect failed. Reason: {}", e.to_string());
-                    let payload = DeadConOut {
-                        con_type,
+                    let payload = DeadConnDroppedOut {
                         id: con_id,
-                        interface_name: con_interface_name.into(),
+                        name: con_interface_name.to_string(),
+                        con_type,
+                        reason: crate::events::DeadConDroppedOutReason::PeriodicVerification,
                     };
-                    handle_disconnect_effects(app_handle, payload);
+                    payload.emit(app_handle);
                 }
             }
         }
@@ -117,12 +86,13 @@ async fn disconnect_dead_connection(
     match disconnect(con_id, con_type, app_handle.clone()).await {
         Ok(_) => {
             info!("Connection verification: interface {}, {}({}): disconnected due to lack of handshake within expected time window.", con_interface_name, con_type, con_id);
-            let out: DeadConOut = DeadConOut {
-                id: con_id,
-                interface_name: con_interface_name.to_string(),
+            let event_payload = DeadConnDroppedOut {
                 con_type,
+                id: con_id,
+                name: con_interface_name.to_string(),
+                reason: crate::events::DeadConDroppedOutReason::PeriodicVerification,
             };
-            handle_disconnect_effects(&app_handle, out);
+            event_payload.emit(&app_handle);
         }
         Err(e) => {
             error!(
@@ -151,129 +121,147 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
         // check every current active connection
         for con in connections.iter() {
             trace!("Connection: {:?}", con);
-            let from = con.start;
-            let aggregation = get_aggregation(from)?;
             match con.connection_type {
                 crate::ConnectionType::Location => {
-                    let stats = LocationStats::all_by_location_id(
-                        db_pool,
-                        con.location_id,
-                        &from,
-                        &aggregation,
-                        Some(1),
-                    )
-                    .await?;
-                    if let Some(latest_stat) = stats.first() {
-                        trace!(
-                            "Latest stat for checked location connection: {:?}",
-                            latest_stat
-                        );
-                        if !check_last_active_connection(
-                            latest_stat.persistent_keepalive_interval,
-                            latest_stat.last_handshake,
-                        ) {
-                            match Location::find_by_id(db_pool, con.location_id).await {
-                                Ok(Some(location)) => {
-                                    // only try to reconnect when location is not protected behind MFA
-                                    match location.mfa_enabled {
-                                        true => {
-                                            warn!("Automatic reconnect for location {}({}) is not possible due to enabled MFA. Interface will be disconnected.", location.name, location.id);
-                                            disconnect_dead_connection(
-                                                latest_stat.location_id,
-                                                &con.interface_name,
-                                                app_handle.clone(),
-                                                ConnectionType::Location,
-                                            )
-                                            .await;
-                                        }
-                                        false => {
-                                            reconnect(
-                                                location.id,
-                                                &location.name,
-                                                &app_handle,
-                                                ConnectionType::Location,
-                                            )
-                                            .await;
+                    match LocationStats::latest_by_location_id(db_pool, con.location_id).await {
+                        Ok(Some(latest_stat)) => {
+                            trace!(
+                                "Latest stat for checked location connection: {:?}",
+                                latest_stat
+                            );
+                            if !check_last_active_connection(
+                                latest_stat.persistent_keepalive_interval,
+                                latest_stat.last_handshake,
+                            ) {
+                                match Location::find_by_id(db_pool, con.location_id).await {
+                                    Ok(Some(location)) => {
+                                        // only try to reconnect when location is not protected behind MFA
+                                        match location.mfa_enabled {
+                                            true => {
+                                                warn!("Automatic reconnect for location {}({}) is not possible due to enabled MFA. Interface will be disconnected.", location.name, location.id);
+                                                disconnect_dead_connection(
+                                                    latest_stat.location_id,
+                                                    &con.interface_name,
+                                                    app_handle.clone(),
+                                                    ConnectionType::Location,
+                                                )
+                                                .await;
+                                            }
+                                            false => {
+                                                reconnect(
+                                                    location.id,
+                                                    &location.name,
+                                                    &app_handle,
+                                                    ConnectionType::Location,
+                                                )
+                                                .await;
+                                            }
                                         }
                                     }
-                                }
-                                Ok(None) => {
-                                    warn!("Attempt to reconnect the location {}({}) cannot be made, as location was not found in the database, connection will be dropped instead.", con.interface_name, con.location_id);
-                                    disconnect_dead_connection(
-                                        con.location_id,
-                                        &con.interface_name,
-                                        app_handle.clone(),
-                                        con.connection_type,
-                                    )
-                                    .await;
-                                }
-                                Err(e) => {
-                                    warn!("Could not retrieve location {}({}) because of a database error. Automatic reconnection cannot be done, interface will be disconnected. Error details: {}", con.interface_name, con.location_id, e.to_string());
-                                    disconnect_dead_connection(
-                                        latest_stat.location_id,
-                                        &con.interface_name,
-                                        app_handle.clone(),
-                                        ConnectionType::Location,
-                                    )
-                                    .await;
+                                    Ok(None) => {
+                                        warn!("Attempt to reconnect the location {}({}) cannot be made, as location was not found in the database, connection will be dropped instead.", con.interface_name, con.location_id);
+                                        disconnect_dead_connection(
+                                            con.location_id,
+                                            &con.interface_name,
+                                            app_handle.clone(),
+                                            con.connection_type,
+                                        )
+                                        .await;
+                                    }
+                                    Err(e) => {
+                                        warn!("Could not retrieve location {}({}) because of a database error. Automatic reconnection cannot be done, interface will be disconnected. Error details: {}", con.interface_name, con.location_id, e.to_string());
+                                        disconnect_dead_connection(
+                                            latest_stat.location_id,
+                                            &con.interface_name,
+                                            app_handle.clone(),
+                                            ConnectionType::Location,
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        warn!(
-                            "Unable to check connection for location {}({}), due to absence of stats.",
-                            con.interface_name, con.location_id
-                        );
+                        Ok(None) => {
+                            error!(
+                                "Location not found in DB for active connection {} {}({})",
+                                con.connection_type, con.interface_name, con.location_id
+                            );
+                            disconnect_dead_connection(
+                                con.location_id,
+                                &con.interface_name,
+                                app_handle.clone(),
+                                ConnectionType::Location,
+                            )
+                            .await;
+                        }
+                        Err(e) => {
+                            warn!("Verification for location {}({}) skipped due to db error. Error: {}", con.interface_name, con.location_id, e.to_string());
+                        }
                     }
                 }
                 crate::ConnectionType::Tunnel => {
-                    let stats = TunnelStats::all_by_tunnel_id(
-                        db_pool,
-                        con.location_id,
-                        &from,
-                        &aggregation,
-                    )
-                    .await?;
-                    if let Some(latest_stat) = stats.first() {
-                        trace!("Latest stat for checked tunnel: {:?}", latest_stat);
-                        if !check_last_active_connection(
-                            latest_stat.persistent_keepalive_interval,
-                            latest_stat.last_handshake,
-                        ) {
-                            match Tunnel::find_by_id(db_pool, con.location_id).await {
-                                Ok(Some(tunnel)) => {
-                                    reconnect(
-                                        tunnel.id,
-                                        &tunnel.name,
-                                        &app_handle,
-                                        ConnectionType::Tunnel,
-                                    )
-                                    .await;
-                                }
-                                Ok(None) => {
-                                    warn!("Attempt to reconnect the tunnel {}({}) cannot be made, as the tunnel was not found in the database. Connection will be dropped instead.", con.interface_name, con.location_id);
-                                    disconnect_dead_connection(
-                                        con.location_id,
-                                        &con.interface_name,
-                                        app_handle.clone(),
-                                        con.connection_type,
-                                    )
-                                    .await;
-                                }
-                                Err(e) => {
-                                    warn!("Attempt to reconnect the tunnel {}({}) cannot be made, because of a database error. Error details: {} , connection will be dropped instead.", con.interface_name, con.location_id, e.to_string());
-                                    disconnect_dead_connection(
-                                        con.location_id,
-                                        &con.interface_name,
-                                        app_handle.clone(),
-                                        con.connection_type,
-                                    )
-                                    .await;
+                    match TunnelStats::latest_by_tunnel_id(db_pool, con.location_id).await {
+                        Ok(Some(latest_stat)) => {
+                            trace!("Latest stat for checked tunnel: {:?}", latest_stat);
+                            if !check_last_active_connection(
+                                latest_stat.persistent_keepalive_interval,
+                                latest_stat.last_handshake,
+                            ) {
+                                match Tunnel::find_by_id(db_pool, con.location_id).await {
+                                    Ok(Some(tunnel)) => {
+                                        reconnect(
+                                            tunnel.id,
+                                            &tunnel.name,
+                                            &app_handle,
+                                            ConnectionType::Tunnel,
+                                        )
+                                        .await;
+                                    }
+                                    Ok(None) => {
+                                        warn!("Attempt to reconnect the tunnel {}({}) cannot be made, as the tunnel was not found in the database. Connection will be dropped instead.", con.interface_name, con.location_id);
+                                        disconnect_dead_connection(
+                                            con.location_id,
+                                            &con.interface_name,
+                                            app_handle.clone(),
+                                            con.connection_type,
+                                        )
+                                        .await;
+                                    }
+                                    Err(e) => {
+                                        warn!("Attempt to reconnect the tunnel {}({}) cannot be made, because of a database error. Error details: {} , connection will be dropped instead.", con.interface_name, con.location_id, e.to_string());
+                                        disconnect_dead_connection(
+                                            con.location_id,
+                                            &con.interface_name,
+                                            app_handle.clone(),
+                                            con.connection_type,
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        warn!("Unable to check connection for tunnel {}({}), due to absence of stats.", con.interface_name, con.location_id);
+                        Ok(None) => {
+                            error!(
+                                "Tunnel not found in db for active connection Tunnel {}({})",
+                                con.interface_name, con.location_id
+                            );
+                            disconnect_dead_connection(
+                                con.location_id,
+                                &con.interface_name,
+                                app_handle.clone(),
+                                ConnectionType::Tunnel,
+                            )
+                            .await;
+                        }
+
+                        Err(e) => {
+                            warn!(
+                                "Verification for tunnel {}({}) skipped due to db error. Error: {}",
+                                con.interface_name,
+                                con.location_id,
+                                e.to_string()
+                            );
+                        }
                     }
                 }
             }

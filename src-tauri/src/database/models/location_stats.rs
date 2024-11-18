@@ -178,4 +178,31 @@ impl LocationStats<Id> {
         .await?;
         Ok(stats)
     }
+
+    pub async fn latest_by_location_id<'e, E>(
+        executor: E,
+        location_id: Id,
+    ) -> Result<Option<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let res = query_as!(
+            LocationStats::<i64>,
+            "SELECT id, location_id, \
+             upload \"upload!: i64\", \
+             download \"download!: i64\", \
+             last_handshake, \
+             collected_at \"collected_at!: NaiveDateTime\", \
+             listen_port \"listen_port!: u32\",
+             persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+             FROM location_stats \
+             WHERE location_id=$1 \
+             ORDER BY last_handshake DESC \
+             LIMIT 1",
+            location_id
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(res)
+    }
 }

@@ -357,6 +357,34 @@ impl TunnelStats<Id> {
         .await?;
         Ok(stats)
     }
+
+    pub async fn latest_by_tunnel_id<'e, E>(
+        executor: E,
+        tunnel_id: Id,
+    ) -> Result<Option<Self>, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let res = query_as!(
+            TunnelStats::<i64>,
+            "SELECT id, tunnel_id, \
+           upload \"upload!: i64\", \
+           download \"download!: i64\", \
+           last_handshake, \
+           collected_at \"collected_at!: NaiveDateTime\", \
+           listen_port \"listen_port!: u32\", \
+           persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+           FROM tunnel_stats \
+           WHERE tunnel_id=$1 
+           ORDER BY last_handshake DESC \
+           LIMIT 1
+           ",
+            tunnel_id
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(res)
+    }
 }
 
 pub async fn peer_to_tunnel_stats<'e, E>(

@@ -3,8 +3,10 @@ use std::{
     path::Path,
     process::Command,
     str::FromStr,
+    thread::panicking,
 };
 
+use chrono::Utc;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use local_ip_address::local_ip;
 use sqlx::query;
@@ -14,13 +16,14 @@ use tracing::Level;
 
 use crate::{
     appstate::AppState,
-    commands::{LocationInterfaceDetails, Payload},
+    commands::{active_connection, disconnect, LocationInterfaceDetails, Payload},
     database::{
         models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
-        ActiveConnection, Connection, DbPool, Location, Tunnel, TunnelConnection, WireguardKeys,
+        ActiveConnection, Connection, DbPool, Location, LocationStats, Tunnel, TunnelConnection,
+        TunnelStats, WireguardKeys,
     },
     error::Error,
-    events::CONNECTION_CHANGED,
+    events::{DeadConnDroppedOut, CONNECTION_CHANGED},
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     service::proto::{
         desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
@@ -615,7 +618,7 @@ pub async fn handle_connection_for_location(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
-    let state = handle.state::<AppState>();
+    let state: tauri::State<'_, AppState> = handle.state::<AppState>();
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
     #[cfg(not(target_os = "macos"))]
@@ -1207,4 +1210,183 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
     debug!("Active connections synchronized with the system state");
 
     Ok(())
+}
+
+pub enum ConnectionToVerify {
+    Location(Location<i64>),
+    Tunnel(Tunnel<i64>),
+}
+
+static CONNECTION_EXPECTED_INIT_TIME: std::time::Duration = std::time::Duration::from_secs(5);
+
+pub fn is_connection_alive(connection_start: &chrono::NaiveDateTime, last_handshake: i64) -> bool {
+    if let Some(handshake) = chrono::DateTime::from_timestamp(last_handshake, 0) {
+        let datetime_start =
+            chrono::DateTime::<Utc>::from_naive_utc_and_offset(*connection_start, Utc);
+        let res = handshake >= datetime_start;
+        trace!("Check for connection, start: {datetime_start}, last handshake: {handshake}, check result: {res}");
+        return res;
+    }
+    error!(
+        "Connection will be considered as dead because conversion of handshake to DateTime failed."
+    );
+    trace!("start: {connection_start}, last handshake: {last_handshake}");
+    false
+}
+
+/// Verify if made connection is actually alive after being optimistically connected.
+/// This works by checking if any handshake was made after connecting, within specified time window.
+// TODO: put the verification time into UI Settings
+pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVerify) {
+    tokio::time::sleep(CONNECTION_EXPECTED_INIT_TIME).await;
+    debug!("Connection verification task finished sleeping");
+    let state: tauri::State<AppState> = app_handle.state();
+    let db_pool = &state.get_pool();
+
+    match connection {
+        ConnectionToVerify::Location(location) => {
+            match state
+                .active_connections
+                .lock()
+                .await
+                .clone()
+                .iter()
+                .find(|x| {
+                    x.location_id == *&location.id && x.connection_type == ConnectionType::Location
+                }) {
+                Some(active_connection) => {
+                    debug!("Verifying connection to location {location}");
+                    trace!("Verifying connection {:?}", active_connection);
+                    let payload = DeadConnDroppedOut {
+                        con_type: ConnectionType::Location,
+                        id: location.id,
+                        name: location.name.to_string(),
+                        reason: crate::events::DeadConDroppedOutReason::ConnectionVerification,
+                    };
+                    match LocationStats::latest_by_location_id(db_pool, location.id).await {
+                        Ok(Some(latest_stat)) => {
+                            if !is_connection_alive(
+                                &active_connection.start,
+                                latest_stat.last_handshake,
+                            ) {
+                                info!("Connected location {location} will be disconnected due to lack of handshake within {} seconds.", CONNECTION_EXPECTED_INIT_TIME.as_secs());
+                                match disconnect(
+                                    location.id,
+                                    ConnectionType::Location,
+                                    app_handle.clone(),
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        payload.emit(&app_handle);
+                                    }
+                                    Err(e) => {
+                                        error!(
+                                            "Failed to disconnect location {location}. Error: {}",
+                                            e.to_string()
+                                        );
+                                    }
+                                }
+                            } else {
+                                info!("Active connection for location {location} verified successfully.");
+                            }
+                        }
+                        Ok(None) => {
+                            info!("Connected location {location} will be disconnected due to lack of statistics within {} seconds.", CONNECTION_EXPECTED_INIT_TIME.as_secs());
+                            match disconnect(
+                                location.id,
+                                ConnectionType::Location,
+                                app_handle.clone(),
+                            )
+                            .await
+                            {
+                                Ok(_) => {
+                                    payload.emit(&app_handle);
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Failed to disconnect location {location}. Error: {}",
+                                        e.to_string()
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Connection verification for location {location} Failed during retrieval of stats. Error: {}", e.to_string());
+                        }
+                    }
+                }
+                None => {
+                    error!("Connection verification for location {location} failed. Active connection in appstate not found.")
+                }
+            }
+        }
+        ConnectionToVerify::Tunnel(tunnel) => {
+            debug!("Verifying connection to tunnel {tunnel}");
+            match state
+                .active_connections
+                .lock()
+                .await
+                .clone()
+                .iter()
+                .find(|x| {
+                    x.location_id == *&tunnel.id && x.connection_type == ConnectionType::Tunnel
+                }) {
+                Some(active_connection) => {
+                    trace!("Verifying connection {:?}", active_connection);
+                    let payload = DeadConnDroppedOut {
+                        con_type: ConnectionType::Tunnel,
+                        id: tunnel.id,
+                        name: tunnel.name.to_string(),
+                        reason: crate::events::DeadConDroppedOutReason::ConnectionVerification,
+                    };
+                    match TunnelStats::latest_by_tunnel_id(db_pool, tunnel.id).await {
+                        Ok(Some(latest_stat)) => {
+                            if !is_connection_alive(
+                                &active_connection.start,
+                                latest_stat.last_handshake,
+                            ) {
+                                info!("Tunnel {tunnel} will be disconnected due to lack of handshake within specified time.");
+                                match disconnect(
+                                    tunnel.id,
+                                    ConnectionType::Tunnel,
+                                    app_handle.clone(),
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        payload.emit(&app_handle);
+                                    }
+                                    Err(e) => {
+                                        error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {}", e.to_string());
+                                    }
+                                }
+                            } else {
+                                info!("Tunnel {tunnel} connection verified successfully.");
+                            }
+                        }
+                        Ok(None) => {
+                            info!("Tunnel {tunnel} will be disconnected due to lack of stats in specified time.");
+                            match disconnect(tunnel.id, ConnectionType::Tunnel, app_handle.clone())
+                                .await
+                            {
+                                Ok(_) => {
+                                    payload.emit(&app_handle);
+                                }
+                                Err(e) => {
+                                    error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {}", e.to_string());
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Connection verification for tunnel {tunnel} failed during retrieval of stats. Reason: {}", e.to_string());
+                        }
+                    }
+                }
+                None => {
+                    error!("Connection verification for tunnel {tunnel} failed. Active connection not found.");
+                }
+            }
+        }
+    }
 }
