@@ -1,7 +1,6 @@
 import './style.scss';
 
 import { useMutation } from '@tanstack/react-query';
-import { show } from '@tauri-apps/api/app';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
