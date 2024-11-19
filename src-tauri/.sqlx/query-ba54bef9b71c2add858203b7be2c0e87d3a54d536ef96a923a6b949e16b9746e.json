@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE location SET route_all_traffic = 0 WHERE instance_id = $1;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ba54bef9b71c2add858203b7be2c0e87d3a54d536ef96a923a6b949e16b9746e"
+}

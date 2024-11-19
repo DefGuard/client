@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, location_id, connected_from, start, end FROM connection WHERE location_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "location_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "connected_from",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "start",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "end",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7f83ec88f699dd2d15e40dfb023a60be3da33c4d1ca49e56b08154aa2ad7b8a0"
+}

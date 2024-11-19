@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO connection (location_id, connected_from, start, end) VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "db41fbabf52faec38ccb768a01a56df117d179fb4e52dfb9d5ff5be9b41518d8"
+}
