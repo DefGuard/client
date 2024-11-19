@@ -33,7 +33,7 @@ fn get_config_file(app: &AppHandle, for_write: bool) -> File {
         .expect("Failed to create and open app config.")
 }
 
-#[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Display, EnumString, PartialEq, Serialize)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AppTheme {
@@ -41,18 +41,7 @@ pub enum AppTheme {
     Dark,
 }
 
-#[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq)]
-#[strum(serialize_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
-pub enum AppLogLevel {
-    Error,
-    Info,
-    Debug,
-    Trace,
-    Warn,
-}
-
-#[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq, AsRefStr)]
+#[derive(AsRefStr, Debug, Clone, Deserialize, Display, EnumString, Serialize, PartialEq)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AppTrayTheme {
@@ -62,28 +51,16 @@ pub enum AppTrayTheme {
     Gray,
 }
 
-impl Into<LevelFilter> for AppLogLevel {
-    fn into(self) -> LevelFilter {
-        match self {
-            AppLogLevel::Debug => LevelFilter::Debug,
-            AppLogLevel::Error => LevelFilter::Error,
-            AppLogLevel::Info => LevelFilter::Info,
-            AppLogLevel::Trace => LevelFilter::Trace,
-            AppLogLevel::Warn => LevelFilter::Warn,
-        }
-    }
-}
-
 // config stored in config.json in app data
 // config is loaded once at startup and saved when modified to the app data file
 // information's needed at startup of the application.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, Patch)]
+#[derive(Clone, Debug, Deserialize, Patch, Serialize)]
 #[patch(attribute(derive(Debug, Deserialize, Serialize)))]
 pub struct AppConfig {
     pub theme: AppTheme,
     pub tray_theme: AppTrayTheme,
     pub check_for_updates: bool,
-    pub log_level: AppLogLevel,
+    pub log_level: LevelFilter,
     /// In seconds. How much time should client wait after connecting for the first handshake.
     pub connection_verification_time: u32,
     /// In seconds. How much time can be between handshakes before connection is automatically dropped.
@@ -97,7 +74,7 @@ impl Default for AppConfig {
             theme: AppTheme::Light,
             check_for_updates: true,
             tray_theme: AppTrayTheme::Color,
-            log_level: AppLogLevel::Info,
+            log_level: LevelFilter::Info,
             connection_verification_time: 10,
             peer_alive_period: 300,
         }
@@ -106,6 +83,7 @@ impl Default for AppConfig {
 
 impl AppConfig {
     /// Will try to load from app data dir file and if fails will return default config
+    #[must_use]
     pub fn new(app: &AppHandle) -> Self {
         let config_path = get_config_file_path(app);
         if !config_path.exists() {
@@ -135,7 +113,7 @@ impl AppConfig {
 
     /// Saves currently loaded AppConfig into app data dir file.
     /// Warning: this will always overwrite file contents.
-    pub fn save(self, app: &AppHandle) {
+    pub fn save(&self, app: &AppHandle) {
         let file = get_config_file(app, true);
         match serde_json::to_writer(file, &self) {
             Ok(()) => debug!("Application configuration file has been saved."),

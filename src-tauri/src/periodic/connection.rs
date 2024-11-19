@@ -105,13 +105,12 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
         sleep(INTERVAL_IN_SECONDS).await;
         let connections = app_state.active_connections.lock().await.clone();
         let connection_count = connections.len();
-        if connection_count > 0 {
-        } else {
+        if connection_count <= 0 {
             debug!("Connections verification skipped, no active connections found, task will wait for next {} seconds", INTERVAL_IN_SECONDS.as_secs());
         }
         // check every current active connection
-        for con in connections.iter() {
-            trace!("Connection: {:?}", con);
+        for con in &connections {
+            trace!("Connection: {con:?}");
             match con.connection_type {
                 crate::ConnectionType::Location => {
                     match LocationStats::latest_by_location_id(db_pool, con.location_id).await {
@@ -120,12 +119,8 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 "Latest stat for checked location connection: {:?}",
                                 latest_stat
                             );
-                            let peer_alive_period = app_state
-                                .app_config
-                                .lock()
-                                .unwrap()
-                                .peer_alive_period
-                                .clone();
+                            let peer_alive_period =
+                                app_state.app_config.lock().unwrap().peer_alive_period;
                             if !check_last_active_connection(
                                 latest_stat.last_handshake,
                                 peer_alive_period,
@@ -200,12 +195,8 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                     match TunnelStats::latest_by_tunnel_id(db_pool, con.location_id).await {
                         Ok(Some(latest_stat)) => {
                             trace!("Latest stat for checked tunnel: {:?}", latest_stat);
-                            let peer_alive_period = app_state
-                                .app_config
-                                .lock()
-                                .unwrap()
-                                .peer_alive_period
-                                .clone();
+                            let peer_alive_period =
+                                app_state.app_config.lock().unwrap().peer_alive_period;
                             if !check_last_active_connection(
                                 latest_stat.last_handshake,
                                 peer_alive_period,

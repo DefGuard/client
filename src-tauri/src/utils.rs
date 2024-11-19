@@ -1219,6 +1219,7 @@ pub enum ConnectionToVerify {
 
 static CONNECTION_EXPECTED_INIT_TIME: std::time::Duration = std::time::Duration::from_secs(5);
 
+#[must_use]
 pub fn is_connection_alive(connection_start: &chrono::NaiveDateTime, last_handshake: i64) -> bool {
     if let Some(handshake) = chrono::DateTime::from_timestamp(last_handshake, 0) {
         let datetime_start =
@@ -1245,7 +1246,6 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
             .lock()
             .unwrap()
             .connection_verification_time
-            .clone()
             .into(),
     );
     tokio::time::sleep(wait_time).await;
@@ -1286,7 +1286,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                                 )
                                 .await
                                 {
-                                    Ok(_) => {
+                                    Ok(()) => {
                                         payload.emit(&app_handle);
                                     }
                                     Err(e) => {
@@ -1309,7 +1309,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                             )
                             .await
                             {
-                                Ok(_) => {
+                                Ok(()) => {
                                     payload.emit(&app_handle);
                                 }
                                 Err(e) => {
@@ -1326,7 +1326,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                     }
                 }
                 None => {
-                    error!("Connection verification for location {location} failed. Active connection in appstate not found.")
+                    error!("Connection verification for location {location} failed. Active connection in appstate not found.");
                 }
             }
         }
@@ -1363,7 +1363,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                                 )
                                 .await
                                 {
-                                    Ok(_) => {
+                                    Ok(()) => {
                                         payload.emit(&app_handle);
                                     }
                                     Err(e) => {
@@ -1379,7 +1379,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                             match disconnect(tunnel.id, ConnectionType::Tunnel, app_handle.clone())
                                 .await
                             {
-                                Ok(_) => {
+                                Ok(()) => {
                                     payload.emit(&app_handle);
                                 }
                                 Err(e) => {

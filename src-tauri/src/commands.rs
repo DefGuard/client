@@ -96,7 +96,7 @@ pub async fn connect(
 pub async fn start_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
     let result = spawn_global_log_watcher_task(&handle, tracing::Level::DEBUG).await;
     if let Err(err) = result {
-        error!("Error while spawning the global log watcher task: {}", err)
+        error!("Error while spawning the global log watcher task: {err}");
     }
     Ok(())
 }
@@ -238,7 +238,7 @@ pub async fn save_device_config(
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
     if response.token.is_some() {
-        debug!("The newly saved device config has a polling token, automatic configuration polling will be possible if the core has an enterprise license.")
+        debug!("The newly saved device config has a polling token, automatic configuration polling will be possible if the core has an enterprise license.");
     } else {
         warn!(
             "Missing polling token for instance {}, core and/or proxy services may need an update, configuration polling won't work",

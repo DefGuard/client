@@ -24,7 +24,6 @@ use log::{Level, LevelFilter};
 use tauri::{api::process, Env};
 use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
-use time;
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -120,7 +119,7 @@ async fn main() {
                 app_state.app_config.lock().unwrap().log_level.into();
 
             let log_level: LevelFilter = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
-                Ok(env_value) => match LevelFilter::from_str(&env_value) {
+                Ok(env_value) => match LevelFilter::from_str(env_value) {
                     Ok(res) => res,
                     Err(_) => config_log_level,
                 },
@@ -174,7 +173,7 @@ async fn main() {
                                 return true;
                             }
                             // Otherwise do not log the following targets
-                            for target in LOG_FILTER.iter() {
+                            for target in &LOG_FILTER {
                                 if metadata.target().contains(target) {
                                     return false;
                                 }
