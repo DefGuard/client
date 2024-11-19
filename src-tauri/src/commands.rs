@@ -32,13 +32,13 @@ use crate::{
     utils::{
         disconnect_interface, execute_command, get_location_interface_details,
         get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
-        handle_connection_for_tunnel, verify_connection,
+        handle_connection_for_tunnel, verify_connection, ConnectionToVerify,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, Serialize)]
 pub struct Payload {
     pub message: String,
 }
@@ -65,7 +65,7 @@ pub async fn connect(
             // verify if connection is alive
             tauri::async_runtime::spawn(verify_connection(
                 handle.clone(),
-                crate::utils::ConnectionToVerify::Location(location),
+                ConnectionToVerify::Location(location),
             ));
             debug!("Connection verification task spawned.");
         } else {
@@ -82,7 +82,7 @@ pub async fn connect(
         // verify if connection is alive
         tauri::async_runtime::spawn(verify_connection(
             handle.clone(),
-            crate::utils::ConnectionToVerify::Tunnel(tunnel),
+            ConnectionToVerify::Tunnel(tunnel),
         ));
         debug!("Connection verification task spawned.");
     } else {

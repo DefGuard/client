@@ -359,12 +359,11 @@ impl GlobalLogWatcher {
             .ok_or(LogWatcherError::LogParseError(line.to_string()))?
             .as_str();
 
-        let timestamp = format!("{} {}", timestamp_date, timestamp_time);
+        let timestamp = format!("{timestamp_date} {timestamp_time}");
         let timestamp = Utc.from_utc_datetime(
-            &NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S%.f").map_err(|e| {
+            &NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S%.f").map_err(|err| {
                 LogWatcherError::LogParseError(format!(
-                    "Failed to parse timestamp {} with error: {}",
-                    timestamp, e
+                    "Failed to parse timestamp {timestamp} with error: {err}"
                 ))
             })?,
         );
@@ -375,8 +374,8 @@ impl GlobalLogWatcher {
                 .ok_or(LogWatcherError::LogParseError(line.to_string()))?
                 .as_str(),
         )
-        .map_err(|e| {
-            LogWatcherError::LogParseError(format!("Failed to parse log level with error: {}", e))
+        .map_err(|err| {
+            LogWatcherError::LogParseError(format!("Failed to parse log level with error: {err}"))
         })?;
 
         let target = captures
@@ -438,7 +437,7 @@ pub async fn spawn_global_log_watcher_task(
     // Show logs only from the last hour
     let from = Some(Utc::now() - Duration::from_secs(60 * 60));
 
-    let event_topic = format!("log-update-global");
+    let event_topic = "log-update-global".to_string();
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();

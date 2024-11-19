@@ -39,10 +39,10 @@ async fn reconnect(
 ) {
     debug!("Starting attempt to reconnect {con_interface_name} {con_type}({con_id})...");
     match disconnect(con_id, con_type, app_handle.clone()).await {
-        Ok(_) => {
+        Ok(()) => {
             debug!("Connection for {con_type} {con_interface_name}({con_id}) disconnected successfully in path of reconnection.");
             match connect(con_id, con_type, None, app_handle.clone()).await {
-                Ok(_) => {
+                Ok(()) => {
                     info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.",);
                 }
                 Err(e) => {
@@ -75,7 +75,7 @@ async fn disconnect_dead_connection(
     debug!(
         "Attempting to disconnect dead connection for interface {con_interface_name}, {con_type}: {con_id}");
     match disconnect(con_id, con_type, app_handle.clone()).await {
-        Ok(_) => {
+        Ok(()) => {
             info!("Connection verification: interface {}, {}({}): disconnected due to lack of handshake within expected time window.", con_interface_name, con_type, con_id);
             let event_payload = DeadConnDroppedOut {
                 con_type,

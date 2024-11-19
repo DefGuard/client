@@ -107,9 +107,8 @@ async fn main() {
             let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
         .setup(|app| {
-            let handle = app.app_handle().clone();
             {
-                let state = AppState::new(&handle);
+                let state = AppState::new(&app.app_handle());
                 app.manage(state);
             }
             let app_state: State<AppState> = app.state();
@@ -118,11 +117,8 @@ async fn main() {
             let config_log_level: LevelFilter =
                 app_state.app_config.lock().unwrap().log_level.into();
 
-            let log_level: LevelFilter = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
-                Ok(env_value) => match LevelFilter::from_str(env_value) {
-                    Ok(res) => res,
-                    Err(_) => config_log_level,
-                },
+            let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
+                Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
                 Err(_) => config_log_level,
             };
 
@@ -155,7 +151,7 @@ async fn main() {
                                 return true;
                             }
                             if !LOG_INCLUDES.is_empty() {
-                                for target in LOG_INCLUDES.iter() {
+                                for target in &*LOG_INCLUDES {
                                     if metadata.target().contains(target) {
                                         return true;
                                     }
@@ -191,14 +187,14 @@ async fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    info!("Starting Defguard client version {}", VERSION);
+    info!("Starting Defguard client version {VERSION}");
     // initialize database
     let app_handle = app.handle();
 
     info!(
         "The application data (database file) will be stored in: {:?} \
         and the application logs in: {:?}. Logs of the background defguard service responsible for \
-        managing the VPN connections at the network level will be stored in: {:?}.",
+        managing the VPN connections at the network level will be stored in: {}.",
         // display the path to the app data directory, convert option<pathbuf> to option<&str>
         app_handle
             .path_resolver()
