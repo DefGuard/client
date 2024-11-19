@@ -1,9 +1,11 @@
 import './style.scss';
 
 import { useMutation } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { show } from '@tauri-apps/api/app';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
+import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 import { LabeledCheckbox } from '../../../../../../shared/defguard-ui/components/Layout/LabeledCheckbox/LabeledCheckbox';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
 import {
@@ -14,6 +16,8 @@ import {
 import { ThemeKey } from '../../../../../../shared/defguard-ui/hooks/theme/types';
 import { LogLevel, TrayIconTheme } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
+import { AppConfigConnectionVerificationPeriod } from './components/AppConfigConnectionVerificationPeriod/AppConfigConnectionVerificationPeriod';
+import { AppConfigPeerAlive } from './components/AppConfigPeerAlive/AppConfigPeerAlive';
 
 export const GlobalSettingsTab = () => {
   const { LL } = useI18nContext();
@@ -37,6 +41,24 @@ export const GlobalSettingsTab = () => {
         <h2>{localLL.theme.title()}</h2>
         <ThemeSelect />
       </section>
+      <section>
+        <header>
+          <h2>{localLL.peer_alive.title()}</h2>
+          <Helper initialPlacement="right">
+            <p>{localLL.peer_alive.helper()}</p>
+          </Helper>
+        </header>
+        <AppConfigConnectionVerificationPeriod />
+      </section>
+      <section>
+        <header>
+          <h2>{localLL.connection_verification.title()}</h2>
+          <Helper initialPlacement="right">
+            <p>{localLL.peer_alive.helper()}</p>
+          </Helper>
+        </header>
+        <AppConfigPeerAlive />
+      </section>
     </div>
   );
 };
@@ -44,10 +66,11 @@ export const GlobalSettingsTab = () => {
 const ThemeSelect = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global.theme;
-  const settings = useClientStore((state) => state.settings);
-  const updateClientSettings = useClientStore((state) => state.updateSettings);
+  const appConfig = useClientStore((state) => state.appConfig);
+  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
+
   const { mutate, isPending } = useMutation({
-    mutationFn: updateClientSettings,
+    mutationFn: updateAppConfig,
   });
 
   const options = useMemo((): SelectOption<ThemeKey>[] => {
@@ -87,7 +110,7 @@ const ThemeSelect = () => {
     <Select
       options={options}
       renderSelected={renderSelected}
-      selected={settings.theme}
+      selected={appConfig.theme}
       onChangeSingle={(theme) => mutate({ theme })}
       loading={isPending}
     />
@@ -97,11 +120,12 @@ const ThemeSelect = () => {
 const LoggingLevelSelect = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global.logging;
-  const settings = useClientStore((state) => state.settings);
-  const updateClientSettings = useClientStore((state) => state.updateSettings);
+  const appConfig = useClientStore((state) => state.appConfig);
+  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
+  const [showWarning, setShowWarning] = useState(false);
 
   const { mutate, isPending } = useMutation({
-    mutationFn: updateClientSettings,
+    mutationFn: updateAppConfig,
   });
 
   const loggingOptions = useMemo((): SelectOption<LogLevel>[] => {
@@ -148,25 +172,33 @@ const LoggingLevelSelect = () => {
   );
 
   return (
-    <Select
-      sizeVariant={SelectSizeVariant.STANDARD}
-      options={loggingOptions}
-      renderSelected={renderSelected}
-      selected={settings.log_level}
-      loading={isPending}
-      onChangeSingle={(level) => mutate({ log_level: level })}
-    />
+    <>
+      {showWarning && <p className="warning-message">{localLL.warning()}</p>}
+      <Select
+        sizeVariant={SelectSizeVariant.STANDARD}
+        options={loggingOptions}
+        renderSelected={renderSelected}
+        selected={appConfig.log_level}
+        loading={isPending}
+        onChangeSingle={(level) => {
+          if (!showWarning) {
+            setShowWarning(true);
+          }
+          mutate({ log_level: level });
+        }}
+      />
+    </>
   );
 };
 
 const TrayIconThemeSelect = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
-  const settings = useClientStore((state) => state.settings);
-  const updateClientSettings = useClientStore((state) => state.updateSettings);
+  const appConfig = useClientStore((state) => state.appConfig);
+  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
 
   const { mutate, isPending } = useMutation({
-    mutationFn: updateClientSettings,
+    mutationFn: updateAppConfig,
   });
 
   const trayThemeSelectOptions = useMemo((): SelectOption<TrayIconTheme>[] => {
@@ -212,14 +244,19 @@ const TrayIconThemeSelect = () => {
     [trayThemeSelectOptions],
   );
 
+  useEffect(() => {
+    console.log(appConfig);
+    console.log(appConfig.tray_theme);
+  }, [appConfig]);
+
   return (
     <Select
       sizeVariant={SelectSizeVariant.STANDARD}
       options={trayThemeSelectOptions}
-      selected={settings.tray_icon_theme}
+      selected={appConfig.tray_theme}
       label={localLL.tray.label()}
       renderSelected={renderSelectedTrayTheme}
-      onChangeSingle={(theme) => mutate({ tray_icon_theme: theme })}
+      onChangeSingle={(theme) => mutate({ tray_theme: theme })}
       loading={isPending}
     />
   );
@@ -228,17 +265,17 @@ const TrayIconThemeSelect = () => {
 const CheckForUpdatesOption = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
-  const settings = useClientStore((state) => state.settings);
-  const updateClientSettings = useClientStore((state) => state.updateSettings);
+  const appConfig = useClientStore((state) => state.appConfig);
+  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
   const { mutate, isPending } = useMutation({
-    mutationFn: updateClientSettings,
+    mutationFn: updateAppConfig,
   });
 
   return (
     <LabeledCheckbox
       label={localLL.versionUpdate.checkboxTitle()}
       disabled={isPending}
-      value={settings.check_for_updates}
+      value={appConfig.check_for_updates}
       onChange={(value) => {
         mutate({ check_for_updates: value });
       }}

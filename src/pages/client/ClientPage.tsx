@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../i18n/i18n-react';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
@@ -17,14 +18,14 @@ import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
 import { DeadConDroppedPayload, TauriEventKey } from './types';
 
-const { getInstances, getTunnels } = clientApi;
+const { getInstances, getTunnels, getAppConfig } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
-  const [setInstances, setTunnels] = useClientStore((state) => [
-    state.setInstances,
-    state.setTunnels,
-  ]);
+  const [setInstances, setTunnels, setClientState] = useClientStore(
+    (state) => [state.setInstances, state.setTunnels, state.setState],
+    shallow,
+  );
   const navigate = useNavigate();
   const firstLaunch = useClientFlags((state) => state.firstStart);
   const [listChecked, setListChecked] = useClientStore((state) => [
@@ -42,6 +43,7 @@ export const ClientPage = () => {
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
+
   const { data: tunnels } = useQuery({
     queryFn: getTunnels,
     queryKey: [clientQueryKeys.getTunnels],
@@ -49,7 +51,19 @@ export const ClientPage = () => {
     refetchOnWindowFocus: false,
   });
 
+  const { data: appConfig } = useQuery({
+    queryFn: getAppConfig,
+    queryKey: [clientQueryKeys.getApplicationConfig],
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
+    const appConfigChanged = listen(TauriEventKey.APPLICATION_CONFIG_CHANGED, () => {
+      queryClient.invalidateQueries({
+        queryKey: [clientQueryKeys.getApplicationConfig],
+      });
+    });
     const instanceUpdate = listen(TauriEventKey.INSTANCE_UPDATE, () => {
       const invalidate = [
         clientQueryKeys.getInstances,
@@ -99,7 +113,7 @@ export const ClientPage = () => {
       (data) => {
         toaster.warning(
           LL.common.messages.deadConDropped({
-            interface_name: data.payload.interface_name,
+            interface_name: data.payload.name,
             con_type: data.payload.con_type,
           }),
           {
@@ -116,6 +130,7 @@ export const ClientPage = () => {
       connectionChanged.then((cleanup) => cleanup());
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
+      appConfigChanged.then((c) => c());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -138,6 +153,13 @@ export const ClientPage = () => {
     setListChecked,
     openDeadConDroppedModal,
   ]);
+
+  useEffect(() => {
+    if (appConfig) {
+      setClientState({ appConfig });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appConfig]);
 
   // navigate to carousel on first app Launch
   useEffect(() => {

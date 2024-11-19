@@ -11,7 +11,7 @@ use strum::{AsRefStr, Display, EnumString};
 use tauri::AppHandle;
 use tracing::field::debug;
 
-const APP_CONFIG_NAME: &str = "config.json";
+const APP_CONFIG_FILE_NAME: &str = "config.json";
 
 fn get_config_file_path(app: &AppHandle) -> PathBuf {
     let mut config_file_path = app
@@ -21,7 +21,7 @@ fn get_config_file_path(app: &AppHandle) -> PathBuf {
     if !config_file_path.exists() {
         std::fs::create_dir_all(&config_file_path).expect("Failed to create missing app data dir");
     }
-    config_file_path.push(APP_CONFIG_NAME);
+    config_file_path.push(APP_CONFIG_FILE_NAME);
     config_file_path
 }
 
@@ -43,12 +43,16 @@ fn get_config_file(app: &AppHandle, for_write: bool) -> File {
 }
 
 #[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq)]
+#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum AppTheme {
     Light,
     Dark,
 }
 
 #[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq)]
+#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum AppLogLevel {
     Error,
     Info,
@@ -58,6 +62,8 @@ pub enum AppLogLevel {
 }
 
 #[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq, AsRefStr)]
+#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum AppTrayTheme {
     Color,
     White,
@@ -83,21 +89,26 @@ impl Into<LevelFilter> for AppLogLevel {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Patch)]
 #[patch(attribute(derive(Debug, Serialize, Deserialize)))]
 pub struct AppConfig {
-    pub db_protected: bool,
     pub theme: AppTheme,
     pub tray_theme: AppTrayTheme,
     pub check_for_updates: bool,
     pub log_level: AppLogLevel,
+    /// In seconds. How much time should client wait after connecting for the first handshake.
+    pub connection_verification_time: u32,
+    /// In seconds. How much time can be between handshakes before connection is automatically dropped.
+    pub peer_alive_period: u32,
 }
 
+// Important: keep in sync with client store default in frontend
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            db_protected: false,
             theme: AppTheme::Light,
             check_for_updates: true,
             tray_theme: AppTrayTheme::Color,
             log_level: AppLogLevel::Info,
+            connection_verification_time: 10,
+            peer_alive_period: 300,
         }
     }
 }
@@ -115,9 +126,11 @@ impl AppConfig {
         let mut config_file = get_config_file(app, false);
         let mut file_contents = String::new();
         if config_file.read_to_string(&mut file_contents).is_ok() {
-            match serde_json::from_str::<AppConfig>(&file_contents) {
-                Ok(res) => {
+            match serde_json::from_str::<AppConfigPatch>(&file_contents) {
+                Ok(patch) => {
                     debug!("Config deserialized successfully");
+                    let mut res = AppConfig::default();
+                    res.apply(patch);
                     return res;
                 }
                 // if deserialization failed, remove file and return default
@@ -133,6 +146,7 @@ impl AppConfig {
         res
     }
 
+    /// Saves currently loaded AppConfig into app data dir file. Warning! this will always override file contents.
     pub fn save(self, app: &AppHandle) {
         let mut file = get_config_file(app, true);
         match serde_json::to_vec(&self) {

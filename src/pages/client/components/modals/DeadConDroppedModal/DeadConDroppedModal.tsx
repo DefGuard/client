@@ -10,7 +10,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { ModalWithTitle } from '../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
-import { ClientConnectionType } from '../../../types';
+import { ClientConnectionType, DeadConDroppedOutReason } from '../../../types';
 import { useDeadConDroppedModal } from './store';
 
 export const DeadConDroppedModal = () => {
@@ -53,16 +53,28 @@ const ModalContent = () => {
     }
   }, [localLL, payload?.con_type]);
 
+  const message = useMemo(() => {
+    switch (payload?.reason) {
+      case DeadConDroppedOutReason.PERIODIC_VERIFICATION:
+        return localLL.body.periodic({
+          conType: typeString,
+          instanceName: payload.name,
+        });
+      case DeadConDroppedOutReason.CONNECTION_VERIFICATION:
+        return localLL.body.connection({
+          conType: typeString,
+          name: payload.name,
+        });
+      default:
+        return '';
+    }
+  }, [payload?.reason, payload?.name, localLL.body, typeString]);
+
   if (!payload) return null;
   return (
     <>
       <div className="message">
-        <p>
-          {localLL.body({
-            conType: typeString,
-            instanceName: payload.interface_name,
-          })}
-        </p>
+        <p>{message}</p>
       </div>
       <div className="controls">
         <Button

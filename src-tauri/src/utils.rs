@@ -3,6 +3,7 @@ use std::{
     path::Path,
     process::Command,
     str::FromStr,
+    time::Duration,
 };
 
 use chrono::Utc;
@@ -1237,9 +1238,18 @@ pub fn is_connection_alive(connection_start: &chrono::NaiveDateTime, last_handsh
 /// This works by checking if any handshake was made after connecting, within specified time window.
 // TODO: put the verification time into UI Settings
 pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVerify) {
-    tokio::time::sleep(CONNECTION_EXPECTED_INIT_TIME).await;
-    debug!("Connection verification task finished sleeping");
     let state: tauri::State<AppState> = app_handle.state();
+    let wait_time = Duration::from_secs(
+        state
+            .app_config
+            .lock()
+            .unwrap()
+            .connection_verification_time
+            .clone()
+            .into(),
+    );
+    tokio::time::sleep(wait_time).await;
+    debug!("Connection verification task finished sleeping");
     let db_pool = &state.get_pool();
 
     match connection {

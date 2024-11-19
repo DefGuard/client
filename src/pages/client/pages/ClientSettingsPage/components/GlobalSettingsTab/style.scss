@@ -5,12 +5,25 @@
   justify-items: flex-start;
   row-gap: 32px;
 
-  & > section {
+  &>section {
     display: flex;
     flex-flow: column;
     align-items: flex-start;
     justify-items: flex-start;
     row-gap: 20px;
+
+    &>header {
+      display: flex;
+      flex-flow: row nowrap;
+      column-gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .warning-message {
+      @include typography(app-body-2);
+      color: var(--text-important);
+    }
   }
 
   .select-container {

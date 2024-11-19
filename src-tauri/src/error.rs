@@ -45,6 +45,8 @@ pub enum Error {
     NoToken,
     #[error("Failed to lock app state member.")]
     StateLockFail,
+    #[error("Failed to acquire lock on mutex. {0}")]
+    PoisonError(String),
 }
 
 // we must manually implement serde::Serialize
@@ -54,5 +56,11 @@ impl serde::Serialize for Error {
         S: serde::ser::Serializer,
     {
         serializer.serialize_str(self.to_string().as_ref())
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for Error {
+    fn from(value: std::sync::PoisonError<T>) -> Self {
+        Self::PoisonError(value.to_string())
     }
 }

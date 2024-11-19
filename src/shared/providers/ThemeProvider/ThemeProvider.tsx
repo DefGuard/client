@@ -6,9 +6,10 @@ import { ThemeKey } from '../../defguard-ui/hooks/theme/types';
 type Props = {
   children: ReactNode;
 };
+
 // this sync settings theme with html dataset
 export const ThemeProvider = ({ children }: Props) => {
-  const currentTheme = useClientStore((state) => state.settings.theme);
+  const currentTheme = useClientStore((state) => state.appConfig.theme);
 
   useEffect(() => {
     const current = document.documentElement.dataset.theme as ThemeKey;

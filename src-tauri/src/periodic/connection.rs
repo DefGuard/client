@@ -15,27 +15,18 @@ use crate::{
 
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(30);
 
-//TODO: retrieve from location config
-// keep it above 200 cuz WG sometimes goes as high as 190 even if interval is set at 25
-const PER_DROP_PERIOD: TimeDelta = TimeDelta::seconds(300);
-
 /// Returns true if connection is valid
-fn check_last_active_connection(
-    persistent_keepalive_interval: Option<u16>,
-    last_handshake: i64,
-) -> bool {
-    if let Some(keepalive) = persistent_keepalive_interval {
-        if let Some(last_handshake) = DateTime::from_timestamp(last_handshake, 0) {
-            let now = Utc::now();
-            //TODO: use keepalive from location
-            let _keepalive_i64: i64 = keepalive.into();
-            // let alive_period = TimeDelta::seconds(keepalive_i64);
-            let alive_period = PER_DROP_PERIOD;
-            let elapsed = now - last_handshake;
-            let res = elapsed <= alive_period;
-            trace!("Stat check: keepalive {keepalive}, last_handshake: {last_handshake}, elapsed: {elapsed}, check_result: {res}");
-            return res;
-        }
+//TODO: Take peer alive period from location
+fn check_last_active_connection(last_handshake: i64, peer_alive_period: u32) -> bool {
+    if let Some(last_handshake) = DateTime::from_timestamp(last_handshake, 0) {
+        let alive_period = TimeDelta::new(peer_alive_period.into(), 0).unwrap();
+        let now = Utc::now();
+        let elapsed = now - last_handshake;
+        let res = elapsed <= alive_period;
+        trace!(
+            "Stat check: last_handshake: {last_handshake}, elapsed: {elapsed}, check_result: {res}"
+        );
+        return res;
     }
     true
 }
@@ -129,9 +120,15 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 "Latest stat for checked location connection: {:?}",
                                 latest_stat
                             );
+                            let peer_alive_period = app_state
+                                .app_config
+                                .lock()
+                                .unwrap()
+                                .peer_alive_period
+                                .clone();
                             if !check_last_active_connection(
-                                latest_stat.persistent_keepalive_interval,
                                 latest_stat.last_handshake,
+                                peer_alive_period,
                             ) {
                                 match Location::find_by_id(db_pool, con.location_id).await {
                                     Ok(Some(location)) => {
@@ -203,9 +200,15 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                     match TunnelStats::latest_by_tunnel_id(db_pool, con.location_id).await {
                         Ok(Some(latest_stat)) => {
                             trace!("Latest stat for checked tunnel: {:?}", latest_stat);
+                            let peer_alive_period = app_state
+                                .app_config
+                                .lock()
+                                .unwrap()
+                                .peer_alive_period
+                                .clone();
                             if !check_last_active_connection(
-                                latest_stat.persistent_keepalive_interval,
                                 latest_stat.last_handshake,
+                                peer_alive_period,
                             ) {
                                 match Tunnel::find_by_id(db_pool, con.location_id).await {
                                     Ok(Some(tunnel)) => {

@@ -45,11 +45,11 @@ export type SaveTunnelRequest = {
 
 export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
-export type LogLevel = 'error' | 'info' | 'debug' | 'trace';
+export type LogLevel = 'error' | 'info' | 'debug' | 'trace' | 'warn';
 export type GlobalLogLevel = 'error' | 'info' | 'debug';
 export type LogSource = 'Client' | 'Service' | 'All';
 
-export type ClientView = 'grid' | 'detail' | null;
+export type ClientView = 'grid' | 'detail';
 
 export type LogItemField = {
   message: string;
@@ -69,12 +69,13 @@ export type InterfaceLogsRequest = {
   locationId: DefguardLocation['id'];
 };
 
-export type Settings = {
+export type AppConfig = {
   theme: ThemeKey;
   log_level: LogLevel;
-  tray_icon_theme: TrayIconTheme;
+  tray_theme: TrayIconTheme;
   check_for_updates: boolean;
-  selected_view: ClientView;
+  connection_verification_time: number;
+  peer_alive_period: number;
 };
 
 export type LocationDetails = {
@@ -123,8 +124,6 @@ export type TauriCommandKey =
   | 'active_connection'
   | 'save_device_config'
   | 'update_location_routing'
-  | 'get_settings'
-  | 'update_settings'
   | 'delete_instance'
   | 'update_instance'
   | 'parse_tunnel_config'
@@ -137,4 +136,6 @@ export type TauriCommandKey =
   | 'open_link'
   | 'get_latest_app_version'
   | 'start_global_logwatcher'
-  | 'stop_global_logwatcher';
+  | 'stop_global_logwatcher'
+  | 'command_get_app_config'
+  | 'command_set_app_config';

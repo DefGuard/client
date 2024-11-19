@@ -50,6 +50,20 @@ type RootTranslation = {
 			 */
 			required: string
 			/**
+			 * F​i​e​l​d​ ​r​e​q​u​i​r​e​s​ ​m​i​n​i​m​a​l​ ​v​a​l​u​e​ ​o​f​ ​{​m​i​n​}
+			 * @param {number} min
+			 */
+			minValue: RequiredParams<'min'>
+			/**
+			 * F​i​e​l​d​ ​c​a​n​n​o​t​ ​e​x​c​e​e​d​ ​m​a​x​i​m​a​l​ ​v​a​l​u​e​ ​o​f​ ​{​m​a​x​}
+			 * @param {number} max
+			 */
+			maxValue: RequiredParams<'max'>
+			/**
+			 * F​i​e​l​d​ ​v​a​l​u​e​ ​m​u​s​t​ ​b​e​ ​a​b​o​v​e​ ​z​e​r​o
+			 */
+			aboveZero: string
+			/**
 			 * M​i​n​ ​l​e​n​g​t​h​ ​o​f​ ​{​l​e​n​g​t​h​}
 			 * @param {number} length
 			 */
@@ -174,12 +188,20 @@ type RootTranslation = {
 					 * L​o​c​a​t​i​o​n
 					 */
 					location: string
-					/**
-					 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​l​a​c​k​ ​o​f​ ​h​a​n​d​s​h​a​k​e​ ​i​n​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​w​i​n​d​o​w​.
-					 * @param {string} conType
-					 * @param {string} instanceName
-					 */
-					body: RequiredParams<'conType' | 'instanceName'>
+					body: {
+						/**
+						 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​l​a​c​k​ ​o​f​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​i​n​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​w​i​n​d​o​w​.
+						 * @param {string} conType
+						 * @param {string} instanceName
+						 */
+						periodic: RequiredParams<'conType' | 'instanceName'>
+						/**
+						 * {​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​a​b​s​e​n​c​e​ ​o​f​ ​h​a​n​d​s​h​a​k​e​.
+						 * @param {string} conType
+						 * @param {string} name
+						 */
+						connection: RequiredParams<'conType' | 'name'>
+					}
 					controls: {
 						/**
 						 * C​l​o​s​e
@@ -307,6 +329,26 @@ type RootTranslation = {
 					title: string
 					tabs: {
 						global: {
+							peer_alive: {
+								/**
+								 * P​e​e​r​ ​a​l​i​v​e​ ​p​e​r​i​o​d​ ​(​s​e​c​o​n​d​s​)
+								 */
+								title: string
+								/**
+								 * I​f​ ​c​o​n​n​e​c​t​i​o​n​ ​e​x​c​e​e​d​s​ ​g​i​v​e​n​ ​t​i​m​e​ ​w​i​t​h​o​u​t​ ​m​a​k​i​n​g​ ​a​n​ ​h​a​n​d​s​h​a​k​e​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​r​o​p​p​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
+								 */
+								helper: string
+							}
+							connection_verification: {
+								/**
+								 * C​o​n​n​e​c​t​i​o​n​ ​v​e​r​i​f​i​c​a​t​i​o​n​ ​t​i​m​e​ ​(​s​e​c​o​n​d​s​)
+								 */
+								title: string
+								/**
+								 * H​o​w​ ​m​u​c​h​ ​t​i​m​e​ ​c​a​n​ ​p​a​s​s​ ​a​f​t​e​r​ ​m​a​k​i​n​g​ ​a​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​t​h​o​u​t​ ​m​a​k​i​n​g​ ​a​n​ ​h​a​n​d​s​h​a​k​e​.​ ​I​f​ ​s​e​t​ ​t​i​m​e​ ​w​i​l​l​ ​p​a​s​s​ ​a​n​d​ ​h​a​n​d​s​h​a​k​e​ ​w​a​s​ ​n​o​t​ ​m​a​d​e​,​ ​t​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​r​o​p​p​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
+								 */
+								helper: string
+							}
 							tray: {
 								/**
 								 * S​y​s​t​e​m​ ​t​r​a​y
@@ -340,6 +382,10 @@ type RootTranslation = {
 								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
 								 */
 								title: string
+								/**
+								 * C​h​a​n​g​e​ ​w​i​l​l​ ​t​a​k​e​ ​e​f​f​e​c​t​ ​a​f​t​e​r​ ​c​l​i​e​n​t​ ​r​e​s​t​a​r​t​.
+								 */
+								warning: string
 								options: {
 									/**
 									 * E​r​r​o​r
@@ -364,7 +410,7 @@ type RootTranslation = {
 									/**
 									 * C​l​i​e​n​t
 									 */
-									cliet: string
+									client: string
 									/**
 									 * S​e​r​v​i​c​e
 									 */
@@ -1615,6 +1661,18 @@ export type TranslationFunctions = {
 			 */
 			required: () => LocalizedString
 			/**
+			 * Field requires minimal value of {min}
+			 */
+			minValue: (arg: { min: number }) => LocalizedString
+			/**
+			 * Field cannot exceed maximal value of {max}
+			 */
+			maxValue: (arg: { max: number }) => LocalizedString
+			/**
+			 * Field value must be above zero
+			 */
+			aboveZero: () => LocalizedString
+			/**
 			 * Min length of {length}
 			 */
 			minLength: (arg: { length: number }) => LocalizedString
@@ -1732,10 +1790,16 @@ export type TranslationFunctions = {
 					 * Location
 					 */
 					location: () => LocalizedString
-					/**
-					 * {conType} {instanceName} was disconnected due to lack of handshake in expected time window.
-					 */
-					body: (arg: { conType: string, instanceName: string }) => LocalizedString
+					body: {
+						/**
+						 * {conType} {instanceName} was disconnected due to lack of handshake within expected time window.
+						 */
+						periodic: (arg: { conType: string, instanceName: string }) => LocalizedString
+						/**
+						 * {conType} {name} was disconnected due to absence of handshake.
+						 */
+						connection: (arg: { conType: string, name: string }) => LocalizedString
+					}
 					controls: {
 						/**
 						 * Close
@@ -1863,6 +1927,26 @@ export type TranslationFunctions = {
 					title: () => LocalizedString
 					tabs: {
 						global: {
+							peer_alive: {
+								/**
+								 * Peer alive period (seconds)
+								 */
+								title: () => LocalizedString
+								/**
+								 * If connection exceeds given time without making an handshake. The connection will be dropped automatically.
+								 */
+								helper: () => LocalizedString
+							}
+							connection_verification: {
+								/**
+								 * Connection verification time (seconds)
+								 */
+								title: () => LocalizedString
+								/**
+								 * How much time can pass after making a connection without making an handshake. If set time will pass and handshake was not made, the connection will be dropped automatically.
+								 */
+								helper: () => LocalizedString
+							}
 							tray: {
 								/**
 								 * System tray
@@ -1896,6 +1980,10 @@ export type TranslationFunctions = {
 								 * Logging threshold
 								 */
 								title: () => LocalizedString
+								/**
+								 * Change will take effect after client restart.
+								 */
+								warning: () => LocalizedString
 								options: {
 									/**
 									 * Error
@@ -1920,7 +2008,7 @@ export type TranslationFunctions = {
 									/**
 									 * Client
 									 */
-									cliet: () => LocalizedString
+									client: () => LocalizedString
 									/**
 									 * Service
 									 */

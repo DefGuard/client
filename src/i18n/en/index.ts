@@ -18,6 +18,9 @@ const en = {
       invalid: 'Field is invalid',
       email: 'Enter a valid E-mail',
       required: 'Field is required',
+      minValue: 'Field requires minimal value of {min: number}',
+      maxValue: 'Field cannot exceed maximal value of {max: number}',
+      aboveZero: 'Field value must be above zero',
       minLength: 'Min length of {length: number}',
       maxLength: 'Max length of {length: number}',
       specialsRequired: 'At least one special character',
@@ -63,7 +66,12 @@ const en = {
           title: '{conType: string} disconnected',
           tunnel: 'Tunnel',
           location: 'Location',
-          body: '{conType: string} {instanceName: string} was disconnected due to lack of handshake in expected time window.',
+          body: {
+            periodic:
+              '{conType: string} {instanceName: string} was disconnected due to lack of handshake within expected time window.',
+            connection:
+              '{conType: string} {name: string} was disconnected due to absence of handshake.',
+          },
           controls: {
             close: 'Close',
           },
@@ -134,6 +142,16 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
           title: 'Settings',
           tabs: {
             global: {
+              peer_alive: {
+                title: 'Peer alive period (seconds)',
+                helper:
+                  'If connection exceeds given time without making an handshake. The connection will be dropped automatically.',
+              },
+              connection_verification: {
+                title: 'Connection verification time (seconds)',
+                helper:
+                  'How much time can pass after making a connection without making an handshake. If set time will pass and handshake was not made, the connection will be dropped automatically.',
+              },
               tray: {
                 title: 'System tray',
                 label: 'Tray icon theme',
@@ -146,6 +164,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               },
               logging: {
                 title: 'Logging threshold',
+                warning: 'Change will take effect after client restart.',
                 options: {
                   error: 'Error',
                   info: 'Info',
@@ -155,7 +174,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               },
               globalLogs: {
                 logSources: {
-                  cliet: 'Client',
+                  client: 'Client',
                   service: 'Service',
                   all: 'All',
                 },

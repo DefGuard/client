@@ -12,7 +12,7 @@ use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
 use crate::{
-    app_config::{self, AppConfig, AppConfigPatch},
+    app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
         models::{instance::InstanceInfo, location_stats::LocationStats, Id, NoId},
@@ -21,7 +21,7 @@ use crate::{
     },
     enterprise::periodic::config::poll_instance,
     error::Error,
-    events::{CONFIG_CHANGED, CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
+    events::{APPLICATION_CONFIG_CHANGED, CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
@@ -1113,46 +1113,33 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
 
 #[tauri::command(async)]
 pub async fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
-    match app_state.app_config.lock() {
-        Ok(res) => {
-            debug!("Config retrieved from sate successfully");
-            Ok(res.clone())
-        }
-        Err(e) => {
-            error!(
-                "Failed to lock app config during get app config command. Reason: {}",
-                e.to_string()
-            );
-            Err(Error::StateLockFail)
-        }
-    }
+    debug!("Running command get app config.");
+    let res = app_state.app_config.lock().unwrap().clone();
+    trace!("Returning config: {}", serde_json::to_string(&res).unwrap());
+    Ok(res)
 }
 
 #[tauri::command(async)]
 pub async fn command_set_app_config(
     config_patch: AppConfigPatch,
+    emit_event: bool,
     app_handle: AppHandle,
-) -> Result<(), Error> {
+) -> Result<AppConfig, Error> {
     let app_state: State<AppState> = app_handle.state();
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
-    let mut app_config = match app_state.app_config.lock() {
-        Ok(guard) => guard,
-        Err(e) => {
-            error!(
-                "Failed to lock app config during set app config command. Reason: {}",
-                e.to_string()
-            );
-            return Err(Error::StateLockFail);
-        }
-    };
     let tray_changed = config_patch.tray_theme.clone();
-    app_config.apply(config_patch);
-    app_config.save(&app_handle);
+    let res: AppConfig;
+    {
+        let mut app_config = app_state.app_config.lock().unwrap();
+        app_config.apply(config_patch);
+        app_config.save(&app_handle);
+        res = app_config.clone();
+    }
     info!("Config changed successfully");
     if let Some(_) = tray_changed {
         debug!("Tray theme included in config change, tray will be updated.");
-        match configure_tray_icon(&app_handle, &app_config.tray_theme) {
+        match configure_tray_icon(&app_handle, &res.tray_theme) {
             Ok(_) => {
                 debug!("Tray updated upon config change");
             }
@@ -1161,16 +1148,18 @@ pub async fn command_set_app_config(
             }
         }
     }
-    match app_handle.emit_all(CONFIG_CHANGED, {}) {
-        Ok(_) => {
-            debug!("Config changed event emitted successfully");
-        }
-        Err(e) => {
-            error!(
-                "Emission of config changed event failed. Reason: {}",
-                e.to_string()
-            );
+    if emit_event {
+        match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, {}) {
+            Ok(_) => {
+                debug!("Config changed event emitted successfully");
+            }
+            Err(e) => {
+                error!(
+                    "Emission of config changed event failed. Reason: {}",
+                    e.to_string()
+                );
+            }
         }
     }
-    Ok(())
+    Ok(res)
 }

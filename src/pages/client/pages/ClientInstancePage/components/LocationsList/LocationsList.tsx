@@ -27,7 +27,7 @@ export const LocationsList = ({
 }: LocationsListProps) => {
   const { LL } = useI18nContext();
 
-  const selectedView = useClientStore((state) => state.settings.selected_view);
+  const selectedView = useClientStore((state) => state.selectedView);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
   const toaster = useToaster();
   const navigate = useNavigate();

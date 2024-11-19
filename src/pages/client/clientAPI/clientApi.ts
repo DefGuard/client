@@ -12,6 +12,7 @@ import {
   Tunnel,
 } from '../types';
 import {
+  AppConfig,
   ConnectionRequest,
   GetLocationsRequest,
   LocationDetails,
@@ -19,7 +20,6 @@ import {
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
-  Settings,
   StatsRequest,
   TauriCommandKey,
   TunnelRequest,
@@ -83,11 +83,6 @@ const getActiveConnection = async (data: ConnectionRequest): Promise<Connection>
 const updateLocationRouting = async (data: RoutingRequest): Promise<Connection> =>
   invokeWrapper('update_location_routing', data);
 
-const getSettings = async (): Promise<Settings> => invokeWrapper('get_settings');
-
-const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
-  invokeWrapper('update_settings', { data });
-
 const deleteInstance = async (id: number): Promise<void> =>
   invokeWrapper('delete_instance', { instanceId: id });
 
@@ -129,7 +124,21 @@ const startGlobalLogWatcher = async (): Promise<void> =>
 const stopGlobalLogWatcher = async (): Promise<void> =>
   invokeWrapper('stop_global_logwatcher');
 
+const getAppConfig = async (): Promise<AppConfig> =>
+  invokeWrapper('command_get_app_config');
+
+const setAppConfig = async (
+  appConfig: Partial<AppConfig>,
+  emitEvent: boolean,
+): Promise<AppConfig> =>
+  invokeWrapper('command_set_app_config', {
+    configPatch: appConfig,
+    emitEvent,
+  });
+
 export const clientApi = {
+  getAppConfig,
+  setAppConfig,
   getInstances,
   getTunnels,
   getLocations,
@@ -141,8 +150,6 @@ export const clientApi = {
   getActiveConnection,
   saveConfig,
   updateLocationRouting,
-  getSettings,
-  updateSettings,
   deleteInstance,
   deleteTunnel,
   getLocationDetails,

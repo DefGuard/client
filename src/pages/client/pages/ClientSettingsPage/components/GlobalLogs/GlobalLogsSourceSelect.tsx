@@ -28,7 +28,7 @@ export const GlobalLogsSourceSelect = ({ initSelected, onChange }: Props) => {
       },
       {
         key: 1,
-        label: localLL.cliet(),
+        label: localLL.client(),
         value: 'Client',
       },
       {

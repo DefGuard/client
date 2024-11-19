@@ -1,5 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
+import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
@@ -19,11 +19,8 @@ interface StatsLayoutSelect {
 export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage;
-  const settings = useClientStore((state) => state.settings);
-  const updateClientSettings = useClientStore((state) => state.updateSettings);
-  const { mutate, isPending } = useMutation({
-    mutationFn: updateClientSettings,
-  });
+  const selectedClientView = useClientStore((s) => s.selectedView);
+  const updateClientStore = useClientStore((s) => s.setState, shallow);
 
   const options = useMemo(
     (): SelectOption<ClientView>[] => [
@@ -69,9 +66,8 @@ export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
     <Select<ClientView>
       options={options}
       renderSelected={renderSelected}
-      selected={settings.selected_view}
-      onChangeSingle={(view) => mutate({ selected_view: view })}
-      loading={isPending}
+      selected={selectedClientView}
+      onChangeSingle={(view) => updateClientStore({ selectedView: view })}
     />
   );
 };
