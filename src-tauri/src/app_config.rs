@@ -1,6 +1,5 @@
 use std::{
-    fs::File,
-    io::{Read, Write},
+    fs::{create_dir_all, File, OpenOptions},
     path::PathBuf,
 };
 
@@ -9,9 +8,8 @@ use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use strum::{AsRefStr, Display, EnumString};
 use tauri::AppHandle;
-use tracing::field::debug;
 
-const APP_CONFIG_FILE_NAME: &str = "config.json";
+static APP_CONFIG_FILE_NAME: &str = "config.json";
 
 fn get_config_file_path(app: &AppHandle) -> PathBuf {
     let mut config_file_path = app
@@ -19,7 +17,7 @@ fn get_config_file_path(app: &AppHandle) -> PathBuf {
         .app_data_dir()
         .expect("Failed to access app data");
     if !config_file_path.exists() {
-        std::fs::create_dir_all(&config_file_path).expect("Failed to create missing app data dir");
+        create_dir_all(&config_file_path).expect("Failed to create missing app data dir");
     }
     config_file_path.push(APP_CONFIG_FILE_NAME);
     config_file_path
@@ -27,19 +25,12 @@ fn get_config_file_path(app: &AppHandle) -> PathBuf {
 
 fn get_config_file(app: &AppHandle, for_write: bool) -> File {
     let config_file_path = get_config_file_path(app);
-    match config_file_path.exists() {
-        true => std::fs::OpenOptions::new()
-            .read(true)
-            .write(for_write)
-            .truncate(for_write)
-            .open(config_file_path)
-            .expect("Failed to open app config"),
-        false => std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(config_file_path)
-            .expect("Failed to create and open app config."),
-    }
+    OpenOptions::new()
+        .create(true)
+        .truncate(for_write)
+        .write(true)
+        .open(config_file_path)
+        .expect("Failed to create and open app config.")
 }
 
 #[derive(Debug, Clone, EnumString, Display, Serialize, Deserialize, Copy, PartialEq)]
@@ -85,9 +76,9 @@ impl Into<LevelFilter> for AppLogLevel {
 
 // config stored in config.json in app data
 // config is loaded once at startup and saved when modified to the app data file
-/// information's needed at startup of the application.
+// information's needed at startup of the application.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Patch)]
-#[patch(attribute(derive(Debug, Serialize, Deserialize)))]
+#[patch(attribute(derive(Debug, Deserialize, Serialize)))]
 pub struct AppConfig {
     pub theme: AppTheme,
     pub tray_theme: AppTrayTheme,
@@ -118,47 +109,39 @@ impl AppConfig {
     pub fn new(app: &AppHandle) -> Self {
         let config_path = get_config_file_path(app);
         if !config_path.exists() {
-            debug!("App config doesn't exist in app data, initializing app with default config.");
+            debug!(
+                "Application configuration file doesn't exist; initializing it with the defaults."
+            );
             let res = Self::default();
             res.save(app);
             return res;
         }
-        let mut config_file = get_config_file(app, false);
-        let mut file_contents = String::new();
-        if config_file.read_to_string(&mut file_contents).is_ok() {
-            match serde_json::from_str::<AppConfigPatch>(&file_contents) {
-                Ok(patch) => {
-                    debug!("Config deserialized successfully");
-                    let mut res = AppConfig::default();
-                    res.apply(patch);
-                    return res;
-                }
-                // if deserialization failed, remove file and return default
-                Err(_) => {
-                    let res = Self::default();
-                    res.save(app);
-                    return res;
-                }
+        let config_file = get_config_file(app, false);
+        match serde_json::from_reader::<_, AppConfigPatch>(config_file) {
+            Ok(patch) => {
+                debug!("Config deserialized successfully");
+                let mut res = AppConfig::default();
+                res.apply(patch);
+                res
+            }
+            // if deserialization failed, remove file and return default
+            Err(_) => {
+                let res = Self::default();
+                res.save(app);
+                res
             }
         }
-        let res = Self::default();
-        res.save(app);
-        res
     }
 
-    /// Saves currently loaded AppConfig into app data dir file. Warning! this will always override file contents.
+    /// Saves currently loaded AppConfig into app data dir file.
+    /// Warning: this will always overwrite file contents.
     pub fn save(self, app: &AppHandle) {
-        let mut file = get_config_file(app, true);
-        match serde_json::to_vec(&self) {
-            Ok(serialized) => {
-                file.write_all(&serialized)
-                    .expect("Failed to write app config file.");
-                debug("App config saved.");
-            }
-            Err(e) => {
+        let file = get_config_file(app, true);
+        match serde_json::to_writer(file, &self) {
+            Ok(()) => debug!("Application configuration file has been saved."),
+            Err(err) => {
                 error!(
-                    "Application config couldn't be saved. Serialization of application config failed. Reason: {}",
-                    e.to_string()
+                    "Application configuration file couldn't be saved. Failed to serialize: {err}",
                 );
             }
         }
