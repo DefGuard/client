@@ -183,7 +183,8 @@ impl LocationStats<Id> {
     {
         let res = query_as!(
             LocationStats::<Id>,
-            "SELECT id, location_id, \
+            "SELECT id \"id!: i64\", \
+            location_id, \
             upload \"upload!: i64\", \
             download \"download!: i64\", \
             last_handshake, \
@@ -192,7 +193,7 @@ impl LocationStats<Id> {
             persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
             FROM location_stats \
             WHERE location_id=$1 \
-            ORDER BY last_handshake DESC \
+            ORDER BY collected_at DESC \
             LIMIT 1",
             location_id
         )

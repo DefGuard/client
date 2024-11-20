@@ -367,7 +367,8 @@ impl TunnelStats<Id> {
     {
         let res = query_as!(
             TunnelStats::<Id>,
-            "SELECT id, tunnel_id, \
+            "SELECT id \"id!: i64\", \
+            tunnel_id, \
             upload \"upload!: i64\", \
             download \"download!: i64\", \
             last_handshake, \
@@ -376,7 +377,7 @@ impl TunnelStats<Id> {
             persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
             FROM tunnel_stats \
             WHERE tunnel_id=$1
-            ORDER BY last_handshake DESC \
+            ORDER BY collected_at DESC \
             LIMIT 1
             ",
             tunnel_id
