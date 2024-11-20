@@ -192,9 +192,8 @@ impl LocationStats<Id> {
             listen_port \"listen_port!: u32\",
             persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
             FROM location_stats \
-            WHERE location_id=$1 \
-            ORDER BY collected_at DESC \
-            LIMIT 1",
+            WHERE location_id = $1 \
+            ORDER BY collected_at DESC LIMIT 1",
             location_id
         )
         .fetch_optional(executor)

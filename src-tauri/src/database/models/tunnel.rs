@@ -376,10 +376,8 @@ impl TunnelStats<Id> {
             listen_port \"listen_port!: u32\", \
             persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
             FROM tunnel_stats \
-            WHERE tunnel_id=$1
-            ORDER BY collected_at DESC \
-            LIMIT 1
-            ",
+            WHERE tunnel_id = $1
+            ORDER BY collected_at DESC LIMIT 1",
             tunnel_id
         )
         .fetch_optional(executor)
