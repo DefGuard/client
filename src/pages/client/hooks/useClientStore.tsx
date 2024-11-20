@@ -13,6 +13,12 @@ import {
 
 const { getInstances, setAppConfig } = clientApi;
 
+const persistedKeys: Array<keyof StoreValues> = [
+  'selectedInstance',
+  'selectedLocation',
+  'selectedView',
+];
+
 // eslint-disable-next-line
 const defaultValues: StoreValues = {
   instances: [],
@@ -85,7 +91,7 @@ export const useClientStore = createWithEqualityFn<Store>()(
     {
       name: 'client-store',
       storage: createJSONStorage(() => localStorage),
-      partialize: (store) => pickBy(store, ['selectedView']),
+      partialize: (store) => pickBy(store, persistedKeys),
       version: 1,
     },
   ),

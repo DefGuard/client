@@ -1,3 +1,4 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -24,8 +25,9 @@ export const AppConfigConnectionVerificationPeriod = () => {
         verificationTime: z
           .number({
             required_error: LL.form.errors.required(),
+            invalid_type_error: LL.form.errors.required(),
           })
-          .min(
+          .gte(
             5,
             LL.form.errors.minValue({
               min: 5,
@@ -46,6 +48,8 @@ export const AppConfigConnectionVerificationPeriod = () => {
     defaultValues: {
       verificationTime: storeValue,
     },
+    mode: 'all',
+    resolver: zodResolver(schema),
   });
 
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
@@ -74,7 +78,7 @@ export const AppConfigConnectionVerificationPeriod = () => {
 
   return (
     <form onSubmit={handleSubmit(handleValidSubmit)}>
-      <FormInput controller={{ control, name: 'verificationTime' }} />
+      <FormInput controller={{ control, name: 'verificationTime' }} type="number" />
       <input type="submit" className="hidden" ref={submitRef} />
     </form>
   );

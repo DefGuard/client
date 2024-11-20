@@ -145,14 +145,14 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 value_in_seconds: '(seconds)',
               },
               peer_alive: {
-                title: 'Peer alive period',
+                title: 'Session timeout',
                 helper:
-                  'If connection exceeds given time without making an handshake. The connection will be dropped automatically.',
+                  'If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.',
               },
               connection_verification: {
-                title: 'Connection verification time',
+                title: 'Connect timeout',
                 helper:
-                  'How much time can pass after making a connection without making an handshake. If set time will pass and handshake was not made, the connection will be dropped automatically.',
+                  'If set time will pass and any handshake with the server was not made. The connection will be disconnected automatically.',
               },
               tray: {
                 title: 'System tray',

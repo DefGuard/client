@@ -337,21 +337,21 @@ type RootTranslation = {
 							}
 							peer_alive: {
 								/**
-								 * P​e​e​r​ ​a​l​i​v​e​ ​p​e​r​i​o​d
+								 * S​e​s​s​i​o​n​ ​t​i​m​e​o​u​t
 								 */
 								title: string
 								/**
-								 * I​f​ ​c​o​n​n​e​c​t​i​o​n​ ​e​x​c​e​e​d​s​ ​g​i​v​e​n​ ​t​i​m​e​ ​w​i​t​h​o​u​t​ ​m​a​k​i​n​g​ ​a​n​ ​h​a​n​d​s​h​a​k​e​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​r​o​p​p​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
+								 * I​f​ ​a​c​t​i​v​e​ ​c​o​n​n​e​c​t​i​o​n​ ​e​x​c​e​e​d​s​ ​g​i​v​e​n​ ​t​i​m​e​ ​w​i​t​h​o​u​t​ ​m​a​k​i​n​g​ ​a​n​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​ ​t​h​e​ ​s​e​r​v​e​r​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​c​o​n​s​i​d​e​r​e​d​ ​i​n​v​a​l​i​d​ ​a​n​d​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
 								 */
 								helper: string
 							}
 							connection_verification: {
 								/**
-								 * C​o​n​n​e​c​t​i​o​n​ ​v​e​r​i​f​i​c​a​t​i​o​n​ ​t​i​m​e
+								 * C​o​n​n​e​c​t​ ​t​i​m​e​o​u​t
 								 */
 								title: string
 								/**
-								 * H​o​w​ ​m​u​c​h​ ​t​i​m​e​ ​c​a​n​ ​p​a​s​s​ ​a​f​t​e​r​ ​m​a​k​i​n​g​ ​a​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​t​h​o​u​t​ ​m​a​k​i​n​g​ ​a​n​ ​h​a​n​d​s​h​a​k​e​.​ ​I​f​ ​s​e​t​ ​t​i​m​e​ ​w​i​l​l​ ​p​a​s​s​ ​a​n​d​ ​h​a​n​d​s​h​a​k​e​ ​w​a​s​ ​n​o​t​ ​m​a​d​e​,​ ​t​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​r​o​p​p​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
+								 * I​f​ ​s​e​t​ ​t​i​m​e​ ​w​i​l​l​ ​p​a​s​s​ ​a​n​d​ ​a​n​y​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​ ​t​h​e​ ​s​e​r​v​e​r​ ​w​a​s​ ​n​o​t​ ​m​a​d​e​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
 								 */
 								helper: string
 							}
@@ -1941,21 +1941,21 @@ export type TranslationFunctions = {
 							}
 							peer_alive: {
 								/**
-								 * Peer alive period
+								 * Session timeout
 								 */
 								title: () => LocalizedString
 								/**
-								 * If connection exceeds given time without making an handshake. The connection will be dropped automatically.
+								 * If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.
 								 */
 								helper: () => LocalizedString
 							}
 							connection_verification: {
 								/**
-								 * Connection verification time
+								 * Connect timeout
 								 */
 								title: () => LocalizedString
 								/**
-								 * How much time can pass after making a connection without making an handshake. If set time will pass and handshake was not made, the connection will be dropped automatically.
+								 * If set time will pass and any handshake with the server was not made. The connection will be disconnected automatically.
 								 */
 								helper: () => LocalizedString
 							}

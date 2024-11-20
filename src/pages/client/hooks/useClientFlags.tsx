@@ -1,12 +1,8 @@
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { SelectedInstance } from '../types';
-
 const defaults: StoreValues = {
   firstStart: true,
-  selectedInstance: undefined,
-  selectedLocation: undefined,
 };
 
 /*Flags that are persisted via localstorage and are not used by rust backend*/
@@ -30,8 +26,6 @@ type Store = StoreValues & StoreMethods;
 type StoreValues = {
   // Is user launching app first time ?
   firstStart: boolean;
-  selectedInstance?: SelectedInstance;
-  selectedLocation?: number;
 };
 
 type StoreMethods = {

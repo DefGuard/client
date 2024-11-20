@@ -43,26 +43,25 @@ export const GlobalSettingsTab = () => {
       <section>
         <header>
           <h2>
-            {localLL.peer_alive.title()}
-            <span>{localLL.common.value_in_seconds()}</span>
-          </h2>
-          <Helper initialPlacement="right">
-            <p>{localLL.peer_alive.helper()}</p>
-          </Helper>
-        </header>
-        <AppConfigConnectionVerificationPeriod />
-      </section>
-      <section>
-        <header>
-          <h2>
-            {localLL.connection_verification.title()}
-            <span>{localLL.common.value_in_seconds()}</span>
+            {localLL.peer_alive.title()} <span>{localLL.common.value_in_seconds()}</span>
           </h2>
           <Helper initialPlacement="right">
             <p>{localLL.peer_alive.helper()}</p>
           </Helper>
         </header>
         <AppConfigPeerAlive />
+      </section>
+      <section>
+        <header>
+          <h2>
+            {localLL.connection_verification.title()}{' '}
+            <span>{localLL.common.value_in_seconds()}</span>
+          </h2>
+          <Helper initialPlacement="right">
+            <p>{localLL.connection_verification.helper()}</p>
+          </Helper>
+        </header>
+        <AppConfigConnectionVerificationPeriod />
       </section>
     </div>
   );

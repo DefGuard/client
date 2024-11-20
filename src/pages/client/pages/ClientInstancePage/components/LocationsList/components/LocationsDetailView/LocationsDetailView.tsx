@@ -2,14 +2,14 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { shallow } from 'zustand/shallow';
 
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
 import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
 import { routes } from '../../../../../../../../shared/routes';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { useClientFlags } from '../../../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
 import {
@@ -39,13 +39,9 @@ export const LocationsDetailView = ({
   connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
   selectedDefguardInstance,
 }: Props) => {
-  const selectedLocationId = useClientFlags((state) => state.selectedLocation);
-  const setClientFlags = useClientFlags((state) => state.setValues);
-  const [activeLocationId, setActiveLocationId] = useState<number | undefined>(
-    selectedLocationId ?? undefined,
-  );
-
   const selectedInstance = useClientStore((state) => state.selectedInstance);
+  const activeLocationId = useClientStore((s) => s.selectedLocation);
+  const setClientState = useClientStore((s) => s.setState, shallow);
 
   const navigate = useNavigate();
 
@@ -56,13 +52,10 @@ export const LocationsDetailView = ({
         content: location.name,
         active: location.id === activeLocationId,
         onClick: () => {
-          setClientFlags({
-            selectedLocation: location.id,
-          });
-          setActiveLocationId(location.id);
+          setClientState({ selectedLocation: location.id });
         },
       })),
-    [locations, activeLocationId, setClientFlags],
+    [locations, activeLocationId, setClientState],
   );
 
   const activeLocation = useMemo((): CommonWireguardFields | undefined => {
@@ -76,12 +69,12 @@ export const LocationsDetailView = ({
     if (activeLocationId === undefined) {
       // set a new activeLocationId if user has deleted last
       if (locations.length) {
-        setActiveLocationId(locations.at(0)?.instance_id);
+        setClientState({ selectedLocation: locations.at(0)?.instance_id });
       } else {
         navigate(routes.client.settings, { replace: true });
       }
     }
-  }, [activeLocationId, navigate, locations]);
+  }, [activeLocationId, locations, navigate, setClientState]);
 
   const { data: tunnels } = useQuery({
     queryKey: [clientQueryKeys.getTunnels],
@@ -96,9 +89,9 @@ export const LocationsDetailView = ({
   // select first location if selected is undefined but component is mounted
   useEffect(() => {
     if ((!activeLocationId || !activeLocation) && !isUndefined(locations[0])) {
-      setActiveLocationId(locations[0].id);
+      setClientState({ selectedLocation: locations[0].id });
     }
-  }, [locations, setActiveLocationId, activeLocationId, activeLocation]);
+  }, [locations, activeLocationId, activeLocation, setClientState]);
 
   if (isUndefined(activeLocationId) || isUndefined(activeLocation)) return null;
 

@@ -1,3 +1,4 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -25,6 +26,7 @@ export const AppConfigPeerAlive = () => {
         peer_alive: z
           .number({
             required_error: LL.form.errors.required(),
+            invalid_type_error: LL.form.errors.required(),
           })
           .min(
             0,
@@ -47,6 +49,8 @@ export const AppConfigPeerAlive = () => {
     defaultValues: {
       peer_alive: peerAlive,
     },
+    mode: 'all',
+    resolver: zodResolver(schema),
   });
 
   const onValidSubmit: SubmitHandler<FormFields> = async (values) => {
@@ -73,7 +77,7 @@ export const AppConfigPeerAlive = () => {
 
   return (
     <form onSubmit={handleSubmit(onValidSubmit)}>
-      <FormInput controller={{ control, name: 'peer_alive' }} />
+      <FormInput controller={{ control, name: 'peer_alive' }} type="number" />
       <input type="submit" ref={submitRef} className="hidden" />
     </form>
   );

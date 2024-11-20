@@ -12,7 +12,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import timezone from 'dayjs/plugin/timezone';
 import updateLocale from 'dayjs/plugin/updateLocale';
 import utc from 'dayjs/plugin/utc';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { debug } from 'tauri-plugin-log-api';
 import { localStorageDetector } from 'typesafe-i18n/detectors';
@@ -22,7 +22,6 @@ import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
-import { useClientFlags } from '../../pages/client/hooks/useClientFlags';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
 import { ClientAddedPage } from '../../pages/client/pages/ClientAddedPage/ClientAddedPage';
@@ -120,16 +119,12 @@ const router = createBrowserRouter([
 const detectedLocale = detectLocale(localStorageDetector);
 
 export const App = () => {
+  //workaround ensure effect once in dev mode, thanks react :3
+  const tauriInitLoadRef = useRef(false);
+  const localeLoadRef = useRef(false);
   const [localeLoaded, setWasLoaded] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const setClientState = useClientStore((state) => state.setState);
-  const clientFlags = useClientFlags();
-
-  // load last visited Instance and Location from user local storage
-  setClientState({
-    selectedInstance: clientFlags.selectedInstance,
-    selectedLocation: clientFlags.selectedLocation,
-  });
 
   const appLoaded = useMemo(
     () => localeLoaded && settingsLoaded,
@@ -138,26 +133,32 @@ export const App = () => {
 
   // load locales
   useEffect(() => {
-    debug('Loading locales');
-    loadLocaleAsync(detectedLocale).then(() => {
-      setWasLoaded(true);
-      debug(`Locale ${detectedLocale} loaded.`);
-    });
-    dayjs.locale(detectedLocale);
+    if (!localeLoadRef.current) {
+      localeLoadRef.current = true;
+      debug('Loading locales');
+      loadLocaleAsync(detectedLocale).then(() => {
+        setWasLoaded(true);
+        debug(`Locale ${detectedLocale} loaded.`);
+      });
+      dayjs.locale(detectedLocale);
+    }
   }, []);
 
   // load settings from tauri first time
   useEffect(() => {
-    const loadTauriState = async () => {
-      debug('App init state from tauri');
-      const appConfig = await getAppConfig();
-      const instances = await getInstances();
-      const tunnels = await getTunnels();
-      setClientState({ appConfig, instances, tunnels });
-      debug('Tauri init data loaded');
-      setSettingsLoaded(true);
-    };
-    loadTauriState();
+    if (!tauriInitLoadRef.current) {
+      tauriInitLoadRef.current = true;
+      const loadTauriState = async () => {
+        debug('App init state from tauri');
+        const appConfig = await getAppConfig();
+        const instances = await getInstances();
+        const tunnels = await getTunnels();
+        setClientState({ appConfig, instances, tunnels });
+        debug('Tauri init data loaded');
+        setSettingsLoaded(true);
+      };
+      loadTauriState();
+    }
   }, [setClientState, setSettingsLoaded]);
 
   if (!appLoaded) return null;

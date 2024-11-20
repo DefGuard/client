@@ -4,6 +4,7 @@ import { Body, fetch } from '@tauri-apps/api/http';
 import { useMemo } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
@@ -18,7 +19,7 @@ import {
   EnrollmentStartResponse,
 } from '../../../../../../../shared/hooks/api/types';
 import { clientApi } from '../../../../../clientAPI/clientApi';
-import { useClientFlags } from '../../../../../hooks/useClientFlags';
+import { useClientStore } from '../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../query';
 import { useDeleteInstanceModal } from '../../DeleteInstanceModal/useDeleteInstanceModal';
 import { useUpdateInstanceModal } from '../useUpdateInstanceModal';
@@ -40,7 +41,7 @@ export const UpdateInstanceModalForm = () => {
   const closeModal = useUpdateInstanceModal((state) => state.close);
   const toaster = useToaster();
   const queryClient = useQueryClient();
-  const setClientFlags = useClientFlags((state) => state.setValues);
+  const setClientState = useClientStore((s) => s.setState, shallow);
 
   const defaultValues = useMemo(
     (): FormFields => ({
@@ -199,7 +200,7 @@ export const UpdateInstanceModalForm = () => {
           text={localLL.controls.removeInstance()}
           onClick={() => {
             if (instance) {
-              setClientFlags({
+              setClientState({
                 selectedInstance: undefined,
                 selectedLocation: undefined,
               });
