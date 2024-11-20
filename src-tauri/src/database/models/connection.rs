@@ -144,7 +144,7 @@ impl ConnectionInfo {
 }
 
 /// Connections stored in memory after creating interface
-#[derive(Debug, Serialize, Clone)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ActiveConnection {
     pub location_id: Id,
     pub connected_from: String,

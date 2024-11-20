@@ -267,23 +267,21 @@ pub fn spawn_stats_thread(
                     trace!("Received interface data: {interface_data:?}");
                     let peers: Vec<Peer> =
                         interface_data.peers.into_iter().map(Into::into).collect();
+                    let pool = state.db.lock().unwrap().clone().unwrap();
                     for peer in peers {
                         if connection_type.eq(&ConnectionType::Location) {
-                            let location_stats = peer_to_location_stats(
-                                &peer,
-                                interface_data.listen_port,
-                                &state.get_pool(),
-                            )
-                            .await
-                            .unwrap();
+                            let location_stats =
+                                peer_to_location_stats(&peer, interface_data.listen_port, &pool)
+                                    .await
+                                    .unwrap();
                             let location_name = location_stats
-                                .get_name(&state.get_pool())
+                                .get_name(&pool)
                                 .await
                                 .unwrap_or("UNKNOWN".to_string());
 
                             debug!("Saving network usage stats related to location {location_name} (interface {interface_name}).");
                             trace!("Stats: {location_stats:?}");
-                            match location_stats.save(&state.get_pool()).await {
+                            match location_stats.save(&pool).await {
                                 Ok(_) => {
                                     debug!(
                                         "Saved network usage stats for location {location_name}"
@@ -296,19 +294,16 @@ pub fn spawn_stats_thread(
                                 }
                             }
                         } else {
-                            let tunnel_stats = peer_to_tunnel_stats(
-                                &peer,
-                                interface_data.listen_port,
-                                &state.get_pool(),
-                            )
-                            .await
-                            .unwrap();
+                            let tunnel_stats =
+                                peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
+                                    .await
+                                    .unwrap();
                             let tunnel_name = tunnel_stats
-                                .get_name(&state.get_pool())
+                                .get_name(&pool)
                                 .await
                                 .unwrap_or("UNKNOWN".to_string());
                             debug!("Saving network usage stats related to tunnel {tunnel_name} (interface {interface_name}): {tunnel_stats:?}");
-                            match tunnel_stats.save(&state.get_pool()).await {
+                            match tunnel_stats.save(&pool).await {
                                 Ok(_) => {
                                     debug!("Saved stats for tunnel {tunnel_name}");
                                 }
@@ -1249,17 +1244,13 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
     debug!("Connection verification task finished sleeping");
     let db_pool = &state.get_pool();
 
+    let active_connections = state.active_connections.lock().await;
+
     match connection {
         ConnectionToVerify::Location(location) => {
-            match state
-                .active_connections
-                .lock()
-                .await
-                .clone()
-                .iter()
-                .find(|&x| {
-                    x.location_id == location.id && x.connection_type == ConnectionType::Location
-                }) {
+            match active_connections.iter().find(|&x| {
+                x.location_id == location.id && x.connection_type == ConnectionType::Location
+            }) {
                 Some(active_connection) => {
                     debug!("Verifying connection to location {location}");
                     trace!("Verifying connection {active_connection:?}");
@@ -1286,10 +1277,9 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                     Ok(()) => {
                                         payload.emit(&app_handle);
                                     }
-                                    Err(e) => {
+                                    Err(err) => {
                                         error!(
-                                            "Failed to disconnect location {location}. Error: {}",
-                                            e.to_string()
+                                            "Failed to disconnect location {location}. Error: {err}"
                                         );
                                     }
                                 }
@@ -1309,16 +1299,15 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                 Ok(()) => {
                                     payload.emit(&app_handle);
                                 }
-                                Err(e) => {
+                                Err(err) => {
                                     error!(
-                                        "Failed to disconnect location {location}. Error: {}",
-                                        e.to_string()
+                                        "Failed to disconnect location {location}. Error: {err}"
                                     );
                                 }
                             }
                         }
-                        Err(e) => {
-                            error!("Connection verification for location {location} Failed during retrieval of stats. Error: {}", e.to_string());
+                        Err(err) => {
+                            error!("Connection verification for location {location} Failed during retrieval of stats. Error: {err}");
                         }
                     }
                 }
@@ -1329,15 +1318,9 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
         }
         ConnectionToVerify::Tunnel(tunnel) => {
             debug!("Verifying connection to tunnel {tunnel}");
-            match state
-                .active_connections
-                .lock()
-                .await
-                .clone()
-                .iter()
-                .find(|&x| {
-                    x.location_id == tunnel.id && x.connection_type == ConnectionType::Tunnel
-                }) {
+            match active_connections.iter().find(|&x| {
+                x.location_id == tunnel.id && x.connection_type == ConnectionType::Tunnel
+            }) {
                 Some(active_connection) => {
                     trace!("Verifying connection {:?}", active_connection);
                     let payload = DeadConnDroppedOut {
@@ -1363,8 +1346,8 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                     Ok(()) => {
                                         payload.emit(&app_handle);
                                     }
-                                    Err(e) => {
-                                        error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {}", e.to_string());
+                                    Err(err) => {
+                                        error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {err}");
                                     }
                                 }
                             } else {
@@ -1379,13 +1362,13 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                 Ok(()) => {
                                     payload.emit(&app_handle);
                                 }
-                                Err(e) => {
-                                    error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {}", e.to_string());
+                                Err(err) => {
+                                    error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {err}");
                                 }
                             }
                         }
-                        Err(e) => {
-                            error!("Connection verification for tunnel {tunnel} failed during retrieval of stats. Reason: {}", e.to_string());
+                        Err(err) => {
+                            error!("Connection verification for tunnel {tunnel} failed during retrieval of stats. Reason: {err}");
                         }
                     }
                 }

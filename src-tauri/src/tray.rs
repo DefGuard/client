@@ -58,7 +58,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
             tray_menu = tray_menu.add_submenu(SystemTraySubmenu::new(instance.name, instance_menu));
         }
     } else if let Err(err) = all_instances {
-        warn!("Cannot load instance menu: {:?}", err);
+        warn!("Cannot load instance menu: {err:?}");
     }
 
     // Load rest of tray menu options
