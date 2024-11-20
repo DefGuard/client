@@ -6,11 +6,11 @@ use std::{
     time::Duration,
 };
 
-use chrono::Utc;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use local_ip_address::local_ip;
 use sqlx::query;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, State};
 use tonic::{transport::Channel, Code};
 use tracing::Level;
 
@@ -23,7 +23,7 @@ use crate::{
         TunnelStats, WireguardKeys,
     },
     error::Error,
-    events::{DeadConnDroppedOut, CONNECTION_CHANGED},
+    events::{DeadConDroppedOutReason, DeadConnDroppedOut, CONNECTION_CHANGED},
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     service::proto::{
         desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
@@ -233,7 +233,7 @@ fn is_port_free(port: u16) -> bool {
 }
 
 pub fn spawn_stats_thread(
-    handle: tauri::AppHandle,
+    handle: AppHandle,
     interface_name: String,
     connection_type: ConnectionType,
     location_id: Id,
@@ -618,7 +618,7 @@ pub async fn handle_connection_for_location(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
-    let state: tauri::State<'_, AppState> = handle.state::<AppState>();
+    let state: State<'_, AppState> = handle.state::<AppState>();
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
     #[cfg(not(target_os = "macos"))]
@@ -1217,20 +1217,17 @@ pub enum ConnectionToVerify {
     Tunnel(Tunnel<i64>),
 }
 
-static CONNECTION_EXPECTED_INIT_TIME: std::time::Duration = std::time::Duration::from_secs(5);
+static CONNECTION_EXPECTED_INIT_TIME: Duration = Duration::from_secs(5);
 
 #[must_use]
-pub fn is_connection_alive(connection_start: &chrono::NaiveDateTime, last_handshake: i64) -> bool {
-    if let Some(handshake) = chrono::DateTime::from_timestamp(last_handshake, 0) {
-        let datetime_start =
-            chrono::DateTime::<Utc>::from_naive_utc_and_offset(*connection_start, Utc);
+fn is_connection_alive(connection_start: &NaiveDateTime, last_handshake: i64) -> bool {
+    if let Some(handshake) = DateTime::from_timestamp(last_handshake, 0) {
+        let datetime_start = DateTime::<Utc>::from_naive_utc_and_offset(*connection_start, Utc);
         let res = handshake >= datetime_start;
         trace!("Check for connection, start: {datetime_start}, last handshake: {handshake}, check result: {res}");
         return res;
     }
-    error!(
-        "Connection will be considered as dead because conversion of handshake to DateTime failed."
-    );
+    error!("Connection is considered dead because conversion of handshake to DateTime failed.");
     trace!("start: {connection_start}, last handshake: {last_handshake}");
     false
 }
@@ -1238,8 +1235,8 @@ pub fn is_connection_alive(connection_start: &chrono::NaiveDateTime, last_handsh
 /// Verify if made connection is actually alive after being optimistically connected.
 /// This works by checking if any handshake was made after connecting, within specified time window.
 // TODO: put the verification time into UI Settings
-pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVerify) {
-    let state: tauri::State<AppState> = app_handle.state();
+pub(crate) async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVerify) {
+    let state: State<AppState> = app_handle.state();
     let wait_time = Duration::from_secs(
         state
             .app_config
@@ -1270,7 +1267,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                         con_type: ConnectionType::Location,
                         id: location.id,
                         name: location.name.to_string(),
-                        reason: crate::events::DeadConDroppedOutReason::ConnectionVerification,
+                        reason: DeadConDroppedOutReason::ConnectionVerification,
                     };
                     match LocationStats::latest_by_location_id(db_pool, location.id).await {
                         Ok(Some(latest_stat)) => {
@@ -1347,7 +1344,7 @@ pub async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVe
                         con_type: ConnectionType::Tunnel,
                         id: tunnel.id,
                         name: tunnel.name.to_string(),
-                        reason: crate::events::DeadConDroppedOutReason::ConnectionVerification,
+                        reason: DeadConDroppedOutReason::ConnectionVerification,
                     };
                     match TunnelStats::latest_by_tunnel_id(db_pool, tunnel.id).await {
                         Ok(Some(latest_stat)) => {

@@ -95,20 +95,21 @@ impl AppConfig {
             return res;
         }
         let config_file = get_config_file(app, false);
+        let mut app_config = Self::default();
         match serde_json::from_reader::<_, AppConfigPatch>(config_file) {
             Ok(patch) => {
                 debug!("Config deserialized successfully");
-                let mut res = AppConfig::default();
-                res.apply(patch);
-                res
+                app_config.apply(patch);
             }
             // if deserialization failed, remove file and return default
-            Err(_) => {
-                let res = Self::default();
-                res.save(app);
-                res
+            Err(err) => {
+                error!(
+                    "Failed to deserialize application configurtion file: {err}. Using defaults."
+                );
+                app_config.save(app);
             }
         }
+        app_config
     }
 
     /// Saves currently loaded AppConfig into app data dir file.

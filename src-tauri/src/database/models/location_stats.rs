@@ -64,15 +64,13 @@ where
 }
 
 impl LocationStats {
-    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, SqlxError>
+    pub(crate) async fn get_name<'e, E>(&self, executor: E) -> Result<String, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
-        Ok(
-            query_scalar!("SELECT name FROM location WHERE id = $1", self.location_id)
-                .fetch_one(executor)
-                .await?,
-        )
+        query_scalar!("SELECT name FROM location WHERE id = $1", self.location_id)
+            .fetch_one(executor)
+            .await
     }
 }
 

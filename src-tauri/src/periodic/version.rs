@@ -3,10 +3,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
-use crate::{
-    app_config::AppConfig, appstate::AppState, commands::get_latest_app_version,
-    events::APP_VERSION_FETCH,
-};
+use crate::{appstate::AppState, commands::get_latest_app_version, events::APP_VERSION_FETCH};
 
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
@@ -18,11 +15,11 @@ pub async fn poll_version(app_handle: AppHandle) {
         debug!("Waiting to fetch latest application version for {INTERVAL_IN_SECONDS:?}...");
         sleep(INTERVAL_IN_SECONDS).await;
 
-        let config_option: Option<AppConfig> = match state.app_config.lock() {
+        let config_option = match state.app_config.lock() {
             Ok(guard) => Some(guard.clone()),
-            Err(e) => {
+            Err(err) => {
                 warn!(
-                    "Check for updates: Could not lock app config mutex guard. Reason: {} Waiting for next loop.", e.to_string()
+                    "Check for updates: Could not lock app config mutex guard. Reason: {err}. Waiting for next loop."
                 );
                 None
             }

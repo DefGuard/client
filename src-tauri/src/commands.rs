@@ -740,15 +740,11 @@ pub async fn active_connection(
     );
     let connection = state.find_connection(location_id, connection_type).await;
     if connection.is_some() {
-        debug!(
-            "Found active connection for location {}(ID: {})",
-            name, location_id
-        )
+        debug!("Found active connection for location {name}(ID: {location_id})");
     }
     trace!("Connection retrieved:\n{connection:#?}");
     debug!(
-        "Active connection information for location {}(ID: {}) has been found, returning connection information",
-        name, location_id
+        "Active connection information for location {name}(ID: {location_id}) has been found, returning connection information",
     );
     Ok(connection)
 }
@@ -874,7 +870,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     if !instance_locations.is_empty() {
         debug!(
             "Found locations associated with the instance {instance}, closing their connections..."
-        )
+        );
     }
     for location in instance_locations {
         if let Some(connection) = app_state
@@ -1115,7 +1111,7 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
 pub async fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
     debug!("Running command get app config.");
     let res = app_state.app_config.lock().unwrap().clone();
-    trace!("Returning config: {}", serde_json::to_string(&res).unwrap());
+    trace!("Returning config: {res:?}");
     Ok(res)
 }
 
@@ -1129,35 +1125,25 @@ pub async fn command_set_app_config(
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
     let tray_changed = config_patch.tray_theme.clone();
-    let res: AppConfig;
-    {
+    let res = {
         let mut app_config = app_state.app_config.lock().unwrap();
         app_config.apply(config_patch);
         app_config.save(&app_handle);
-        res = app_config.clone();
-    }
+        app_config.clone()
+    };
     info!("Config changed successfully");
-    if let Some(_) = tray_changed {
+    if tray_changed.is_some() {
         debug!("Tray theme included in config change, tray will be updated.");
         match configure_tray_icon(&app_handle, &res.tray_theme) {
-            Ok(_) => {
-                debug!("Tray updated upon config change");
-            }
-            Err(e) => {
-                error!("Tray change failed. Reason: {}", e.to_string());
-            }
+            Ok(_) => debug!("Tray updated upon config change"),
+            Err(err) => error!("Tray change failed. Reason: {err}"),
         }
     }
     if emit_event {
         match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, {}) {
-            Ok(_) => {
-                debug!("Config changed event emitted successfully");
-            }
-            Err(e) => {
-                error!(
-                    "Emission of config changed event failed. Reason: {}",
-                    e.to_string()
-                );
+            Ok(()) => debug!("Config changed event emitted successfully"),
+            Err(err) => {
+                error!("Emission of config changed event failed. Reason: {err}");
             }
         }
     }

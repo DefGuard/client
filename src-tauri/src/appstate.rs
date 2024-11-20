@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub struct AppState {
-    pub db: Arc<std::sync::Mutex<Option<DbPool>>>,
+    pub db: std::sync::Mutex<Option<DbPool>>,
     pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
     pub client: DesktopDaemonServiceClient<Channel>,
     pub log_watchers: Arc<std::sync::Mutex<HashMap<String, CancellationToken>>>,
@@ -31,7 +31,7 @@ impl AppState {
     pub fn new(app_handle: &AppHandle) -> Self {
         let client = setup_client().expect("Failed to setup gRPC client");
         AppState {
-            db: Arc::new(std::sync::Mutex::new(None)),
+            db: std::sync::Mutex::new(None),
             active_connections: Arc::new(Mutex::new(Vec::new())),
             client,
             log_watchers: Arc::new(std::sync::Mutex::new(HashMap::new())),
@@ -39,12 +39,12 @@ impl AppState {
         }
     }
 
-    pub fn get_pool(&self) -> DbPool {
+    pub(crate) fn get_pool(&self) -> DbPool {
         self.db
             .lock()
             .expect("Failed to lock dbpool mutex")
             .clone()
-            .unwrap()
+            .expect("Missing database connection pool")
     }
 
     /// Try to remove a connection from the list of active connections.

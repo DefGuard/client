@@ -37,41 +37,29 @@ impl DeadConnDroppedOut {
     pub fn emit(self, app_handle: &AppHandle) {
         match self.reason {
             DeadConDroppedOutReason::ConnectionVerification => {
-                if let Err(e) =
+                if let Err(err) =
                     Notification::new(app_handle.config().tauri.bundle.identifier.clone())
                         .title(format!("{} {} disconnected", self.con_type, self.name))
                         .body("No handshake.")
                         .show()
                 {
-                    warn!(
-                        "Dead connection dropped notification not shown. Reason: {}",
-                        e.to_string()
-                    );
+                    warn!("Dead connection dropped notification not shown. Reason: {err}");
                 }
-                if let Err(e) = app_handle.emit_all(DEAD_CONNECTION_DROPPED, self) {
-                    error!(
-                        "Event Dead Connection Dropped was not emitted. Reason: {}",
-                        e.to_string()
-                    );
+                if let Err(err) = app_handle.emit_all(DEAD_CONNECTION_DROPPED, self) {
+                    error!("Event Dead Connection Dropped was not emitted. Reason: {err}");
                 }
             }
             DeadConDroppedOutReason::PeriodicVerification => {
-                if let Err(e) =
+                if let Err(err) =
                     Notification::new(app_handle.config().tauri.bundle.identifier.clone())
                         .title(format!("{} {} disconnected", self.con_type, self.name))
                         .body("Handshake timeout.")
                         .show()
                 {
-                    warn!(
-                        "Dead connection dropped notification not shown. Reason: {}",
-                        e.to_string()
-                    );
+                    warn!("Dead connection dropped notification not shown. Reason: {err}");
                 }
-                if let Err(e) = app_handle.emit_all(DEAD_CONNECTION_DROPPED, self) {
-                    error!(
-                        "Event Dead Connection Dropped was not emitted. Reason: {}",
-                        e.to_string()
-                    )
+                if let Err(err) = app_handle.emit_all(DEAD_CONNECTION_DROPPED, self) {
+                    error!("Event Dead Connection Dropped was not emitted. Reason: {err}")
                 }
             }
         }

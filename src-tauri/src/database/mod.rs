@@ -16,12 +16,12 @@ use crate::error::Error;
 
 const DB_NAME: &str = "defguard.db";
 
-pub type DbPool = sqlx::SqlitePool;
+pub(crate) type DbPool = sqlx::SqlitePool;
 
 /// Initializes the database
 pub async fn init_db(app_handle: &AppHandle) -> Result<DbPool, Error> {
     let db_url = prepare_db_url(app_handle)?;
-    debug!("Connecting to database: {}", db_url);
+    debug!("Connecting to database: {db_url}");
     let pool = DbPool::connect(&db_url).await?;
     debug!("Running database migrations, if there are any.");
     sqlx::migrate!().run(&pool).await?;
