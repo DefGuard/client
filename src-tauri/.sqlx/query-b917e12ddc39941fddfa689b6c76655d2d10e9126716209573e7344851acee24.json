@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, tunnel_id, upload \"upload!: i64\", download \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM tunnel_stats WHERE tunnel_id=$1 \n           ORDER BY last_handshake DESC LIMIT 1\n           ",
+  "query": "SELECT id, location_id, upload \"upload!: i64\", download \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\",\n            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM location_stats WHERE location_id=$1 ORDER BY last_handshake DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "tunnel_id",
+        "name": "location_id",
         "ordinal": 1,
         "type_info": "Integer"
       },
@@ -55,8 +55,8 @@
       false,
       false,
       false,
-      false
+      true
     ]
   },
-  "hash": "66cf9b73af47657ec96e5babe87ed975c7fb687c2e61083d158905d639f07026"
+  "hash": "b917e12ddc39941fddfa689b6c76655d2d10e9126716209573e7344851acee24"
 }

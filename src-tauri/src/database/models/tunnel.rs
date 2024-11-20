@@ -245,10 +245,10 @@ pub struct TunnelStats<I = NoId> {
     pub tunnel_id: Id,
     upload: i64,
     download: i64,
-    pub last_handshake: i64,
-    collected_at: NaiveDateTime,
+    pub(crate) last_handshake: i64,
+    pub(crate) collected_at: NaiveDateTime,
     listen_port: u32,
-    pub persistent_keepalive_interval: Option<u16>,
+    pub(crate) persistent_keepalive_interval: Option<u16>,
 }
 
 impl TunnelStats {
@@ -368,17 +368,17 @@ impl TunnelStats<Id> {
         let res = query_as!(
             TunnelStats::<Id>,
             "SELECT id, tunnel_id, \
-           upload \"upload!: i64\", \
-           download \"download!: i64\", \
-           last_handshake, \
-           collected_at \"collected_at!: NaiveDateTime\", \
-           listen_port \"listen_port!: u32\", \
-           persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
-           FROM tunnel_stats \
-           WHERE tunnel_id=$1 
-           ORDER BY last_handshake DESC \
-           LIMIT 1
-           ",
+            upload \"upload!: i64\", \
+            download \"download!: i64\", \
+            last_handshake, \
+            collected_at \"collected_at!: NaiveDateTime\", \
+            listen_port \"listen_port!: u32\", \
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM tunnel_stats \
+            WHERE tunnel_id=$1
+            ORDER BY last_handshake DESC \
+            LIMIT 1
+            ",
             tunnel_id
         )
         .fetch_optional(executor)

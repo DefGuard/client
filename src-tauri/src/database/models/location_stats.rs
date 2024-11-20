@@ -18,7 +18,7 @@ pub struct LocationStats<I = NoId> {
     upload: i64,
     download: i64,
     pub(crate) last_handshake: i64,
-    collected_at: NaiveDateTime,
+    pub(crate) collected_at: NaiveDateTime,
     listen_port: u32,
     pub(crate) persistent_keepalive_interval: Option<u16>,
 }
@@ -184,16 +184,16 @@ impl LocationStats<Id> {
         let res = query_as!(
             LocationStats::<Id>,
             "SELECT id, location_id, \
-             upload \"upload!: i64\", \
-             download \"download!: i64\", \
-             last_handshake, \
-             collected_at \"collected_at!: NaiveDateTime\", \
-             listen_port \"listen_port!: u32\",
-             persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
-             FROM location_stats \
-             WHERE location_id=$1 \
-             ORDER BY last_handshake DESC \
-             LIMIT 1",
+            upload \"upload!: i64\", \
+            download \"download!: i64\", \
+            last_handshake, \
+            collected_at \"collected_at!: NaiveDateTime\", \
+            listen_port \"listen_port!: u32\",
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM location_stats \
+            WHERE location_id=$1 \
+            ORDER BY last_handshake DESC \
+            LIMIT 1",
             location_id
         )
         .fetch_optional(executor)

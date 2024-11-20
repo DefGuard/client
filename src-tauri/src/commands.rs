@@ -1136,7 +1136,7 @@ pub async fn command_set_app_config(
     if tray_changed.is_some() {
         debug!("Tray theme included in config change, tray will be updated.");
         match configure_tray_icon(&app_handle, &res.tray_theme) {
-            Ok(_) => debug!("Tray updated upon config change"),
+            Ok(()) => debug!("Tray updated upon config change"),
             Err(err) => error!("Tray change failed. Reason: {err}"),
         }
     }

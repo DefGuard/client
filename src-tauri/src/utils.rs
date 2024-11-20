@@ -1212,23 +1212,19 @@ pub enum ConnectionToVerify {
     Tunnel(Tunnel<i64>),
 }
 
-static CONNECTION_EXPECTED_INIT_TIME: Duration = Duration::from_secs(5);
-
 #[must_use]
-fn is_connection_alive(connection_start: NaiveDateTime, last_handshake: i64) -> bool {
-    if let Some(handshake) = DateTime::from_timestamp(last_handshake, 0) {
-        let datetime_start = DateTime::<Utc>::from_naive_utc_and_offset(connection_start, Utc);
-        let res = handshake >= datetime_start;
-        trace!("Check for connection, start: {datetime_start}, last handshake: {handshake}, check result: {res}");
-        return res;
-    }
-    error!("Connection is considered dead because conversion of handshake to DateTime failed.");
-    trace!("start: {connection_start}, last handshake: {last_handshake}");
-    false
+fn is_connection_alive(connection_start: NaiveDateTime, last_activity: NaiveDateTime) -> bool {
+    let start = DateTime::<Utc>::from_naive_utc_and_offset(connection_start, Utc);
+    let activity = DateTime::<Utc>::from_naive_utc_and_offset(last_activity, Utc);
+    let result = activity >= start;
+    trace!(
+        "Check for connection, start: {start}, last activity: {activity}, check result: {result}"
+    );
+    result
 }
 
 /// Verify if made connection is actually alive after being optimistically connected.
-/// This works by checking if any handshake was made after connecting, within specified time window.
+/// This works by checking if any activity was made after connecting, within specified time window.
 // TODO: put the verification time into UI Settings
 pub(crate) async fn verify_connection(app_handle: AppHandle, connection: ConnectionToVerify) {
     let state: State<AppState> = app_handle.state();
@@ -1263,10 +1259,11 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                     };
                     let connection_start = active_connection.start;
                     drop(active_connections); // release Mutex lock
+
                     match LocationStats::latest_by_location_id(db_pool, location.id).await {
                         Ok(Some(latest_stat)) => {
-                            if !is_connection_alive(connection_start, latest_stat.last_handshake) {
-                                info!("Connected location {location} will be disconnected due to lack of handshake within {} seconds.", CONNECTION_EXPECTED_INIT_TIME.as_secs());
+                            if !is_connection_alive(connection_start, latest_stat.collected_at) {
+                                info!("Location {location} will be disconnected due to lack of activity within {wait_time:?}.");
                                 match disconnect(
                                     location.id,
                                     ConnectionType::Location,
@@ -1288,7 +1285,7 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                             }
                         }
                         Ok(None) => {
-                            info!("Connected location {location} will be disconnected due to lack of statistics within {} seconds.", CONNECTION_EXPECTED_INIT_TIME.as_secs());
+                            info!("Location {location} will be disconnected due to lack of statistics within {wait_time:?}.");
                             match disconnect(
                                 location.id,
                                 ConnectionType::Location,
@@ -1322,7 +1319,7 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                 x.location_id == tunnel.id && x.connection_type == ConnectionType::Tunnel
             }) {
                 Some(active_connection) => {
-                    trace!("Verifying connection {:?}", active_connection);
+                    trace!("Verifying connection {active_connection:?}");
                     let payload = DeadConnDroppedOut {
                         con_type: ConnectionType::Tunnel,
                         id: tunnel.id,
@@ -1331,10 +1328,11 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                     };
                     let connection_start = active_connection.start;
                     drop(active_connections); // release Mutex lock
+
                     match TunnelStats::latest_by_tunnel_id(db_pool, tunnel.id).await {
                         Ok(Some(latest_stat)) => {
-                            if !is_connection_alive(connection_start, latest_stat.last_handshake) {
-                                info!("Tunnel {tunnel} will be disconnected due to lack of handshake within specified time.");
+                            if !is_connection_alive(connection_start, latest_stat.collected_at) {
+                                info!("Tunnel {tunnel} will be disconnected due to lack of activity within specified time.");
                                 match disconnect(
                                     tunnel.id,
                                     ConnectionType::Tunnel,

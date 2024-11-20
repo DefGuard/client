@@ -155,7 +155,7 @@ pub struct ActiveConnection {
 
 impl ActiveConnection {
     #[must_use]
-    pub fn new(
+    pub(crate) fn new(
         location_id: Id,
         connected_from: String,
         interface_name: String,
