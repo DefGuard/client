@@ -100,13 +100,12 @@ impl AppConfig {
         let mut app_config = Self::default();
         match serde_json::from_reader::<_, AppConfigPatch>(config_file) {
             Ok(patch) => {
-                eprintln!("Config deserialized successfully");
                 app_config.apply(patch);
             }
             // if deserialization failed, remove file and return default
             Err(err) => {
                 eprintln!(
-                    "Failed to deserialize application configurtion file: {err}. Using defaults."
+                    "Failed to deserialize application configuration file: {err}. Using defaults."
                 );
                 app_config.save(app);
             }
