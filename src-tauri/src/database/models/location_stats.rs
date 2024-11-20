@@ -131,7 +131,7 @@ impl LocationStats<NoId> {
 }
 
 impl LocationStats<Id> {
-    pub async fn all_by_location_id<'e, E>(
+    pub(crate) async fn all_by_location_id<'e, E>(
         executor: E,
         location_id: Id,
         from: &NaiveDateTime,
@@ -146,14 +146,14 @@ impl LocationStats<Id> {
         let stats = query_as!(
             LocationStats,
             "WITH cte AS ( \
-                SELECT \
-                    id, location_id, \
-                    COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) upload, \
-                    COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) download, \
-                    last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
-                FROM location_stats \
-                ORDER BY collected_at \
-	            LIMIT -1 OFFSET 1 \
+            SELECT \
+                id, location_id, \
+                COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) upload, \
+                COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) download, \
+                last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
+            FROM location_stats \
+            ORDER BY collected_at \
+            LIMIT -1 OFFSET 1 \
             ) \
             SELECT \
                 id, location_id, \
@@ -177,7 +177,7 @@ impl LocationStats<Id> {
         Ok(stats)
     }
 
-    pub async fn latest_by_location_id<'e, E>(
+    pub(crate) async fn latest_by_location_id<'e, E>(
         executor: E,
         location_id: Id,
     ) -> Result<Option<Self>, Error>

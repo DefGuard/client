@@ -124,10 +124,9 @@ async fn main() {
 
             // Sets the time format. Service's logs have a subsecond part, so we also need to include it here,
             // otherwise the logs couldn't be sorted correctly when displayed together in the UI.
-            let format = time::format_description::parse(
-                "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]",
-            )
-            .unwrap();
+            let format = time::macros::format_description!(
+                "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]"
+            );
 
             app.handle()
                 .plugin(

@@ -1249,17 +1249,13 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
     debug!("Connection verification task finished sleeping");
     let db_pool = &state.get_pool();
 
+    let active_connections = state.active_connections.lock().await;
+
     match connection {
         ConnectionToVerify::Location(location) => {
-            match state
-                .active_connections
-                .lock()
-                .await
-                .clone()
-                .iter()
-                .find(|&x| {
-                    x.location_id == location.id && x.connection_type == ConnectionType::Location
-                }) {
+            match active_connections.iter().find(|&x| {
+                x.location_id == location.id && x.connection_type == ConnectionType::Location
+            }) {
                 Some(active_connection) => {
                     debug!("Verifying connection to location {location}");
                     trace!("Verifying connection {active_connection:?}");
@@ -1286,10 +1282,9 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                     Ok(()) => {
                                         payload.emit(&app_handle);
                                     }
-                                    Err(e) => {
+                                    Err(err) => {
                                         error!(
-                                            "Failed to disconnect location {location}. Error: {}",
-                                            e.to_string()
+                                            "Failed to disconnect location {location}. Error: {err}"
                                         );
                                     }
                                 }
@@ -1309,16 +1304,15 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                 Ok(()) => {
                                     payload.emit(&app_handle);
                                 }
-                                Err(e) => {
+                                Err(err) => {
                                     error!(
-                                        "Failed to disconnect location {location}. Error: {}",
-                                        e.to_string()
+                                        "Failed to disconnect location {location}. Error: {err}"
                                     );
                                 }
                             }
                         }
-                        Err(e) => {
-                            error!("Connection verification for location {location} Failed during retrieval of stats. Error: {}", e.to_string());
+                        Err(err) => {
+                            error!("Connection verification for location {location} Failed during retrieval of stats. Error: {err}");
                         }
                     }
                 }
@@ -1329,15 +1323,9 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
         }
         ConnectionToVerify::Tunnel(tunnel) => {
             debug!("Verifying connection to tunnel {tunnel}");
-            match state
-                .active_connections
-                .lock()
-                .await
-                .clone()
-                .iter()
-                .find(|&x| {
-                    x.location_id == tunnel.id && x.connection_type == ConnectionType::Tunnel
-                }) {
+            match active_connections.iter().find(|&x| {
+                x.location_id == tunnel.id && x.connection_type == ConnectionType::Tunnel
+            }) {
                 Some(active_connection) => {
                     trace!("Verifying connection {:?}", active_connection);
                     let payload = DeadConnDroppedOut {
@@ -1363,8 +1351,8 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                     Ok(()) => {
                                         payload.emit(&app_handle);
                                     }
-                                    Err(e) => {
-                                        error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {}", e.to_string());
+                                    Err(err) => {
+                                        error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {err}");
                                     }
                                 }
                             } else {
@@ -1379,13 +1367,13 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                 Ok(()) => {
                                     payload.emit(&app_handle);
                                 }
-                                Err(e) => {
-                                    error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {}", e.to_string());
+                                Err(err) => {
+                                    error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {err}");
                                 }
                             }
                         }
-                        Err(e) => {
-                            error!("Connection verification for tunnel {tunnel} failed during retrieval of stats. Reason: {}", e.to_string());
+                        Err(err) => {
+                            error!("Connection verification for tunnel {tunnel} failed during retrieval of stats. Reason: {err}");
                         }
                     }
                 }
