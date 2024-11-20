@@ -397,7 +397,7 @@ pub async fn setup_interface_tunnel(
         "Parsing tunnel {tunnel} allowed ips: {:?}",
         tunnel.allowed_ips
     );
-    let allowed_ips: Vec<String> = if tunnel.route_all_traffic {
+    let allowed_ips = if tunnel.route_all_traffic {
         debug!("Using all traffic routing for tunnel {tunnel}: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
@@ -1215,9 +1215,9 @@ pub enum ConnectionToVerify {
 static CONNECTION_EXPECTED_INIT_TIME: Duration = Duration::from_secs(5);
 
 #[must_use]
-fn is_connection_alive(connection_start: &NaiveDateTime, last_handshake: i64) -> bool {
+fn is_connection_alive(connection_start: NaiveDateTime, last_handshake: i64) -> bool {
     if let Some(handshake) = DateTime::from_timestamp(last_handshake, 0) {
-        let datetime_start = DateTime::<Utc>::from_naive_utc_and_offset(*connection_start, Utc);
+        let datetime_start = DateTime::<Utc>::from_naive_utc_and_offset(connection_start, Utc);
         let res = handshake >= datetime_start;
         trace!("Check for connection, start: {datetime_start}, last handshake: {handshake}, check result: {res}");
         return res;
@@ -1240,6 +1240,7 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
             .connection_verification_time
             .into(),
     );
+    debug!("Connection verification task is sleeping for {wait_time:?}");
     tokio::time::sleep(wait_time).await;
     debug!("Connection verification task finished sleeping");
     let db_pool = &state.get_pool();
@@ -1260,12 +1261,11 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                         name: location.name.to_string(),
                         reason: DeadConDroppedOutReason::ConnectionVerification,
                     };
+                    let connection_start = active_connection.start;
+                    drop(active_connections); // release Mutex lock
                     match LocationStats::latest_by_location_id(db_pool, location.id).await {
                         Ok(Some(latest_stat)) => {
-                            if !is_connection_alive(
-                                &active_connection.start,
-                                latest_stat.last_handshake,
-                            ) {
+                            if !is_connection_alive(connection_start, latest_stat.last_handshake) {
                                 info!("Connected location {location} will be disconnected due to lack of handshake within {} seconds.", CONNECTION_EXPECTED_INIT_TIME.as_secs());
                                 match disconnect(
                                     location.id,
@@ -1329,12 +1329,11 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                         name: tunnel.name.to_string(),
                         reason: DeadConDroppedOutReason::ConnectionVerification,
                     };
+                    let connection_start = active_connection.start;
+                    drop(active_connections); // release Mutex lock
                     match TunnelStats::latest_by_tunnel_id(db_pool, tunnel.id).await {
                         Ok(Some(latest_stat)) => {
-                            if !is_connection_alive(
-                                &active_connection.start,
-                                latest_stat.last_handshake,
-                            ) {
+                            if !is_connection_alive(connection_start, latest_stat.last_handshake) {
                                 info!("Tunnel {tunnel} will be disconnected due to lack of handshake within specified time.");
                                 match disconnect(
                                     tunnel.id,

@@ -53,8 +53,9 @@ pub async fn connect(
 ) -> Result<(), Error> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
     let state = handle.state::<AppState>();
+    let pool = state.get_pool();
     if connection_type == ConnectionType::Location {
-        if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
+        if let Some(location) = Location::find_by_id(&pool, location_id).await? {
             debug!(
                 "Identified location with ID {location_id} as \"{}\", handling connection...",
                 location.name
@@ -72,7 +73,7 @@ pub async fn connect(
             error!("Location with ID {location_id} not found in the database, aborting connection attempt");
             return Err(Error::NotFound);
         }
-    } else if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
+    } else if let Some(tunnel) = Tunnel::find_by_id(&pool, location_id).await? {
         debug!(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
@@ -1140,7 +1141,7 @@ pub async fn command_set_app_config(
         }
     }
     if emit_event {
-        match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, {}) {
+        match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, ()) {
             Ok(()) => debug!("Config changed event emitted successfully"),
             Err(err) => {
                 error!("Emission of config changed event failed. Reason: {err}");

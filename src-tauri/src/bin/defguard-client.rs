@@ -141,7 +141,7 @@ async fn main() {
                                 record.level(),
                                 record.target(),
                                 message
-                            ))
+                            ));
                         })
                         .targets(LOG_TARGETS)
                         .level(log_level)
@@ -179,7 +179,7 @@ async fn main() {
                 )
                 .unwrap();
 
-            info!("App setup completed, log level: {}", log_level.to_string());
+            info!("App setup completed, log level: {log_level}");
 
             Ok(())
         })
