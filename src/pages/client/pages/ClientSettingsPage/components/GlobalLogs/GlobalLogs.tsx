@@ -23,7 +23,7 @@ import { GlobalLogsSourceSelect } from './GlobalLogsSourceSelect';
 
 export const GlobalLogs = () => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);
-  const globalLogLevelRef = useRef<GlobalLogLevel>('info');
+  const globalLogLevelRef = useRef<GlobalLogLevel>('INFO');
   const logSourceRef = useRef<LogSource>('All');
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details.logs;
@@ -111,7 +111,7 @@ export const GlobalLogs = () => {
         <h3>{localLL.title()}</h3>
         <div id="selects">
           <GlobalLogsSelect
-            initSelected={'info'}
+            initSelected={'INFO'}
             onChange={(level) => {
               globalLogLevelRef.current = level;
               clearLogs();
@@ -166,11 +166,11 @@ const createLogLineElement = (content: string): HTMLParagraphElement => {
 const filterLogByLevel = (target: LogLevel, log: LogLevel): boolean => {
   const log_level = log.toLocaleLowerCase();
   switch (target) {
-    case 'error':
+    case 'ERROR':
       return log_level === 'error';
-    case 'info':
+    case 'INFO':
       return ['info', 'error', 'warn'].includes(log_level);
-    case 'debug':
+    case 'DEBUG':
       return ['error', 'info', 'debug', 'warn'].includes(log_level);
     default:
       return true;

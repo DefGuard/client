@@ -970,9 +970,9 @@ fn close_service_handle(
 // so `handle_connection_for_location` and `handle_connection_for_tunnel` are not
 // partially duplicated here.
 #[cfg(target_os = "windows")]
-pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
+pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
-    let appstate = apphandle.state::<AppState>();
+    let appstate = app_handle.state::<AppState>();
     let all_locations = Location::all(&appstate.get_pool()).await?;
     let service_control_manager = open_service_manager().map_err(|err| {
         error!("Failed to open service control manager while trying to sync client's connections with the host state: {}", err);
@@ -1059,7 +1059,7 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
             appstate.active_connections.lock().await
         );
         debug!("Sending event informing the frontend that a new connection has been created.");
-        apphandle.emit_all(
+        app_handle.emit_all(
             CONNECTION_CHANGED,
             Payload {
                 message: "Created new connection".into(),
@@ -1072,7 +1072,7 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
             location
         );
         spawn_stats_thread(
-            apphandle.clone(),
+            app_handle.clone(),
             interface_name.clone(),
             ConnectionType::Location,
             location.id,
@@ -1084,7 +1084,7 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
 
         debug!("Spawning service log watcher for location {}...", location);
         spawn_log_watcher_task(
-            apphandle.clone(),
+            app_handle.clone(),
             location.id,
             interface_name,
             ConnectionType::Location,
@@ -1173,7 +1173,7 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
             appstate.active_connections.lock().await
         );
         debug!("Sending event informing the frontend that a new connection has been created.");
-        apphandle.emit_all(
+        app_handle.emit_all(
             CONNECTION_CHANGED,
             Payload {
                 message: "Created new connection".into(),
@@ -1184,7 +1184,7 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
         // Spawn stats threads
         debug!("Spawning stats thread for tunnel {}", tunnel.name);
         spawn_stats_thread(
-            apphandle.clone(),
+            app_handle.clone(),
             interface_name.clone(),
             ConnectionType::Tunnel,
             tunnel.id,
@@ -1194,7 +1194,7 @@ pub async fn sync_connections(apphandle: &AppHandle) -> Result<(), Error> {
         //spawn log watcher
         debug!("Spawning log watcher for tunnel {}", tunnel.name);
         spawn_log_watcher_task(
-            apphandle.clone(),
+            app_handle.clone(),
             tunnel.id,
             interface_name,
             ConnectionType::Tunnel,

@@ -141,15 +141,15 @@ const createLogLineElement = (content: string): HTMLParagraphElement => {
 const filterLogByLevel = (target: LogLevel, log: LogLevel): boolean => {
   const log_level = log.toLocaleLowerCase();
   switch (target) {
-    case 'error':
+    case 'ERROR':
       return log_level === 'error';
-    case 'warn':
+    case 'WARN':
       return ['error', 'warn'].includes(log_level);
-    case 'info':
+    case 'INFO':
       return ['info', 'error', 'warn'].includes(log_level);
-    case 'debug':
+    case 'DEBUG':
       return ['error', 'info', 'debug', 'warn'].includes(log_level);
-    case 'trace':
+    case 'TRACE':
       return true;
   }
 };

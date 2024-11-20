@@ -23,12 +23,12 @@ fn get_config_file_path(app: &AppHandle) -> PathBuf {
     config_file_path
 }
 
-fn get_config_file(app: &AppHandle, for_write: bool) -> File {
+fn get_config_file(app: &AppHandle, write: bool, truncate: bool) -> File {
     let config_file_path = get_config_file_path(app);
     OpenOptions::new()
         .create(true)
-        .truncate(for_write)
-        .write(true)
+        .truncate(truncate)
+        .write(write)
         .open(config_file_path)
         .expect("Failed to create and open app config.")
 }
@@ -87,6 +87,7 @@ impl AppConfig {
     pub fn new(app: &AppHandle) -> Self {
         let config_path = get_config_file_path(app);
         if !config_path.exists() {
+            println!("Configuration file not found !");
             debug!(
                 "Application configuration file doesn't exist; initializing it with the defaults."
             );
@@ -94,17 +95,20 @@ impl AppConfig {
             res.save(app);
             return res;
         }
-        let config_file = get_config_file(app, false);
+        let config_file = get_config_file(app, true, true);
         let mut app_config = Self::default();
         match serde_json::from_reader::<_, AppConfigPatch>(config_file) {
             Ok(patch) => {
                 debug!("Config deserialized successfully");
+                println!("{app_config:?}");
+                println!("{patch:?}");
                 app_config.apply(patch);
             }
             // if deserialization failed, remove file and return default
             Err(err) => {
+                println!("Deserialization failed. returning default, {err}");
                 error!(
-                    "Failed to deserialize application configurtion file: {err}. Using defaults."
+                    "Failed to deserialize application configuration file: {err}. Using defaults."
                 );
                 app_config.save(app);
             }
@@ -115,7 +119,7 @@ impl AppConfig {
     /// Saves currently loaded AppConfig into app data dir file.
     /// Warning: this will always overwrite file contents.
     pub fn save(&self, app: &AppHandle) {
-        let file = get_config_file(app, true);
+        let file = get_config_file(app, true, true);
         match serde_json::to_writer(file, &self) {
             Ok(()) => debug!("Application configuration file has been saved."),
             Err(err) => {

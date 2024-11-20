@@ -24,7 +24,7 @@ const defaultValues: StoreValues = {
   selectedView: 'grid',
   // application config stored in app data json file, ONLY interact with it via store methods.
   appConfig: {
-    log_level: 'error',
+    log_level: 'INFO',
     theme: 'light',
     tray_theme: 'color',
     check_for_updates: true,

@@ -1,7 +1,7 @@
 import './style.scss';
 
 import { useMutation } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
@@ -42,7 +42,10 @@ export const GlobalSettingsTab = () => {
       </section>
       <section>
         <header>
-          <h2>{localLL.peer_alive.title()}</h2>
+          <h2>
+            {localLL.peer_alive.title()}
+            <span>{localLL.common.value_in_seconds()}</span>
+          </h2>
           <Helper initialPlacement="right">
             <p>{localLL.peer_alive.helper()}</p>
           </Helper>
@@ -51,7 +54,10 @@ export const GlobalSettingsTab = () => {
       </section>
       <section>
         <header>
-          <h2>{localLL.connection_verification.title()}</h2>
+          <h2>
+            {localLL.connection_verification.title()}
+            <span>{localLL.common.value_in_seconds()}</span>
+          </h2>
           <Helper initialPlacement="right">
             <p>{localLL.peer_alive.helper()}</p>
           </Helper>
@@ -132,22 +138,22 @@ const LoggingLevelSelect = () => {
       {
         key: 0,
         label: localLL.options.error(),
-        value: 'error',
+        value: 'ERROR',
       },
       {
         key: 1,
         label: localLL.options.info(),
-        value: 'info',
+        value: 'INFO',
       },
       {
         key: 2,
         label: localLL.options.debug(),
-        value: 'debug',
+        value: 'DEBUG',
       },
       {
         key: 3,
         label: localLL.options.trace(),
-        value: 'trace',
+        value: 'TRACE',
       },
     ];
     return res;
@@ -242,11 +248,6 @@ const TrayIconThemeSelect = () => {
     },
     [trayThemeSelectOptions],
   );
-
-  useEffect(() => {
-    console.log(appConfig);
-    console.log(appConfig.tray_theme);
-  }, [appConfig]);
 
   return (
     <Select

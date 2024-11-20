@@ -68,9 +68,8 @@ const en = {
           location: 'Location',
           body: {
             periodic:
-              '{conType: string} {instanceName: string} was disconnected due to lack of handshake within expected time window.',
-            connection:
-              '{conType: string} {name: string} was disconnected due to absence of handshake.',
+              '{conType: string} {instanceName: string} was automatically disconnected because it exceeded the expected time for staying active without receiving confirmation from the server.',
+            connection: `{conType: string} {name: string} connection was automatically disconnected because it didn't complete the necessary setup in time. This can happen if the connection wasn't fully established`,
           },
           controls: {
             close: 'Close',
@@ -142,13 +141,16 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
           title: 'Settings',
           tabs: {
             global: {
+              common: {
+                value_in_seconds: '(seconds)',
+              },
               peer_alive: {
-                title: 'Peer alive period (seconds)',
+                title: 'Peer alive period',
                 helper:
                   'If connection exceeds given time without making an handshake. The connection will be dropped automatically.',
               },
               connection_verification: {
-                title: 'Connection verification time (seconds)',
+                title: 'Connection verification time',
                 helper:
                   'How much time can pass after making a connection without making an handshake. If set time will pass and handshake was not made, the connection will be dropped automatically.',
               },

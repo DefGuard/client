@@ -36,7 +36,8 @@ extern crate log;
 
 // for tauri log plugin
 const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
-const LOG_FILTER: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
+// if found in metadata target name it will ignore the log if it was below info level
+const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
 
 lazy_static! {
     static ref LOG_INCLUDES: Vec<String> = load_log_targets();
@@ -114,8 +115,7 @@ async fn main() {
             let app_state: State<AppState> = app.state();
 
             // use config default if deriving from env value fails so that env can override config file
-            let config_log_level: LevelFilter =
-                app_state.app_config.lock().unwrap().log_level.into();
+            let config_log_level = app_state.app_config.lock().unwrap().log_level;
 
             let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
                 Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
@@ -169,7 +169,7 @@ async fn main() {
                                 return true;
                             }
                             // Otherwise do not log the following targets
-                            for target in &LOG_FILTER {
+                            for target in &LOGGING_TARGET_IGNORE_LIST {
                                 if metadata.target().contains(target) {
                                     return false;
                                 }
@@ -179,6 +179,9 @@ async fn main() {
                         .build(),
                 )
                 .unwrap();
+
+            info!("App setup completed, log level: {}", log_level.to_string());
+
             Ok(())
         })
         .system_tray(SystemTray::new())

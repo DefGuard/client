@@ -190,13 +190,13 @@ type RootTranslation = {
 					location: string
 					body: {
 						/**
-						 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​l​a​c​k​ ​o​f​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​i​n​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​w​i​n​d​o​w​.
+						 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​b​e​c​a​u​s​e​ ​i​t​ ​e​x​c​e​e​d​e​d​ ​t​h​e​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​f​o​r​ ​s​t​a​y​i​n​g​ ​a​c​t​i​v​e​ ​w​i​t​h​o​u​t​ ​r​e​c​e​i​v​i​n​g​ ​c​o​n​f​i​r​m​a​t​i​o​n​ ​f​r​o​m​ ​t​h​e​ ​s​e​r​v​e​r​.
 						 * @param {string} conType
 						 * @param {string} instanceName
 						 */
 						periodic: RequiredParams<'conType' | 'instanceName'>
 						/**
-						 * {​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​a​b​s​e​n​c​e​ ​o​f​ ​h​a​n​d​s​h​a​k​e​.
+						 * {​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​c​o​n​n​e​c​t​i​o​n​ ​w​a​s​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​b​e​c​a​u​s​e​ ​i​t​ ​d​i​d​n​'​t​ ​c​o​m​p​l​e​t​e​ ​t​h​e​ ​n​e​c​e​s​s​a​r​y​ ​s​e​t​u​p​ ​i​n​ ​t​i​m​e​.​ ​T​h​i​s​ ​c​a​n​ ​h​a​p​p​e​n​ ​i​f​ ​t​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​a​s​n​'​t​ ​f​u​l​l​y​ ​e​s​t​a​b​l​i​s​h​e​d
 						 * @param {string} conType
 						 * @param {string} name
 						 */
@@ -329,9 +329,15 @@ type RootTranslation = {
 					title: string
 					tabs: {
 						global: {
+							common: {
+								/**
+								 * (​s​e​c​o​n​d​s​)
+								 */
+								value_in_seconds: string
+							}
 							peer_alive: {
 								/**
-								 * P​e​e​r​ ​a​l​i​v​e​ ​p​e​r​i​o​d​ ​(​s​e​c​o​n​d​s​)
+								 * P​e​e​r​ ​a​l​i​v​e​ ​p​e​r​i​o​d
 								 */
 								title: string
 								/**
@@ -341,7 +347,7 @@ type RootTranslation = {
 							}
 							connection_verification: {
 								/**
-								 * C​o​n​n​e​c​t​i​o​n​ ​v​e​r​i​f​i​c​a​t​i​o​n​ ​t​i​m​e​ ​(​s​e​c​o​n​d​s​)
+								 * C​o​n​n​e​c​t​i​o​n​ ​v​e​r​i​f​i​c​a​t​i​o​n​ ​t​i​m​e
 								 */
 								title: string
 								/**
@@ -1792,11 +1798,11 @@ export type TranslationFunctions = {
 					location: () => LocalizedString
 					body: {
 						/**
-						 * {conType} {instanceName} was disconnected due to lack of handshake within expected time window.
+						 * {conType} {instanceName} was automatically disconnected because it exceeded the expected time for staying active without receiving confirmation from the server.
 						 */
 						periodic: (arg: { conType: string, instanceName: string }) => LocalizedString
 						/**
-						 * {conType} {name} was disconnected due to absence of handshake.
+						 * {conType} {name} connection was automatically disconnected because it didn't complete the necessary setup in time. This can happen if the connection wasn't fully established
 						 */
 						connection: (arg: { conType: string, name: string }) => LocalizedString
 					}
@@ -1927,9 +1933,15 @@ export type TranslationFunctions = {
 					title: () => LocalizedString
 					tabs: {
 						global: {
+							common: {
+								/**
+								 * (seconds)
+								 */
+								value_in_seconds: () => LocalizedString
+							}
 							peer_alive: {
 								/**
-								 * Peer alive period (seconds)
+								 * Peer alive period
 								 */
 								title: () => LocalizedString
 								/**
@@ -1939,7 +1951,7 @@ export type TranslationFunctions = {
 							}
 							connection_verification: {
 								/**
-								 * Connection verification time (seconds)
+								 * Connection verification time
 								 */
 								title: () => LocalizedString
 								/**

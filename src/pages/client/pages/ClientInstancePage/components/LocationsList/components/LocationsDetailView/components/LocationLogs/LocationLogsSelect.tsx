@@ -24,22 +24,22 @@ export const LocationLogsSelect = ({ initSelected, onChange }: Props) => {
       {
         key: 0,
         label: localLL.error(),
-        value: 'error',
+        value: 'ERROR',
       },
       {
         key: 1,
         label: localLL.info(),
-        value: 'info',
+        value: 'INFO',
       },
       {
         key: 2,
         label: localLL.debug(),
-        value: 'debug',
+        value: 'DEBUG',
       },
       {
         key: 3,
         label: localLL.trace(),
-        value: 'trace',
+        value: 'TRACE',
       },
     ];
   }, [localLL]);

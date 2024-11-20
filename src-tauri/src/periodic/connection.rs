@@ -133,7 +133,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                                 warn!("Automatic reconnect for location {}({}) is not possible due to enabled MFA. Interface will be disconnected.", location.name, location.id);
                                                 disconnect_dead_connection(
                                                     latest_stat.location_id,
-                                                    &con.interface_name,
+                                                    &location.name,
                                                     app_handle.clone(),
                                                     ConnectionType::Location,
                                                 )

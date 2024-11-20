@@ -20,6 +20,13 @@
       justify-content: flex-start;
     }
 
+    h2 {
+      span {
+        @include typography(input-label);
+        color: var(--text-body-secondary);
+      }
+    }
+
     .warning-message {
       @include typography(app-body-2);
       color: var(--text-important);

@@ -45,8 +45,8 @@ export type SaveTunnelRequest = {
 
 export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
-export type LogLevel = 'error' | 'info' | 'debug' | 'trace' | 'warn';
-export type GlobalLogLevel = 'error' | 'info' | 'debug';
+export type LogLevel = 'ERROR' | 'INFO' | 'DEBUG' | 'TRACE' | 'WARN';
+export type GlobalLogLevel = 'ERROR' | 'INFO' | 'DEBUG';
 export type LogSource = 'Client' | 'Service' | 'All';
 
 export type ClientView = 'grid' | 'detail';
