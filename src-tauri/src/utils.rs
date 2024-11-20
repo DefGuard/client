@@ -267,23 +267,21 @@ pub fn spawn_stats_thread(
                     trace!("Received interface data: {interface_data:?}");
                     let peers: Vec<Peer> =
                         interface_data.peers.into_iter().map(Into::into).collect();
+                    let pool = state.db.lock().unwrap().clone().unwrap();
                     for peer in peers {
                         if connection_type.eq(&ConnectionType::Location) {
-                            let location_stats = peer_to_location_stats(
-                                &peer,
-                                interface_data.listen_port,
-                                &state.get_pool(),
-                            )
-                            .await
-                            .unwrap();
+                            let location_stats =
+                                peer_to_location_stats(&peer, interface_data.listen_port, &pool)
+                                    .await
+                                    .unwrap();
                             let location_name = location_stats
-                                .get_name(&state.get_pool())
+                                .get_name(&pool)
                                 .await
                                 .unwrap_or("UNKNOWN".to_string());
 
                             debug!("Saving network usage stats related to location {location_name} (interface {interface_name}).");
                             trace!("Stats: {location_stats:?}");
-                            match location_stats.save(&state.get_pool()).await {
+                            match location_stats.save(&pool).await {
                                 Ok(_) => {
                                     debug!(
                                         "Saved network usage stats for location {location_name}"
@@ -296,19 +294,16 @@ pub fn spawn_stats_thread(
                                 }
                             }
                         } else {
-                            let tunnel_stats = peer_to_tunnel_stats(
-                                &peer,
-                                interface_data.listen_port,
-                                &state.get_pool(),
-                            )
-                            .await
-                            .unwrap();
+                            let tunnel_stats =
+                                peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
+                                    .await
+                                    .unwrap();
                             let tunnel_name = tunnel_stats
-                                .get_name(&state.get_pool())
+                                .get_name(&pool)
                                 .await
                                 .unwrap_or("UNKNOWN".to_string());
                             debug!("Saving network usage stats related to tunnel {tunnel_name} (interface {interface_name}): {tunnel_stats:?}");
-                            match tunnel_stats.save(&state.get_pool()).await {
+                            match tunnel_stats.save(&pool).await {
                                 Ok(_) => {
                                     debug!("Saved stats for tunnel {tunnel_name}");
                                 }

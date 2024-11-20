@@ -48,19 +48,17 @@ where
     E: SqliteExecutor<'e>,
 {
     let location = Location::find_by_public_key(executor, &peer.public_key.to_string()).await?;
-    Ok(LocationStats {
-        id: NoId,
-        location_id: location.id,
-        upload: peer.tx_bytes as i64,
-        download: peer.rx_bytes as i64,
-        last_handshake: peer.last_handshake.map_or(0, |ts| {
+    Ok(LocationStats::new(
+        location.id,
+        peer.tx_bytes as i64,
+        peer.rx_bytes as i64,
+        peer.last_handshake.map_or(0, |ts| {
             ts.duration_since(SystemTime::UNIX_EPOCH)
                 .map_or(0, |duration| duration.as_secs() as i64)
         }),
-        collected_at: Utc::now().naive_utc(),
         listen_port,
-        persistent_keepalive_interval: peer.persistent_keepalive_interval,
-    })
+        peer.persistent_keepalive_interval,
+    ))
 }
 
 impl LocationStats {
@@ -76,12 +74,11 @@ impl LocationStats {
 
 impl LocationStats<NoId> {
     #[must_use]
-    pub fn new(
+    pub(crate) fn new(
         location_id: Id,
         upload: i64,
         download: i64,
         last_handshake: i64,
-        collected_at: NaiveDateTime,
         listen_port: u32,
         persistent_keepalive_interval: Option<u16>,
     ) -> Self {
@@ -91,13 +88,13 @@ impl LocationStats<NoId> {
             upload,
             download,
             last_handshake,
-            collected_at,
+            collected_at: Utc::now().naive_utc(),
             listen_port,
             persistent_keepalive_interval,
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
+    pub(crate) async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
     where
         E: SqliteExecutor<'e>,
     {

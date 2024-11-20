@@ -27,6 +27,7 @@ fn get_config_file(app: &AppHandle, for_write: bool) -> File {
     let config_file_path = get_config_file_path(app);
     OpenOptions::new()
         .create(true)
+        .read(true)
         .truncate(for_write)
         .write(true)
         .open(config_file_path)
@@ -82,12 +83,13 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    /// Will try to load from app data dir file and if fails will return default config
+    /// Try to load application configuration from application data directory.
+    /// If reading the configuration file fails, default settings will be returned.
     #[must_use]
     pub fn new(app: &AppHandle) -> Self {
         let config_path = get_config_file_path(app);
         if !config_path.exists() {
-            debug!(
+            eprintln!(
                 "Application configuration file doesn't exist; initializing it with the defaults."
             );
             let res = Self::default();
@@ -98,12 +100,12 @@ impl AppConfig {
         let mut app_config = Self::default();
         match serde_json::from_reader::<_, AppConfigPatch>(config_file) {
             Ok(patch) => {
-                debug!("Config deserialized successfully");
+                eprintln!("Config deserialized successfully");
                 app_config.apply(patch);
             }
             // if deserialization failed, remove file and return default
             Err(err) => {
-                error!(
+                eprintln!(
                     "Failed to deserialize application configurtion file: {err}. Using defaults."
                 );
                 app_config.save(app);
