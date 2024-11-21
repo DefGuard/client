@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO connection (location_id, connected_from, start, end) VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
+  "query": "INSERT INTO connection (location_id, start, end) VALUES ($1, $2, $3) RETURNING id \"id!\"",
   "describe": {
     "columns": [
       {
@@ -10,11 +10,11 @@
       }
     ],
     "parameters": {
-      "Right": 4
+      "Right": 3
     },
     "nullable": [
       true
     ]
   },
-  "hash": "db41fbabf52faec38ccb768a01a56df117d179fb4e52dfb9d5ff5be9b41518d8"
+  "hash": "8414b06af2f371b16c126f4ef629b82ffb99f2988e92dd3d78ea663e81ba29bd"
 }

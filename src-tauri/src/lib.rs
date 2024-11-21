@@ -63,7 +63,6 @@ pub struct CommonWireguardFields {
 pub struct CommonConnection<I = NoId> {
     pub id: I,
     pub location_id: Id,
-    pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
     pub connection_type: ConnectionType,
@@ -87,7 +86,6 @@ pub struct CommonLocationStats<I = NoId> {
 pub struct CommonConnectionInfo {
     pub id: Id,
     pub location_id: Id,
-    pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
     pub upload: Option<i32>,

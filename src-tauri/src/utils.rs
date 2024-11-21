@@ -9,7 +9,6 @@ use std::{
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
-use local_ip_address::local_ip;
 use sqlx::query;
 use tauri::{AppHandle, Manager, State};
 use tokio::time::sleep;
@@ -625,7 +624,7 @@ pub(crate) async fn handle_connection_for_location(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
-    let state: State<'_, AppState> = handle.state::<AppState>();
+    let state = handle.state::<AppState>();
     #[cfg(target_os = "macos")]
     let interface_name = get_interface_name();
     #[cfg(not(target_os = "macos"))]
@@ -638,14 +637,8 @@ pub(crate) async fn handle_connection_for_location(
         state.client.clone(),
     )
     .await?;
-    let address = local_ip()?;
     state
-        .add_connection(
-            location.id,
-            address,
-            &interface_name,
-            ConnectionType::Location,
-        )
+        .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
@@ -694,9 +687,8 @@ pub(crate) async fn handle_connection_for_tunnel(
     #[cfg(not(target_os = "macos"))]
     let interface_name = get_interface_name(&tunnel.name);
     setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
-    let address = local_ip()?;
     state
-        .add_connection(tunnel.id, address, &interface_name, ConnectionType::Tunnel)
+        .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
@@ -1030,13 +1022,7 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
             continue;
         }
 
-        let address = local_ip()?;
-        state.add_connection(
-            location.id,
-            address,
-            &interface_name,
-            ConnectionType::Location,
-        );
+        state.add_connection(location.id, &interface_name, ConnectionType::Location);
 
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
@@ -1140,8 +1126,7 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
             continue;
         }
 
-        let address = local_ip()?;
-        state.add_connection(tunnel.id, address, &interface_name, ConnectionType::Tunnel);
+        state.add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel);
 
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(

@@ -409,7 +409,6 @@ where
 pub struct TunnelConnection<I = NoId> {
     pub id: I,
     pub tunnel_id: Id,
-    pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
 }
@@ -419,7 +418,6 @@ impl From<TunnelConnectionInfo> for CommonConnectionInfo {
         CommonConnectionInfo {
             id: val.id,
             location_id: val.tunnel_id,
-            connected_from: val.connected_from,
             start: val.start,
             end: val.end,
             upload: val.upload,
@@ -438,7 +436,7 @@ impl TunnelConnection<Id> {
     {
         let connections = query_as!(
             TunnelConnection,
-            "SELECT id, tunnel_id, connected_from, start, end \
+            "SELECT id, tunnel_id, start, end \
             FROM tunnel_connection WHERE tunnel_id = $1",
             tunnel_id
         )
@@ -456,7 +454,7 @@ impl TunnelConnection<Id> {
     {
         let connection = query_as!(
             TunnelConnection,
-            "SELECT id, tunnel_id, connected_from, start, end \
+            "SELECT id, tunnel_id, start, end \
             FROM tunnel_connection WHERE tunnel_id = $1 \
             ORDER BY end DESC LIMIT 1",
             tunnel_id
@@ -473,10 +471,9 @@ impl TunnelConnection<NoId> {
         E: SqliteExecutor<'e>,
     {
         let id = query_scalar!(
-            "INSERT INTO tunnel_connection (tunnel_id, connected_from, start, end) \
-            VALUES ($1, $2, $3, $4) RETURNING id \"id!\"",
+            "INSERT INTO tunnel_connection (tunnel_id, start, end) \
+            VALUES ($1, $2, $3) RETURNING id \"id!\"",
             self.tunnel_id,
-            self.connected_from,
             self.start,
             self.end,
         )
@@ -486,7 +483,6 @@ impl TunnelConnection<NoId> {
         Ok(TunnelConnection::<Id> {
             id,
             tunnel_id: self.tunnel_id,
-            connected_from: self.connected_from,
             start: self.start,
             end: self.end,
         })
@@ -498,7 +494,6 @@ impl TunnelConnection<NoId> {
 pub struct TunnelConnectionInfo {
     pub id: Id,
     pub tunnel_id: Id,
-    pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
     pub upload: Option<i32>,
@@ -516,9 +511,8 @@ impl TunnelConnectionInfo {
         let connections = query_as!(
             TunnelConnectionInfo,
             "SELECT c.id, c.tunnel_id, \
-            c.connected_from \"connected_from!\", c.start \"start!\", \
-            c.end \"end!\", \
-            COALESCE(( \
+            c.start \"start!\", c.end \"end!\", \
+            COALESCE((\
                 SELECT ls.upload \
                 FROM tunnel_stats ls \
                 WHERE ls.tunnel_id = c.tunnel_id \
@@ -526,7 +520,7 @@ impl TunnelConnectionInfo {
                 AND ls.collected_at <= c.end \
                 ORDER BY ls.collected_at DESC LIMIT 1 \
             ), 0) \"upload: _\", \
-            COALESCE(( \
+            COALESCE((\
                 SELECT ls.download \
                 FROM tunnel_stats ls \
                 WHERE ls.tunnel_id = c.tunnel_id \
@@ -550,7 +544,6 @@ impl From<&ActiveConnection> for TunnelConnection<NoId> {
         Self {
             id: NoId,
             tunnel_id: active_connection.location_id,
-            connected_from: active_connection.connected_from.clone(),
             start: active_connection.start,
             end: Utc::now().naive_utc(),
         }
@@ -562,7 +555,6 @@ impl From<TunnelConnection<Id>> for CommonConnection<Id> {
         Self {
             id: tunnel_connection.id,
             location_id: tunnel_connection.tunnel_id, // Assuming you want to map tunnel_id to location_id
-            connected_from: tunnel_connection.connected_from,
             start: tunnel_connection.start,
             end: tunnel_connection.end,
             connection_type: ConnectionType::Tunnel, // You need to set the connection_type appropriately based on your logic,

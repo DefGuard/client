@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    net::IpAddr,
     sync::Arc,
 };
 
@@ -55,16 +54,10 @@ impl AppState {
     pub(crate) async fn add_connection<S: Into<String>>(
         &self,
         location_id: Id,
-        address: IpAddr,
         interface_name: S,
         connection_type: ConnectionType,
     ) {
-        let connection = ActiveConnection::new(
-            location_id,
-            address.to_string(),
-            interface_name.into(),
-            connection_type,
-        );
+        let connection = ActiveConnection::new(location_id, interface_name.into(), connection_type);
         trace!("Adding active connection for location ID: {location_id}");
         let mut connections = self.active_connections.lock().await;
         connections.push(connection);
@@ -94,7 +87,10 @@ impl AppState {
         }
     }
 
-    pub async fn get_connection_id_by_type(&self, connection_type: &ConnectionType) -> Vec<Id> {
+    pub(crate) async fn get_connection_id_by_type(
+        &self,
+        connection_type: &ConnectionType,
+    ) -> Vec<Id> {
         let active_connections = self.active_connections.lock().await;
 
         let connection_ids = active_connections
