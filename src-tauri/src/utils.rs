@@ -12,6 +12,7 @@ use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConf
 use local_ip_address::local_ip;
 use sqlx::query;
 use tauri::{AppHandle, Manager, State};
+use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
 use tracing::Level;
 
@@ -638,19 +639,14 @@ pub(crate) async fn handle_connection_for_location(
     )
     .await?;
     let address = local_ip()?;
-    let connection = ActiveConnection::new(
-        location.id,
-        address.to_string(),
-        interface_name.clone(),
-        ConnectionType::Location,
-    );
-
-    // Update active connections.
-    {
-        let mut active = state.active_connections.lock().await;
-        active.push(connection);
-        trace!("Active connections: {active:?}");
-    }
+    state
+        .add_connection(
+            location.id,
+            address,
+            &interface_name,
+            ConnectionType::Location,
+        )
+        .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit_all(
@@ -699,19 +695,9 @@ pub(crate) async fn handle_connection_for_tunnel(
     let interface_name = get_interface_name(&tunnel.name);
     setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
     let address = local_ip()?;
-    let connection = ActiveConnection::new(
-        tunnel.id,
-        address.to_string(),
-        interface_name.clone(),
-        ConnectionType::Tunnel,
-    );
-
-    // Update active connections.
-    {
-        let mut active = state.active_connections.lock().await;
-        active.push(connection);
-        trace!("Active connections: {active:?}");
-    }
+    state
+        .add_connection(tunnel.id, address, &interface_name, ConnectionType::Tunnel)
+        .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit_all(
@@ -732,7 +718,7 @@ pub(crate) async fn handle_connection_for_tunnel(
     );
     debug!("Stats thread for tunnel {} spawned", tunnel.name);
 
-    //spawn log watcher
+    // spawn log watcher
     debug!("Spawning log watcher for tunnel {}", tunnel.name);
     spawn_log_watcher_task(
         handle,
@@ -1045,19 +1031,12 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
         }
 
         let address = local_ip()?;
-        let connection = ActiveConnection::new(
+        state.add_connection(
             location.id,
-            address.to_string(),
-            interface_name.clone(),
+            address,
+            &interface_name,
             ConnectionType::Location,
         );
-
-        // Update active connections.
-        {
-            let mut active = state.active_connections.lock().await;
-            active.push(connection);
-            trace!("Active connections: {active:?}");
-        }
 
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
@@ -1162,19 +1141,7 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
         }
 
         let address = local_ip()?;
-        let connection = ActiveConnection::new(
-            tunnel.id,
-            address.to_string(),
-            interface_name.clone(),
-            ConnectionType::Tunnel,
-        );
-
-        // Update active connections.
-        {
-            let mut active = state.active_connections.lock().await;
-            active.push(connection);
-            trace!("Active connections: {active:?}");
-        }
+        state.add_connection(tunnel.id, address, &interface_name, ConnectionType::Tunnel);
 
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
@@ -1216,9 +1183,9 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
     Ok(())
 }
 
-pub enum ConnectionToVerify {
-    Location(Location<i64>),
-    Tunnel(Tunnel<i64>),
+pub(crate) enum ConnectionToVerify {
+    Location(Location<Id>),
+    Tunnel(Tunnel<Id>),
 }
 
 #[must_use]
@@ -1246,7 +1213,7 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
             .into(),
     );
     debug!("Connection verification task is sleeping for {wait_time:?}");
-    tokio::time::sleep(wait_time).await;
+    sleep(wait_time).await;
     debug!("Connection verification task finished sleeping");
     let db_pool = &state.get_pool();
 

@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    net::IpAddr,
     sync::Arc,
 };
 
@@ -51,6 +52,25 @@ impl AppState {
             .expect("Missing database connection pool")
     }
 
+    pub(crate) async fn add_connection<S: Into<String>>(
+        &self,
+        location_id: Id,
+        address: IpAddr,
+        interface_name: S,
+        connection_type: ConnectionType,
+    ) {
+        let connection = ActiveConnection::new(
+            location_id,
+            address.to_string(),
+            interface_name.into(),
+            connection_type,
+        );
+        trace!("Adding active connection for location ID: {location_id}");
+        let mut connections = self.active_connections.lock().await;
+        connections.push(connection);
+        trace!("Current active connections: {connections:?}");
+    }
+
     /// Try to remove a connection from the list of active connections.
     /// Return removed connection, or `None` if not found.
     pub(crate) async fn remove_connection(
@@ -58,7 +78,7 @@ impl AppState {
         location_id: Id,
         connection_type: &ConnectionType,
     ) -> Option<ActiveConnection> {
-        trace!("Removing active connection for location with id: {location_id}");
+        trace!("Removing active connection for location ID: {location_id}");
         let mut connections = self.active_connections.lock().await;
 
         if let Some(index) = connections.iter().position(|conn| {
@@ -69,7 +89,7 @@ impl AppState {
             trace!("Active connection has been removed from the active connections list.");
             Some(removed_connection)
         } else {
-            debug!("No active connection found with location_id: {location_id}");
+            debug!("No active connection found with location ID: {location_id}");
             None
         }
     }

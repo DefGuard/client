@@ -1072,15 +1072,14 @@ static PRODUCT_NAME: &str = "defguard-client";
 #[tauri::command(async)]
 pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
     let app_version = handle.package_info().version.to_string();
-    let current_version = app_version.as_str();
     let operating_system = env::consts::OS;
 
     let mut request_data = HashMap::new();
     request_data.insert("product", PRODUCT_NAME);
-    request_data.insert("client_version", current_version);
+    request_data.insert("client_version", &app_version);
     request_data.insert("operating_system", operating_system);
 
-    debug!("Fetching latest application version, client metadata: current version: {current_version} and operating system: {operating_system}");
+    debug!("Fetching latest application version, client metadata: current version: {app_version} and operating system: {operating_system}");
 
     let client = reqwest::Client::new();
     let res = client
@@ -1109,16 +1108,16 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     }
 }
 
-#[tauri::command(async)]
-pub async fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
+#[tauri::command]
+pub fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
     debug!("Running command get app config.");
     let res = app_state.app_config.lock().unwrap().clone();
     trace!("Returning config: {res:?}");
     Ok(res)
 }
 
-#[tauri::command(async)]
-pub async fn command_set_app_config(
+#[tauri::command]
+pub fn command_set_app_config(
     config_patch: AppConfigPatch,
     emit_event: bool,
     app_handle: AppHandle,
@@ -1126,7 +1125,7 @@ pub async fn command_set_app_config(
     let app_state: State<AppState> = app_handle.state();
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
-    let tray_changed = config_patch.tray_theme.clone();
+    let tray_changed = config_patch.tray_theme.is_some();
     let res = {
         let mut app_config = app_state.app_config.lock().unwrap();
         app_config.apply(config_patch);
@@ -1134,7 +1133,7 @@ pub async fn command_set_app_config(
         app_config.clone()
     };
     info!("Config changed successfully");
-    if tray_changed.is_some() {
+    if tray_changed {
         debug!("Tray theme included in config change, tray will be updated.");
         match configure_tray_icon(&app_handle, &res.tray_theme) {
             Ok(()) => debug!("Tray updated upon config change"),
@@ -1145,7 +1144,7 @@ pub async fn command_set_app_config(
         match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, ()) {
             Ok(()) => debug!("Config changed event emitted successfully"),
             Err(err) => {
-                error!("Emission of config changed event failed. Reason: {err}");
+                error!("Failed to emit config change event. Reason: {err}");
             }
         }
     }
