@@ -7,9 +7,11 @@ pub mod utils;
 pub mod windows;
 
 use std::{
+    collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
-    time::{Duration, UNIX_EPOCH},
+    sync::atomic::{AtomicUsize, Ordering},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::VERSION;
@@ -40,6 +42,7 @@ use self::config::Config;
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
+static THREAD_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -220,56 +223,68 @@ impl DesktopDaemonService for DaemonService {
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
-        debug!(
-            "Received a request to start a new network usage stats data stream for interface {}",
-            request.interface_name
-        );
         let ifname = request.interface_name;
+        debug!(
+            "Received a request to start a new network usage stats data stream for interface {ifname}"
+        );
         let span = info_span!("read_interface_data", interface_name = &ifname);
-        span.in_scope(|| {
-            debug!("Starting network usage stats stream for interface {ifname}");
-        });
 
-        let stats_period = self.stats_period;
+        // Setup WireGuard API.
+        let wgapi = setup_wgapi(&ifname)?;
+        let mut interval = interval(Duration::from_secs(self.stats_period));
         let (tx, rx) = mpsc::channel(64);
+
+        span.in_scope(|| {
+            info!("Spawning statistics collector task for interface {ifname}");
+        });
+        let count = THREAD_COUNT.fetch_add(1, Ordering::Relaxed);
+        warn!("STAT THREAD COUNT: {count}+1");
         tokio::spawn(async move {
-            debug!("Spawning network usage stats collection task for interface {ifname}");
-            // setup WireGuard API
-            let error_msg = format!("Failed to initialize WireGuard API for interface {ifname} during the creation of the network usage stats collection task.");
-            let wgapi = setup_wgapi(&ifname).expect(&error_msg);
-            let period = Duration::from_secs(stats_period);
-            let mut interval = interval(period);
+            // Helper map to track if peer data is actually changing to avoid sending duplicate stats.
+            let mut peer_map = HashMap::new();
 
             loop {
-                // wait till next iteration
-                debug!("Waiting for next network usage stats update for interface {ifname}");
+                // Loop delay
                 interval.tick().await;
-                debug!("Gathering network usage stats to send to the client about network activity for interface {ifname}");
+                debug!("Gathering network usage statistics for client's network activity on {ifname}");
                 match wgapi.read_interface_data() {
-                    Ok(host) => {
+                    Ok(mut host) => {
+                        let peers = &mut host.peers;
+                        debug!(
+                            "Found {} peers configured on WireGuard interface",
+                            peers.len()
+                        );
+                        // Filter out never connected peers.
+                        peers.retain(|_, peer| {
+                            // Last handshake time-stamp must exist...
+                            if let Some(last_hs) = peer.last_handshake {
+                                // ...and not be UNIX epoch.
+                                if last_hs != SystemTime::UNIX_EPOCH &&
+                                    match peer_map.get(&peer.public_key) {
+                                    Some(last_peer) => last_peer != peer,
+                                    None => true,
+                                } {
+                                    debug!("Peer {} statistics changed; keeping it.", peer.public_key);
+                                    peer_map.insert(peer.public_key.clone(), peer.clone());
+                                    return true;
+                                }
+                            }
+                            debug!("Peer {} statistics didn't change; ignoring it.", peer.public_key);
+                            false
+                        });
                         if let Err(err) = tx.send(Ok(host.into())).await {
                             error!(
-                                "Couldn't send network usage stats update for interface {ifname}. Error: {err}"
+                                "Couldn't send network usage stats update for {ifname}: {err}"
                             );
                             break;
                         }
                     }
                     Err(err) => {
-                        match err {
-                            WireguardInterfaceError::SocketClosed(err) => {
-                                warn!(
-                                    "Failed to retrieve network usage stats for WireGuard interface {ifname}. Error: {err}"
-                                );
-                                break;
-                            }
-                            _ => {
-                                error!("Failed to retrieve network usage stats for WireGuard interface {ifname}. Error: {err}");
-                                break;
-                            }
-                        }
+                        error!("Failed to retrieve network usage stats for interface {ifname}: {err}");
+                        break;
                     }
                 }
-                debug!("Network activity statistics for interface {ifname} have been sent to the client");
+                debug!("Network activity statistics for interface {ifname} sent to the client");
             }
             debug!("The client has disconnected from the network usage statistics data stream for interface {ifname}, stopping the statistics data collection task.");
         }.instrument(span));

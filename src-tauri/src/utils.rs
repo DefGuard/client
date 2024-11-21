@@ -3,6 +3,7 @@ use std::{
     path::Path,
     process::Command,
     str::FromStr,
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 
@@ -152,15 +153,15 @@ pub async fn setup_interface(
         if let Err(error) = client.create_interface(request).await {
             match error.code() {
                 Code::Unavailable => {
-                    error!("There was an error while setting up connection for location {location}, Defguard background service is unavailable. Please make sure the service is running. Error details: {error}, Interface configuration: {interface_config:?}");
-                    return Err(Error::InternalError(
-                        "Defguard background service is unavailable. Please make sure the service is running.".to_string(),
-                    ));
+                    error!("There was an error while setting up connection for location {location}, background service is unavailable. Please make sure the service is running. Error: {error}, Interface configuration: {interface_config:?}");
+                    Err(Error::InternalError(
+                        "Background service is unavailable. Please make sure the service is running.".into(),
+                    ))
                 }
                 _ => {
-                    error!("There was an error while sending the request to the defguard background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error details: {error}");
+                    error!("There was an error while sending the request to the background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error: {error}");
                     Err(Error::InternalError(
-                        format!("There was an error while sending the request to the defguard background service to create an interface for location {location}. Error details: {}. Check logs for a more detailed information.", error.message())
+                        format!("There was an error while sending the request to the background service to create an interface for location {location}. Error: {error}. Check logs for a more detailed information.")
                     ))
                 }
             }
@@ -232,12 +233,16 @@ fn is_port_free(port: u16) -> bool {
     }
 }
 
+static THREAD_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 pub fn spawn_stats_thread(
     handle: AppHandle,
     interface_name: String,
     connection_type: ConnectionType,
     location_id: Id,
 ) {
+    let count = THREAD_COUNT.fetch_add(1, Ordering::Relaxed);
+    warn!("STAT THREAD COUNT: {count}+1");
     tokio::spawn(async move {
         let state = handle.state::<AppState>();
         let mut client = state.client.clone();
@@ -788,20 +793,13 @@ pub async fn disconnect_interface(
             };
             debug!("Sending request to the background service to remove interface {} for location {}...", active_connection.interface_name, location.name);
             if let Err(error) = client.remove_interface(request).await {
-                match error.code() {
-                    Code::Unavailable => {
-                        error!("Couldn't remove interface {}. Defguard background service is unavailable. Please make sure the service is running. Error details: {error}.", active_connection.interface_name);
-                        return Err(Error::InternalError(
-                            format!("Couldn't remove interface {}. Defguard background service is unavailable. Please make sure the service is running.", active_connection.interface_name),
-                        ));
-                    }
-                    _ => {
-                        error!("There was an error while sending the request to the defguard background service to remove an interface {}. Error details: {error}", active_connection.interface_name);
-                        return Err(Error::InternalError(
-                            format!("There was an error while sending the request to the defguard background service to remove an interface {}. Error details: {}.", active_connection.interface_name, error.message())
-                        ));
-                    }
-                }
+                let msg = if error.code() == Code::Unavailable {
+                    format!("Couldn't remove interface {}. Background service is unavailable. Please make sure the service is running. Error: {error}.", active_connection.interface_name)
+                } else {
+                    format!("Failed to send a request to the background service to remove interface {}. Error: {error}.", active_connection.interface_name)
+                };
+                error!("{msg}");
+                return Err(Error::InternalError(msg));
             }
             let connection: Connection = active_connection.into();
             let connection = connection.save(&state.get_pool()).await?;
@@ -882,14 +880,13 @@ pub async fn get_tunnel_or_location_name(
             .and_then(|t| t.map(|t| t.name)),
     };
 
-    match name {
-        Some(name) => name,
-        None => {
-            debug!(
+    if let Some(name) = name {
+        name
+    } else {
+        debug!(
                 "Couldn't identify {connection_type}'s name for logging purposes, it will be referred to as UNKNOWN",
             );
-            "UNKNOWN".to_string()
-        }
+        "UNKNOWN".to_string()
     }
 }
 
