@@ -5,11 +5,8 @@ use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
 use sqlx::{query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
-use super::{Id, NoId};
-use crate::{
-    commands::DateTimeAggregation, database::Location, error::Error, CommonLocationStats,
-    ConnectionType,
-};
+use super::{location::Location, Id, NoId};
+use crate::{commands::DateTimeAggregation, error::Error, CommonLocationStats, ConnectionType};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {

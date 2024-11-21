@@ -2,14 +2,6 @@ pub mod models;
 
 use std::{env, fs};
 
-pub use models::{
-    connection::{ActiveConnection, Connection, ConnectionInfo},
-    instance::{Instance, InstanceInfo},
-    location::Location,
-    location_stats::LocationStats,
-    tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
-    wireguard_keys::WireguardKeys,
-};
 use tauri::AppHandle;
 
 use crate::error::Error;

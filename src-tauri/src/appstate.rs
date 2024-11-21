@@ -10,7 +10,10 @@ use tonic::transport::Channel;
 
 use crate::{
     app_config::AppConfig,
-    database::{models::Id, ActiveConnection, DbPool, Instance, Location},
+    database::{
+        models::{connection::ActiveConnection, instance::Instance, location::Location, Id},
+        DbPool,
+    },
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
@@ -133,7 +136,7 @@ impl AppState {
     }
 
     /// Returns active connections for a given instance.
-    pub async fn active_connections(
+    pub(crate) async fn active_connections(
         &self,
         instance: &Instance<Id>,
     ) -> Result<Vec<ActiveConnection>, crate::error::Error> {

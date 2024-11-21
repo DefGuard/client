@@ -7,10 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
-use super::{Id, NoId};
+use super::{connection::ActiveConnection, Id, NoId};
 use crate::{
-    commands::DateTimeAggregation, database::ActiveConnection, error::Error, CommonConnection,
-    CommonConnectionInfo, CommonLocationStats, ConnectionType,
+    commands::DateTimeAggregation, error::Error, CommonConnection, CommonConnectionInfo,
+    CommonLocationStats, ConnectionType,
 };
 
 #[serde_as]

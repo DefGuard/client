@@ -7,7 +7,11 @@ use tokio::time::sleep;
 use crate::{
     appstate::AppState,
     commands::{connect, disconnect},
-    database::{Location, LocationStats, Tunnel, TunnelStats},
+    database::models::{
+        location::Location,
+        location_stats::LocationStats,
+        tunnel::{Tunnel, TunnelStats},
+    },
     error::Error,
     events::DeadConnDroppedOut,
     ConnectionType,
@@ -128,26 +132,23 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 match Location::find_by_id(db_pool, con.location_id).await {
                                     Ok(Some(location)) => {
                                         // only try to reconnect when location is not protected behind MFA
-                                        match location.mfa_enabled {
-                                            true => {
-                                                warn!("Automatic reconnect for location {}({}) is not possible due to enabled MFA. Interface will be disconnected.", location.name, location.id);
-                                                disconnect_dead_connection(
-                                                    latest_stat.location_id,
-                                                    &location.name,
-                                                    app_handle.clone(),
-                                                    ConnectionType::Location,
-                                                )
-                                                .await;
-                                            }
-                                            false => {
-                                                reconnect(
-                                                    location.id,
-                                                    &location.name,
-                                                    &app_handle,
-                                                    ConnectionType::Location,
-                                                )
-                                                .await;
-                                            }
+                                        if location.mfa_enabled {
+                                            warn!("Automatic reconnect for location {}({}) is not possible due to enabled MFA. Interface will be disconnected.", location.name, location.id);
+                                            disconnect_dead_connection(
+                                                latest_stat.location_id,
+                                                &location.name,
+                                                app_handle.clone(),
+                                                ConnectionType::Location,
+                                            )
+                                            .await;
+                                        } else {
+                                            reconnect(
+                                                location.id,
+                                                &location.name,
+                                                &app_handle,
+                                                ConnectionType::Location,
+                                            )
+                                            .await;
                                         }
                                     }
                                     Ok(None) => {

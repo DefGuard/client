@@ -19,9 +19,15 @@ use crate::{
     appstate::AppState,
     commands::{disconnect, LocationInterfaceDetails, Payload},
     database::{
-        models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats, Id},
-        ActiveConnection, Connection, DbPool, Location, LocationStats, Tunnel, TunnelConnection,
-        TunnelStats, WireguardKeys,
+        models::{
+            connection::{ActiveConnection, Connection},
+            location::Location,
+            location_stats::{peer_to_location_stats, LocationStats},
+            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection, TunnelStats},
+            wireguard_keys::WireguardKeys,
+            Id,
+        },
+        DbPool,
     },
     error::Error,
     events::{DeadConDroppedOutReason, DeadConnDroppedOut, CONNECTION_CHANGED},
@@ -235,7 +241,7 @@ fn is_port_free(port: u16) -> bool {
 
 static THREAD_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-pub fn spawn_stats_thread(
+pub(crate) fn spawn_stats_thread(
     handle: AppHandle,
     interface_name: String,
     connection_type: ConnectionType,
@@ -612,7 +618,7 @@ pub async fn get_location_interface_details(
 }
 
 /// Setup new connection for location
-pub async fn handle_connection_for_location(
+pub(crate) async fn handle_connection_for_location(
     location: &Location<Id>,
     preshared_key: Option<String>,
     handle: AppHandle,
@@ -684,7 +690,7 @@ pub async fn handle_connection_for_location(
 }
 
 /// Setup new connection for tunnel
-pub async fn handle_connection_for_tunnel(
+pub(crate) async fn handle_connection_for_tunnel(
     tunnel: &Tunnel<Id>,
     handle: AppHandle,
 ) -> Result<(), Error> {
@@ -769,7 +775,7 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
 }
 
 /// Helper function to remove interface and close connection
-pub async fn disconnect_interface(
+pub(crate) async fn disconnect_interface(
     active_connection: &ActiveConnection,
     state: &AppState,
 ) -> Result<(), Error> {
@@ -962,7 +968,7 @@ fn close_service_handle(
 // so `handle_connection_for_location` and `handle_connection_for_tunnel` are not
 // partially duplicated here.
 #[cfg(target_os = "windows")]
-pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
+pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
     let appstate = app_handle.state::<AppState>();
     let all_locations = Location::all(&appstate.get_pool()).await?;

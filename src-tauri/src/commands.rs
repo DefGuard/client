@@ -14,10 +14,14 @@ use tauri::{AppHandle, Manager, State};
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
-    database::{
-        models::{instance::InstanceInfo, location_stats::LocationStats, Id, NoId},
-        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Tunnel, TunnelConnection,
-        TunnelConnectionInfo, TunnelStats, WireguardKeys,
+    database::models::{
+        connection::{ActiveConnection, Connection, ConnectionInfo},
+        instance::{Instance, InstanceInfo},
+        location::Location,
+        location_stats::LocationStats,
+        tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
+        wireguard_keys::WireguardKeys,
+        Id, NoId,
     },
     enterprise::periodic::config::poll_instance,
     error::Error,
@@ -359,12 +363,9 @@ pub async fn all_locations(
     instance_id: Id,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, Error> {
-    let instance = match Instance::find_by_id(&app_state.get_pool(), instance_id).await? {
-        Some(instance) => instance,
-        None => {
-            error!("Tried to get all locations for the instance with ID {instance_id}, but the instance was not found.");
-            return Err(Error::NotFound);
-        }
+    let Some(instance) = Instance::find_by_id(&app_state.get_pool(), instance_id).await? else {
+        error!("Tried to get all locations for the instance with ID {instance_id}, but the instance was not found.");
+        return Err(Error::NotFound);
     };
     trace!(
         "Getting information about all locations for instance {}.",

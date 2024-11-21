@@ -7,7 +7,7 @@ use crate::{
     app_config::AppTrayTheme,
     appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
-    database::Location,
+    database::models::location::Location,
     error::Error,
     ConnectionType,
 };

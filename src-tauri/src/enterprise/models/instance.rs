@@ -1,7 +1,9 @@
-use crate::database::models::Id;
-use crate::database::Instance;
-use crate::error::Error;
 use sqlx::SqliteExecutor;
+
+use crate::{
+    database::models::{instance::Instance, Id},
+    error::Error,
+};
 
 impl Instance<Id> {
     pub async fn disable_enterprise_features<'e, E>(&mut self, executor: E) -> Result<(), Error>

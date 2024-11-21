@@ -8,7 +8,7 @@ use tokio::time::sleep;
 use crate::{
     appstate::AppState,
     commands::{do_update_instance, locations_changed},
-    database::{models::Id, Instance},
+    database::models::{instance::Instance, Id},
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},

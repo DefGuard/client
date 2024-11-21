@@ -297,7 +297,7 @@ impl DesktopDaemonService for DaemonService {
 }
 
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
-    debug!("Starting defguard interface management daemon");
+    debug!("Starting Defguard interface management daemon");
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let daemon_service = DaemonService::new(&config);
