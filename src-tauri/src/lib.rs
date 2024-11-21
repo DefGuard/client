@@ -23,7 +23,7 @@ mod proto {
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 
 /// Location type used in commands to check if we using tunnel or location
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone, Copy)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ConnectionType {
     Tunnel,
     Location,

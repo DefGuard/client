@@ -644,11 +644,14 @@ pub(crate) async fn handle_connection_for_location(
         interface_name.clone(),
         ConnectionType::Location,
     );
-    state.active_connections.lock().await.push(connection);
-    trace!(
-        "Active connections: {:?}",
-        state.active_connections.lock().await
-    );
+
+    // Update active connections.
+    {
+        let mut active = state.active_connections.lock().await;
+        active.push(connection);
+        trace!("Active connections: {active:?}");
+    }
+
     debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit_all(
         CONNECTION_CHANGED,
@@ -659,23 +662,17 @@ pub(crate) async fn handle_connection_for_location(
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // Spawn stats threads
-    debug!(
-        "Spawning network usage stats thread for location {}...",
-        location
-    );
+    debug!("Spawning network usage stats thread for location {location}...");
     spawn_stats_thread(
         handle.clone(),
         interface_name.clone(),
         ConnectionType::Location,
         location.id,
     );
-    debug!(
-        "Network usage stats thread for location {} spawned.",
-        location
-    );
+    debug!("Network usage stats thread for location {location} spawned.");
 
     // spawn log watcher
-    debug!("Spawning service log watcher for location {}...", location);
+    debug!("Spawning service log watcher for location {location}...");
     spawn_log_watcher_task(
         handle,
         location.id,
@@ -685,7 +682,7 @@ pub(crate) async fn handle_connection_for_location(
         None,
     )
     .await?;
-    debug!("Service log watcher for location {} spawned.", location);
+    debug!("Service log watcher for location {location} spawned.");
     Ok(())
 }
 
@@ -708,11 +705,14 @@ pub(crate) async fn handle_connection_for_tunnel(
         interface_name.clone(),
         ConnectionType::Tunnel,
     );
-    state.active_connections.lock().await.push(connection);
-    debug!(
-        "Active connections: {:?}",
-        state.active_connections.lock().await
-    );
+
+    // Update active connections.
+    {
+        let mut active = state.active_connections.lock().await;
+        active.push(connection);
+        trace!("Active connections: {active:?}");
+    }
+
     debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit_all(
         CONNECTION_CHANGED,
@@ -1051,11 +1051,14 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
             interface_name.clone(),
             ConnectionType::Location,
         );
-        appstate.active_connections.lock().await.push(connection);
-        trace!(
-            "Active connections: {:?}",
-            appstate.active_connections.lock().await
-        );
+
+        // Update active connections.
+        {
+            let mut active = state.active_connections.lock().await;
+            active.push(connection);
+            trace!("Active connections: {active:?}");
+        }
+
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
             CONNECTION_CHANGED,
@@ -1165,11 +1168,14 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
             interface_name.clone(),
             ConnectionType::Tunnel,
         );
-        appstate.active_connections.lock().await.push(connection);
-        debug!(
-            "Active connections: {:?}",
-            appstate.active_connections.lock().await
-        );
+
+        // Update active connections.
+        {
+            let mut active = state.active_connections.lock().await;
+            active.push(connection);
+            trace!("Active connections: {active:?}");
+        }
+
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
             CONNECTION_CHANGED,

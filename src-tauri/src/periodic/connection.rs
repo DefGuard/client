@@ -107,13 +107,13 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
 
     loop {
         sleep(INTERVAL_IN_SECONDS).await;
-        let connections = app_state.active_connections.lock().await.clone();
+        let connections = app_state.active_connections.lock().await;
         let connection_count = connections.len();
         if connection_count == 0 {
             debug!("Connections verification skipped, no active connections found, task will wait for next {} seconds", INTERVAL_IN_SECONDS.as_secs());
         }
         // check every current active connection
-        for con in &connections {
+        for con in &*connections {
             trace!("Connection: {con:?}");
             match con.connection_type {
                 crate::ConnectionType::Location => {

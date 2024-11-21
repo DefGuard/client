@@ -337,7 +337,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     Ok(instance_info)
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Debug, Serialize)]
 pub struct LocationInfo {
     pub id: Id,
     pub instance_id: Id,
@@ -797,7 +797,7 @@ pub async fn update_location_routing(
     handle: AppHandle,
 ) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
-    debug!("Updating location routing {location_id} with {connection_type:?}");
+    debug!("Updating location routing {location_id} with {connection_type}");
     let name = get_tunnel_or_location_name(location_id, connection_type, &app_state).await;
 
     match connection_type {

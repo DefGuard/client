@@ -1,3 +1,5 @@
+// use std::thread::JoinHandle;
+
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query_as, query_scalar, SqliteExecutor};
@@ -104,7 +106,10 @@ impl From<ConnectionInfo> for CommonConnectionInfo {
 }
 
 impl ConnectionInfo {
-    pub async fn all_by_location_id<'e, E>(executor: E, location_id: Id) -> Result<Vec<Self>, Error>
+    pub(crate) async fn all_by_location_id<'e, E>(
+        executor: E,
+        location_id: Id,
+    ) -> Result<Vec<Self>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -116,7 +121,7 @@ impl ConnectionInfo {
             "SELECT c.id, c.location_id, \
             c.connected_from \"connected_from!\", c.start \"start!\", \
             c.end \"end!\", \
-            COALESCE(( \
+            COALESCE((\
                 SELECT ls.upload \
                 FROM location_stats ls \
                 WHERE ls.location_id = c.location_id \
@@ -124,7 +129,7 @@ impl ConnectionInfo {
                 AND ls.collected_at <= c.end \
                 ORDER BY ls.collected_at DESC LIMIT 1 \
             ), 0) \"upload: _\", \
-            COALESCE(( \
+            COALESCE((\
                 SELECT ls.download \
                 FROM location_stats ls \
                 WHERE ls.location_id = c.location_id \
@@ -143,7 +148,7 @@ impl ConnectionInfo {
     }
 }
 
-/// Connections stored in memory after creating interface
+/// Connections stored in memory after creating a network interface.
 #[derive(Clone, Debug, Serialize)]
 pub struct ActiveConnection {
     pub location_id: Id,
@@ -151,6 +156,8 @@ pub struct ActiveConnection {
     pub start: NaiveDateTime,
     pub interface_name: String,
     pub connection_type: ConnectionType,
+    // #[serde(skip)]
+    // stats_thread: JoinHandle<()>,
 }
 
 impl ActiveConnection {

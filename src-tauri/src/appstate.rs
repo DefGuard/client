@@ -14,6 +14,7 @@ use crate::{
         models::{connection::ActiveConnection, instance::Instance, location::Location, Id},
         DbPool,
     },
+    error::Error,
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
@@ -52,7 +53,7 @@ impl AppState {
 
     /// Try to remove a connection from the list of active connections.
     /// Return removed connection, or `None` if not found.
-    pub async fn remove_connection(
+    pub(crate) async fn remove_connection(
         &self,
         location_id: Id,
         connection_type: &ConnectionType,
@@ -90,7 +91,7 @@ impl AppState {
         connection_ids
     }
 
-    pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
+    pub(crate) async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
         debug!("Closing all active connections...");
         let active_connections = self.active_connections.lock().await;
         let active_connections_count = active_connections.len();
@@ -112,15 +113,15 @@ impl AppState {
         Ok(())
     }
 
-    pub async fn find_connection(
+    pub(crate) async fn find_connection(
         &self,
         id: Id,
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
         let connections = self.active_connections.lock().await;
         trace!(
-        "Checking for active connection with id: {id}, connection_type: {connection_type:?} in active connections."
-    );
+            "Checking for active connection with ID {id}, type {connection_type} in active connections."
+        );
 
         if let Some(connection) = connections
             .iter()
@@ -130,7 +131,7 @@ impl AppState {
             trace!("Found connection: {connection:?}");
             Some(connection.to_owned())
         } else {
-            debug!("Couldn't find connection with id: {id}, connection_type: {connection_type:?} in active connections.");
+            debug!("Couldn't find connection with ID {id}, type: {connection_type} in active connections.");
             None
         }
     }
@@ -139,7 +140,7 @@ impl AppState {
     pub(crate) async fn active_connections(
         &self,
         instance: &Instance<Id>,
-    ) -> Result<Vec<ActiveConnection>, crate::error::Error> {
+    ) -> Result<Vec<ActiveConnection>, Error> {
         let locations: HashSet<Id> = Location::find_by_instance_id(&self.get_pool(), instance.id)
             .await?
             .iter()
