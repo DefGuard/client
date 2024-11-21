@@ -318,7 +318,7 @@ impl TunnelStats<NoId> {
 }
 
 impl TunnelStats<Id> {
-    pub async fn all_by_tunnel_id<'e, E>(
+    pub(crate) async fn all_by_tunnel_id<'e, E>(
         executor: E,
         tunnel_id: Id,
         from: &NaiveDateTime,
@@ -330,24 +330,19 @@ impl TunnelStats<Id> {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             TunnelStats,
-            "WITH cte AS ( \
-                SELECT \
-                    id, tunnel_id, \
-                    COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, \
-                    COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, \
-                    last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
-                FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1 \
-            ) \
-            SELECT \
-                id, tunnel_id, \
-                SUM(MAX(upload, 0)) \"upload!: i64\", \
-                SUM(MAX(download, 0)) \"download!: i64\", \
-                last_handshake, \
-                collected_at \"collected_at!: NaiveDateTime\", \
-                listen_port \"listen_port!: u32\", \
-                persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
-            FROM cte \
-            WHERE tunnel_id = $2 AND collected_at >= $3 \
+            "WITH cte AS (\
+            SELECT id, tunnel_id, \
+            COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, \
+            COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, \
+            last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
+            FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1) \
+            SELECT id, tunnel_id, \
+            SUM(MAX(upload, 0)) \"upload!: i64\", \
+            SUM(MAX(download, 0)) \"download!: i64\", \
+            last_handshake, collected_at \"collected_at!: NaiveDateTime\", \
+            listen_port \"listen_port!: u32\", \
+            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM cte WHERE tunnel_id = $2 AND collected_at >= $3 \
             GROUP BY collected_at ORDER BY collected_at",
             aggregation,
             tunnel_id,

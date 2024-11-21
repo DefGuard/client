@@ -623,15 +623,15 @@ pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Err
     })
 }
 
-pub enum DateTimeAggregation {
+pub(crate) enum DateTimeAggregation {
     Hour,
     Second,
 }
 
 impl DateTimeAggregation {
-    /// Returns database format string for given aggregation variant
+    /// Returns database format string for a given aggregation variant.
     #[must_use]
-    pub fn fstring(&self) -> &'static str {
+    pub(crate) fn fstring(&self) -> &'static str {
         match self {
             Self::Hour => "%Y-%m-%d %H:00:00",
             Self::Second => "%Y-%m-%d %H:%M:%S",
@@ -639,7 +639,7 @@ impl DateTimeAggregation {
     }
 }
 
-pub fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
+pub(crate) fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     // Use hourly aggregation for longer periods
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),

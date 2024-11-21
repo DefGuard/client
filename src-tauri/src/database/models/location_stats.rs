@@ -139,31 +139,26 @@ impl LocationStats<Id> {
         E: SqliteExecutor<'e>,
     {
         let aggregation = aggregation.fstring();
+        // SQLite: If the LIMIT expression evaluates to a negative value,
+        // then there is no upper bound on the number of rows returned
         let query_limit = limit.unwrap_or(-1);
         let stats = query_as!(
             LocationStats,
-            "WITH cte AS ( \
-            SELECT \
-                id, location_id, \
-                COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) upload, \
-                COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) download, \
-                last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
-            FROM location_stats \
-            ORDER BY collected_at \
-            LIMIT -1 OFFSET 1 \
-            ) \
-            SELECT \
-                id, location_id, \
-            	SUM(MAX(upload, 0)) \"upload!: i64\", \
-            	SUM(MAX(download, 0)) \"download!: i64\", \
-            	last_handshake, \
-            	collected_at \"collected_at!: NaiveDateTime\", \
-            	listen_port \"listen_port!: u32\", \
-            	persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
-            FROM cte \
-            WHERE location_id = $2 AND collected_at >= $3 \
-            GROUP BY collected_at ORDER BY collected_at \
-            LIMIT $4",
+            "WITH cte AS (\
+            SELECT id, location_id, \
+            COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) upload, \
+            COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) download, \
+            last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
+            FROM location_stats ORDER BY collected_at LIMIT -1 OFFSET 1) \
+            SELECT id, location_id, \
+           	SUM(MAX(upload, 0)) \"upload!: i64\", \
+           	SUM(MAX(download, 0)) \"download!: i64\", \
+           	last_handshake, \
+           	collected_at \"collected_at!: NaiveDateTime\", \
+           	listen_port \"listen_port!: u32\", \
+           	persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            FROM cte WHERE location_id = $2 AND collected_at >= $3 \
+            GROUP BY collected_at ORDER BY collected_at LIMIT $4",
             aggregation,
             location_id,
             from,
