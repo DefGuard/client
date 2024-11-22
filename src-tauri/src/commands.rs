@@ -11,6 +11,8 @@ use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
+static UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
+
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
@@ -306,7 +308,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     trace!("Instances found: {instances:#?}");
     let mut instance_info = Vec::new();
     let connection_ids = app_state
-        .get_connection_id_by_type(&ConnectionType::Location)
+        .get_connection_id_by_type(ConnectionType::Location)
         .await;
     for instance in instances {
         let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
@@ -376,8 +378,8 @@ pub async fn all_locations(
         "Found {} locations for instance {instance} to return information about.",
         locations.len()
     );
-    let active_locations_ids: Vec<i64> = app_state
-        .get_connection_id_by_type(&ConnectionType::Location)
+    let active_locations_ids = app_state
+        .get_connection_id_by_type(ConnectionType::Location)
         .await;
     let mut location_info = Vec::new();
     for location in locations {
@@ -962,7 +964,7 @@ pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInf
     trace!("Tunnels found: {tunnels:#?}");
     let mut tunnel_info = Vec::new();
     let active_tunnel_ids = app_state
-        .get_connection_id_by_type(&ConnectionType::Tunnel)
+        .get_connection_id_by_type(ConnectionType::Tunnel)
         .await;
 
     for tunnel in tunnels {
@@ -1082,11 +1084,7 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     debug!("Fetching latest application version, client metadata: current version: {app_version} and operating system: {operating_system}");
 
     let client = reqwest::Client::new();
-    let res = client
-        .post("https://pkgs.defguard.net/api/update/check")
-        .json(&request_data)
-        .send()
-        .await;
+    let res = client.post(UPDATE_URL).json(&request_data).send().await;
 
     if let Ok(response) = res {
         let response_json = response.json::<AppVersionInfo>().await;

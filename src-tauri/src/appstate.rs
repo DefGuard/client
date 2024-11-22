@@ -3,7 +3,10 @@ use std::{
     sync::Arc,
 };
 
-use tauri::AppHandle;
+use tauri::{
+    async_runtime::{spawn, JoinHandle},
+    AppHandle,
+};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
@@ -18,7 +21,7 @@ use crate::{
     service::{
         proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
     },
-    utils::disconnect_interface,
+    utils::{disconnect_interface, stats_handler},
     ConnectionType,
 };
 
@@ -28,6 +31,7 @@ pub struct AppState {
     pub client: DesktopDaemonServiceClient<Channel>,
     pub log_watchers: Arc<std::sync::Mutex<HashMap<String, CancellationToken>>>,
     pub app_config: Arc<std::sync::Mutex<AppConfig>>,
+    stat_threads: std::sync::Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
 }
 
 impl AppState {
@@ -40,6 +44,7 @@ impl AppState {
             client,
             log_watchers: Arc::new(std::sync::Mutex::new(HashMap::new())),
             app_config: Arc::new(std::sync::Mutex::new(AppConfig::new(app_handle))),
+            stat_threads: std::sync::Mutex::new(HashMap::new()),
         }
     }
 
@@ -57,11 +62,29 @@ impl AppState {
         interface_name: S,
         connection_type: ConnectionType,
     ) {
-        let connection = ActiveConnection::new(location_id, interface_name.into(), connection_type);
+        let ifname = interface_name.into();
+        let connection = ActiveConnection::new(location_id, ifname.clone(), connection_type);
         trace!("Adding active connection for location ID: {location_id}");
         let mut connections = self.active_connections.lock().await;
         connections.push(connection);
         trace!("Current active connections: {connections:?}");
+
+        debug!("Spawning thread for network statistics for location ID {location_id}");
+        let handle = spawn(stats_handler(
+            self.get_pool(),
+            ifname,
+            connection_type,
+            self.client.clone(),
+        ));
+        if let Some(old_handle) = self
+            .stat_threads
+            .lock()
+            .unwrap()
+            .insert(location_id, handle)
+        {
+            warn!("Something went wrong: old network statistics thread still exists");
+            old_handle.abort();
+        }
     }
 
     /// Try to remove a connection from the list of active connections.
@@ -72,6 +95,13 @@ impl AppState {
         connection_type: &ConnectionType,
     ) -> Option<ActiveConnection> {
         trace!("Removing active connection for location ID: {location_id}");
+
+        // Stop statistics thread
+        if let Some(handle) = self.stat_threads.lock().unwrap().get(&location_id) {
+            debug!("Stopping network statistics thread for {location_id}");
+            handle.abort();
+        }
+
         let mut connections = self.active_connections.lock().await;
 
         if let Some(index) = connections.iter().position(|conn| {
@@ -89,14 +119,14 @@ impl AppState {
 
     pub(crate) async fn get_connection_id_by_type(
         &self,
-        connection_type: &ConnectionType,
+        connection_type: ConnectionType,
     ) -> Vec<Id> {
         let active_connections = self.active_connections.lock().await;
 
         let connection_ids = active_connections
             .iter()
             .filter_map(|con| {
-                if con.connection_type.eq(connection_type) {
+                if con.connection_type == connection_type {
                     Some(con.location_id)
                 } else {
                     None

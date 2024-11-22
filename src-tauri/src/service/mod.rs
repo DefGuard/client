@@ -162,7 +162,9 @@ impl DesktopDaemonService for DaemonService {
                 Status::new(Code::Internal, msg)
             })?;
 
-            if !dns.is_empty() {
+            if dns.is_empty() {
+                debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
+            } else {
                 debug!("The following DNS servers will be set: {dns:?}, search domains: {search_domains:?}");
                 wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
                     let msg =
@@ -170,8 +172,6 @@ impl DesktopDaemonService for DaemonService {
                     error!("{msg}");
                     Status::new(Code::Internal, msg)
                 })?;
-            } else {
-                debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
             }
         }
 

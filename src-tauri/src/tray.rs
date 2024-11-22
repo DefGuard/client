@@ -166,9 +166,9 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
         Ok(location_id) => {
             match Location::find_by_id(&handle.state::<AppState>().get_pool(), location_id).await {
                 Ok(Some(location)) => {
-                    let active_locations_ids: Vec<i64> = handle
+                    let active_locations_ids = handle
                         .state::<AppState>()
-                        .get_connection_id_by_type(&ConnectionType::Location)
+                        .get_connection_id_by_type(ConnectionType::Location)
                         .await;
 
                     if active_locations_ids.contains(&location_id) {

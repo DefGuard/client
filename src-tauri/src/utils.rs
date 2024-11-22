@@ -3,7 +3,6 @@ use std::{
     path::Path,
     process::Command,
     str::FromStr,
-    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 
@@ -157,19 +156,16 @@ pub async fn setup_interface(
             dns: location.dns.clone(),
         };
         if let Err(error) = client.create_interface(request).await {
-            match error.code() {
-                Code::Unavailable => {
-                    error!("There was an error while setting up connection for location {location}, background service is unavailable. Please make sure the service is running. Error: {error}, Interface configuration: {interface_config:?}");
-                    Err(Error::InternalError(
-                        "Background service is unavailable. Please make sure the service is running.".into(),
+            if error.code() == Code::Unavailable {
+                error!("Failed to set up connection for location {location}; background service is unavailable. Make sure the service is running. Error: {error}, Interface configuration: {interface_config:?}");
+                Err(Error::InternalError(
+                    "Background service is unavailable. Make sure the service is running.".into(),
+                ))
+            } else {
+                error!("Failed to send a request to the background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error: {error}");
+                Err(Error::InternalError(
+                        format!("Failed to send a request to the background service to create an interface for location {location}. Error: {error}. Check logs for details.")
                     ))
-                }
-                _ => {
-                    error!("There was an error while sending the request to the background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error: {error}");
-                    Err(Error::InternalError(
-                        format!("There was an error while sending the request to the background service to create an interface for location {location}. Error: {error}. Check logs for a more detailed information.")
-                    ))
-                }
             }
         } else {
             info!("The interface for location {location} has been created successfully, interface name: {}.", interface_config.name);
@@ -239,106 +235,82 @@ fn is_port_free(port: u16) -> bool {
     }
 }
 
-static THREAD_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-pub(crate) fn spawn_stats_thread(
-    handle: AppHandle,
+pub(crate) async fn stats_handler(
+    pool: DbPool,
     interface_name: String,
     connection_type: ConnectionType,
-    location_id: Id,
+    mut client: DesktopDaemonServiceClient<Channel>,
 ) {
-    let count = THREAD_COUNT.fetch_add(1, Ordering::Relaxed);
-    warn!("STAT THREAD COUNT: {count}+1");
-    tokio::spawn(async move {
-        let state = handle.state::<AppState>();
-        let mut client = state.client.clone();
-        let request = ReadInterfaceDataRequest {
-            interface_name: interface_name.clone(),
-        };
-        let mut stream = client
-            .read_interface_data(request)
-            .await
-            .expect("Failed to connect to interface stats stream for interface {interface_name}")
-            .into_inner();
+    let request = ReadInterfaceDataRequest {
+        interface_name: interface_name.clone(),
+    };
+    let mut stream = client
+        .read_interface_data(request)
+        .await
+        .expect("Failed to connect to interface stats stream for interface {interface_name}")
+        .into_inner();
 
-        loop {
-            debug!("Checking if connection for interface {interface_name} still exists...");
-            if state
-                .find_connection(location_id, connection_type)
-                .await
-                .is_none()
-            {
-                debug!("Location connection for interface {interface_name} has been removed, stopping stats thread for that interface.");
-                break;
-            }
-            debug!("Connection for interface {interface_name} still exists, continuing to read network stats...");
-            match stream.message().await {
-                Ok(Some(interface_data)) => {
-                    debug!("Received new network usage statistics for interface {interface_name}.");
-                    trace!("Received interface data: {interface_data:?}");
-                    let peers: Vec<Peer> =
-                        interface_data.peers.into_iter().map(Into::into).collect();
-                    let pool = state.db.lock().unwrap().clone().unwrap();
-                    for peer in peers {
-                        if connection_type.eq(&ConnectionType::Location) {
-                            let location_stats =
-                                peer_to_location_stats(&peer, interface_data.listen_port, &pool)
-                                    .await
-                                    .unwrap();
-                            let location_name = location_stats
-                                .get_name(&pool)
+    loop {
+        match stream.message().await {
+            Ok(Some(interface_data)) => {
+                debug!("Received new network usage statistics for interface {interface_name}.");
+                trace!("Received interface data: {interface_data:?}");
+                let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
+                for peer in peers {
+                    if connection_type.eq(&ConnectionType::Location) {
+                        let location_stats =
+                            peer_to_location_stats(&peer, interface_data.listen_port, &pool)
                                 .await
-                                .unwrap_or("UNKNOWN".to_string());
+                                .unwrap();
+                        let location_name = location_stats
+                            .get_name(&pool)
+                            .await
+                            .unwrap_or("UNKNOWN".to_string());
 
-                            debug!("Saving network usage stats related to location {location_name} (interface {interface_name}).");
-                            trace!("Stats: {location_stats:?}");
-                            match location_stats.save(&pool).await {
-                                Ok(_) => {
-                                    debug!(
-                                        "Saved network usage stats for location {location_name}"
-                                    );
-                                }
-                                Err(err) => {
-                                    error!(
+                        debug!("Saving network usage stats related to location {location_name} (interface {interface_name}).");
+                        trace!("Stats: {location_stats:?}");
+                        match location_stats.save(&pool).await {
+                            Ok(_) => {
+                                debug!("Saved network usage stats for location {location_name}");
+                            }
+                            Err(err) => {
+                                error!(
                                         "Failed to save network usage stats for location {location_name}: {err}"
                                     );
-                                }
                             }
-                        } else {
-                            let tunnel_stats =
-                                peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
-                                    .await
-                                    .unwrap();
-                            let tunnel_name = tunnel_stats
-                                .get_name(&pool)
+                        }
+                    } else {
+                        let tunnel_stats =
+                            peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
                                 .await
-                                .unwrap_or("UNKNOWN".to_string());
-                            debug!("Saving network usage stats related to tunnel {tunnel_name} (interface {interface_name}): {tunnel_stats:?}");
-                            match tunnel_stats.save(&pool).await {
-                                Ok(_) => {
-                                    debug!("Saved stats for tunnel {tunnel_name}");
-                                }
-                                Err(err) => {
-                                    error!("Failed to save stats for tunnel {tunnel_name}: {err}");
-                                }
+                                .unwrap();
+                        let tunnel_name = tunnel_stats
+                            .get_name(&pool)
+                            .await
+                            .unwrap_or("UNKNOWN".to_string());
+                        debug!("Saving network usage stats related to tunnel {tunnel_name} (interface {interface_name}): {tunnel_stats:?}");
+                        match tunnel_stats.save(&pool).await {
+                            Ok(_) => {
+                                debug!("Saved stats for tunnel {tunnel_name}");
+                            }
+                            Err(err) => {
+                                error!("Failed to save stats for tunnel {tunnel_name}: {err}");
                             }
                         }
                     }
                 }
-                Ok(None) => {
-                    debug!(
-                        "gRPC stream to the defguard-service managing connections has been closed"
-                    );
-                    break;
-                }
-                Err(err) => {
-                    error!("gRPC stream to the defguard-service managing connections error: {err}");
-                    break;
-                }
+            }
+            Ok(None) => {
+                debug!("gRPC stream to the defguard-service managing connections has been closed");
+                break;
+            }
+            Err(err) => {
+                error!("gRPC stream to the defguard-service managing connections error: {err}");
+                break;
             }
         }
-        debug!("Network usage stats thread for interface {interface_name} has been terminated");
-    });
+    }
+    debug!("Network usage stats thread for interface {interface_name} has been terminated");
 }
 
 // gets targets that will be allowed by logger, this will be empty if not provided
@@ -650,16 +622,6 @@ pub(crate) async fn handle_connection_for_location(
     )?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
-    // Spawn stats threads
-    debug!("Spawning network usage stats thread for location {location}...");
-    spawn_stats_thread(
-        handle.clone(),
-        interface_name.clone(),
-        ConnectionType::Location,
-        location.id,
-    );
-    debug!("Network usage stats thread for location {location} spawned.");
-
     // spawn log watcher
     debug!("Spawning service log watcher for location {location}...");
     spawn_log_watcher_task(
@@ -699,16 +661,6 @@ pub(crate) async fn handle_connection_for_tunnel(
         },
     )?;
     debug!("Event informing the frontend that a new connection has been created sent.");
-
-    // Spawn stats threads
-    debug!("Spawning stats thread for tunnel {}", tunnel.name);
-    spawn_stats_thread(
-        handle.clone(),
-        interface_name.clone(),
-        ConnectionType::Tunnel,
-        tunnel.id,
-    );
-    debug!("Stats thread for tunnel {} spawned", tunnel.name);
 
     // spawn log watcher
     debug!("Spawning log watcher for tunnel {}", tunnel.name);
@@ -1033,21 +985,6 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
         )?;
         debug!("Event informing the frontend that a new connection has been created sent.");
 
-        debug!(
-            "Spawning network usage stats thread for location {}...",
-            location
-        );
-        spawn_stats_thread(
-            app_handle.clone(),
-            interface_name.clone(),
-            ConnectionType::Location,
-            location.id,
-        );
-        debug!(
-            "Network usage stats thread for location {} spawned.",
-            location
-        );
-
         debug!("Spawning service log watcher for location {}...", location);
         spawn_log_watcher_task(
             app_handle.clone(),
@@ -1137,16 +1074,6 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
         )?;
         debug!("Event informing the frontend that a new connection has been created sent.");
 
-        // Spawn stats threads
-        debug!("Spawning stats thread for tunnel {}", tunnel.name);
-        spawn_stats_thread(
-            app_handle.clone(),
-            interface_name.clone(),
-            ConnectionType::Tunnel,
-            tunnel.id,
-        );
-        debug!("Stats thread for tunnel {} spawned", tunnel.name);
-
         //spawn log watcher
         debug!("Spawning log watcher for tunnel {}", tunnel.name);
         spawn_log_watcher_task(
@@ -1223,7 +1150,9 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
 
                     match LocationStats::latest_by_location_id(db_pool, location.id).await {
                         Ok(Some(latest_stat)) => {
-                            if !is_connection_alive(connection_start, latest_stat.collected_at) {
+                            if is_connection_alive(connection_start, latest_stat.collected_at) {
+                                info!("Active connection for location {location} verified successfully.");
+                            } else {
                                 info!("Location {location} will be disconnected due to lack of activity within {wait_time:?}.");
                                 match disconnect(
                                     location.id,
@@ -1241,8 +1170,6 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                         );
                                     }
                                 }
-                            } else {
-                                info!("Active connection for location {location} verified successfully.");
                             }
                         }
                         Ok(None) => {
@@ -1292,7 +1219,9 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
 
                     match TunnelStats::latest_by_tunnel_id(db_pool, tunnel.id).await {
                         Ok(Some(latest_stat)) => {
-                            if !is_connection_alive(connection_start, latest_stat.collected_at) {
+                            if is_connection_alive(connection_start, latest_stat.collected_at) {
+                                info!("Tunnel {tunnel} connection verified successfully.");
+                            } else {
                                 info!("Tunnel {tunnel} will be disconnected due to lack of activity within specified time.");
                                 match disconnect(
                                     tunnel.id,
@@ -1308,8 +1237,6 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                                         error!("Connection for tunnel {tunnel} could not be disconnected. Reason: {err}");
                                     }
                                 }
-                            } else {
-                                info!("Tunnel {tunnel} connection verified successfully.");
                             }
                         }
                         Ok(None) => {

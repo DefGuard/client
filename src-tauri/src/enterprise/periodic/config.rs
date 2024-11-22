@@ -15,7 +15,7 @@ use crate::{
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
-const POLLING_ENDPOINT: &str = "/api/v1/poll";
+static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
 /// Periodically retrieves and updates configuration for all [`Instance`]s.
 /// Updates are only performed if no connections are established to the [`Instance`],
