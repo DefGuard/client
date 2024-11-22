@@ -124,7 +124,7 @@ pub async fn disconnect(
     debug!("Received a command to disconnect from the {connection_type} {name}({location_id})");
 
     debug!("Removing active connection for {connection_type} {name}({location_id}) from the application's state, if it exists...");
-    if let Some(connection) = state.remove_connection(location_id, &connection_type).await {
+    if let Some(connection) = state.remove_connection(location_id, connection_type).await {
         debug!("Found and removed active connection from the application's state for {connection_type} {name}({location_id})");
         trace!("Connection: {connection:?}");
         disconnect_interface(&connection, &state).await?;
@@ -878,7 +878,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     }
     for location in instance_locations {
         if let Some(connection) = app_state
-            .remove_connection(location.id, &ConnectionType::Location)
+            .remove_connection(location.id, ConnectionType::Location)
             .await
         {
             debug!("Found active connection for location {location}, closing...");
@@ -1015,7 +1015,7 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     debug!("The tunnel to delete with ID {tunnel_id} has been identified as {tunnel}, proceeding with deletion.");
 
     if let Some(connection) = app_state
-        .remove_connection(tunnel_id, &ConnectionType::Tunnel)
+        .remove_connection(tunnel_id, ConnectionType::Tunnel)
         .await
     {
         debug!("Found active connection for tunnel {tunnel} which is being deleted, closing the connection.");

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use tauri::{
     async_runtime::{spawn, JoinHandle},
@@ -27,10 +24,10 @@ use crate::{
 
 pub struct AppState {
     pub db: std::sync::Mutex<Option<DbPool>>,
-    pub active_connections: Arc<Mutex<Vec<ActiveConnection>>>,
+    pub active_connections: Mutex<Vec<ActiveConnection>>,
     pub client: DesktopDaemonServiceClient<Channel>,
-    pub log_watchers: Arc<std::sync::Mutex<HashMap<String, CancellationToken>>>,
-    pub app_config: Arc<std::sync::Mutex<AppConfig>>,
+    pub log_watchers: std::sync::Mutex<HashMap<String, CancellationToken>>,
+    pub app_config: std::sync::Mutex<AppConfig>,
     stat_threads: std::sync::Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
 }
 
@@ -40,10 +37,10 @@ impl AppState {
         let client = setup_client().expect("Failed to setup gRPC client");
         AppState {
             db: std::sync::Mutex::new(None),
-            active_connections: Arc::new(Mutex::new(Vec::new())),
+            active_connections: Mutex::new(Vec::new()),
             client,
-            log_watchers: Arc::new(std::sync::Mutex::new(HashMap::new())),
-            app_config: Arc::new(std::sync::Mutex::new(AppConfig::new(app_handle))),
+            log_watchers: std::sync::Mutex::new(HashMap::new()),
+            app_config: std::sync::Mutex::new(AppConfig::new(app_handle)),
             stat_threads: std::sync::Mutex::new(HashMap::new()),
         }
     }
@@ -64,10 +61,12 @@ impl AppState {
     ) {
         let ifname = interface_name.into();
         let connection = ActiveConnection::new(location_id, ifname.clone(), connection_type);
-        trace!("Adding active connection for location ID: {location_id}");
+        debug!("Adding active connection for location ID: {location_id}");
+        error!("LOCK 1");
         let mut connections = self.active_connections.lock().await;
         connections.push(connection);
         trace!("Current active connections: {connections:?}");
+        drop(connections);
 
         debug!("Spawning thread for network statistics for location ID {location_id}");
         let handle = spawn(stats_handler(
@@ -76,14 +75,18 @@ impl AppState {
             connection_type,
             self.client.clone(),
         ));
-        if let Some(old_handle) = self
+        let Some(old_handle) = self
             .stat_threads
             .lock()
             .unwrap()
             .insert(location_id, handle)
-        {
-            warn!("Something went wrong: old network statistics thread still exists");
-            old_handle.abort();
+        else {
+            return;
+        };
+        warn!("Something went wrong: old network statistics thread still exists");
+        old_handle.abort();
+        if let Err(err) = old_handle.await {
+            debug!("Old network statistics thread for location ID {location_id} returned {err}");
         }
     }
 
@@ -92,24 +95,31 @@ impl AppState {
     pub(crate) async fn remove_connection(
         &self,
         location_id: Id,
-        connection_type: &ConnectionType,
+        connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
-        trace!("Removing active connection for location ID: {location_id}");
+        debug!("Removing active connection for location ID: {location_id}");
 
         // Stop statistics thread
-        if let Some(handle) = self.stat_threads.lock().unwrap().get(&location_id) {
-            debug!("Stopping network statistics thread for {location_id}");
-            handle.abort();
+        {
+            let handle = self.stat_threads.lock().unwrap().remove(&location_id);
+            if let Some(handle) = handle {
+                debug!("Stopping network statistics thread for location ID {location_id}");
+                handle.abort();
+                if let Err(err) = handle.await {
+                    debug!(
+                        "Network statistics thread for location ID {location_id} returned {err}"
+                    );
+                }
+            }
         }
 
         let mut connections = self.active_connections.lock().await;
-
         if let Some(index) = connections.iter().position(|conn| {
-            conn.location_id == location_id && conn.connection_type.eq(connection_type)
+            conn.location_id == location_id && conn.connection_type == connection_type
         }) {
             // Found a connection with the specified location_id
             let removed_connection = connections.remove(index);
-            trace!("Active connection has been removed from the active connections list.");
+            debug!("Active connection has been removed from the active connections list.");
             Some(removed_connection)
         } else {
             debug!("No active connection found with location ID: {location_id}");
@@ -121,6 +131,7 @@ impl AppState {
         &self,
         connection_type: ConnectionType,
     ) -> Vec<Id> {
+        error!("LOCK 2");
         let active_connections = self.active_connections.lock().await;
 
         let connection_ids = active_connections
@@ -139,9 +150,10 @@ impl AppState {
 
     pub(crate) async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
         debug!("Closing all active connections...");
+        error!("LOCK 3");
         let active_connections = self.active_connections.lock().await;
         let active_connections_count = active_connections.len();
-        debug!("Found {} active connections", active_connections_count);
+        debug!("Found {active_connections_count} active connections");
         for connection in active_connections.iter() {
             debug!(
                 "Found active connection with location {}",
@@ -164,6 +176,7 @@ impl AppState {
         id: Id,
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
+        error!("LOCK 4");
         let connections = self.active_connections.lock().await;
         trace!(
             "Checking for active connection with ID {id}, type {connection_type} in active connections."

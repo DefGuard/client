@@ -1128,7 +1128,7 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
     sleep(wait_time).await;
     debug!("Connection verification task finished sleeping");
     let db_pool = &state.get_pool();
-
+    error!("LOCK 6");
     let active_connections = state.active_connections.lock().await;
 
     match connection {

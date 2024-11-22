@@ -10,7 +10,6 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -42,7 +41,6 @@ use self::config::Config;
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
-static THREAD_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -237,8 +235,7 @@ impl DesktopDaemonService for DaemonService {
         span.in_scope(|| {
             info!("Spawning statistics collector task for interface {ifname}");
         });
-        let count = THREAD_COUNT.fetch_add(1, Ordering::Relaxed);
-        warn!("STAT THREAD COUNT: {count}+1");
+
         tokio::spawn(async move {
             // Helper map to track if peer data is actually changing to avoid sending duplicate stats.
             let mut peer_map = HashMap::new();

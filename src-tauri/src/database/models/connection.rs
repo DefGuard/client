@@ -1,5 +1,3 @@
-// use std::thread::JoinHandle;
-
 use chrono::{NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{query_as, query_scalar, SqliteExecutor};
@@ -149,8 +147,6 @@ pub struct ActiveConnection {
     pub start: NaiveDateTime,
     pub interface_name: String,
     pub connection_type: ConnectionType,
-    // #[serde(skip)]
-    // stats_thread: JoinHandle<()>,
 }
 
 impl ActiveConnection {
