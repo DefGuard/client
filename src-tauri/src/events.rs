@@ -26,7 +26,6 @@ pub enum DeadConDroppedOutReason {
 /// Used as payload for [`DEAD_CONNECTION_DROPPED`] event
 #[derive(Serialize, Clone, Debug)]
 pub struct DeadConnDroppedOut {
-    pub(crate) id: i64,
     pub(crate) name: String,
     pub(crate) con_type: ConnectionType,
     pub(crate) reason: DeadConDroppedOutReason,

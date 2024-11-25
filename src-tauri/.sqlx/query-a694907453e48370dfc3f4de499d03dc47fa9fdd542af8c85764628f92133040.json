@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "WITH cte AS ( SELECT id, tunnel_id, COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1 ) SELECT id, tunnel_id, SUM(MAX(upload, 0)) \"upload!: i64\", SUM(MAX(download, 0)) \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM cte WHERE tunnel_id = $2 AND collected_at >= $3 GROUP BY collected_at ORDER BY collected_at",
+  "query": "WITH cte AS (SELECT id, location_id, COALESCE(upload - LAG(upload) OVER (PARTITION BY location_id ORDER BY collected_at), 0) upload, COALESCE(download - LAG(download) OVER (PARTITION BY location_id ORDER BY collected_at), 0) download, last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval FROM location_stats ORDER BY collected_at LIMIT -1 OFFSET 1) SELECT id, location_id, SUM(MAX(upload, 0)) \"upload!: i64\", SUM(MAX(download, 0)) \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM cte WHERE location_id = $2 AND collected_at >= $3 GROUP BY collected_at ORDER BY collected_at LIMIT $4",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "tunnel_id",
+        "name": "location_id",
         "ordinal": 1,
         "type_info": "Integer"
       },
@@ -45,7 +45,7 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false,
@@ -55,8 +55,8 @@
       false,
       true,
       false,
-      false
+      true
     ]
   },
-  "hash": "b130d533efa93e32e6c8288a19c001d5554b4a33fd0d48dbd2d3303aecb4fca2"
+  "hash": "a694907453e48370dfc3f4de499d03dc47fa9fdd542af8c85764628f92133040"
 }

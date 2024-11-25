@@ -21,8 +21,6 @@ pub enum Error {
     IpAddrMask(#[from] IpAddrParseError),
     #[error("IP address parse error: {0}")]
     AddrParse(#[from] AddrParseError),
-    #[error("Local Ip Error: {0}")]
-    LocalIpError(#[from] local_ip_address::Error),
     #[error("Internal error: {0}")]
     InternalError(String),
     #[error("Failed to parse timestamp")]

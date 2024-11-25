@@ -140,7 +140,6 @@ pub struct GlobalLogWatcher {
 }
 
 impl GlobalLogWatcher {
-    #[must_use]
     pub fn new(
         handle: AppHandle,
         cancellation_token: CancellationToken,

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT c.id, c.location_id, c.start \"start!\", c.end \"end!\", COALESCE((SELECT ls.upload FROM location_stats ls WHERE ls.location_id = c.location_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"upload: _\", COALESCE((SELECT ls.download FROM location_stats ls WHERE ls.location_id = c.location_id AND ls.collected_at >= c.start AND ls.collected_at <= c.end ORDER BY ls.collected_at DESC LIMIT 1 ), 0) \"download: _\" FROM connection c WHERE location_id = $1 ORDER BY start DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "location_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "start!",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "end!",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "upload: _",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "download: _",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "35cdd5aa0fa68c9700b71bae80b6fe97b3ef20aa110ef0502af0762c2e4ef493"
+}

@@ -23,7 +23,7 @@ mod proto {
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 
 /// Location type used in commands to check if we using tunnel or location
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone, Copy)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ConnectionType {
     Tunnel,
     Location,
@@ -63,7 +63,6 @@ pub struct CommonWireguardFields {
 pub struct CommonConnection<I = NoId> {
     pub id: I,
     pub location_id: Id,
-    pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
     pub connection_type: ConnectionType,
@@ -87,7 +86,6 @@ pub struct CommonLocationStats<I = NoId> {
 pub struct CommonConnectionInfo {
     pub id: Id,
     pub location_id: Id,
-    pub connected_from: String,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
     pub upload: Option<i32>,

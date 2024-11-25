@@ -25,7 +25,6 @@ dark-light = "1.1"
 defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.5.5" }
 dirs = "5.0"
 lazy_static = "1.5"
-local-ip-address = "0.6"
 log = { version = "0.4", features = ["serde"] }
 prost = "0.13"
 rand = "0.8"
