@@ -605,7 +605,7 @@ pub(crate) async fn handle_connection_for_location(
         location,
         interface_name.clone(),
         preshared_key,
-        &state.get_pool(),
+        &state.db,
         state.client.clone(),
     )
     .await?;
@@ -719,7 +719,7 @@ pub(crate) async fn disconnect_interface(
 
     match active_connection.connection_type {
         ConnectionType::Location => {
-            let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? else {
+            let Some(location) = Location::find_by_id(&state.db, location_id).await? else {
                 error!("Error while disconnecting interface {interface_name}, location with ID {location_id} not found");
                 return Err(Error::NotFound);
             };
@@ -738,7 +738,7 @@ pub(crate) async fn disconnect_interface(
                 return Err(Error::InternalError(msg));
             }
             let connection: Connection = active_connection.into();
-            let connection = connection.save(&state.get_pool()).await?;
+            let connection = connection.save(&state.db).await?;
             debug!(
                 "Saved location {} new connection status in the database",
                 location.name
@@ -751,7 +751,7 @@ pub(crate) async fn disconnect_interface(
             debug!("Finished disconnecting from location {}", location.name);
         }
         ConnectionType::Tunnel => {
-            let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? else {
+            let Some(tunnel) = Tunnel::find_by_id(&state.db, location_id).await? else {
                 error!("Error while disconnecting interface {interface_name}, tunnel with ID {location_id} not found");
                 return Err(Error::NotFound);
             };
@@ -780,7 +780,7 @@ pub(crate) async fn disconnect_interface(
                 info!("Executed defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", active_connection.interface_name);
             }
             let connection: TunnelConnection = active_connection.into();
-            let connection = connection.save(&state.get_pool()).await?;
+            let connection = connection.save(&state.db).await?;
             debug!(
                 "Saved new tunnel {} connection status in the database",
                 tunnel.name
@@ -806,11 +806,11 @@ pub async fn get_tunnel_or_location_name(
     appstate: &AppState,
 ) -> String {
     let name = match connection_type {
-        ConnectionType::Location => Location::find_by_id(&appstate.get_pool(), id)
+        ConnectionType::Location => Location::find_by_id(&appstate.db, id)
             .await
             .ok()
             .and_then(|l| l.map(|l| l.name)),
-        ConnectionType::Tunnel => Tunnel::find_by_id(&appstate.get_pool(), id)
+        ConnectionType::Tunnel => Tunnel::find_by_id(&appstate.db, id)
             .await
             .ok()
             .and_then(|t| t.map(|t| t.name)),
@@ -901,7 +901,7 @@ fn close_service_handle(
 pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
     let appstate = app_handle.state::<AppState>();
-    let all_locations = Location::all(&appstate.get_pool()).await?;
+    let all_locations = Location::all(&appstate.db).await?;
     let service_control_manager = open_service_manager().map_err(|err| {
         error!("Failed to open service control manager while trying to sync client's connections with the host state: {}", err);
         Error::InternalError("Failed to open service control manager while trying to sync client's connections with the host state".to_string())
@@ -1000,7 +1000,7 @@ pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error
 
     debug!("Synchronizing active connections for tunnels...");
     // Do the same for tunnels
-    for tunnel in Tunnel::all(&appstate.get_pool()).await? {
+    for tunnel in Tunnel::all(&appstate.db).await? {
         let interface_name = get_interface_name(&tunnel.name);
         let service_name = format!("WireGuardTunnel${}", interface_name);
         let service = match open_service(
@@ -1127,7 +1127,7 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
     debug!("Connection verification task is sleeping for {wait_time:?}");
     sleep(wait_time).await;
     debug!("Connection verification task finished sleeping");
-    let db_pool = &state.get_pool();
+    let db_pool = &state.db;
     let active_connections = state.active_connections.lock().await;
 
     match connection {

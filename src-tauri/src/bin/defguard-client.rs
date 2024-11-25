@@ -5,6 +5,7 @@
 
 use std::{env, str::FromStr};
 
+use defguard_client::commands::*;
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
@@ -17,7 +18,6 @@ use defguard_client::{
     utils::load_log_targets,
     VERSION,
 };
-use defguard_client::{commands::*, database};
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
@@ -43,7 +43,6 @@ lazy_static! {
     static ref LOG_INCLUDES: Vec<String> = load_log_targets();
 }
 
-// TODO: Refactor later
 #[allow(clippy::single_match)]
 #[tokio::main]
 async fn main() {
@@ -209,16 +208,13 @@ async fn main() {
         service::config::DEFAULT_LOG_DIR
     );
 
-    debug!("Performing database setup...");
+    debug!("Running database migrations, if there are any.");
     let app_state: State<AppState> = app_handle.state();
-    let db = match database::init_db(&app_handle).await {
-        Ok(db) => db,
-        Err(e) => {
-            error!("Failed to initialize database: {}", e);
-            return;
-        }
-    };
-    *app_state.db.lock().unwrap() = Some(db);
+    sqlx::migrate!()
+        .run(&app_state.db)
+        .await
+        .expect("Failed to apply database migrations");
+    debug!("Applied all database migrations that were pending. If any.");
     debug!("Database setup has been completed successfully.");
 
     // Sync already active connections on windows.
@@ -232,11 +228,10 @@ async fn main() {
             Ok(_) => {
                 info!("Synchronized application's active connections with the connections already open on the system, if there were any.")
             }
-            Err(e) => {
+            Err(err) => {
                 warn!(
                     "Failed to synchronize application's active connections with the connections already open on the system. \
-                    The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error details: {}",
-                    e
+                    The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error: {err}"
                 )
             }
         };

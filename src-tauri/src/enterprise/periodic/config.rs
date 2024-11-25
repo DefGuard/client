@@ -23,9 +23,8 @@ static POLLING_ENDPOINT: &str = "/api/v1/poll";
 pub async fn poll_config(handle: AppHandle) {
     debug!("Starting the configuration polling loop...");
     let state: State<AppState> = handle.state();
-    let pool = state.get_pool();
     loop {
-        let Ok(mut transaction) = pool.begin().await else {
+        let Ok(mut transaction) = state.db.begin().await else {
             error!(
                 "Failed to begin database transaction for config polling, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()

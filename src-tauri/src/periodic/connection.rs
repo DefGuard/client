@@ -96,7 +96,7 @@ async fn disconnect_dead_connection(
 /// Verify if the active connection is valid or not, this is needed in case client was offline and gateway already terminated the peer but client still assume it's connected.
 pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Error> {
     let app_state = app_handle.state::<AppState>();
-    let pool = &app_state.get_pool();
+    let pool = &app_state.db;
     let peer_alive_period = app_state.app_config.lock().unwrap().peer_alive_period;
     debug!("Active connections verification started.");
 

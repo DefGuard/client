@@ -11,6 +11,7 @@ use tonic::transport::Channel;
 use crate::{
     app_config::AppConfig,
     database::{
+        init_db,
         models::{connection::ActiveConnection, instance::Instance, location::Location, Id},
         DbPool,
     },
@@ -23,7 +24,7 @@ use crate::{
 };
 
 pub struct AppState {
-    pub db: std::sync::Mutex<Option<DbPool>>,
+    pub db: DbPool,
     pub active_connections: Mutex<Vec<ActiveConnection>>,
     pub client: DesktopDaemonServiceClient<Channel>,
     pub log_watchers: std::sync::Mutex<HashMap<String, CancellationToken>>,
@@ -34,23 +35,14 @@ pub struct AppState {
 impl AppState {
     #[must_use]
     pub fn new(app_handle: &AppHandle) -> Self {
-        let client = setup_client().expect("Failed to setup gRPC client");
         AppState {
-            db: std::sync::Mutex::new(None),
+            db: init_db(&app_handle.path_resolver()).expect("Failed to initalize database"),
             active_connections: Mutex::new(Vec::new()),
-            client,
+            client: setup_client().expect("Failed to setup gRPC client"),
             log_watchers: std::sync::Mutex::new(HashMap::new()),
             app_config: std::sync::Mutex::new(AppConfig::new(app_handle)),
             stat_threads: std::sync::Mutex::new(HashMap::new()),
         }
-    }
-
-    pub(crate) fn get_pool(&self) -> DbPool {
-        self.db
-            .lock()
-            .expect("Failed to lock dbpool mutex")
-            .clone()
-            .expect("Missing database connection pool")
     }
 
     pub(crate) async fn add_connection<S: Into<String>>(
@@ -69,7 +61,7 @@ impl AppState {
 
         debug!("Spawning thread for network statistics for location ID {location_id}");
         let handle = spawn(stats_handler(
-            self.get_pool(),
+            self.db.clone(),
             ifname,
             connection_type,
             self.client.clone(),
@@ -196,7 +188,7 @@ impl AppState {
         &self,
         instance: &Instance<Id>,
     ) -> Result<Vec<ActiveConnection>, Error> {
-        let locations: HashSet<Id> = Location::find_by_instance_id(&self.get_pool(), instance.id)
+        let locations: HashSet<Id> = Location::find_by_instance_id(&self.db, instance.id)
             .await?
             .iter()
             .map(|location| location.id)
