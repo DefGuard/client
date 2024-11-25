@@ -1140,7 +1140,6 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                     trace!("Verifying connection {active_connection:?}");
                     let payload = DeadConnDroppedOut {
                         con_type: ConnectionType::Location,
-                        id: location.id,
                         name: location.name.to_string(),
                         reason: DeadConDroppedOutReason::ConnectionVerification,
                     };
@@ -1209,7 +1208,6 @@ pub(crate) async fn verify_connection(app_handle: AppHandle, connection: Connect
                     trace!("Verifying connection {active_connection:?}");
                     let payload = DeadConnDroppedOut {
                         con_type: ConnectionType::Tunnel,
-                        id: tunnel.id,
                         name: tunnel.name.to_string(),
                         reason: DeadConDroppedOutReason::ConnectionVerification,
                     };

@@ -37,7 +37,7 @@ fn check_last_active_connection(last_handshake: i64, peer_alive_period: u32) -> 
 }
 
 async fn reconnect(
-    con_id: i64,
+    con_id: Id,
     con_interface_name: &str,
     app_handle: &AppHandle,
     con_type: ConnectionType,
@@ -53,7 +53,6 @@ async fn reconnect(
                 Err(err) => {
                     error!("Reconnect attempt failed, disconnect succeeded but connect failed. Error: {err}");
                     let payload = DeadConnDroppedOut {
-                        id: con_id,
                         name: con_interface_name.to_string(),
                         con_type,
                         reason: DeadConDroppedOutReason::PeriodicVerification,
@@ -83,7 +82,6 @@ async fn disconnect_dead_connection(
             info!("Connection verification: interface {con_interface_name}, {con_type}({con_id}): disconnected due to timeout.");
             let event_payload = DeadConnDroppedOut {
                 con_type,
-                id: con_id,
                 name: con_interface_name.to_string(),
                 reason: DeadConDroppedOutReason::PeriodicVerification,
             };
