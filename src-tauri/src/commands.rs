@@ -514,15 +514,9 @@ pub async fn do_update_instance(
     if instance.disable_all_traffic != instance_info.disable_all_traffic
         && instance_info.disable_all_traffic
     {
-        debug!(
-            "Disabling all traffic for all locations of instance {}.",
-            instance
-        );
+        debug!("Disabling all traffic for all locations of instance {instance}");
         Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-        debug!(
-            "Disabled all traffic for all locations of instance {}.",
-            instance
-        );
+        debug!("Disabled all traffic for all locations of instance {instance}");
     }
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
@@ -539,8 +533,7 @@ pub async fn do_update_instance(
     }
     instance.save(transaction.as_mut()).await?;
     debug!(
-        "A new base configuration has been applied to instance {}, even if nothing changed",
-        instance
+        "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
     // check if locations have changed
@@ -578,40 +571,27 @@ pub async fn do_update_instance(
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.dns = new_location.dns;
                 current_location.save(transaction.as_mut()).await?;
-                info!(
-                    "Location {} configuration updated for instance {}",
-                    current_location, instance,
-                );
+                info!("Location {current_location} configuration updated for instance {instance}");
             } else {
                 // create new location
-                debug!(
-                    "Creating new location {new_location} for instance {}",
-                    instance
-                );
+                debug!("Creating new location {new_location} for instance instance {instance}");
                 let new_location = new_location.save(transaction.as_mut()).await?;
-                info!(
-                    "New location {} created for instance {}",
-                    new_location, instance
-                );
+                info!("New location {new_location} created for instance {instance}");
             }
         }
 
         // remove locations which were present in current locations
         // but no longer found in core response
-        debug!("Removing locations for instance {}.", instance);
+        debug!("Removing locations for instance {instance}");
         for removed_location in current_locations {
             removed_location.delete(transaction.as_mut()).await?;
             info!(
-                "Removed location {} for instance {} during instance update",
-                removed_location, instance
+                "Removed location {removed_location} for instance {instance} during instance update"
             );
         }
-        debug!("Finished updating locations for instance {}", instance);
+        debug!("Finished updating locations for instance {instance}");
     } else {
-        info!(
-            "Locations for instance {} didn't change. Not updating them.",
-            instance
-        );
+        info!("Locations for instance {instance} didn't change. Not updating them.");
     }
     Ok(())
 }
@@ -729,10 +709,7 @@ pub async fn active_connection(
 ) -> Result<Option<ActiveConnection>, Error> {
     let state = handle.state::<AppState>();
     let name = get_tunnel_or_location_name(location_id, connection_type, &state).await;
-    debug!(
-        "Checking if there is an active connection for location {}(ID: {})",
-        name, location_id
-    );
+    debug!("Checking if there is an active connection for location {name}(ID: {location_id})");
     let connection = state.find_connection(location_id, connection_type).await;
     if connection.is_some() {
         debug!("Found active connection for location {name}(ID: {location_id})");
