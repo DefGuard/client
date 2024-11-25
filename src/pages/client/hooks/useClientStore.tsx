@@ -86,6 +86,7 @@ export const useClientStore = createWithEqualityFn<Store>()(
         // don't emit event bcs this updates store anyway
         const newConfig = await setAppConfig(data, false);
         set({ appConfig: newConfig });
+        return newConfig;
       },
     }),
     {
@@ -118,5 +119,5 @@ type StoreMethods = {
   setTunnels: (tunnels: CommonWireguardFields[]) => void;
   setListChecked: (listChecked: boolean) => void;
   updateInstances: () => Promise<void>;
-  updateAppConfig: (data: Partial<AppConfig>) => Promise<void>;
+  updateAppConfig: (data: Partial<AppConfig>) => Promise<AppConfig>;
 };

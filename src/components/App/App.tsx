@@ -34,6 +34,7 @@ import { WireguardInstanceType } from '../../pages/client/types';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
+import { useTheme } from '../../shared/defguard-ui/hooks/theme/useTheme';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
@@ -125,6 +126,7 @@ export const App = () => {
   const [localeLoaded, setWasLoaded] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const setClientState = useClientStore((state) => state.setState);
+  const { changeTheme } = useTheme();
 
   const appLoaded = useMemo(
     () => localeLoaded && settingsLoaded,
@@ -153,13 +155,15 @@ export const App = () => {
         const appConfig = await getAppConfig();
         const instances = await getInstances();
         const tunnels = await getTunnels();
+        changeTheme(appConfig.theme);
         setClientState({ appConfig, instances, tunnels });
         debug('Tauri init data loaded');
         setSettingsLoaded(true);
       };
       loadTauriState();
     }
-  }, [setClientState, setSettingsLoaded]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!appLoaded) return null;
 

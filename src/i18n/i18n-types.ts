@@ -131,6 +131,10 @@ type RootTranslation = {
 			 * R​e​s​e​t
 			 */
 			reset: string
+			/**
+			 * S​a​v​e
+			 */
+			save: string
 		}
 		messages: {
 			/**
@@ -1744,6 +1748,10 @@ export type TranslationFunctions = {
 			 * Reset
 			 */
 			reset: () => LocalizedString
+			/**
+			 * Save
+			 */
+			save: () => LocalizedString
 		}
 		messages: {
 			/**

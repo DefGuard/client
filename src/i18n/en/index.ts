@@ -42,6 +42,7 @@ const en = {
       cancel: 'Cancel',
       close: 'Close',
       reset: 'Reset',
+      save: 'Save',
     },
     messages: {
       error: 'Unexpected error occurred!',

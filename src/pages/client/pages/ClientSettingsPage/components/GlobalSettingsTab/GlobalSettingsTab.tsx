@@ -1,44 +1,138 @@
 import './style.scss';
 
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  SubmitHandler,
+  useController,
+  UseControllerProps,
+  useForm,
+} from 'react-hook-form';
+import { z } from 'zod';
+import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
+import { FormCheckBox } from '../../../../../../shared/defguard-ui/components/Form/FormCheckBox/FormCheckBox';
+import { FormInput } from '../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
+import { FormSelect } from '../../../../../../shared/defguard-ui/components/Form/FormSelect/FormSelect';
+import { Button } from '../../../../../../shared/defguard-ui/components/Layout/Button/Button';
+import {
+  ButtonSize,
+  ButtonStyleVariant,
+} from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
-import { LabeledCheckbox } from '../../../../../../shared/defguard-ui/components/Layout/LabeledCheckbox/LabeledCheckbox';
-import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
 import {
   SelectOption,
   SelectSelectedValue,
   SelectSizeVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
-import { ThemeKey } from '../../../../../../shared/defguard-ui/hooks/theme/types';
-import { LogLevel, TrayIconTheme } from '../../../../clientAPI/types';
+import {
+  availableThemes,
+  ThemeKey,
+} from '../../../../../../shared/defguard-ui/hooks/theme/types';
+import {
+  AppConfig,
+  availableLogLevels,
+  availableTrayThemes,
+  LogLevel,
+  TrayIconTheme,
+} from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { AppConfigConnectionVerificationPeriod } from './components/AppConfigConnectionVerificationPeriod/AppConfigConnectionVerificationPeriod';
-import { AppConfigPeerAlive } from './components/AppConfigPeerAlive/AppConfigPeerAlive';
+
+type FormFields = AppConfig;
+
+type FormMemberProps = {
+  controller: UseControllerProps<FormFields>;
+};
 
 export const GlobalSettingsTab = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
+  const currentConfig = useClientStore((s) => s.appConfig);
+  const setAppConfig = useClientStore((s) => s.updateAppConfig, shallow);
+
+  const { mutateAsync } = useMutation({
+    mutationFn: setAppConfig,
+  });
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        theme: z
+          .string()
+          .min(1, LL.form.errors.required())
+          .refine(
+            (value) => availableThemes.includes(value as ThemeKey),
+            LL.form.errors.invalid(),
+          ),
+        log_level: z
+          .string()
+          .min(1, LL.form.errors.required())
+          .refine((v) => availableLogLevels.includes(v as LogLevel)),
+        tray_theme: z
+          .string()
+          .min(1, LL.form.errors.required())
+          .refine((v) => availableTrayThemes.includes(v as TrayIconTheme)),
+        check_for_updates: z.boolean(),
+        connection_verification_time: z
+          .number({
+            invalid_type_error: LL.form.errors.required(),
+            required_error: LL.form.errors.required(),
+          })
+          .gte(5, LL.form.errors.minValue({ min: 5 })),
+        peer_alive_period: z
+          .number({
+            invalid_type_error: LL.form.errors.required(),
+            required_error: LL.form.errors.required(),
+          })
+          .gte(120, LL.form.errors.minValue({ min: 120 })),
+      }),
+    [LL.form.errors],
+  );
+
+  const {
+    handleSubmit,
+    control,
+    reset,
+    formState: { isDirty, isValid },
+  } = useForm<AppConfig>({
+    defaultValues: currentConfig,
+    mode: 'all',
+    resolver: zodResolver(schema),
+  });
+
+  const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
+    const newConfig = await mutateAsync(values);
+    reset(newConfig);
+  };
 
   return (
-    <div id="global-settings-tab">
-      <section>
+    <form id="global-settings-tab" onSubmit={handleSubmit(handleValidSubmit)}>
+      <div className="controls spaced">
+        <Button
+          type="submit"
+          size={ButtonSize.SMALL}
+          styleVariant={ButtonStyleVariant.SAVE}
+          disabled={!isDirty || !isValid}
+          text={LL.common.controls.save()}
+        />
+      </div>
+      <section className="spaced">
         <h2>{localLL.versionUpdate.title()}</h2>
-        <CheckForUpdatesOption />
+        <CheckForUpdatesOption controller={{ control, name: 'check_for_updates' }} />
       </section>
       <section>
         <h2>{localLL.tray.title()}</h2>
-        <TrayIconThemeSelect />
+        <TrayIconThemeSelect controller={{ control, name: 'tray_theme' }} />
       </section>
       <section>
         <h2>{localLL.logging.title()}</h2>
-        <LoggingLevelSelect />
+        <LoggingLevelSelect controller={{ control, name: 'log_level' }} />
       </section>
       <section>
         <h2>{localLL.theme.title()}</h2>
-        <ThemeSelect />
+        <ThemeSelect controller={{ control, name: 'theme' }} />
       </section>
       <section>
         <header>
@@ -49,7 +143,7 @@ export const GlobalSettingsTab = () => {
             <p>{localLL.peer_alive.helper()}</p>
           </Helper>
         </header>
-        <AppConfigPeerAlive />
+        <FormInput controller={{ control, name: 'peer_alive_period' }} type="number" />
       </section>
       <section>
         <header>
@@ -61,21 +155,18 @@ export const GlobalSettingsTab = () => {
             <p>{localLL.connection_verification.helper()}</p>
           </Helper>
         </header>
-        <AppConfigConnectionVerificationPeriod />
+        <FormInput
+          controller={{ control, name: 'connection_verification_time' }}
+          type="number"
+        />
       </section>
-    </div>
+    </form>
   );
 };
 
-const ThemeSelect = () => {
+const ThemeSelect = ({ controller }: FormMemberProps) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global.theme;
-  const appConfig = useClientStore((state) => state.appConfig);
-  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: updateAppConfig,
-  });
 
   const options = useMemo((): SelectOption<ThemeKey>[] => {
     const res: SelectOption<ThemeKey>[] = [
@@ -111,26 +202,22 @@ const ThemeSelect = () => {
   );
 
   return (
-    <Select
+    <FormSelect
       options={options}
       renderSelected={renderSelected}
-      selected={appConfig.theme}
-      onChangeSingle={(theme) => mutate({ theme })}
-      loading={isPending}
+      controller={controller}
     />
   );
 };
 
-const LoggingLevelSelect = () => {
+const LoggingLevelSelect = ({ controller }: FormMemberProps) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global.logging;
   const appConfig = useClientStore((state) => state.appConfig);
-  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
   const [showWarning, setShowWarning] = useState(false);
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: updateAppConfig,
-  });
+  const {
+    field: { value },
+  } = useController(controller);
 
   const loggingOptions = useMemo((): SelectOption<LogLevel>[] => {
     const res: SelectOption<LogLevel>[] = [
@@ -175,35 +262,28 @@ const LoggingLevelSelect = () => {
     [loggingOptions],
   );
 
+  useEffect(() => {
+    if (value !== appConfig.log_level) {
+      setShowWarning(true);
+    }
+  }, [value, appConfig.log_level]);
+
   return (
     <>
       {showWarning && <p className="warning-message">{localLL.warning()}</p>}
-      <Select
+      <FormSelect
+        controller={controller}
         sizeVariant={SelectSizeVariant.STANDARD}
         options={loggingOptions}
         renderSelected={renderSelected}
-        selected={appConfig.log_level}
-        loading={isPending}
-        onChangeSingle={(level) => {
-          if (!showWarning) {
-            setShowWarning(true);
-          }
-          mutate({ log_level: level });
-        }}
       />
     </>
   );
 };
 
-const TrayIconThemeSelect = () => {
+const TrayIconThemeSelect = ({ controller }: FormMemberProps) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
-  const appConfig = useClientStore((state) => state.appConfig);
-  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: updateAppConfig,
-  });
 
   const trayThemeSelectOptions = useMemo((): SelectOption<TrayIconTheme>[] => {
     const res: SelectOption<TrayIconTheme>[] = [
@@ -249,35 +329,25 @@ const TrayIconThemeSelect = () => {
   );
 
   return (
-    <Select
+    <FormSelect
       sizeVariant={SelectSizeVariant.STANDARD}
       options={trayThemeSelectOptions}
-      selected={appConfig.tray_theme}
       label={localLL.tray.label()}
       renderSelected={renderSelectedTrayTheme}
-      onChangeSingle={(theme) => mutate({ tray_theme: theme })}
-      loading={isPending}
+      controller={controller}
     />
   );
 };
 
-const CheckForUpdatesOption = () => {
+const CheckForUpdatesOption = ({ controller }: FormMemberProps) => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.settingsPage.tabs.global;
-  const appConfig = useClientStore((state) => state.appConfig);
-  const updateAppConfig = useClientStore((s) => s.updateAppConfig);
-  const { mutate, isPending } = useMutation({
-    mutationFn: updateAppConfig,
-  });
 
   return (
-    <LabeledCheckbox
+    <FormCheckBox
+      labelPlacement="right"
       label={localLL.versionUpdate.checkboxTitle()}
-      disabled={isPending}
-      value={appConfig.check_for_updates}
-      onChange={(value) => {
-        mutate({ check_for_updates: value });
-      }}
+      controller={controller}
     />
   );
 };

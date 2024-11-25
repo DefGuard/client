@@ -45,7 +45,12 @@ export type SaveTunnelRequest = {
 
 export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
 
+export const availableTrayThemes: TrayIconTheme[] = ['color', 'white', 'gray', 'black'];
+
 export type LogLevel = 'ERROR' | 'INFO' | 'DEBUG' | 'TRACE' | 'WARN';
+
+export const availableLogLevels: LogLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
+
 export type GlobalLogLevel = 'ERROR' | 'INFO' | 'DEBUG';
 export type LogSource = 'Client' | 'Service' | 'All';
 
