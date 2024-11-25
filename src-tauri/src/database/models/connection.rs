@@ -36,24 +36,6 @@ impl Connection<NoId> {
         })
     }
 
-    // pub(crate) async fn all_by_location_id<'e, E>(
-    //     executor: E,
-    //     location_id: Id,
-    // ) -> Result<Vec<Connection<Id>>, Error>
-    // where
-    //     E: SqliteExecutor<'e>,
-    // {
-    //     let connections = query_as!(
-    //         Connection,
-    //         "SELECT id, location_id, start, end \
-    //         FROM connection WHERE location_id = $1",
-    //         location_id
-    //     )
-    //     .fetch_all(executor)
-    //     .await?;
-    //     Ok(connections)
-    // }
-
     pub(crate) async fn latest_by_location_id<'e, E>(
         executor: E,
         location_id: Id,
