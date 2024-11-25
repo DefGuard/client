@@ -50,8 +50,8 @@ async fn reconnect(
                 Ok(()) => {
                     info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.",);
                 }
-                Err(e) => {
-                    error!("Reconnect attempt failed, disconnect succeeded but connect failed. Reason: {}", e.to_string());
+                Err(err) => {
+                    error!("Reconnect attempt failed, disconnect succeeded but connect failed. Error: {err}");
                     let payload = DeadConnDroppedOut {
                         id: con_id,
                         name: con_interface_name.to_string(),
@@ -62,10 +62,9 @@ async fn reconnect(
                 }
             }
         }
-        Err(e) => {
+        Err(err) => {
             error!(
-                "Reconnect attempt failed, disconnect of {con_type} {con_interface_name}({con_id}) failed. Reason: {}",
-                e.to_string()
+                "Reconnect attempt failed, disconnect of {con_type} {con_interface_name}({con_id}) failed. Error: {err}"
             );
         }
     }
@@ -81,7 +80,7 @@ async fn disconnect_dead_connection(
         "Attempting to disconnect dead connection for interface {con_interface_name}, {con_type}: {con_id}");
     match disconnect(con_id, con_type, app_handle.clone()).await {
         Ok(()) => {
-            info!("Connection verification: interface {}, {}({}): disconnected due to lack of handshake within expected time window.", con_interface_name, con_type, con_id);
+            info!("Connection verification: interface {con_interface_name}, {con_type}({con_id}): disconnected due to timeout.");
             let event_payload = DeadConnDroppedOut {
                 con_type,
                 id: con_id,
@@ -90,12 +89,8 @@ async fn disconnect_dead_connection(
             };
             event_payload.emit(&app_handle);
         }
-        Err(e) => {
-            error!(
-                "Failed attempt to disconnect dead connection({}). Reason: {}",
-                con_id,
-                e.to_string()
-            );
+        Err(err) => {
+            error!("Failed attempt to disconnect dead connection({con_id}). Reason: {err}");
         }
     }
 }
@@ -113,7 +108,6 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
 
     loop {
         sleep(INTERVAL_IN_SECONDS).await;
-        error!("LOCK 5");
         let connections = app_state.active_connections.lock().await;
         let connection_count = connections.len();
         if connection_count == 0 {
@@ -140,8 +134,8 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 con.connection_type, con.interface_name, con.location_id
                             );
                         }
-                        Err(e) => {
-                            warn!("Verification for location {}({}) skipped due to db error. Error: {}", con.interface_name, con.location_id, e.to_string());
+                        Err(err) => {
+                            warn!("Verification for location {}({}) skipped due to db error. Error: {err}", con.interface_name, con.location_id);
                         }
                     }
                 }
@@ -174,8 +168,10 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                 }
             }
         }
+        // Before processing locations/tunnels, the lock on active connections must be released.
         drop(connections);
 
+        // Process locations
         for location_id in locations_to_disconnect.drain(..) {
             match Location::find_by_id(pool, location_id).await {
                 Ok(Some(location)) => {
@@ -201,10 +197,10 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                 }
                 Ok(None) => {
                     // Unlikely due to ON DELETE CASCADE.
-                    warn!("Attempt to reconnect the location ID {} cannot be made, as location was not found in the database.", location_id);
+                    warn!("Attempt to reconnect the location ID {location_id} cannot be made, as location was not found in the database.");
                 }
                 Err(err) => {
-                    warn!("Could not retrieve location ID {} because of a database error. Automatic reconnection cannot be done, interface will be disconnected. Error: {err}", location_id);
+                    warn!("Could not retrieve location ID {location_id} because of a database error. Automatic reconnection cannot be done, interface will be disconnected. Error: {err}");
                     disconnect_dead_connection(
                         location_id,
                         "DEAD LOCATION",
@@ -216,6 +212,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
             }
         }
 
+        // Process tunnels
         for tunnel_id in tunnels_to_disconnect.drain(..) {
             match Tunnel::find_by_id(pool, tunnel_id).await {
                 Ok(Some(tunnel)) => {
@@ -223,10 +220,10 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                 }
                 Ok(None) => {
                     // Unlikely due to ON DELETE CASCADE.
-                    warn!("Attempt to reconnect the tunnel ID {} cannot be made, as the tunnel was not found in the database.", tunnel_id);
+                    warn!("Attempt to reconnect the tunnel ID {tunnel_id} cannot be made, as the tunnel was not found in the database.");
                 }
                 Err(err) => {
-                    warn!("Attempt to reconnect the tunnel ID {} cannot be made, because of a database error. Error: {err}, connection will be dropped instead.", tunnel_id);
+                    warn!("Attempt to reconnect the tunnel ID {tunnel_id} cannot be made, because of a database error. Error: {err}, connection will be dropped instead.");
                     disconnect_dead_connection(
                         tunnel_id,
                         "DEAD TUNNEL",

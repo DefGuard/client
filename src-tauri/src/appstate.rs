@@ -62,7 +62,6 @@ impl AppState {
         let ifname = interface_name.into();
         let connection = ActiveConnection::new(location_id, ifname.clone(), connection_type);
         debug!("Adding active connection for location ID: {location_id}");
-        error!("LOCK 1");
         let mut connections = self.active_connections.lock().await;
         connections.push(connection);
         trace!("Current active connections: {connections:?}");
@@ -131,7 +130,6 @@ impl AppState {
         &self,
         connection_type: ConnectionType,
     ) -> Vec<Id> {
-        error!("LOCK 2");
         let active_connections = self.active_connections.lock().await;
 
         let connection_ids = active_connections
@@ -149,8 +147,7 @@ impl AppState {
     }
 
     pub(crate) async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
-        debug!("Closing all active connections...");
-        error!("LOCK 3");
+        debug!("Closing all active connections");
         let active_connections = self.active_connections.lock().await;
         let active_connections_count = active_connections.len();
         debug!("Found {active_connections_count} active connections");
@@ -176,7 +173,6 @@ impl AppState {
         id: Id,
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
-        error!("LOCK 4");
         let connections = self.active_connections.lock().await;
         trace!(
             "Checking for active connection with ID {id}, type {connection_type} in active connections."
