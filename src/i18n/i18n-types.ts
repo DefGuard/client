@@ -50,6 +50,20 @@ type RootTranslation = {
 			 */
 			required: string
 			/**
+			 * F​i​e​l​d​ ​r​e​q​u​i​r​e​s​ ​m​i​n​i​m​a​l​ ​v​a​l​u​e​ ​o​f​ ​{​m​i​n​}
+			 * @param {number} min
+			 */
+			minValue: RequiredParams<'min'>
+			/**
+			 * F​i​e​l​d​ ​c​a​n​n​o​t​ ​e​x​c​e​e​d​ ​m​a​x​i​m​a​l​ ​v​a​l​u​e​ ​o​f​ ​{​m​a​x​}
+			 * @param {number} max
+			 */
+			maxValue: RequiredParams<'max'>
+			/**
+			 * F​i​e​l​d​ ​v​a​l​u​e​ ​m​u​s​t​ ​b​e​ ​a​b​o​v​e​ ​z​e​r​o
+			 */
+			aboveZero: string
+			/**
 			 * M​i​n​ ​l​e​n​g​t​h​ ​o​f​ ​{​l​e​n​g​t​h​}
 			 * @param {number} length
 			 */
@@ -117,6 +131,10 @@ type RootTranslation = {
 			 * R​e​s​e​t
 			 */
 			reset: string
+			/**
+			 * S​a​v​e
+			 */
+			save: string
 		}
 		messages: {
 			/**
@@ -174,12 +192,20 @@ type RootTranslation = {
 					 * L​o​c​a​t​i​o​n
 					 */
 					location: string
-					/**
-					 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​d​u​e​ ​t​o​ ​l​a​c​k​ ​o​f​ ​h​a​n​d​s​h​a​k​e​ ​i​n​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​w​i​n​d​o​w​.
-					 * @param {string} conType
-					 * @param {string} instanceName
-					 */
-					body: RequiredParams<'conType' | 'instanceName'>
+					body: {
+						/**
+						 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​b​e​c​a​u​s​e​ ​i​t​ ​e​x​c​e​e​d​e​d​ ​t​h​e​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​f​o​r​ ​s​t​a​y​i​n​g​ ​a​c​t​i​v​e​ ​w​i​t​h​o​u​t​ ​r​e​c​e​i​v​i​n​g​ ​c​o​n​f​i​r​m​a​t​i​o​n​ ​f​r​o​m​ ​t​h​e​ ​s​e​r​v​e​r​.
+						 * @param {string} conType
+						 * @param {string} instanceName
+						 */
+						periodic: RequiredParams<'conType' | 'instanceName'>
+						/**
+						 * {​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​c​o​n​n​e​c​t​i​o​n​ ​w​a​s​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​b​e​c​a​u​s​e​ ​i​t​ ​d​i​d​n​'​t​ ​c​o​m​p​l​e​t​e​ ​t​h​e​ ​n​e​c​e​s​s​a​r​y​ ​s​e​t​u​p​ ​i​n​ ​t​i​m​e​.​ ​T​h​i​s​ ​c​a​n​ ​h​a​p​p​e​n​ ​i​f​ ​t​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​a​s​n​'​t​ ​f​u​l​l​y​ ​e​s​t​a​b​l​i​s​h​e​d
+						 * @param {string} conType
+						 * @param {string} name
+						 */
+						connection: RequiredParams<'conType' | 'name'>
+					}
 					controls: {
 						/**
 						 * C​l​o​s​e
@@ -307,6 +333,32 @@ type RootTranslation = {
 					title: string
 					tabs: {
 						global: {
+							common: {
+								/**
+								 * (​s​e​c​o​n​d​s​)
+								 */
+								value_in_seconds: string
+							}
+							peer_alive: {
+								/**
+								 * S​e​s​s​i​o​n​ ​t​i​m​e​o​u​t
+								 */
+								title: string
+								/**
+								 * I​f​ ​a​c​t​i​v​e​ ​c​o​n​n​e​c​t​i​o​n​ ​e​x​c​e​e​d​s​ ​g​i​v​e​n​ ​t​i​m​e​ ​w​i​t​h​o​u​t​ ​m​a​k​i​n​g​ ​a​n​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​ ​t​h​e​ ​s​e​r​v​e​r​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​c​o​n​s​i​d​e​r​e​d​ ​i​n​v​a​l​i​d​ ​a​n​d​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
+								 */
+								helper: string
+							}
+							connection_verification: {
+								/**
+								 * C​o​n​n​e​c​t​ ​t​i​m​e​o​u​t
+								 */
+								title: string
+								/**
+								 * I​f​ ​s​e​t​ ​t​i​m​e​ ​w​i​l​l​ ​p​a​s​s​ ​a​n​d​ ​a​n​y​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​ ​t​h​e​ ​s​e​r​v​e​r​ ​w​a​s​ ​n​o​t​ ​m​a​d​e​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
+								 */
+								helper: string
+							}
 							tray: {
 								/**
 								 * S​y​s​t​e​m​ ​t​r​a​y
@@ -340,6 +392,10 @@ type RootTranslation = {
 								 * L​o​g​g​i​n​g​ ​t​h​r​e​s​h​o​l​d
 								 */
 								title: string
+								/**
+								 * C​h​a​n​g​e​ ​w​i​l​l​ ​t​a​k​e​ ​e​f​f​e​c​t​ ​a​f​t​e​r​ ​c​l​i​e​n​t​ ​r​e​s​t​a​r​t​.
+								 */
+								warning: string
 								options: {
 									/**
 									 * E​r​r​o​r
@@ -364,7 +420,7 @@ type RootTranslation = {
 									/**
 									 * C​l​i​e​n​t
 									 */
-									cliet: string
+									client: string
 									/**
 									 * S​e​r​v​i​c​e
 									 */
@@ -1615,6 +1671,18 @@ export type TranslationFunctions = {
 			 */
 			required: () => LocalizedString
 			/**
+			 * Field requires minimal value of {min}
+			 */
+			minValue: (arg: { min: number }) => LocalizedString
+			/**
+			 * Field cannot exceed maximal value of {max}
+			 */
+			maxValue: (arg: { max: number }) => LocalizedString
+			/**
+			 * Field value must be above zero
+			 */
+			aboveZero: () => LocalizedString
+			/**
 			 * Min length of {length}
 			 */
 			minLength: (arg: { length: number }) => LocalizedString
@@ -1680,6 +1748,10 @@ export type TranslationFunctions = {
 			 * Reset
 			 */
 			reset: () => LocalizedString
+			/**
+			 * Save
+			 */
+			save: () => LocalizedString
 		}
 		messages: {
 			/**
@@ -1732,10 +1804,16 @@ export type TranslationFunctions = {
 					 * Location
 					 */
 					location: () => LocalizedString
-					/**
-					 * {conType} {instanceName} was disconnected due to lack of handshake in expected time window.
-					 */
-					body: (arg: { conType: string, instanceName: string }) => LocalizedString
+					body: {
+						/**
+						 * {conType} {instanceName} was automatically disconnected because it exceeded the expected time for staying active without receiving confirmation from the server.
+						 */
+						periodic: (arg: { conType: string, instanceName: string }) => LocalizedString
+						/**
+						 * {conType} {name} connection was automatically disconnected because it didn't complete the necessary setup in time. This can happen if the connection wasn't fully established
+						 */
+						connection: (arg: { conType: string, name: string }) => LocalizedString
+					}
 					controls: {
 						/**
 						 * Close
@@ -1863,6 +1941,32 @@ export type TranslationFunctions = {
 					title: () => LocalizedString
 					tabs: {
 						global: {
+							common: {
+								/**
+								 * (seconds)
+								 */
+								value_in_seconds: () => LocalizedString
+							}
+							peer_alive: {
+								/**
+								 * Session timeout
+								 */
+								title: () => LocalizedString
+								/**
+								 * If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.
+								 */
+								helper: () => LocalizedString
+							}
+							connection_verification: {
+								/**
+								 * Connect timeout
+								 */
+								title: () => LocalizedString
+								/**
+								 * If set time will pass and any handshake with the server was not made. The connection will be disconnected automatically.
+								 */
+								helper: () => LocalizedString
+							}
 							tray: {
 								/**
 								 * System tray
@@ -1896,6 +2000,10 @@ export type TranslationFunctions = {
 								 * Logging threshold
 								 */
 								title: () => LocalizedString
+								/**
+								 * Change will take effect after client restart.
+								 */
+								warning: () => LocalizedString
 								options: {
 									/**
 									 * Error
@@ -1920,7 +2028,7 @@ export type TranslationFunctions = {
 									/**
 									 * Client
 									 */
-									cliet: () => LocalizedString
+									client: () => LocalizedString
 									/**
 									 * Service
 									 */

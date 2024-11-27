@@ -25,8 +25,7 @@ dark-light = "1.1"
 defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.5.5" }
 dirs = "5.0"
 lazy_static = "1.5"
-local-ip-address = "0.6"
-log = "0.4"
+log = { version = "0.4", features = ["serde"] }
 prost = "0.13"
 rand = "0.8"
 regex = "1.11"
@@ -36,30 +35,30 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_with = "3.9"
 sqlx = { version = "0.8", features = [
-  "chrono",
-  "sqlite",
-  "runtime-tokio",
-  "uuid",
-  "macros",
+    "chrono",
+    "sqlite",
+    "runtime-tokio",
+    "uuid",
+    "macros",
 ] }
-struct-patch = "0.4"
+struct-patch = "0.8"
 strum = { version = "0.26", features = ["derive"] }
 tauri = { version = "1.8", features = [
-  "notification-all",
-  "dialog-all",
-  "clipboard-all",
-  "http-all",
-  "window-all",
-  "system-tray",
-  "native-tls-vendored",
-  "icon-png",
-  "fs-all",
+    "notification-all",
+    "dialog-all",
+    "clipboard-all",
+    "http-all",
+    "window-all",
+    "system-tray",
+    "native-tls-vendored",
+    "icon-png",
+    "fs-all",
 ] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 thiserror = "1.0"
-time = { version = "0.3", features = ["formatting"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tokio-util = "0.7"
 tonic = "0.12"

@@ -14,7 +14,7 @@ const { openLink } = clientApi;
 export const NewApplicationVersionAvailableInfo = () => {
   const { LL } = useI18nContext();
   const { newAppVersionAvailable } = useNewAppVersionAvailable();
-  const checkForUpdates = useClientStore((state) => state.settings.check_for_updates);
+  const checkForUpdates = useClientStore((state) => state.appConfig.check_for_updates);
 
   const dismissed = useApplicationUpdateStore((state) => state.dismissed, shallow);
   const setValues = useApplicationUpdateStore((state) => state.setValues, shallow);

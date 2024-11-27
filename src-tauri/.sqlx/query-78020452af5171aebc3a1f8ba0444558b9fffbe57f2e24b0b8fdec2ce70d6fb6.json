@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id!: i64\", tunnel_id, upload \"upload!: i64\", download \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM tunnel_stats WHERE tunnel_id = $1\n            ORDER BY collected_at DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tunnel_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "upload!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "download!: i64",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_handshake",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "collected_at!: NaiveDateTime",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "listen_port!: u32",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "persistent_keepalive_interval?: u16",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "78020452af5171aebc3a1f8ba0444558b9fffbe57f2e24b0b8fdec2ce70d6fb6"
+}

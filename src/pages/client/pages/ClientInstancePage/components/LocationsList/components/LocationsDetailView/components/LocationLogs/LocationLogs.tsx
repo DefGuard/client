@@ -23,7 +23,7 @@ type Props = {
 
 export const LocationLogs = ({ locationId, connectionType }: Props) => {
   const logsContainerElement = useRef<HTMLDivElement | null>(null);
-  const appLogLevel = useClientStore((state) => state.settings.log_level);
+  const appLogLevel = useClientStore((state) => state.appConfig.log_level);
   const locationLogLevelRef = useRef<LogLevel>(appLogLevel);
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.instancePage.detailView.details.logs;
@@ -141,13 +141,15 @@ const createLogLineElement = (content: string): HTMLParagraphElement => {
 const filterLogByLevel = (target: LogLevel, log: LogLevel): boolean => {
   const log_level = log.toLocaleLowerCase();
   switch (target) {
-    case 'error':
+    case 'ERROR':
       return log_level === 'error';
-    case 'info':
+    case 'WARN':
+      return ['error', 'warn'].includes(log_level);
+    case 'INFO':
       return ['info', 'error', 'warn'].includes(log_level);
-    case 'debug':
+    case 'DEBUG':
       return ['error', 'info', 'debug', 'warn'].includes(log_level);
-    case 'trace':
+    case 'TRACE':
       return true;
   }
 };

@@ -74,10 +74,10 @@
         width: 270px;
         margin-bottom: 20px;
 
-        p,
-        span {
+        & > span {
           @include typography(app-button-l);
           text-decoration: none;
+          color: var(--text-button-secondary) !important;
         }
       }
 

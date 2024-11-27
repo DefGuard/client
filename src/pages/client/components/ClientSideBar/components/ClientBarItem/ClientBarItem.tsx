@@ -6,7 +6,6 @@ import { useMatch, useNavigate } from 'react-router-dom';
 
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
 import { routes } from '../../../../../../shared/routes';
-import { useClientFlags } from '../../../../hooks/useClientFlags';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { SelectedInstance, WireguardInstanceType } from '../../../../types';
 
@@ -17,16 +16,10 @@ type Props = {
   active?: boolean;
 };
 
-export const ClientBarItem = ({
-  itemType,
-  itemId,
-  label,
-  active: acitve = false,
-}: Props) => {
+export const ClientBarItem = ({ itemType, itemId, label, active = false }: Props) => {
   const instancePage = useMatch('/client/instance/');
   const navigate = useNavigate();
   const setClientStore = useClientStore((state) => state.setState);
-  const setClientFlags = useClientFlags((state) => state.setValues);
   const selectedInstance = useClientStore((state) => state.selectedInstance);
   const itemSelected = useMemo(() => {
     return (
@@ -39,7 +32,7 @@ export const ClientBarItem = ({
 
   const cn = classNames('client-bar-item', 'clickable', {
     active: itemSelected,
-    connected: acitve,
+    connected: active,
   });
 
   const { refs, floatingStyles } = useFloating({
@@ -61,10 +54,6 @@ export const ClientBarItem = ({
                 type: WireguardInstanceType.DEFGUARD_INSTANCE,
               };
               setClientStore({
-                selectedInstance: _selectedInstance,
-              });
-              // remember user choice next time when user will open client again
-              setClientFlags({
                 selectedInstance: _selectedInstance,
               });
               break;
@@ -90,7 +79,7 @@ export const ClientBarItem = ({
           <p>{label[0]}</p>
         </div>
       </div>
-      {acitve && (
+      {active && (
         <div
           className="client-bar-active-item-bar"
           ref={refs.setFloating}

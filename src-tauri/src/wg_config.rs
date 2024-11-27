@@ -4,7 +4,7 @@ use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
 
-use crate::database::Tunnel;
+use crate::database::models::tunnel::Tunnel;
 
 #[derive(Debug, Error)]
 pub enum WireguardConfigParseError {

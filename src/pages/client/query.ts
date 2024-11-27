@@ -7,4 +7,5 @@ export const clientQueryKeys = {
   getActiveConnection: 'GET_ACTIVE_CONNECTION',
   getLocationDetails: 'GET_LOCATION_DETAILS',
   getTunnels: 'GET_TUNNELS',
+  getApplicationConfig: 'GET_APPLICATION_CONFIG',
 };

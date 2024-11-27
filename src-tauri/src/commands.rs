@@ -11,19 +11,23 @@ use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
 use tauri::{AppHandle, Manager, State};
 
+static UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
+
 use crate::{
+    app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
-    database::{
-        models::{
-            instance::InstanceInfo, location_stats::LocationStats, settings::SettingsPatch, Id,
-            NoId,
-        },
-        ActiveConnection, Connection, ConnectionInfo, Instance, Location, Settings, Tunnel,
-        TunnelConnection, TunnelConnectionInfo, TunnelStats, WireguardKeys,
+    database::models::{
+        connection::{ActiveConnection, Connection, ConnectionInfo},
+        instance::{Instance, InstanceInfo},
+        location::Location,
+        location_stats::LocationStats,
+        tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
+        wireguard_keys::WireguardKeys,
+        Id, NoId,
     },
     enterprise::periodic::config::poll_instance,
     error::Error,
-    events::{CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
+    events::{APPLICATION_CONFIG_CHANGED, CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
@@ -34,13 +38,13 @@ use crate::{
     utils::{
         disconnect_interface, execute_command, get_location_interface_details,
         get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
-        handle_connection_for_tunnel,
+        handle_connection_for_tunnel, verify_connection, ConnectionToVerify,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, Serialize)]
 pub struct Payload {
     pub message: String,
 }
@@ -56,7 +60,7 @@ pub async fn connect(
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
     let state = handle.state::<AppState>();
     if connection_type == ConnectionType::Location {
-        if let Some(location) = Location::find_by_id(&state.get_pool(), location_id).await? {
+        if let Some(location) = Location::find_by_id(&state.db, location_id).await? {
             debug!(
                 "Identified location with ID {location_id} as \"{}\", handling connection...",
                 location.name
@@ -64,17 +68,29 @@ pub async fn connect(
             handle_connection_for_location(&location, preshared_key, handle.clone()).await?;
             reload_tray_menu(&handle).await;
             info!("Connected to location {location}");
+            // verify if connection is alive
+            tauri::async_runtime::spawn(verify_connection(
+                handle.clone(),
+                ConnectionToVerify::Location(location),
+            ));
+            debug!("Connection verification task spawned.");
         } else {
             error!("Location with ID {location_id} not found in the database, aborting connection attempt");
             return Err(Error::NotFound);
         }
-    } else if let Some(tunnel) = Tunnel::find_by_id(&state.get_pool(), location_id).await? {
+    } else if let Some(tunnel) = Tunnel::find_by_id(&state.db, location_id).await? {
         debug!(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
         );
-        handle_connection_for_tunnel(&tunnel, handle).await?;
+        handle_connection_for_tunnel(&tunnel, handle.clone()).await?;
         info!("Successfully connected to tunnel {tunnel}");
+        // verify if connection is alive
+        tauri::async_runtime::spawn(verify_connection(
+            handle.clone(),
+            ConnectionToVerify::Tunnel(tunnel),
+        ));
+        debug!("Connection verification task spawned.");
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);
@@ -86,7 +102,7 @@ pub async fn connect(
 pub async fn start_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
     let result = spawn_global_log_watcher_task(&handle, tracing::Level::DEBUG).await;
     if let Err(err) = result {
-        error!("Error while spawning the global log watcher task: {}", err)
+        error!("Error while spawning the global log watcher task: {err}");
     }
     Ok(())
 }
@@ -107,7 +123,7 @@ pub async fn disconnect(
     debug!("Received a command to disconnect from the {connection_type} {name}({location_id})");
 
     debug!("Removing active connection for {connection_type} {name}({location_id}) from the application's state, if it exists...");
-    if let Some(connection) = state.remove_connection(location_id, &connection_type).await {
+    if let Some(connection) = state.remove_connection(location_id, connection_type).await {
         debug!("Found and removed active connection from the application's state for {connection_type} {name}({location_id})");
         trace!("Connection: {connection:?}");
         disconnect_interface(&connection, &state).await?;
@@ -153,7 +169,7 @@ pub async fn disconnect(
 /// connections for this instance.
 async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
     let state: State<'_, AppState> = handle.state();
-    let mut transaction = state.get_pool().begin().await?;
+    let mut transaction = state.db.begin().await?;
     let Some(location) = Location::find_by_id(&mut *transaction, location_id).await? else {
         error!("Location {location_id} not found, skipping config update check");
         return Err(Error::NotFound);
@@ -222,13 +238,13 @@ pub async fn save_device_config(
 ) -> Result<SaveDeviceConfigResponse, Error> {
     debug!("Saving device configuration: {response:#?}.");
 
-    let mut transaction = app_state.get_pool().begin().await?;
+    let mut transaction = app_state.db.begin().await?;
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
     if response.token.is_some() {
-        debug!("The newly saved device config has a polling token, automatic configuration polling will be possible if the core has an enterprise license.")
+        debug!("The newly saved device config has a polling token, automatic configuration polling will be possible if the core has an enterprise license.");
     } else {
         warn!(
             "Missing polling token for instance {}, core and/or proxy services may need an update, configuration polling won't work",
@@ -269,7 +285,7 @@ pub async fn save_device_config(
     transaction.commit().await?;
     info!("New instance {} created.", instance);
     trace!("Created following instance: {instance:#?}");
-    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
+    let locations = Location::find_by_instance_id(&app_state.db, instance.id).await?;
     trace!("Created following locations: {locations:#?}");
     handle.emit_all(INSTANCE_UPDATE, ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
@@ -283,7 +299,7 @@ pub async fn save_device_config(
 #[tauri::command(async)]
 pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo<Id>>, Error> {
     debug!("Getting information about all instances.");
-    let instances = Instance::all(&app_state.get_pool()).await?;
+    let instances = Instance::all(&app_state.db).await?;
     trace!(
         "Found {} instances to return information about.",
         instances.len()
@@ -291,15 +307,15 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     trace!("Instances found: {instances:#?}");
     let mut instance_info = Vec::new();
     let connection_ids = app_state
-        .get_connection_id_by_type(&ConnectionType::Location)
+        .get_connection_id_by_type(ConnectionType::Location)
         .await;
     for instance in instances {
-        let locations = Location::find_by_instance_id(&app_state.get_pool(), instance.id).await?;
+        let locations = Location::find_by_instance_id(&app_state.db, instance.id).await?;
         let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&app_state.get_pool(), instance.id)
+        let keys = WireguardKeys::find_by_instance_id(&app_state.db, instance.id)
             .await?
             .ok_or(Error::NotFound)?;
         instance_info.push(InstanceInfo {
@@ -322,7 +338,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     Ok(instance_info)
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Debug, Serialize)]
 pub struct LocationInfo {
     pub id: Id,
     pub instance_id: Id,
@@ -348,24 +364,21 @@ pub async fn all_locations(
     instance_id: Id,
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, Error> {
-    let instance = match Instance::find_by_id(&app_state.get_pool(), instance_id).await? {
-        Some(instance) => instance,
-        None => {
-            error!("Tried to get all locations for the instance with ID {instance_id}, but the instance was not found.");
-            return Err(Error::NotFound);
-        }
+    let Some(instance) = Instance::find_by_id(&app_state.db, instance_id).await? else {
+        error!("Tried to get all locations for the instance with ID {instance_id}, but the instance was not found.");
+        return Err(Error::NotFound);
     };
     trace!(
         "Getting information about all locations for instance {}.",
         instance.name
     );
-    let locations = Location::find_by_instance_id(&app_state.get_pool(), instance_id).await?;
+    let locations = Location::find_by_instance_id(&app_state.db, instance_id).await?;
     trace!(
         "Found {} locations for instance {instance} to return information about.",
         locations.len()
     );
-    let active_locations_ids: Vec<i64> = app_state
-        .get_connection_id_by_type(&ConnectionType::Location)
+    let active_locations_ids = app_state
+        .get_connection_id_by_type(ConnectionType::Location)
         .await;
     let mut location_info = Vec::new();
     for location in locations {
@@ -416,10 +429,11 @@ pub async fn location_interface_details(
     connection_type: ConnectionType,
     app_state: State<'_, AppState>,
 ) -> Result<LocationInterfaceDetails, Error> {
-    let pool = app_state.get_pool();
     match connection_type {
-        ConnectionType::Location => get_location_interface_details(location_id, &pool).await,
-        ConnectionType::Tunnel => get_tunnel_interface_details(location_id, &pool).await,
+        ConnectionType::Location => {
+            get_location_interface_details(location_id, &app_state.db).await
+        }
+        ConnectionType::Tunnel => get_tunnel_interface_details(location_id, &app_state.db).await,
     }
 }
 
@@ -432,11 +446,9 @@ pub async fn update_instance(
 ) -> Result<(), Error> {
     debug!("Received command to update instance with id {instance_id}");
     trace!("Processing following response:\n {response:#?}");
-    let pool = app_state.get_pool();
-
-    if let Some(mut instance) = Instance::find_by_id(&pool, instance_id).await? {
+    if let Some(mut instance) = Instance::find_by_id(&app_state.db, instance_id).await? {
         debug!("The instance with id {instance_id} to update was found: {instance}");
-        let mut transaction = pool.begin().await?;
+        let mut transaction = app_state.db.begin().await?;
         do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
@@ -502,15 +514,9 @@ pub async fn do_update_instance(
     if instance.disable_all_traffic != instance_info.disable_all_traffic
         && instance_info.disable_all_traffic
     {
-        debug!(
-            "Disabling all traffic for all locations of instance {}.",
-            instance
-        );
+        debug!("Disabling all traffic for all locations of instance {instance}");
         Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-        debug!(
-            "Disabled all traffic for all locations of instance {}.",
-            instance
-        );
+        debug!("Disabled all traffic for all locations of instance {instance}");
     }
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
@@ -527,8 +533,7 @@ pub async fn do_update_instance(
     }
     instance.save(transaction.as_mut()).await?;
     debug!(
-        "A new base configuration has been applied to instance {}, even if nothing changed",
-        instance
+        "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
     // check if locations have changed
@@ -566,40 +571,27 @@ pub async fn do_update_instance(
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.dns = new_location.dns;
                 current_location.save(transaction.as_mut()).await?;
-                info!(
-                    "Location {} configuration updated for instance {}",
-                    current_location, instance,
-                );
+                info!("Location {current_location} configuration updated for instance {instance}");
             } else {
                 // create new location
-                debug!(
-                    "Creating new location {new_location} for instance {}",
-                    instance
-                );
+                debug!("Creating new location {new_location} for instance instance {instance}");
                 let new_location = new_location.save(transaction.as_mut()).await?;
-                info!(
-                    "New location {} created for instance {}",
-                    new_location, instance
-                );
+                info!("New location {new_location} created for instance {instance}");
             }
         }
 
         // remove locations which were present in current locations
         // but no longer found in core response
-        debug!("Removing locations for instance {}.", instance);
+        debug!("Removing locations for instance {instance}");
         for removed_location in current_locations {
             removed_location.delete(transaction.as_mut()).await?;
             info!(
-                "Removed location {} for instance {} during instance update",
-                removed_location, instance
+                "Removed location {removed_location} for instance {instance} during instance update"
             );
         }
-        debug!("Finished updating locations for instance {}", instance);
+        debug!("Finished updating locations for instance {instance}");
     } else {
-        info!(
-            "Locations for instance {} didn't change. Not updating them.",
-            instance
-        );
+        info!("Locations for instance {instance} didn't change. Not updating them.");
     }
     Ok(())
 }
@@ -612,15 +604,15 @@ pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Err
     })
 }
 
-pub enum DateTimeAggregation {
+pub(crate) enum DateTimeAggregation {
     Hour,
     Second,
 }
 
 impl DateTimeAggregation {
-    /// Returns database format string for given aggregation variant
+    /// Returns database format string for a given aggregation variant.
     #[must_use]
-    pub fn fstring(&self) -> &'static str {
+    pub(crate) fn fstring(&self) -> &'static str {
         match self {
             Self::Hour => "%Y-%m-%d %H:00:00",
             Self::Second => "%Y-%m-%d %H:%M:%S",
@@ -628,7 +620,7 @@ impl DateTimeAggregation {
     }
 }
 
-pub fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
+pub(crate) fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
     // Use hourly aggregation for longer periods
     let aggregation = match Utc::now().naive_utc() - from {
         duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
@@ -652,19 +644,15 @@ pub async fn location_stats(
     let from = parse_timestamp(from)?.naive_utc();
     let aggregation = get_aggregation(from)?;
     let stats = match connection_type {
-        ConnectionType::Location => LocationStats::all_by_location_id(
-            &app_state.get_pool(),
-            location_id,
-            &from,
-            &aggregation,
-            None,
-        )
-        .await?
-        .into_iter()
-        .map(Into::into)
-        .collect(),
+        ConnectionType::Location => {
+            LocationStats::all_by_location_id(&app_state.db, location_id, &from, &aggregation, None)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        }
         ConnectionType::Tunnel => {
-            TunnelStats::all_by_tunnel_id(&app_state.get_pool(), location_id, &from, &aggregation)
+            TunnelStats::all_by_tunnel_id(&app_state.db, location_id, &from, &aggregation)
                 .await?
                 .into_iter()
                 .map(Into::into)
@@ -683,15 +671,13 @@ pub async fn all_connections(
 ) -> Result<Vec<CommonConnectionInfo>, Error> {
     debug!("Retrieving connections for location {location_id}");
     let connections: Vec<CommonConnectionInfo> = match connection_type {
-        ConnectionType::Location => {
-            ConnectionInfo::all_by_location_id(&app_state.get_pool(), location_id)
-                .await?
-                .into_iter()
-                .map(Into::into)
-                .collect()
-        }
+        ConnectionType::Location => ConnectionInfo::all_by_location_id(&app_state.db, location_id)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect(),
         ConnectionType::Tunnel => {
-            TunnelConnectionInfo::all_by_tunnel_id(&app_state.get_pool(), location_id)
+            TunnelConnectionInfo::all_by_tunnel_id(&app_state.db, location_id)
                 .await?
                 .into_iter()
                 .map(Into::into)
@@ -709,8 +695,7 @@ pub async fn all_tunnel_connections(
     app_state: State<'_, AppState>,
 ) -> Result<Vec<TunnelConnectionInfo>, Error> {
     debug!("Retrieving connections for location {location_id}");
-    let connections =
-        TunnelConnectionInfo::all_by_tunnel_id(&app_state.get_pool(), location_id).await?;
+    let connections = TunnelConnectionInfo::all_by_tunnel_id(&app_state.db, location_id).await?;
     debug!("Tunnel connections retrieved({})", connections.len());
     trace!("Connections found:\n{connections:#?}");
     Ok(connections)
@@ -724,21 +709,14 @@ pub async fn active_connection(
 ) -> Result<Option<ActiveConnection>, Error> {
     let state = handle.state::<AppState>();
     let name = get_tunnel_or_location_name(location_id, connection_type, &state).await;
-    debug!(
-        "Checking if there is an active connection for location {}(ID: {})",
-        name, location_id
-    );
+    debug!("Checking if there is an active connection for location {name}(ID: {location_id})");
     let connection = state.find_connection(location_id, connection_type).await;
     if connection.is_some() {
-        debug!(
-            "Found active connection for location {}(ID: {})",
-            name, location_id
-        )
+        debug!("Found active connection for location {name}(ID: {location_id})");
     }
     trace!("Connection retrieved:\n{connection:#?}");
     debug!(
-        "Active connection information for location {}(ID: {}) has been found, returning connection information",
-        name, location_id
+        "Active connection information for location {name}(ID: {location_id}) has been found, returning connection information",
     );
     Ok(connection)
 }
@@ -756,7 +734,7 @@ pub async fn last_connection(
     );
     if connection_type == ConnectionType::Location {
         if let Some(connection) =
-            Connection::latest_by_location_id(&app_state.get_pool(), location_id).await?
+            Connection::latest_by_location_id(&app_state.db, location_id).await?
         {
             debug!(
                 "Last connection to {connection_type} {name} has been made at {}",
@@ -768,7 +746,7 @@ pub async fn last_connection(
             Ok(None)
         }
     } else if let Some(connection) =
-        TunnelConnection::latest_by_tunnel_id(&app_state.get_pool(), location_id).await?
+        TunnelConnection::latest_by_tunnel_id(&app_state.db, location_id).await?
     {
         debug!(
             "Last connection to {connection_type} {name} has been made at {}",
@@ -789,16 +767,14 @@ pub async fn update_location_routing(
     handle: AppHandle,
 ) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
-    debug!("Updating location routing {location_id} with {connection_type:?}");
+    debug!("Updating location routing {location_id} with {connection_type}");
     let name = get_tunnel_or_location_name(location_id, connection_type, &app_state).await;
 
     match connection_type {
         ConnectionType::Location => {
-            if let Some(mut location) =
-                Location::find_by_id(&app_state.get_pool(), location_id).await?
-            {
+            if let Some(mut location) = Location::find_by_id(&app_state.db, location_id).await? {
                 // Check if the instance has route_all_traffic disabled
-                let instance = Instance::find_by_id(&app_state.get_pool(), location.instance_id)
+                let instance = Instance::find_by_id(&app_state.db, location.instance_id)
                     .await?
                     .ok_or(Error::NotFound)?;
                 if instance.disable_all_traffic && route_all_traffic {
@@ -811,7 +787,7 @@ pub async fn update_location_routing(
                 }
 
                 location.route_all_traffic = route_all_traffic;
-                location.save(&app_state.get_pool()).await?;
+                location.save(&app_state.db).await?;
                 debug!("Location routing updated for location {name}(ID: {location_id})");
                 handle.emit_all(
                     LOCATION_UPDATE,
@@ -828,10 +804,9 @@ pub async fn update_location_routing(
             }
         }
         ConnectionType::Tunnel => {
-            if let Some(mut tunnel) = Tunnel::find_by_id(&app_state.get_pool(), location_id).await?
-            {
+            if let Some(mut tunnel) = Tunnel::find_by_id(&app_state.db, location_id).await? {
                 tunnel.route_all_traffic = route_all_traffic;
-                tunnel.save(&app_state.get_pool()).await?;
+                tunnel.save(&app_state.db).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
                 handle.emit_all(
                     LOCATION_UPDATE,
@@ -849,43 +824,11 @@ pub async fn update_location_routing(
 }
 
 #[tauri::command(async)]
-pub async fn get_settings(handle: AppHandle) -> Result<Settings, Error> {
-    let app_state = handle.state::<AppState>();
-    let settings = Settings::get(&app_state.get_pool()).await?;
-    Ok(settings)
-}
-
-#[tauri::command(async)]
-pub async fn update_settings(data: SettingsPatch, handle: AppHandle) -> Result<Settings, Error> {
-    debug!("Updating settings");
-    let app_state = handle.state::<AppState>();
-    let pool = &app_state.get_pool();
-    trace!("Pool received");
-    let mut settings = Settings::get(pool).await?;
-    trace!("Settings read from table");
-    settings.apply(data);
-    debug!("Saving settings");
-    settings.save(pool).await?;
-    debug!("Settings saved, resetting the tray icon.");
-    match configure_tray_icon(&handle, &settings.tray_icon_theme) {
-        Ok(()) => {}
-        Err(e) => {
-            error!(
-                "Tray configuration update failed during settings update. err : {}",
-                e.to_string()
-            );
-        }
-    }
-    debug!("Tray icon reset.");
-    Ok(settings)
-}
-
-#[tauri::command(async)]
 pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance with ID {instance_id}");
     let app_state = handle.state::<AppState>();
     let mut client = app_state.client.clone();
-    let pool = &app_state.get_pool();
+    let pool = &app_state.db;
     let Some(instance) = Instance::find_by_id(pool, instance_id).await? else {
         error!("Couldn't delete instance: instance with ID {instance_id} could not be found.");
         return Err(Error::NotFound);
@@ -896,11 +839,11 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     if !instance_locations.is_empty() {
         debug!(
             "Found locations associated with the instance {instance}, closing their connections..."
-        )
+        );
     }
     for location in instance_locations {
         if let Some(connection) = app_state
-            .remove_connection(location.id, &ConnectionType::Location)
+            .remove_connection(location.id, ConnectionType::Location)
             .await
         {
             debug!("Found active connection for location {location}, closing...");
@@ -909,7 +852,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
                 endpoint: location.endpoint.clone(),
             };
             client.remove_interface(request).await.map_err(|status| {
-                    error!("Error occured while removing interface {} for location {location}, status: {status}", connection.interface_name);
+                    error!("Error occurred while removing interface {} for location {location}, status: {status}", connection.interface_name);
                     Error::InternalError(format!(
                         "There was an error while removing interface for location {location}, error message: {}. Check logs for more details.", status.message()
                     ))
@@ -940,7 +883,7 @@ pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
     debug!("Received tunnel configuration to update: {tunnel:?}");
-    tunnel.save(&app_state.get_pool()).await?;
+    tunnel.save(&app_state.db).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
     handle.emit_all(
         LOCATION_UPDATE,
@@ -955,7 +898,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
     let app_state = handle.state::<AppState>();
     debug!("Received tunnel configuration to save: {tunnel:?}");
-    let tunnel = tunnel.save(&app_state.get_pool()).await?;
+    let tunnel = tunnel.save(&app_state.db).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
     handle.emit_all(
         LOCATION_UPDATE,
@@ -981,12 +924,12 @@ pub struct TunnelInfo<I = NoId> {
 pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo<Id>>, Error> {
     trace!("Getting information about all tunnels");
 
-    let tunnels = Tunnel::all(&app_state.get_pool()).await?;
+    let tunnels = Tunnel::all(&app_state.db).await?;
     trace!("Found ({}) tunnels to get information about", tunnels.len());
     trace!("Tunnels found: {tunnels:#?}");
     let mut tunnel_info = Vec::new();
     let active_tunnel_ids = app_state
-        .get_connection_id_by_type(&ConnectionType::Tunnel)
+        .get_connection_id_by_type(ConnectionType::Tunnel)
         .await;
 
     for tunnel in tunnels {
@@ -1015,7 +958,7 @@ pub async fn tunnel_details(
 ) -> Result<Tunnel<Id>, Error> {
     debug!("Retrieving details about tunnel with ID {tunnel_id}.");
 
-    if let Some(tunnel) = Tunnel::find_by_id(&app_state.get_pool(), tunnel_id).await? {
+    if let Some(tunnel) = Tunnel::find_by_id(&app_state.db, tunnel_id).await? {
         debug!("The tunnel {tunnel} has been found, returning its details.");
         Ok(tunnel)
     } else {
@@ -1029,7 +972,7 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     debug!("Deleting tunnel with ID {tunnel_id}");
     let app_state = handle.state::<AppState>();
     let mut client = app_state.client.clone();
-    let pool = &app_state.get_pool();
+    let pool = &app_state.db;
     let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? else {
         error!("The tunnel to delete with ID {tunnel_id} could not be found, cannot delete.");
         return Err(Error::NotFound);
@@ -1037,7 +980,7 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     debug!("The tunnel to delete with ID {tunnel_id} has been identified as {tunnel}, proceeding with deletion.");
 
     if let Some(connection) = app_state
-        .remove_connection(tunnel_id, &ConnectionType::Tunnel)
+        .remove_connection(tunnel_id, ConnectionType::Tunnel)
         .await
     {
         debug!("Found active connection for tunnel {tunnel} which is being deleted, closing the connection.");
@@ -1054,11 +997,11 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
             .remove_interface(request)
             .await
             .map_err(|status| {
-                error!("An error occured while removing interface {} for tunnel {tunnel}, status: {status}",
+                error!("An error occurred while removing interface {} for tunnel {tunnel}, status: {status}",
                 connection.interface_name);
                 Error::InternalError(
                     format!(
-                        "An error occured while removing interface {} for tunnel {tunnel}, error message: {}. Check logs for more details.", connection.interface_name, status.message()
+                        "An error occurred while removing interface {} for tunnel {tunnel}, error message: {}. Check logs for more details.", connection.interface_name, status.message()
                     )
                 )
             })?;
@@ -1096,22 +1039,17 @@ static PRODUCT_NAME: &str = "defguard-client";
 #[tauri::command(async)]
 pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
     let app_version = handle.package_info().version.to_string();
-    let current_version = app_version.as_str();
     let operating_system = env::consts::OS;
 
     let mut request_data = HashMap::new();
     request_data.insert("product", PRODUCT_NAME);
-    request_data.insert("client_version", current_version);
+    request_data.insert("client_version", &app_version);
     request_data.insert("operating_system", operating_system);
 
-    debug!("Fetching latest application version, client metadata: current version: {current_version} and operating system: {operating_system}");
+    debug!("Fetching latest application version, client metadata: current version: {app_version} and operating system: {operating_system}");
 
     let client = reqwest::Client::new();
-    let res = client
-        .post("https://pkgs.defguard.net/api/update/check")
-        .json(&request_data)
-        .send()
-        .await;
+    let res = client.post(UPDATE_URL).json(&request_data).send().await;
 
     if let Ok(response) = res {
         let response_json = response.json::<AppVersionInfo>().await;
@@ -1131,4 +1069,47 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         error!("Failed to fetch latest application version {err}");
         Err(Error::CommandError(err.to_string()))
     }
+}
+
+#[tauri::command]
+pub fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
+    debug!("Running command get app config.");
+    let res = app_state.app_config.lock().unwrap().clone();
+    trace!("Returning config: {res:?}");
+    Ok(res)
+}
+
+#[tauri::command]
+pub fn command_set_app_config(
+    config_patch: AppConfigPatch,
+    emit_event: bool,
+    app_handle: AppHandle,
+) -> Result<AppConfig, Error> {
+    let app_state: State<AppState> = app_handle.state();
+    debug!("Command set app config received.");
+    trace!("Command payload: {config_patch:?}");
+    let tray_changed = config_patch.tray_theme.is_some();
+    let res = {
+        let mut app_config = app_state.app_config.lock().unwrap();
+        app_config.apply(config_patch);
+        app_config.save(&app_handle);
+        app_config.clone()
+    };
+    info!("Config changed successfully");
+    if tray_changed {
+        debug!("Tray theme included in config change, tray will be updated.");
+        match configure_tray_icon(&app_handle, &res.tray_theme) {
+            Ok(()) => debug!("Tray updated upon config change"),
+            Err(err) => error!("Tray change failed. Reason: {err}"),
+        }
+    }
+    if emit_event {
+        match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, ()) {
+            Ok(()) => debug!("Config changed event emitted successfully"),
+            Err(err) => {
+                error!("Failed to emit config change event. Reason: {err}");
+            }
+        }
+    }
+    Ok(res)
 }

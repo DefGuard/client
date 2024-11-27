@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, location_id, connected_from, start, end FROM connection WHERE location_id = $1",
+  "query": "SELECT id, tunnel_id, start, end FROM tunnel_connection WHERE tunnel_id = $1",
   "describe": {
     "columns": [
       {
@@ -9,23 +9,18 @@
         "type_info": "Integer"
       },
       {
-        "name": "location_id",
+        "name": "tunnel_id",
         "ordinal": 1,
         "type_info": "Integer"
       },
       {
-        "name": "connected_from",
-        "ordinal": 2,
-        "type_info": "Text"
-      },
-      {
         "name": "start",
-        "ordinal": 3,
+        "ordinal": 2,
         "type_info": "Datetime"
       },
       {
         "name": "end",
-        "ordinal": 4,
+        "ordinal": 3,
         "type_info": "Datetime"
       }
     ],
@@ -36,9 +31,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "7f83ec88f699dd2d15e40dfb023a60be3da33c4d1ca49e56b08154aa2ad7b8a0"
+  "hash": "459a8adf012858af893c824e53cfb91940599ec468f978cb4843f7e14fc376b1"
 }

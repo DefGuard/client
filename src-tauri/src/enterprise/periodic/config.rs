@@ -8,14 +8,14 @@ use tokio::time::sleep;
 use crate::{
     appstate::AppState,
     commands::{do_update_instance, locations_changed},
-    database::{models::Id, Instance},
+    database::models::{instance::Instance, Id},
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
-const POLLING_ENDPOINT: &str = "/api/v1/poll";
+static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
 /// Periodically retrieves and updates configuration for all [`Instance`]s.
 /// Updates are only performed if no connections are established to the [`Instance`],
@@ -23,9 +23,8 @@ const POLLING_ENDPOINT: &str = "/api/v1/poll";
 pub async fn poll_config(handle: AppHandle) {
     debug!("Starting the configuration polling loop...");
     let state: State<AppState> = handle.state();
-    let pool = state.get_pool();
     loop {
-        let Ok(mut transaction) = pool.begin().await else {
+        let Ok(mut transaction) = state.db.begin().await else {
             error!(
                 "Failed to begin database transaction for config polling, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()

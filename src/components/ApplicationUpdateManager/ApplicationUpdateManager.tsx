@@ -17,7 +17,7 @@ export const ApplicationUpdateManager = () => {
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
 
   const setApplicationUpdateData = useApplicationUpdateStore((state) => state.setValues);
-  const checkForUpdates = useClientStore((state) => state.settings.check_for_updates);
+  const checkForUpdates = useClientStore((state) => state.appConfig.check_for_updates);
 
   // Get current application version.
   useEffect(() => {

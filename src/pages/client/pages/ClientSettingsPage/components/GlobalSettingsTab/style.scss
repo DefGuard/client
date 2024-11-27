@@ -1,9 +1,21 @@
 #global-settings-tab {
+  position: relative;
   display: flex;
   flex-flow: column;
   align-items: flex-start;
   justify-items: flex-start;
-  row-gap: 32px;
+
+  .spaced {
+    padding-bottom: 32px;
+  }
+
+  .select-container {
+    margin-bottom: 32px;
+  }
+
+  .input {
+    padding-bottom: 32px;
+  }
 
   & > section {
     display: flex;
@@ -11,9 +23,47 @@
     align-items: flex-start;
     justify-items: flex-start;
     row-gap: 20px;
+
+    & > header {
+      display: flex;
+      flex-flow: row nowrap;
+      column-gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+
+      .helper {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    h2 {
+      span {
+        @include typography(input-label);
+        color: var(--text-body-secondary);
+      }
+    }
+
+    .warning-message {
+      @include typography(app-body-2);
+      color: var(--text-important);
+    }
   }
 
   .select-container {
     min-width: 250px;
+  }
+
+  & > .controls {
+    display: flex;
+    width: 100%;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-end;
+
+    .btn {
+      width: 100%;
+      max-width: 120px;
+    }
   }
 }

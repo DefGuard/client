@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id!: i64\", location_id, upload \"upload!: i64\", download \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\",\n            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM location_stats WHERE location_id = $1 ORDER BY collected_at DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "location_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "upload!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "download!: i64",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_handshake",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "collected_at!: NaiveDateTime",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "listen_port!: u32",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "persistent_keepalive_interval?: u16",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "d59e13cc4f96bcab2ce0d36bd787f46f286328892deacafb79066f1c0a1bae41"
+}

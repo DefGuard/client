@@ -79,10 +79,16 @@ export enum ClientConnectionType {
   TUNNEL = 'Tunnel',
 }
 
+export enum DeadConDroppedOutReason {
+  PERIODIC_VERIFICATION = 'PeriodicVerification',
+  CONNECTION_VERIFICATION = 'ConnectionVerification',
+}
+
 export type DeadConDroppedPayload = {
   id: number;
+  name: string;
   con_type: ClientConnectionType;
-  interface_name: string;
+  reason: DeadConDroppedOutReason;
 };
 
 export enum TauriEventKey {
@@ -93,4 +99,5 @@ export enum TauriEventKey {
   APP_VERSION_FETCH = 'app-version-fetch',
   CONFIG_CHANGED = 'config-changed',
   DEAD_CONNECTION_DROPPED = 'dead-connection-dropped',
+  APPLICATION_CONFIG_CHANGED = 'application-config-changed',
 }

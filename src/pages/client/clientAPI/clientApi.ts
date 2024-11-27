@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api';
 import { InvokeArgs } from '@tauri-apps/api/tauri';
-import pTimeout from 'p-timeout';
+import pTimeout, { TimeoutError } from 'p-timeout';
 import { debug, error, trace } from 'tauri-plugin-log-api';
 
 import { NewApplicationVersionInfo } from '../../../shared/hooks/api/types';
@@ -12,6 +12,7 @@ import {
   Tunnel,
 } from '../types';
 import {
+  AppConfig,
   ConnectionRequest,
   GetLocationsRequest,
   LocationDetails,
@@ -19,11 +20,10 @@ import {
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
-  Settings,
   StatsRequest,
   TauriCommandKey,
   TunnelRequest,
-  UpdateInstnaceRequest,
+  UpdateInstanceRequest,
 } from './types';
 
 // Streamlines logging for invokes
@@ -40,9 +40,15 @@ async function invokeWrapper<T>(
     debug(`Invoke ${command} completed on the frontend`);
     trace(`${command} completed with data: ${JSON.stringify(res)}`);
     return res;
+    // TODO: handle more error types ?
   } catch (e) {
-    error(`Invoking ${command} FAILED\n${JSON.stringify(e)}`);
-    return Promise.reject(e);
+    let message: string = `Invoking command ${command} failed due to unknown error: ${JSON.stringify(e)}`;
+    trace(message);
+    if (e instanceof TimeoutError) {
+      message = `Invoking command ${command} timeout out after ${timeout / 1000} seconds`;
+    }
+    error(message);
+    return Promise.reject(message);
   }
 }
 
@@ -77,15 +83,10 @@ const getActiveConnection = async (data: ConnectionRequest): Promise<Connection>
 const updateLocationRouting = async (data: RoutingRequest): Promise<Connection> =>
   invokeWrapper('update_location_routing', data);
 
-const getSettings = async (): Promise<Settings> => invokeWrapper('get_settings');
-
-const updateSettings = async (data: Partial<Settings>): Promise<Settings> =>
-  invokeWrapper('update_settings', { data });
-
 const deleteInstance = async (id: number): Promise<void> =>
   invokeWrapper('delete_instance', { instanceId: id });
 
-const updateInstance = async (data: UpdateInstnaceRequest): Promise<void> =>
+const updateInstance = async (data: UpdateInstanceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
 
 const parseTunnelConfig = async (config: string) =>
@@ -123,7 +124,21 @@ const startGlobalLogWatcher = async (): Promise<void> =>
 const stopGlobalLogWatcher = async (): Promise<void> =>
   invokeWrapper('stop_global_logwatcher');
 
+const getAppConfig = async (): Promise<AppConfig> =>
+  invokeWrapper('command_get_app_config');
+
+const setAppConfig = async (
+  appConfig: Partial<AppConfig>,
+  emitEvent: boolean,
+): Promise<AppConfig> =>
+  invokeWrapper('command_set_app_config', {
+    configPatch: appConfig,
+    emitEvent,
+  });
+
 export const clientApi = {
+  getAppConfig,
+  setAppConfig,
   getInstances,
   getTunnels,
   getLocations,
@@ -135,8 +150,6 @@ export const clientApi = {
   getActiveConnection,
   saveConfig,
   updateLocationRouting,
-  getSettings,
-  updateSettings,
   deleteInstance,
   deleteTunnel,
   getLocationDetails,

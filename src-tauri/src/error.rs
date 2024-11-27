@@ -21,8 +21,6 @@ pub enum Error {
     IpAddrMask(#[from] IpAddrParseError),
     #[error("IP address parse error: {0}")]
     AddrParse(#[from] AddrParseError),
-    #[error("Local Ip Error: {0}")]
-    LocalIpError(#[from] local_ip_address::Error),
     #[error("Internal error: {0}")]
     InternalError(String),
     #[error("Failed to parse timestamp")]
@@ -43,6 +41,10 @@ pub enum Error {
     CoreNotEnterprise,
     #[error("Instance has no config polling token")]
     NoToken,
+    #[error("Failed to lock app state member.")]
+    StateLockFail,
+    #[error("Failed to acquire lock on mutex. {0}")]
+    PoisonError(String),
 }
 
 // we must manually implement serde::Serialize
@@ -52,5 +54,11 @@ impl serde::Serialize for Error {
         S: serde::ser::Serializer,
     {
         serializer.serialize_str(self.to_string().as_ref())
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for Error {
+    fn from(value: std::sync::PoisonError<T>) -> Self {
+        Self::PoisonError(value.to_string())
     }
 }

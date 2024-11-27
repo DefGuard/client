@@ -37,7 +37,6 @@ pub struct LogDirs {
 const DELAY: Duration = Duration::from_secs(2);
 
 impl LogDirs {
-    #[must_use]
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
         debug!("Getting log directories for service and client to watch.");
         let service_log_dir = get_service_log_dir().to_path_buf();
@@ -53,11 +52,11 @@ impl LogDirs {
             service_log_dir, client_log_dir
         );
 
-        return Ok(Self {
+        Ok(Self {
             service_log_dir,
             current_service_log_file: None,
             client_log_dir,
-        });
+        })
     }
 
     /// Find the latest log file in directory for the service
@@ -122,10 +121,10 @@ impl LogDirs {
                 "Couldn't convert the client log directory path ({:?}) to a string slice",
                 self.client_log_dir
             )))?;
-        let path = format!("{}/defguard-client.log", dir_str);
+        let path = format!("{dir_str}/defguard-client.log");
         trace!("Constructed client log file path: {path}");
         let file = File::open(&path)?;
-        trace!("Client log file at {:?} opened successfully", path);
+        trace!("Client log file at {path:?} opened successfully");
         Ok(file)
     }
 }
@@ -141,7 +140,6 @@ pub struct GlobalLogWatcher {
 }
 
 impl GlobalLogWatcher {
-    #[must_use]
     pub fn new(
         handle: AppHandle,
         cancellation_token: CancellationToken,
@@ -237,7 +235,7 @@ impl GlobalLogWatcher {
                         }
                     } else {
                         trace!("Read service log line: {service_line:?}");
-                        if let Some(parsed_line) = self.parse_service_log_line(&service_line)? {
+                        if let Some(parsed_line) = self.parse_service_log_line(&service_line) {
                             trace!("Parsed service log line: {parsed_line:?}");
                             parsed_lines.push(parsed_line);
                         }
@@ -302,13 +300,11 @@ impl GlobalLogWatcher {
     ///
     /// Deserializes the log line into a known struct.
     /// Also performs filtering by log level and optional timestamp.
-    fn parse_service_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
+    fn parse_service_log_line(&self, line: &str) -> Option<LogLine> {
         trace!("Parsing service log line: {line}");
-        let mut log_line = if let Ok(line) = serde_json::from_str::<LogLine>(line) {
-            line
-        } else {
+        let Ok(mut log_line) = serde_json::from_str::<LogLine>(line) else {
             warn!("Failed to parse service log line: {line}");
-            return Ok(None);
+            return None;
         };
         trace!("Parsed service log line into: {log_line:?}");
 
@@ -319,7 +315,7 @@ impl GlobalLogWatcher {
                 log_line.level,
                 self.log_level
             );
-            return Ok(None);
+            return None;
         }
 
         // filter by optional timestamp
@@ -329,7 +325,7 @@ impl GlobalLogWatcher {
                     "Timestamp {} is below configured threshold {from}. Skipping line...",
                     log_line.timestamp
                 );
-                return Ok(None);
+                return None;
             }
         }
 
@@ -337,7 +333,7 @@ impl GlobalLogWatcher {
 
         trace!("Successfully parsed service log line.");
 
-        Ok(Some(log_line))
+        Some(log_line)
     }
 
     /// Parse a client log line into a known struct using regex.
@@ -359,12 +355,11 @@ impl GlobalLogWatcher {
             .ok_or(LogWatcherError::LogParseError(line.to_string()))?
             .as_str();
 
-        let timestamp = format!("{} {}", timestamp_date, timestamp_time);
+        let timestamp = format!("{timestamp_date} {timestamp_time}");
         let timestamp = Utc.from_utc_datetime(
-            &NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S%.f").map_err(|e| {
+            &NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%d %H:%M:%S%.f").map_err(|err| {
                 LogWatcherError::LogParseError(format!(
-                    "Failed to parse timestamp {} with error: {}",
-                    timestamp, e
+                    "Failed to parse timestamp {timestamp} with error: {err}"
                 ))
             })?,
         );
@@ -375,8 +370,8 @@ impl GlobalLogWatcher {
                 .ok_or(LogWatcherError::LogParseError(line.to_string()))?
                 .as_str(),
         )
-        .map_err(|e| {
-            LogWatcherError::LogParseError(format!("Failed to parse log level with error: {}", e))
+        .map_err(|err| {
+            LogWatcherError::LogParseError(format!("Failed to parse log level with error: {err}"))
         })?;
 
         let target = captures
@@ -438,7 +433,7 @@ pub async fn spawn_global_log_watcher_task(
     // Show logs only from the last hour
     let from = Some(Utc::now() - Duration::from_secs(60 * 60));
 
-    let event_topic = format!("log-update-global");
+    let event_topic = "log-update-global".to_string();
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();
