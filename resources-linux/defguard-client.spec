@@ -1,5 +1,5 @@
 Name:     defguard-client
-Version:  ${version}
+Version:  %{version}
 Release:  1%{?dist}
 Summary:  Defguard desktop client
 
