@@ -11,10 +11,10 @@ Requires: libappindicator-gtk3 webkit2gtk4.0
 Desktop client for managing WireGuard VPN connections
 
 %install
-%{__mkdir} -p %{buildroot}/%{_bindir} %{buildroot}/%{_libdir} %{buildroot}/%{_sbindir}
+%{__mkdir} -p %{buildroot}/%{_bindir} %{buildroot}/%{_sbindir} %{buildroot}/%{_prefix}/lib/systemd/system
 %{__install} -m 755 src-tauri/target/release/defguard-client %{buildroot}/%{_bindir}/
 %{__install} -m 755 src-tauri/target/release/defguard-service %{buildroot}/%{_sbindir}/
-%{__install} -m 644 resources-linux/defguard-service.service %{buildroot}/%{_libdir}/systemd/system/
+%{__install} -m 644 resources-linux/defguard-service.service %{buildroot}/%{_prefix}/lib/systemd/system/
 
 %post
 # %{systemd_post} defguard-service.service
@@ -38,4 +38,4 @@ systemctl daemon-reload
 %files
 %{_bindir}/defguard-client
 %{_sbindir}/defguard-service
-%{_libdir}/systemd/system/defguard-service.service
+%{_prefix}/lib/systemd/system/defguard-service.service
