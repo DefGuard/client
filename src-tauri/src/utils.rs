@@ -898,7 +898,7 @@ fn close_service_handle(
 // so `handle_connection_for_location` and `handle_connection_for_tunnel` are not
 // partially duplicated here.
 #[cfg(target_os = "windows")]
-pub(crate) async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
+pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
     let appstate = app_handle.state::<AppState>();
     let all_locations = Location::all(&appstate.db).await?;
