@@ -241,7 +241,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
   const finishMFA = async (code: string) => {
     if (!location) return toaster.error(localLL.errors.mfaStartGeneric());
 
-    const data = { token, code: Number(code) };
+    const data = { token, code: code };
 
     const response = await fetch<MFAFinishResponse>(proxyUrl + '/finish', {
       method: 'POST',
