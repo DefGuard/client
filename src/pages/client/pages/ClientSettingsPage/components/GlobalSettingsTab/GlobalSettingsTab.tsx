@@ -75,12 +75,6 @@ export const GlobalSettingsTab = () => {
           .min(1, LL.form.errors.required())
           .refine((v) => availableTrayThemes.includes(v as TrayIconTheme)),
         check_for_updates: z.boolean(),
-        connection_verification_time: z
-          .number({
-            invalid_type_error: LL.form.errors.required(),
-            required_error: LL.form.errors.required(),
-          })
-          .gte(5, LL.form.errors.minValue({ min: 5 })),
         peer_alive_period: z
           .number({
             invalid_type_error: LL.form.errors.required(),
@@ -144,21 +138,6 @@ export const GlobalSettingsTab = () => {
           </Helper>
         </header>
         <FormInput controller={{ control, name: 'peer_alive_period' }} type="number" />
-      </section>
-      <section>
-        <header>
-          <h2>
-            {localLL.connection_verification.title()}{' '}
-            <span>{localLL.common.value_in_seconds()}</span>
-          </h2>
-          <Helper initialPlacement="right">
-            <p>{localLL.connection_verification.helper()}</p>
-          </Helper>
-        </header>
-        <FormInput
-          controller={{ control, name: 'connection_verification_time' }}
-          type="number"
-        />
       </section>
     </form>
   );

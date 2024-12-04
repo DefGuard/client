@@ -62,9 +62,7 @@ pub struct AppConfig {
     pub tray_theme: AppTrayTheme,
     pub check_for_updates: bool,
     pub log_level: LevelFilter,
-    /// In seconds. How much time should client wait after connecting for the first handshake.
-    pub connection_verification_time: u32,
-    /// In seconds. How much time can be between handshakes before connection is automatically dropped.
+    /// In seconds. How much time after last network activity the connection is automatically dropped.
     pub peer_alive_period: u32,
 }
 
@@ -76,7 +74,6 @@ impl Default for AppConfig {
             check_for_updates: true,
             tray_theme: AppTrayTheme::Color,
             log_level: LevelFilter::Info,
-            connection_verification_time: 10,
             peer_alive_period: 300,
         }
     }

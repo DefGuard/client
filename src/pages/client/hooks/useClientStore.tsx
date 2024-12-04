@@ -34,7 +34,6 @@ const defaultValues: StoreValues = {
     theme: 'light',
     tray_theme: 'color',
     check_for_updates: true,
-    connection_verification_time: 10,
     peer_alive_period: 300,
   },
 };

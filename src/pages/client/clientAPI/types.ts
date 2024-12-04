@@ -79,7 +79,6 @@ export type AppConfig = {
   log_level: LogLevel;
   tray_theme: TrayIconTheme;
   check_for_updates: boolean;
-  connection_verification_time: number;
   peer_alive_period: number;
 };
 
