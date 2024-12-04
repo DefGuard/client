@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{NaiveDateTime, TimeDelta, Utc};
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
@@ -14,26 +14,19 @@ use crate::{
         Id,
     },
     error::Error,
-    events::{DeadConDroppedOutReason, DeadConnDroppedOut},
+    events::DeadConnDroppedOut,
     ConnectionType,
 };
 
-const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(30);
+const CHECK_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Returns true if connection is valid
-//TODO: Take peer alive period from location
-fn check_last_active_connection(last_handshake: i64, peer_alive_period: u32) -> bool {
-    if let Some(last_handshake) = DateTime::from_timestamp(last_handshake, 0) {
-        let alive_period = TimeDelta::new(peer_alive_period.into(), 0).unwrap();
-        let now = Utc::now();
-        let elapsed = now - last_handshake;
-        let res = elapsed <= alive_period;
-        trace!(
-            "Stat check: last_handshake: {last_handshake}, elapsed: {elapsed}, check_result: {res}"
-        );
-        return res;
-    }
-    true
+fn check_last_active_connection(last: NaiveDateTime, peer_alive_period: TimeDelta) -> bool {
+    let now = Utc::now();
+    let elapsed = now - last.and_utc();
+    let res = elapsed <= peer_alive_period;
+    trace!("Stat check: last activity: {last}, elapsed: {elapsed}, result: {res}");
+    res
 }
 
 async fn reconnect(
@@ -55,7 +48,6 @@ async fn reconnect(
                     let payload = DeadConnDroppedOut {
                         name: con_interface_name.to_string(),
                         con_type,
-                        reason: DeadConDroppedOutReason::PeriodicVerification,
                     };
                     payload.emit(app_handle);
                 }
@@ -83,7 +75,6 @@ async fn disconnect_dead_connection(
             let event_payload = DeadConnDroppedOut {
                 con_type,
                 name: con_interface_name.to_string(),
-                reason: DeadConDroppedOutReason::PeriodicVerification,
             };
             event_payload.emit(&app_handle);
         }
@@ -93,25 +84,28 @@ async fn disconnect_dead_connection(
     }
 }
 
-/// Verify if the active connection is valid or not, this is needed in case client was offline and gateway already terminated the peer but client still assume it's connected.
+/// Verify if the active connection is active. This is needed in case client was offline and
+/// gateway already terminated the peer but client still assume it's connected.
 pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Error> {
     let app_state = app_handle.state::<AppState>();
     let pool = &app_state.db;
-    let peer_alive_period = app_state.app_config.lock().unwrap().peer_alive_period;
     debug!("Active connections verification started.");
 
-    // Both are by IDs.
+    // Both vectors contain IDs.
     let mut locations_to_disconnect = Vec::new();
     let mut tunnels_to_disconnect = Vec::new();
 
     loop {
-        sleep(INTERVAL_IN_SECONDS).await;
+        sleep(CHECK_INTERVAL).await;
         let connections = app_state.active_connections.lock().await;
         let connection_count = connections.len();
         if connection_count == 0 {
-            debug!("Connections verification skipped, no active connections found, task will wait for next {INTERVAL_IN_SECONDS:?}");
+            debug!("Connections verification skipped, no active connections found, task will wait for next {CHECK_INTERVAL:?}");
         }
-        // check every current active connection
+        let peer_alive_period = TimeDelta::seconds(i64::from(
+            app_state.app_config.lock().unwrap().peer_alive_period,
+        ));
+        // Check currently active connections.
         for con in &*connections {
             trace!("Connection: {con:?}");
             match con.connection_type {
@@ -120,7 +114,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         Ok(Some(latest_stat)) => {
                             trace!("Latest statistics for location: {latest_stat:?}");
                             if !check_last_active_connection(
-                                latest_stat.last_handshake,
+                                latest_stat.collected_at,
                                 peer_alive_period,
                             ) {
                                 locations_to_disconnect.push(con.location_id);
@@ -128,7 +122,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         }
                         Ok(None) => {
                             error!(
-                                "LocationStats not found in databse for active connection {} {}({})",
+                                "LocationStats not found in database for active connection {} {}({})",
                                 con.connection_type, con.interface_name, con.location_id
                             );
                         }
@@ -142,7 +136,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         Ok(Some(latest_stat)) => {
                             trace!("Latest statistics for tunnel: {latest_stat:?}");
                             if !check_last_active_connection(
-                                latest_stat.last_handshake,
+                                latest_stat.collected_at,
                                 peer_alive_period,
                             ) {
                                 tunnels_to_disconnect.push(con.location_id);
