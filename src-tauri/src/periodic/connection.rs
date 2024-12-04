@@ -117,6 +117,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 latest_stat.collected_at,
                                 peer_alive_period,
                             ) {
+                                debug!("There wasn't any activity for Location {}; considering it being dead.", con.location_id);
                                 locations_to_disconnect.push(con.location_id);
                             }
                         }
@@ -139,6 +140,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 latest_stat.collected_at,
                                 peer_alive_period,
                             ) {
+                                debug!("There wasn't any activity for Tunnel {}; considering it being dead.", con.location_id);
                                 tunnels_to_disconnect.push(con.location_id);
                             }
                         }
