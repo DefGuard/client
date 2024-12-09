@@ -108,6 +108,20 @@ impl Location<Id> {
         .await
     }
 
+    pub async fn find_by_name<'e, E>(executor: E, name: &str) -> Result<Self, SqlxError>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        query_as!(
+            Self,
+            "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, \
+            route_all_traffic, mfa_enabled, keepalive_interval FROM location WHERE name = $1",
+            name
+        )
+        .fetch_one(executor)
+        .await
+    }
+
     pub async fn find_by_public_key<'e, E>(executor: E, pubkey: &str) -> Result<Self, SqlxError>
     where
         E: SqliteExecutor<'e>,

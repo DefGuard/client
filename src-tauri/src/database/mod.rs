@@ -5,17 +5,15 @@ use std::{
     fs::{create_dir_all, File},
 };
 
-use tauri::PathResolver;
-
-use crate::error::Error;
+use crate::{app_data_dir, error::Error};
 
 const DB_NAME: &str = "defguard.db";
 
 pub(crate) type DbPool = sqlx::SqlitePool;
 
 /// Initializes the database
-pub fn init_db(path_resolver: &PathResolver) -> Result<DbPool, Error> {
-    let db_url = prepare_db_url(path_resolver)?;
+pub fn init_db() -> Result<DbPool, Error> {
+    let db_url = prepare_db_url()?;
     debug!("Connecting to database: {db_url}");
     let pool = DbPool::connect_lazy(&db_url)?;
 
@@ -24,15 +22,14 @@ pub fn init_db(path_resolver: &PathResolver) -> Result<DbPool, Error> {
 
 /// Returns database url. Checks for custom url in `DATABASE_URL` env variable.
 /// Handles creating appropriate directories if they don't exist.
-fn prepare_db_url(path_resolver: &PathResolver) -> Result<String, Error> {
+fn prepare_db_url() -> Result<String, Error> {
     if let Ok(url) = env::var("DATABASE_URL") {
         info!("The default database location has been just overridden by the DATABASE_URL environment variable. The application will use the database located at: {url}");
         Ok(url)
     } else {
         debug!("A production database will be used as no custom DATABASE_URL was provided.");
         // Check if database directory and file exists, create if they don't.
-        let app_dir = path_resolver
-            .app_data_dir()
+        let app_dir = app_data_dir()
             .ok_or(Error::Config(
                 "Application data directory is not defined. Cannot proceed. Is the application running on a supported platform?".to_string()
             ))?;
