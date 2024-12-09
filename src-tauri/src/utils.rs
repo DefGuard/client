@@ -1,4 +1,5 @@
 use std::{
+    env,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     path::Path,
     process::Command,
@@ -51,8 +52,8 @@ use winapi::{
 };
 
 pub const IS_MACOS: bool = cfg!(target_os = "macos");
-static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
-static DEFAULT_ROUTE_IPV6: &str = "::/0";
+pub static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
+pub static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface
 pub async fn setup_interface(
@@ -177,7 +178,7 @@ pub async fn setup_interface(
     }
 }
 
-fn find_random_free_port() -> Option<u16> {
+pub fn find_random_free_port() -> Option<u16> {
     const MAX_PORT: u16 = 65535;
     const MIN_PORT: u16 = 6000;
 
@@ -313,19 +314,16 @@ pub(crate) async fn stats_handler(
 // gets targets that will be allowed by logger, this will be empty if not provided
 #[must_use]
 pub fn load_log_targets() -> Vec<String> {
-    match std::env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
-        Ok(targets) => {
-            if !targets.is_empty() {
-                return targets
-                    .split(',')
-                    .filter(|t| !t.is_empty())
-                    .map(ToString::to_string)
-                    .collect();
-            }
-            Vec::new()
+    if let Ok(targets) = env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
+        if !targets.is_empty() {
+            return targets
+                .split(',')
+                .filter(|t| !t.is_empty())
+                .map(ToString::to_string)
+                .collect();
         }
-        Err(_) => Vec::new(),
     }
+    Vec::new()
 }
 
 // helper function to get log file directory for the defguard-service daemon

@@ -140,10 +140,7 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
 }
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &AppTrayTheme) -> Result<(), Error> {
-    let resource_str = format!(
-        "resources/icons/tray-32x32-{}.png",
-        theme.as_ref().to_lowercase().trim()
-    );
+    let resource_str = format!("resources/icons/tray-32x32-{theme}.png");
     debug!("Trying to load the tray icon from {resource_str}");
     if let Some(icon_path) = app.path_resolver().resolve_resource(&resource_str) {
         let icon = Icon::File(icon_path);

@@ -69,7 +69,7 @@ impl DaemonService {
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
 #[cfg(not(target_os = "macos"))]
-fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
+pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
     let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
@@ -80,7 +80,7 @@ fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
 }
 
 #[cfg(target_os = "macos")]
-fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
+pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
     let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
