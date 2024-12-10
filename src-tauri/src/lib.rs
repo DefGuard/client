@@ -26,6 +26,7 @@ pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_G
 // This must match tauri.bundle.identifier from tauri.conf.json.
 static BUNDLE_IDENTIFIER: &str = "net.defguard";
 // Returns the path to the user’s data directory.
+#[must_use]
 pub fn app_data_dir() -> Option<PathBuf> {
     dirs_next::data_dir().map(|dir| dir.join(BUNDLE_IDENTIFIER))
 }

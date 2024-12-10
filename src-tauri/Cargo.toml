@@ -1,3 +1,6 @@
+[workspace]
+members = ["cli", "common"]
+
 [package]
 name = "defguard-client"
 version = "1.1.0"
@@ -21,18 +24,18 @@ anyhow = "1.0"
 base64 = "0.22"
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
+common = { path = "common" }
 dark-light = "1.1"
 defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.5.5" }
 dirs-next = "2.0"
 lazy_static = "1.5"
 log = { version = "0.4", features = ["serde"] }
 prost = "0.13"
-rand = "0.8"
 regex = "1.11"
 reqwest = { version = "0.12", features = ["cookies", "json"] }
 rust-ini = "0.21"
-serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 serde_with = "3.11"
 sqlx = { version = "0.8", features = [
     "chrono",

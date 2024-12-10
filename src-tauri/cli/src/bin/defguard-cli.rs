@@ -1,6 +1,7 @@
 use std::{net::IpAddr, str::FromStr, time::Duration};
 
 use clap::{command, value_parser, Arg, Command};
+use common::{find_free_tcp_port, get_interface_name};
 use defguard_client::{
     database::{
         init_db,
@@ -8,7 +9,7 @@ use defguard_client::{
     },
     proto,
     service::setup_wgapi,
-    utils::{find_random_free_port, get_interface_name, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
+    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
 };
 use defguard_wireguard_rs::{
     host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WireguardInterfaceApi,
@@ -32,9 +33,6 @@ async fn connect(pool: &SqlitePool, name: String) -> Result<(), CliError> {
     let location = Location::find_by_name(pool, &name).await?;
     eprintln!("{location:?}");
 
-    #[cfg(target_os = "macos")]
-    let ifname = get_interface_name();
-    #[cfg(not(target_os = "macos"))]
     let ifname = get_interface_name(&location.name);
 
     let wgapi = setup_wgapi(&ifname).expect("Failed to setup WireGuard API");
@@ -113,7 +111,7 @@ async fn connect(pool: &SqlitePool, name: String) -> Result<(), CliError> {
         name: location.name,
         prvkey: key.prvkey,
         address: location.address.clone(),
-        port: find_random_free_port().unwrap() as u32,
+        port: u32::from(find_free_tcp_port().unwrap()),
         peers: vec![peer.clone()],
         mtu: None,
     };
