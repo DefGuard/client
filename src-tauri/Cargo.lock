@@ -1296,15 +1296,16 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "common",
- "defguard-client",
- "defguard_wireguard_rs",
+ "defguard_wireguard_rs 0.6.0",
  "dirs-next",
+ "prost",
+ "prost-build",
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "sqlx",
  "thiserror 2.0.6",
  "tokio",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -1317,7 +1318,7 @@ dependencies = [
  "clap",
  "common",
  "dark-light",
- "defguard_wireguard_rs",
+ "defguard_wireguard_rs 0.5.5",
  "dirs-next",
  "lazy_static",
  "log",
@@ -1372,6 +1373,25 @@ dependencies = [
  "nix 0.29.0",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "defguard_wireguard_rs"
+version = "0.6.0"
+dependencies = [
+ "base64 0.22.1",
+ "libc",
+ "log",
+ "netlink-packet-core",
+ "netlink-packet-generic",
+ "netlink-packet-route",
+ "netlink-packet-utils",
+ "netlink-packet-wireguard",
+ "netlink-sys",
+ "nix 0.29.0",
+ "serde",
+ "thiserror 2.0.6",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -3539,9 +3559,9 @@ dependencies = [
 
 [[package]]
 name = "netlink-sys"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "416060d346fbaf1f23f9512963e3e878f1a78e707cb699ba9215761754244307"
+checksum = "16c903aa70590cb93691bf97a767c8d1d6122d2cc9070433deb3bbf36ce8bd23"
 dependencies = [
  "bytes",
  "libc",
@@ -5095,18 +5115,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.215"
+version = "1.0.216"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6513c1ad0b11a9376da888e3e0baa0077f1aed55c17f50e7b2397136129fb88f"
+checksum = "0b9781016e935a97e8beecf0c933758c97a5520d32930e460142b4cd80c6338e"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.215"
+version = "1.0.216"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad1e866f866923f252f05c889987993144fb74e722403468a4ebd70c3cd756c0"
+checksum = "46f859dbbf73865c6627ed570e78961cd3ac92407a2d117204c49232485da55e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6020,7 +6040,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-log"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#d7e23048eb42d197b94667dff74f88fc608366ee"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#3e7329c8db16f5cda4b1cb89e566565af1923da1"
 dependencies = [
  "byte-unit",
  "fern",
@@ -6035,7 +6055,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-single-instance"
 version = "0.0.0"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#d7e23048eb42d197b94667dff74f88fc608366ee"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#3e7329c8db16f5cda4b1cb89e566565af1923da1"
 dependencies = [
  "log",
  "serde",
@@ -6049,7 +6069,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-window-state"
 version = "0.1.1"
-source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#d7e23048eb42d197b94667dff74f88fc608366ee"
+source = "git+https://github.com/tauri-apps/plugins-workspace?branch=v1#3e7329c8db16f5cda4b1cb89e566565af1923da1"
 dependencies = [
  "bincode",
  "bitflags 2.6.0",
