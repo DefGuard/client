@@ -148,7 +148,7 @@ async fn connect(config: &CliConfig) -> Result<(), CliError> {
             Err(err) => {
                 // Handle the error from IpAddrMask::from_str, if needed
                 eprintln!(
-                    "Error parsing IP address {allowed_ip} while setting up interface: {err}"
+                    "Error parsing IP address `{allowed_ip}` while setting up interface: {err}"
                 );
                 continue;
             }
@@ -299,10 +299,9 @@ async fn main() {
         .arg(config_opt)
         .arg_required_else_help(true)
         .propagate_version(true)
-        .subcommand_required(true)
-        .subcommand(Command::new("connect").about("connect device"))
+        .subcommand_required(false)
         .subcommand(
-            Command::new("enrolldev")
+            Command::new("enroll")
                 .about("Enroll device")
                 .arg(dev_name_opt)
                 .arg(token_opt)
@@ -321,10 +320,7 @@ async fn main() {
     let mut config = CliConfig::load(&config_path);
 
     match matches.subcommand() {
-        Some(("connect", _submatches)) => {
-            connect(&config).await.expect("Failed to connect");
-        }
-        Some(("enrolldev", submatches)) => {
+        Some(("enroll", submatches)) => {
             let name = submatches
                 .get_one::<String>("devname")
                 .expect("device name is required")
@@ -337,9 +333,8 @@ async fn main() {
             enroll(&mut config, url, token, name)
                 .await
                 .expect("Failed to enroll");
+            config.save(&config_path);
         }
-        _ => unreachable!(),
+        _ => connect(&config).await.expect("Failed to connect"),
     }
-
-    config.save(&config_path);
 }
