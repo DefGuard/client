@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use reqwest::StatusCode;
+use reqwest::{Client, StatusCode};
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
@@ -116,7 +116,7 @@ pub async fn poll_instance(
                 instance.proxy_url
             ))
         })?;
-    let response = reqwest::Client::new()
+    let response = Client::new()
         .post(url)
         .json(&request)
         .timeout(Duration::from_secs(5))
@@ -237,9 +237,9 @@ async fn config_changed(
     Ok(locations_changed || info_changed)
 }
 
-/// Retrieves pubkey & token to build InstanceInfoRequest
+/// Retrieves token to build InstanceInfoRequest
 fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
-    let token = &instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
+    let token = instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
 
     Ok(InstanceInfoRequest {
         token: (*token).to_string(),
