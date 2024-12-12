@@ -465,7 +465,7 @@ dependencies = [
  "rustversion",
  "serde",
  "sync_wrapper 1.0.2",
- "tower 0.5.1",
+ "tower 0.5.2",
  "tower-layer",
  "tower-service",
 ]
@@ -648,9 +648,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a68f1f47cdf0ec8ee4b941b2eee2a80cb796db73118c0dd09ac63fbe405be22"
+checksum = "786a307d683a5bf92e6fd5fd69a7eb613751668d1d8d67d802846dfe367c62c8"
 dependencies = [
  "memchr",
  "serde",
@@ -1296,7 +1296,7 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "common",
- "defguard_wireguard_rs 0.6.0",
+ "defguard_wireguard_rs",
  "dirs-next",
  "prost",
  "prost-build",
@@ -1318,7 +1318,7 @@ dependencies = [
  "clap",
  "common",
  "dark-light",
- "defguard_wireguard_rs 0.5.5",
+ "defguard_wireguard_rs",
  "dirs-next",
  "lazy_static",
  "log",
@@ -1358,26 +1358,8 @@ dependencies = [
 
 [[package]]
 name = "defguard_wireguard_rs"
-version = "0.5.5"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.5.5#fbb88ee2296121459ab17985857915b680ade8a4"
-dependencies = [
- "base64 0.22.1",
- "libc",
- "log",
- "netlink-packet-core",
- "netlink-packet-generic",
- "netlink-packet-route",
- "netlink-packet-utils",
- "netlink-packet-wireguard",
- "netlink-sys",
- "nix 0.29.0",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "defguard_wireguard_rs"
 version = "0.6.0"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.6.0#59ea9bd38263886135502e84d3768f9bf502505a"
 dependencies = [
  "base64 0.22.1",
  "libc",
@@ -4640,9 +4622,9 @@ checksum = "f2ff9a1f06a88b01621b7ae906ef0211290d1c8a168a15542486a8f61c0833b9"
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.7"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b6dfecf2c74bce2466cabf93f6664d6998a69eb21e39f4207930065b27b771f"
+checksum = "03a862b389f93e68874fbf580b9de08dd02facb9a788ebadaf4a3fd33cf58834"
 dependencies = [
  "bitflags 2.6.0",
 ]
@@ -4967,9 +4949,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.19"
+version = "0.23.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "934b404430bb06b3fae2cba809eb45a1ab1aecd64491213d7c3301b88393f8d1"
+checksum = "5065c3f250cbd332cd894be57c40fa52387247659b14a2d6041d121547903b1b"
 dependencies = [
  "once_cell",
  "rustls-pki-types",
@@ -6538,14 +6520,14 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2873938d487c3cfb9aed7546dc9f2711d867c9f90c46b889989a2cb84eba6b4f"
+checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
 dependencies = [
  "futures-core",
  "futures-util",
  "pin-project-lite",
- "sync_wrapper 0.1.2",
+ "sync_wrapper 1.0.2",
  "tower-layer",
  "tower-service",
 ]

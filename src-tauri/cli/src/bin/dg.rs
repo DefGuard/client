@@ -3,6 +3,7 @@ use std::{
     net::IpAddr,
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 
 use clap::{command, value_parser, Arg, Command};
@@ -15,20 +16,26 @@ use defguard_wireguard_rs::{
     error::WireguardInterfaceError, host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration,
     WGApi, WireguardInterfaceApi,
 };
-use reqwest::{Client, Url};
+use reqwest::{Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::signal::ctrl_c;
+use tokio::{
+    select,
+    signal::{
+        ctrl_c,
+        unix::{signal, SignalKind},
+    },
+    sync::Notify,
+};
 
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/defguard.proxy.rs"));
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 struct CliConfig {
-    // proxy_url: Url, // get from instance_info.proxy_url
     private_key: Key,
-    // device: proto::Device, // not needed
+    device: proto::Device,
     device_config: proto::DeviceConfig,
     instance_info: proto::InstanceInfo,
     // polling token used for further client-core communication
@@ -73,6 +80,8 @@ impl CliConfig {
 
 #[derive(Debug, Error)]
 enum CliError {
+    #[error("Api")]
+    Api,
     #[error("Missing data")]
     MissingData,
     #[error(transparent)]
@@ -83,10 +92,10 @@ enum CliError {
     WireGuard(#[from] WireguardInterfaceError),
 }
 
-async fn connect(config: &CliConfig) -> Result<(), CliError> {
+async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError> {
     eprintln!("Connecting to {:?}...", config.device_config);
 
-    let ifname = get_interface_name(&config.instance_info.name);
+    let ifname = get_interface_name(&config.device.name);
 
     // let wgapi = setup_wgapi(&ifname).expect("Failed to setup WireGuard API");
     #[cfg(not(target_os = "macos"))]
@@ -146,7 +155,6 @@ async fn connect(config: &CliConfig) -> Result<(), CliError> {
                 peer.allowed_ips.push(addr);
             }
             Err(err) => {
-                // Handle the error from IpAddrMask::from_str, if needed
                 eprintln!(
                     "Error parsing IP address `{allowed_ip}` while setting up interface: {err}"
                 );
@@ -192,7 +200,7 @@ async fn connect(config: &CliConfig) -> Result<(), CliError> {
 
     eprintln!("Finished creating a new interface {ifname}");
 
-    ctrl_c().await.unwrap();
+    trigger.notified().await;
 
     eprintln!("Shutting down...");
     wgapi.remove_interface().unwrap();
@@ -200,12 +208,12 @@ async fn connect(config: &CliConfig) -> Result<(), CliError> {
     Ok(())
 }
 
-// TODO: extract error message from response
-// #[derive(Deserialize)]
-// struct ApiError {
-//     error: String,
-// }
+#[derive(Deserialize)]
+struct ApiError {
+    error: String,
+}
 
+/// Enroll device.
 async fn enroll(
     config: &mut CliConfig,
     base_url: &Url,
@@ -220,8 +228,14 @@ async fn enroll(
         .json(&proto::EnrollmentStartRequest { token })
         .send()
         .await?;
-    println!("Start enrolment result: {result:?}");
-    let response: proto::EnrollmentStartResponse = result.error_for_status()?.json().await?;
+
+    let response: proto::EnrollmentStartResponse = if result.status() == StatusCode::OK {
+        result.json().await?
+    } else {
+        let error: ApiError = result.json().await?;
+        eprintln!("Failed to start enrolment: {}", error.error);
+        return Err(CliError::Api);
+    };
     println!("{response:?}");
 
     if response.instance.is_none() {
@@ -244,8 +258,14 @@ async fn enroll(
         })
         .send()
         .await?;
-    println!("Create device result: {result:?}");
-    let response: proto::DeviceConfigResponse = result.error_for_status()?.json().await?;
+
+    let response: proto::DeviceConfigResponse = if result.status() == StatusCode::OK {
+        result.json().await?
+    } else {
+        let error: ApiError = result.json().await?;
+        eprintln!("Failed to start enrolment: {}", error.error);
+        return Err(CliError::Api);
+    };
     println!("{response:?}");
 
     let count = response.configs.len();
@@ -257,8 +277,13 @@ async fn enroll(
         eprintln!("Missing InstanceInfo");
         return Err(CliError::MissingData);
     };
+    let Some(device) = response.device else {
+        eprintln!("Missing Device");
+        return Err(CliError::MissingData);
+    };
 
     config.private_key = prvkey;
+    config.device = device;
     config.device_config = response.configs[0].clone();
     config.instance_info = instance_info;
     config.token = response.token;
@@ -319,22 +344,44 @@ async fn main() {
         });
     let mut config = CliConfig::load(&config_path);
 
-    match matches.subcommand() {
-        Some(("enroll", submatches)) => {
-            let name = submatches
-                .get_one::<String>("devname")
-                .expect("device name is required")
-                .to_string();
-            let token = submatches
-                .get_one::<String>("token")
-                .expect("token is required")
-                .to_string();
-            let url = submatches.get_one::<Url>("url").expect("URL is required");
-            enroll(&mut config, url, token, name)
-                .await
-                .expect("Failed to enroll");
-            config.save(&config_path);
+    if let Some(("enroll", submatches)) = matches.subcommand() {
+        let name = submatches
+            .get_one::<String>("devname")
+            .expect("device name is required")
+            .to_string();
+        let token = submatches
+            .get_one::<String>("token")
+            .expect("token is required")
+            .to_string();
+        let url = submatches.get_one::<Url>("url").expect("URL is required");
+        enroll(&mut config, url, token, name)
+            .await
+            .expect("Failed to enroll");
+        config.save(&config_path);
+    } else {
+        let trigger = Arc::new(Notify::new());
+        let mut hangup = signal(SignalKind::hangup()).unwrap();
+        let mut perpetuum = true;
+        while perpetuum {
+            // Must be spawned as a separate task, otherwise trigger won't reach it.
+            let task = tokio::spawn(connect(config.clone(), trigger.clone()));
+            select! {
+                biased;
+                _ = hangup.recv() => {
+                    trigger.notify_one();
+                    eprintln!("Re-configuring...");
+                    config = CliConfig::load(&config_path);
+                },
+                _ = ctrl_c() => {
+                    trigger.notify_one();
+                    eprintln!("Quitting...");
+                    perpetuum = false;
+                },
+                Err(err) = task => {
+                    eprintln!("Failed to operate: {err}");
+                    break;
+                },
+            }
         }
-        _ => connect(&config).await.expect("Failed to connect"),
     }
 }
