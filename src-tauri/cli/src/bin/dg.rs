@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 
 use clap::{command, value_parser, Arg, Command};
@@ -26,6 +27,7 @@ use tokio::{
         unix::{signal, SignalKind},
     },
     sync::Notify,
+    time::sleep,
 };
 
 mod proto {
@@ -291,6 +293,84 @@ async fn enroll(
     Ok(())
 }
 
+const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
+const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Fetch configuration from Defguard proxy.
+async fn fetch_config(
+    client: &Client,
+    url: Url,
+    token: String,
+) -> Result<proto::DeviceConfig, CliError> {
+    let result = client
+        .post(url.clone())
+        .json(&proto::InstanceInfoRequest { token })
+        .timeout(HTTP_REQ_TIMEOUT)
+        .send()
+        .await?;
+
+    let instance_response: proto::InstanceInfoResponse = if result.status() == StatusCode::OK {
+        result.json().await?
+    } else {
+        eprintln!("Failed to poll config");
+        return Err(CliError::Api);
+    };
+
+    let Some(response) = instance_response.device_config else {
+        eprintln!("Missing `DeviceConfigResponse`");
+        return Err(CliError::Api);
+    };
+
+    let count = response.configs.len();
+    if count != 1 {
+        eprintln!("Expected one device config, found {count}.");
+        return Err(CliError::TooManyDevices);
+    }
+    // let Some(instance_info) = response.instance else {
+    //     eprintln!("Missing InstanceInfo");
+    //     return Err(CliError::MissingData);
+    // };
+    // let Some(device) = response.device else {
+    //     eprintln!("Missing Device");
+    //     return Err(CliError::MissingData);
+    // };
+    let Some(device_config) = response.configs.into_iter().next() else {
+        // This should not happen.
+        return Err(CliError::MissingData);
+    };
+
+    Ok(device_config)
+}
+
+/// Poll configuration from Defguard proxy in regular intervals.
+/// Exit when `DeviceConfig` differs from the current one.
+async fn poll_config(config: &mut CliConfig) {
+    // sanity check
+    let Some(token) = config.clone().token else {
+        return;
+    };
+
+    let Ok(client) = Client::builder().cookie_store(true).build() else {
+        return;
+    };
+    let Ok(mut url) = Url::parse(&config.instance_info.proxy_url) else {
+        return;
+    };
+    url.set_path("/api/v1/poll");
+
+    loop {
+        sleep(INTERVAL_SECONDS).await;
+        let Ok(device_config) = fetch_config(&client, url.clone(), token.clone()).await else {
+            eprintln!("Failed to fetch configuration from proxy");
+            continue;
+        };
+
+        if config.device_config != device_config {
+            break;
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // Define command line arguments.
@@ -376,6 +456,9 @@ async fn main() {
                     trigger.notify_one();
                     eprintln!("Quitting...");
                     perpetuum = false;
+                },
+                () = poll_config(&mut config), if config.token.is_some() => {
+                    eprintln!("Configuration has changed, re-configuring...");
                 },
                 Err(err) = task => {
                     eprintln!("Failed to operate: {err}");
