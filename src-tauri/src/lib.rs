@@ -19,7 +19,29 @@ pub mod utils;
 pub mod wg_config;
 
 pub mod proto {
+    use crate::database::models::{location::Location, Id, NoId};
+
     tonic::include_proto!("defguard.proxy");
+
+    impl DeviceConfig {
+        #[must_use]
+        pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
+            Location {
+                id: NoId,
+                instance_id,
+                network_id: self.network_id,
+                name: self.network_name,
+                address: self.assigned_ip, // Transforming assigned_ip to address
+                pubkey: self.pubkey,
+                endpoint: self.endpoint,
+                allowed_ips: self.allowed_ips,
+                dns: self.dns,
+                route_all_traffic: false,
+                mfa_enabled: self.mfa_enabled,
+                keepalive_interval: self.keepalive_interval.into(),
+            }
+        }
+    }
 }
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));

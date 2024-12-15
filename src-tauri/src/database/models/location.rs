@@ -207,7 +207,7 @@ impl Location<NoId> {
     }
 }
 
-impl From<Location<Id>> for Location<NoId> {
+impl From<Location<Id>> for Location {
     fn from(location: Location<Id>) -> Self {
         Self {
             id: NoId,

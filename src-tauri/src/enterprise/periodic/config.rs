@@ -15,6 +15,7 @@ use crate::{
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
+const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
 /// Periodically retrieves and updates configuration for all [`Instance`]s.
@@ -119,7 +120,7 @@ pub async fn poll_instance(
     let response = Client::new()
         .post(url)
         .json(&request)
-        .timeout(Duration::from_secs(5))
+        .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await;
     let response = response.map_err(|err| {
