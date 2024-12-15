@@ -458,6 +458,7 @@ async fn main() {
                     perpetuum = false;
                 },
                 () = poll_config(&mut config), if config.token.is_some() => {
+                    trigger.notify_one();
                     eprintln!("Configuration has changed, re-configuring...");
                 },
                 Err(err) = task => {
