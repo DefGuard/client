@@ -14,7 +14,7 @@ jobs:
       - X64
     defaults:
       run:
-        working-directory: src-tauri/cli
+        working-directory: ./src-tauri/cli
     strategy:
       fail-fast: false
       matrix:
