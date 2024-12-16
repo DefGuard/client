@@ -1,8 +1,11 @@
 [package]
-name = "defguard-cli"
+name = "defguard-dg"
 version = "1.0.0"
-edition = "2021"
-rust-version = "1.80"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
 
 [build-dependencies]
 prost-build = "0.13"
@@ -19,7 +22,11 @@ serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 x25519-dalek = { version = "2", features = [
-    "getrandom",
-    "serde",
-    "static_secrets",
+  "getrandom",
+  "serde",
+  "static_secrets",
 ] }
+
+# Dummy feature to let tauri build the release.
+[features]
+custom-protocol = []

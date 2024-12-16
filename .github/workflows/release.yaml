@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - v*.*.*
+    branches:
+      - cli
 
 jobs:
   build-wireguard-go:
@@ -162,6 +164,25 @@ jobs:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
+
+      - name: Rename db binary
+        run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+      - name: Tar client binary
+        uses: a7ul/tar-action@v1.1.0
+        with:
+          command: c
+          files: |
+            dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+      - name: Upload client archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
   build-macos:
     needs:
