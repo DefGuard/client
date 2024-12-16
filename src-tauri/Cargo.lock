@@ -1292,7 +1292,7 @@ checksum = "7046468a81e6a002061c01e6a7c83139daf91b11c30e66795b13217c2d885c8b"
 
 [[package]]
 name = "defguard-client"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1340,7 +1340,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-dg"
-version = "1.0.0"
+version = "1.1.1"
 dependencies = [
  "clap",
  "common",

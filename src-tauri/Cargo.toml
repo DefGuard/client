@@ -11,10 +11,10 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.80"
+version = "1.1.1"
 
 [package]
 name = "defguard-client"
-version = "1.1.0"
 description = "Defguard desktop client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
@@ -23,6 +23,7 @@ edition.workspace = true
 homepage.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
+version.workspace = true
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }

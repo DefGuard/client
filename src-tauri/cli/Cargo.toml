@@ -1,11 +1,11 @@
 [package]
 name = "defguard-dg"
-version = "1.0.0"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
+version.workspace = true
 
 [build-dependencies]
 prost-build = "0.13"
