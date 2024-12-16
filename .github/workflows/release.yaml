@@ -132,7 +132,7 @@ jobs:
       - name: Rename client binary
         run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
       - name: Tar client binary
-        uses: a7ul/tar-action@v1.1.0
+        uses: a7ul/tar-action@v1.2.0
         with:
           command: c
           files: |
@@ -150,7 +150,7 @@ jobs:
       - name: Rename daemon binary
         run: mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
       - name: Tar daemon binary
-        uses: a7ul/tar-action@v1.1.0
+        uses: a7ul/tar-action@v1.2.0
         with:
           command: c
           files: |
@@ -166,16 +166,16 @@ jobs:
           asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
-      - name: Rename db binary
+      - name: Rename dg binary
         run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-      - name: Tar client binary
-        uses: a7ul/tar-action@v1.1.0
+      - name: Tar dg binary
+        uses: a7ul/tar-action@v1.2.0
         with:
           command: c
           files: |
             dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
           outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-      - name: Upload client archive
+      - name: Upload dg archive
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -184,6 +184,7 @@ jobs:
           asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
+
   build-macos:
     needs:
       - create-release
