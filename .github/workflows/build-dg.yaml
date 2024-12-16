@@ -1,0 +1,75 @@
+name: Build DG
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - cli
+
+jobs:
+  build-dg:
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [linux, linux-arm64, freebsd]
+        include:
+          - build: linux
+            arch: amd64
+            target: x86_64-unknown-linux-gnu
+          - build: linux-arm64
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+          - build: freebsd
+            arch: amd64
+            target: x86_64-unknown-freebsd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libprotobuf-dev libssl-dev protobuf-compiler rpm
+
+      - name: Install Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Change working directory
+        run: cd src-tauri/cli
+
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --locked --release --target ${{ matrix.target }}
+          use-cross: true
+
+      - name: Rename binary
+        run: mv ../target/${{ matrix.target }}/release/dg dg-${{ github.ref_name }}-${{ matrix.target }}
+
+      - name: Tar
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: |
+            dg-${{ github.ref_name }}-${{ matrix.target }}
+          outPath: dg-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+
+      - name: Upload release archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          asset_name: dg-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/octet-stream

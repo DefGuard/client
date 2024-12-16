@@ -46,7 +46,7 @@ jobs:
     steps:
       - name: Create GitHub release
         id: release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           generate_release_notes: true
@@ -110,7 +110,7 @@ jobs:
         run: |
           rpmbuild --build-in-place --define "_topdir $(pwd)" --define "version ${{ env.VERSION }}" -bb resources-linux/defguard-client.spec
       - name: Upload RPM
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -119,7 +119,7 @@ jobs:
           asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_content_type: application/octet-stream
       - name: Upload DEB
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -137,7 +137,7 @@ jobs:
             defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
           outPath: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
       - name: Upload client archive
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -155,7 +155,7 @@ jobs:
             defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
           outPath: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
       - name: Upload daemon archive
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -232,7 +232,7 @@ jobs:
           xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
           xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
       - name: Upload installation package
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -241,13 +241,13 @@ jobs:
           asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
 
-  # Building signed windows bundle involves a few steps as described here:
+  # Building signed Windows bundle involves a few steps as described here:
   # https://wixtoolset.org/docs/tools/signing/#signing-bundles-at-the-command-line
-  # 1. Build defguard & bundle the binaries (defguard & wireguard) using wix (windows)
-  # 2. Detach the burn engine from the bundle so that it can be signed (also windows)
-  # 3. Sign the burn engine (linux)
-  # 4. Reattach the burn engine back to the bundle (windows again)
-  # 5. Sign the whole bundle (linux)
+  # 1. Build Defguard and bundle the binaries (Defguard and WireGuard) using Wix (Windows)
+  # 2. Detach the burn engine from the bundle so that it can be signed (also Windows)
+  # 3. Sign the burn engine (Linux)
+  # 4. Reattach the burn engine back to the bundle (Windows again)
+  # 5. Sign the whole bundle (Linux)
   build-windows:
     needs:
       - create-release
@@ -294,12 +294,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bundle application
         run: |
-          # prepare wix extension
           dotnet tool install --global wix --version 4.0.5
           wix extension add WixToolset.Bal.wixext/4
-          # bundle defguard & wireguard binaries together
           wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\.wix\extensions\WixToolset.Bal.wixext\4\wixext4\WixToolset.Bal.wixext.dll
-          # detach burn engine from the bundle to be signed
           wix burn detach .\src-tauri\resources-windows\defguard-client.exe -engine .\src-tauri\resources-windows\burnengine.exe
       - name: Upload unsigned bundle and burn-engine
         uses: actions/upload-artifact@v4
@@ -345,10 +342,8 @@ jobs:
           name: unsigned-bundle-and-signed-burnengine
       - name: Reattach burn-engine
         run: |
-          # prepare wix extension
           dotnet tool install --global wix --version 4.0.5
           wix extension add WixToolset.Bal.wixext/4
-          # reattach burn engine to the bundle
           wix burn reattach defguard-client.exe -engine burnengine-signed.exe -o defguard-client-reattached.exe
       - name: Upload bundle with reattached burn-engine
         uses: actions/upload-artifact@v4
@@ -376,7 +371,7 @@ jobs:
       - name: Sign bundle
         run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client-reattached.exe -out defguard-client-signed.exe
       - name: Upload installer asset
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
