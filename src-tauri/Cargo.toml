@@ -1,5 +1,7 @@
 [workspace]
 members = ["cli", "common"]
+
+[target.'cfg(not(target_os = "windows"))'.workspace]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
