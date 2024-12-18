@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - v*.*.*
-    branches:
-      - cli
 
 jobs:
   build-wireguard-go:
@@ -76,8 +74,7 @@ jobs:
           submodules: 'recursive'
       - name: Write release version
         run: |
-          # VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          VERSION=1.1.1
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/setup-node@v3
