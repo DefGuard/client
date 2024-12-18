@@ -43,7 +43,6 @@ lazy_static! {
     static ref LOG_INCLUDES: Vec<String> = load_log_targets();
 }
 
-#[allow(clippy::single_match)]
 #[tokio::main]
 async fn main() {
     // add bundled `wireguard-go` binary to PATH
@@ -91,8 +90,8 @@ async fn main() {
             command_get_app_config,
             command_set_app_config
         ])
-        .on_window_event(|event| match event.event() {
-            WindowEvent::CloseRequested { api, .. } => {
+        .on_window_event(|event| {
+            if let WindowEvent::CloseRequested { api, .. } = event.event() {
                 #[cfg(not(target_os = "macos"))]
                 let _ = event.window().hide();
 
@@ -101,7 +100,6 @@ async fn main() {
 
                 api.prevent_close();
             }
-            _ => {}
         })
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });

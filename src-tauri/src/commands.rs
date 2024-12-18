@@ -32,7 +32,7 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::{DeviceConfig, DeviceConfigResponse},
+    proto::DeviceConfigResponse,
     service::proto::RemoveInterfaceRequest,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
@@ -185,24 +185,6 @@ pub struct Device {
     pub created_at: i64,
 }
 
-#[must_use]
-pub fn device_config_to_location(device_config: DeviceConfig, instance_id: Id) -> Location<NoId> {
-    Location {
-        id: NoId,
-        instance_id,
-        network_id: device_config.network_id,
-        name: device_config.network_name,
-        address: device_config.assigned_ip, // Transforming assigned_ip to address
-        pubkey: device_config.pubkey,
-        endpoint: device_config.endpoint,
-        allowed_ips: device_config.allowed_ips,
-        dns: device_config.dns,
-        route_all_traffic: false,
-        mfa_enabled: device_config.mfa_enabled,
-        keepalive_interval: device_config.keepalive_interval.into(),
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InstanceResponse {
     // uuid
@@ -258,8 +240,8 @@ pub async fn save_device_config(
         "Saved wireguard key {} for instance {}({})",
         keys.pubkey, instance.name, instance.id
     );
-    for location in response.configs {
-        let new_location = device_config_to_location(location, instance.id);
+    for dev_config in response.configs {
+        let new_location = dev_config.into_location(instance.id);
         debug!(
             "Saving location {} for instance {}({})",
             new_location.name, instance.name, instance.id
@@ -455,30 +437,22 @@ pub async fn locations_changed(
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
-    let db_locations: Vec<Location<NoId>> =
+    let db_locations: HashSet<Location<NoId>> =
         Location::find_by_instance_id(transaction.as_mut(), instance.id)
             .await?
             .into_iter()
-            .map(Location::<NoId>::from)
-            // ignore route_all_traffic flag as core does not have it
-            .map(|mut location| {
-                location.route_all_traffic = false;
-                location
+            .map(|location| {
+                let mut new_location = Location::<NoId>::from(location);
+                // Ignore `route_all_traffic` flag as Defguard core does not have it.
+                new_location.route_all_traffic = false;
+                new_location
             })
             .collect();
-    let db_locations: HashSet<Location<NoId>> = HashSet::from_iter(db_locations);
-    let core_locations: Vec<Location<NoId>> = device_config
+    let core_locations: HashSet<Location> = device_config
         .configs
         .iter()
-        .map(|config| device_config_to_location(config.clone(), instance.id))
-        .map(Location::<NoId>::from)
-        // just to make sure we are really on the same page
-        .map(|mut location| {
-            location.route_all_traffic = false;
-            location
-        })
+        .map(|config| config.clone().into_location(instance.id))
         .collect();
-    let core_locations: HashSet<Location<NoId>> = HashSet::from_iter(core_locations);
 
     Ok(db_locations != core_locations)
 }
@@ -534,9 +508,9 @@ pub async fn do_update_instance(
         // fetch existing locations for given instance
         let mut current_locations =
             Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
-        for location in response.configs {
+        for dev_config in response.configs {
             // parse device config
-            let new_location = device_config_to_location(location, instance.id);
+            let new_location = dev_config.into_location(instance.id);
 
             // check if location is already present in current locations
             if let Some(position) = current_locations

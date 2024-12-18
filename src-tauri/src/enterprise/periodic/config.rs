@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use reqwest::StatusCode;
+use reqwest::{Client, StatusCode};
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Manager, State, Url};
 use tokio::time::sleep;
@@ -15,6 +15,7 @@ use crate::{
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
+const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
 /// Periodically retrieves and updates configuration for all [`Instance`]s.
@@ -116,10 +117,10 @@ pub async fn poll_instance(
                 instance.proxy_url
             ))
         })?;
-    let response = reqwest::Client::new()
+    let response = Client::new()
         .post(url)
         .json(&request)
-        .timeout(Duration::from_secs(5))
+        .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await;
     let response = response.map_err(|err| {
@@ -237,9 +238,9 @@ async fn config_changed(
     Ok(locations_changed || info_changed)
 }
 
-/// Retrieves pubkey & token to build InstanceInfoRequest
+/// Retrieves token to build InstanceInfoRequest
 fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
-    let token = &instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
+    let token = instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
 
     Ok(InstanceInfoRequest {
         token: (*token).to_string(),

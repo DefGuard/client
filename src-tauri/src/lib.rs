@@ -1,6 +1,9 @@
+use std::{fmt, path::PathBuf};
+
 use chrono::NaiveDateTime;
 use database::models::NoId;
 use serde::{Deserialize, Serialize};
+
 pub mod app_config;
 pub mod appstate;
 pub mod commands;
@@ -14,13 +17,41 @@ pub mod service;
 pub mod tray;
 pub mod utils;
 pub mod wg_config;
-use std::fmt;
 
-mod proto {
+pub mod proto {
+    use crate::database::models::{location::Location, Id, NoId};
+
     tonic::include_proto!("defguard.proxy");
+
+    impl DeviceConfig {
+        #[must_use]
+        pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
+            Location {
+                id: NoId,
+                instance_id,
+                network_id: self.network_id,
+                name: self.network_name,
+                address: self.assigned_ip, // Transforming assigned_ip to address
+                pubkey: self.pubkey,
+                endpoint: self.endpoint,
+                allowed_ips: self.allowed_ips,
+                dns: self.dns,
+                route_all_traffic: false,
+                mfa_enabled: self.mfa_enabled,
+                keepalive_interval: self.keepalive_interval.into(),
+            }
+        }
+    }
 }
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
+// This must match tauri.bundle.identifier from tauri.conf.json.
+static BUNDLE_IDENTIFIER: &str = "net.defguard";
+// Returns the path to the user’s data directory.
+#[must_use]
+pub fn app_data_dir() -> Option<PathBuf> {
+    dirs_next::data_dir().map(|dir| dir.join(BUNDLE_IDENTIFIER))
+}
 
 /// Location type used in commands to check if we using tunnel or location
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
