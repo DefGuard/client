@@ -20,15 +20,9 @@ use defguard_wireguard_rs::{
 use reqwest::{Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::{
-    select,
-    signal::{
-        ctrl_c,
-        unix::{signal, SignalKind},
-    },
-    sync::Notify,
-    time::sleep,
-};
+#[cfg(unix)]
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::{select, signal::ctrl_c, sync::Notify, time::sleep};
 
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/defguard.proxy.rs"));
@@ -371,6 +365,19 @@ async fn poll_config(config: &mut CliConfig) {
     }
 }
 
+/// Wait for hangup (HUP) signal.
+#[cfg(unix)]
+async fn wait_for_hangup() {
+    if let Ok(mut hangup) = signal(SignalKind::hangup()) {
+        hangup.recv().await;
+    }
+}
+/// Dummy version of the above function for non-UNIX systems.
+#[cfg(not(unix))]
+async fn wait_for_hangup() {
+    sleep(Duration::new(u64::MAX, 0)).await;
+}
+
 #[tokio::main]
 async fn main() {
     // Define command line arguments.
@@ -440,14 +447,13 @@ async fn main() {
         config.save(&config_path);
     } else {
         let trigger = Arc::new(Notify::new());
-        let mut hangup = signal(SignalKind::hangup()).unwrap();
         let mut perpetuum = true;
         while perpetuum {
             // Must be spawned as a separate task, otherwise trigger won't reach it.
             let task = tokio::spawn(connect(config.clone(), trigger.clone()));
             select! {
                 biased;
-                _ = hangup.recv() => {
+                _ = wait_for_hangup() => {
                     trigger.notify_one();
                     eprintln!("Re-configuring...");
                     config = CliConfig::load(&config_path);

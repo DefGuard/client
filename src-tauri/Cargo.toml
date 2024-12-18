@@ -1,7 +1,5 @@
 [workspace]
 members = ["cli", "common"]
-
-[target.'cfg(not(target_os = "windows"))'.workspace]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
@@ -105,3 +103,9 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = true
