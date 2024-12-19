@@ -1,0 +1,7 @@
+[Desktop Entry]
+Categories=Utility;
+Exec=defguard-client
+Icon=defguard-client
+Name=defguard-client
+Terminal=false
+Type=Application
