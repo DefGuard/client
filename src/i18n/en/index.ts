@@ -150,11 +150,6 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 helper:
                   'If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.',
               },
-              connection_verification: {
-                title: 'Connect timeout',
-                helper:
-                  'If set time will pass and any handshake with the server was not made. The connection will be disconnected automatically.',
-              },
               tray: {
                 title: 'System tray',
                 label: 'Tray icon theme',

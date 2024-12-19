@@ -349,16 +349,6 @@ type RootTranslation = {
 								 */
 								helper: string
 							}
-							connection_verification: {
-								/**
-								 * C​o​n​n​e​c​t​ ​t​i​m​e​o​u​t
-								 */
-								title: string
-								/**
-								 * I​f​ ​s​e​t​ ​t​i​m​e​ ​w​i​l​l​ ​p​a​s​s​ ​a​n​d​ ​a​n​y​ ​h​a​n​d​s​h​a​k​e​ ​w​i​t​h​ ​t​h​e​ ​s​e​r​v​e​r​ ​w​a​s​ ​n​o​t​ ​m​a​d​e​.​ ​T​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​i​l​l​ ​b​e​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​.
-								 */
-								helper: string
-							}
 							tray: {
 								/**
 								 * S​y​s​t​e​m​ ​t​r​a​y
@@ -1954,16 +1944,6 @@ export type TranslationFunctions = {
 								title: () => LocalizedString
 								/**
 								 * If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.
-								 */
-								helper: () => LocalizedString
-							}
-							connection_verification: {
-								/**
-								 * Connect timeout
-								 */
-								title: () => LocalizedString
-								/**
-								 * If set time will pass and any handshake with the server was not made. The connection will be disconnected automatically.
 								 */
 								helper: () => LocalizedString
 							}

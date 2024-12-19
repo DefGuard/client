@@ -38,7 +38,7 @@ use crate::{
     utils::{
         disconnect_interface, execute_command, get_location_interface_details,
         get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
-        handle_connection_for_tunnel, verify_connection, ConnectionToVerify,
+        handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
@@ -68,12 +68,6 @@ pub async fn connect(
             handle_connection_for_location(&location, preshared_key, handle.clone()).await?;
             reload_tray_menu(&handle).await;
             info!("Connected to location {location}");
-            // verify if connection is alive
-            tauri::async_runtime::spawn(verify_connection(
-                handle.clone(),
-                ConnectionToVerify::Location(location),
-            ));
-            debug!("Connection verification task spawned.");
         } else {
             error!("Location with ID {location_id} not found in the database, aborting connection attempt");
             return Err(Error::NotFound);
@@ -85,12 +79,6 @@ pub async fn connect(
         );
         handle_connection_for_tunnel(&tunnel, handle.clone()).await?;
         info!("Successfully connected to tunnel {tunnel}");
-        // verify if connection is alive
-        tauri::async_runtime::spawn(verify_connection(
-            handle.clone(),
-            ConnectionToVerify::Tunnel(tunnel),
-        ));
-        debug!("Connection verification task spawned.");
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);

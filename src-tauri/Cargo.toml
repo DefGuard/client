@@ -2,7 +2,7 @@
 name = "defguard-client"
 version = "1.1.0"
 description = "Defguard desktop client"
-license = ""
+license-file = "../LICENSE.md"
 homepage = "https://github.com/DefGuard/client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
