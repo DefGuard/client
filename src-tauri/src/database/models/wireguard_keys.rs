@@ -1,7 +1,8 @@
-use sqlx::{query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use sqlx::{query_as, query_scalar, SqliteExecutor};
+use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::{Id, NoId};
-use crate::error::Error;
 
 // User key pair
 #[derive(Debug)]
@@ -16,7 +17,7 @@ impl WireguardKeys<Id> {
     pub async fn find_by_instance_id<'e, E>(
         executor: E,
         instance_id: Id,
-    ) -> Result<Option<Self>, SqlxError>
+    ) -> Result<Option<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -34,7 +35,7 @@ impl WireguardKeys<Id> {
 impl WireguardKeys<NoId> {
     #[must_use]
     pub fn new(instance_id: Id, pubkey: String, prvkey: String) -> Self {
-        WireguardKeys {
+        Self {
             id: NoId,
             instance_id,
             pubkey,
@@ -42,7 +43,20 @@ impl WireguardKeys<NoId> {
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<WireguardKeys<Id>, Error>
+    #[must_use]
+    pub fn generate(instance_id: Id) -> Self {
+        let secret = StaticSecret::random();
+        let public_key = PublicKey::from(&secret);
+
+        Self {
+            id: NoId,
+            instance_id,
+            pubkey: BASE64_STANDARD.encode(public_key),
+            prvkey: BASE64_STANDARD.encode(secret.as_bytes()),
+        }
+    }
+
+    pub async fn save<'e, E>(self, executor: E) -> Result<WireguardKeys<Id>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {

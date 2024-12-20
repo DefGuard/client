@@ -1,0 +1,10 @@
+[package]
+name = "common"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.80"
+
+[dependencies]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+nix = { version = "0.29", features = ["net"] }

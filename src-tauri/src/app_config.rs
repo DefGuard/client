@@ -6,7 +6,7 @@ use std::{
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
-use strum::{AsRefStr, Display, EnumString};
+use strum::{Display, EnumString};
 use tauri::AppHandle;
 
 static APP_CONFIG_FILE_NAME: &str = "config.json";
@@ -42,7 +42,7 @@ pub enum AppTheme {
     Dark,
 }
 
-#[derive(AsRefStr, Debug, Clone, Deserialize, Display, EnumString, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Display, EnumString, PartialEq, Serialize)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AppTrayTheme {
