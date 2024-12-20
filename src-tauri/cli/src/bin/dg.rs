@@ -412,7 +412,7 @@ async fn main() {
 
     let matches = command!()
         .arg(config_opt)
-        .arg_required_else_help(true)
+        .arg_required_else_help(false)
         .propagate_version(true)
         .subcommand_required(false)
         .subcommand(
@@ -429,13 +429,14 @@ async fn main() {
         Some(path) => path.clone(),
         None => {
             if let Some(mut path) = dirs_next::data_dir() {
-                path.push("net.defguard.cli/config.json");
+                path.push("net.defguard.cli");
                 if !path.exists() {
                     if let Err(err) = create_dir(&path) {
                         eprintln!("Failed to create default configuration path: {err}");
                         return;
                     }
                 }
+                path.push("config.json");
                 path
             } else {
                 eprintln!("Default configuration path is not available on this platform. Please, specify it explicitly.");
