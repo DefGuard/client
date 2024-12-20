@@ -354,13 +354,16 @@ async fn poll_config(config: &mut CliConfig) {
 
     loop {
         sleep(INTERVAL_SECONDS).await;
-        let Ok(device_config) = fetch_config(&client, url.clone(), token.clone()).await else {
-            eprintln!("Failed to fetch configuration from proxy");
-            continue;
-        };
-
-        if config.device_config != device_config {
-            break;
+        match fetch_config(&client, url.clone(), token.clone()).await {
+            Ok(device_config) => {
+                if config.device_config != device_config {
+                    eprintln!("Configuration has changed, re-configuring...");
+                    break;
+                }
+            }
+            Err(err) => {
+                eprintln!("Failed to fetch configuration from proxy: {err}");
+            }
         }
     }
 }
