@@ -1,5 +1,5 @@
 use std::{
-    fs::OpenOptions,
+    fs::{create_dir, OpenOptions},
     net::IpAddr,
     path::{Path, PathBuf},
     str::FromStr,
@@ -421,14 +421,25 @@ async fn main() {
         )
         .get_matches();
 
-    let config_path = matches
-        .get_one::<PathBuf>("config")
-        .cloned()
-        .unwrap_or_else(|| {
-            let mut path = dirs_next::data_dir().unwrap_or_default();
-            path.push("net.defguard.cli/config.json");
-            path
-        });
+    // Obtain configuration file path.
+    let config_path = match matches.get_one::<PathBuf>("config") {
+        Some(path) => path.clone(),
+        None => {
+            if let Some(mut path) = dirs_next::data_dir() {
+                path.push("net.defguard.cli/config.json");
+                if !path.exists() {
+                    if let Err(err) = create_dir(&path) {
+                        eprintln!("Failed to create default configuration path: {err}");
+                        return;
+                    }
+                }
+                path
+            } else {
+                eprintln!("Default configuration path is not available on this platform. Please, specify it explicitly.");
+                return;
+            }
+        }
+    };
     let mut config = CliConfig::load(&config_path);
 
     if let Some(("enroll", submatches)) = matches.subcommand() {
@@ -453,7 +464,7 @@ async fn main() {
             let task = tokio::spawn(connect(config.clone(), trigger.clone()));
             select! {
                 biased;
-                _ = wait_for_hangup() => {
+                () = wait_for_hangup() => {
                     trigger.notify_one();
                     eprintln!("Re-configuring...");
                     config = CliConfig::load(&config_path);
