@@ -80,7 +80,7 @@ export const GlobalSettingsTab = () => {
             invalid_type_error: LL.form.errors.required(),
             required_error: LL.form.errors.required(),
           })
-          .gte(120, LL.form.errors.minValue({ min: 120 })),
+          .gte(4, LL.form.errors.minValue({ min: 4 })),
       }),
     [LL.form.errors],
   );

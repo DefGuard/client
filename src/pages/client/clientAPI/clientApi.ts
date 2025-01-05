@@ -42,7 +42,9 @@ async function invokeWrapper<T>(
     return res;
     // TODO: handle more error types ?
   } catch (e) {
-    let message: string = `Invoking command ${command} failed due to unknown error: ${JSON.stringify(e)}`;
+    let message: string = `Invoking command ${command} failed due to unknown error: ${JSON.stringify(
+      e,
+    )}`;
     trace(message);
     if (e instanceof TimeoutError) {
       message = `Invoking command ${command} timeout out after ${timeout / 1000} seconds`;

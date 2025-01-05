@@ -160,11 +160,12 @@ type RootTranslation = {
 			 */
 			configChanged: RequiredParams<'instance'>
 			/**
-			 * {​c​o​n​_​t​y​p​e​}​ ​{​i​n​t​e​r​f​a​c​e​_​n​a​m​e​}​ ​d​i​s​c​o​n​n​e​c​t​e​d​.
+			 * D​e​t​e​c​t​e​d​ ​n​o​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​{​c​o​n​_​t​y​p​e​}​ ​{​i​n​t​e​r​f​a​c​e​_​n​a​m​e​}​ ​f​o​r​ ​{​t​i​m​e​}​s​.​ ​P​e​r​f​o​r​m​e​d​ ​a​n​ ​a​u​t​o​m​a​t​i​c​ ​r​e​c​o​n​n​e​c​t​ ​t​o​ ​t​r​y​ ​t​o​ ​p​r​e​s​e​r​v​e​ ​c​o​n​n​e​c​t​i​o​n​.
 			 * @param {string} con_type
 			 * @param {string} interface_name
+			 * @param {number} time
 			 */
-			deadConDropped: RequiredParams<'con_type' | 'interface_name'>
+			deadConDropped: RequiredParams<'con_type' | 'interface_name' | 'time'>
 		}
 	}
 	components: {
@@ -180,10 +181,11 @@ type RootTranslation = {
 			modals: {
 				deadConDropped: {
 					/**
-					 * {​c​o​n​T​y​p​e​}​ ​d​i​s​c​o​n​n​e​c​t​e​d
+					 * {​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​d​i​s​c​o​n​n​e​c​t​e​d
 					 * @param {string} conType
+					 * @param {string} name
 					 */
-					title: RequiredParams<'conType'>
+					title: RequiredParams<'conType' | 'name'>
 					/**
 					 * T​u​n​n​e​l
 					 */
@@ -192,20 +194,13 @@ type RootTranslation = {
 					 * L​o​c​a​t​i​o​n
 					 */
 					location: string
-					body: {
-						/**
-						 * {​c​o​n​T​y​p​e​}​ ​{​i​n​s​t​a​n​c​e​N​a​m​e​}​ ​w​a​s​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​b​e​c​a​u​s​e​ ​i​t​ ​e​x​c​e​e​d​e​d​ ​t​h​e​ ​e​x​p​e​c​t​e​d​ ​t​i​m​e​ ​f​o​r​ ​s​t​a​y​i​n​g​ ​a​c​t​i​v​e​ ​w​i​t​h​o​u​t​ ​r​e​c​e​i​v​i​n​g​ ​c​o​n​f​i​r​m​a​t​i​o​n​ ​f​r​o​m​ ​t​h​e​ ​s​e​r​v​e​r​.
-						 * @param {string} conType
-						 * @param {string} instanceName
-						 */
-						periodic: RequiredParams<'conType' | 'instanceName'>
-						/**
-						 * {​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​c​o​n​n​e​c​t​i​o​n​ ​w​a​s​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​d​i​s​c​o​n​n​e​c​t​e​d​ ​b​e​c​a​u​s​e​ ​i​t​ ​d​i​d​n​'​t​ ​c​o​m​p​l​e​t​e​ ​t​h​e​ ​n​e​c​e​s​s​a​r​y​ ​s​e​t​u​p​ ​i​n​ ​t​i​m​e​.​ ​T​h​i​s​ ​c​a​n​ ​h​a​p​p​e​n​ ​i​f​ ​t​h​e​ ​c​o​n​n​e​c​t​i​o​n​ ​w​a​s​n​'​t​ ​f​u​l​l​y​ ​e​s​t​a​b​l​i​s​h​e​d
-						 * @param {string} conType
-						 * @param {string} name
-						 */
-						connection: RequiredParams<'conType' | 'name'>
-					}
+					/**
+					 * T​h​e​ ​{​c​o​n​T​y​p​e​}​ ​{​n​a​m​e​}​ ​h​a​s​ ​b​e​e​n​ ​d​i​s​c​o​n​n​e​c​t​e​d​,​ ​s​i​n​c​e​ ​w​e​ ​h​a​v​e​ ​d​e​t​e​c​t​e​d​ ​t​h​a​t​ ​t​h​e​ ​s​e​r​v​e​r​ ​i​s​ ​n​o​t​ ​r​e​s​p​o​n​d​i​n​g​ ​w​i​t​h​ ​a​n​y​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​{​t​i​m​e​}​s​.​ ​I​f​ ​t​h​i​s​ ​m​e​s​s​a​g​e​ ​k​e​e​p​s​ ​o​c​c​u​r​r​i​n​g​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​a​n​d​ ​i​n​f​o​r​m​ ​t​h​e​m​ ​a​b​o​u​t​ ​t​h​i​s​ ​f​a​c​t​.
+					 * @param {string} conType
+					 * @param {string} name
+					 * @param {number} time
+					 */
+					message: RequiredParams<'conType' | 'name' | 'time'>
 					controls: {
 						/**
 						 * C​l​o​s​e
@@ -1765,9 +1760,9 @@ export type TranslationFunctions = {
 			 */
 			configChanged: (arg: { instance: string }) => LocalizedString
 			/**
-			 * {con_type} {interface_name} disconnected.
+			 * Detected no traffic for {con_type} {interface_name} for {time}s. Performed an automatic reconnect to try to preserve connection.
 			 */
-			deadConDropped: (arg: { con_type: string, interface_name: string }) => LocalizedString
+			deadConDropped: (arg: { con_type: string, interface_name: string, time: number }) => LocalizedString
 		}
 	}
 	components: {
@@ -1783,9 +1778,9 @@ export type TranslationFunctions = {
 			modals: {
 				deadConDropped: {
 					/**
-					 * {conType} disconnected
+					 * {conType} {name} disconnected
 					 */
-					title: (arg: { conType: string }) => LocalizedString
+					title: (arg: { conType: string, name: string }) => LocalizedString
 					/**
 					 * Tunnel
 					 */
@@ -1794,16 +1789,10 @@ export type TranslationFunctions = {
 					 * Location
 					 */
 					location: () => LocalizedString
-					body: {
-						/**
-						 * {conType} {instanceName} was automatically disconnected because it exceeded the expected time for staying active without receiving confirmation from the server.
-						 */
-						periodic: (arg: { conType: string, instanceName: string }) => LocalizedString
-						/**
-						 * {conType} {name} connection was automatically disconnected because it didn't complete the necessary setup in time. This can happen if the connection wasn't fully established
-						 */
-						connection: (arg: { conType: string, name: string }) => LocalizedString
-					}
+					/**
+					 * The {conType} {name} has been disconnected, since we have detected that the server is not responding with any traffic for {time}s. If this message keeps occurring, please contact your administrator and inform them about this fact.
+					 */
+					message: (arg: { conType: string, name: string, time: number }) => LocalizedString
 					controls: {
 						/**
 						 * Close
