@@ -139,10 +139,15 @@ pub async fn setup_interface(
     };
     debug!("Found free port: {port} for interface {interface_name}.");
 
+    let Ok(address) = location.address.parse() else {
+        let msg = format!("Failed to parse IP address '{}'", location.address);
+        error!("{msg}");
+        return Err(Error::InternalError(msg));
+    };
     let interface_config = InterfaceConfiguration {
         name: interface_name,
         prvkey: keys.prvkey,
-        address: location.address.clone(),
+        addresses: vec![address],
         port: port.into(),
         peers: vec![peer.clone()],
         mtu: None,
@@ -354,10 +359,15 @@ pub async fn setup_interface_tunnel(
     };
     debug!("Found free port: {port} for interface {interface_name}.");
 
+    let Ok(address) = tunnel.address.parse() else {
+        let msg = format!("Failed to parse IP address '{}'", tunnel.address);
+        error!("{msg}");
+        return Err(Error::InternalError(msg));
+    };
     let interface_config = InterfaceConfiguration {
         name: interface_name,
         prvkey: tunnel.prvkey.clone(),
-        address: tunnel.address.clone(),
+        addresses: vec![address],
         port: port.into(),
         peers: vec![peer.clone()],
         mtu: None,

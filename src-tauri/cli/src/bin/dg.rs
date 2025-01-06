@@ -86,6 +86,8 @@ enum CliError {
     TooManyDevices,
     #[error(transparent)]
     WireGuard(#[from] WireguardInterfaceError),
+    #[error("Invalid address")]
+    InvalidAddress,
 }
 
 async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError> {
@@ -159,11 +161,15 @@ async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError
         }
     }
     eprintln!("Parsed allowed IPs: {:?}", peer.allowed_ips);
+    let Ok(address) = config.device_config.assigned_ip.parse() else {
+        eprintln!("Invalid assigned IP address in device configuration");
+        return Err(CliError::InvalidAddress);
+    };
 
     let config = InterfaceConfiguration {
         name: config.instance_info.name.clone(),
         prvkey: config.private_key.to_string(),
-        address: config.device_config.assigned_ip.clone(),
+        addresses: vec![address],
         port: u32::from(find_free_tcp_port().unwrap()),
         peers: vec![peer.clone()],
         mtu: None,

@@ -319,7 +319,11 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
         Self {
             name: config.name,
             prvkey: config.prvkey,
-            address: config.address,
+            address: config
+                .addresses
+                .first()
+                .map(|addr| addr.to_string())
+                .unwrap_or_default(),
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
         }
@@ -328,10 +332,14 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
 
 impl From<proto::InterfaceConfig> for InterfaceConfiguration {
     fn from(config: proto::InterfaceConfig) -> Self {
+        let mut addresses = Vec::new();
+        if let Ok(address) = config.address.parse() {
+            addresses.push(address);
+        }
         Self {
             name: config.name,
             prvkey: config.prvkey,
-            address: config.address,
+            addresses,
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
             mtu: None,
