@@ -125,7 +125,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                             ) {
                                 // Check if there was any traffic since the connection was established.
                                 // If not, consider the location dead and disconnect it later without reconnecting.
-                                if latest_stat.collected_at - con.start < TimeDelta::zero() {
+                                if latest_stat.collected_at < con.start {
                                     debug!("There wasn't any activity for Location {} since its connection at {}; considering it being dead and possibly broken. \
                                     It will be disconnected without a further automatic reconnect.", con.location_id, con.start);
                                     locations_to_disconnect.push((con.location_id, false));
