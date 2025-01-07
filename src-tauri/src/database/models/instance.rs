@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, SqliteExecutor};
 
 use super::{Id, NoId};
-use crate::{error::Error, proto};
+use crate::proto;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Instance<I = NoId> {
@@ -42,19 +42,16 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
 }
 
 impl Instance<Id> {
-    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), Error>
+    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
-        let url = self.url.to_string();
-        let proxy_url = self.proxy_url.to_string();
-        // Update the existing record when there is an ID
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6, enterprise_enabled = $7, token = $8 WHERE id = $9;",
             self.name,
             self.uuid,
-            url,
-            proxy_url,
+            self.url,
+            self.proxy_url,
             self.username,
             self.disable_all_traffic,
             self.enterprise_enabled,
@@ -66,7 +63,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -79,7 +76,7 @@ impl Instance<Id> {
         Ok(instances)
     }
 
-    pub async fn find_by_id<'e, E>(executor: E, id: Id) -> Result<Option<Self>, Error>
+    pub(crate) async fn find_by_id<'e, E>(executor: E, id: Id) -> Result<Option<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -93,21 +90,7 @@ impl Instance<Id> {
         Ok(instance)
     }
 
-    pub async fn find_by_uuid<'e, E>(executor: E, uuid: &str) -> Result<Option<Self>, Error>
-    where
-        E: SqliteExecutor<'e>,
-    {
-        let instance = query_as!(
-            Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE uuid = $1;",
-            uuid
-        )
-        .fetch_optional(executor)
-        .await?;
-        Ok(instance)
-    }
-
-    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
+    pub(crate) async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -118,7 +101,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    pub(crate) async fn delete<'e, E>(&self, executor: E) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -126,7 +109,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub async fn all_with_token<'e, E>(executor: E) -> Result<Vec<Self>, Error>
+    pub(crate) async fn all_with_token<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -154,28 +137,7 @@ impl PartialEq<proto::InstanceInfo> for Instance<Id> {
 }
 
 impl Instance<NoId> {
-    #[must_use]
-    pub fn new(
-        name: String,
-        uuid: String,
-        url: String,
-        proxy_url: String,
-        username: String,
-    ) -> Instance<NoId> {
-        Instance {
-            id: NoId,
-            name,
-            uuid,
-            url,
-            proxy_url,
-            username,
-            token: None,
-            disable_all_traffic: false,
-            enterprise_enabled: false,
-        }
-    }
-
-    pub async fn save<'e, E>(self, executor: E) -> Result<Instance<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> Result<Instance<Id>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {

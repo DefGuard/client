@@ -69,7 +69,7 @@ impl DaemonService {
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
 #[cfg(not(target_os = "macos"))]
-fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
+pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
     let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
@@ -80,7 +80,7 @@ fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
 }
 
 #[cfg(target_os = "macos")]
-fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
+pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
     let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
@@ -319,7 +319,11 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
         Self {
             name: config.name,
             prvkey: config.prvkey,
-            address: config.address,
+            address: config
+                .addresses
+                .first()
+                .map(|addr| addr.to_string())
+                .unwrap_or_default(),
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
         }
@@ -328,10 +332,14 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
 
 impl From<proto::InterfaceConfig> for InterfaceConfiguration {
     fn from(config: proto::InterfaceConfig) -> Self {
+        let mut addresses = Vec::new();
+        if let Ok(address) = config.address.parse() {
+            addresses.push(address);
+        }
         Self {
             name: config.name,
             prvkey: config.prvkey,
-            address: config.address,
+            addresses,
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
             mtu: None,
