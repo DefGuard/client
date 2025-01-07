@@ -62,7 +62,7 @@ const ModalContent = () => {
         time: payload.peer_alive_period,
       });
     }
-  }, [payload?.name, localLL.message, typeString]);
+  }, [localLL, payload, typeString]);
 
   if (!payload) return null;
   return (
