@@ -53,7 +53,7 @@ const en = {
       configChanged:
         'Configuration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
       deadConDropped:
-        'Detected no traffic for {con_type: string} {interface_name: string} for {time: number}s. Performed an automatic reconnect to try to preserve connection.',
+        'Detected that the {con_type: string} {interface_name: string} has disconnected, trying to reconnect...',
     },
   },
   components: {

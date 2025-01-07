@@ -160,12 +160,11 @@ type RootTranslation = {
 			 */
 			configChanged: RequiredParams<'instance'>
 			/**
-			 * D​e​t​e​c​t​e​d​ ​n​o​ ​t​r​a​f​f​i​c​ ​f​o​r​ ​{​c​o​n​_​t​y​p​e​}​ ​{​i​n​t​e​r​f​a​c​e​_​n​a​m​e​}​ ​f​o​r​ ​{​t​i​m​e​}​s​.​ ​P​e​r​f​o​r​m​e​d​ ​a​n​ ​a​u​t​o​m​a​t​i​c​ ​r​e​c​o​n​n​e​c​t​ ​t​o​ ​t​r​y​ ​t​o​ ​p​r​e​s​e​r​v​e​ ​c​o​n​n​e​c​t​i​o​n​.
+			 * D​e​t​e​c​t​e​d​ ​t​h​a​t​ ​t​h​e​ ​{​c​o​n​_​t​y​p​e​}​ ​{​i​n​t​e​r​f​a​c​e​_​n​a​m​e​}​ ​h​a​s​ ​d​i​s​c​o​n​n​e​c​t​e​d​,​ ​t​r​y​i​n​g​ ​t​o​ ​r​e​c​o​n​n​e​c​t​.​.​.
 			 * @param {string} con_type
 			 * @param {string} interface_name
-			 * @param {number} time
 			 */
-			deadConDropped: RequiredParams<'con_type' | 'interface_name' | 'time'>
+			deadConDropped: RequiredParams<'con_type' | 'interface_name'>
 		}
 	}
 	components: {
@@ -1760,9 +1759,9 @@ export type TranslationFunctions = {
 			 */
 			configChanged: (arg: { instance: string }) => LocalizedString
 			/**
-			 * Detected no traffic for {con_type} {interface_name} for {time}s. Performed an automatic reconnect to try to preserve connection.
+			 * Detected that the {con_type} {interface_name} has disconnected, trying to reconnect...
 			 */
-			deadConDropped: (arg: { con_type: string, interface_name: string, time: number }) => LocalizedString
+			deadConDropped: (arg: { con_type: string, interface_name: string }) => LocalizedString
 		}
 	}
 	components: {

@@ -40,18 +40,18 @@ async fn reconnect(
     match disconnect(con_id, con_type, app_handle.clone()).await {
         Ok(()) => {
             debug!("Connection for {con_type} {con_interface_name}({con_id}) disconnected successfully in path of reconnection.");
+            let payload = DeadConnReconnected {
+                name: con_interface_name.to_string(),
+                con_type,
+                peer_alive_period: peer_alive_period.num_seconds(),
+            };
+            payload.emit(app_handle);
             match connect(con_id, con_type, None, app_handle.clone()).await {
                 Ok(()) => {
                     info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.",);
                 }
                 Err(err) => {
                     error!("Reconnect attempt failed, disconnect succeeded but connect failed. Error: {err}");
-                    let payload = DeadConnReconnected {
-                        name: con_interface_name.to_string(),
-                        con_type,
-                        peer_alive_period: peer_alive_period.num_seconds(),
-                    };
-                    payload.emit(app_handle);
                 }
             }
         }
