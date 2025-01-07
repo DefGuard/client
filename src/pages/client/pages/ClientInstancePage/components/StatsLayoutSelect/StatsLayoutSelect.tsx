@@ -35,7 +35,7 @@ export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
   );
 
   const renderSelected: SelectProps<ClientView>['renderSelected'] = useCallback(
-    (value): SelectSelectedValue => {
+    (value: ClientView): SelectSelectedValue => {
       const selected = options.find((o) => o.value === value);
       if (selected) {
         return {
