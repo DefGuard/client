@@ -122,7 +122,6 @@ export const ClientPage = () => {
           LL.common.messages.deadConDropped({
             interface_name: data.payload.name,
             con_type: data.payload.con_type,
-            time: data.payload.peer_alive_period,
           }),
           {
             lifetime: -1,
