@@ -107,6 +107,8 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
         let connection_count = connections.len();
         if connection_count == 0 {
             debug!("Connections verification skipped, no active connections found, task will wait for next {CHECK_INTERVAL:?}");
+        } else {
+            debug!("Verifying state of {connection_count} active connections. Inactive connections will be disconnected and reconnected if possible.");
         }
         let peer_alive_period = TimeDelta::seconds(i64::from(
             app_state.app_config.lock().unwrap().peer_alive_period,
@@ -130,7 +132,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                     It will be disconnected without a further automatic reconnect.", con.location_id, con.start);
                                     locations_to_disconnect.push((con.location_id, false));
                                 } else {
-                                    debug!("There wasn't any activity for Location {}; considering it being dead.", con.location_id);
+                                    debug!("There wasn't any activity for Location {} for the last {}s; considering it being dead.", con.location_id, peer_alive_period.num_seconds());
                                     locations_to_disconnect.push((con.location_id, true));
                                 }
                             }
@@ -165,7 +167,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                     It will be disconnected without a further automatic reconnect.", con.location_id, con.start);
                                     tunnels_to_disconnect.push((con.location_id, false));
                                 } else {
-                                    debug!("There wasn't any activity for Tunnel {}; considering it being dead.", con.location_id);
+                                    debug!("There wasn't any activity for Tunnel {} for the last {}s; considering it being dead.", con.location_id, peer_alive_period.num_seconds());
                                     tunnels_to_disconnect.push((con.location_id, true));
                                 }
                             }
@@ -263,7 +265,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         )
                         .await;
                     } else {
-                        warn!("Automatic reconnect for location {}({}) is not possible due to lack of activity. Interface will be disconnected.", tunnel.name, tunnel.id);
+                        debug!("Automatic reconnect for location {}({}) is not possible due to lack of activity since the connection start. Interface will be disconnected.", tunnel.name, tunnel.id);
                         disconnect_dead_connection(
                             tunnel_id,
                             "DEAD TUNNEL",
