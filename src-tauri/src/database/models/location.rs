@@ -36,6 +36,21 @@ impl fmt::Display for Location<NoId> {
 }
 
 impl Location<Id> {
+    #[cfg(windows)]
+    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        query_as!(
+          Self,
+          "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
+          route_all_traffic, mfa_enabled, keepalive_interval \
+          FROM location;"
+      )
+        .fetch_all(executor)
+        .await
+    }
+
     pub(crate) async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
     where
         E: SqliteExecutor<'e>,

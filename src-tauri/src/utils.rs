@@ -996,7 +996,9 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
             continue;
         }
 
-        appstate.add_connection(location.id, &interface_name, ConnectionType::Location);
+        appstate
+            .add_connection(location.id, &interface_name, ConnectionType::Location)
+            .await;
 
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
@@ -1084,7 +1086,9 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
             continue;
         }
 
-        appstate.add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel);
+        appstate
+            .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
+            .await;
 
         debug!("Sending event informing the frontend that a new connection has been created.");
         app_handle.emit_all(
