@@ -54,14 +54,14 @@ pub enum DaemonError {
 
 #[derive(Debug, Default)]
 pub struct DaemonService {
-    stats_period: u64,
+    stats_period: Duration,
 }
 
 impl DaemonService {
     #[must_use]
     pub fn new(config: &Config) -> Self {
         Self {
-            stats_period: config.stats_period,
+            stats_period: Duration::from_secs(config.stats_period),
         }
     }
 }
@@ -192,16 +192,14 @@ impl DesktopDaemonService for DaemonService {
         #[cfg(not(windows))]
         {
             debug!("Cleaning up interface {ifname} routing");
-            wgapi
-                .remove_endpoint_routing(&request.endpoint)
-                .map_err(|err| {
-                    let msg = format!(
-                        "Failed to remove routing for endpoint {}: {err}",
-                        request.endpoint
-                    );
-                    error!("{msg}");
-                    Status::new(Code::Internal, msg)
-                })?;
+            // Ignore error as this should not be considered fatal,
+            // e.g. endpoint might fail to resolve DNS name.
+            if let Err(err) = wgapi.remove_endpoint_routing(&request.endpoint) {
+                error!(
+                    "Failed to remove routing for endpoint {}: {err}",
+                    request.endpoint
+                );
+            }
         }
 
         wgapi.remove_interface().map_err(|err| {
@@ -229,7 +227,7 @@ impl DesktopDaemonService for DaemonService {
 
         // Setup WireGuard API.
         let wgapi = setup_wgapi(&ifname)?;
-        let mut interval = interval(Duration::from_secs(self.stats_period));
+        let mut interval = interval(self.stats_period);
         let (tx, rx) = mpsc::channel(64);
 
         span.in_scope(|| {
@@ -283,7 +281,10 @@ impl DesktopDaemonService for DaemonService {
                 }
                 debug!("Network activity statistics for interface {ifname} sent to the client");
             }
-            debug!("The client has disconnected from the network usage statistics data stream for interface {ifname}, stopping the statistics data collection task.");
+            debug!(
+                "The client has disconnected from the network usage statistics data stream \
+                for interface {ifname}, stopping the statistics data collection task."
+            );
         }.instrument(span));
 
         let output_stream = ReceiverStream::new(rx);
@@ -426,7 +427,8 @@ mod tests {
         let mut base_peer = Peer::new(peer_key);
         let addr = IpAddrMask::from_str("10.20.30.2/32").unwrap();
         base_peer.allowed_ips.push(addr);
-        base_peer.last_handshake = Some(SystemTime::UNIX_EPOCH); // workaround since ns are lost in conversion
+        // Workaround since nanoseconds are lost in conversion.
+        base_peer.last_handshake = Some(SystemTime::UNIX_EPOCH);
         base_peer.protocol_version = Some(3);
         base_peer.endpoint = Some("127.0.0.1:8080".parse().unwrap());
         base_peer.tx_bytes = 100;

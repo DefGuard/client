@@ -59,7 +59,8 @@ impl Tunnel<Id> {
         query!(
             "UPDATE tunnel SET name = $1, pubkey = $2, prvkey = $3, address = $4, \
             server_pubkey = $5, preshared_key = $6, allowed_ips = $7, endpoint = $8, dns = $9, \
-            persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, pre_down = $14, post_down = $15 \
+            persistent_keep_alive = $10, route_all_traffic = $11, pre_up = $12, post_up = $13, \
+            pre_down = $14, post_down = $15 \
             WHERE id = $16;",
             self.name,
             self.pubkey,
@@ -101,8 +102,9 @@ impl Tunnel<Id> {
     {
         query_as!(
             Self,
-            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
-            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, \
+            allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, \
+            post_up, pre_down, post_down FROM tunnel WHERE id = $1;",
             tunnel_id
         )
         .fetch_optional(executor)
@@ -115,8 +117,10 @@ impl Tunnel<Id> {
     {
         let tunnels = query_as!(
             Self,
-            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, \
-            persistent_keep_alive, route_all_traffic, pre_up, post_up, pre_down, post_down FROM tunnel;"
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, \
+            allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, \
+            post_up, pre_down, post_down \
+            FROM tunnel;"
         )
         .fetch_all(executor)
         .await?;
@@ -131,9 +135,10 @@ impl Tunnel<Id> {
         E: SqliteExecutor<'e>,
     {
         query_as!(
-           Self,
-            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, allowed_ips, endpoint, dns, persistent_keep_alive, \
-            route_all_traffic, pre_up, post_up, pre_down, post_down \
+            Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, \
+            allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, \
+            post_up, pre_down, post_down \
             FROM tunnel WHERE server_pubkey = $1;",
             pubkey
         )
@@ -508,27 +513,24 @@ impl TunnelConnectionInfo {
     where
         E: SqliteExecutor<'e>,
     {
-        // Because we store interface information for given timestamp select last upload and download
-        // before connection ended
+        // Because we store interface information for given timestamp,
+        // select last upload and download before connection ended.
         // FIXME: Optimize query
         let connections = query_as!(
             TunnelConnectionInfo,
-            "SELECT c.id, c.tunnel_id, \
-            c.start \"start!\", c.end \"end!\", \
+            "SELECT c.id, c.tunnel_id, c.start, c.end, \
             COALESCE((\
                 SELECT ls.upload \
                 FROM tunnel_stats ls \
                 WHERE ls.tunnel_id = c.tunnel_id \
-                AND ls.collected_at >= c.start \
-                AND ls.collected_at <= c.end \
+                AND ls.collected_at BETWEEN c.start AND c.end \
                 ORDER BY ls.collected_at DESC LIMIT 1 \
             ), 0) \"upload: _\", \
             COALESCE((\
                 SELECT ls.download \
                 FROM tunnel_stats ls \
                 WHERE ls.tunnel_id = c.tunnel_id \
-                AND ls.collected_at >= c.start \
-                AND ls.collected_at <= c.end \
+                AND ls.collected_at BETWEEN c.start AND c.end \
                 ORDER BY ls.collected_at DESC LIMIT 1 \
             ), 0) \"download: _\" \
             FROM tunnel_connection c WHERE tunnel_id = $1 \
