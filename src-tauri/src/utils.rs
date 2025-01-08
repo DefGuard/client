@@ -1,10 +1,6 @@
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
-    path::Path,
-    process::Command,
-    str::FromStr,
-};
+use std::{env, path::Path, process::Command, str::FromStr};
 
+use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
 use tauri::{AppHandle, Manager};
@@ -51,8 +47,8 @@ use winapi::{
 };
 
 pub const IS_MACOS: bool = cfg!(target_os = "macos");
-static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
-static DEFAULT_ROUTE_IPV6: &str = "::/0";
+pub static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
+pub static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface
 pub async fn setup_interface(
@@ -134,101 +130,49 @@ pub async fn setup_interface(
 
     // request interface configuration
     debug!("Looking for a free port for interface {interface_name}...");
-    if let Some(port) = find_random_free_port() {
-        debug!("Found free port: {port} for interface {interface_name}.");
-        let interface_config = InterfaceConfiguration {
-            name: interface_name,
-            prvkey: keys.prvkey,
-            address: location.address.clone(),
-            port: port.into(),
-            peers: vec![peer.clone()],
-            mtu: None,
-        };
-        debug!(
-            "Creating interface for location {location} with configuration {interface_config:?}"
-        );
-        let request = CreateInterfaceRequest {
-            config: Some(interface_config.clone().into()),
-            allowed_ips,
-            dns: location.dns.clone(),
-        };
-        if let Err(error) = client.create_interface(request).await {
-            if error.code() == Code::Unavailable {
-                error!("Failed to set up connection for location {location}; background service is unavailable. Make sure the service is running. Error: {error}, Interface configuration: {interface_config:?}");
-                Err(Error::InternalError(
-                    "Background service is unavailable. Make sure the service is running.".into(),
-                ))
-            } else {
-                error!("Failed to send a request to the background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error: {error}");
-                Err(Error::InternalError(
-                        format!("Failed to send a request to the background service to create an interface for location {location}. Error: {error}. Check logs for details.")
-                    ))
-            }
-        } else {
-            info!("The interface for location {location} has been created successfully, interface name: {}.", interface_config.name);
-            Ok(())
-        }
-    } else {
+    let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port during interface {interface_name} setup for location {location}"
         );
         error!("{msg}");
-        Err(Error::InternalError(msg))
-    }
-}
+        return Err(Error::InternalError(msg));
+    };
+    debug!("Found free port: {port} for interface {interface_name}.");
 
-fn find_random_free_port() -> Option<u16> {
-    const MAX_PORT: u16 = 65535;
-    const MIN_PORT: u16 = 6000;
-
-    // Create a TcpListener to check for port availability
-    for _ in 0..=(MAX_PORT - MIN_PORT) {
-        let port = rand::random::<u16>() % (MAX_PORT - MIN_PORT) + MIN_PORT;
-        if is_port_free(port) {
-            return Some(port);
+    let Ok(address) = location.address.parse() else {
+        let msg = format!("Failed to parse IP address '{}'", location.address);
+        error!("{msg}");
+        return Err(Error::InternalError(msg));
+    };
+    let interface_config = InterfaceConfiguration {
+        name: interface_name,
+        prvkey: keys.prvkey,
+        addresses: vec![address],
+        port: port.into(),
+        peers: vec![peer.clone()],
+        mtu: None,
+    };
+    debug!("Creating interface for location {location} with configuration {interface_config:?}");
+    let request = CreateInterfaceRequest {
+        config: Some(interface_config.clone().into()),
+        allowed_ips,
+        dns: location.dns.clone(),
+    };
+    if let Err(error) = client.create_interface(request).await {
+        if error.code() == Code::Unavailable {
+            error!("Failed to set up connection for location {location}; background service is unavailable. Make sure the service is running. Error: {error}, Interface configuration: {interface_config:?}");
+            Err(Error::InternalError(
+                "Background service is unavailable. Make sure the service is running.".into(),
+            ))
+        } else {
+            error!("Failed to send a request to the background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error: {error}");
+            Err(Error::InternalError(
+                        format!("Failed to send a request to the background service to create an interface for location {location}. Error: {error}. Check logs for details.")
+                    ))
         }
-    }
-
-    None // No free port found in the specified range
-}
-
-#[cfg(target_os = "macos")]
-/// Find next available `utun` interface.
-#[must_use]
-pub fn get_interface_name() -> String {
-    let mut index = 0;
-    if let Ok(interfaces) = nix::net::if_::if_nameindex() {
-        while index < u32::MAX {
-            let ifname = format!("utun{index}");
-            if interfaces
-                .iter()
-                .any(|interface| interface.name().to_string_lossy() == ifname)
-            {
-                index += 1;
-            } else {
-                return ifname;
-            }
-        }
-    }
-
-    "utun0".into()
-}
-
-/// Strips location name of all non-alphanumeric characters returning usable interface name.
-#[cfg(not(target_os = "macos"))]
-#[must_use]
-pub fn get_interface_name(name: &str) -> String {
-    name.chars().filter(|c| c.is_alphanumeric()).collect()
-}
-
-fn is_port_free(port: u16) -> bool {
-    if let Ok(listener) = TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
-    {
-        // Port is available; close the listener
-        drop(listener);
-        true
     } else {
-        false
+        info!("The interface for location {location} has been created successfully, interface name: {}.", interface_config.name);
+        Ok(())
     }
 }
 
@@ -313,19 +257,16 @@ pub(crate) async fn stats_handler(
 // gets targets that will be allowed by logger, this will be empty if not provided
 #[must_use]
 pub fn load_log_targets() -> Vec<String> {
-    match std::env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
-        Ok(targets) => {
-            if !targets.is_empty() {
-                return targets
-                    .split(',')
-                    .filter(|t| !t.is_empty())
-                    .map(ToString::to_string)
-                    .collect();
-            }
-            Vec::new()
+    if let Ok(targets) = env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
+        if !targets.is_empty() {
+            return targets
+                .split(',')
+                .filter(|t| !t.is_empty())
+                .map(ToString::to_string)
+                .collect();
         }
-        Err(_) => Vec::new(),
     }
+    Vec::new()
 }
 
 // helper function to get log file directory for the defguard-service daemon
@@ -409,60 +350,65 @@ pub async fn setup_interface_tunnel(
 
     // request interface configuration
     debug!("Looking for a free port for interface {interface_name}...");
-    if let Some(port) = find_random_free_port() {
-        debug!("Found free port: {port} for interface {interface_name}.");
-        let interface_config = InterfaceConfiguration {
-            name: interface_name,
-            prvkey: tunnel.prvkey.clone(),
-            address: tunnel.address.clone(),
-            port: port.into(),
-            peers: vec![peer.clone()],
-            mtu: None,
-        };
-        debug!("Creating interface {interface_config:?}");
-        let request = CreateInterfaceRequest {
-            config: Some(interface_config.clone().into()),
-            allowed_ips,
-            dns: tunnel.dns.clone(),
-        };
-        if let Some(pre_up) = &tunnel.pre_up {
-            debug!("Executing defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name);
-            let _ = execute_command(pre_up);
-            info!(
-                "Executed defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name
-            );
-        }
-        if let Err(error) = client.create_interface(request).await {
-            error!(
-                "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
-                interface_config.name
-            );
-            Err(Error::InternalError(format!(
-                "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. Check logs for more details.",
-                interface_config.name, error.message()
-            )))
-        } else {
-            info!(
-                "Network interface {} for tunnel {tunnel} created successfully.",
-                interface_config.name
-            );
-            if let Some(post_up) = &tunnel.post_up {
-                debug!("Executing defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
-                let _ = execute_command(post_up);
-                info!("Executed defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
-            }
-            debug!(
-                "Created interface {} with config: {interface_config:?}",
-                interface_config.name
-            );
-            Ok(())
-        }
-    } else {
+    let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port for interface {interface_name} while setting up tunnel {tunnel}"
         );
         error!("{msg}");
-        Err(Error::InternalError(msg))
+        return Err(Error::InternalError(msg));
+    };
+    debug!("Found free port: {port} for interface {interface_name}.");
+
+    let Ok(address) = tunnel.address.parse() else {
+        let msg = format!("Failed to parse IP address '{}'", tunnel.address);
+        error!("{msg}");
+        return Err(Error::InternalError(msg));
+    };
+    let interface_config = InterfaceConfiguration {
+        name: interface_name,
+        prvkey: tunnel.prvkey.clone(),
+        addresses: vec![address],
+        port: port.into(),
+        peers: vec![peer.clone()],
+        mtu: None,
+    };
+    debug!("Creating interface {interface_config:?}");
+    let request = CreateInterfaceRequest {
+        config: Some(interface_config.clone().into()),
+        allowed_ips,
+        dns: tunnel.dns.clone(),
+    };
+    if let Some(pre_up) = &tunnel.pre_up {
+        debug!("Executing defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name);
+        let _ = execute_command(pre_up);
+        info!(
+                "Executed defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name
+            );
+    }
+    if let Err(error) = client.create_interface(request).await {
+        error!(
+            "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
+            interface_config.name
+        );
+        Err(Error::InternalError(format!(
+                "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. Check logs for more details.",
+                interface_config.name, error.message()
+            )))
+    } else {
+        info!(
+            "Network interface {} for tunnel {tunnel} created successfully.",
+            interface_config.name
+        );
+        if let Some(post_up) = &tunnel.post_up {
+            debug!("Executing defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
+            let _ = execute_command(post_up);
+            info!("Executed defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
+        }
+        debug!(
+            "Created interface {} with config: {interface_config:?}",
+            interface_config.name
+        );
+        Ok(())
     }
 }
 
@@ -476,9 +422,6 @@ pub async fn get_tunnel_interface_details(
         let peer_pubkey = &tunnel.pubkey;
 
         // generate interface name
-        #[cfg(target_os = "macos")]
-        let interface_name = get_interface_name();
-        #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&tunnel.name);
 
         debug!("Fetching tunnel stats for tunnel ID {tunnel_id}");
@@ -539,9 +482,6 @@ pub async fn get_location_interface_details(
         let peer_pubkey = keys.pubkey;
 
         // generate interface name
-        #[cfg(target_os = "macos")]
-        let interface_name = get_interface_name();
-        #[cfg(not(target_os = "macos"))]
         let interface_name = get_interface_name(&location.name);
 
         debug!("Fetching location stats for location ID {location_id}");
@@ -594,9 +534,6 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    #[cfg(target_os = "macos")]
-    let interface_name = get_interface_name();
-    #[cfg(not(target_os = "macos"))]
     let interface_name = get_interface_name(&location.name);
     setup_interface(
         location,
@@ -641,9 +578,6 @@ pub(crate) async fn handle_connection_for_tunnel(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
-    #[cfg(target_os = "macos")]
-    let interface_name = get_interface_name();
-    #[cfg(not(target_os = "macos"))]
     let interface_name = get_interface_name(&tunnel.name);
     setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
     state

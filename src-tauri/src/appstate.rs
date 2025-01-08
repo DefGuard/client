@@ -36,7 +36,7 @@ impl AppState {
     #[must_use]
     pub fn new(app_handle: &AppHandle) -> Self {
         AppState {
-            db: init_db(&app_handle.path_resolver()).expect("Failed to initalize database"),
+            db: init_db().expect("Failed to initalize database"),
             active_connections: Mutex::new(Vec::new()),
             client: setup_client().expect("Failed to setup gRPC client"),
             log_watchers: std::sync::Mutex::new(HashMap::new()),

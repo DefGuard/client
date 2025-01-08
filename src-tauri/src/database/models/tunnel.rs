@@ -52,7 +52,7 @@ impl fmt::Display for Tunnel<Id> {
 }
 
 impl Tunnel<Id> {
-    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
+    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -84,7 +84,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    pub(crate) async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -92,7 +92,10 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: Id) -> Result<Option<Self>, SqlxError>
+    pub(crate) async fn find_by_id<'e, E>(
+        executor: E,
+        tunnel_id: Id,
+    ) -> Result<Option<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -106,7 +109,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -120,7 +123,7 @@ impl Tunnel<Id> {
         Ok(tunnels)
     }
 
-    pub async fn find_by_server_public_key<'e, E>(
+    pub(crate) async fn find_by_server_public_key<'e, E>(
         executor: E,
         pubkey: &str,
     ) -> Result<Self, SqlxError>
@@ -138,7 +141,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
+    pub(crate) async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -153,7 +156,7 @@ impl Tunnel<Id> {
 impl Tunnel<NoId> {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(
+    pub(crate) fn new(
         name: String,
         pubkey: String,
         prvkey: String,
@@ -190,7 +193,7 @@ impl Tunnel<NoId> {
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
+    pub(crate) async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
