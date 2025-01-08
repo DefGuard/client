@@ -106,9 +106,15 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
         let connections = app_state.active_connections.lock().await;
         let connection_count = connections.len();
         if connection_count == 0 {
-            debug!("Connections verification skipped, no active connections found, task will wait for next {CHECK_INTERVAL:?}");
+            debug!(
+                "Connections verification skipped, no active connections found, task \
+                will wait for next {CHECK_INTERVAL:?}"
+            );
         } else {
-            debug!("Verifying state of {connection_count} active connections. Inactive connections will be disconnected and reconnected if possible.");
+            debug!(
+                "Verifying state of {connection_count} active connections. Inactive \
+                connections will be disconnected and reconnected if possible."
+            );
         }
         let peer_alive_period = TimeDelta::seconds(i64::from(
             app_state.app_config.lock().unwrap().peer_alive_period,
@@ -128,11 +134,21 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 // Check if there was any traffic since the connection was established.
                                 // If not, consider the location dead and disconnect it later without reconnecting.
                                 if latest_stat.collected_at < con.start {
-                                    debug!("There wasn't any activity for Location {} since its connection at {}; considering it being dead and possibly broken. \
-                                    It will be disconnected without a further automatic reconnect.", con.location_id, con.start);
+                                    debug!(
+                                        "There wasn't any activity for Location {} since its \
+                                        connection at {}; considering it being dead and possibly \
+                                        broken. It will be disconnected without a further automatic \
+                                        reconnect.",
+                                        con.location_id, con.start
+                                    );
                                     locations_to_disconnect.push((con.location_id, false));
                                 } else {
-                                    debug!("There wasn't any activity for Location {} for the last {}s; considering it being dead.", con.location_id, peer_alive_period.num_seconds());
+                                    debug!(
+                                        "There wasn't any activity for Location {} for the last \
+                                        {}s; considering it being dead.",
+                                        con.location_id,
+                                        peer_alive_period.num_seconds()
+                                    );
                                     locations_to_disconnect.push((con.location_id, true));
                                 }
                             }
@@ -143,12 +159,20 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 con.connection_type, con.interface_name, con.location_id
                             );
                             if Utc::now() - con.start.and_utc() > peer_alive_period {
-                                debug!("There wasn't any activity for Location {} since its connection at {}; considering it being dead.", con.location_id, con.start);
+                                debug!(
+                                    "There wasn't any activity for Location {} since its \
+                                    connection at {}; considering it being dead.",
+                                    con.location_id, con.start
+                                );
                                 locations_to_disconnect.push((con.location_id, false));
                             }
                         }
                         Err(err) => {
-                            warn!("Verification for location {}({}) skipped due to db error. Error: {err}", con.interface_name, con.location_id);
+                            warn!(
+                                "Verification for location {}({}) skipped due to database error: \
+                                {err}",
+                                con.interface_name, con.location_id
+                            );
                         }
                     }
                 }
@@ -163,11 +187,21 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 // Check if there was any traffic since the connection was established.
                                 // If not, consider the location dead and disconnect it later without reconnecting.
                                 if latest_stat.collected_at - con.start < TimeDelta::zero() {
-                                    debug!("There wasn't any activity for Tunnel {} since its connection at {}; considering it being dead and possibly broken. \
-                                    It will be disconnected without a further automatic reconnect.", con.location_id, con.start);
+                                    debug!(
+                                        "There wasn't any activity for Tunnel {} since its \
+                                        connection at {}; considering it being dead and possibly \
+                                        broken. It will be disconnected without a further \
+                                        automatic reconnect.",
+                                        con.location_id, con.start
+                                    );
                                     tunnels_to_disconnect.push((con.location_id, false));
                                 } else {
-                                    debug!("There wasn't any activity for Tunnel {} for the last {}s; considering it being dead.", con.location_id, peer_alive_period.num_seconds());
+                                    debug!(
+                                        "There wasn't any activity for Tunnel {} for the last
+                                        {}s; considering it being dead.",
+                                        con.location_id,
+                                        peer_alive_period.num_seconds()
+                                    );
                                     tunnels_to_disconnect.push((con.location_id, true));
                                 }
                             }
@@ -178,15 +212,19 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                                 con.interface_name, con.location_id
                             );
                             if Utc::now() - con.start.and_utc() > peer_alive_period {
-                                debug!("There wasn't any activity for Location {} since its connection at {}; considering it being dead.", con.location_id, con.start);
+                                debug!(
+                                    "There wasn't any activity for Location {} since its \
+                                    connection at {}; considering it being dead.",
+                                    con.location_id, con.start
+                                );
                                 tunnels_to_disconnect.push((con.location_id, false));
                             }
                         }
                         Err(err) => {
                             warn!(
-                                "Verification for tunnel {}({}) skipped due to db error. Error: {err}",
-                                con.interface_name,
-                                con.location_id
+                                "Verification for tunnel {}({}) skipped due to db error. \
+                                Error: {err}",
+                                con.interface_name, con.location_id
                             );
                         }
                     }
@@ -201,7 +239,11 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
             match Location::find_by_id(pool, location_id).await {
                 Ok(Some(location)) => {
                     if !allow_reconnect {
-                        warn!("Automatic reconnect for location {}({}) is not possible due to lack of activity. Interface will be disconnected.", location.name, location.id);
+                        warn!(
+                            "Automatic reconnect for location {}({}) is not possible due to lack \
+                            of activity. Interface will be disconnected.",
+                            location.name, location.id
+                        );
                         disconnect_dead_connection(
                             location_id,
                             &location.name,
@@ -213,7 +255,11 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                     } else if
                     // only try to reconnect when location is not protected behind MFA
                     location.mfa_enabled {
-                        warn!("Automatic reconnect for location {}({}) is not possible due to enabled MFA. Interface will be disconnected.", location.name, location.id);
+                        warn!(
+                            "Automatic reconnect for location {}({}) is not possible due to \
+                            enabled MFA. Interface will be disconnected.",
+                            location.name, location.id
+                        );
                         disconnect_dead_connection(
                             location_id,
                             &location.name,
@@ -235,10 +281,17 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                 }
                 Ok(None) => {
                     // Unlikely due to ON DELETE CASCADE.
-                    warn!("Attempt to reconnect the location ID {location_id} cannot be made, as location was not found in the database.");
+                    warn!(
+                        "Attempt to reconnect the location ID {location_id} cannot be made, as \
+                        location was not found in the database."
+                    );
                 }
                 Err(err) => {
-                    warn!("Could not retrieve location ID {location_id} because of a database error. Automatic reconnection cannot be done, interface will be disconnected. Error: {err}");
+                    warn!(
+                        "Could not retrieve location ID {location_id} because of a database \
+                        error. Automatic reconnection cannot be done, interface will be \
+                        disconnected. Error: {err}"
+                    );
                     disconnect_dead_connection(
                         location_id,
                         "DEAD LOCATION",
@@ -265,7 +318,12 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                         )
                         .await;
                     } else {
-                        debug!("Automatic reconnect for location {}({}) is not possible due to lack of activity since the connection start. Interface will be disconnected.", tunnel.name, tunnel.id);
+                        debug!(
+                            "Automatic reconnect for location {}({}) is not possible due to lack \
+                            of activity since the connection start. Interface will be \
+                            disconnected.",
+                            tunnel.name, tunnel.id
+                        );
                         disconnect_dead_connection(
                             tunnel_id,
                             "DEAD TUNNEL",
@@ -278,10 +336,16 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                 }
                 Ok(None) => {
                     // Unlikely due to ON DELETE CASCADE.
-                    warn!("Attempt to reconnect the tunnel ID {tunnel_id} cannot be made, as the tunnel was not found in the database.");
+                    warn!(
+                        "Attempt to reconnect the tunnel ID {tunnel_id} cannot be made, as the \
+                        tunnel was not found in the database."
+                    );
                 }
                 Err(err) => {
-                    warn!("Attempt to reconnect the tunnel ID {tunnel_id} cannot be made, because of a database error. Error: {err}, connection will be dropped instead.");
+                    warn!(
+                        "Attempt to reconnect the tunnel ID {tunnel_id} cannot be made, because \
+                        of a database: {err}, connection will be dropped instead."
+                    );
                     disconnect_dead_connection(
                         tunnel_id,
                         "DEAD TUNNEL",

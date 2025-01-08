@@ -46,12 +46,11 @@ use winapi::{
     },
 };
 
-pub const IS_MACOS: bool = cfg!(target_os = "macos");
-pub static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
-pub static DEFAULT_ROUTE_IPV6: &str = "::/0";
+pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
+pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface
-pub async fn setup_interface(
+pub(crate) async fn setup_interface(
     location: &Location<Id>,
     interface_name: String,
     preshared_key: Option<String>,
@@ -60,14 +59,14 @@ pub async fn setup_interface(
 ) -> Result<(), Error> {
     debug!("Setting up interface for location: {location}");
 
-    debug!("Looking for wireguard keys for location {location} instance");
+    debug!("Looking for WireGuard keys for location {location} instance");
     let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? else {
         error!("No keys found for instance: {}", location.instance_id);
         return Err(Error::InternalError(
             "No keys found for instance".to_string(),
         ));
     };
-    debug!("Wireguard keys found for location {location} instance");
+    debug!("WireGuard keys found for location {location} instance");
 
     // prepare peer config
     debug!(
@@ -94,11 +93,14 @@ pub async fn setup_interface(
     }
 
     debug!(
-        "Parsing location {location} allowed ips: {}",
+        "Parsing location {location} allowed IPs: {}",
         location.allowed_ips
     );
     let allowed_ips = if location.route_all_traffic {
-        debug!("Using all traffic routing for location {location}: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
+        debug!(
+            "Using all traffic routing for location {location}: {DEFAULT_ROUTE_IPV4} \
+            {DEFAULT_ROUTE_IPV6}"
+        );
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         debug!(
@@ -118,7 +120,10 @@ pub async fn setup_interface(
             }
             Err(err) => {
                 // Handle the error from IpAddrMask::from_str, if needed
-                error!("Error parsing IP address {allowed_ip} while setting up interface for location {location}, error details: {err}");
+                error!(
+                    "Error parsing IP address {allowed_ip} while setting up interface for \
+                    location {location}, error details: {err}"
+                );
                 continue;
             }
         }
@@ -132,7 +137,8 @@ pub async fn setup_interface(
     debug!("Looking for a free port for interface {interface_name}...");
     let Some(port) = find_free_tcp_port() else {
         let msg = format!(
-            "Couldn't find free port during interface {interface_name} setup for location {location}"
+            "Couldn't find free port during interface {interface_name} setup for location \
+            {location}"
         );
         error!("{msg}");
         return Err(Error::InternalError(msg));
@@ -160,18 +166,31 @@ pub async fn setup_interface(
     };
     if let Err(error) = client.create_interface(request).await {
         if error.code() == Code::Unavailable {
-            error!("Failed to set up connection for location {location}; background service is unavailable. Make sure the service is running. Error: {error}, Interface configuration: {interface_config:?}");
+            error!(
+                "Failed to set up connection for location {location}; background service is \
+                unavailable. Make sure the service is running. Error: {error}, Interface \
+                configuration: {interface_config:?}"
+            );
             Err(Error::InternalError(
                 "Background service is unavailable. Make sure the service is running.".into(),
             ))
         } else {
-            error!("Failed to send a request to the background service to create an interface for location {location} with the following configuration: {interface_config:?}. Error: {error}");
-            Err(Error::InternalError(
-                        format!("Failed to send a request to the background service to create an interface for location {location}. Error: {error}. Check logs for details.")
-                    ))
+            error!(
+                "Failed to send a request to the background service to create an interface for \
+                location {location} with the following configuration: {interface_config:?}. \
+                Error: {error}"
+            );
+            Err(Error::InternalError(format!(
+                "Failed to send a request to the background service to create an interface for \
+                location {location}. Error: {error}. Check logs for details."
+            )))
         }
     } else {
-        info!("The interface for location {location} has been created successfully, interface name: {}.", interface_config.name);
+        info!(
+            "The interface for location {location} has been created successfully, interface \
+            name: {}.",
+            interface_config.name
+        );
         Ok(())
     }
 }
@@ -208,7 +227,10 @@ pub(crate) async fn stats_handler(
                             .await
                             .unwrap_or("UNKNOWN".to_string());
 
-                        debug!("Saving network usage stats related to location {location_name} (interface {interface_name}).");
+                        debug!(
+                            "Saving network usage stats related to location {location_name} \
+                            (interface {interface_name})."
+                        );
                         trace!("Stats: {location_stats:?}");
                         match location_stats.save(&pool).await {
                             Ok(_) => {
@@ -216,8 +238,9 @@ pub(crate) async fn stats_handler(
                             }
                             Err(err) => {
                                 error!(
-                                        "Failed to save network usage stats for location {location_name}: {err}"
-                                    );
+                                    "Failed to save network usage stats for location \
+                                    {location_name}: {err}"
+                                );
                             }
                         }
                     } else {
@@ -229,7 +252,10 @@ pub(crate) async fn stats_handler(
                             .get_name(&pool)
                             .await
                             .unwrap_or("UNKNOWN".to_string());
-                        debug!("Saving network usage stats related to tunnel {tunnel_name} (interface {interface_name}): {tunnel_stats:?}");
+                        debug!(
+                            "Saving network usage stats related to tunnel {tunnel_name} \
+                            (interface {interface_name}): {tunnel_stats:?}"
+                        );
                         match tunnel_stats.save(&pool).await {
                             Ok(_) => {
                                 debug!("Saved stats for tunnel {tunnel_name}");
@@ -319,12 +345,15 @@ pub async fn setup_interface_tunnel(
         tunnel.allowed_ips
     );
     let allowed_ips = if tunnel.route_all_traffic {
-        debug!("Using all traffic routing for tunnel {tunnel}: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
+        debug!(
+            "Using all traffic routing for tunnel {tunnel}: {DEFAULT_ROUTE_IPV4} \
+            {DEFAULT_ROUTE_IPV6}"
+        );
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         let msg = match &tunnel.allowed_ips {
             Some(ips) => format!("Using predefined location traffic for tunnel {tunnel}: {ips}"),
-            None => "No allowed IPs found in tunnel {tunnel} configuration".to_string(),
+            None => "No allowed IP addresses found in tunnel {tunnel} configuration".to_string(),
         };
         debug!("{msg}");
         tunnel
@@ -379,11 +408,17 @@ pub async fn setup_interface_tunnel(
         dns: tunnel.dns.clone(),
     };
     if let Some(pre_up) = &tunnel.pre_up {
-        debug!("Executing defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name);
+        debug!(
+            "Executing defined PreUp command before setting up the interface {} for the \
+            tunnel {tunnel}: {pre_up}",
+            interface_config.name
+        );
         let _ = execute_command(pre_up);
         info!(
-                "Executed defined PreUp command before setting up the interface {} for the tunnel {tunnel}: {pre_up}", interface_config.name
-            );
+            "Executed defined PreUp command before setting up the interface {} for the \
+            tunnel {tunnel}: {pre_up}",
+            interface_config.name
+        );
     }
     if let Err(error) = client.create_interface(request).await {
         error!(
@@ -391,18 +426,28 @@ pub async fn setup_interface_tunnel(
             interface_config.name
         );
         Err(Error::InternalError(format!(
-                "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. Check logs for more details.",
-                interface_config.name, error.message()
-            )))
+            "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
+            Check logs for more details.",
+            interface_config.name,
+            error.message()
+        )))
     } else {
         info!(
             "Network interface {} for tunnel {tunnel} created successfully.",
             interface_config.name
         );
         if let Some(post_up) = &tunnel.post_up {
-            debug!("Executing defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
+            debug!(
+                "Executing defined PostUp command after setting up the interface {} for the \
+                tunnel {tunnel}: {post_up}",
+                interface_config.name
+            );
             let _ = execute_command(post_up);
-            info!("Executed defined PostUp command after setting up the interface {} for the tunnel {tunnel}: {post_up}", interface_config.name);
+            info!(
+                "Executed defined PostUp command after setting up the interface {} for the \
+                tunnel {tunnel}: {post_up}",
+                interface_config.name
+            );
         }
         debug!(
             "Created interface {} with config: {interface_config:?}",
@@ -651,19 +696,34 @@ pub(crate) async fn disconnect_interface(
     match active_connection.connection_type {
         ConnectionType::Location => {
             let Some(location) = Location::find_by_id(&state.db, location_id).await? else {
-                error!("Error while disconnecting interface {interface_name}, location with ID {location_id} not found");
+                error!(
+                    "Error while disconnecting interface {interface_name}, location with ID \
+                    {location_id} not found"
+                );
                 return Err(Error::NotFound);
             };
             let request = RemoveInterfaceRequest {
                 interface_name,
                 endpoint: location.endpoint.clone(),
             };
-            debug!("Sending request to the background service to remove interface {} for location {}...", active_connection.interface_name, location.name);
+            debug!(
+                "Sending request to the background service to remove interface {} for location \
+                {}...",
+                active_connection.interface_name, location.name
+            );
             if let Err(error) = client.remove_interface(request).await {
                 let msg = if error.code() == Code::Unavailable {
-                    format!("Couldn't remove interface {}. Background service is unavailable. Please make sure the service is running. Error: {error}.", active_connection.interface_name)
+                    format!(
+                        "Couldn't remove interface {}. Background service is unavailable. \
+                        Please make sure the service is running. Error: {error}.",
+                        active_connection.interface_name
+                    )
                 } else {
-                    format!("Failed to send a request to the background service to remove interface {}. Error: {error}.", active_connection.interface_name)
+                    format!(
+                        "Failed to send a request to the background service to remove interface \
+                        {}. Error: {error}.",
+                        active_connection.interface_name
+                    )
                 };
                 error!("{msg}");
                 return Err(Error::InternalError(msg));
@@ -683,13 +743,24 @@ pub(crate) async fn disconnect_interface(
         }
         ConnectionType::Tunnel => {
             let Some(tunnel) = Tunnel::find_by_id(&state.db, location_id).await? else {
-                error!("Error while disconnecting interface {interface_name}, tunnel with ID {location_id} not found");
+                error!(
+                    "Error while disconnecting interface {interface_name}, tunnel with ID \
+                    {location_id} not found"
+                );
                 return Err(Error::NotFound);
             };
             if let Some(pre_down) = &tunnel.pre_down {
-                debug!("Executing defined PreDown command before setting up the interface {} for the tunnel {tunnel}: {pre_down}", active_connection.interface_name);
+                debug!(
+                    "Executing defined PreDown command before setting up the interface {} for the \
+                    tunnel {tunnel}: {pre_down}",
+                    active_connection.interface_name
+                );
                 let _ = execute_command(pre_down);
-                info!("Executed defined PreDown command before setting up the interface {} for the tunnel {tunnel}: {pre_down}", active_connection.interface_name);
+                info!(
+                    "Executed defined PreDown command before setting up the interface {} for \
+                    the tunnel {tunnel}: {pre_down}",
+                    active_connection.interface_name
+                );
             }
             let request = RemoveInterfaceRequest {
                 interface_name,
@@ -697,8 +768,8 @@ pub(crate) async fn disconnect_interface(
             };
             if let Err(error) = client.remove_interface(request).await {
                 error!(
-                    "Error while removing interface {}, error details: {:?}",
-                    active_connection.interface_name, error
+                    "Error while removing interface {}, error details: {error:?}",
+                    active_connection.interface_name
                 );
                 return Err(Error::InternalError(format!(
                     "Failed to remove interface, error message: {}",
@@ -706,9 +777,17 @@ pub(crate) async fn disconnect_interface(
                 )));
             }
             if let Some(post_down) = &tunnel.post_down {
-                debug!("Executing defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", active_connection.interface_name);
+                debug!(
+                    "Executing defined PostDown command after removing the interface {} for the \
+                    tunnel {tunnel}: {post_down}",
+                    active_connection.interface_name
+                );
                 let _ = execute_command(post_down);
-                info!("Executed defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", active_connection.interface_name);
+                info!(
+                    "Executed defined PostDown command after removing the interface {} for the \
+                    tunnel {tunnel}: {post_down}",
+                    active_connection.interface_name
+                );
             }
             let connection: TunnelConnection = active_connection.into();
             let connection = connection.save(&state.db).await?;
@@ -751,8 +830,9 @@ pub async fn get_tunnel_or_location_name(
         name
     } else {
         debug!(
-                "Couldn't identify {connection_type}'s name for logging purposes, it will be referred to as UNKNOWN",
-            );
+            "Couldn't identify {connection_type}'s name for logging purposes, \
+            it will be referred to as UNKNOWN",
+        );
         "UNKNOWN".to_string()
     }
 }
@@ -834,8 +914,15 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     let appstate = app_handle.state::<AppState>();
     let all_locations = Location::all(&appstate.db).await?;
     let service_control_manager = open_service_manager().map_err(|err| {
-        error!("Failed to open service control manager while trying to sync client's connections with the host state: {}", err);
-        Error::InternalError("Failed to open service control manager while trying to sync client's connections with the host state".to_string())
+        error!(
+            "Failed to open service control manager while trying to sync client's connections \
+            with the host state: {err}"
+        );
+        Error::InternalError(
+            "Failed to open service control manager while trying to sync client's
+            connections with the host state"
+                .to_string(),
+        )
     })?;
 
     debug!("Opened service control manager, starting to synchronize active connections for locations...");
@@ -861,9 +948,11 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
                 }
                 _ => {
                     warn!(
-                            "Failed to open service {service_name} for interface {interface_name} while synchronizing active connections. \
-                            This may cause the location {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}", location.name
-                        );
+                        "Failed to open service {service_name} for interface {interface_name} while \
+                        synchronizing active connections. This may cause the location {} state to \
+                        display incorrectly in the client. Reconnect to it manually to fix it. \
+                        Error: {err}", location.name
+                    );
                     continue;
                 }
             },
@@ -876,7 +965,8 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
                     debug!("WireGuard tunnel {} is running, ", interface_name);
                 } else {
                     debug!(
-                        "WireGuard tunnel {} is not running, status code: {status}. Refer to Windows documentation for more information about the code.",
+                        "WireGuard tunnel {} is not running, status code: {status}. Refer to \
+                        Windows documentation for more information about the code.",
                         interface_name
                     );
                     continue;
@@ -885,8 +975,9 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
             Err(err) => {
                 close_service_handle(service, &service_name)?;
                 warn!(
-                    "Failed to query service status for interface {} while synchronizing active connections. \
-                    This may cause the location {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}",
+                    "Failed to query service status for interface {} while synchronizing active \
+                    connections. This may cause the location {} state to display incorrectly in \
+                    the client. Reconnect to it manually to fix it. Error: {err}",
                     interface_name, location.name
                 );
                 continue;
@@ -934,29 +1025,28 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     for tunnel in Tunnel::all(&appstate.db).await? {
         let interface_name = get_interface_name(&tunnel.name);
         let service_name = format!("WireGuardTunnel${}", interface_name);
-        let service = match open_service(
-            service_control_manager,
-            &service_name,
-            SERVICE_QUERY_STATUS,
-        ) {
-            Ok(service) => service,
-            Err(err) => match err {
-                ERROR_SERVICE_DOES_NOT_EXIST => {
-                    debug!(
-                        "WireGuard tunnel {} is not installed, nothing to synchronize",
-                        interface_name
-                    );
-                    continue;
-                }
-                _ => {
-                    error!(
-                            "Failed to open service {service_name} for interface {interface_name}. \
-                            This may cause the tunnel {} state to display incorrectly in the client. Reconnect to it manually to fix it. Error: {err}", tunnel.name
+        let service =
+            match open_service(service_control_manager, &service_name, SERVICE_QUERY_STATUS) {
+                Ok(service) => service,
+                Err(err) => match err {
+                    ERROR_SERVICE_DOES_NOT_EXIST => {
+                        debug!(
+                            "WireGuard tunnel {} is not installed, nothing to synchronize",
+                            interface_name
                         );
-                    continue;
-                }
-            },
-        };
+                        continue;
+                    }
+                    _ => {
+                        error!(
+                            "Failed to open service {service_name} for interface {interface_name}. \
+                            This may cause the tunnel {} state to display incorrectly in the \
+                            client. Reconnect to it manually to fix it. Error: {err}",
+                            tunnel.name
+                        );
+                        continue;
+                    }
+                },
+            };
         match get_service_status(service) {
             Ok(status) => {
                 // Only point where we don't jump to the next iteration of the loop and continue with the rest of the code below the match

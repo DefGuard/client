@@ -95,12 +95,12 @@ pub async fn start_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
     Ok(())
 }
 
-#[tauri::command(async)]
-pub async fn stop_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
+#[tauri::command]
+pub fn stop_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
     stop_global_log_watcher_task(&handle)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn disconnect(
     location_id: Id,
     connection_type: ConnectionType,
@@ -131,16 +131,23 @@ pub async fn disconnect(
                 match err {
                     Error::CoreNotEnterprise => {
                         debug!(
-                            "Tried to fetch instance config from core after disconnecting from {name}(ID: {location_id}), but the core is not enterprise, so we can't fetch the config."
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the core is not enterprise, so we \
+                            can't fetch the config."
                         );
                     }
                     Error::NoToken => {
                         debug!(
-                            "Tried to fetch instance config from core after disconnecting from {name}(ID: {location_id}), but this location's instance has no polling token, so we can't fetch the config."
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but this location's instance has no \
+                            polling token, so we can't fetch the config."
                         );
                     }
                     _ => {
-                        warn!("Error while trying to fetch instance config after disconnecting from {name}(ID: {location_id}): {err}");
+                        warn!(
+                            "Error while trying to fetch instance config after disconnecting \
+                            from {name}(ID: {location_id}): {err}"
+                        );
                     }
                 }
             };
@@ -148,7 +155,10 @@ pub async fn disconnect(
         info!("Disconnected from {connection_type} {name}(ID: {location_id})");
         Ok(())
     } else {
-        warn!("Couldn't disconnect from {connection_type} {name}(ID: {location_id}), as no active connection was found.");
+        warn!(
+            "Couldn't disconnect from {connection_type} {name}(ID: {location_id}), as no active \
+            connection was found."
+        );
         Err(Error::NotFound)
     }
 }
@@ -432,7 +442,7 @@ pub async fn update_instance(
 }
 
 /// Returns true if configuration in instance_info differs from current configuration
-pub async fn locations_changed(
+pub(crate) async fn locations_changed(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
@@ -457,7 +467,7 @@ pub async fn locations_changed(
     Ok(db_locations != core_locations)
 }
 
-pub async fn do_update_instance(
+pub(crate) async fn do_update_instance(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
     response: DeviceConfigResponse,
@@ -939,39 +949,66 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
         error!("The tunnel to delete with ID {tunnel_id} could not be found, cannot delete.");
         return Err(Error::NotFound);
     };
-    debug!("The tunnel to delete with ID {tunnel_id} has been identified as {tunnel}, proceeding with deletion.");
+    debug!(
+        "The tunnel to delete with ID {tunnel_id} has been identified as {tunnel}, proceeding \
+        with deletion."
+    );
 
     if let Some(connection) = app_state
         .remove_connection(tunnel_id, ConnectionType::Tunnel)
         .await
     {
-        debug!("Found active connection for tunnel {tunnel} which is being deleted, closing the connection.");
+        debug!(
+            "Found active connection for tunnel {tunnel} which is being deleted, closing the \
+            connection."
+        );
         if let Some(pre_down) = &tunnel.pre_down {
-            debug!("Executing defined PreDown command before removing the interface {} for the tunnel {tunnel}: {pre_down}", connection.interface_name);
+            debug!(
+                "Executing defined PreDown command before removing the interface {} for the \
+                tunnel {tunnel}: {pre_down}",
+                connection.interface_name
+            );
             let _ = execute_command(pre_down);
-            info!("Executed defined PreDown command before removing the interface {} for the tunnel {tunnel}: {pre_down}", connection.interface_name);
+            info!(
+                "Executed defined PreDown command before removing the interface {} for the \
+                tunnel {tunnel}: {pre_down}",
+                connection.interface_name
+            );
         }
         let request = RemoveInterfaceRequest {
             interface_name: connection.interface_name.clone(),
             endpoint: tunnel.endpoint.clone(),
         };
-        client
-            .remove_interface(request)
-            .await
-            .map_err(|status| {
-                error!("An error occurred while removing interface {} for tunnel {tunnel}, status: {status}",
-                connection.interface_name);
-                Error::InternalError(
-                    format!(
-                        "An error occurred while removing interface {} for tunnel {tunnel}, error message: {}. Check logs for more details.", connection.interface_name, status.message()
-                    )
-                )
-            })?;
-        info!("Network interface {} has been removed and the connection to tunnel {tunnel} has been closed.", connection.interface_name);
+        client.remove_interface(request).await.map_err(|status| {
+            error!(
+                "An error occurred while removing interface {} for tunnel {tunnel}, status: \
+                {status}",
+                connection.interface_name
+            );
+            Error::InternalError(format!(
+                "An error occurred while removing interface {} for tunnel {tunnel}, error \
+                message: {}. Check logs for more details.",
+                connection.interface_name,
+                status.message()
+            ))
+        })?;
+        info!(
+            "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
+            closed.",
+            connection.interface_name
+        );
         if let Some(post_down) = &tunnel.post_down {
-            debug!("Executing defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", connection.interface_name);
+            debug!(
+                "Executing defined PostDown command after removing the interface {} for the \
+                tunnel {tunnel}: {post_down}",
+                connection.interface_name
+            );
             let _ = execute_command(post_down);
-            info!("Executed defined PostDown command after removing the interface {} for the tunnel {tunnel}: {post_down}", connection.interface_name);
+            info!(
+                "Executed defined PostDown command after removing the interface {} for the \
+                tunnel {tunnel}: {post_down}",
+                connection.interface_name
+            );
         }
     }
     tunnel.delete(pool).await?;
