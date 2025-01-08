@@ -47,7 +47,8 @@ impl Instance<Id> {
         E: SqliteExecutor<'e>,
     {
         query!(
-            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, disable_all_traffic = $6, enterprise_enabled = $7, token = $8 WHERE id = $9;",
+            "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
+            disable_all_traffic = $6, enterprise_enabled = $7, token = $8 WHERE id = $9;",
             self.name,
             self.uuid,
             self.url,
@@ -69,7 +70,8 @@ impl Instance<Id> {
     {
         let instances = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance;"
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
+            disable_all_traffic, enterprise_enabled FROM instance;"
         )
         .fetch_all(executor)
         .await?;
@@ -82,7 +84,8 @@ impl Instance<Id> {
     {
         let instance = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE id = $1;",
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
+            disable_all_traffic, enterprise_enabled FROM instance WHERE id = $1;",
             id
         )
         .fetch_optional(executor)
@@ -115,7 +118,9 @@ impl Instance<Id> {
     {
         let instances = query_as!(
             Self,
-            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled FROM instance WHERE token IS NOT NULL;"
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
+            disable_all_traffic, enterprise_enabled FROM instance
+            WHERE token IS NOT NULL;"
         )
         .fetch_all(executor)
         .await?;
@@ -144,7 +149,9 @@ impl Instance<NoId> {
         let url = self.url.clone();
         let proxy_url = self.proxy_url.clone();
         let result = query!(
-            "INSERT INTO instance (name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+            "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
+            disable_all_traffic, enterprise_enabled) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
             self.name,
             self.uuid,
             url,

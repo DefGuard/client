@@ -88,27 +88,24 @@ impl ConnectionInfo {
     where
         E: SqliteExecutor<'e>,
     {
-        // Because we store interface information for given timestamp select last upload and download
-        // before connection ended
+        // Because we store interface information for given timestamp,
+        // select last upload and download before connection ended.
         // FIXME: Optimize query
         let connections = query_as!(
             ConnectionInfo,
-            "SELECT c.id, c.location_id, \
-            c.start \"start!\", c.end \"end!\", \
+            "SELECT c.id, c.location_id, c.start, c.end, \
             COALESCE((\
                 SELECT ls.upload \
                 FROM location_stats ls \
                 WHERE ls.location_id = c.location_id \
-                AND ls.collected_at >= c.start \
-                AND ls.collected_at <= c.end \
+                AND ls.collected_at BETWEEN c.start AND c.end \
                 ORDER BY ls.collected_at DESC LIMIT 1 \
             ), 0) \"upload: _\", \
             COALESCE((\
                 SELECT ls.download \
                 FROM location_stats ls \
                 WHERE ls.location_id = c.location_id \
-                AND ls.collected_at >= c.start \
-                AND ls.collected_at <= c.end \
+                AND ls.collected_at BETWEEN c.start AND c.end \
                 ORDER BY ls.collected_at DESC LIMIT 1 \
             ), 0) \"download: _\" \
             FROM connection c WHERE location_id = $1 \
