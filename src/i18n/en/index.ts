@@ -52,7 +52,8 @@ const en = {
       networkError: "There was a network error. Can't reach proxy.",
       configChanged:
         'Configuration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
-      deadConDropped: '{con_type: string} {interface_name: string} disconnected.',
+      deadConDropped:
+        'Detected that the {con_type: string} {interface_name: string} has disconnected, trying to reconnect...',
     },
   },
   components: {
@@ -64,14 +65,11 @@ const en = {
     client: {
       modals: {
         deadConDropped: {
-          title: '{conType: string} disconnected',
+          title: '{conType: string} {name: string} disconnected',
           tunnel: 'Tunnel',
           location: 'Location',
-          body: {
-            periodic:
-              '{conType: string} {instanceName: string} was automatically disconnected because it exceeded the expected time for staying active without receiving confirmation from the server.',
-            connection: `{conType: string} {name: string} connection was automatically disconnected because it didn't complete the necessary setup in time. This can happen if the connection wasn't fully established`,
-          },
+          message:
+            'The {conType: string} {name: string} has been disconnected, since we have detected that the server is not responding with any traffic for {time: number}s. If this message keeps occurring, please contact your administrator and inform them about this fact.',
           controls: {
             close: 'Close',
           },

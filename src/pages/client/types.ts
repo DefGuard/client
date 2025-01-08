@@ -85,10 +85,15 @@ export enum DeadConDroppedOutReason {
 }
 
 export type DeadConDroppedPayload = {
-  id: number;
   name: string;
   con_type: ClientConnectionType;
-  reason: DeadConDroppedOutReason;
+  peer_alive_period: number;
+};
+
+export type DeadConReconnectedPayload = {
+  name: string;
+  con_type: ClientConnectionType;
+  peer_alive_period: number;
 };
 
 export enum TauriEventKey {
@@ -99,5 +104,6 @@ export enum TauriEventKey {
   APP_VERSION_FETCH = 'app-version-fetch',
   CONFIG_CHANGED = 'config-changed',
   DEAD_CONNECTION_DROPPED = 'dead-connection-dropped',
+  DEAD_CONNECTION_RECONNECTED = 'dead-connection-reconnected',
   APPLICATION_CONFIG_CHANGED = 'application-config-changed',
 }

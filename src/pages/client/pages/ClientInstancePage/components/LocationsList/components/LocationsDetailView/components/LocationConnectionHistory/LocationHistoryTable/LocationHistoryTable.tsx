@@ -49,10 +49,6 @@ export const LocationHistoryTable = ({ connections }: Props) => {
         key: 'duration',
       },
       {
-        text: pageLL.connectedFrom(),
-        key: 'connected_from',
-      },
-      {
         text: pageLL.upload(),
         key: 'upload',
       },

@@ -10,7 +10,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { ModalWithTitle } from '../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
-import { ClientConnectionType, DeadConDroppedOutReason } from '../../../types';
+import { ClientConnectionType } from '../../../types';
 import { useDeadConDroppedModal } from './store';
 
 export const DeadConDroppedModal = () => {
@@ -25,6 +25,7 @@ export const DeadConDroppedModal = () => {
       isOpen={isOpen}
       title={localLL.title({
         conType: payload?.con_type ?? '',
+        name: payload?.name ?? '',
       })}
       afterClose={reset}
       onClose={close}
@@ -54,21 +55,14 @@ const ModalContent = () => {
   }, [localLL, payload?.con_type]);
 
   const message = useMemo(() => {
-    switch (payload?.reason) {
-      case DeadConDroppedOutReason.PERIODIC_VERIFICATION:
-        return localLL.body.periodic({
-          conType: typeString,
-          instanceName: payload.name,
-        });
-      case DeadConDroppedOutReason.CONNECTION_VERIFICATION:
-        return localLL.body.connection({
-          conType: typeString,
-          name: payload.name,
-        });
-      default:
-        return '';
+    if (payload) {
+      return localLL.message({
+        conType: typeString,
+        name: payload.name,
+        time: payload.peer_alive_period,
+      });
     }
-  }, [payload?.reason, payload?.name, localLL.body, typeString]);
+  }, [localLL, payload, typeString]);
 
   if (!payload) return null;
   return (

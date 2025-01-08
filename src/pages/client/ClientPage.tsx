@@ -16,7 +16,7 @@ import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
-import { DeadConDroppedPayload, TauriEventKey } from './types';
+import { DeadConDroppedPayload, DeadConReconnectedPayload, TauriEventKey } from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
 
@@ -111,6 +111,13 @@ export const ClientPage = () => {
     const deadConnectionDropped = listen<DeadConDroppedPayload>(
       TauriEventKey.DEAD_CONNECTION_DROPPED,
       (data) => {
+        openDeadConDroppedModal(data.payload);
+      },
+    );
+
+    const deadConnectionReconnected = listen<DeadConReconnectedPayload>(
+      TauriEventKey.DEAD_CONNECTION_RECONNECTED,
+      (data) => {
         toaster.warning(
           LL.common.messages.deadConDropped({
             interface_name: data.payload.name,
@@ -120,12 +127,12 @@ export const ClientPage = () => {
             lifetime: -1,
           },
         );
-        openDeadConDroppedModal(data.payload);
       },
     );
 
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
+      deadConnectionReconnected.then((cleanup) => cleanup());
       configChanged.then((cleanup) => cleanup());
       connectionChanged.then((cleanup) => cleanup());
       instanceUpdate.then((cleanup) => cleanup());
