@@ -40,36 +40,49 @@ struct CliConfig {
 
 impl CliConfig {
     /// Load configuration from a file at `path`.
-    #[must_use]
-    fn load(path: &Path) -> Self {
+    fn load(path: &Path) -> Result<Self, CliError> {
         let file = match OpenOptions::new().read(true).open(path) {
             Ok(file) => file,
             Err(err) => {
-                eprintln!("Unable to open configuration: {err}; using defaults.");
-                return Self::default();
+                return Err(CliError::ConfigNotFound(
+                    err.to_string(),
+                    path.to_string_lossy().to_string(),
+                ));
             }
         };
         match serde_json::from_reader::<_, Self>(file) {
-            Ok(config) => config,
-            Err(err) => {
-                eprintln!("Unable to load configuration: {err}; using defaults.");
-                Self::default()
-            }
+            Ok(config) => Ok(config),
+            Err(err) => Err(CliError::ConfigParse(
+                path.to_string_lossy().to_string(),
+                err.to_string(),
+            )),
         }
     }
 
     /// Save configuration to a file at `path`.
     fn save(&self, path: &Path) {
         // TODO: chmod 600 / umask
-        let file = OpenOptions::new()
+        let file = match OpenOptions::new()
             .create(true)
             .truncate(true)
             .write(true)
             .open(path)
-            .unwrap();
+        {
+            Ok(file) => file,
+            Err(err) => {
+                eprintln!(
+                    "Failed to open configuration file at {}. Error details: {err}",
+                    path.to_string_lossy()
+                );
+                return;
+            }
+        };
         match serde_json::to_writer(file, &self) {
             Ok(()) => eprintln!("Configuration has been saved"),
-            Err(err) => eprintln!("Failed to save configuration: {err}"),
+            Err(err) => eprintln!(
+                "Failed to save configuration at {}. Error details: {err}",
+                path.to_string_lossy()
+            ),
         }
     }
 }
@@ -88,11 +101,19 @@ enum CliError {
     WireGuard(#[from] WireguardInterfaceError),
     #[error("Invalid address")]
     InvalidAddress,
+    #[error(
+        "Unable to open CLI configuration ({0}) at path: \"{1}\". \
+        Proceed with enrollment first via the \"enroll\" command or pass a \
+        valid configuration file path using the \"--config\" option."
+    )]
+    ConfigNotFound(String, String),
+    #[error("Couldn't parse CLI configuration at \"{0}\". Error details: {1}")]
+    ConfigParse(String, String),
 }
 
 async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError> {
-    eprintln!("Connecting to {:?}...", config.device_config);
-
+    let network_name = config.device_config.network_name.clone();
+    eprintln!("Connecting to network {network_name}...");
     let ifname = get_interface_name(&config.device.name);
 
     // let wgapi = setup_wgapi(&ifname).expect("Failed to setup WireGuard API");
@@ -201,11 +222,16 @@ async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError
     }
 
     eprintln!("Finished creating a new interface {ifname}");
+    eprintln!("Connected to network {network_name}.");
 
     trigger.notified().await;
-
-    eprintln!("Shutting down...");
+    eprintln!(
+        "Closing the interface {ifname} for network {network_name} because of a received signal..."
+    );
     wgapi.remove_interface().unwrap();
+    eprintln!("Interface {ifname} has been closed and the connection has been terminated.");
+    // Send cleanup ack to a task that may've cancelled the connection.
+    trigger.notify_one();
 
     Ok(())
 }
@@ -216,12 +242,8 @@ struct ApiError {
 }
 
 /// Enroll device.
-async fn enroll(
-    config: &mut CliConfig,
-    base_url: &Url,
-    token: String,
-    name: String,
-) -> Result<(), CliError> {
+async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
+    eprintln!("Starting enrollment through the proxy at {base_url}...");
     let client = Client::builder().cookie_store(true).build()?;
     let mut url = base_url.clone();
     url.set_path("/api/v1/enrollment/start");
@@ -232,16 +254,20 @@ async fn enroll(
         .await?;
 
     let response: proto::EnrollmentStartResponse = if result.status() == StatusCode::OK {
-        result.json().await?
+        let result = result.json().await?;
+        eprintln!("Enrollment start request has been successfully sent to the proxy.");
+        result
     } else {
         let error: ApiError = result.json().await?;
         eprintln!("Failed to start enrolment: {}", error.error);
         return Err(CliError::Api);
     };
-    println!("{response:?}");
 
     if response.instance.is_none() {
-        eprintln!("Missing InstanceInfo");
+        eprintln!(
+            "InstanceInfo is missing from the received enrollment start response: {:?}",
+            response
+        );
         return Err(CliError::MissingData);
     }
 
@@ -254,7 +280,8 @@ async fn enroll(
     let result = client
         .post(url)
         .json(&proto::NewDevice {
-            name,
+            // The name is ignored by the server as it's set by the user before the enrollment.
+            name: "".to_string(),
             pubkey: pubkey.to_string(),
             token: None, //Some(config.token.clone()),
         })
@@ -262,38 +289,44 @@ async fn enroll(
         .await?;
 
     let response: proto::DeviceConfigResponse = if result.status() == StatusCode::OK {
-        result.json().await?
+        let result = result.json().await?;
+        eprintln!("The device public key has been successfully sent to the proxy. The device should be now configured on the server's end.");
+        result
     } else {
         let error: ApiError = result.json().await?;
         eprintln!("Failed to start enrolment: {}", error.error);
         return Err(CliError::Api);
     };
-    println!("{response:?}");
 
     let count = response.configs.len();
     if count != 1 {
-        eprintln!("Expected one device config, found {count}.");
+        eprintln!(
+            "Expected one device config in the configuration received from proxy, found {count}. Response: {:?}", response
+        );
         return Err(CliError::TooManyDevices);
     }
     let Some(instance_info) = response.instance else {
-        eprintln!("Missing InstanceInfo");
+        eprintln!("Missing InstanceInfo in the configuration received from the proxy.");
         return Err(CliError::MissingData);
     };
     let Some(device) = response.device else {
-        eprintln!("Missing Device");
+        eprintln!("Missing Device in the configuration received from the proxy.");
         return Err(CliError::MissingData);
     };
 
-    config.private_key = prvkey;
-    config.device = device;
-    config.device_config = response.configs[0].clone();
-    config.instance_info = instance_info;
-    config.token = response.token;
+    let config = CliConfig {
+        private_key: prvkey,
+        device,
+        device_config: response.configs[0].clone(),
+        instance_info,
+        token: response.token,
+    };
+    eprintln!("Enrollment has been successfully completed.");
 
-    Ok(())
+    Ok(config)
 }
 
-const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
+const INTERVAL_SECONDS: Duration = Duration::from_secs(4);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Fetch configuration from Defguard proxy.
@@ -349,7 +382,6 @@ async fn poll_config(config: &mut CliConfig) {
     let Some(token) = config.clone().token else {
         return;
     };
-
     let Ok(client) = Client::builder().cookie_store(true).build() else {
         return;
     };
@@ -396,12 +428,6 @@ async fn main() {
         .short('c')
         .value_name("CONFIG")
         .value_parser(value_parser!(PathBuf));
-    let dev_name_opt = Arg::new("devname")
-        .help("Device name")
-        .long("devname")
-        .required(true)
-        .short('d')
-        .value_name("NAME");
     let token_opt = Arg::new("token")
         .help("Enrollment token")
         .long("token")
@@ -424,7 +450,6 @@ async fn main() {
         .subcommand(
             Command::new("enroll")
                 .about("Enroll device")
-                .arg(dev_name_opt)
                 .arg(token_opt)
                 .arg(url_opt),
         )
@@ -450,43 +475,56 @@ async fn main() {
             }
         }
     };
-    let mut config = CliConfig::load(&config_path);
 
     if let Some(("enroll", submatches)) = matches.subcommand() {
-        let name = submatches
-            .get_one::<String>("devname")
-            .expect("device name is required")
-            .to_string();
         let token = submatches
             .get_one::<String>("token")
             .expect("token is required")
             .to_string();
         let url = submatches.get_one::<Url>("url").expect("URL is required");
-        enroll(&mut config, url, token, name)
-            .await
-            .expect("Failed to enroll");
+        let config = enroll(url, token).await.expect("Failed to enroll");
         config.save(&config_path);
     } else {
+        let mut config = match CliConfig::load(&config_path) {
+            Ok(config) => config,
+            Err(err) => {
+                eprintln!("Failed to load CLI configuration: {err}");
+                return;
+            }
+        };
         let trigger = Arc::new(Notify::new());
         let mut perpetuum = true;
         while perpetuum {
             // Must be spawned as a separate task, otherwise trigger won't reach it.
             let task = tokio::spawn(connect(config.clone(), trigger.clone()));
+            // After cancelling the connection a given task should wait for cleanup confirmation.
             select! {
                 biased;
                 () = wait_for_hangup() => {
-                    trigger.notify_one();
                     eprintln!("Re-configuring...");
-                    config = CliConfig::load(&config_path);
+                    trigger.notify_one();
+                    match CliConfig::load(&config_path) {
+                        Ok(new_config) => {
+                            eprintln!("Configuration has been reloaded, resetting the connection...");
+                            config = new_config;
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to load configuration: {err}");
+                            perpetuum = false;
+                        }
+                    }
+                    trigger.notified().await;
                 },
                 _ = ctrl_c() => {
                     trigger.notify_one();
-                    eprintln!("Quitting...");
+                    eprintln!("Quitting and shutting down the connection...");
                     perpetuum = false;
+                    trigger.notified().await;
                 },
                 () = poll_config(&mut config), if config.token.is_some() => {
+                    eprintln!("Location configuration has changed, re-configuring and resetting the connection...");
                     trigger.notify_one();
-                    eprintln!("Configuration has changed, re-configuring...");
+                    trigger.notified().await;
                 },
                 Err(err) = task => {
                     eprintln!("Failed to operate: {err}");
