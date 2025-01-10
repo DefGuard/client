@@ -59,10 +59,8 @@ impl CliConfig {
         let file = match OpenOptions::new().read(true).open(path) {
             Ok(file) => file,
             Err(err) => {
-                return Err(CliError::ConfigNotFound(
-                    err.to_string(),
-                    path.to_string_lossy().to_string(),
-                ));
+                debug!("Failed to open configuration file at {path:?}. Error details: {err}");
+                return Err(CliError::ConfigNotFound(path.to_string_lossy().to_string()));
             }
         };
         match serde_json::from_reader::<_, Self>(file) {
@@ -75,7 +73,7 @@ impl CliConfig {
     }
 
     /// Save configuration to a file at `path`.
-    fn save(&self, path: &Path) {
+    fn save(&self, path: &Path) -> Result<(), CliError> {
         // TODO: chmod 600 / umask
         let file = match OpenOptions::new()
             .create(true)
@@ -85,11 +83,10 @@ impl CliConfig {
         {
             Ok(file) => file,
             Err(err) => {
-                error!(
-                    "Failed to open configuration file at {}. Error details: {err}",
-                    path.to_string_lossy()
-                );
-                return;
+                return Err(CliError::ConfigSave(
+                    path.to_string_lossy().to_string(),
+                    format!("Failed to open configuration file for saving: {}", err),
+                ));
             }
         };
         match serde_json::to_writer(file, &self) {
@@ -97,11 +94,15 @@ impl CliConfig {
                 "Configuration file has been saved to {}",
                 path.to_string_lossy()
             ),
-            Err(err) => error!(
-                "Failed to save configuration at {}. Error details: {err}",
-                path.to_string_lossy()
-            ),
-        }
+            Err(err) => {
+                return Err(CliError::ConfigSave(
+                    path.to_string_lossy().to_string(),
+                    err.to_string(),
+                ));
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -119,16 +120,14 @@ enum CliError {
     WireGuard(#[from] WireguardInterfaceError),
     #[error("Invalid address")]
     InvalidAddress,
-    #[error(
-        "Unable to open CLI configuration ({0}) at path: \"{1}\". \
-        Proceed with enrollment first via the \"enroll\" command or pass a \
-        valid configuration file path using the \"--config\" option."
-    )]
-    ConfigNotFound(String, String),
+    #[error("Couldn't open CLI configuration at path: \"{0}\".")]
+    ConfigNotFound(String),
     #[error("Couldn't parse CLI configuration at \"{0}\". Error details: {1}")]
     ConfigParse(String, String),
     #[error("Defguard core has enterprise features disabled")]
     EnterpriseDisabled,
+    #[error("Failed to save configuration at {0}: {1}")]
+    ConfigSave(String, String),
 }
 
 async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError> {
@@ -431,7 +430,7 @@ async fn poll_config(config: &mut CliConfig) {
         }
     };
     url.set_path("/api/v1/poll");
-
+    debug!("Config polling setup done, starting the polling loop...");
     loop {
         sleep(INTERVAL_SECONDS).await;
         debug!("Polling network configuration from proxy...");
@@ -517,7 +516,7 @@ async fn main() {
         .subcommand_required(false)
         .subcommand(
             Command::new("enroll")
-                .about("Enroll device")
+                .about("Perform the enrollment and configuration. Use this first to set up the device.")
                 .arg(token_opt)
                 .arg(url_opt),
         )
@@ -564,7 +563,7 @@ async fn main() {
             }
         }
     };
-    debug!("Using the following CLI configuration path: {config_path:?}");
+    debug!("The following configuration will be used: {config_path:?}");
 
     if let Some(("enroll", submatches)) = matches.subcommand() {
         debug!("Enrollment command has been selected, starting enrollment...");
@@ -580,16 +579,26 @@ async fn main() {
             .await
             .expect("The enrollment process has failed");
         debug!("Successfully enrolled the device, saving the configuration...");
-        config.save(&config_path);
+        if let Err(err) = config.save(&config_path) {
+            error!("{err}");
+            return;
+        }
         info!("Device has been successfully enrolled and the CLI configuration has been saved to {config_path:?}");
     } else {
         debug!("No command has been selected, trying to proceed with establishing a connection...");
         let mut config = match CliConfig::load(&config_path) {
             Ok(config) => config,
-            Err(err) => {
-                error!("Failed to load CLI configuration: {err}");
-                return;
-            }
+            Err(err) => match err {
+                CliError::ConfigNotFound(path) => {
+                    error!("No CLI confioguration file found at \"{path}\". \
+                    Proceed with enrollment first using \"dg enroll -t <TOKEN> -u <URL>\" or pass a valid configuration file path using the \"--config\" option. Use \"dg --help\" to display all options.");
+                    return;
+                }
+                _ => {
+                    error!("Failed to load CLI configuration: {err}");
+                    return;
+                }
+            },
         };
         info!("Using the following CLI configuration: {config_path:?}");
         debug!("Successfully loaded CLI configuration");
@@ -601,7 +610,7 @@ async fn main() {
             debug!("Starting the connection task...");
             // Must be spawned as a separate task, otherwise trigger won't reach it.
             let task = tokio::spawn(connect(config.clone(), trigger.clone()));
-            debug!("Connection task has been spawned. Listening for signals...");
+            debug!("Connection task has been spawned.");
             // After cancelling the connection a given task should wait for cleanup confirmation.
             select! {
                 biased;
