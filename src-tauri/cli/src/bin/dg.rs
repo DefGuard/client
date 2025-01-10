@@ -349,7 +349,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     Ok(config)
 }
 
-const INTERVAL_SECONDS: Duration = Duration::from_secs(4);
+const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Fetch configuration from Defguard proxy.
