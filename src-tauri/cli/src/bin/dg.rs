@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use clap::{command, value_parser, Arg, Command};
+use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{find_free_tcp_port, get_interface_name};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
@@ -482,16 +482,21 @@ async fn main() {
         .long("config")
         .short('c')
         .value_name("CONFIG")
+        .env("DG_CONFIG")
         .value_parser(value_parser!(PathBuf));
     let debug_opt = Arg::new("debug")
         .help("Enable debug logs")
         .long("debug")
         .short('d')
+        .value_parser(FalseyValueParser::new())
+        .env("DG_DEBUG")
         .action(clap::ArgAction::SetTrue);
     let verbose_opt = Arg::new("verbose")
         .help("Enable logging everything")
         .long("verbose")
         .short('v')
+        .value_parser(FalseyValueParser::new())
+        .env("DG_VERBOSE")
         .action(clap::ArgAction::SetTrue);
     let token_opt = Arg::new("token")
         .help("Enrollment token")

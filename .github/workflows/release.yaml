@@ -182,6 +182,34 @@ jobs:
           asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
+      - name: Build dg deb
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/bin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_opts: '--architecture ${{ matrix.arch }} --debug --output-type deb --version ${{ env.VERSION }} --package defguard-${{ env.VERSION }}-${{ matrix.target }}.deb'
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
+          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
+          asset_content_type: application/octet-stream
+      - name: Build dg rpm
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/bin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_opts: '--architecture ${{ matrix.arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package defguard-${{ env.VERSION }}-${{ matrix.target }}.rpm'
+      - name: Upload RPM
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
+          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
+          asset_content_type: application/octet-stream
 
   build-macos:
     needs:

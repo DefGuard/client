@@ -1,0 +1,5 @@
+-s dir
+--name dg
+--description "defguard CLI client"
+--url "https://defguard.net/"
+--maintainer "teonite"
