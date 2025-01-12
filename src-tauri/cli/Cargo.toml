@@ -13,7 +13,7 @@ prost-build = "0.13"
 [dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 common = { path = "../common" }
-defguard_wireguard_rs = { workspace = true }
+defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next = "2.0"
 prost = "0.13"
 reqwest = { version = "0.12", features = ["cookies", "json"] }

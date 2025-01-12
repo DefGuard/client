@@ -185,7 +185,7 @@ jobs:
       - name: Build dg deb
         uses: defGuard/fpm-action@main
         with:
-          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/bin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
           fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb'
       - name: Upload DEB
         uses: actions/upload-release-asset@v1.0.2
@@ -199,7 +199,7 @@ jobs:
       - name: Build dg rpm
         uses: defGuard/fpm-action@main
         with:
-          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/bin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
           fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm'
       - name: Upload RPM
         uses: actions/upload-release-asset@v1.0.2
