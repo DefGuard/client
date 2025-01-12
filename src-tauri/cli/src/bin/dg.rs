@@ -490,6 +490,7 @@ async fn main() {
         .short('d')
         .value_parser(FalseyValueParser::new())
         .env("DG_DEBUG")
+        .global(true)
         .action(clap::ArgAction::SetTrue);
     let verbose_opt = Arg::new("verbose")
         .help("Enable logging everything")
@@ -497,6 +498,7 @@ async fn main() {
         .short('v')
         .value_parser(FalseyValueParser::new())
         .env("DG_VERBOSE")
+        .global(true)
         .action(clap::ArgAction::SetTrue);
     let token_opt = Arg::new("token")
         .help("Enrollment token")
