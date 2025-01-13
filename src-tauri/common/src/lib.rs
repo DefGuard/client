@@ -11,13 +11,19 @@ pub fn find_free_tcp_port() -> Option<u16> {
         .map(|local_addr| local_addr.port())
 }
 
-#[cfg(target_os = "macos")]
-/// Find next available `utun` interface.
+#[cfg(not(windows))]
+/// Find next available interface. On macOS, search for available `utun` interface.
+/// On other UNIX, search for available `wg` interface.
 #[must_use]
 pub fn get_interface_name(_name: &str) -> String {
+    #[cfg(target_os = "macos")]
+    let base_ifname = "utun";
+    #[cfg(not(target_os = "macos"))]
+    let base_ifname = "wg";
     if let Ok(interfaces) = nix::net::if_::if_nameindex() {
         for index in 0..=u16::MAX {
-            let ifname = format!("utun{index}");
+            #[cfg(target_os = "macos")]
+            let ifname = format!("{base_ifname}{index}");
             if !interfaces
                 .iter()
                 .any(|interface| interface.name().to_string_lossy() == ifname)
@@ -27,11 +33,11 @@ pub fn get_interface_name(_name: &str) -> String {
         }
     }
 
-    "utun0".into()
+    format!("{base_ifname}0")
 }
 
 /// Strips location name of all non-alphanumeric characters returning usable interface name.
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
 #[must_use]
 pub fn get_interface_name(name: &str) -> String {
     name.chars().filter(|c| c.is_alphanumeric()).collect()
