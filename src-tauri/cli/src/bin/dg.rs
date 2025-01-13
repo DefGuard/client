@@ -453,6 +453,9 @@ async fn poll_config(config: &mut CliConfig) {
             Err(CliError::EnterpriseDisabled) => {
                 debug!("Enterprise features are disabled on this Defguard instance. Skipping...");
             }
+            Err(CliError::Reqwest(err)) => {
+                warn!("Failed to make network request to proxy ({url}): {err}. Check your network connection.");
+            }
             Err(err) => {
                 warn!("Failed to fetch configuration from proxy ({url}): {err}");
             }
