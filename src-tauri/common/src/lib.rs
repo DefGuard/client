@@ -22,7 +22,6 @@ pub fn get_interface_name(_name: &str) -> String {
     let base_ifname = "wg";
     if let Ok(interfaces) = nix::net::if_::if_nameindex() {
         for index in 0..=u16::MAX {
-            #[cfg(target_os = "macos")]
             let ifname = format!("{base_ifname}{index}");
             if !interfaces
                 .iter()
