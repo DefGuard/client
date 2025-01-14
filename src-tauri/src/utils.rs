@@ -749,8 +749,8 @@ pub(crate) async fn disconnect_interface(
                 );
                 let _ = execute_command(pre_down);
                 info!(
-                    "Executed defined PreDown command before setting up the interface {} for \
-                    the tunnel {tunnel}: {pre_down}",
+                    "Executed defined PreDown command before setting up the interface {} for the \
+                    tunnel {tunnel}: {pre_down}",
                     active_connection.interface_name
                 );
             }
