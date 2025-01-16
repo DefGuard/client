@@ -45,7 +45,7 @@ use crate::{
 };
 
 #[derive(Clone, Serialize)]
-pub struct Payload {
+pub(crate) struct Payload {
     pub message: String,
 }
 
