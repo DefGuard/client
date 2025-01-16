@@ -122,8 +122,8 @@ impl DesktopDaemonService for DaemonService {
             debug!("Done creating a new interface {ifname}");
         }
 
-        // The WireGuard DNS config value can be a list of IP addresses and domain names, which will be
-        // used as DNS servers and search domains respectively.
+        // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
+        // be used as DNS servers and search domains respectively.
         debug!("Preparing DNS configuration for interface {ifname}");
         let dns_string = request.dns.unwrap_or_default();
         let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
@@ -137,7 +137,10 @@ impl DesktopDaemonService for DaemonService {
                 search_domains.push(entry);
             }
         }
-        debug!("DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: {search_domains:?}");
+        debug!(
+            "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
+            {search_domains:?}"
+        );
 
         #[cfg(not(windows))]
         let configure_interface_result = wgapi.configure_interface(&config);
@@ -161,9 +164,15 @@ impl DesktopDaemonService for DaemonService {
             })?;
 
             if dns.is_empty() {
-                debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
+                debug!(
+                    "No DNS configuration provided for interface {ifname}, skipping DNS \
+                    configuration"
+                );
             } else {
-                debug!("The following DNS servers will be set: {dns:?}, search domains: {search_domains:?}");
+                debug!(
+                    "The following DNS servers will be set: {dns:?}, search domains: \
+                    {search_domains:?}"
+                );
                 wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
                     let msg =
                         format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
@@ -221,7 +230,8 @@ impl DesktopDaemonService for DaemonService {
         let request = request.into_inner();
         let ifname = request.interface_name;
         debug!(
-            "Received a request to start a new network usage stats data stream for interface {ifname}"
+            "Received a request to start a new network usage stats data stream for interface \
+            {ifname}"
         );
         let span = info_span!("read_interface_data", interface_name = &ifname);
 
@@ -234,58 +244,73 @@ impl DesktopDaemonService for DaemonService {
             info!("Spawning statistics collector task for interface {ifname}");
         });
 
-        tokio::spawn(async move {
-            // Helper map to track if peer data is actually changing to avoid sending duplicate stats.
-            let mut peer_map = HashMap::new();
+        tokio::spawn(
+            async move {
+                // Helper map to track if peer data is actually changing to avoid sending duplicate
+                // stats.
+                let mut peer_map = HashMap::new();
 
-            loop {
-                // Loop delay
-                interval.tick().await;
-                debug!("Gathering network usage statistics for client's network activity on {ifname}");
-                match wgapi.read_interface_data() {
-                    Ok(mut host) => {
-                        let peers = &mut host.peers;
-                        debug!(
-                            "Found {} peers configured on WireGuard interface",
-                            peers.len()
-                        );
-                        // Filter out never connected peers.
-                        peers.retain(|_, peer| {
-                            // Last handshake time-stamp must exist...
-                            if let Some(last_hs) = peer.last_handshake {
-                                // ...and not be UNIX epoch.
-                                if last_hs != SystemTime::UNIX_EPOCH &&
-                                    match peer_map.get(&peer.public_key) {
-                                    Some(last_peer) => last_peer != peer,
-                                    None => true,
-                                } {
-                                    debug!("Peer {} statistics changed; keeping it.", peer.public_key);
-                                    peer_map.insert(peer.public_key.clone(), peer.clone());
-                                    return true;
+                loop {
+                    // Loop delay
+                    interval.tick().await;
+                    debug!(
+                    "Gathering network usage statistics for client's network activity on {ifname}");
+                    match wgapi.read_interface_data() {
+                        Ok(mut host) => {
+                            let peers = &mut host.peers;
+                            debug!(
+                                "Found {} peers configured on WireGuard interface",
+                                peers.len()
+                            );
+                            // Filter out never connected peers.
+                            peers.retain(|_, peer| {
+                                // Last handshake time-stamp must exist...
+                                if let Some(last_hs) = peer.last_handshake {
+                                    // ...and not be UNIX epoch.
+                                    if last_hs != SystemTime::UNIX_EPOCH
+                                        && match peer_map.get(&peer.public_key) {
+                                            Some(last_peer) => last_peer != peer,
+                                            None => true,
+                                        }
+                                    {
+                                        debug!(
+                                            "Peer {} statistics changed; keeping it.",
+                                            peer.public_key
+                                        );
+                                        peer_map.insert(peer.public_key.clone(), peer.clone());
+                                        return true;
+                                    }
                                 }
+                                debug!(
+                                    "Peer {} statistics didn't change; ignoring it.",
+                                    peer.public_key
+                                );
+                                false
+                            });
+                            if let Err(err) = tx.send(Ok(host.into())).await {
+                                error!(
+                                    "Couldn't send network usage stats update for {ifname}: {err}"
+                                );
+                                break;
                             }
-                            debug!("Peer {} statistics didn't change; ignoring it.", peer.public_key);
-                            false
-                        });
-                        if let Err(err) = tx.send(Ok(host.into())).await {
+                        }
+                        Err(err) => {
                             error!(
-                                "Couldn't send network usage stats update for {ifname}: {err}"
+                                "Failed to retrieve network usage stats for interface {ifname}: \
+                                {err}"
                             );
                             break;
                         }
                     }
-                    Err(err) => {
-                        error!("Failed to retrieve network usage stats for interface {ifname}: {err}");
-                        break;
-                    }
+                    debug!("Network activity statistics for interface {ifname} sent to the client");
                 }
-                debug!("Network activity statistics for interface {ifname} sent to the client");
-            }
-            debug!(
-                "The client has disconnected from the network usage statistics data stream \
+                debug!(
+                    "The client has disconnected from the network usage statistics data stream \
                 for interface {ifname}, stopping the statistics data collection task."
-            );
-        }.instrument(span));
+                );
+            }
+            .instrument(span),
+        );
 
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(

@@ -37,7 +37,7 @@ base64 = "0.22"
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 chrono = { version = "0.4", features = ["serde"] }
 common = { path = "common" }
-dark-light = "1.1"
+dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next = "2.0"
 lazy_static = "1.5"
@@ -87,12 +87,11 @@ x25519-dalek = { version = "2", features = [
   "static_secrets",
 ] }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-service = "0.7"
+[target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winsvc", "winerror"] }
-widestring = "1.1"
+windows-service = "0.7"
 
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["net"] }
 
 [features]
