@@ -91,16 +91,20 @@ impl CliConfig {
         };
         #[cfg(not(windows))]
         {
-            let mut perms = file
-                .metadata()
-                .map_err(|err| {
-                    CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
-                })?
-                .permissions();
-            perms.set_mode(0o600);
-            file.set_permissions(perms).map_err(|err| {
-                CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
-            })?;
+            debug!("Setting config file permissions...");
+            match file.metadata() {
+                Ok(meta) => {
+                    let mut perms = meta.permissions();
+                    perms.set_mode(0o600);
+                    if let Err(err) = file.set_permissions(perms) {
+                        warn!("Failed to set permissions for the configuration file: {err}");
+                    }
+                }
+                Err(err) => {
+                    warn!("Failed to set permissions for the configuration file: {err}")
+                }
+            }
+            debug!("Config file permissions have been set.");
         }
         match serde_json::to_writer(file, &self) {
             Ok(()) => debug!(
