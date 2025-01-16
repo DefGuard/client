@@ -2,6 +2,7 @@ use core::fmt;
 use std::{
     fs::{create_dir, OpenOptions},
     net::IpAddr,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -74,7 +75,6 @@ impl CliConfig {
 
     /// Save configuration to a file at `path`.
     fn save(&self, path: &Path) -> Result<(), CliError> {
-        // TODO: chmod 600 / umask
         let file = match OpenOptions::new()
             .create(true)
             .truncate(true)
@@ -89,6 +89,16 @@ impl CliConfig {
                 ));
             }
         };
+        let mut perms = file
+            .metadata()
+            .map_err(|err| {
+                CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+            })?
+            .permissions();
+        perms.set_mode(0o600);
+        file.set_permissions(perms).map_err(|err| {
+            CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+        })?;
         match serde_json::to_writer(file, &self) {
             Ok(()) => debug!(
                 "Configuration file has been saved to {}",
