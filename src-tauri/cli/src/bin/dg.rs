@@ -89,16 +89,19 @@ impl CliConfig {
                 ));
             }
         };
-        let mut perms = file
-            .metadata()
-            .map_err(|err| {
+        #[cfg(not(windows))]
+        {
+            let mut perms = file
+                .metadata()
+                .map_err(|err| {
+                    CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+                })?
+                .permissions();
+            perms.set_mode(0o600);
+            file.set_permissions(perms).map_err(|err| {
                 CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
-            })?
-            .permissions();
-        perms.set_mode(0o600);
-        file.set_permissions(perms).map_err(|err| {
-            CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
-        })?;
+            })?;
+        }
         match serde_json::to_writer(file, &self) {
             Ok(()) => debug!(
                 "Configuration file has been saved to {}",
