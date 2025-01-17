@@ -1,8 +1,9 @@
 use core::fmt;
+#[cfg(not(windows))]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::{create_dir, OpenOptions},
     net::IpAddr,
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
