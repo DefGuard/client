@@ -1,0 +1,21 @@
+[Unit]
+Description=Defguard CLI client
+Documentation=https://docs.defguard.net/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecReload=/bin/kill -HUP $MAINPID
+EnvironmentFile=/etc/defguard/dg.conf
+ExecStart=/usr/sbin/dg
+KillMode=process
+KillSignal=SIGINT
+LimitNOFILE=65536
+LimitNPROC=infinity
+Restart=on-failure
+RestartSec=2
+TasksMax=infinity
+OOMScoreAdjust=-1000
+
+[Install]
+WantedBy=multi-user.target
