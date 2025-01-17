@@ -230,7 +230,10 @@ pub async fn spawn_log_watcher_task(
         "Location"
     };
     let event_topic = format!("log-update-{connection_type_str}-{location_id}");
-    debug!("Using the following event topic for the service log watcher for communicating with the frontend: {event_topic}");
+    debug!(
+        "Using the following event topic for the service log watcher for communicating with the \
+        frontend: {event_topic}"
+    );
 
     // explicitly clone before topic is moved into the closure
     let topic_clone = event_topic.clone();
@@ -273,8 +276,11 @@ pub async fn spawn_log_watcher_task(
     }
 
     let name = get_tunnel_or_location_name(location_id, connection_type, &app_state).await;
-    info!("A background task has been spawned to watch the defguard service log file for {connection_type} {name} (interface {interface_name}), \
-        location's specific collected logs will be displayed in the {connection_type}'s detailed view.");
+    info!(
+        "A background task has been spawned to watch the defguard service log file for \
+        {connection_type} {name} (interface {interface_name}), location's specific collected logs \
+        will be displayed in the {connection_type}'s detailed view."
+    );
     Ok(event_topic)
 }
 
