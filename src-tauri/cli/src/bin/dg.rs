@@ -1,8 +1,9 @@
 use core::fmt;
+#[cfg(not(windows))]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::{create_dir, OpenOptions},
     net::IpAddr,
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -154,9 +155,9 @@ async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError
 
     // let wgapi = setup_wgapi(&ifname).expect("Failed to setup WireGuard API");
     #[cfg(not(target_os = "macos"))]
-    let wgapi = WGApi::<Kernel>::new(ifname.to_string())?;
+    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
     #[cfg(target_os = "macos")]
-    let wgapi = WGApi::<Userspace>::new(ifname.to_string())?;
+    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
 
     #[cfg(not(windows))]
     {
