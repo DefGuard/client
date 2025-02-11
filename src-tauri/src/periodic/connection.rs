@@ -124,7 +124,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
             trace!("Connection: {con:?}");
             match con.connection_type {
                 ConnectionType::Location => {
-                    match LocationStats::latest_by_location_id(pool, con.location_id).await {
+                    match LocationStats::latest_by_download_change(pool, con.location_id).await {
                         Ok(Some(latest_stat)) => {
                             trace!("Latest statistics for location: {latest_stat:?}");
                             if !check_last_active_connection(
@@ -177,7 +177,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                     }
                 }
                 ConnectionType::Tunnel => {
-                    match TunnelStats::latest_by_tunnel_id(pool, con.location_id).await {
+                    match TunnelStats::latest_by_download_change(pool, con.location_id).await {
                         Ok(Some(latest_stat)) => {
                             trace!("Latest statistics for tunnel: {latest_stat:?}");
                             if !check_last_active_connection(

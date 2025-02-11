@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id!: i64\", tunnel_id, upload \"upload!: i64\", download \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM tunnel_stats WHERE tunnel_id = $1\n            ORDER BY collected_at DESC LIMIT 1",
+  "query": "WITH prev_download AS (\n              SELECT download \n              FROM location_stats \n              WHERE location_id = $1 \n              ORDER BY collected_at DESC \n              LIMIT 1 OFFSET 1\n          )\n          SELECT ls.id \"id!: i64\",\n              ls.location_id,\n              ls.upload \"upload!: i64\",\n              ls.download \"download!: i64\",\n              ls.last_handshake,\n              ls.collected_at \"collected_at!: NaiveDateTime\",\n              ls.listen_port \"listen_port!: u32\",\n              ls.persistent_keepalive_interval \"persistent_keepalive_interval?: u16\"\n          FROM location_stats ls\n          LEFT JOIN prev_download pd\n          WHERE ls.location_id = $1\n          AND (pd.download IS NULL OR ls.download != pd.download)\n          ORDER BY ls.collected_at DESC\n          LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "tunnel_id",
+        "name": "location_id",
         "ordinal": 1,
         "type_info": "Integer"
       },
@@ -48,15 +48,15 @@
       "Right": 1
     },
     "nullable": [
+      true,
       false,
       false,
       false,
       false,
       false,
       false,
-      false,
-      false
+      true
     ]
   },
-  "hash": "78020452af5171aebc3a1f8ba0444558b9fffbe57f2e24b0b8fdec2ce70d6fb6"
+  "hash": "bdb139d1c8f2c01a6cbf53415ee72ac3745bb56b62b7c575cdb1e6a9f35f042b"
 }
