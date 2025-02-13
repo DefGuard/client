@@ -13,7 +13,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use super::VERSION;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -38,6 +37,7 @@ use tonic::{
 use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
+use super::VERSION;
 
 const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";

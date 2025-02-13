@@ -361,7 +361,7 @@ impl TunnelStats<Id> {
         Ok(stats)
     }
 
-    pub async fn latest_by_tunnel_id<'e, E>(
+    pub(crate) async fn latest_by_download_change<'e, E>(
         executor: E,
         tunnel_id: Id,
     ) -> Result<Option<Self>, Error>
@@ -370,17 +370,27 @@ impl TunnelStats<Id> {
     {
         let res = query_as!(
             TunnelStats::<Id>,
-            "SELECT id \"id!: i64\", \
-            tunnel_id, \
-            upload \"upload!: i64\", \
-            download \"download!: i64\", \
-            last_handshake, \
-            collected_at \"collected_at!: NaiveDateTime\", \
-            listen_port \"listen_port!: u32\", \
-            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
-            FROM tunnel_stats \
-            WHERE tunnel_id = $1
-            ORDER BY collected_at DESC LIMIT 1",
+            "WITH prev_download AS (
+            SELECT download 
+            FROM tunnel_stats 
+            WHERE tunnel_id = $1 
+            ORDER BY collected_at DESC 
+            LIMIT 1 OFFSET 1
+        )
+        SELECT ts.id \"id!: i64\",
+            ts.tunnel_id,
+            ts.upload \"upload!: i64\",
+            ts.download \"download!: i64\",
+            ts.last_handshake,
+            ts.collected_at \"collected_at!: NaiveDateTime\",
+            ts.listen_port \"listen_port!: u32\",
+            ts.persistent_keepalive_interval \"persistent_keepalive_interval?: u16\"
+        FROM tunnel_stats ts
+        LEFT JOIN prev_download pd
+        WHERE ts.tunnel_id = $1
+        AND (pd.download IS NULL OR ts.download != pd.download)
+        ORDER BY ts.collected_at DESC
+        LIMIT 1",
             tunnel_id
         )
         .fetch_optional(executor)

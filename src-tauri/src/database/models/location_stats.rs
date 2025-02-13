@@ -166,7 +166,7 @@ impl LocationStats<Id> {
         Ok(stats)
     }
 
-    pub(crate) async fn latest_by_location_id<'e, E>(
+    pub(crate) async fn latest_by_download_change<'e, E>(
         executor: E,
         location_id: Id,
     ) -> Result<Option<Self>, Error>
@@ -175,17 +175,27 @@ impl LocationStats<Id> {
     {
         let res = query_as!(
             LocationStats::<Id>,
-            "SELECT id \"id!: i64\", \
-            location_id, \
-            upload \"upload!: i64\", \
-            download \"download!: i64\", \
-            last_handshake, \
-            collected_at \"collected_at!: NaiveDateTime\", \
-            listen_port \"listen_port!: u32\",
-            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
-            FROM location_stats \
-            WHERE location_id = $1 \
-            ORDER BY collected_at DESC LIMIT 1",
+            "WITH prev_download AS (
+              SELECT download 
+              FROM location_stats 
+              WHERE location_id = $1 
+              ORDER BY collected_at DESC 
+              LIMIT 1 OFFSET 1
+          )
+          SELECT ls.id \"id!: i64\",
+              ls.location_id,
+              ls.upload \"upload!: i64\",
+              ls.download \"download!: i64\",
+              ls.last_handshake,
+              ls.collected_at \"collected_at!: NaiveDateTime\",
+              ls.listen_port \"listen_port!: u32\",
+              ls.persistent_keepalive_interval \"persistent_keepalive_interval?: u16\"
+          FROM location_stats ls
+          LEFT JOIN prev_download pd
+          WHERE ls.location_id = $1
+          AND (pd.download IS NULL OR ls.download != pd.download)
+          ORDER BY ls.collected_at DESC
+          LIMIT 1",
             location_id
         )
         .fetch_optional(executor)
