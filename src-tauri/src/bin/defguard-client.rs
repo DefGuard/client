@@ -5,14 +5,13 @@
 
 use std::{env, str::FromStr};
 
-use defguard_client::commands::*;
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
     appstate::AppState,
-    enterprise::periodic::config::poll_config,
+    commands::*,
     events::SINGLE_INSTANCE,
-    periodic::{connection::verify_active_connections, version::poll_version},
+    periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
     utils::load_log_targets,
@@ -57,7 +56,7 @@ async fn main() {
         let current_path = env::var("PATH").expect("Failed to get current PATH variable");
         env::set_var(
             "PATH",
-            format! {"{current_path}:{}", current_bin_dir.to_str().unwrap()},
+            format!("{current_path}:{}", current_bin_dir.to_str().unwrap()),
         );
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
@@ -198,11 +197,11 @@ async fn main() {
         app_handle
             .path_resolver()
             .app_data_dir()
-            .unwrap_or("UNDEFINED DATA DIRECTORY".into()),
+            .unwrap_or_else(|| "UNDEFINED DATA DIRECTORY".into()),
         app_handle
             .path_resolver()
             .app_log_dir()
-            .unwrap_or("UNDEFINED LOG DIRECTORY".into()),
+            .unwrap_or_else(|| "UNDEFINED LOG DIRECTORY".into()),
         service::config::DEFAULT_LOG_DIR
     );
 
@@ -245,10 +244,17 @@ async fn main() {
     }
 
     // run periodic tasks
-    debug!("Starting periodic tasks (config and version polling)...");
-    tauri::async_runtime::spawn(poll_version(app_handle.clone()));
-    tauri::async_runtime::spawn(poll_config(app_handle.clone()));
-    tauri::async_runtime::spawn(verify_active_connections(app_handle.clone()));
+    debug!(
+        "Starting periodic tasks (config, version polling and active connection verification)..."
+    );
+    let periodic_tasks_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        run_periodic_tasks(&periodic_tasks_handle).await;
+        // One of the tasks exited, so something went wrong, quit the app
+        error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
+        let app_state: State<AppState> = periodic_tasks_handle.state();
+        app_state.quit(&periodic_tasks_handle);
+    });
     debug!("Periodic tasks have been started");
 
     // load tray menu after database initialization to show all instance and locations

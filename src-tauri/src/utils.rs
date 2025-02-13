@@ -6,6 +6,13 @@ use sqlx::query;
 use tauri::{AppHandle, Manager};
 use tonic::{transport::Channel, Code};
 use tracing::Level;
+#[cfg(target_os = "windows")]
+use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
+#[cfg(target_os = "windows")]
+use windows_service::{
+    service::{ServiceAccess, ServiceState},
+    service_manager::{ServiceManager, ServiceManagerAccess},
+};
 
 use crate::{
     appstate::AppState,
@@ -29,13 +36,6 @@ use crate::{
         ReadInterfaceDataRequest, RemoveInterfaceRequest,
     },
     ConnectionType,
-};
-#[cfg(target_os = "windows")]
-use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
-#[cfg(target_os = "windows")]
-use windows_service::{
-    service::{ServiceAccess, ServiceState},
-    service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";

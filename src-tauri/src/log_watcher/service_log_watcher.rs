@@ -18,6 +18,7 @@ use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
+use super::{LogLine, LogWatcherError};
 use crate::{
     appstate::AppState,
     database::models::Id,
@@ -26,8 +27,6 @@ use crate::{
     utils::{get_service_log_dir, get_tunnel_or_location_name},
     ConnectionType,
 };
-
-use super::{LogLine, LogWatcherError};
 
 const DELAY: Duration = Duration::from_secs(2);
 

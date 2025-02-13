@@ -90,7 +90,11 @@ async fn disconnect_dead_connection(
 
 /// Verify if the active connection is active. This is needed in case client was offline and
 /// gateway already terminated the peer but client still assume it's connected.
-pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Error> {
+///
+/// The decision whether the connection is active is made based on the time of the last stat which download has changed, indicating
+/// a successful two-way communication. If that time is longer than the peer_alive_period, the connection is considered dead.
+/// Only the download change is verified, as the upload change doesn't guarantee that packets are being received from the gateway.
+pub async fn verify_active_connections(app_handle: AppHandle) {
     let app_state = app_handle.state::<AppState>();
     let pool = &app_state.db;
     debug!("Active connections verification started.");
@@ -124,7 +128,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
             trace!("Connection: {con:?}");
             match con.connection_type {
                 ConnectionType::Location => {
-                    match LocationStats::latest_by_location_id(pool, con.location_id).await {
+                    match LocationStats::latest_by_download_change(pool, con.location_id).await {
                         Ok(Some(latest_stat)) => {
                             trace!("Latest statistics for location: {latest_stat:?}");
                             if !check_last_active_connection(
@@ -177,7 +181,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) -> Result<(), Erro
                     }
                 }
                 ConnectionType::Tunnel => {
-                    match TunnelStats::latest_by_tunnel_id(pool, con.location_id).await {
+                    match TunnelStats::latest_by_download_change(pool, con.location_id).await {
                         Ok(Some(latest_stat)) => {
                             trace!("Latest statistics for tunnel: {latest_stat:?}");
                             if !check_last_active_connection(
