@@ -13,7 +13,6 @@ use crate::{
         tunnel::{Tunnel, TunnelStats},
         Id,
     },
-    error::Error,
     events::{DeadConnDroppedOut, DeadConnReconnected},
     ConnectionType,
 };
