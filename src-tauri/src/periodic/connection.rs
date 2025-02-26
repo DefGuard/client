@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use chrono::{NaiveDateTime, TimeDelta, Utc};
 use tauri::{AppHandle, Manager};
-use time::Time;
 use tokio::time::sleep;
 
 use crate::{
@@ -139,7 +138,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
                                 // Check if there was any traffic since the connection was established
                                 // If not and the connection was established longer than the peer_alive_period,
                                 // consider the location dead and disconnect it later without reconnecting.
-                                let time_since_connection = Utc::now().naive_utc() - con.start;
+                                let time_since_connection = Utc::now() - con.start.and_utc();
                                 if latest_stat.collected_at < con.start {
                                     if time_since_connection > peer_alive_period {
                                         debug!(
