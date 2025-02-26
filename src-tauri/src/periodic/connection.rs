@@ -135,17 +135,28 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
                                 latest_stat.collected_at,
                                 peer_alive_period,
                             ) {
-                                // Check if there was any traffic since the connection was established.
-                                // If not, consider the location dead and disconnect it later without reconnecting.
+                                // Check if there was any traffic since the connection was established
+                                // If not and the connection was established longer than the peer_alive_period,
+                                // consider the location dead and disconnect it later without reconnecting.
+                                let time_since_connection = Utc::now() - con.start.and_utc();
                                 if latest_stat.collected_at < con.start {
-                                    debug!(
-                                        "There wasn't any activity for Location {} since its \
-                                        connection at {}; considering it being dead and possibly \
-                                        broken. It will be disconnected without a further automatic \
-                                        reconnect.",
-                                        con.location_id, con.start
-                                    );
-                                    locations_to_disconnect.push((con.location_id, false));
+                                    if time_since_connection > peer_alive_period {
+                                        debug!(
+                                          "There wasn't any activity for Location {} since its \
+                                          connection at {}; considering it being dead and possibly \
+                                          broken. It will be terminated without a further automatic \
+                                          reconnect.",
+                                          con.location_id, con.start
+                                        );
+                                        locations_to_disconnect.push((con.location_id, false));
+                                    } else {
+                                        debug!(
+                                          "There wasn't any activity for Location {} since its \
+                                          connection at {}; The amount of time passed since the connection \
+                                          is {time_since_connection}, the connection will be terminated when it reaches \
+                                          {peer_alive_period}", 
+                                        con.location_id, con.start);
+                                    }
                                 } else {
                                     debug!(
                                         "There wasn't any activity for Location {} for the last \
