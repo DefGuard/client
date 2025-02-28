@@ -842,8 +842,8 @@ async fn check_connection(
 ) -> Result<(), Error> {
     let appstate = app_handle.state::<AppState>();
     let interface_name = get_interface_name(name);
-    let service_name = format!("WireGuardTunnel${}", name);
-    let service = match service_manager.open_service(&service_name, ServiceAccess::QUERY_CONFIG) {
+    let service_name = format!("WireGuardTunnel${}", interface_name);
+    let service = match service_manager.open_service(&service_name, ServiceAccess::QUERY_STATUS) {
         Ok(service) => service,
         Err(windows_service::Error::Winapi(err))
             if err.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) =>
