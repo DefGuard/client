@@ -102,7 +102,6 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
       body: Body.json(data),
     })
       .then(async (res: Response<EnrollmentStartResponse | EnrollmentError>) => {
-        const authCookie = res.headers['set-cookie'];
         if (!res.ok) {
           setIsLoading(false);
           error(JSON.stringify(res.data));
@@ -121,6 +120,24 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
               );
             }
           }
+        }
+        // There may be other set-cookies, set by e.g. a proxy
+        // Get only the defguard_proxy cookie
+        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
+          cookie.startsWith('defguard_proxy='),
+        );
+        if (!authCookie) {
+          setIsLoading(false);
+          error(
+            LL.common.messages.errorWithMessage({
+              message: LL.common.messages.noCookie(),
+            }),
+          );
+          throw Error(
+            LL.common.messages.errorWithMessage({
+              message: LL.common.messages.noCookie(),
+            }),
+          );
         }
         debug('Response received with status OK');
         const r = res.data as EnrollmentStartResponse;
