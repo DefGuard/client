@@ -54,6 +54,7 @@ const en = {
         'Configuration for instance {instance: string} has changed. Disconnect from all locations to apply changes.',
       deadConDropped:
         'Detected that the {con_type: string} {interface_name: string} has disconnected, trying to reconnect...',
+      noCookie: 'No defguard_proxy set-cookie received',
     },
   },
   components: {

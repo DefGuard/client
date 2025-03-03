@@ -165,6 +165,10 @@ type RootTranslation = {
 			 * @param {string} interface_name
 			 */
 			deadConDropped: RequiredParams<'con_type' | 'interface_name'>
+			/**
+			 * N​o​ ​d​e​f​g​u​a​r​d​_​p​r​o​x​y​ ​s​e​t​-​c​o​o​k​i​e​ ​r​e​c​e​i​v​e​d
+			 */
+			noCookie: string
 		}
 	}
 	components: {
@@ -1762,6 +1766,10 @@ export type TranslationFunctions = {
 			 * Detected that the {con_type} {interface_name} has disconnected, trying to reconnect...
 			 */
 			deadConDropped: (arg: { con_type: string, interface_name: string }) => LocalizedString
+			/**
+			 * No defguard_proxy set-cookie received
+			 */
+			noCookie: () => LocalizedString
 		}
 	}
 	components: {
