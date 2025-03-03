@@ -108,7 +108,17 @@ export const UpdateInstanceModalForm = () => {
       proxy_api_url = proxy_api_url + '/api/v1';
       const instance = clientInstances.find((i) => i.uuid === enrollmentData.instance.id);
       if (instance) {
-        const authCookie = res.headers['set-cookie'];
+        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
+          cookie.startsWith('defguard_proxy='),
+        );
+        if (!authCookie) {
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: LL.common.messages.noCookie(),
+            }),
+          );
+          return;
+        }
         headers['Cookie'] = authCookie;
         const instanceInfoResponse = await fetch<CreateDeviceResponse>(
           `${proxy_api_url}/enrollment/network_info`,
