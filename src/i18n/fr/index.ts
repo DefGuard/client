@@ -108,7 +108,7 @@ Si vous souhaitez sécuriser votre instance WireGuard, essayez le serveur **defg
             },
             security: {
               // md
-              title: 'Sécurité et confidentialité **bien faites !**',
+              title: 'Une sécurité et une confidentialité dans **les règles de l\'art**',
               // md
               sideText: `* La confidentialité nécessite le contrôle de vos données, donc vos données utilisateur (Identité, SSO) doivent être sur hebergées sur vos serveurs.
 * La sécurisation de vos données et applications nécessite une authentification et une autorisation (SSO) avec une authentification multi-facteurs, et pour une sécurité plus evoluée - du MFA avec un module de sécurité matériel.
@@ -204,7 +204,7 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
           instance: {
             title: 'Votre instance a été ajoutée avec succès',
             content:
-              'Votre instance a été ajoutée avec succès. Vous pouvez maintenant connecter cet appareil. Véérifier son état et les statistiques en utilisant le menu dans la barre latérale de gauche.',
+              'Votre instance a été ajoutée avec succès. Vous pouvez maintenant connecter cet appareil. Vérifier son état et les statistiques en utilisant le menu dans la barre latérale de gauche.',
             controls: {
               submit: 'Ajouter une autre instance',
             },
@@ -222,7 +222,7 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
               helper: `
                 <p>
                   <b>Trafic prédéfini</b> - router uniquement le trafic pour les réseaux définis par l'administrateur via cet emplacement VPN</br>
-                  <b>Tout le trafic</b> - router TOUT votre trafic réseau via cet emplacement VPN
+                  <b>Tout le trafic</b> - router L'INTEGRALITE de votre trafic réseau via cet emplacement VPN
                 </p>`,
             },
           },
@@ -335,7 +335,7 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
               },
               helpers: {
                 advancedOptions:
-                  'Cliquez sur la section "Options avancées" pour afficher les paramètres supplémentaires permettant d\'affiner la configuration de votre tunnel WireGuard. Parmis les options disponibles, vous pouvez ppersonnaliser les scripts pré et post',
+                  'Cliquez sur la section "Options avancées" pour afficher les paramètres supplémentaires permettant d\'affiner la configuration de votre tunnel WireGuard. Parmi les options disponibles, vous pouvez personnaliser les scripts de pré-exécution/post-exécution',
                 name: 'Un nom unique pour votre tunnel WireGuard afin de l\'identifier facilement.',
                 pubkey:
                   'La clé publique associée au tunnel WireGuard pour une communication sécurisée.',
@@ -394,7 +394,7 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
                 <div>
                 <ul>
                   <li> Entrez un nom pour le tunnel.</li>
-                  <li> Fournissez des détails essentiels tels que la clé privée, la clé publique et l\'endpoint (adresse du serveur).</li>
+                  <li> Fournissez les détails nécessaires tels que la clé privée, la clé publique et l\'endpoint (adresse du serveur).</li>
                 </ul>
                 </div>
                 <p>
@@ -433,16 +433,16 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
             card: {
               title: 'Vous pouvez obtenir le jeton en',
               content: `
-                <p>1. En invoquant le processus d\'activation du Bureau à distance vous-même</p>
+                <p>1. Invoquant le processus d\'activation du Bureau à distance vous-même</p>
                 <div>
                 <p>
-                Si vous avez accès à votre instance defguard (soit vous êtes chez vous/au bureau où defguard est accessible), allez sur defguard -> votre profil -> "Ajouter un appareil" et choisissez : Activer le client Defguard. Ensuite, choisissez si vous souhaitez que le jeton vous soit envoyé par e-mail ou simplement le copier depuis defguard.
+                Si vous avez accès à votre instance defguard (depuis chez vous ou au bureau), allez sur defguard -> votre profil -> "Ajouter un appareil" et choisissez : Activer le client Defguard. Ensuite, choisissez si vous souhaitez que le jeton vous soit envoyé par e-mail ou simplement le copier depuis defguard.
                 </p>
                 </div>
-                <p>2. En activant à distance par votre administrateur</p>
+                <p>2. L\'activant à distance par votre administrateur</p>
                 <div>
                 <p>
-                Si vous n\'avez pas accès à defguard - veuillez contacter votre administrateur (dans votre message/e-mail d\'intégration se trouvaient les coordonnées de l\'administrateur) et demandez l\'activation du bureau à distance - le mieux est de vous envoyer l\'e-mail d\'activation, à partir duquel vous pourrez copier l\'URL de l\'instance et le jeton.
+                Si vous n\'avez pas accès à defguard - veuillez contacter votre administrateur (dans votre message/e-mail d\'intégration se trouvent les coordonnées de l\'administrateur) et demandez l\'activation du bureau à distance - le mieux est de vous envoyer l\'e-mail d\'activation, à partir duquel vous pourrez copier l\'URL de l\'instance et le jeton.
                 </p>
                 </div>
                 <p>
@@ -584,7 +584,7 @@ Si vous avez des questions, veuillez consulter votre administrateur. Toutes les 
 `,
                   manual: `
         <p>
-          Veuillez noter que la configuration fournie ici <strong>n'inclut pas la clé privée et utilise la clé publique à sa place</strong> vous devrez la remplacer vous-même pour que la configuration fonctionne correctement.
+          Veuillez noter que la configuration fournie ici <strong>inclut la clé publique en lieu et place de la clé privée.</strong> Vous devrez la remplacer pour que la configuration fonctionne correctement.
         </p>
 `,
                 },
