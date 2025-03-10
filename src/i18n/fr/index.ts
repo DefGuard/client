@@ -95,14 +95,14 @@ const fr = {
               tunnel: {
                 title: 'Ajouter un tunnel',
                 subtitle:
-                  'Utilisez-le aisément comme un client WireGuard®. Configurez votre propre tunnel ou importez un fichier de configuration.',
+                  'Utilisez-le simplement comme un client WireGuard®. Configurez votre propre tunnel ou importez un fichier de configuration.',
               },
             },
             twoFa: {
               // md
               title: 'WireGuard **2FA avec defguard**',
               // md
-              sideText: `Étant donné que le protocole WireGuard ne supporte pas le 2FA/MFA - la plupart (sinon tous) des clients WireGuard actuellement disponibles ne supportent pas l\'authentification multi-facteurs/2FA réelle - et utilisent le 2FA uniquement comme autorisation à l\'"application" elle-même (et non au tunnel WireGuard).
+              sideText: `Le protocole WireGuard ne supporte pas le 2FA/MFA - la plupart (sinon tous) des clients WireGuard actuellement disponibles ne supportent pas l\'authentification multi-facteurs/2FA réelle - et utilisent le 2FA uniquement comme autorisation à l\'"application" elle-même (et non au tunnel WireGuard).
 
 Si vous souhaitez sécuriser votre instance WireGuard, essayez le serveur **defguard** VPN & SSO (qui est également gratuit et open source) pour obtenir un véritable 2FA en utilisant les clés PSK WireGuard et la configuration des pairs par la passerelle defguard !`,
             },
@@ -110,9 +110,9 @@ Si vous souhaitez sécuriser votre instance WireGuard, essayez le serveur **defg
               // md
               title: 'Une sécurité et une confidentialité dans **les règles de l\'art**',
               // md
-              sideText: `* La confidentialité nécessite le contrôle de vos données, donc vos données utilisateur (Identité, SSO) doivent être sur hebergées sur vos serveurs.
-* La sécurisation de vos données et applications nécessite une authentification et une autorisation (SSO) avec une authentification multi-facteurs, et pour une sécurité plus evoluée - du MFA avec un module de sécurité matériel.
-* L\'accés sécurisé et confidentielle, à vos données et applications, nécessite un chiffrement des données (HTTPS) et un tunnel sécurisé entre votre appareil et Internet pour bénéficier d'un chiffrement de bout en bout du trafic (VPN).
+              sideText: `* La confidentialité nécessite le contrôle de vos données (Identité, SSO), elles doivent donc être hebergées sur vos serveurs.
+* La sécurisation de vos données et applications nécessite une authentification et une autorisation (SSO) avec une authentification multi-facteurs. Pour une sécurité plus evoluée - du MFA avec un module de sécurité matériel.
+* L\'accés sécurisé et confidentielle à vos données et applications nécessite un chiffrement des données (HTTPS) et un tunnel sécurisé, entre votre appareil et Internet, pour bénéficier d'un chiffrement de bout en bout du trafic (VPN).
 * Pour faire entièrement confiance à vos solutions SSO & VPN, elle doivent être open source`,
             },
             instances: {
@@ -283,9 +283,9 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
                   serverAddress: 'Adresse du serveur',
                   allowedIps: 'IP autorisées',
                   dns: 'Serveurs DNS',
-                  keepalive: 'Keepalive persistant',
-                  handshake: 'Dernier Handshake',
-                  handshakeValue: 'il y a {seconds: number} secondes',
+                  keepalive: 'Keepalive',
+                  handshake: 'Handshake',
+                  handshakeValue: '{seconds: number} secondes',
                 },
               },
             },
