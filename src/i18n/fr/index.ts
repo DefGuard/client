@@ -1,8 +1,11 @@
 /* eslint-disable no-irregular-whitespace */
 /* eslint-disable max-len */
+import { deepmerge } from 'deepmerge-ts';
+
+import en from '../en';
 import type { BaseTranslation } from '../i18n-types';
 
-const fr = {
+const translation = {
   time: {
     seconds: {
       singular: 'seconde',
@@ -740,5 +743,7 @@ Si vous souhaitez désactiver votre connexion VPN, appuyez simplement sur "désa
     },
   },
 } satisfies BaseTranslation;
+
+const fr = deepmerge(en, translation);
 
 export default fr;
