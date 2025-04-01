@@ -49,5 +49,9 @@ jobs:
         run: |
           rustup component add rustfmt
           cargo fmt -- --check
+      - name: Run clippy linter
+        run: |
+          rustup component add clippy
+          cargo clippy --all-targets --all-features -- -D warnings
       - name: Run tests
         run: cargo test --locked --no-fail-fast
