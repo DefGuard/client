@@ -3,7 +3,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, str::FromStr};
+use std::{env, str::FromStr, sync::LazyLock};
 
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
@@ -17,7 +17,6 @@ use defguard_client::{
     utils::load_log_targets,
     VERSION,
 };
-use lazy_static::lazy_static;
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{api::process, Env};
@@ -38,9 +37,7 @@ const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
 // if found in metadata target name it will ignore the log if it was below info level
 const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
 
-lazy_static! {
-    static ref LOG_INCLUDES: Vec<String> = load_log_targets();
-}
+static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(|| load_log_targets());
 
 #[tokio::main]
 async fn main() {

@@ -79,7 +79,7 @@ impl<'a> ServiceLogWatcher<'a> {
             self.parse_log_dir()?;
             if self.cancellation_token.is_cancelled() {
                 break;
-            };
+            }
         }
 
         Ok(())

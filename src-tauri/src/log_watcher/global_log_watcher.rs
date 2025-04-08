@@ -227,8 +227,7 @@ impl GlobalLogWatcher {
                             && latest_log_file != self.log_dirs.current_service_log_file
                         {
                             debug!(
-                                "Found a new service log file: {:?}, switching to it.",
-                                latest_log_file
+                                "Found a new service log file: {latest_log_file:?}, switching to it."
                             );
                             self.log_dirs.current_service_log_file = latest_log_file;
                             break;
