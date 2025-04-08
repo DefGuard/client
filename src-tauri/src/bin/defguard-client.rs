@@ -37,7 +37,7 @@ const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::LogDir];
 // if found in metadata target name it will ignore the log if it was below info level
 const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
 
-static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(|| load_log_targets());
+static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
 #[tokio::main]
 async fn main() {
