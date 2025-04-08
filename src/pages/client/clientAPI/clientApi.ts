@@ -32,22 +32,22 @@ async function invokeWrapper<T>(
   args?: InvokeArgs,
   timeout: number = 10000,
 ): Promise<T> {
-  debug(`Invoking command '${command}' on the frontend`);
+  debug(`Invoking "${command}" on the frontend`);
   try {
     const res = await pTimeout(invoke<T>(command, args), {
       milliseconds: timeout,
     });
-    debug(`Invoke ${command} completed on the frontend`);
-    trace(`${command} completed with data: ${JSON.stringify(res)}`);
+    debug(`"${command}" completed on the frontend`);
+    trace(`"${command}" returned: ${JSON.stringify(res)}`);
     return res;
     // TODO: handle more error types ?
   } catch (e) {
-    let message: string = `Invoking command "${command}" failed due to unknown error: ${JSON.stringify(
+    let message: string = `Invoking "${command}" failed due to unknown error: ${JSON.stringify(
       e,
     )}`;
     trace(message);
     if (e instanceof TimeoutError) {
-      message = `Invoking command "${command}" timed out after ${timeout / 1000} seconds`;
+      message = `Invoking "${command}" timed out after ${timeout / 1000} seconds`;
     }
     error(message);
     return Promise.reject(message);
