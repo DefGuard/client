@@ -40,7 +40,6 @@ common = { path = "common" }
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next = "2.0"
-lazy_static = "1.5"
 log = { version = "0.4", features = ["serde"] }
 prost = "0.13"
 regex = "1.11"
@@ -56,8 +55,8 @@ sqlx = { version = "0.8", features = [
   "uuid",
   "macros",
 ] }
-struct-patch = "0.8"
-strum = { version = "0.26", features = ["derive"] }
+struct-patch = "0.9"
+strum = { version = "0.27", features = ["derive"] }
 tauri = { version = "1.8", features = [
   "notification-all",
   "dialog-all",

@@ -37,6 +37,6 @@ pub async fn poll_version(app_handle: AppHandle) {
             } else {
                 debug!("Checking for updates is turned off. Skipping latest application version fetch.");
             }
-        };
+        }
     }
 }

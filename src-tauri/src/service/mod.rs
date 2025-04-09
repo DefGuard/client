@@ -348,7 +348,7 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
             address: config
                 .addresses
                 .first()
-                .map(|addr| addr.to_string())
+                .map(ToString::to_string)
                 .unwrap_or_default(),
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),

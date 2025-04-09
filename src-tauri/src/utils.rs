@@ -116,7 +116,6 @@ pub(crate) async fn setup_interface(
                     "Error parsing IP address {allowed_ip} while setting up interface for \
                     location {location}, error details: {err}"
                 );
-                continue;
             }
         }
     }
@@ -363,7 +362,6 @@ pub async fn setup_interface_tunnel(
                 // Handle the error from IpAddrMask::from_str, if needed
                 error!("Error parsing IP address {allowed_ip}: {err}");
                 // Continue to the next iteration of the loop
-                continue;
             }
         }
     }
@@ -657,10 +655,7 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            debug!(
-                "Command {command} executed successfully. Stdout: {}",
-                stdout
-            );
+            debug!("Command {command} executed successfully. Stdout: {stdout}");
             if !stderr.is_empty() {
                 error!("Command produced the following output on stderr: {stderr}");
             }
