@@ -3,7 +3,7 @@ members = ["cli", "common"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.7.0" }
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.7.2" }
 
 [workspace.package]
 authors = ["Defguard"]
