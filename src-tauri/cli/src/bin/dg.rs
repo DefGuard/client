@@ -25,6 +25,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
+#[cfg(not(unix))]
+use tokio::time::sleep;
 use tokio::{select, signal::ctrl_c, sync::Notify, time::interval};
 use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
