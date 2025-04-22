@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::{select, signal::ctrl_c, sync::Notify, time::sleep};
+use tokio::{select, signal::ctrl_c, sync::Notify, time::interval};
 use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -448,8 +448,9 @@ async fn poll_config(config: &mut CliConfig) {
     };
     url.set_path("/api/v1/poll");
     debug!("Config polling setup done, starting the polling loop...");
+    let mut interval = interval(INTERVAL_SECONDS);
     loop {
-        sleep(INTERVAL_SECONDS).await;
+        interval.tick().await;
         debug!("Polling network configuration from proxy...");
         match fetch_config(&client, url.clone(), token.clone()).await {
             Ok(device_config) => {
