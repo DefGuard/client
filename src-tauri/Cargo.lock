@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "defguard_wireguard_rs"
 version = "0.7.2"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=v0.7.2#6538ef726645604e7d466a4f7c5365a1b4629f86"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?branch=main#1a5119e911e50fa111d17b06be7db942bd1a262f"
 dependencies = [
  "base64 0.22.1",
  "libc",
