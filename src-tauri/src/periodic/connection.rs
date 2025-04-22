@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use chrono::{NaiveDateTime, TimeDelta, Utc};
 use tauri::{AppHandle, Manager};
-use tokio::time::sleep;
+use tokio::time::interval;
 
 use crate::{
     appstate::AppState,
@@ -104,8 +104,10 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
     let mut locations_to_disconnect = Vec::new();
     let mut tunnels_to_disconnect = Vec::new();
 
+    let mut interval = interval(CHECK_INTERVAL);
+
     loop {
-        sleep(CHECK_INTERVAL).await;
+        interval.tick().await;
         let connections = app_state.active_connections.lock().await;
         let connection_count = connections.len();
         if connection_count == 0 {

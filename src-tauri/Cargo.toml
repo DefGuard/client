@@ -3,7 +3,8 @@ members = ["cli", "common"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.7.0" }
+# FIXME: revert to tagged release before client release
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "main" }
 
 [workspace.package]
 authors = ["Defguard"]
