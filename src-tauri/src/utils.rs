@@ -135,16 +135,21 @@ pub(crate) async fn setup_interface(
         return Err(Error::InternalError(msg));
     };
     debug!("Found free port: {port} for interface {interface_name}.");
-
-    let Ok(address) = location.address.parse() else {
-        let msg = format!("Failed to parse IP address '{}'", location.address);
-        error!("{msg}");
-        return Err(Error::InternalError(msg));
-    };
+    let addresses = location
+        .address
+        .split(",")
+        .map(str::trim)
+        .map(IpAddrMask::from_str)
+        .collect::<Result<_, _>>()
+        .map_err(|err| {
+            let msg = format!("Failed to parse IP addresses '{}': {err}", location.address);
+            error!("{msg}");
+            Error::InternalError(msg)
+        })?;
     let interface_config = InterfaceConfiguration {
         name: interface_name,
         prvkey: keys.prvkey,
-        addresses: vec![address],
+        addresses,
         port: port.into(),
         peers: vec![peer.clone()],
         mtu: None,
@@ -378,15 +383,21 @@ pub async fn setup_interface_tunnel(
     };
     debug!("Found free port: {port} for interface {interface_name}.");
 
-    let Ok(address) = tunnel.address.parse() else {
-        let msg = format!("Failed to parse IP address '{}'", tunnel.address);
-        error!("{msg}");
-        return Err(Error::InternalError(msg));
-    };
+    let addresses = tunnel
+        .address
+        .split(",")
+        .map(str::trim)
+        .map(IpAddrMask::from_str)
+        .collect::<Result<_, _>>()
+        .map_err(|err| {
+            let msg = format!("Failed to parse IP addresses '{}': {err}", tunnel.address);
+            error!("{msg}");
+            Error::InternalError(msg)
+        })?;
     let interface_config = InterfaceConfiguration {
         name: interface_name,
         prvkey: tunnel.prvkey.clone(),
-        addresses: vec![address],
+        addresses,
         port: port.into(),
         peers: vec![peer.clone()],
         mtu: None,
