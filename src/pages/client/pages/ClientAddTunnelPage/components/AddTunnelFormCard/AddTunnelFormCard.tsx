@@ -119,7 +119,7 @@ export const AddTunnelFormCard = () => {
               (ip) => patternValidIp.test(ip) || patternValidIpV6.test(ip),
             );
           }
-          return patternValidIp.test(value) || patternValidIpV6.test(value);
+          return false;
         }, LL.form.errors.invalid()),
         endpoint: z
           .string()
