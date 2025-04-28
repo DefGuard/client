@@ -26,17 +26,25 @@
         cargo-tauri
         toolchain
         rust-analyzer-unwrapped
+        # wrapGAppsHook
+        # wrapGAppsHook3
+        # wrapGAppsHook4
         nodejs_18
         nodePackages.pnpm
         trunk
+        # glib
+        # gsettings-desktop-schemas
       ];
       nativeBuildPackages = with pkgs; [
         pkg-config
         dbus
         openssl
-        glib
+        # glib
         gtk3
         libsoup_2_4
+        # wrapGAppsHook
+        # wrapGAppsHook3
+        # wrapGAppsHook4
         webkitgtk_4_0
         librsvg
         protobuf
@@ -46,13 +54,17 @@
         gtk3
         cairo
         gdk-pixbuf
-        glib
+        # wrapGAppsHook
+        # wrapGAppsHook3
+        # wrapGAppsHook4
+        # glib
         dbus
         openssl
         librsvg
         libsoup_3
         webkitgtk_4_0
         libayatana-appindicator
+        # gsettings-desktop-schemas
       ];
     in {
       devShells.default = pkgs.mkShell {
@@ -65,6 +77,7 @@
           export OPENSSL_INCLUDE_DIR="${openssl.dev}/include/openssl"
           export OPENSSL_LIB_DIR="${openssl.out}/lib"
           export OPENSSL_ROOT_DIR="${openssl.out}"
+          export XDG_DATA_DIRS="${gtk3}/share/gsettings-schemas/gtk+3-${gtk3.dev.version}:$XDG_DATA_DIRS"
           export RUST_SRC_PATH="${toolchain}/lib/rustlib/src/rust/library"
         '';
       };
