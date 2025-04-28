@@ -113,6 +113,12 @@ export const AddTunnelFormCard = () => {
             return value === '' || patternValidWireguardKey.test(value);
           }, LL.form.errors.invalid()),
         address: z.string().refine((value) => {
+          if (value) {
+            const ips = value.split(',').map((ip) => ip.trim());
+            return ips.every(
+              (ip) => patternValidIp.test(ip) || patternValidIpV6.test(ip),
+            );
+          }
           return patternValidIp.test(value) || patternValidIpV6.test(value);
         }, LL.form.errors.invalid()),
         endpoint: z
