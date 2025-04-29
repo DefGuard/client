@@ -205,27 +205,27 @@ pub(crate) async fn stats_handler(
         match stream.message().await {
             Ok(Some(interface_data)) => {
                 debug!("Received new network usage statistics for interface {interface_name}.");
-                if LocationStats::purge(&pool).await.is_ok() {
-                    debug!("Purged location stats.");
-                } else {
-                    error!("Failed to purge location stats.");
+                if let Err(err) = LocationStats::purge(&pool).await {
+                    error!("Failed to purge location stats: {err}");
                 }
-                if TunnelStats::purge(&pool).await.is_ok() {
-                    debug!("Purged tunnel stats.");
-                } else {
-                    error!("Failed to purge tunnel stats.");
+                if let Err(err) = TunnelStats::purge(&pool).await {
+                    error!("Failed to purge tunnel stats: {err}");
                 }
 
                 trace!("Received interface data: {interface_data:?}");
                 let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
                 for peer in peers {
                     if connection_type.eq(&ConnectionType::Location) {
-                        let Ok(location_stats) =
-                            peer_to_location_stats(&peer, interface_data.listen_port, &pool).await
-                        else {
-                            error!("Failed to convert peer data to location stats.");
-                            continue;
-                        };
+                        let location_stats =
+                            match peer_to_location_stats(&peer, interface_data.listen_port, &pool)
+                                .await
+                            {
+                                Ok(stats) => stats,
+                                Err(err) => {
+                                    error!("Failed to convert peer data to location stats: {err}");
+                                    continue;
+                                }
+                            };
                         let location_name = location_stats
                             .get_name(&pool)
                             .await
@@ -248,12 +248,16 @@ pub(crate) async fn stats_handler(
                             }
                         }
                     } else {
-                        let Ok(tunnel_stats) =
-                            peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool).await
-                        else {
-                            error!("Failed to convert peer data to tunnel stats.");
-                            continue;
-                        };
+                        let tunnel_stats =
+                            match peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
+                                .await
+                            {
+                                Ok(stats) => stats,
+                                Err(err) => {
+                                    error!("Failed to convert peer data to tunnel stats: {err}");
+                                    continue;
+                                }
+                            };
                         let tunnel_name = tunnel_stats
                             .get_name(&pool)
                             .await

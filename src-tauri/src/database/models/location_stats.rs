@@ -208,10 +208,13 @@ impl LocationStats<Id> {
     where
         E: SqliteExecutor<'e>,
     {
+        debug!("Purging location statistics.");
+
         let past = (Utc::now() - PURGE_DURATION).naive_utc();
         query!("DELETE FROM location_stats WHERE collected_at < $1", past)
             .execute(executor)
             .await?;
+
         Ok(())
     }
 }
