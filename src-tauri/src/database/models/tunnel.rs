@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
-use super::{connection::ActiveConnection, Id, NoId};
+use super::{connection::ActiveConnection, Id, NoId, PURGE_DURATION};
 use crate::{
     commands::DateTimeAggregation, error::Error, CommonConnection, CommonConnectionInfo,
     CommonLocationStats, ConnectionType,
@@ -256,7 +256,7 @@ pub struct TunnelStats<I = NoId> {
     pub(crate) last_handshake: i64,
     pub(crate) collected_at: NaiveDateTime,
     listen_port: u32,
-    pub(crate) persistent_keepalive_interval: Option<u16>,
+    pub(crate) persistent_keepalive_interval: u16,
 }
 
 impl TunnelStats {
@@ -279,7 +279,7 @@ impl TunnelStats<NoId> {
         last_handshake: i64,
         collected_at: NaiveDateTime,
         listen_port: u32,
-        persistent_keepalive_interval: Option<u16>,
+        persistent_keepalive_interval: u16,
     ) -> Self {
         TunnelStats {
             id: NoId,
@@ -349,7 +349,7 @@ impl TunnelStats<Id> {
             SUM(MAX(download, 0)) \"download!: i64\", \
             last_handshake, collected_at \"collected_at!: NaiveDateTime\", \
             listen_port \"listen_port!: u32\", \
-            persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" \
+            persistent_keepalive_interval \"persistent_keepalive_interval!: u16\" \
             FROM cte WHERE tunnel_id = $2 AND collected_at >= $3 \
             GROUP BY collected_at ORDER BY collected_at",
             aggregation,
@@ -371,10 +371,10 @@ impl TunnelStats<Id> {
         let res = query_as!(
             TunnelStats::<Id>,
             "WITH prev_download AS (
-            SELECT download 
-            FROM tunnel_stats 
-            WHERE tunnel_id = $1 
-            ORDER BY collected_at DESC 
+            SELECT download
+            FROM tunnel_stats
+            WHERE tunnel_id = $1
+            ORDER BY collected_at DESC
             LIMIT 1 OFFSET 1
         )
         SELECT ts.id \"id!: i64\",
@@ -384,7 +384,7 @@ impl TunnelStats<Id> {
             ts.last_handshake,
             ts.collected_at \"collected_at!: NaiveDateTime\",
             ts.listen_port \"listen_port!: u32\",
-            ts.persistent_keepalive_interval \"persistent_keepalive_interval?: u16\"
+            ts.persistent_keepalive_interval \"persistent_keepalive_interval!: u16\"
         FROM tunnel_stats ts
         LEFT JOIN prev_download pd
         WHERE ts.tunnel_id = $1
@@ -396,6 +396,18 @@ impl TunnelStats<Id> {
         .fetch_optional(executor)
         .await?;
         Ok(res)
+    }
+
+    /// Purge old statistics.
+    pub(crate) async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let past = (Utc::now() - PURGE_DURATION).naive_utc();
+        query!("DELETE FROM tunnel_stats WHERE collected_at < $1", past)
+            .execute(executor)
+            .await?;
+        Ok(())
     }
 }
 
@@ -419,7 +431,7 @@ where
         }),
         collected_at: Utc::now().naive_utc(),
         listen_port,
-        persistent_keepalive_interval: peer.persistent_keepalive_interval,
+        persistent_keepalive_interval: peer.persistent_keepalive_interval.unwrap_or_default(),
     })
 }
 
@@ -587,8 +599,77 @@ impl From<TunnelStats<Id>> for CommonLocationStats<Id> {
             last_handshake: tunnel_stats.last_handshake,
             collected_at: tunnel_stats.collected_at,
             listen_port: tunnel_stats.listen_port,
-            persistent_keepalive_interval: tunnel_stats.persistent_keepalive_interval, // Set the appropriate value
+            persistent_keepalive_interval: Some(tunnel_stats.persistent_keepalive_interval), // Set the appropriate value
             connection_type: ConnectionType::Tunnel,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Duration;
+    use sqlx::SqlitePool;
+
+    use super::*;
+
+    impl TunnelStats<Id> {
+        async fn count<'e, E>(executor: E) -> Result<i64, Error>
+        where
+            E: SqliteExecutor<'e>,
+        {
+            let count = query_scalar!("SELECT count(*) FROM tunnel_stats")
+                .fetch_one(executor)
+                .await?;
+            Ok(count)
+        }
+    }
+
+    #[sqlx::test]
+    async fn purge_stats(pool: SqlitePool) {
+        let tunnel = Tunnel::new(
+            "test".into(),
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            None,
+            None,
+            String::new(),
+            None,
+            0,
+            false,
+            None,
+            None,
+            None,
+            None,
+        )
+        .save(&pool)
+        .await
+        .unwrap();
+
+        let delta = Duration::days(60);
+        assert!(delta > PURGE_DURATION);
+
+        let now = Utc::now();
+        TunnelStats::new(tunnel.id, 0, 0, 0, now.naive_utc(), 0, 0)
+            .save(&pool)
+            .await
+            .unwrap();
+        TunnelStats::new(tunnel.id, 0, 0, 0, (now - delta).naive_utc(), 0, 0)
+            .save(&pool)
+            .await
+            .unwrap();
+        TunnelStats::new(tunnel.id, 0, 0, 0, (now + delta).naive_utc(), 0, 0)
+            .save(&pool)
+            .await
+            .unwrap();
+
+        let count = TunnelStats::<Id>::count(&pool).await.unwrap();
+        assert_eq!(count, 3);
+
+        TunnelStats::purge(&pool).await.unwrap();
+
+        let count = TunnelStats::<Id>::count(&pool).await.unwrap();
+        assert_eq!(count, 2);
     }
 }

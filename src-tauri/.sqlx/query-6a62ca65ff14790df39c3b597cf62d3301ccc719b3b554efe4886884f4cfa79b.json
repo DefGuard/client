@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM location_stats WHERE collected_at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "6a62ca65ff14790df39c3b597cf62d3301ccc719b3b554efe4886884f4cfa79b"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "WITH prev_download AS (\n              SELECT download \n              FROM location_stats \n              WHERE location_id = $1 \n              ORDER BY collected_at DESC \n              LIMIT 1 OFFSET 1\n          )\n          SELECT ls.id \"id!: i64\",\n              ls.location_id,\n              ls.upload \"upload!: i64\",\n              ls.download \"download!: i64\",\n              ls.last_handshake,\n              ls.collected_at \"collected_at!: NaiveDateTime\",\n              ls.listen_port \"listen_port!: u32\",\n              ls.persistent_keepalive_interval \"persistent_keepalive_interval?: u16\"\n          FROM location_stats ls\n          LEFT JOIN prev_download pd\n          WHERE ls.location_id = $1\n          AND (pd.download IS NULL OR ls.download != pd.download)\n          ORDER BY ls.collected_at DESC\n          LIMIT 1",
+  "query": "WITH prev_download AS (\n              SELECT download\n              FROM location_stats\n              WHERE location_id = $1\n              ORDER BY collected_at DESC\n              LIMIT 1 OFFSET 1\n          )\n          SELECT ls.id \"id!: i64\",\n              ls.location_id,\n              ls.upload \"upload!: i64\",\n              ls.download \"download!: i64\",\n              ls.last_handshake,\n              ls.collected_at \"collected_at!: NaiveDateTime\",\n              ls.listen_port \"listen_port!: u32\",\n              ls.persistent_keepalive_interval \"persistent_keepalive_interval?: u16\"\n          FROM location_stats ls\n          LEFT JOIN prev_download pd\n          WHERE ls.location_id = $1\n          AND (pd.download IS NULL OR ls.download != pd.download)\n          ORDER BY ls.collected_at DESC\n          LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -58,5 +58,5 @@
       true
     ]
   },
-  "hash": "bdb139d1c8f2c01a6cbf53415ee72ac3745bb56b62b7c575cdb1e6a9f35f042b"
+  "hash": "7f97fe602e8d1c75f79d88abd2b20eca881e3d8682aaff17b2342f282e3916bf"
 }
