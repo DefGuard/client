@@ -65,6 +65,8 @@
           export OPENSSL_INCLUDE_DIR="${openssl.dev}/include/openssl"
           export OPENSSL_LIB_DIR="${openssl.out}/lib"
           export OPENSSL_ROOT_DIR="${openssl.out}"
+          # https://discourse.nixos.org/t/which-package-includes-org-gtk-gtk4-settings-filechooser/38063/12
+          export XDG_DATA_DIRS="${gtk3}/share/gsettings-schemas/gtk+3-${gtk3.dev.version}:$XDG_DATA_DIRS"
           export RUST_SRC_PATH="${toolchain}/lib/rustlib/src/rust/library"
         '';
       };
