@@ -3,9 +3,9 @@ use std::time::SystemTime;
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
-use sqlx::{query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
-use super::{location::Location, Id, NoId};
+use super::{location::Location, Id, NoId, PURGE_DURATION};
 use crate::{commands::DateTimeAggregation, error::Error, CommonLocationStats, ConnectionType};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -176,10 +176,10 @@ impl LocationStats<Id> {
         let res = query_as!(
             LocationStats::<Id>,
             "WITH prev_download AS (
-              SELECT download 
-              FROM location_stats 
-              WHERE location_id = $1 
-              ORDER BY collected_at DESC 
+              SELECT download
+              FROM location_stats
+              WHERE location_id = $1
+              ORDER BY collected_at DESC
               LIMIT 1 OFFSET 1
           )
           SELECT ls.id \"id!: i64\",
@@ -201,5 +201,20 @@ impl LocationStats<Id> {
         .fetch_optional(executor)
         .await?;
         Ok(res)
+    }
+
+    /// Purge old statistics.
+    pub(crate) async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        debug!("Purging location statistics.");
+
+        let past = (Utc::now() - PURGE_DURATION).naive_utc();
+        query!("DELETE FROM location_stats WHERE collected_at < $1", past)
+            .execute(executor)
+            .await?;
+
+        Ok(())
     }
 }

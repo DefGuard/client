@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "WITH cte AS (SELECT id, tunnel_id, COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1) SELECT id, tunnel_id, SUM(MAX(upload, 0)) \"upload!: i64\", SUM(MAX(download, 0)) \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval?: u16\" FROM cte WHERE tunnel_id = $2 AND collected_at >= $3 GROUP BY collected_at ORDER BY collected_at",
+  "query": "WITH cte AS (SELECT id, tunnel_id, COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1) SELECT id, tunnel_id, SUM(MAX(upload, 0)) \"upload!: i64\", SUM(MAX(download, 0)) \"download!: i64\", last_handshake, collected_at \"collected_at!: NaiveDateTime\", listen_port \"listen_port!: u32\", persistent_keepalive_interval \"persistent_keepalive_interval!: u16\" FROM cte WHERE tunnel_id = $2 AND collected_at >= $3 GROUP BY collected_at ORDER BY collected_at",
   "describe": {
     "columns": [
       {
@@ -39,7 +39,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "persistent_keepalive_interval?: u16",
+        "name": "persistent_keepalive_interval!: u16",
         "ordinal": 7,
         "type_info": "Integer"
       }
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "436b04e7983e1db5ca0a3a3531d7694242bd02ee4098a366f880066b571fc21e"
+  "hash": "db08146110d6df2759b34328c8ac6f87350d379fce3541ea43ed3519b5757d72"
 }

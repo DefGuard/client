@@ -21,8 +21,8 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection},
             location::Location,
-            location_stats::peer_to_location_stats,
-            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection},
+            location_stats::{peer_to_location_stats, LocationStats},
+            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection, TunnelStats},
             wireguard_keys::WireguardKeys,
             Id,
         },
@@ -205,14 +205,27 @@ pub(crate) async fn stats_handler(
         match stream.message().await {
             Ok(Some(interface_data)) => {
                 debug!("Received new network usage statistics for interface {interface_name}.");
+                if let Err(err) = LocationStats::purge(&pool).await {
+                    error!("Failed to purge location stats: {err}");
+                }
+                if let Err(err) = TunnelStats::purge(&pool).await {
+                    error!("Failed to purge tunnel stats: {err}");
+                }
+
                 trace!("Received interface data: {interface_data:?}");
                 let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
                 for peer in peers {
                     if connection_type.eq(&ConnectionType::Location) {
                         let location_stats =
-                            peer_to_location_stats(&peer, interface_data.listen_port, &pool)
+                            match peer_to_location_stats(&peer, interface_data.listen_port, &pool)
                                 .await
-                                .unwrap();
+                            {
+                                Ok(stats) => stats,
+                                Err(err) => {
+                                    error!("Failed to convert peer data to location stats: {err}");
+                                    continue;
+                                }
+                            };
                         let location_name = location_stats
                             .get_name(&pool)
                             .await
@@ -236,9 +249,15 @@ pub(crate) async fn stats_handler(
                         }
                     } else {
                         let tunnel_stats =
-                            peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
+                            match peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
                                 .await
-                                .unwrap();
+                            {
+                                Ok(stats) => stats,
+                                Err(err) => {
+                                    error!("Failed to convert peer data to tunnel stats: {err}");
+                                    continue;
+                                }
+                            };
                         let tunnel_name = tunnel_stats
                             .get_name(&pool)
                             .await

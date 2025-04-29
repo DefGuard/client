@@ -42,7 +42,11 @@ pub async fn poll_config(handle: AppHandle) {
             sleep(INTERVAL_SECONDS).await;
             continue;
         };
-        debug!("Found {} instances with a config polling token, proceeding with polling their configuration...", instances.len());
+        debug!(
+            "Found {} instances with a config polling token, proceeding with polling their \
+            configuration...",
+            instances.len()
+        );
         let mut config_retrieved = 0;
         for instance in &mut instances {
             if instance.token.is_some() {
@@ -50,28 +54,26 @@ pub async fn poll_config(handle: AppHandle) {
                     match err {
                         Error::CoreNotEnterprise => {
                             debug!(
-                                "Tried to contact core for instance {} config but it's not enterprise, can't retrieve config",
-                                instance,
+                                "Tried to contact core for instance {instance} config but it's not \
+                                enterprise, can't retrieve config"
                             );
                         }
                         Error::NoToken => {
                             debug!(
-                                "Instance {} has no token, can't retrieve its config from the core",
-                                instance,
+                                "Instance {instance} has no token, can't retrieve its config from \
+                                the core",
                             );
                         }
                         _ => {
                             error!(
-                                "Failed to retrieve instance {} config from core: {err}",
-                                instance
+                                "Failed to retrieve instance {instance} config from core: {err}"
                             );
                         }
                     }
                 } else {
                     config_retrieved += 1;
                     debug!(
-                        "Finished processing configuration polling request for instance {}",
-                        instance
+                        "Finished processing configuration polling request for instance {instance}"
                     );
                 }
             }
@@ -84,8 +86,8 @@ pub async fn poll_config(handle: AppHandle) {
         }
         if config_retrieved > 0 {
             info!(
-                "Automatically retrieved the newest instance configuration from core for {} instances, sleeping for {}s",
-                config_retrieved,
+                "Automatically retrieved the newest instance configuration from core for \
+                {config_retrieved} instances, sleeping for {}s",
                 INTERVAL_SECONDS.as_secs(),
             );
             debug!("Instances for which configuration was retrieved from core: {instances:?}");
@@ -232,8 +234,8 @@ async fn config_changed(
         None => false,
     };
     debug!(
-        "Did the locations change?: {}. Did the instance information change?: {}",
-        locations_changed, info_changed
+        "Did the locations change?: {locations_changed}. Did the instance information change?: \
+        {info_changed}"
     );
     Ok(locations_changed || info_changed)
 }

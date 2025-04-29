@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM tunnel_stats WHERE collected_at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "90f7ba9b4cbfccb444bf6e35b790591f3409076a57cebce145f1e06e73b94231"
+}

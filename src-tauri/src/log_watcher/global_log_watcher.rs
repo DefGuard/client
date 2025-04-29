@@ -48,8 +48,8 @@ impl LogDirs {
                     "Path to client logs directory is empty.".to_string(),
                 ))?;
         debug!(
-            "Log directories of service and client have been identified by the global log watcher: {:?} and {:?}",
-            service_log_dir, client_log_dir
+            "Log directories of service and client have been identified by the global log watcher: \
+            {service_log_dir:?} and {client_log_dir:?}"
         );
 
         Ok(Self {
