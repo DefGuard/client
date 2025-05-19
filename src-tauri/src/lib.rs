@@ -1,3 +1,5 @@
+// FIXME: actually refactor errors instead
+#![allow(clippy::result_large_err)]
 use std::{fmt, path::PathBuf};
 
 use chrono::NaiveDateTime;
