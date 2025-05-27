@@ -54,5 +54,7 @@ jobs:
           mkdir ../dist
           rustup component add clippy
           cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run cargo deny
+        uses: EmbarkStudios/cargo-deny-action@v2
       - name: Run tests
         run: cargo test --locked --no-fail-fast
