@@ -116,7 +116,6 @@ allow = [
     "0BSD",
     "CC0-1.0",
     "OpenSSL",
-    "AGPL-3.0",
     "CDLA-Permissive-2.0",
 ]
 # The confidence threshold for detecting a license from license text.
@@ -127,9 +126,8 @@ confidence-threshold = 0.8
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
-    # Each entry is the crate and version constraint, and its specific allow
-    # list
-    #{ allow = ["Zlib"], crate = "adler32" },
+    { allow = ["AGPL-3.0"], crate = "common" },
+    { allow = ["AGPL-3.0"], crate = "defguard-client" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
