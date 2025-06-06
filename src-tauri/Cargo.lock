@@ -1347,7 +1347,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client"
-version = "1.2.4"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1393,7 +1393,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-dg"
-version = "1.2.4"
+version = "1.4.0"
 dependencies = [
  "clap",
  "common",
