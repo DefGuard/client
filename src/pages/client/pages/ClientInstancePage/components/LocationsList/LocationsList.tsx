@@ -1,4 +1,7 @@
+import './style.scss';
+
 import { useEffect } from 'react';
+import Markdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -54,6 +57,11 @@ export const LocationsList = ({
 
   return (
     <>
+      {locations && locations.length === 0 && (
+        <div id="locations-no-data">
+          <Markdown>{LL.pages.client.pages.instancePage.noData().trim()}</Markdown>
+        </div>
+      )}
       {locations.length === 1 && selectedView === null && !isTunnelType && (
         <LocationsDetailView
           locations={locations}
