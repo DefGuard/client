@@ -5,39 +5,39 @@ on:
       - v*.*.*
 
 jobs:
-  # build-wireguard-go:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       architecture: [arm64, amd64]
-  #   runs-on: [self-hosted, macOS]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         repository: WireGuard/wireguard-go
-  #         ref: master
-  #         fetch-depth: 0
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v5
-  #       with:
-  #         go-version: '1.22'
-  #     - name: Build wireguard-go binary
-  #       run: make
-  #       env:
-  #         GOOS: darwin
-  #         GOARCH: ${{ matrix.architecture }}
-  #     - name: Upload binary artifact arm64
-  #       if: matrix.architecture == 'arm64'
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: wireguard-go-aarch64-apple-darwin
-  #         path: wireguard-go
-  #     - name: Upload binary artifact amd64
-  #       if: matrix.architecture == 'amd64'
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: wireguard-go-x86_64-apple-darwin
-  #         path: wireguard-go
+  build-wireguard-go:
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [arm64, amd64]
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: WireGuard/wireguard-go
+          ref: master
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Build wireguard-go binary
+        run: make
+        env:
+          GOOS: darwin
+          GOARCH: ${{ matrix.architecture }}
+      - name: Upload binary artifact arm64
+        if: matrix.architecture == 'arm64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wireguard-go-aarch64-apple-darwin
+          path: wireguard-go
+      - name: Upload binary artifact amd64
+        if: matrix.architecture == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wireguard-go-x86_64-apple-darwin
+          path: wireguard-go
 
   create-release:
     name: create-release
@@ -213,83 +213,83 @@ jobs:
           asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
           asset_content_type: application/octet-stream
 
-  # build-macos:
-  #   needs:
-  #     - create-release
-  #     - build-wireguard-go
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       target: [aarch64-apple-darwin, x86_64-apple-darwin]
-  #   runs-on:
-  #     - self-hosted
-  #     - macOS
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         submodules: 'recursive'
-  #     - name: Write release version
-  #       run: |
-  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-  #         echo Version: $VERSION
-  #         echo "VERSION=$VERSION" >> $GITHUB_ENV
-  #     - uses: actions/setup-node@v3
-  #       with:
-  #         node-version: '20'
-  #     - uses: pnpm/action-setup@v2
-  #       with:
-  #         version: 9
-  #         run_install: false
-  #     - name: Get pnpm store directory
-  #       shell: bash
-  #       run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-  #     - uses: actions/cache@v3
-  #       name: Setup pnpm cache
-  #       with:
-  #         path: ${{ env.STORE_PATH }}
-  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-pnpm-build-store-
-  #     - name: Install deps
-  #       run: pnpm install --frozen-lockfile
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - name: Install protobuf compiler
-  #       run: brew install protobuf
-  #     - name: Install ARM target
-  #       run: rustup target add aarch64-apple-darwin
-  #     - name: Download wireguard-go binary
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: wireguard-go-${{ matrix.target }}
-  #         path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
-  #     - name: Unlock keychain
-  #       run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
-  #     - name: Build app
-  #       uses: tauri-apps/tauri-action@v0
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         APPLE_SIGNING_IDENTITY: 'Developer ID Application: TEONITE (6WD6W6WQNV)'
-  #         APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-  #         APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-  #         APPLE_ID: 'admin@teonite.com'
-  #         APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
-  #         APPLE_TEAM_ID: '6WD6W6WQNV'
-  #       with:
-  #         args: --target ${{ matrix.target }} -v
-  #     - name: Build installation package
-  #       run: |
-  #         bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "Developer ID Installer: TEONITE (6WD6W6WQNV)" /Users/admin/Library/Keychains/login.keychain
-  #         xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-  #         xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-  #     - name: Upload installation package
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-  #         asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
-  #         asset_content_type: application/octet-stream
+  build-macos:
+    needs:
+      - create-release
+      - build-wireguard-go
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    runs-on:
+      - self-hosted
+      - macOS
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+          run_install: false
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install protobuf compiler
+        run: brew install protobuf
+      - name: Install ARM target
+        run: rustup target add aarch64-apple-darwin
+      - name: Download wireguard-go binary
+        uses: actions/download-artifact@v4
+        with:
+          name: wireguard-go-${{ matrix.target }}
+          path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
+      - name: Unlock keychain
+        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
+      - name: Build app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: 'Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)'
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: 'kamil@defguard.net'
+          APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: '82GZ7KN29J'
+        with:
+          args: --target ${{ matrix.target }} -v
+      - name: Build installation package
+        run: |
+          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "Developer ID Installer: TEONITE (6WD6W6WQNV)" /Users/admin/Library/Keychains/login.keychain
+          xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+          xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+      - name: Upload installation package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
+          asset_content_type: application/octet-stream
 
   # Building signed Windows bundle involves a few steps as described here:
   # https://wixtoolset.org/docs/tools/signing/#signing-bundles-at-the-command-line
