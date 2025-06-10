@@ -8,8 +8,8 @@ jobs:
   build-wireguard-go:
     strategy:
       fail-fast: false
-      matrix:
-        architecture: [arm64, amd64]
+    matrix:
+      architecture: [arm64, amd64]
     runs-on: [self-hosted, macOS]
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - name: Build wireguard-go binary
         run: make
         env:
