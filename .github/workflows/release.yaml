@@ -8,8 +8,8 @@ jobs:
   build-wireguard-go:
     strategy:
       fail-fast: false
-    matrix:
-      architecture: [arm64, amd64]
+      matrix:
+        architecture: [arm64, amd64]
     runs-on: [self-hosted, macOS]
     steps:
       - uses: actions/checkout@v4
