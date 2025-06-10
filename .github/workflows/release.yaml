@@ -67,6 +67,7 @@ jobs:
       APPLE_SIGNING_IDENTITY: 'Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)'
       APPLE_ID: 'kamil@defguard.net'
       APPLE_TEAM_ID: '82GZ7KN29J'
+      TAURI_BUILD_KEYCHAIN_PASSWORD: 'tauri-build'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -105,8 +106,8 @@ jobs:
         with:
           name: wireguard-go-${{ matrix.target }}
           path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
-      # - name: Unlock keychain
-      #   run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
+      - name: Unlock keychain
+        run: security -v unlock-keychain -p "${{ env.TAURI_BUILD_KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/tauri-build.keychain
       - name: Build app
         uses: tauri-apps/tauri-action@v0
         env:
