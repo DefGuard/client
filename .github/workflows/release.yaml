@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - name: Build wireguard-go binary
         run: make
         env:
@@ -224,6 +224,11 @@ jobs:
     runs-on:
       - self-hosted
       - macOS
+    env:
+      APPLE_SIGNING_IDENTITY_APPLICATION: 'Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)'
+      APPLE_SIGNING_IDENTITY_INSTALLER: 'Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)'
+      APPLE_ID: 'kamil@defguard.net'
+      APPLE_TEAM_ID: '82GZ7KN29J'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -261,25 +266,29 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wireguard-go-${{ matrix.target }}
-          path: src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
+          path: src-tauri/resources-macos/binaries
+      - name: Rename wireguard-go binary
+        run: |
+          ls -l src-tauri/resources-macos/binaries
+          mv src-tauri/resources-macos/binaries/wireguard-go src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
       - name: Unlock keychain
         run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
       - name: Build app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: 'Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)'
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: 'kamil@defguard.net'
+          APPLE_ID: ${{ env.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: '82GZ7KN29J'
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
         with:
           args: --target ${{ matrix.target }} -v
       - name: Build installation package
         run: |
-          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts "Developer ID Installer: TEONITE (6WD6W6WQNV)" /Users/admin/Library/Keychains/login.keychain
-          xcrun notarytool submit --wait --apple-id admin@teonite.com --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id 6WD6W6WQNV src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}' /Users/admin/Library/Keychains/login.keychain
+          xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
           xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
       - name: Upload installation package
         uses: actions/upload-release-asset@v1
