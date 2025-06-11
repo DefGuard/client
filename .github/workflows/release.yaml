@@ -64,7 +64,8 @@ jobs:
       - self-hosted
       - macOS
     env:
-      APPLE_SIGNING_IDENTITY: 'Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)'
+      APPLE_SIGNING_IDENTITY_APPLICATION: 'Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)'
+      APPLE_SIGNING_IDENTITY_INSTALLER: 'Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)'
       APPLE_ID: 'kamil@defguard.net'
       APPLE_TEAM_ID: '82GZ7KN29J'
     steps:
@@ -115,7 +116,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ env.APPLE_ID }}
@@ -125,7 +126,7 @@ jobs:
           args: --target ${{ matrix.target }} -v
       - name: Build installation package
         run: |
-          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY }}' /Users/admin/Library/Keychains/login.keychain
+          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}' /Users/admin/Library/Keychains/login.keychain
           xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
           xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
       - name: Upload installation package
