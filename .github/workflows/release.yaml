@@ -125,7 +125,7 @@ jobs:
           args: --target ${{ matrix.target }} -v
       - name: Build installation package
         run: |
-          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts ${{ env.APPLE_SIGNING_IDENTITY }} /Users/admin/Library/Keychains/login.keychain
+          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY }}' /Users/admin/Library/Keychains/login.keychain
           xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
           xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
       - name: Upload installation package
