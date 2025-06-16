@@ -1,11 +1,13 @@
 [package]
 name = "common"
-version = "1.0.0"
-edition = "2021"
-rust-version = "1.80"
-license-file = "../../LICENSE.md"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+version.workspace = true
 
 [dependencies]
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.29", features = ["net"] }
+nix = { version = "0.30", features = ["net"] }
