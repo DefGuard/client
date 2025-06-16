@@ -363,7 +363,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
     fn from(config: proto::InterfaceConfig) -> Self {
         let addresses = config
             .address
-            .split(",")
+            .split(',')
             .filter_map(|ip| IpAddrMask::from_str(ip.trim()).ok())
             .collect();
         Self {
