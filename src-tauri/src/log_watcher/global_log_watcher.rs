@@ -48,8 +48,8 @@ impl LogDirs {
                     "Path to client logs directory is empty.".to_string(),
                 ))?;
         debug!(
-            "Log directories of service and client have been identified by the global log watcher: {:?} and {:?}",
-            service_log_dir, client_log_dir
+            "Log directories of service and client have been identified by the global log watcher: \
+            {service_log_dir:?} and {client_log_dir:?}"
         );
 
         Ok(Self {
@@ -227,8 +227,7 @@ impl GlobalLogWatcher {
                             && latest_log_file != self.log_dirs.current_service_log_file
                         {
                             debug!(
-                                "Found a new service log file: {:?}, switching to it.",
-                                latest_log_file
+                                "Found a new service log file: {latest_log_file:?}, switching to it."
                             );
                             self.log_dirs.current_service_log_file = latest_log_file;
                             break;

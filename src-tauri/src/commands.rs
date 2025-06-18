@@ -263,7 +263,7 @@ pub async fn save_device_config(
         );
     }
     transaction.commit().await?;
-    info!("New instance {} created.", instance);
+    info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(&app_state.db, instance.id).await?;
     trace!("Created following locations: {locations:#?}");
@@ -473,7 +473,7 @@ pub(crate) async fn do_update_instance(
     response: DeviceConfigResponse,
 ) -> Result<(), Error> {
     // update instance
-    debug!("Updating instance {}", instance);
+    debug!("Updating instance {instance}");
     let locations_changed = locations_changed(transaction, instance, &response).await?;
     let instance_info = response
         .instance

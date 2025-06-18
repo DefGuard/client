@@ -31,10 +31,7 @@ pub async fn generate_tray_menu(app_state: State<'_, AppState>) -> Result<System
     let all_instances = all_instances(app_state.clone()).await;
     if let Ok(instances) = all_instances {
         let instance_count = instances.len();
-        debug!(
-            "Got {} instances to display in the tray menu",
-            instance_count
-        );
+        debug!("Got {instance_count} instances to display in the tray menu");
         for instance in instances {
             let mut instance_menu = SystemTrayMenu::new();
             let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
@@ -169,11 +166,11 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                         .await;
 
                     if active_locations_ids.contains(&location_id) {
-                        info!("Disconnect location with id {}", id);
+                        info!("Disconnect location with id {id}");
                         let _ =
                             disconnect(location_id, ConnectionType::Location, handle.clone()).await;
                     } else {
-                        info!("Connect location with id {}", id);
+                        info!("Connect location with id {id}");
                         // check is mfa enabled and trigger modal on frontend
                         if location.mfa_enabled {
                             info!(

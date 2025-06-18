@@ -11,3 +11,5 @@ pub mod wireguard_keys;
 pub type Id = i64;
 #[derive(Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct NoId;
+
+const PURGE_DURATION: chrono::Duration = chrono::Duration::days(30);

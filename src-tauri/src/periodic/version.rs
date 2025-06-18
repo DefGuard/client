@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
-use tokio::time::sleep;
+use tokio::time::interval;
 
 use crate::{appstate::AppState, commands::get_latest_app_version, events::APP_VERSION_FETCH};
 
@@ -10,10 +10,11 @@ const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 h
 pub async fn poll_version(app_handle: AppHandle) {
     debug!("Starting the latest application version polling loop...");
     let state = app_handle.state::<AppState>();
+    let mut interval = interval(INTERVAL_IN_SECONDS);
 
     loop {
         debug!("Waiting to fetch latest application version for {INTERVAL_IN_SECONDS:?}...");
-        sleep(INTERVAL_IN_SECONDS).await;
+        interval.tick().await;
 
         let config_option = match state.app_config.lock() {
             Ok(guard) => Some(guard.clone()),
@@ -37,6 +38,6 @@ pub async fn poll_version(app_handle: AppHandle) {
             } else {
                 debug!("Checking for updates is turned off. Skipping latest application version fetch.");
             }
-        };
+        }
     }
 }

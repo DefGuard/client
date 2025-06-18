@@ -25,7 +25,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::{select, signal::ctrl_c, sync::Notify, time::sleep};
+#[cfg(not(unix))]
+use tokio::time::sleep;
+use tokio::{select, signal::ctrl_c, sync::Notify, time::interval};
 use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -86,7 +88,7 @@ impl CliConfig {
             Err(err) => {
                 return Err(CliError::ConfigSave(
                     path.to_string_lossy().to_string(),
-                    format!("Failed to open configuration file for saving: {}", err),
+                    format!("Failed to open configuration file for saving: {err}"),
                 ));
             }
         };
@@ -102,7 +104,7 @@ impl CliConfig {
                     }
                 }
                 Err(err) => {
-                    warn!("Failed to set permissions for the configuration file: {err}")
+                    warn!("Failed to set permissions for the configuration file: {err}");
                 }
             }
             debug!("Config file permissions have been set.");
@@ -118,7 +120,7 @@ impl CliConfig {
                     err.to_string(),
                 ));
             }
-        };
+        }
 
         Ok(())
     }
@@ -215,7 +217,6 @@ async fn connect(config: CliConfig, trigger: Arc<Notify>) -> Result<(), CliError
                     "Error parsing IP address `{allowed_ip}` while setting up interface: {err}. \
                 Trying to parse the remaining addresses if any."
                 );
-                continue;
             }
         }
     }
@@ -323,7 +324,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
         .post(url)
         .json(&proto::NewDevice {
             // The name is ignored by the server as it's set by the user before the enrollment.
-            name: "".to_string(),
+            name: String::new(),
             pubkey: pubkey.to_string(),
             token: None, //Some(config.token.clone()),
         })
@@ -449,8 +450,9 @@ async fn poll_config(config: &mut CliConfig) {
     };
     url.set_path("/api/v1/poll");
     debug!("Config polling setup done, starting the polling loop...");
+    let mut interval = interval(INTERVAL_SECONDS);
     loop {
-        sleep(INTERVAL_SECONDS).await;
+        interval.tick().await;
         debug!("Polling network configuration from proxy...");
         match fetch_config(&client, url.clone(), token.clone()).await {
             Ok(device_config) => {
@@ -464,9 +466,8 @@ async fn poll_config(config: &mut CliConfig) {
                     config.device_config = device_config;
                     debug!("New configuration has been successfully applied.");
                     break;
-                } else {
-                    debug!("Network configuration has not changed. Continuing...");
                 }
+                debug!("Network configuration has not changed. Continuing...");
             }
             Err(CliError::EnterpriseDisabled) => {
                 debug!("Enterprise features are disabled on this Defguard instance. Skipping...");

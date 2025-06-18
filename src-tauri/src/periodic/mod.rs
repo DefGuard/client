@@ -11,13 +11,13 @@ pub mod version;
 /// Runs all the client periodic tasks, finishing when any of them returns.
 pub async fn run_periodic_tasks(app_handle: &AppHandle) {
     select! {
-        _ = poll_version(app_handle.clone()) => {
+        () = poll_version(app_handle.clone()) => {
             error!("Version polling task has stopped unexpectedly");
         }
-        _ = poll_config(app_handle.clone()) => {
+        () = poll_config(app_handle.clone()) => {
             error!("Config polling task has stopped unexpectedly");
         }
-        _ = verify_active_connections(app_handle.clone()) => {
+        () = verify_active_connections(app_handle.clone()) => {
             error!("Active connection verification task has stopped unexpectedly");
         }
     };
