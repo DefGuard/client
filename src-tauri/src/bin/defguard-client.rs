@@ -10,6 +10,7 @@ use defguard_client::utils::sync_connections;
 use defguard_client::{
     appstate::AppState,
     commands::*,
+    database::models::{location_stats::LocationStats, tunnel::TunnelStats},
     events::SINGLE_INSTANCE,
     periodic::run_periodic_tasks,
     service,
@@ -210,6 +211,15 @@ async fn main() {
         .expect("Failed to apply database migrations");
     debug!("Applied all database migrations that were pending. If any.");
     debug!("Database setup has been completed successfully.");
+
+    debug!("Purging old stats from the database...");
+    if let Err(err) = LocationStats::purge(&app_state.db).await {
+        error!("Failed to purge location stats: {err}");
+    }
+    if let Err(err) = TunnelStats::purge(&app_state.db).await {
+        error!("Failed to purge tunnel stats: {err}");
+    }
+    debug!("Old stats have been purged successfully.");
 
     // Sync already active connections on windows.
     // When windows is restarted, the app doesn't close the active connections

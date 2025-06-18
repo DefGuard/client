@@ -204,7 +204,7 @@ impl LocationStats<Id> {
     }
 
     /// Purge old statistics.
-    pub(crate) async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    pub async fn purge<'e, E>(executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
