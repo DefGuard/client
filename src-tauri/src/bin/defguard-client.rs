@@ -215,11 +215,14 @@ async fn main() {
     debug!("Purging old stats from the database...");
     if let Err(err) = LocationStats::purge(&app_state.db).await {
         error!("Failed to purge location stats: {err}");
+    } else {
+        debug!("Old location stats have been purged successfully.");
     }
     if let Err(err) = TunnelStats::purge(&app_state.db).await {
         error!("Failed to purge tunnel stats: {err}");
+    } else {
+        debug!("Old tunnel stats have been purged successfully.");
     }
-    debug!("Old stats have been purged successfully.");
 
     // Sync already active connections on windows.
     // When windows is restarted, the app doesn't close the active connections
