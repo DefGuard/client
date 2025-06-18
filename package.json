@@ -118,7 +118,7 @@
     "typesafe-i18n": "^5.26.2",
     "typescript": "^5.8.3",
     "typescript-eslint-language-service": "^5.0.5",
-    "vite": "^4.5.13"
+    "vite": "^4.5.14"
   },
   "volta": {
     "node": "20.5.1"
