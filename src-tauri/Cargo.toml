@@ -3,7 +3,8 @@ members = ["cli", "common"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
-defguard_wireguard_rs = { version = "0.7.4" }
+# defguard_wireguard_rs = { version = "0.7.4" }
+defguard_wireguard_rs = { path = "../../wireguard-rs" }
 
 [workspace.package]
 authors = ["Defguard"]

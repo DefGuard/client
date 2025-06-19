@@ -11,6 +11,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
     str::FromStr,
+    sync::RwLock,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -54,8 +55,13 @@ pub enum DaemonError {
     TransportError(#[from] tonic::transport::Error),
 }
 
-#[derive(Debug, Default)]
-pub struct DaemonService {
+#[derive(Default)]
+pub(crate) struct DaemonService {
+    // Map of running `WGApi`s; key is interface name.
+    #[cfg(target_os = "macos")]
+    wgapis: RwLock<HashMap<String, WGApi<Userspace>>>,
+    #[cfg(not(target_os = "macos"))]
+    wgapis: HashMap<String, WGApi<Kernel>>,
     stats_period: Duration,
 }
 
@@ -63,6 +69,7 @@ impl DaemonService {
     #[must_use]
     pub fn new(config: &Config) -> Self {
         Self {
+            wgapis: RwLock::new(HashMap::new()),
             stats_period: Duration::from_secs(config.stats_period),
         }
     }
@@ -109,8 +116,11 @@ impl DesktopDaemonService for DaemonService {
             .into();
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
-        // setup WireGuard API
-        let wgapi = setup_wgapi(ifname)?;
+        // Setup WireGuard API.
+        let mut wgapis_map = self.wgapis.write().unwrap();
+        let wgapi = wgapis_map
+            .entry(ifname.clone())
+            .or_insert(setup_wgapi(ifname)?);
 
         #[cfg(not(windows))]
         {
@@ -327,10 +337,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let daemon_service = DaemonService::new(&config);
 
-    info!(
-        "Defguard daemon version {} started, listening on {addr}",
-        VERSION
-    );
+    info!("Defguard daemon version {VERSION} started, listening on {addr}");
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()

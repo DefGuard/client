@@ -18,8 +18,6 @@ use defguard_client::{
     VERSION,
 };
 use log::{Level, LevelFilter};
-#[cfg(target_os = "macos")]
-use tauri::{api::process, Env};
 use tauri::{Builder, Manager, RunEvent, State, SystemTray, WindowEvent};
 use tauri_plugin_log::LogTarget;
 
@@ -41,23 +39,6 @@ static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
 #[tokio::main]
 async fn main() {
-    // add bundled `wireguard-go` binary to PATH
-    #[cfg(target_os = "macos")]
-    {
-        debug!("Adding bundled wireguard-go binary to PATH");
-        let current_bin_path =
-            process::current_binary(&Env::default()).expect("Failed to get current binary path");
-        let current_bin_dir = current_bin_path
-            .parent()
-            .expect("Failed to get current binary directory");
-        let current_path = env::var("PATH").expect("Failed to get current PATH variable");
-        env::set_var(
-            "PATH",
-            format!("{current_path}:{}", current_bin_dir.to_str().unwrap()),
-        );
-        debug!("Added binary dir {current_bin_dir:?} to PATH");
-    }
-
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
