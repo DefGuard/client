@@ -382,7 +382,7 @@ jobs:
         with:
           name: unsigned-bundle-and-burnengine
       - name: Sign burn-engine
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in burnengine.exe -out burnengine-signed.exe
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in burnengine.exe -out burnengine-signed.exe
       - name: Upload bundle and burn-engine artifact
         uses: actions/upload-artifact@v4
         with:
@@ -428,7 +428,7 @@ jobs:
         with:
           name: unsigned-bundle-with-reattached-signed-burn-engine
       - name: Sign bundle
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.68-MS.so -certs /srv/codesign/29ee7778ca5217107841bbbf6b3062e1.pem -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client-reattached.exe -out defguard-client-signed.exe
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client-reattached.exe -out defguard-client-signed.exe
       - name: Upload installer asset
         uses: actions/upload-release-asset@v1
         env:
