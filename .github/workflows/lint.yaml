@@ -48,3 +48,6 @@ jobs:
 
       - name: Check TSC
         run: pnpm tsc
+
+      - name: Audit
+        run: pnpm audit --prod

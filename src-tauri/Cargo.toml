@@ -3,8 +3,7 @@ members = ["cli", "common"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
-# FIXME: revert to tagged release before client release
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", branch = "main" }
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs.git", rev = "v0.7.4" }
 
 [workspace.package]
 authors = ["Defguard"]
@@ -12,7 +11,7 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.80"
-version = "1.2.4"
+version = "1.4.0"
 
 [package]
 name = "defguard-client"

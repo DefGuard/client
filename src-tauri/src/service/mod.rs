@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
+    str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -21,6 +22,7 @@ use defguard_wireguard_rs::{
     error::WireguardInterfaceError,
     host::{Host, Peer},
     key::Key,
+    net::IpAddrMask,
     InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 use proto::{
@@ -349,9 +351,10 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
             prvkey: config.prvkey,
             address: config
                 .addresses
-                .first()
+                .iter()
                 .map(ToString::to_string)
-                .unwrap_or_default(),
+                .collect::<Vec<_>>()
+                .join(","),
             port: config.port,
             peers: config.peers.into_iter().map(Into::into).collect(),
         }
@@ -360,10 +363,11 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
 
 impl From<proto::InterfaceConfig> for InterfaceConfiguration {
     fn from(config: proto::InterfaceConfig) -> Self {
-        let mut addresses = Vec::new();
-        if let Ok(address) = config.address.parse() {
-            addresses.push(address);
-        }
+        let addresses = config
+            .address
+            .split(",")
+            .filter_map(|ip| IpAddrMask::from_str(ip.trim()).ok())
+            .collect();
         Self {
             name: config.name,
             prvkey: config.prvkey,

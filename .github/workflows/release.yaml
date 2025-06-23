@@ -38,6 +38,7 @@ jobs:
         with:
           name: wireguard-go-x86_64-apple-darwin
           path: wireguard-go
+
   create-release:
     name: create-release
     runs-on: self-hosted
@@ -50,6 +51,7 @@ jobs:
         with:
           draft: true
           generate_release_notes: true
+
   build-linux:
     needs:
       - create-release
