@@ -13,13 +13,13 @@ export const GoToBrowserIcon = () => (
       height="76.2553"
       rx="5.44681"
       stroke="#CBD3D8"
-      stroke-width="2.7234"
+      strokeWidth="2.7234"
     />
     <path
       d="M31.4517 14.0708H118.601"
       stroke="#CBD3D8"
-      stroke-width="1.3617"
-      stroke-linecap="round"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
     />
     <circle cx="36.2174" cy="9.30476" r="2.04255" fill="#CBD3D8" />
     <circle cx="43.026" cy="9.30476" r="2.04255" fill="#CBD3D8" />
@@ -39,13 +39,13 @@ export const GoToBrowserIcon = () => (
       height="76.2553"
       rx="5.44681"
       stroke="#899CA8"
-      stroke-width="2.7234"
+      strokeWidth="2.7234"
     />
     <path
       d="M3.46826 40.0537H90.6172"
       stroke="#899CA8"
-      stroke-width="1.3617"
-      stroke-linecap="round"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
     />
     <circle cx="8.23396" cy="35.2877" r="2.04255" fill="#899CA8" />
     <circle cx="15.0426" cy="35.2877" r="2.04255" fill="#899CA8" />
@@ -53,22 +53,22 @@ export const GoToBrowserIcon = () => (
     <path
       d="M40.5544 86.3513C39.4828 81.9585 38.8723 76.9415 38.8723 71.6129C38.8723 65.5233 39.6695 59.8409 41.0423 55.0321M53.0427 55.0321C54.4155 59.8409 55.2127 65.5233 55.2127 71.6129C55.2127 76.9415 54.6022 81.9585 53.5306 86.3513M30.7021 71.3726H63.3829M70.1914 71.3726C70.1914 84.1574 59.8273 94.5215 47.0425 94.5215C34.2577 94.5215 23.8936 84.1574 23.8936 71.3726C23.8936 58.5878 34.2577 48.2236 47.0425 48.2236C59.8273 48.2236 70.1914 58.5878 70.1914 71.3726Z"
       stroke="#899CA8"
-      stroke-width="2.7234"
-      stroke-linecap="round"
+      strokeWidth="2.7234"
+      strokeLinecap="round"
     />
     <path
       d="M77 82.9937L89.0258 123.514L96.3179 115.051L100.296 120.46C101.598 122.229 103.403 123.563 105.477 124.288L109.255 125.609L112.942 120.015L110.779 119.337C108.366 118.58 106.291 117.007 104.911 114.888L102.134 110.626L110.491 102.747L77 82.9937Z"
       fill="white"
       stroke="#0C8CE0"
-      stroke-width="2.7234"
-      stroke-linejoin="round"
+      strokeWidth="2.7234"
+      strokeLinejoin="round"
     />
     <path
       d="M76.6597 82.3829C86.8724 80.7943 107.298 72.4425 107.298 51.7446"
       stroke="#0C8CE0"
-      stroke-width="1.3617"
-      stroke-linecap="round"
-      stroke-dasharray="2.72 5.45"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
+      strokeDasharray="2.72 5.45"
     />
   </svg>
 );
@@ -88,13 +88,13 @@ export const BrowserPendingIcon = () => (
       height="76.2553"
       rx="5.44681"
       stroke="#CBD3D8"
-      stroke-width="2.7234"
+      strokeWidth="2.7234"
     />
     <path
       d="M31.4517 14.4043H118.601"
       stroke="#CBD3D8"
-      stroke-width="1.3617"
-      stroke-linecap="round"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
     />
     <circle cx="36.2174" cy="9.63826" r="2.04255" fill="#CBD3D8" />
     <circle cx="43.026" cy="9.63826" r="2.04255" fill="#CBD3D8" />
@@ -114,13 +114,13 @@ export const BrowserPendingIcon = () => (
       height="76.2553"
       rx="5.44681"
       stroke="#899CA8"
-      stroke-width="2.7234"
+      strokeWidth="2.7234"
     />
     <path
       d="M3.46826 40.3872H90.6172"
       stroke="#899CA8"
-      stroke-width="1.3617"
-      stroke-linecap="round"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
     />
     <circle cx="8.23396" cy="35.6212" r="2.04255" fill="#899CA8" />
     <circle cx="15.0426" cy="35.6212" r="2.04255" fill="#899CA8" />
@@ -129,15 +129,15 @@ export const BrowserPendingIcon = () => (
       d="M77 83.3271L89.0258 123.848L96.3179 115.385L100.296 120.793C101.598 122.562 103.403 123.897 105.477 124.622L109.255 125.942L112.942 120.349L110.779 119.67C108.366 118.913 106.291 117.341 104.911 115.222L102.134 110.959L110.491 103.081L77 83.3271Z"
       fill="white"
       stroke="#0C8CE0"
-      stroke-width="2.7234"
-      stroke-linejoin="round"
+      strokeWidth="2.7234"
+      strokeLinejoin="round"
     />
     <path
       d="M76.6597 82.7164C86.8724 81.1278 107.298 72.776 107.298 52.0781"
       stroke="#0C8CE0"
-      stroke-width="1.3617"
-      stroke-linecap="round"
-      stroke-dasharray="2.72 5.45"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
+      strokeDasharray="2.72 5.45"
     />
   </svg>
 );
@@ -157,13 +157,13 @@ export const BrowserErrorIcon = () => (
       height="76.2553"
       rx="5.44681"
       stroke="#CBD3D8"
-      stroke-width="2.7234"
+      strokeWidth="2.7234"
     />
     <path
       d="M30.9517 14.0708H118.101"
       stroke="#CBD3D8"
-      stroke-width="1.3617"
-      stroke-linecap="round"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
     />
     <circle cx="35.7174" cy="9.30476" r="2.04255" fill="#CBD3D8" />
     <circle cx="42.526" cy="9.30476" r="2.04255" fill="#CBD3D8" />
@@ -183,13 +183,13 @@ export const BrowserErrorIcon = () => (
       height="76.2553"
       rx="5.44681"
       stroke="#899CA8"
-      stroke-width="2.7234"
+      strokeWidth="2.7234"
     />
     <path
       d="M2.96826 40.0537H90.1172"
       stroke="#899CA8"
-      stroke-width="1.3617"
-      stroke-linecap="round"
+      strokeWidth="1.3617"
+      strokeLinecap="round"
     />
     <circle cx="7.73396" cy="35.2877" r="2.04255" fill="#899CA8" />
     <circle cx="14.5426" cy="35.2877" r="2.04255" fill="#899CA8" />
@@ -197,8 +197,8 @@ export const BrowserErrorIcon = () => (
     <path
       d="M84.1131 50.3031C84.3022 49.5279 84.4099 48.6426 84.4099 47.7022C84.4099 46.6276 84.2692 45.6248 84.027 44.7762M81.9093 44.7762C81.667 45.6248 81.5263 46.6276 81.5263 47.7022C81.5263 48.6426 81.6341 49.5279 81.8232 50.3031M85.8517 47.6598H80.0845M78.883 47.6598C78.883 49.916 80.712 51.7449 82.9681 51.7449C85.2243 51.7449 87.0532 49.916 87.0532 47.6598C87.0532 45.4037 85.2243 43.5747 82.9681 43.5747C80.712 43.5747 78.883 45.4037 78.883 47.6598Z"
       stroke="#899CA8"
-      stroke-width="0.680851"
-      stroke-linecap="round"
+      strokeWidth="0.680851"
+      strokeLinecap="round"
     />
     <path
       d="M37.614 80.6702L58.447 59.8372C59.2688 59.0154 59.2688 57.6829 58.447 56.8611C57.6252 56.0392 56.2927 56.0392 55.4708 56.8611L34.6379 77.694C33.816 78.5159 33.816 79.8483 34.6379 80.6702C35.4597 81.492 36.7922 81.492 37.614 80.6702Z"

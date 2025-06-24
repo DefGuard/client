@@ -3,10 +3,11 @@ import './style.scss';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Body, fetch } from '@tauri-apps/api/http';
+import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
-import ReactMarkdown from 'react-markdown';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import ReactMarkdown from 'react-markdown';
 import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
@@ -17,17 +18,16 @@ import {
   ButtonSize,
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
+import { LoaderSpinner } from '../../../../../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
 import { MessageBox } from '../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
 import { MessageBoxType } from '../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/types';
 import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { useMFAModal } from './useMFAModal';
-import { LoaderSpinner } from '../../../../../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
-import { isUndefined } from 'lodash-es';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { DefguardInstance, WireguardInstanceType } from '../../../../../../types';
 import { BrowserErrorIcon, BrowserPendingIcon, GoToBrowserIcon } from './Icons';
+import { useMFAModal } from './useMFAModal';
 
 const { connect } = clientApi;
 
@@ -364,6 +364,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
 
   useEffect(() => {
     const TIMEOUT_DURATION = 5 * 60 * 1000;
+    // eslint-disable-next-line prefer-const
     let timeoutId: NodeJS.Timeout;
 
     const pollMFAStatus = async () => {
