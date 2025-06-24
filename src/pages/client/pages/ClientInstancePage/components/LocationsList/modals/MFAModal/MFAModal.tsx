@@ -334,7 +334,6 @@ const OpenIDMFALogin = ({
       </div>
       <div className="mfa-modal-content-button-container">
         <Button
-          size={ButtonSize.STANDARD}
           styleVariant={ButtonStyleVariant.PRIMARY}
           text={localLL.openidLogin.buttonText({ provider: displayName })}
           onClick={() => {
@@ -464,7 +463,6 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
         <Button
           styleVariant={ButtonStyleVariant.STANDARD}
           text={localLL.openidPending.tryAgain()}
-          size={ButtonSize.STANDARD}
           onClick={() => {
             resetState();
           }}
