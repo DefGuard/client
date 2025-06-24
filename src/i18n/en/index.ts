@@ -722,6 +722,19 @@ If you want to disengage your VPN connection, simply press "deactivate".
         useEmailCode: 'Use your email code',
         saveAuthenticationMethodForFutureLogins: 'Use this method for future logins',
         buttonSubmit: 'Verify',
+        openidLogin: {
+          description:
+            'In order to connect to the VPN please login with {provider}. To do so, please click "Authenticate with {provider}" button below.',
+          browserWarning:
+            '**This will open a new window in your Web Browser** and automatically redirect you to the {provider} login page. After authenticating with {provider} please get back here.',
+          buttonText: 'Authenticate with {provider}',
+        },
+        openidPending: {
+          description: 'Waiting for authentication in your browser...',
+          tryAgain: 'Try again',
+          errorDescription:
+            'There was an error during authentication. Use the try again button below to retry the authentication process.',
+        },
         errors: {
           mfaNotConfigured: 'Selected method has not been configured.',
           mfaStartGeneric:
@@ -731,6 +744,7 @@ If you want to disengage your VPN connection, simply press "deactivate".
           invalidCode:
             'Error, this code is invalid, try again or contact your administrator.',
           tokenExpired: 'Token has expired. Please try to connect again.',
+          authenticationTimeout: 'Authentication timed out. Please try again.',
         },
       },
     },

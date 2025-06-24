@@ -233,9 +233,7 @@ impl GlobalLogWatcher {
                             break;
                         }
                     } else {
-                        trace!("Read service log line: {service_line:?}");
                         if let Some(parsed_line) = self.parse_service_log_line(&service_line) {
-                            trace!("Parsed service log line: {parsed_line:?}");
                             parsed_lines.push(parsed_line);
                         }
                         service_line.clear();
@@ -260,15 +258,13 @@ impl GlobalLogWatcher {
                     if client_line_read > 0 {
                         match self.parse_client_log_line(&client_line) {
                             Ok(Some(parsed_line)) => {
-                                trace!("Parsed client log line: {parsed_line:?}");
                                 parsed_lines.push(parsed_line);
                             }
                             Ok(None) => {
-                                trace!("The following log line was filtered out: {client_line:?}");
+                                // Line was filtered out, do nothing
                             }
-                            Err(err) => {
-                                // trace here is intentional, adding error logs would loop the reader infinitely
-                                trace!("Couldn't parse client log line: {client_line:?}: {err}");
+                            Err(_) => {
+                                // Don't log it, as it will cause an endless loop
                             }
                         }
                         client_line.clear();
@@ -300,37 +296,24 @@ impl GlobalLogWatcher {
     /// Deserializes the log line into a known struct.
     /// Also performs filtering by log level and optional timestamp.
     fn parse_service_log_line(&self, line: &str) -> Option<LogLine> {
-        trace!("Parsing service log line: {line}");
         let Ok(mut log_line) = serde_json::from_str::<LogLine>(line) else {
             warn!("Failed to parse service log line: {line}");
             return None;
         };
-        trace!("Parsed service log line into: {log_line:?}");
 
         // filter by log level
         if log_line.level > self.log_level {
-            trace!(
-                "Log level {} is above configured verbosity threshold {}. Skipping line...",
-                log_line.level,
-                self.log_level
-            );
             return None;
         }
 
         // filter by optional timestamp
         if let Some(from) = self.from {
             if log_line.timestamp < from {
-                trace!(
-                    "Timestamp {} is below configured threshold {from}. Skipping line...",
-                    log_line.timestamp
-                );
                 return None;
             }
         }
 
         log_line.source = Some(LogSource::Service);
-
-        trace!("Successfully parsed service log line.");
 
         Some(log_line)
     }
@@ -338,7 +321,6 @@ impl GlobalLogWatcher {
     /// Parse a client log line into a known struct using regex.
     /// If the line doesn't match the regex, it's filtered out.
     fn parse_client_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
-        trace!("Parsing client log line: {line}");
         // Example log:
         // [2024-10-09][09:08:41][DEBUG][defguard_client::commands] Retrieving all locations.
         let regex = Regex::new(r"\[(.*?)\]\[(.*?)\]\[(.*?)\]\[(.*?)\] (.*)")?;
@@ -398,25 +380,15 @@ impl GlobalLogWatcher {
         };
 
         if log_line.level > self.log_level {
-            trace!(
-                "Log level {} is above configured verbosity threshold {}. Skipping line...",
-                log_line.level,
-                self.log_level
-            );
             return Ok(None);
         }
 
         if let Some(from) = self.from {
             if log_line.timestamp < from {
-                trace!("Timestamp is before configured threshold {from}. Skipping line...");
                 return Ok(None);
             }
         }
 
-        trace!(
-            "Successfully parsed client log line from file {:?}",
-            self.log_dirs.client_log_dir
-        );
         Ok(Some(log_line))
     }
 }

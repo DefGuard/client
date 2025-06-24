@@ -1591,6 +1591,37 @@ type RootTranslation = {
 				 * V​e​r​i​f​y
 				 */
 				buttonSubmit: string
+				openidLogin: {
+					/**
+					 * I​n​ ​o​r​d​e​r​ ​t​o​ ​c​o​n​n​e​c​t​ ​t​o​ ​t​h​e​ ​V​P​N​ ​p​l​e​a​s​e​ ​l​o​g​i​n​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}​.​ ​T​o​ ​d​o​ ​s​o​,​ ​p​l​e​a​s​e​ ​c​l​i​c​k​ ​"​A​u​t​h​e​n​t​i​c​a​t​e​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}​"​ ​b​u​t​t​o​n​ ​b​e​l​o​w​.
+					 * @param {unknown} provider
+					 */
+					description: RequiredParams<'provider' | 'provider'>
+					/**
+					 * *​*​T​h​i​s​ ​w​i​l​l​ ​o​p​e​n​ ​a​ ​n​e​w​ ​w​i​n​d​o​w​ ​i​n​ ​y​o​u​r​ ​W​e​b​ ​B​r​o​w​s​e​r​*​*​ ​a​n​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​r​e​d​i​r​e​c​t​ ​y​o​u​ ​t​o​ ​t​h​e​ ​{​p​r​o​v​i​d​e​r​}​ ​l​o​g​i​n​ ​p​a​g​e​.​ ​A​f​t​e​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​n​g​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}​ ​p​l​e​a​s​e​ ​g​e​t​ ​b​a​c​k​ ​h​e​r​e​.
+					 * @param {unknown} provider
+					 */
+					browserWarning: RequiredParams<'provider' | 'provider'>
+					/**
+					 * A​u​t​h​e​n​t​i​c​a​t​e​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}
+					 * @param {unknown} provider
+					 */
+					buttonText: RequiredParams<'provider'>
+				}
+				openidPending: {
+					/**
+					 * W​a​i​t​i​n​g​ ​f​o​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​i​n​ ​y​o​u​r​ ​b​r​o​w​s​e​r​.​.​.
+					 */
+					description: string
+					/**
+					 * T​r​y​ ​a​g​a​i​n
+					 */
+					tryAgain: string
+					/**
+					 * T​h​e​r​e​ ​w​a​s​ ​a​n​ ​e​r​r​o​r​ ​d​u​r​i​n​g​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​.​ ​U​s​e​ ​t​h​e​ ​t​r​y​ ​a​g​a​i​n​ ​b​u​t​t​o​n​ ​b​e​l​o​w​ ​t​o​ ​r​e​t​r​y​ ​t​h​e​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​p​r​o​c​e​s​s​.
+					 */
+					errorDescription: string
+				}
 				errors: {
 					/**
 					 * S​e​l​e​c​t​e​d​ ​m​e​t​h​o​d​ ​h​a​s​ ​n​o​t​ ​b​e​e​n​ ​c​o​n​f​i​g​u​r​e​d​.
@@ -1616,6 +1647,10 @@ type RootTranslation = {
 					 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​t​o​ ​c​o​n​n​e​c​t​ ​a​g​a​i​n​.
 					 */
 					tokenExpired: string
+					/**
+					 * A​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​t​i​m​e​d​ ​o​u​t​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​.
+					 */
+					authenticationTimeout: string
 				}
 			}
 		}
@@ -3179,6 +3214,34 @@ export type TranslationFunctions = {
 				 * Verify
 				 */
 				buttonSubmit: () => LocalizedString
+				openidLogin: {
+					/**
+					 * In order to connect to the VPN please login with {provider}. To do so, please click "Authenticate with {provider}" button below.
+					 */
+					description: (arg: { provider: unknown }) => LocalizedString
+					/**
+					 * **This will open a new window in your Web Browser** and automatically redirect you to the {provider} login page. After authenticating with {provider} please get back here.
+					 */
+					browserWarning: (arg: { provider: unknown }) => LocalizedString
+					/**
+					 * Authenticate with {provider}
+					 */
+					buttonText: (arg: { provider: unknown }) => LocalizedString
+				}
+				openidPending: {
+					/**
+					 * Waiting for authentication in your browser...
+					 */
+					description: () => LocalizedString
+					/**
+					 * Try again
+					 */
+					tryAgain: () => LocalizedString
+					/**
+					 * There was an error during authentication. Use the try again button below to retry the authentication process.
+					 */
+					errorDescription: () => LocalizedString
+				}
 				errors: {
 					/**
 					 * Selected method has not been configured.
@@ -3204,6 +3267,10 @@ export type TranslationFunctions = {
 					 * Token has expired. Please try to connect again.
 					 */
 					tokenExpired: () => LocalizedString
+					/**
+					 * Authentication timed out. Please try again.
+					 */
+					authenticationTimeout: () => LocalizedString
 				}
 			}
 		}
