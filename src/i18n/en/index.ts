@@ -744,7 +744,10 @@ If you want to disengage your VPN connection, simply press "deactivate".
           invalidCode:
             'Error, this code is invalid, try again or contact your administrator.',
           tokenExpired: 'Token has expired. Please try to connect again.',
-          authenticationTimeout: 'Authentication timed out. Please try again.',
+          authenticationTimeout:
+            'Authentication took too long and timed out. Please try connecting again.',
+          sessionInvalidated:
+            'Error: Your login session might have been invalidated or expired. Please try again.',
         },
       },
     },

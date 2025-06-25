@@ -359,17 +359,17 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
   const toaster = useToaster();
   const location = useMFAModal((state) => state.instance);
   const closeModal = useMFAModal((state) => state.close);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const TIMEOUT_DURATION = 5 * 60 * 1000;
+    const TIMEOUT_DURATION = 5 * 1000 * 60; // 5 minutes timeout
     // eslint-disable-next-line prefer-const
     let timeoutId: NodeJS.Timeout;
 
     const pollMFAStatus = async () => {
       if (!location) {
         toaster.error(localLL.errors.mfaStartGeneric());
-        setError(localLL.errors.locationNotSpecified());
+        setErrorMessage(localLL.errors.locationNotSpecified());
         return;
       }
 
@@ -408,22 +408,22 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       clearTimeout(timeoutId);
       const { error: errorMessage } = response.data as unknown as MFAError;
 
-      if (
-        errorMessage === 'invalid token' ||
-        errorMessage === 'login session not found'
-      ) {
-        console.error(response.data);
-        toaster.error(localLL.errors.tokenExpired());
-        resetState();
+      if (errorMessage === 'invalid token') {
+        error(JSON.stringify(response.data, null, 2));
+        setErrorMessage(localLL.errors.tokenExpired());
+      } else if (errorMessage === 'login session not found') {
+        error(JSON.stringify(response.data, null, 2));
+        setErrorMessage(localLL.errors.sessionInvalidated());
       } else {
-        console.error('MFA error:', response.data);
-        toaster.error(JSON.stringify(response.data, null, 2));
+        error(JSON.stringify(response.data, null, 2));
+        setErrorMessage(localLL.errors.mfaStartGeneric());
       }
     };
 
     const handleTimeout = () => {
       clearInterval(interval);
-      toaster.error(localLL.errors.authenticationTimeout());
+      clearTimeout(timeoutId);
+      setErrorMessage(localLL.errors.authenticationTimeout());
     };
 
     const interval = setInterval(pollMFAStatus, 5000);
@@ -437,7 +437,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
 
   return (
     <div className="mfa-modal-content">
-      {!error ? (
+      {!errorMessage ? (
         <>
           <div className="mfa-modal-content-icon">
             <div className="icon-spinner">
@@ -456,6 +456,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
           </div>
           <div className="mfa-modal-content-description mfa-model-error-description">
             <p>{localLL.openidPending.errorDescription()}</p>
+            <p className="mfa-model-error-message">{errorMessage}</p>
           </div>
         </>
       )}

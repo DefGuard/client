@@ -1648,9 +1648,13 @@ type RootTranslation = {
 					 */
 					tokenExpired: string
 					/**
-					 * A​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​t​i​m​e​d​ ​o​u​t​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​.
+					 * A​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​t​o​o​k​ ​t​o​o​ ​l​o​n​g​ ​a​n​d​ ​t​i​m​e​d​ ​o​u​t​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​c​o​n​n​e​c​t​i​n​g​ ​a​g​a​i​n​.
 					 */
 					authenticationTimeout: string
+					/**
+					 * E​r​r​o​r​:​ ​Y​o​u​r​ ​l​o​g​i​n​ ​s​e​s​s​i​o​n​ ​m​i​g​h​t​ ​h​a​v​e​ ​b​e​e​n​ ​i​n​v​a​l​i​d​a​t​e​d​ ​o​r​ ​e​x​p​i​r​e​d​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​.
+					 */
+					sessionInvalidated: string
 				}
 			}
 		}
@@ -3268,9 +3272,13 @@ export type TranslationFunctions = {
 					 */
 					tokenExpired: () => LocalizedString
 					/**
-					 * Authentication timed out. Please try again.
+					 * Authentication took too long and timed out. Please try connecting again.
 					 */
 					authenticationTimeout: () => LocalizedString
+					/**
+					 * Error: Your login session might have been invalidated or expired. Please try again.
+					 */
+					sessionInvalidated: () => LocalizedString
 				}
 			}
 		}
