@@ -735,6 +735,11 @@ If you want to disengage your VPN connection, simply press "deactivate".
           errorDescription:
             'There was an error during authentication. Use the try again button below to retry the authentication process.',
         },
+        openidUnavailable: {
+          description:
+            'The OpenID authentication is currently unavailable. This may be due to a configuration issue or the Defguard instance is down. Please contact your administrator or try again later.',
+          tryAgain: 'Try again',
+        },
         errors: {
           mfaNotConfigured: 'Selected method has not been configured.',
           mfaStartGeneric:

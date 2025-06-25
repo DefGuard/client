@@ -1622,6 +1622,16 @@ type RootTranslation = {
 					 */
 					errorDescription: string
 				}
+				openidUnavailable: {
+					/**
+					 * T​h​e​ ​O​p​e​n​I​D​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​i​s​ ​c​u​r​r​e​n​t​l​y​ ​u​n​a​v​a​i​l​a​b​l​e​.​ ​T​h​i​s​ ​m​a​y​ ​b​e​ ​d​u​e​ ​t​o​ ​a​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​i​s​s​u​e​ ​o​r​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​i​s​ ​d​o​w​n​.​ ​P​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​o​r​ ​t​r​y​ ​a​g​a​i​n​ ​l​a​t​e​r​.
+					 */
+					description: string
+					/**
+					 * T​r​y​ ​a​g​a​i​n
+					 */
+					tryAgain: string
+				}
 				errors: {
 					/**
 					 * S​e​l​e​c​t​e​d​ ​m​e​t​h​o​d​ ​h​a​s​ ​n​o​t​ ​b​e​e​n​ ​c​o​n​f​i​g​u​r​e​d​.
@@ -3245,6 +3255,16 @@ export type TranslationFunctions = {
 					 * There was an error during authentication. Use the try again button below to retry the authentication process.
 					 */
 					errorDescription: () => LocalizedString
+				}
+				openidUnavailable: {
+					/**
+					 * The OpenID authentication is currently unavailable. This may be due to a configuration issue or the Defguard instance is down. Please contact your administrator or try again later.
+					 */
+					description: () => LocalizedString
+					/**
+					 * Try again
+					 */
+					tryAgain: () => LocalizedString
 				}
 				errors: {
 					/**

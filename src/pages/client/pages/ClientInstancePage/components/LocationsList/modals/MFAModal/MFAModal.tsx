@@ -50,7 +50,13 @@ type MFAStartResponse = {
   token: string;
 };
 
-type Screen = 'start' | 'authenticator_app' | 'email' | 'openid_login' | 'openid_pending';
+type Screen =
+  | 'start'
+  | 'authenticator_app'
+  | 'email'
+  | 'openid_login'
+  | 'openid_pending'
+  | 'openid_unavailable';
 
 export const MFAModal = () => {
   const { LL } = useI18nContext();
@@ -137,8 +143,14 @@ export const MFAModal = () => {
 
       return response.data;
     } else {
-      const error = (response.data as unknown as MFAError).error;
-      if (error === 'selected MFA method not available') {
+      const errorData = (response.data as unknown as MFAError).error;
+      error('MFA failed to start with the following error: ' + errorData);
+      if (selectedMethod === 2) {
+        setScreen('openid_unavailable');
+        return;
+      }
+
+      if (errorData === 'selected MFA method not available') {
         toaster.error(localLL.errors.mfaNotConfigured());
       } else {
         toaster.error(localLL.errors.mfaStartGeneric());
@@ -181,6 +193,9 @@ export const MFAModal = () => {
     >
       {useOpenIDMFA && screen === 'start' && (
         <OpenIDMFAStart isPending={isPending} showOpenIDScreen={showOpenIDScreen} />
+      )}
+      {useOpenIDMFA && screen === 'openid_unavailable' && (
+        <OpenIDMFAUnavailable resetState={resetAuthState} />
       )}
       {screen === 'start' && !useOpenIDMFA && (
         <MFAStart
@@ -229,6 +244,29 @@ type MFAStartProps = {
   showAuthenticatorAppCodeForm: () => void;
   showEmailCodeForm: () => void;
   showOpenIDScreen: () => void;
+};
+
+const OpenIDMFAUnavailable = ({ resetState }: { resetState: () => void }) => {
+  const { LL } = useI18nContext();
+  const localLL = LL.modals.mfa.authentication;
+
+  return (
+    <div className="mfa-modal-content">
+      <div className="mfa-modal-content-icon">
+        <BrowserErrorIcon />
+      </div>
+      <div className="mfa-modal-content-description mfa-model-error-description">
+        <p>{localLL.openidUnavailable.description()}</p>
+      </div>
+      <div className="mfa-modal-content-footer">
+        <Button
+          styleVariant={ButtonStyleVariant.STANDARD}
+          text={localLL.openidUnavailable.tryAgain()}
+          onClick={resetState}
+        />
+      </div>
+    </div>
+  );
 };
 
 const OpenIDMFAStart = ({
