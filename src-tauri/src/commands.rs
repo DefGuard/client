@@ -308,6 +308,8 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             pubkey: keys.pubkey,
             disable_all_traffic: instance.disable_all_traffic,
             enterprise_enabled: instance.enterprise_enabled,
+            use_openid_for_mfa: instance.use_openid_for_mfa,
+            openid_display_name: instance.openid_display_name,
         });
     }
     debug!(
@@ -492,6 +494,8 @@ pub(crate) async fn do_update_instance(
     }
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
+    instance.use_openid_for_mfa = instance_info.use_openid_for_mfa;
+    instance.openid_display_name = instance_info.openid_display_name;
     // Token may be empty if it was not issued
     // This happens during polling, as core doesn't issue a new token for polling request
     if response.token.is_some() {

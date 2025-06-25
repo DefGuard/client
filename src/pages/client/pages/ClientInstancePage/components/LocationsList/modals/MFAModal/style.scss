@@ -7,43 +7,59 @@
 }
 
 .mfa-modal-content {
-  padding-left: 50px;
-  padding-right: 50px;
-  padding-top: 25px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: var(--spacing-m);
+
+  .mfa-modal-content-icon {
+    position: relative;
+  }
+
+  .icon-spinner {
+    position: absolute;
+    top: 50px;
+    left: 22.26px;
+  }
 
   & > .mfa-modal-content-button-container {
     display: flex;
     flex-direction: column;
-    margin-top: 30px;
-
-    & > button {
-      margin-bottom: 40px;
-      padding-left: 48px;
-      padding-right: 48px;
-      width: 330px;
-      background-color: var(--surface-button);
-
-      & > .text {
-        @include typography(app-button-l);
-        color: var(--text-button-tertiary);
-      }
-    }
+    gap: var(--spacing-s);
   }
 
   & > .mfa-modal-content-description {
-    height: 70px;
     text-align: center;
     @include typography(welcome-h2);
     color: var(--text-body-secondary);
   }
 
+  .mfa-model-error-description {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-s);
+  }
+
+  .mfa-model-error-message {
+    @include typography(app-code);
+  }
+
+  .error-details {
+    @include typography(app-code);
+  }
+
   & > p {
     @include typography(welcome-h2);
     color: var(--text-body-secondary);
+  }
+
+  & .mfa-modal-content-footer {
+    button {
+      display: flex;
+      width: 303px;
+      padding: 12px 48px;
+    }
   }
 
   & > form {

@@ -8,6 +8,8 @@ export type DefguardInstance = {
   active: boolean;
   pubkey: string;
   disable_all_traffic: boolean;
+  use_openid_for_mfa: boolean;
+  openid_display_name?: string;
 };
 
 export type DefguardLocation = {
