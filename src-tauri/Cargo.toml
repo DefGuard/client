@@ -11,7 +11,7 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.80"
-version = "1.4.0"
+version = "1.5.0"
 
 [package]
 name = "defguard-client"
@@ -49,24 +49,24 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "3.11"
 sqlx = { version = "0.8", features = [
-    "chrono",
-    "sqlite",
-    "runtime-tokio",
-    "uuid",
-    "macros",
+  "chrono",
+  "sqlite",
+  "runtime-tokio",
+  "uuid",
+  "macros",
 ] }
 struct-patch = "0.9"
 strum = { version = "0.27", features = ["derive"] }
 tauri = { version = "1.8", features = [
-    "notification-all",
-    "dialog-all",
-    "clipboard-all",
-    "http-all",
-    "window-all",
-    "system-tray",
-    "native-tls-vendored",
-    "icon-png",
-    "fs-all",
+  "notification-all",
+  "dialog-all",
+  "clipboard-all",
+  "http-all",
+  "window-all",
+  "system-tray",
+  "native-tls-vendored",
+  "icon-png",
+  "fs-all",
 ] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
@@ -81,9 +81,9 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 webbrowser = "1.0"
 x25519-dalek = { version = "2", features = [
-    "getrandom",
-    "serde",
-    "static_secrets",
+  "getrandom",
+  "serde",
+  "static_secrets",
 ] }
 
 [target.'cfg(windows)'.dependencies]
