@@ -1,74 +1,68 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,route_all_traffic, mfa_enabled, keepalive_interval FROM location;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name FROM instance WHERE id = $1;",
   "describe": {
     "columns": [
       {
-        "name": "id",
+        "name": "id: _",
         "ordinal": 0,
         "type_info": "Integer"
       },
       {
-        "name": "instance_id",
+        "name": "name",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Text"
       },
       {
-        "name": "name",
+        "name": "uuid",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "address",
+        "name": "url",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "pubkey",
+        "name": "proxy_url",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "endpoint",
+        "name": "username",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "allowed_ips",
+        "name": "token?",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "dns",
+        "name": "disable_all_traffic",
         "ordinal": 7,
-        "type_info": "Text"
+        "type_info": "Bool"
       },
       {
-        "name": "network_id",
+        "name": "enterprise_enabled",
         "ordinal": 8,
-        "type_info": "Integer"
+        "type_info": "Bool"
       },
       {
-        "name": "route_all_traffic",
+        "name": "use_openid_for_mfa",
         "ordinal": 9,
         "type_info": "Bool"
       },
       {
-        "name": "mfa_enabled",
+        "name": "openid_display_name",
         "ordinal": 10,
-        "type_info": "Bool"
-      },
-      {
-        "name": "keepalive_interval",
-        "ordinal": 11,
-        "type_info": "Integer"
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -79,8 +73,8 @@
       false,
       false,
       false,
-      false
+      true
     ]
   },
-  "hash": "5953a81f34f906e34aabec089dfe0cebf2afc3ad798638db9ea0aabcd506192b"
+  "hash": "7f1db6e3022b3bef4515d183feb6dc2e3b787c1fe5c4ce26c1c14c356d0c85d5"
 }
