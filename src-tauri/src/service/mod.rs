@@ -96,6 +96,8 @@ pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
 
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
+    type ReadInterfaceDataStream = InterfaceDataStream;
+
     async fn create_interface(
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
@@ -224,8 +226,6 @@ impl DesktopDaemonService for DaemonService {
         debug!("Finished removing interface {ifname}");
         Ok(Response::new(()))
     }
-
-    type ReadInterfaceDataStream = InterfaceDataStream;
 
     async fn read_interface_data(
         &self,
@@ -365,7 +365,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
     fn from(config: proto::InterfaceConfig) -> Self {
         let addresses = config
             .address
-            .split(",")
+            .split(',')
             .filter_map(|ip| IpAddrMask::from_str(ip.trim()).ok())
             .collect();
         Self {

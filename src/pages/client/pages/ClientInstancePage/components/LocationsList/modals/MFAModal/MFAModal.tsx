@@ -3,9 +3,11 @@ import './style.scss';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Body, fetch } from '@tauri-apps/api/http';
-import { useCallback, useMemo, useState } from 'react';
+import { isUndefined } from 'lodash-es';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import ReactMarkdown from 'react-markdown';
 import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
@@ -16,11 +18,15 @@ import {
   ButtonSize,
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
+import { LoaderSpinner } from '../../../../../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
 import { MessageBox } from '../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
 import { MessageBoxType } from '../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/types';
 import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
+import { useClientStore } from '../../../../../../hooks/useClientStore';
+import { DefguardInstance, WireguardInstanceType } from '../../../../../../types';
+import { BrowserErrorIcon, BrowserPendingIcon, GoToBrowserIcon } from './Icons';
 import { useMFAModal } from './useMFAModal';
 
 const { connect } = clientApi;
@@ -44,12 +50,20 @@ type MFAStartResponse = {
   token: string;
 };
 
+type Screen =
+  | 'start'
+  | 'authenticator_app'
+  | 'email'
+  | 'openid_login'
+  | 'openid_pending'
+  | 'openid_unavailable';
+
 export const MFAModal = () => {
   const { LL } = useI18nContext();
   const toaster = useToaster();
 
-  const [authMethod, setAuthMethod] = useState<0 | 1>(0);
-  const [screen, setScreen] = useState<'start' | 'authenticator_app' | 'email'>('start');
+  const [authMethod, setAuthMethod] = useState<0 | 1 | 2>(0);
+  const [screen, setScreen] = useState<Screen>('start');
   const [mfaToken, setMFAToken] = useState('');
   const [proxyUrl, setProxyUrl] = useState('');
 
@@ -57,6 +71,20 @@ export const MFAModal = () => {
   const isOpen = useMFAModal((state) => state.isOpen);
   const location = useMFAModal((state) => state.instance);
   const [close, reset] = useMFAModal((state) => [state.close, state.reset], shallow);
+  const [selectedInstanceId, selectedInstanceType] = useClientStore((state) => [
+    state.selectedInstance?.id,
+    state.selectedInstance?.type,
+  ]);
+  const instances = useClientStore((state) => state.instances);
+  const selectedInstance = useMemo((): DefguardInstance | undefined => {
+    if (
+      !isUndefined(selectedInstanceId) &&
+      selectedInstanceType &&
+      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE
+    ) {
+      return instances.find((i) => i.id === selectedInstanceId);
+    }
+  }, [selectedInstanceId, selectedInstanceType, instances]);
 
   const resetState = () => {
     reset();
@@ -69,23 +97,20 @@ export const MFAModal = () => {
     setMFAToken('');
   };
 
+  // selectedMethod: 0 = authenticator app, 1 = email, 2 = OpenID
   const startMFA = async (selectedMethod: number) => {
     if (!location) return toaster.error(localLL.errors.locationNotSpecified());
 
-    const clientInstances = await clientApi.getInstances();
-    const instance = clientInstances.find((i) => i.id === location.instance_id);
-
-    if (!instance) {
+    if (!selectedInstance) {
       return toaster.error(localLL.errors.instanceNotFound());
     }
 
-    setProxyUrl(instance.proxy_url + CLIENT_MFA_ENDPOINT);
-    const mfaStartUrl = instance.proxy_url + CLIENT_MFA_ENDPOINT + '/start';
+    setProxyUrl(selectedInstance.proxy_url);
+    const mfaStartUrl = selectedInstance.proxy_url + CLIENT_MFA_ENDPOINT + '/start';
 
-    // selectedMethod: 0 = authenticator app, 1 = email
     const data = {
       method: selectedMethod,
-      pubkey: instance.pubkey,
+      pubkey: selectedInstance.pubkey,
       location_id: location.network_id,
     };
 
@@ -100,13 +125,32 @@ export const MFAModal = () => {
     if (response.ok) {
       const { token } = response.data;
 
-      setScreen(selectedMethod === 0 ? 'authenticator_app' : 'email');
+      switch (selectedMethod) {
+        case 0:
+          setScreen('authenticator_app');
+          break;
+        case 1:
+          setScreen('email');
+          break;
+        case 2:
+          setScreen('openid_login');
+          break;
+        default:
+          toaster.error(localLL.errors.mfaStartGeneric());
+          return;
+      }
       setMFAToken(token);
 
       return response.data;
     } else {
-      const error = (response.data as unknown as MFAError).error;
-      if (error === 'selected MFA method not available') {
+      const errorData = (response.data as unknown as MFAError).error;
+      error('MFA failed to start with the following error: ' + errorData);
+      if (selectedMethod === 2) {
+        setScreen('openid_unavailable');
+        return;
+      }
+
+      if (errorData === 'selected MFA method not available') {
         toaster.error(localLL.errors.mfaNotConfigured());
       } else {
         toaster.error(localLL.errors.mfaStartGeneric());
@@ -115,6 +159,10 @@ export const MFAModal = () => {
       return;
     }
   };
+
+  const useOpenIDMFA = useMemo(() => {
+    return selectedInstance?.use_openid_for_mfa || false;
+  }, [selectedInstance]);
 
   const { mutate, isPending } = useMutation({
     mutationFn: startMFA,
@@ -130,6 +178,11 @@ export const MFAModal = () => {
     mutate(0);
   }, [mutate]);
 
+  const showOpenIDScreen = useCallback(() => {
+    setAuthMethod(2);
+    mutate(2);
+  }, [mutate]);
+
   return (
     <ModalWithTitle
       id="mfa-modal"
@@ -138,14 +191,38 @@ export const MFAModal = () => {
       onClose={close}
       afterClose={resetState}
     >
-      {screen === 'start' ? (
+      {useOpenIDMFA && screen === 'start' && (
+        <OpenIDMFAStart isPending={isPending} showOpenIDScreen={showOpenIDScreen} />
+      )}
+      {useOpenIDMFA && screen === 'openid_unavailable' && (
+        <OpenIDMFAUnavailable resetState={resetAuthState} />
+      )}
+      {screen === 'start' && !useOpenIDMFA && (
         <MFAStart
           isPending={isPending}
           authMethod={authMethod}
           showEmailCodeForm={showEmailCodeForm}
           showAuthenticatorAppCodeForm={showAuthenticatorAppCodeForm}
+          showOpenIDScreen={showOpenIDScreen}
         />
-      ) : (
+      )}
+      {screen === 'openid_login' && (
+        <OpenIDMFALogin
+          proxyUrl={proxyUrl}
+          token={mfaToken}
+          resetAuthState={resetAuthState}
+          setScreen={setScreen}
+          openidDisplayName={selectedInstance?.openid_display_name}
+        />
+      )}
+      {screen === 'openid_pending' && (
+        <OpenIDMFAPending
+          proxyUrl={proxyUrl}
+          token={mfaToken}
+          resetState={resetAuthState}
+        />
+      )}
+      {(screen === 'authenticator_app' || screen === 'email') && (
         <MFACodeForm
           description={
             screen === 'authenticator_app'
@@ -166,6 +243,50 @@ type MFAStartProps = {
   authMethod: number;
   showAuthenticatorAppCodeForm: () => void;
   showEmailCodeForm: () => void;
+  showOpenIDScreen: () => void;
+};
+
+const OpenIDMFAUnavailable = ({ resetState }: { resetState: () => void }) => {
+  const { LL } = useI18nContext();
+  const localLL = LL.modals.mfa.authentication;
+
+  return (
+    <div className="mfa-modal-content">
+      <div className="mfa-modal-content-icon">
+        <BrowserErrorIcon />
+      </div>
+      <div className="mfa-modal-content-description mfa-model-error-description">
+        <p>{localLL.openidUnavailable.description()}</p>
+      </div>
+      <div className="mfa-modal-content-footer">
+        <Button
+          styleVariant={ButtonStyleVariant.STANDARD}
+          text={localLL.openidUnavailable.tryAgain()}
+          onClick={resetState}
+        />
+      </div>
+    </div>
+  );
+};
+
+const OpenIDMFAStart = ({
+  isPending,
+  showOpenIDScreen,
+}: {
+  isPending: boolean;
+  showOpenIDScreen: () => void;
+}) => {
+  useEffect(() => {
+    if (!isPending) {
+      showOpenIDScreen();
+    }
+  }, [isPending, showOpenIDScreen]);
+
+  return (
+    <div className="mfa-modal-content">
+      <LoaderSpinner size={50} />
+    </div>
+  );
 };
 
 const MFAStart = ({
@@ -220,6 +341,176 @@ type MFAFinishResponse = {
   preshared_key: string;
 };
 
+const OpenIDMFALogin = ({
+  proxyUrl,
+  token,
+  setScreen,
+  openidDisplayName,
+}: {
+  proxyUrl: string;
+  token: string;
+  openidDisplayName?: string;
+  resetAuthState: () => void;
+  setScreen: (screen: Screen) => void;
+}) => {
+  const { LL } = useI18nContext();
+  const localLL = LL.modals.mfa.authentication;
+  const { openLink } = clientApi;
+  const displayName = openidDisplayName || 'OpenID provider';
+
+  return (
+    <div className="mfa-modal-content">
+      <div className="mfa-modal-content-icon">
+        <GoToBrowserIcon />
+      </div>
+      <div className="mfa-modal-content-description">
+        <p>{localLL.openidLogin.description({ provider: displayName })}</p>
+        <br />
+        <ReactMarkdown>
+          {localLL.openidLogin.browserWarning({ provider: displayName })}
+        </ReactMarkdown>
+      </div>
+      <div className="mfa-modal-content-button-container">
+        <Button
+          styleVariant={ButtonStyleVariant.PRIMARY}
+          text={localLL.openidLogin.buttonText({ provider: displayName })}
+          onClick={() => {
+            const link = proxyUrl + 'openid/mfa?token=' + token;
+            openLink(link);
+            setScreen('openid_pending');
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+type OpenIDMFAPendingProps = {
+  proxyUrl: string;
+  token: string;
+  resetState: () => void;
+};
+
+const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps) => {
+  const { LL } = useI18nContext();
+  const localLL = LL.modals.mfa.authentication;
+  const toaster = useToaster();
+  const location = useMFAModal((state) => state.instance);
+  const closeModal = useMFAModal((state) => state.close);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const TIMEOUT_DURATION = 5 * 1000 * 60; // 5 minutes timeout
+    // eslint-disable-next-line prefer-const
+    let timeoutId: NodeJS.Timeout;
+
+    const pollMFAStatus = async () => {
+      if (!location) {
+        toaster.error(localLL.errors.mfaStartGeneric());
+        setErrorMessage(localLL.errors.locationNotSpecified());
+        return;
+      }
+
+      const data = { token };
+      const response = await fetch<MFAFinishResponse>(
+        proxyUrl + CLIENT_MFA_ENDPOINT + '/finish',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: Body.json(data),
+        },
+      );
+
+      if (response.ok) {
+        clearInterval(interval);
+        clearTimeout(timeoutId);
+        closeModal();
+
+        await connect({
+          locationId: location?.id,
+          connectionType: location.connection_type,
+          presharedKey: response.data.preshared_key,
+        });
+        return;
+      }
+
+      // HTTP 428: Precondition required, continue waiting, the user may have not completed the OpenID login yet
+      if (response.status === 428) {
+        return;
+      }
+
+      // Other errors: stop polling and handle
+      clearInterval(interval);
+      clearTimeout(timeoutId);
+      const { error: errorMessage } = response.data as unknown as MFAError;
+
+      if (errorMessage === 'invalid token') {
+        error(JSON.stringify(response.data, null, 2));
+        setErrorMessage(localLL.errors.tokenExpired());
+      } else if (errorMessage === 'login session not found') {
+        error(JSON.stringify(response.data, null, 2));
+        setErrorMessage(localLL.errors.sessionInvalidated());
+      } else {
+        error(JSON.stringify(response.data, null, 2));
+        setErrorMessage(localLL.errors.mfaStartGeneric());
+      }
+    };
+
+    const handleTimeout = () => {
+      clearInterval(interval);
+      clearTimeout(timeoutId);
+      setErrorMessage(localLL.errors.authenticationTimeout());
+    };
+
+    const interval = setInterval(pollMFAStatus, 5000);
+    timeoutId = setTimeout(handleTimeout, TIMEOUT_DURATION);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeoutId);
+    };
+  }, [proxyUrl, token, location, closeModal, resetState, localLL.errors, toaster]);
+
+  return (
+    <div className="mfa-modal-content">
+      {!errorMessage ? (
+        <>
+          <div className="mfa-modal-content-icon">
+            <div className="icon-spinner">
+              <LoaderSpinner size={49} />
+            </div>
+            <BrowserPendingIcon />
+          </div>
+          <div className="mfa-modal-content-description">
+            <p>{localLL.openidPending.description()}</p>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mfa-modal-content-icon">
+            <BrowserErrorIcon />
+          </div>
+          <div className="mfa-modal-content-description mfa-model-error-description">
+            <p>{localLL.openidPending.errorDescription()}</p>
+            <p className="mfa-model-error-message">{errorMessage}</p>
+          </div>
+        </>
+      )}
+      <div className="mfa-modal-content-footer">
+        <Button
+          styleVariant={ButtonStyleVariant.STANDARD}
+          text={localLL.openidPending.tryAgain()}
+          onClick={() => {
+            resetState();
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) => {
   const { LL } = useI18nContext();
   const toaster = useToaster();
@@ -243,13 +534,16 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
 
     const data = { token, code: code };
 
-    const response = await fetch<MFAFinishResponse>(proxyUrl + '/finish', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await fetch<MFAFinishResponse>(
+      proxyUrl + CLIENT_MFA_ENDPOINT + '/finish',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: Body.json(data),
       },
-      body: Body.json(data),
-    });
+    );
 
     if (response.ok) {
       closeModal();

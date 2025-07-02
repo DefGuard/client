@@ -1598,6 +1598,47 @@ type RootTranslation = {
 				 * V​e​r​i​f​y
 				 */
 				buttonSubmit: string
+				openidLogin: {
+					/**
+					 * I​n​ ​o​r​d​e​r​ ​t​o​ ​c​o​n​n​e​c​t​ ​t​o​ ​t​h​e​ ​V​P​N​ ​p​l​e​a​s​e​ ​l​o​g​i​n​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}​.​ ​T​o​ ​d​o​ ​s​o​,​ ​p​l​e​a​s​e​ ​c​l​i​c​k​ ​"​A​u​t​h​e​n​t​i​c​a​t​e​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}​"​ ​b​u​t​t​o​n​ ​b​e​l​o​w​.
+					 * @param {unknown} provider
+					 */
+					description: RequiredParams<'provider' | 'provider'>
+					/**
+					 * *​*​T​h​i​s​ ​w​i​l​l​ ​o​p​e​n​ ​a​ ​n​e​w​ ​w​i​n​d​o​w​ ​i​n​ ​y​o​u​r​ ​W​e​b​ ​B​r​o​w​s​e​r​*​*​ ​a​n​d​ ​a​u​t​o​m​a​t​i​c​a​l​l​y​ ​r​e​d​i​r​e​c​t​ ​y​o​u​ ​t​o​ ​t​h​e​ ​{​p​r​o​v​i​d​e​r​}​ ​l​o​g​i​n​ ​p​a​g​e​.​ ​A​f​t​e​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​n​g​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}​ ​p​l​e​a​s​e​ ​g​e​t​ ​b​a​c​k​ ​h​e​r​e​.
+					 * @param {unknown} provider
+					 */
+					browserWarning: RequiredParams<'provider' | 'provider'>
+					/**
+					 * A​u​t​h​e​n​t​i​c​a​t​e​ ​w​i​t​h​ ​{​p​r​o​v​i​d​e​r​}
+					 * @param {unknown} provider
+					 */
+					buttonText: RequiredParams<'provider'>
+				}
+				openidPending: {
+					/**
+					 * W​a​i​t​i​n​g​ ​f​o​r​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​i​n​ ​y​o​u​r​ ​b​r​o​w​s​e​r​.​.​.
+					 */
+					description: string
+					/**
+					 * T​r​y​ ​a​g​a​i​n
+					 */
+					tryAgain: string
+					/**
+					 * T​h​e​r​e​ ​w​a​s​ ​a​n​ ​e​r​r​o​r​ ​d​u​r​i​n​g​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​.​ ​U​s​e​ ​t​h​e​ ​t​r​y​ ​a​g​a​i​n​ ​b​u​t​t​o​n​ ​b​e​l​o​w​ ​t​o​ ​r​e​t​r​y​ ​t​h​e​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​p​r​o​c​e​s​s​.
+					 */
+					errorDescription: string
+				}
+				openidUnavailable: {
+					/**
+					 * T​h​e​ ​O​p​e​n​I​D​ ​a​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​i​s​ ​c​u​r​r​e​n​t​l​y​ ​u​n​a​v​a​i​l​a​b​l​e​.​ ​T​h​i​s​ ​m​a​y​ ​b​e​ ​d​u​e​ ​t​o​ ​a​ ​c​o​n​f​i​g​u​r​a​t​i​o​n​ ​i​s​s​u​e​ ​o​r​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​i​s​ ​d​o​w​n​.​ ​P​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​ ​o​r​ ​t​r​y​ ​a​g​a​i​n​ ​l​a​t​e​r​.
+					 */
+					description: string
+					/**
+					 * T​r​y​ ​a​g​a​i​n
+					 */
+					tryAgain: string
+				}
 				errors: {
 					/**
 					 * S​e​l​e​c​t​e​d​ ​m​e​t​h​o​d​ ​h​a​s​ ​n​o​t​ ​b​e​e​n​ ​c​o​n​f​i​g​u​r​e​d​.
@@ -1623,6 +1664,14 @@ type RootTranslation = {
 					 * T​o​k​e​n​ ​h​a​s​ ​e​x​p​i​r​e​d​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​t​o​ ​c​o​n​n​e​c​t​ ​a​g​a​i​n​.
 					 */
 					tokenExpired: string
+					/**
+					 * A​u​t​h​e​n​t​i​c​a​t​i​o​n​ ​t​o​o​k​ ​t​o​o​ ​l​o​n​g​ ​a​n​d​ ​t​i​m​e​d​ ​o​u​t​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​c​o​n​n​e​c​t​i​n​g​ ​a​g​a​i​n​.
+					 */
+					authenticationTimeout: string
+					/**
+					 * E​r​r​o​r​:​ ​Y​o​u​r​ ​l​o​g​i​n​ ​s​e​s​s​i​o​n​ ​m​i​g​h​t​ ​h​a​v​e​ ​b​e​e​n​ ​i​n​v​a​l​i​d​a​t​e​d​ ​o​r​ ​e​x​p​i​r​e​d​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​.
+					 */
+					sessionInvalidated: string
 				}
 			}
 		}
@@ -3193,6 +3242,44 @@ export type TranslationFunctions = {
 				 * Verify
 				 */
 				buttonSubmit: () => LocalizedString
+				openidLogin: {
+					/**
+					 * In order to connect to the VPN please login with {provider}. To do so, please click "Authenticate with {provider}" button below.
+					 */
+					description: (arg: { provider: unknown }) => LocalizedString
+					/**
+					 * **This will open a new window in your Web Browser** and automatically redirect you to the {provider} login page. After authenticating with {provider} please get back here.
+					 */
+					browserWarning: (arg: { provider: unknown }) => LocalizedString
+					/**
+					 * Authenticate with {provider}
+					 */
+					buttonText: (arg: { provider: unknown }) => LocalizedString
+				}
+				openidPending: {
+					/**
+					 * Waiting for authentication in your browser...
+					 */
+					description: () => LocalizedString
+					/**
+					 * Try again
+					 */
+					tryAgain: () => LocalizedString
+					/**
+					 * There was an error during authentication. Use the try again button below to retry the authentication process.
+					 */
+					errorDescription: () => LocalizedString
+				}
+				openidUnavailable: {
+					/**
+					 * The OpenID authentication is currently unavailable. This may be due to a configuration issue or the Defguard instance is down. Please contact your administrator or try again later.
+					 */
+					description: () => LocalizedString
+					/**
+					 * Try again
+					 */
+					tryAgain: () => LocalizedString
+				}
 				errors: {
 					/**
 					 * Selected method has not been configured.
@@ -3218,6 +3305,14 @@ export type TranslationFunctions = {
 					 * Token has expired. Please try to connect again.
 					 */
 					tokenExpired: () => LocalizedString
+					/**
+					 * Authentication took too long and timed out. Please try connecting again.
+					 */
+					authenticationTimeout: () => LocalizedString
+					/**
+					 * Error: Your login session might have been invalidated or expired. Please try again.
+					 */
+					sessionInvalidated: () => LocalizedString
 				}
 			}
 		}

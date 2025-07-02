@@ -137,7 +137,7 @@ pub(crate) async fn setup_interface(
     debug!("Found free port: {port} for interface {interface_name}.");
     let addresses = location
         .address
-        .split(",")
+        .split(',')
         .map(str::trim)
         .map(IpAddrMask::from_str)
         .collect::<Result<_, _>>()
@@ -404,7 +404,7 @@ pub async fn setup_interface_tunnel(
 
     let addresses = tunnel
         .address
-        .split(",")
+        .split(',')
         .map(str::trim)
         .map(IpAddrMask::from_str)
         .collect::<Result<_, _>>()
