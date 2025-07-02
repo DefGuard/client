@@ -26,7 +26,7 @@
         cargo-tauri
         toolchain
         rust-analyzer-unwrapped
-        nodejs_18
+        nodejs_20
         nodePackages.pnpm
         trunk
       ];

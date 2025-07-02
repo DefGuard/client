@@ -1,0 +1,12 @@
+#locations-no-data {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: 20px;
+  padding-top: 60px;
+
+  p {
+    @include typography(app-body-2);
+  }
+}

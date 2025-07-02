@@ -212,6 +212,11 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
         },
         instancePage: {
           title: 'Locations',
+          //md
+          noData: `
+Currently you do not have access to any VPN Locations. This may be temporary - your administration team maybe is configuring your access policies.
+
+If this will not change, please contact your administrator.`,
           controls: {
             connect: 'Connect',
             disconnect: 'Disconnect',

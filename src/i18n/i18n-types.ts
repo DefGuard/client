@@ -492,6 +492,13 @@ type RootTranslation = {
 					 * L​o​c​a​t​i​o​n​s
 					 */
 					title: string
+					/**
+					 * 
+				​C​u​r​r​e​n​t​l​y​ ​y​o​u​ ​d​o​ ​n​o​t​ ​h​a​v​e​ ​a​c​c​e​s​s​ ​t​o​ ​a​n​y​ ​V​P​N​ ​L​o​c​a​t​i​o​n​s​.​ ​T​h​i​s​ ​m​a​y​ ​b​e​ ​t​e​m​p​o​r​a​r​y​ ​-​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​i​o​n​ ​t​e​a​m​ ​m​a​y​b​e​ ​i​s​ ​c​o​n​f​i​g​u​r​i​n​g​ ​y​o​u​r​ ​a​c​c​e​s​s​ ​p​o​l​i​c​i​e​s​.​
+				​
+				​I​f​ ​t​h​i​s​ ​w​i​l​l​ ​n​o​t​ ​c​h​a​n​g​e​,​ ​p​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					noData: string
 					controls: {
 						/**
 						 * C​o​n​n​e​c​t
@@ -2137,6 +2144,13 @@ export type TranslationFunctions = {
 					 * Locations
 					 */
 					title: () => LocalizedString
+					/**
+					 * 
+				Currently you do not have access to any VPN Locations. This may be temporary - your administration team maybe is configuring your access policies.
+			
+				If this will not change, please contact your administrator.
+					 */
+					noData: () => LocalizedString
 					controls: {
 						/**
 						 * Connect
