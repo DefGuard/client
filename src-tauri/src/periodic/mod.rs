@@ -1,4 +1,5 @@
 use connection::verify_active_connections;
+use purge_stats::purge_stats;
 use tauri::AppHandle;
 use tokio::select;
 use version::poll_version;
@@ -6,6 +7,7 @@ use version::poll_version;
 use crate::enterprise::periodic::config::poll_config;
 
 pub mod connection;
+pub mod purge_stats;
 pub mod version;
 
 /// Runs all the client periodic tasks, finishing when any of them returns.
@@ -19,6 +21,9 @@ pub async fn run_periodic_tasks(app_handle: &AppHandle) {
         }
         () = verify_active_connections(app_handle.clone()) => {
             error!("Active connection verification task has stopped unexpectedly");
+        }
+        () = purge_stats(app_handle.clone()) => {
+            error!("Stats purging task has stopped unexpectedly");
         }
     };
 }

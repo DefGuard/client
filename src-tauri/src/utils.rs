@@ -21,8 +21,8 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection},
             location::Location,
-            location_stats::{peer_to_location_stats, LocationStats},
-            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection, TunnelStats},
+            location_stats::peer_to_location_stats,
+            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection},
             wireguard_keys::WireguardKeys,
             Id,
         },
