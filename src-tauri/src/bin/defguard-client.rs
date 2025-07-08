@@ -254,9 +254,6 @@ async fn main() {
     }
 
     // run periodic tasks
-    debug!(
-        "Starting periodic tasks (config, version polling and active connection verification)..."
-    );
     let periodic_tasks_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         run_periodic_tasks(&periodic_tasks_handle).await;
