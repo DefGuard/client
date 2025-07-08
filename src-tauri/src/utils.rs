@@ -210,13 +210,6 @@ pub(crate) async fn stats_handler(
         match stream.message().await {
             Ok(Some(interface_data)) => {
                 debug!("Received new network usage statistics for interface {interface_name}.");
-                if let Err(err) = LocationStats::purge(&pool).await {
-                    error!("Failed to purge location stats: {err}");
-                }
-                if let Err(err) = TunnelStats::purge(&pool).await {
-                    error!("Failed to purge tunnel stats: {err}");
-                }
-
                 trace!("Received interface data: {interface_data:?}");
                 let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
                 for peer in peers {
