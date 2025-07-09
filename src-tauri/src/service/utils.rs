@@ -1,6 +1,18 @@
 use std::io::stdout;
 
+#[cfg(windows)]
+use crate::service::DAEMON_BASE_URL;
+#[cfg(unix)]
+use crate::service::DAEMON_SOCKET_PATH;
+#[cfg(unix)]
+use hyper_util::rt::TokioIo;
+#[cfg(unix)]
+use tokio::net::UnixStream;
 use tonic::transport::channel::{Channel, Endpoint};
+#[cfg(unix)]
+use tonic::transport::Uri;
+#[cfg(unix)]
+use tower::service_fn;
 use tracing::{debug, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
@@ -9,9 +21,22 @@ use tracing_subscriber::{
 };
 
 use crate::service::{
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DaemonError, DAEMON_BASE_URL,
+    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DaemonError,
 };
 
+#[cfg(unix)]
+pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
+    debug!("Setting up gRPC client");
+    let endpoint = Endpoint::try_from("http://[::]:50051")?;
+    let channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
+        // Connect to a Uds socket
+        Ok::<_, std::io::Error>(TokioIo::new(UnixStream::connect(DAEMON_SOCKET_PATH).await?))
+    }));
+    let client = DesktopDaemonServiceClient::new(channel);
+    Ok(client)
+}
+
+#[cfg(windows)]
 pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
     debug!("Setting up gRPC client");
     let endpoint = Endpoint::from_shared(DAEMON_BASE_URL)?;
