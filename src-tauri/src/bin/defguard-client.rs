@@ -109,7 +109,11 @@ async fn main() {
             let app_state: State<AppState> = app.state();
 
             // use config default if deriving from env value fails so that env can override config file
-            let config_log_level = app_state.app_config.lock().unwrap().log_level;
+            let config_log_level = app_state
+                .app_config
+                .lock()
+                .expect("Failed to acquire lock on app config")
+                .log_level;
 
             let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
                 Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
