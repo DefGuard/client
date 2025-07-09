@@ -17,8 +17,9 @@ pub(crate) type DbPool = sqlx::SqlitePool;
 /// Initializes the database
 pub fn init_db() -> Result<DbPool, Error> {
     let db_url = prepare_db_url()?;
-    let opts =
-        SqliteConnectOptions::from_str(&db_url)?.journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
+    let opts = SqliteConnectOptions::from_str(&db_url)?
+        .auto_vacuum(sqlx::sqlite::SqliteAutoVacuum::Incremental)
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
     debug!("Connecting to database: {db_url} with options: {opts:?}");
     let pool = DbPool::connect_lazy_with(opts);
 
