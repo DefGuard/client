@@ -1,8 +1,8 @@
-use connection::verify_active_connections;
-use purge_stats::purge_stats;
+use self::{
+    connection::verify_active_connections, purge_stats::purge_stats, version::poll_version,
+};
 use tauri::AppHandle;
 use tokio::select;
-use version::poll_version;
 
 use crate::enterprise::periodic::config::poll_config;
 
