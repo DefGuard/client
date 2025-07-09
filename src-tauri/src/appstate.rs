@@ -34,13 +34,13 @@ pub struct AppState {
 
 impl AppState {
     #[must_use]
-    pub fn new(app_handle: &AppHandle) -> Self {
+    pub fn new(config: AppConfig) -> Self {
         AppState {
             db: init_db().expect("Failed to initalize database"),
             active_connections: Mutex::new(Vec::new()),
             client: setup_client().expect("Failed to setup gRPC client"),
             log_watchers: std::sync::Mutex::new(HashMap::new()),
-            app_config: std::sync::Mutex::new(AppConfig::new(app_handle)),
+            app_config: std::sync::Mutex::new(config),
             stat_threads: std::sync::Mutex::new(HashMap::new()),
         }
     }

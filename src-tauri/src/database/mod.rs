@@ -3,7 +3,10 @@ pub mod models;
 use std::{
     env,
     fs::{create_dir_all, File},
+    str::FromStr,
 };
+
+use sqlx::sqlite::SqliteConnectOptions;
 
 use crate::{app_data_dir, error::Error};
 
@@ -14,8 +17,11 @@ pub(crate) type DbPool = sqlx::SqlitePool;
 /// Initializes the database
 pub fn init_db() -> Result<DbPool, Error> {
     let db_url = prepare_db_url()?;
-    debug!("Connecting to database: {db_url}");
-    let pool = DbPool::connect_lazy(&db_url)?;
+    let opts = SqliteConnectOptions::from_str(&db_url)?
+        .auto_vacuum(sqlx::sqlite::SqliteAutoVacuum::Incremental)
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
+    debug!("Connecting to database: {db_url} with options: {opts:?}");
+    let pool = DbPool::connect_lazy_with(opts);
 
     Ok(pool)
 }
