@@ -8,6 +8,7 @@ use std::{env, str::FromStr, sync::LazyLock};
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
+    app_config::AppConfig,
     appstate::AppState,
     commands::*,
     database::models::{location_stats::LocationStats, tunnel::TunnelStats},
@@ -102,19 +103,12 @@ async fn main() {
             let _ = app.emit_all(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
         .setup(|app| {
-            {
-                let state = AppState::new(&app.app_handle());
-                app.manage(state);
-            }
-            let app_state: State<AppState> = app.state();
+            // prepare config
+            let config = AppConfig::new(&app.app_handle());
 
+            // setup logging
             // use config default if deriving from env value fails so that env can override config file
-            let config_log_level = app_state
-                .app_config
-                .lock()
-                .expect("Failed to acquire lock on app config")
-                .log_level;
-
+            let config_log_level = config.log_level;
             let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
                 Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
                 Err(_) => config_log_level,
@@ -176,6 +170,11 @@ async fn main() {
                         .build(),
                 )
                 .unwrap();
+
+            {
+                let state = AppState::new(config);
+                app.manage(state);
+            }
 
             info!("App setup completed, log level: {log_level}");
 
