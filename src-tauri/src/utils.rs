@@ -211,21 +211,36 @@ pub(crate) async fn stats_handler(
             Ok(Some(interface_data)) => {
                 debug!("Received new network usage statistics for interface {interface_name}.");
                 trace!("Received interface data: {interface_data:?}");
+
+                // begin transaction
+                let mut transaction = match pool.begin().await {
+                    Ok(transactions) => transactions,
+                    Err(err) => {
+                        error!(
+                            "Failed to begin database transaction for saving location/tunnel stats: {err}",
+                        );
+                        continue;
+                    }
+                };
+
                 let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
                 for peer in peers {
                     if connection_type.eq(&ConnectionType::Location) {
-                        let location_stats =
-                            match peer_to_location_stats(&peer, interface_data.listen_port, &pool)
-                                .await
-                            {
-                                Ok(stats) => stats,
-                                Err(err) => {
-                                    error!("Failed to convert peer data to location stats: {err}");
-                                    continue;
-                                }
-                            };
+                        let location_stats = match peer_to_location_stats(
+                            &peer,
+                            interface_data.listen_port,
+                            &mut *transaction,
+                        )
+                        .await
+                        {
+                            Ok(stats) => stats,
+                            Err(err) => {
+                                error!("Failed to convert peer data to location stats: {err}");
+                                continue;
+                            }
+                        };
                         let location_name = location_stats
-                            .get_name(&pool)
+                            .get_name(&mut *transaction)
                             .await
                             .unwrap_or("UNKNOWN".to_string());
 
@@ -234,7 +249,7 @@ pub(crate) async fn stats_handler(
                             (interface {interface_name})."
                         );
                         trace!("Stats: {location_stats:?}");
-                        match location_stats.save(&pool).await {
+                        match location_stats.save(&mut *transaction).await {
                             Ok(_) => {
                                 debug!("Saved network usage stats for location {location_name}");
                             }
@@ -246,25 +261,28 @@ pub(crate) async fn stats_handler(
                             }
                         }
                     } else {
-                        let tunnel_stats =
-                            match peer_to_tunnel_stats(&peer, interface_data.listen_port, &pool)
-                                .await
-                            {
-                                Ok(stats) => stats,
-                                Err(err) => {
-                                    error!("Failed to convert peer data to tunnel stats: {err}");
-                                    continue;
-                                }
-                            };
+                        let tunnel_stats = match peer_to_tunnel_stats(
+                            &peer,
+                            interface_data.listen_port,
+                            &mut *transaction,
+                        )
+                        .await
+                        {
+                            Ok(stats) => stats,
+                            Err(err) => {
+                                error!("Failed to convert peer data to tunnel stats: {err}");
+                                continue;
+                            }
+                        };
                         let tunnel_name = tunnel_stats
-                            .get_name(&pool)
+                            .get_name(&mut *transaction)
                             .await
                             .unwrap_or("UNKNOWN".to_string());
                         debug!(
                             "Saving network usage stats related to tunnel {tunnel_name} \
                             (interface {interface_name}): {tunnel_stats:?}"
                         );
-                        match tunnel_stats.save(&pool).await {
+                        match tunnel_stats.save(&mut *transaction).await {
                             Ok(_) => {
                                 debug!("Saved stats for tunnel {tunnel_name}");
                             }
@@ -273,6 +291,13 @@ pub(crate) async fn stats_handler(
                             }
                         }
                     }
+                }
+
+                // commit transaction
+                if let Err(err) = transaction.commit().await {
+                    error!(
+                "Failed to commit database transaction for saving location/tunnel stats: {err}",
+            )
                 }
             }
             Ok(None) => {

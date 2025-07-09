@@ -804,14 +804,15 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     debug!("Deleting instance with ID {instance_id}");
     let app_state = handle.state::<AppState>();
     let mut client = app_state.client.clone();
-    let pool = &app_state.db;
-    let Some(instance) = Instance::find_by_id(pool, instance_id).await? else {
+    let mut transaction = app_state.db.begin().await?;
+
+    let Some(instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
         error!("Couldn't delete instance: instance with ID {instance_id} could not be found.");
         return Err(Error::NotFound);
     };
     debug!("The instance that is being deleted has been identified as {instance}");
 
-    let instance_locations = Location::find_by_instance_id(pool, instance_id).await?;
+    let instance_locations = Location::find_by_instance_id(&mut *transaction, instance_id).await?;
     if !instance_locations.is_empty() {
         debug!(
             "Found locations associated with the instance {instance}, closing their connections..."
@@ -836,7 +837,10 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             info!("The connection to location {location} has been closed, as it was associated with the instance {instance} that is being deleted.");
         }
     }
-    instance.delete(pool).await?;
+    instance.delete(&mut *transaction).await?;
+
+    transaction.commit().await?;
+
     reload_tray_menu(&handle).await;
 
     handle.emit_all(INSTANCE_UPDATE, ())?;
@@ -948,8 +952,9 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     debug!("Deleting tunnel with ID {tunnel_id}");
     let app_state = handle.state::<AppState>();
     let mut client = app_state.client.clone();
-    let pool = &app_state.db;
-    let Some(tunnel) = Tunnel::find_by_id(pool, tunnel_id).await? else {
+    let mut transaction = app_state.db.begin().await?;
+
+    let Some(tunnel) = Tunnel::find_by_id(&mut *transaction, tunnel_id).await? else {
         error!("The tunnel to delete with ID {tunnel_id} could not be found, cannot delete.");
         return Err(Error::NotFound);
     };
@@ -1015,7 +1020,9 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
             );
         }
     }
-    tunnel.delete(pool).await?;
+    tunnel.delete(&mut *transaction).await?;
+
+    transaction.commit().await?;
 
     info!("Successfully deleted tunnel {tunnel}");
     Ok(())
