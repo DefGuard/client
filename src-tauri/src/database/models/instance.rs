@@ -158,8 +158,8 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            disable_all_traffic, enterprise_enabled) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+            disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -167,7 +167,9 @@ impl Instance<NoId> {
             self.username,
             self.token,
             self.disable_all_traffic,
-            self.enterprise_enabled
+            self.enterprise_enabled,
+            self.use_openid_for_mfa,
+            self.openid_display_name
         )
         .fetch_one(executor)
         .await?;
