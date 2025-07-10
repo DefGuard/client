@@ -86,6 +86,11 @@ x25519-dalek = { version = "2", features = [
   "static_secrets",
 ] }
 
+[target.'cfg(unix)'.dependencies]
+tokio-stream = "0.1"
+tower = "0.5"
+hyper-util = "0.1"
+
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winsvc", "winerror"] }
 windows-service = "0.7"
