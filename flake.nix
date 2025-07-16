@@ -30,6 +30,7 @@
         nodePackages.pnpm
         trunk
         sqlx-cli
+        vtsls
       ];
       nativeBuildPackages = with pkgs; [
         pkg-config
