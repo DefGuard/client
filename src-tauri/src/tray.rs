@@ -166,22 +166,22 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                         .await;
 
                     if active_locations_ids.contains(&location_id) {
-                        info!("Disconnect location with id {id}");
+                        info!("Disconnect location with ID {id}");
                         let _ =
                             disconnect(location_id, ConnectionType::Location, handle.clone()).await;
                     } else {
-                        info!("Connect location with id {id}");
+                        info!("Connect location with ID {id}");
                         // check is mfa enabled and trigger modal on frontend
-                        if location.mfa_enabled {
+                        if location.mfa_enabled() {
                             info!(
-                                "mfa enabled for location with id {:?}, trigger mfa modal",
+                                "MFA enabled for location with ID {:?}, trigger MFA modal",
                                 location.id
                             );
                             handle
                                 .emit_all(
                                     "mfa-trigger",
                                     Payload {
-                                        message: "Trigger mfa event".into(),
+                                        message: "Trigger MFA event".into(),
                                     },
                                 )
                                 .unwrap();
@@ -190,7 +190,7 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                                 .await
                         {
                             info!(
-                                "Unable to connect location with id {}, error: {e:?}",
+                                "Unable to connect location with ID {}, error: {e:?}",
                                 location.id
                             );
                         }

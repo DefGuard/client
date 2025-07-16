@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name FROM instance\n            WHERE token IS NOT NULL;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, disable_all_traffic, enterprise_enabled, openid_display_name FROM instance\n            WHERE token IS NOT NULL;",
   "describe": {
     "columns": [
       {
@@ -49,13 +49,8 @@
         "type_info": "Bool"
       },
       {
-        "name": "use_openid_for_mfa",
-        "ordinal": 9,
-        "type_info": "Bool"
-      },
-      {
         "name": "openid_display_name",
-        "ordinal": 10,
+        "ordinal": 9,
         "type_info": "Text"
       }
     ],
@@ -72,9 +67,8 @@
       true,
       false,
       false,
-      false,
       true
     ]
   },
-  "hash": "e50367bf0ea4627fb3125e541c2a2b2da96589b3aeb6b1c902f436ae98e9ffe9"
+  "hash": "2d9b8eebfbc2651ae0038f73d5867706509a45ca570ebe750c6e26ec3fc78dd8"
 }

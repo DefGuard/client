@@ -28,6 +28,7 @@ pub mod proto {
     impl DeviceConfig {
         #[must_use]
         pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
+            let location_mfa = self.location_mfa().into();
             Location {
                 id: NoId,
                 instance_id,
@@ -39,8 +40,8 @@ pub mod proto {
                 allowed_ips: self.allowed_ips,
                 dns: self.dns,
                 route_all_traffic: false,
-                mfa_enabled: self.mfa_enabled,
                 keepalive_interval: self.keepalive_interval.into(),
+                location_mfa,
             }
         }
     }
