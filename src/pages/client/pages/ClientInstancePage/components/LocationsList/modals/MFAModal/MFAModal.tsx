@@ -25,7 +25,11 @@ import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/compo
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { DefguardInstance, WireguardInstanceType } from '../../../../../../types';
+import {
+  DefguardInstance,
+  LocationMfaType,
+  WireguardInstanceType,
+} from '../../../../../../types';
 import { BrowserErrorIcon, BrowserPendingIcon, GoToBrowserIcon } from './Icons';
 import { useMFAModal } from './useMFAModal';
 
@@ -161,8 +165,8 @@ export const MFAModal = () => {
   };
 
   const useOpenIDMFA = useMemo(() => {
-    return selectedInstance?.use_openid_for_mfa || false;
-  }, [selectedInstance]);
+    return location?.location_mfa === LocationMfaType.EXTERNAL;
+  }, [location]);
 
   const { mutate, isPending } = useMutation({
     mutationFn: startMFA,

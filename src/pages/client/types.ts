@@ -8,9 +8,14 @@ export type DefguardInstance = {
   active: boolean;
   pubkey: string;
   disable_all_traffic: boolean;
-  use_openid_for_mfa: boolean;
   openid_display_name?: string;
 };
+
+export enum LocationMfaType {
+  DISABLED = 'disabled',
+  INTERNAL = 'internal',
+  EXTERNAL = 'external',
+}
 
 export type DefguardLocation = {
   instance_id: number;
@@ -60,7 +65,7 @@ export type CommonWireguardFields = {
   // Tunnel or Location
   connection_type: WireguardInstanceType;
   // Available in Location only
-  mfa_enabled: boolean | undefined;
+  location_mfa?: LocationMfaType;
   pubkey: string;
   instance_id: number;
   network_id: number;

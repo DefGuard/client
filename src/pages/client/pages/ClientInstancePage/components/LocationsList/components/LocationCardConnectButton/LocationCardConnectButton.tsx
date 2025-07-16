@@ -15,7 +15,7 @@ import {
 import SvgIconX from '../../../../../../../../shared/defguard-ui/components/svg/IconX';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { CommonWireguardFields } from '../../../../../../types';
+import { CommonWireguardFields, LocationMfaType } from '../../../../../../types';
 import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
 
 const { connect, disconnect } = clientApi;
@@ -38,6 +38,11 @@ export const LocationCardConnectButton = ({ location }: Props) => {
     connected: location?.active,
   });
 
+  const mfaEnabled =
+    location?.location_mfa &&
+    (location.location_mfa === LocationMfaType.INTERNAL ||
+      location.location_mfa === LocationMfaType.EXTERNAL);
+
   const handleClick = async () => {
     setIsLoading(true);
     try {
@@ -48,7 +53,7 @@ export const LocationCardConnectButton = ({ location }: Props) => {
             connectionType: location.connection_type,
           });
         } else {
-          if (location.mfa_enabled) {
+          if (mfaEnabled) {
             openMFAModal(location);
           } else {
             await connect({
