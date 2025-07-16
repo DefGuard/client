@@ -8,6 +8,7 @@ use crate::{error::Error, proto::LocationMfa as ProtoLocationMfa};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
+#[serde(rename_all = "lowercase")]
 pub enum LocationMfaType {
     Disabled = 1,
     Internal = 2,
