@@ -54,6 +54,7 @@ const DAEMON_HTTP_PORT: u16 = 54127;
 #[cfg(windows)]
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
+#[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 
 #[derive(Error, Debug)]
