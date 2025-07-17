@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa \"location_mfa: LocationMfaType\" FROM location WHERE instance_id = $1",
+  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" FROM location WHERE pubkey = $1;",
   "describe": {
     "columns": [
       {
@@ -59,7 +59,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "location_mfa: LocationMfaType",
+        "name": "location_mfa_mode: LocationMfaMode",
         "ordinal": 11,
         "type_info": "Integer"
       }
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "c00105623c0e7370e30fdc23310a09e3aa52a2b6e69d13351d7166a0c1fbe80c"
+  "hash": "ac02b04f6490a768571290d7dc77444eb0ca55a3a7e159c3b2e529ebf75f224f"
 }
