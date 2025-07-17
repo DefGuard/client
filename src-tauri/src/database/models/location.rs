@@ -1,10 +1,31 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
-use crate::error::Error;
+use crate::{error::Error, proto::LocationMfaMode as ProtoLocationMfaMode};
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[repr(u32)]
+#[serde(rename_all = "lowercase")]
+pub enum LocationMfaMode {
+    Disabled = 1,
+    Internal = 2,
+    External = 3,
+}
+
+impl From<ProtoLocationMfaMode> for LocationMfaMode {
+    fn from(value: ProtoLocationMfaMode) -> Self {
+        match value {
+            ProtoLocationMfaMode::Unspecified | ProtoLocationMfaMode::Disabled => {
+                LocationMfaMode::Disabled
+            }
+            ProtoLocationMfaMode::Internal => LocationMfaMode::Internal,
+            ProtoLocationMfaMode::External => LocationMfaMode::External,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Location<I = NoId> {
@@ -19,8 +40,8 @@ pub struct Location<I = NoId> {
     pub allowed_ips: String,
     pub dns: Option<String>,
     pub route_all_traffic: bool,
-    pub mfa_enabled: bool,
     pub keepalive_interval: i64,
+    pub location_mfa_mode: LocationMfaMode,
 }
 
 impl fmt::Display for Location<Id> {
@@ -44,7 +65,7 @@ impl Location<Id> {
         query_as!(
           Self,
           "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
-          route_all_traffic, mfa_enabled, keepalive_interval \
+          route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
           FROM location;"
       )
         .fetch_all(executor)
@@ -59,7 +80,7 @@ impl Location<Id> {
         query!(
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
-            mfa_enabled = $10, keepalive_interval = $11 WHERE id = $12",
+            keepalive_interval = $10, location_mfa_mode = $11 WHERE id = $12",
             self.instance_id,
             self.name,
             self.address,
@@ -69,8 +90,8 @@ impl Location<Id> {
             self.dns,
             self.network_id,
             self.route_all_traffic,
-            self.mfa_enabled,
             self.keepalive_interval,
+            self.location_mfa_mode,
             self.id,
         )
         .execute(executor)
@@ -89,7 +110,7 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, mfa_enabled, keepalive_interval \
+            network_id, route_all_traffic,  keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
             FROM location WHERE id = $1",
             location_id
         )
@@ -107,7 +128,7 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, mfa_enabled, keepalive_interval \
+            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
             FROM location WHERE instance_id = $1",
             instance_id
         )
@@ -125,7 +146,7 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, mfa_enabled, keepalive_interval \
+            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
             FROM location WHERE pubkey = $1;",
             pubkey
         )
@@ -159,6 +180,13 @@ impl Location<Id> {
         .await?;
         Ok(())
     }
+
+    pub(crate) fn mfa_enabled(&self) -> bool {
+        match self.location_mfa_mode {
+            LocationMfaMode::Disabled => false,
+            LocationMfaMode::Internal | LocationMfaMode::External => true,
+        }
+    }
 }
 
 impl Location<NoId> {
@@ -169,7 +197,7 @@ impl Location<NoId> {
         // Insert a new record when there is no ID
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
-            dns, network_id, route_all_traffic, mfa_enabled, keepalive_interval) \
+            dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode) \
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
             RETURNING id \"id!\"",
             self.instance_id,
@@ -181,8 +209,8 @@ impl Location<NoId> {
             self.dns,
             self.network_id,
             self.route_all_traffic,
-            self.mfa_enabled,
-            self.keepalive_interval
+            self.keepalive_interval,
+            self.location_mfa_mode
         )
         .fetch_one(executor)
         .await?;
@@ -198,8 +226,8 @@ impl Location<NoId> {
             dns: self.dns,
             network_id: self.network_id,
             route_all_traffic: self.route_all_traffic,
-            mfa_enabled: self.mfa_enabled,
             keepalive_interval: self.keepalive_interval,
+            location_mfa_mode: self.location_mfa_mode,
         })
     }
 }
@@ -217,8 +245,8 @@ impl From<Location<Id>> for Location {
             allowed_ips: location.allowed_ips,
             dns: location.dns,
             route_all_traffic: location.route_all_traffic,
-            mfa_enabled: location.mfa_enabled,
             keepalive_interval: location.keepalive_interval,
+            location_mfa_mode: location.location_mfa_mode,
         }
     }
 }

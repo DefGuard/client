@@ -270,7 +270,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
                         .await;
                     } else if
                     // only try to reconnect when location is not protected behind MFA
-                    location.mfa_enabled {
+                    location.mfa_enabled() {
                         warn!(
                             "Automatic reconnect for location {}({}) is not possible due to \
                             enabled MFA. Interface will be disconnected.",

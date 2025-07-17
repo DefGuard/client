@@ -19,7 +19,7 @@
 
       toolchain = pkgs.rust-bin.stable.latest.default.override {
         extensions = ["rust-analyzer" "rust-src" "rustfmt" "clippy"];
-        targets = ["wasm32-unknown-unknown"];
+        targets = ["wasm32-unknown-unknown" "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-pc-windows-gnu"];
       };
       packages = with pkgs; [
         cargo
@@ -29,6 +29,8 @@
         nodejs_20
         nodePackages.pnpm
         trunk
+        sqlx-cli
+        vtsls
       ];
       nativeBuildPackages = with pkgs; [
         pkg-config

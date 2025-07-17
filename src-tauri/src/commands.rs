@@ -19,7 +19,7 @@ use crate::{
     database::models::{
         connection::{ActiveConnection, Connection, ConnectionInfo},
         instance::{Instance, InstanceInfo},
-        location::Location,
+        location::{Location, LocationMfaMode},
         location_stats::LocationStats,
         tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
         wireguard_keys::WireguardKeys,
@@ -308,7 +308,6 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
             pubkey: keys.pubkey,
             disable_all_traffic: instance.disable_all_traffic,
             enterprise_enabled: instance.enterprise_enabled,
-            use_openid_for_mfa: instance.use_openid_for_mfa,
             openid_display_name: instance.openid_display_name,
         });
     }
@@ -331,8 +330,8 @@ pub struct LocationInfo {
     pub route_all_traffic: bool,
     pub connection_type: ConnectionType,
     pub pubkey: String,
-    pub mfa_enabled: bool,
     pub network_id: Id,
+    pub location_mfa_mode: LocationMfaMode,
 }
 
 impl fmt::Display for LocationInfo {
@@ -374,8 +373,8 @@ pub async fn all_locations(
             route_all_traffic: location.route_all_traffic,
             connection_type: ConnectionType::Location,
             pubkey: location.pubkey,
-            mfa_enabled: location.mfa_enabled,
             network_id: location.network_id,
+            location_mfa_mode: location.location_mfa_mode,
         };
         location_info.push(info);
     }
@@ -494,7 +493,6 @@ pub(crate) async fn do_update_instance(
     }
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
-    instance.use_openid_for_mfa = instance_info.use_openid_for_mfa;
     instance.openid_display_name = instance_info.openid_display_name;
     // Token may be empty if it was not issued
     // This happens during polling, as core doesn't issue a new token for polling request
@@ -543,9 +541,9 @@ pub(crate) async fn do_update_instance(
                 current_location.pubkey = new_location.pubkey;
                 current_location.endpoint = new_location.endpoint;
                 current_location.allowed_ips = new_location.allowed_ips;
-                current_location.mfa_enabled = new_location.mfa_enabled;
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.dns = new_location.dns;
+                current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
             } else {
