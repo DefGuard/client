@@ -3,12 +3,12 @@
 -- 1 - MFA disabled
 -- 2 - internal MFA
 -- 3 - external MFA
-ALTER TABLE location ADD COLUMN location_mfa INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE location ADD COLUMN location_mfa_mode INTEGER NOT NULL DEFAULT 1;
 
 -- populate new column based on value in `mfa_enabled` column
 -- previously only internal MFA was available
 UPDATE location
-SET location_mfa = CASE
+SET location_mfa_mode = CASE
     WHEN mfa_enabled = true THEN 2
     ELSE 1
 END;

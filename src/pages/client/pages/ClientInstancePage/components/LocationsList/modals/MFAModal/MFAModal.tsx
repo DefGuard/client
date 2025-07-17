@@ -165,7 +165,7 @@ export const MFAModal = () => {
   };
 
   const useOpenIDMFA = useMemo(() => {
-    return location?.location_mfa === LocationMfaType.EXTERNAL;
+    return location?.location_mfa_mode === LocationMfaType.EXTERNAL;
   }, [location]);
 
   const { mutate, isPending } = useMutation({

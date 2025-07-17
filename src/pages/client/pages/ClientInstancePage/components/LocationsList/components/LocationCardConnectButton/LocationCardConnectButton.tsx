@@ -39,9 +39,9 @@ export const LocationCardConnectButton = ({ location }: Props) => {
   });
 
   const mfaEnabled =
-    location?.location_mfa &&
-    (location.location_mfa === LocationMfaType.INTERNAL ||
-      location.location_mfa === LocationMfaType.EXTERNAL);
+    location?.location_mfa_mode &&
+    (location.location_mfa_mode === LocationMfaType.INTERNAL ||
+      location.location_mfa_mode === LocationMfaType.EXTERNAL);
 
   const handleClick = async () => {
     setIsLoading(true);

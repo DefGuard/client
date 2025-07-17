@@ -21,14 +21,30 @@ pub mod utils;
 pub mod wg_config;
 
 pub mod proto {
-    use crate::database::models::{location::Location, Id, NoId};
+    use crate::database::models::{
+        location::{Location, LocationMfaMode as MfaMode},
+        Id, NoId,
+    };
 
     tonic::include_proto!("defguard.proxy");
 
     impl DeviceConfig {
         #[must_use]
         pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
-            let location_mfa = self.location_mfa().into();
+            let location_mfa_mode = match self.location_mfa_mode {
+                Some(_location_mfa_mode) => self.location_mfa_mode().into(),
+                None => {
+                    // handle legacy core response
+                    // DEPRECATED(1.5): superseeded by location_mfa_mode
+                    #[allow(deprecated)]
+                    if self.mfa_enabled {
+                        MfaMode::Internal
+                    } else {
+                        MfaMode::Disabled
+                    }
+                }
+            };
+
             Location {
                 id: NoId,
                 instance_id,
@@ -41,7 +57,7 @@ pub mod proto {
                 dns: self.dns,
                 route_all_traffic: false,
                 keepalive_interval: self.keepalive_interval.into(),
-                location_mfa,
+                location_mfa_mode,
             }
         }
     }

@@ -65,7 +65,7 @@ export type CommonWireguardFields = {
   // Tunnel or Location
   connection_type: WireguardInstanceType;
   // Available in Location only
-  location_mfa?: LocationMfaType;
+  location_mfa_mode?: LocationMfaType;
   pubkey: string;
   instance_id: number;
   network_id: number;

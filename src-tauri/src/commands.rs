@@ -19,7 +19,7 @@ use crate::{
     database::models::{
         connection::{ActiveConnection, Connection, ConnectionInfo},
         instance::{Instance, InstanceInfo},
-        location::{Location, LocationMfaType},
+        location::{Location, LocationMfaMode},
         location_stats::LocationStats,
         tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
         wireguard_keys::WireguardKeys,
@@ -331,7 +331,7 @@ pub struct LocationInfo {
     pub connection_type: ConnectionType,
     pub pubkey: String,
     pub network_id: Id,
-    pub location_mfa: LocationMfaType,
+    pub location_mfa_mode: LocationMfaMode,
 }
 
 impl fmt::Display for LocationInfo {
@@ -374,7 +374,7 @@ pub async fn all_locations(
             connection_type: ConnectionType::Location,
             pubkey: location.pubkey,
             network_id: location.network_id,
-            location_mfa: location.location_mfa,
+            location_mfa_mode: location.location_mfa_mode,
         };
         location_info.push(info);
     }
@@ -543,7 +543,7 @@ pub(crate) async fn do_update_instance(
                 current_location.allowed_ips = new_location.allowed_ips;
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.dns = new_location.dns;
-                current_location.location_mfa = new_location.location_mfa;
+                current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
             } else {
