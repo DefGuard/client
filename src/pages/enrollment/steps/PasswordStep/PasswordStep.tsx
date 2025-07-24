@@ -68,12 +68,12 @@ export const PasswordStep = () => {
     return () => {
       sub.unsubscribe();
     };
-  }, [nextSubject, submitRef]);
+  }, [nextSubject]);
 
   useEffect(() => {
     reset();
     //eslint-disable-next-line
-  }, []);
+  }, [reset]);
 
   return (
     <Card id="enrollment-password-card">

@@ -18,7 +18,7 @@ const { updateLocationRouting } = clientApi;
 export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props) => {
   const handleChange = async (value: boolean) => {
     try {
-      if (location && location.connection_type) {
+      if (location?.connection_type) {
         await updateLocationRouting({
           locationId: location?.id,
           connectionType: location.connection_type,

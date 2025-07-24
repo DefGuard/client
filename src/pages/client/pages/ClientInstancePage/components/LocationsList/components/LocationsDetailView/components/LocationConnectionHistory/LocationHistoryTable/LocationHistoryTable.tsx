@@ -35,6 +35,7 @@ export const LocationHistoryTable = ({ connections }: Props) => {
   const { LL } = useI18nContext();
   const pageLL = LL.pages.client.pages.instancePage.detailView.history.headers;
   const connectionsLength = useRef(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   const listHeaders = useMemo((): ListHeader[] => {
     return [
       {

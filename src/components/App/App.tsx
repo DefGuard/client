@@ -147,6 +147,7 @@ export const App = () => {
   }, []);
 
   // load settings from tauri first time
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     if (!tauriInitLoadRef.current) {
       tauriInitLoadRef.current = true;

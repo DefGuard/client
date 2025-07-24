@@ -148,13 +148,13 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         if (proxy_api_url[proxy_api_url.length - 1] === '/') {
           proxy_api_url = proxy_api_url.slice(0, -1);
         }
-        proxy_api_url = proxy_api_url + '/api/v1';
+        proxy_api_url = `${proxy_api_url}/api/v1`;
         setIsLoading(false);
 
         if (instance) {
           debug('Instance already exists, fetching update');
           // update already registered instance instead
-          headers['Cookie'] = authCookie;
+          headers.Cookie = authCookie;
           fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,

@@ -93,15 +93,13 @@ const InfoSection = memo(({ locationId, connectionType }: Props) => {
         <div className="info">
           <Label>{localLL.info.vpn.allowedIps()}</Label>
           <div className="values ips">
-            {data && data.allowed_ips.split(',').map((ip) => <p key={ip}>{ip}</p>)}
+            {data?.allowed_ips.split(',').map((ip) => <p key={ip}>{ip}</p>)}
           </div>
         </div>
         <div className="info">
           <Label>{localLL.info.vpn.dns()}</Label>
           <div className="values">
-            <p>
-              {data && data.dns && data.dns.split(',').map((d) => <p key={d}>{d}</p>)}
-            </p>
+            <p>{data?.dns?.split(',').map((d) => <p key={d}>{d}</p>)}</p>
           </div>
         </div>
         <div className="info">

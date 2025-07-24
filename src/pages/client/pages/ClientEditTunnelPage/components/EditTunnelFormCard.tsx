@@ -162,7 +162,7 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
         dns: z
           .string()
           .refine((value) => {
-            if (value && value.length != 0) {
+            if (value && value.length !== 0) {
               return validateIpOrDomainList(value, ',', true);
             }
             return true;
@@ -209,109 +209,105 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
   };
 
   return (
-    <>
-      <form onSubmit={handleSubmit(handleValidSubmit)}>
-        <Card id="edit-tunnel-form-card">
-          <header className="header">
-            <h2>Tunnel Configuration</h2>
-            <div className="controls"></div>
-          </header>
-          <div className="client">
-            <FormInput
-              controller={{ control, name: 'name' }}
-              label={localLL.labels.name()}
-              labelExtras={<Helper>{localLL.helpers.name()}</Helper>}
-            />
-            <FormInput
-              controller={{ control, name: 'prvkey' }}
-              label={localLL.labels.privateKey()}
-              labelExtras={<Helper>{localLL.helpers.prvkey()}</Helper>}
-            />
-            <FormInput
-              controller={{ control, name: 'pubkey' }}
-              label={localLL.labels.publicKey()}
-              labelExtras={<Helper>{localLL.helpers.pubkey()}</Helper>}
-            />
-            <FormInput
-              controller={{ control, name: 'address' }}
-              label={localLL.labels.address()}
-              labelExtras={<Helper>{localLL.helpers.address()}</Helper>}
-            />
-          </div>
-        </Card>
-        <Card>
-          <h3>{localLL.sections.vpnServer()}</h3>
+    <form onSubmit={handleSubmit(handleValidSubmit)}>
+      <Card id="edit-tunnel-form-card">
+        <header className="header">
+          <h2>Tunnel Configuration</h2>
+          <div className="controls"></div>
+        </header>
+        <div className="client">
           <FormInput
-            controller={{ control, name: 'server_pubkey' }}
-            label={localLL.labels.serverPubkey()}
-            labelExtras={<Helper>{localLL.helpers.serverPubkey()}</Helper>}
+            controller={{ control, name: 'name' }}
+            label={localLL.labels.name()}
+            labelExtras={<Helper>{localLL.helpers.name()}</Helper>}
           />
           <FormInput
-            controller={{ control, name: 'preshared_key' }}
-            label={localLL.labels.presharedKey()}
-            labelExtras={<Helper>{localLL.helpers.presharedKey()}</Helper>}
+            controller={{ control, name: 'prvkey' }}
+            label={localLL.labels.privateKey()}
+            labelExtras={<Helper>{localLL.helpers.prvkey()}</Helper>}
           />
           <FormInput
-            controller={{ control, name: 'endpoint' }}
-            label={localLL.labels.endpoint()}
-            labelExtras={<Helper>{localLL.helpers.endpoint()}</Helper>}
+            controller={{ control, name: 'pubkey' }}
+            label={localLL.labels.publicKey()}
+            labelExtras={<Helper>{localLL.helpers.pubkey()}</Helper>}
           />
           <FormInput
-            controller={{ control, name: 'dns' }}
-            label={localLL.labels.dns()}
-            labelExtras={<Helper>{localLL.helpers.dns()}</Helper>}
+            controller={{ control, name: 'address' }}
+            label={localLL.labels.address()}
+            labelExtras={<Helper>{localLL.helpers.address()}</Helper>}
           />
-          <FormInput
-            controller={{ control, name: 'allowed_ips' }}
-            label={localLL.labels.allowedips()}
-            labelExtras={<Helper>{localLL.helpers.allowedIps()}</Helper>}
-          />
+        </div>
+      </Card>
+      <Card>
+        <h3>{localLL.sections.vpnServer()}</h3>
+        <FormInput
+          controller={{ control, name: 'server_pubkey' }}
+          label={localLL.labels.serverPubkey()}
+          labelExtras={<Helper>{localLL.helpers.serverPubkey()}</Helper>}
+        />
+        <FormInput
+          controller={{ control, name: 'preshared_key' }}
+          label={localLL.labels.presharedKey()}
+          labelExtras={<Helper>{localLL.helpers.presharedKey()}</Helper>}
+        />
+        <FormInput
+          controller={{ control, name: 'endpoint' }}
+          label={localLL.labels.endpoint()}
+          labelExtras={<Helper>{localLL.helpers.endpoint()}</Helper>}
+        />
+        <FormInput
+          controller={{ control, name: 'dns' }}
+          label={localLL.labels.dns()}
+          labelExtras={<Helper>{localLL.helpers.dns()}</Helper>}
+        />
+        <FormInput
+          controller={{ control, name: 'allowed_ips' }}
+          label={localLL.labels.allowedips()}
+          labelExtras={<Helper>{localLL.helpers.allowedIps()}</Helper>}
+        />
 
+        <FormInput
+          controller={{ control, name: 'persistent_keep_alive' }}
+          label={localLL.labels.persistentKeepAlive()}
+          labelExtras={<Helper>{localLL.helpers.persistentKeepAlive()}</Helper>}
+        />
+        <div className="advanced-options-header">
+          <h3>{localLL.sections.advancedOptions()}</h3>
+          <Helper> {localLL.helpers.advancedOptions()}</Helper>
+          <div className="underscore"></div>
+          <button type="button" onClick={handleToggleAdvancedOptions}>
+            <ArrowSingle
+              direction={
+                showAdvancedOptions ? ArrowSingleDirection.UP : ArrowSingleDirection.DOWN
+              }
+              size={ArrowSingleSize.SMALL}
+            />
+          </button>
+        </div>
+        <div className={`advanced-options ${showAdvancedOptions ? 'open' : ''}`}>
           <FormInput
-            controller={{ control, name: 'persistent_keep_alive' }}
-            label={localLL.labels.persistentKeepAlive()}
-            labelExtras={<Helper>{localLL.helpers.persistentKeepAlive()}</Helper>}
+            controller={{ control, name: 'pre_up' }}
+            label={localLL.labels.preUp()}
+            labelExtras={<Helper>{localLL.helpers.preUp()}</Helper>}
           />
-          <div className="advanced-options-header">
-            <h3>{localLL.sections.advancedOptions()}</h3>
-            <Helper> {localLL.helpers.advancedOptions()}</Helper>
-            <div className="underscore"></div>
-            <button type="button" onClick={handleToggleAdvancedOptions}>
-              <ArrowSingle
-                direction={
-                  showAdvancedOptions
-                    ? ArrowSingleDirection.UP
-                    : ArrowSingleDirection.DOWN
-                }
-                size={ArrowSingleSize.SMALL}
-              />
-            </button>
-          </div>
-          <div className={`advanced-options ${showAdvancedOptions ? 'open' : ''}`}>
-            <FormInput
-              controller={{ control, name: 'pre_up' }}
-              label={localLL.labels.preUp()}
-              labelExtras={<Helper>{localLL.helpers.preUp()}</Helper>}
-            />
-            <FormInput
-              controller={{ control, name: 'post_up' }}
-              label={localLL.labels.postUp()}
-              labelExtras={<Helper>{localLL.helpers.postUp()}</Helper>}
-            />
-            <FormInput
-              controller={{ control, name: 'pre_down' }}
-              label={localLL.labels.PreDown()}
-              labelExtras={<Helper>{localLL.helpers.preDown()}</Helper>}
-            />
-            <FormInput
-              controller={{ control, name: 'post_down' }}
-              label={localLL.labels.PostDown()}
-              labelExtras={<Helper>{localLL.helpers.postDown()}</Helper>}
-            />
-          </div>
-        </Card>
-        <input type="submit" aria-hidden="true" className="hidden" ref={submitRef} />
-      </form>
-    </>
+          <FormInput
+            controller={{ control, name: 'post_up' }}
+            label={localLL.labels.postUp()}
+            labelExtras={<Helper>{localLL.helpers.postUp()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'pre_down' }}
+            label={localLL.labels.PreDown()}
+            labelExtras={<Helper>{localLL.helpers.preDown()}</Helper>}
+          />
+          <FormInput
+            controller={{ control, name: 'post_down' }}
+            label={localLL.labels.PostDown()}
+            labelExtras={<Helper>{localLL.helpers.postDown()}</Helper>}
+          />
+        </div>
+      </Card>
+      <input type="submit" aria-hidden="true" className="hidden" ref={submitRef} />
+    </form>
   );
 };

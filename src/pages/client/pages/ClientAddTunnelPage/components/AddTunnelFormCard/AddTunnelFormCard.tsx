@@ -132,7 +132,7 @@ export const AddTunnelFormCard = () => {
         dns: z
           .string()
           .refine((value) => {
-            if (value && value.length != 0) {
+            if (value && value.length !== 0) {
               return validateIpOrDomainList(value, ',', true);
             }
             return true;
@@ -211,9 +211,9 @@ export const AddTunnelFormCard = () => {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line
-    const onPrvKeyChange = (e: any) => {
-      if (generatedKeys && e.target.value !== defaultValues.prvkey) {
+    const onPrvKeyChange = (e: Event) => {
+      const input = e.target as HTMLInputElement;
+      if (generatedKeys && input.value !== defaultValues.prvkey) {
         setGeneratedKeys(false);
       }
     };

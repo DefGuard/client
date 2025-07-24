@@ -48,7 +48,7 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
   // Clear logs when the component is unmounted or locationId changes
   useEffect(() => {
     return () => clearLogs();
-  }, [clearLogs, locationId]);
+  }, [clearLogs]);
 
   // Listen to new logs
   useEffect(() => {
@@ -90,14 +90,14 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
       eventUnlisten?.();
     };
     //eslint-disable-next-line
-  }, [locationId]);
+  }, [locationId, connectionType]);
 
   const getAllLogs = () => {
     let logs = '';
 
     if (logsContainerElement) {
       logsContainerElement.current?.childNodes.forEach((item) => {
-        logs += item.textContent + '\n';
+        logs += `${item.textContent}\n`;
       });
     }
 

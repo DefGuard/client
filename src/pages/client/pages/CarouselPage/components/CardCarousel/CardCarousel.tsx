@@ -51,7 +51,7 @@ export const CardCarousel = ({
       }
       return currentIndex + 1;
     });
-  }, [setInternalIndex, cardsCount]);
+  }, [cardsCount]);
 
   useEffect(() => {
     if (autoSlide) {

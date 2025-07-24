@@ -42,8 +42,8 @@ export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
           key: selected.key,
           displayValue: selected.label,
         };
-      } else if (selected == null && locations != undefined) {
-        if (locations.length == 1) {
+      } else if (selected == null && locations !== undefined) {
+        if (locations.length === 1) {
           return {
             key: 'detail',
             displayValue: localLL.header.filters.views.detail(),

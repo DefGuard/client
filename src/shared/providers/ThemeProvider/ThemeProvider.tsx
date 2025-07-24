@@ -13,7 +13,7 @@ export const ThemeProvider = ({ children }: Props) => {
 
   useEffect(() => {
     const current = document.documentElement.dataset.theme as ThemeKey;
-    if (currentTheme != current) {
+    if (currentTheme !== current) {
       document.documentElement.dataset.theme = currentTheme;
     }
   }, [currentTheme]);

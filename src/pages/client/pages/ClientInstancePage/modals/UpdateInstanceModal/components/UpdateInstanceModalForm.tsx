@@ -105,7 +105,7 @@ export const UpdateInstanceModalForm = () => {
       if (proxy_api_url[proxy_api_url.length - 1] === '/') {
         proxy_api_url = proxy_api_url.slice(0, -1);
       }
-      proxy_api_url = proxy_api_url + '/api/v1';
+      proxy_api_url = `${proxy_api_url}/api/v1`;
       const instance = clientInstances.find((i) => i.uuid === enrollmentData.instance.id);
       if (instance) {
         const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
@@ -119,7 +119,7 @@ export const UpdateInstanceModalForm = () => {
           );
           return;
         }
-        headers['Cookie'] = authCookie;
+        headers.Cookie = authCookie;
         const instanceInfoResponse = await fetch<CreateDeviceResponse>(
           `${proxy_api_url}/enrollment/network_info`,
           {

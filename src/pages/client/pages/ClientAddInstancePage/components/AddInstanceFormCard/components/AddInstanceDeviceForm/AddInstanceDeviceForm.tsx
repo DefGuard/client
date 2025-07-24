@@ -96,7 +96,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
         if (!r.ok) {
           setIsLoading(false);
           const details = `${
-            (r.data as ErrorData)?.error ? (r.data as ErrorData).error + ', ' : ''
+            (r.data as ErrorData)?.error ? `${(r.data as ErrorData).error}, ` : ''
           }`;
           error(
             `Failed to create device check enrollment and defguard logs, details: ${details} Error status code: ${r.status}`,

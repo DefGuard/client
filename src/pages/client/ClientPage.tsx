@@ -62,6 +62,7 @@ export const ClientPage = () => {
     refetchOnWindowFocus: false,
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     const appConfigChanged = listen(TauriEventKey.APPLICATION_CONFIG_CHANGED, () => {
       queryClient.invalidateQueries({
@@ -156,15 +157,9 @@ export const ClientPage = () => {
       setListChecked(true);
       setTunnels(tunnels);
     }
-  }, [
-    instances,
-    setInstances,
-    tunnels,
-    setTunnels,
-    setListChecked,
-    openDeadConDroppedModal,
-  ]);
+  }, [instances, setInstances, tunnels, setTunnels, setListChecked]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     if (appConfig) {
       setClientState({ appConfig });

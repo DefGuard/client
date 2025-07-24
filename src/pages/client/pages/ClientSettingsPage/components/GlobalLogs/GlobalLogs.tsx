@@ -91,14 +91,14 @@ export const GlobalLogs = () => {
       eventUnlisten?.();
     };
     //eslint-disable-next-line
-  }, []);
+  }, [startGlobalLogWatcher, stopGlobalLogWatcher]);
 
   const getAllLogs = () => {
     let logs = '';
 
     if (logsContainerElement) {
       logsContainerElement.current?.childNodes.forEach((item) => {
-        logs += item.textContent + '\n';
+        logs += `${item.textContent}\n`;
       });
     }
 
