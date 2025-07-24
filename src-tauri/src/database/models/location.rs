@@ -66,7 +66,7 @@ impl Location<Id> {
           Self,
           "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
           route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
-          FROM location;"
+          FROM location ORDER BY name ASC;"
       )
         .fetch_all(executor)
         .await
@@ -129,7 +129,7 @@ impl Location<Id> {
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
             network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
-            FROM location WHERE instance_id = $1",
+            FROM location WHERE instance_id = $1 ORDER BY name ASC",
             instance_id
         )
         .fetch_all(executor)

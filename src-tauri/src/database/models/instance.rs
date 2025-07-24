@@ -74,7 +74,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance;"
+            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
@@ -123,7 +123,7 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
             disable_all_traffic, enterprise_enabled, openid_display_name FROM instance
-            WHERE token IS NOT NULL;"
+            WHERE token IS NOT NULL ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
