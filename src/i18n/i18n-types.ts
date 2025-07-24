@@ -170,6 +170,20 @@ type RootTranslation = {
 			 * N​o​ ​d​e​f​g​u​a​r​d​_​p​r​o​x​y​ ​s​e​t​-​c​o​o​k​i​e​ ​r​e​c​e​i​v​e​d
 			 */
 			noCookie: string
+			/**
+			 * C​o​n​t​e​x​t​ ​i​s​ ​n​o​t​ ​s​e​c​u​r​e​.
+			 */
+			insecureContext: string
+			clipboard: {
+				/**
+				 * C​l​i​p​b​o​a​r​d​ ​i​s​ ​n​o​t​ ​a​c​c​e​s​s​i​b​l​e​.
+				 */
+				error: string
+				/**
+				 * C​o​n​t​e​n​t​ ​c​o​p​i​e​d​ ​t​o​ ​c​l​i​p​b​o​a​r​d​.
+				 */
+				success: string
+			}
 		}
 	}
 	components: {
@@ -1827,6 +1841,20 @@ export type TranslationFunctions = {
 			 * No defguard_proxy set-cookie received
 			 */
 			noCookie: () => LocalizedString
+			/**
+			 * Context is not secure.
+			 */
+			insecureContext: () => LocalizedString
+			clipboard: {
+				/**
+				 * Clipboard is not accessible.
+				 */
+				error: () => LocalizedString
+				/**
+				 * Content copied to clipboard.
+				 */
+				success: () => LocalizedString
+			}
 		}
 	}
 	components: {
