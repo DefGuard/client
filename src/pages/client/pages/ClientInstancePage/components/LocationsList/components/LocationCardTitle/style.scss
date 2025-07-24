@@ -30,4 +30,35 @@
       }
     }
   }
+
+  & > .addresses-badge-container {
+    position: relative;
+    cursor: help;
+
+    & > .client-addresses {
+      max-width: 90px;
+
+      & > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+}
+
+.list-addresses-floating {
+  list-style: none;
+  display: flex;
+  flex-flow: column;
+  row-gap: var(--spacing-xs);
+  max-height: 250px;
+  max-width: 100dvh;
+  overflow: auto;
+  padding: var(--spacing-xs);
+  margin: 0;
+
+  li {
+    @include typography(app-modal-1);
+    color: var(--text-body-secondary);
+  }
 }
