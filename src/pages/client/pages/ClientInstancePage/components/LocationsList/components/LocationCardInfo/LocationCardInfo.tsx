@@ -7,7 +7,7 @@ import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { FloatingMenu } from '../../../../../../../../shared/defguard-ui/components/Layout/FloatingMenu/FloatingMenu';
 import { FloatingMenuProvider } from '../../../../../../../../shared/defguard-ui/components/Layout/FloatingMenu/FloatingMenuProvider';
 import { FloatingMenuTrigger } from '../../../../../../../../shared/defguard-ui/components/Layout/FloatingMenu/FloatingMenuTrigger';
-import { CommonWireguardFields, Connection } from '../../../../../../types';
+import type { CommonWireguardFields, Connection } from '../../../../../../types';
 
 type Props = {
   location?: CommonWireguardFields;

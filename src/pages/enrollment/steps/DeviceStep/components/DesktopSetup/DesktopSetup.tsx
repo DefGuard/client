@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
@@ -17,7 +17,7 @@ import {
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
+import type { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../client/clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../client/query';

@@ -2,7 +2,7 @@ import './style.scss';
 
 import { clipboard } from '@tauri-apps/api';
 import { save } from '@tauri-apps/api/dialog';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { writeTextFile } from '@tauri-apps/api/fs';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -12,7 +12,7 @@ import { ActionButtonVariant } from '../../../../../../shared/defguard-ui/compon
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 import { clientApi } from '../../../../clientAPI/clientApi';
-import {
+import type {
   GlobalLogLevel,
   LogItem,
   LogLevel,
@@ -91,14 +91,14 @@ export const GlobalLogs = () => {
       eventUnlisten?.();
     };
     //eslint-disable-next-line
-  }, []);
+  }, [startGlobalLogWatcher, stopGlobalLogWatcher]);
 
   const getAllLogs = () => {
     let logs = '';
 
     if (logsContainerElement) {
       logsContainerElement.current?.childNodes.forEach((item) => {
-        logs += item.textContent + '\n';
+        logs += `${item.textContent}\n`;
       });
     }
 
