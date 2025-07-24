@@ -24,17 +24,17 @@ export const LocationCardTitle = ({ location }: Props) => {
       <SvgIconConnection />
       <span className="location-name">{location?.name}</span>
 
-      <AddressBadge addresses={location?.address || ''} />
+      <AddressBadge address={location?.address || ''} />
     </div>
   );
 };
 
 type AddressBadgeProps = {
   // comma-separated list of addresses
-  addresses: string;
+  address: string;
 };
 
-const AddressBadge = ({ addresses: address }: AddressBadgeProps) => {
+const AddressBadge = ({ address }: AddressBadgeProps) => {
   // split into separate addreses to show in tooltip
   const addresses = useMemo(() => address.split(','), [address]);
 

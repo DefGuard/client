@@ -55,6 +55,11 @@ const en = {
       deadConDropped:
         'Detected that the {con_type: string} {interface_name: string} has disconnected, trying to reconnect...',
       noCookie: 'No defguard_proxy set-cookie received',
+      insecureContext: 'Context is not secure.',
+      clipboard: {
+        error: 'Clipboard is not accessible.',
+        success: 'Content copied to clipboard.',
+      },
     },
   },
   components: {
