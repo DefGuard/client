@@ -1,11 +1,11 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch, Response } from '@tauri-apps/api/http';
+import { Body, fetch, type Response } from '@tauri-apps/api/http';
 import { invoke } from '@tauri-apps/api/tauri';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
@@ -18,7 +18,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import {
+import type {
   CreateDeviceResponse,
   EnrollmentError,
   EnrollmentStartResponse,
@@ -27,8 +27,8 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
-import { AddInstanceInitResponse } from '../../types';
+import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import type { AddInstanceInitResponse } from '../../types';
 
 type Props = {
   nextStep: (data: AddInstanceInitResponse) => void;
@@ -148,13 +148,13 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         if (proxy_api_url[proxy_api_url.length - 1] === '/') {
           proxy_api_url = proxy_api_url.slice(0, -1);
         }
-        proxy_api_url = proxy_api_url + '/api/v1';
+        proxy_api_url = `${proxy_api_url}/api/v1`;
         setIsLoading(false);
 
         if (instance) {
           debug('Instance already exists, fetching update');
           // update already registered instance instead
-          headers['Cookie'] = authCookie;
+          headers.Cookie = authCookie;
           fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,

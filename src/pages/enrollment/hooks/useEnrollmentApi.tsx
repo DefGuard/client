@@ -1,7 +1,7 @@
 import { Body, fetch } from '@tauri-apps/api/http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
-import {
+import type {
   ActivateUserResponse,
   AppInfo,
   CreateDeviceResponse,

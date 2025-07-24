@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Body, fetch } from '@tauri-apps/api/http';
 import { useMemo } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -14,7 +14,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import {
+import type {
   CreateDeviceResponse,
   EnrollmentStartResponse,
 } from '../../../../../../../shared/hooks/api/types';
@@ -105,7 +105,7 @@ export const UpdateInstanceModalForm = () => {
       if (proxy_api_url[proxy_api_url.length - 1] === '/') {
         proxy_api_url = proxy_api_url.slice(0, -1);
       }
-      proxy_api_url = proxy_api_url + '/api/v1';
+      proxy_api_url = `${proxy_api_url}/api/v1`;
       const instance = clientInstances.find((i) => i.uuid === enrollmentData.instance.id);
       if (instance) {
         const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
@@ -119,7 +119,7 @@ export const UpdateInstanceModalForm = () => {
           );
           return;
         }
-        headers['Cookie'] = authCookie;
+        headers.Cookie = authCookie;
         const instanceInfoResponse = await fetch<CreateDeviceResponse>(
           `${proxy_api_url}/enrollment/network_info`,
           {

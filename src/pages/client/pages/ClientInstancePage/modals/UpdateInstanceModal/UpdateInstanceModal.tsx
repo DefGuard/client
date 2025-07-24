@@ -1,12 +1,12 @@
 import './style.scss';
 
-import { useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { MessageBox } from '../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
 import { MessageBoxType } from '../../../../../../shared/defguard-ui/components/Layout/MessageBox/types';
 import { ModalWithTitle } from '../../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
+import useEffectOnce from '../../../../../../shared/defguard-ui/utils/useEffectOnce';
 import { useDeleteInstanceModal } from '../DeleteInstanceModal/useDeleteInstanceModal';
 import { UpdateInstanceModalForm } from './components/UpdateInstanceModalForm';
 import { useUpdateInstanceModal } from './useUpdateInstanceModal';
@@ -21,11 +21,9 @@ export const UpdateInstanceModal = () => {
   );
   const isDeleteOpen = useDeleteInstanceModal((state) => state.isOpen);
 
-  // reset state on page mount
-  useEffect(() => {
+  useEffectOnce(() => {
     reset();
-    // eslint-disable-next-line
-  }, []);
+  });
 
   return (
     <ModalWithTitle

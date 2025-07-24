@@ -46,17 +46,15 @@ export const WelcomeStep = () => {
   }, [next, nextSubject]);
 
   return (
-    <>
-      <Card id="enrollment-welcome-card">
-        <EnrollmentStepIndicator />
-        <h3>
-          {LL.pages.enrollment.steps.welcome.title({ name: `${userInfo?.first_name}` })}
-        </h3>
-        <div className="explenation">
-          <ReactMarkdown rehypePlugins={[rehypeSanitaze]}>{markdown}</ReactMarkdown>
-        </div>
-        <AdminInfo />
-      </Card>
-    </>
+    <Card id="enrollment-welcome-card">
+      <EnrollmentStepIndicator />
+      <h3>
+        {LL.pages.enrollment.steps.welcome.title({ name: `${userInfo?.first_name}` })}
+      </h3>
+      <div className="explenation">
+        <ReactMarkdown rehypePlugins={[rehypeSanitaze]}>{markdown}</ReactMarkdown>
+      </div>
+      <AdminInfo />
+    </Card>
   );
 };

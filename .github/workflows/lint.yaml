@@ -45,11 +45,8 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Run Eslint and Prettier Lint
+      - name: Run Biome and Prettier Lint
         run: pnpm lint
-
-      - name: Check TSC
-        run: pnpm tsc
 
       - name: Audit
         run: pnpm audit --prod

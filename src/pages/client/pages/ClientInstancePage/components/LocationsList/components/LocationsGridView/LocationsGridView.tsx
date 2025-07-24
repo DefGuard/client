@@ -12,7 +12,7 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import {
+import type {
   CommonWireguardFields,
   DefguardInstance,
   WireguardInstanceType,

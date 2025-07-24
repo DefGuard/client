@@ -1,7 +1,7 @@
 import './style.scss';
 
 import dayjs from 'dayjs';
-import { ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { debug, error } from 'tauri-plugin-log-api';
 import { useBreakpoint } from 'use-breakpoint';
@@ -41,7 +41,7 @@ export const EnrollmentPage = () => {
   const stepsMax = useEnrollmentStore((state) => state.stepsMax);
   const loading = useEnrollmentStore((state) => state.loading);
 
-  const [setEnrollmentState, back, reset, nextSubject] = useEnrollmentStore(
+  const [setEnrollmentState, back, _reset, nextSubject] = useEnrollmentStore(
     (state) => [state.setState, state.perviousStep, state.reset, state.nextSubject],
     shallow,
   );
@@ -80,7 +80,7 @@ export const EnrollmentPage = () => {
         navigate(routes.timeout, { replace: true });
       }
     }
-  }, [sessionEnd, navigate, reset]);
+  }, [sessionEnd, navigate]);
 
   useEffect(() => {
     enrollmentFinished.current = stepsMax === currentStep;

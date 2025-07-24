@@ -1,6 +1,6 @@
-import { Response } from '@tauri-apps/api/http';
+import type { Response } from '@tauri-apps/api/http';
 
-import { DefguardInstance } from '../../../pages/client/types';
+import type { DefguardInstance } from '../../../pages/client/types';
 
 export type EmptyApiResponse = Record<string, never>;
 

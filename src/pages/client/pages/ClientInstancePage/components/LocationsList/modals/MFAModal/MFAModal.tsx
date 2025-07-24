@@ -6,7 +6,7 @@ import { Body, fetch } from '@tauri-apps/api/http';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
@@ -26,7 +26,7 @@ import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toa
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import {
-  DefguardInstance,
+  type DefguardInstance,
   LocationMfaType,
   WireguardInstanceType,
 } from '../../../../../../types';
@@ -110,7 +110,7 @@ export const MFAModal = () => {
     }
 
     setProxyUrl(selectedInstance.proxy_url);
-    const mfaStartUrl = selectedInstance.proxy_url + CLIENT_MFA_ENDPOINT + '/start';
+    const mfaStartUrl = `${selectedInstance.proxy_url + CLIENT_MFA_ENDPOINT}/start`;
 
     const data = {
       method: selectedMethod,
@@ -148,7 +148,7 @@ export const MFAModal = () => {
       return response.data;
     } else {
       const errorData = (response.data as unknown as MFAError).error;
-      error('MFA failed to start with the following error: ' + errorData);
+      error(`MFA failed to start with the following error: ${errorData}`);
       if (selectedMethod === 2) {
         setScreen('openid_unavailable');
         return;
@@ -318,6 +318,7 @@ const MFAStart = ({
           size={ButtonSize.LARGE}
           loading={isAuthenticatorAppPending}
           styleVariant={ButtonStyleVariant.STANDARD}
+          // biome-ignore lint/correctness/useHookAtTopLevel: not a hook
           text={isAuthenticatorAppPending ? '' : localLL.useAuthenticatorApp()}
           onClick={showAuthenticatorAppCodeForm}
         />
@@ -326,6 +327,7 @@ const MFAStart = ({
           size={ButtonSize.LARGE}
           loading={isEmailCodePending}
           styleVariant={ButtonStyleVariant.STANDARD}
+          // biome-ignore lint/correctness/useHookAtTopLevel: it's not hook
           text={isEmailCodePending ? '' : localLL.useEmailCode()}
           onClick={showEmailCodeForm}
         />
@@ -379,7 +381,7 @@ const OpenIDMFALogin = ({
           styleVariant={ButtonStyleVariant.PRIMARY}
           text={localLL.openidLogin.buttonText({ provider: displayName })}
           onClick={() => {
-            const link = proxyUrl + 'openid/mfa?token=' + token;
+            const link = `${proxyUrl}openid/mfa?token=${token}`;
             openLink(link);
             setScreen('openid_pending');
           }}
@@ -405,7 +407,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
 
   useEffect(() => {
     const TIMEOUT_DURATION = 5 * 1000 * 60; // 5 minutes timeout
-    // eslint-disable-next-line prefer-const
+    // biome-ignore lint/style/useConst: false positive
     let timeoutId: NodeJS.Timeout;
 
     const pollMFAStatus = async () => {
@@ -417,7 +419,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
 
       const data = { token };
       const response = await fetch<MFAFinishResponse>(
-        proxyUrl + CLIENT_MFA_ENDPOINT + '/finish',
+        `${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`,
         {
           method: 'POST',
           headers: {
@@ -475,7 +477,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       clearInterval(interval);
       clearTimeout(timeoutId);
     };
-  }, [proxyUrl, token, location, closeModal, resetState, localLL.errors, toaster]);
+  }, [proxyUrl, token, location, closeModal, localLL.errors, toaster]);
 
   return (
     <div className="mfa-modal-content">
@@ -539,7 +541,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
     const data = { token, code: code };
 
     const response = await fetch<MFAFinishResponse>(
-      proxyUrl + CLIENT_MFA_ENDPOINT + '/finish',
+      `${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`,
       {
         method: 'POST',
         headers: {
