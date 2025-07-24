@@ -3,7 +3,7 @@ import './style.scss';
 import dayjs from 'dayjs';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
-import { CommonWireguardFields, Connection } from '../../../../../../types';
+import type { CommonWireguardFields, Connection } from '../../../../../../types';
 
 type Props = {
   location?: CommonWireguardFields;

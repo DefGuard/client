@@ -1,7 +1,7 @@
-import { ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
 
 import { useClientStore } from '../../../pages/client/hooks/useClientStore';
-import { ThemeKey } from '../../defguard-ui/hooks/theme/types';
+import type { ThemeKey } from '../../defguard-ui/hooks/theme/types';
 
 type Props = {
   children: ReactNode;

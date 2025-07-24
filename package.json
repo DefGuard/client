@@ -5,20 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "npm-run-all --parallel vite typesafe-i18n",
-    "build": "tsc && vite build",
+    "typecheck": "tsc --project ./tsconfig.node.json",
+    "build": "pnpm run typecheck && vite build",
     "preview": "vite preview",
     "typesafe-i18n": "typesafe-i18n",
     "generate-translation-types": "typesafe-i18n --no-watch",
-    "lint": "eslint --config ./.eslintrc.cjs src && prettier --check src/**/*.{ts,tsx,scss} && tsc",
-    "fix": "prettier --end-of-line lf -w src/**/*.{ts,tsx,scss} && eslint --fix --config ./.eslintrc.cjs src",
+    "lint": "biome lint && pnpm run typecheck && prettier --check src/**/*.{ts,tsx,scss} && tsc",
+    "lint-ci": "biome ci && pnpm run typecheck && prettier --check src/**/*.{ts,tsx,scss} && tsc",
+    "fix": "biome check --fix && prettier --end-of-line lf -w src/**/*.{ts,tsx,scss}",
     "vite": "vite",
-    "eslint": "eslint",
     "prettier": "prettier",
     "parse-client-svgs": "svgr --no-index --jsx-runtime automatic --svgo-config ./svgo.config.json --prettier-config ./.prettierrc --out-dir ./src/shared/components/svg/ --typescript ./src/shared/images/svg/",
     "parse-ui-svgs": "svgr --no-index --jsx-runtime automatic --svgo-config ./svgo.config.json --prettier-config ./.prettierrc --out-dir ./src/shared/defguard-ui/components/svg/ --typescript ./src/shared/defguard-ui/images/svg/",
     "parse-svgs": "pnpm parse-ui-svgs && pnpm parse-client-svgs",
     "svgr": "svgr",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "biome": "biome"
   },
   "browserslist": {
     "production": [
@@ -37,7 +39,11 @@
       "ignoreMissing": [
         "react-native"
       ]
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild"
+    ]
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.28",
@@ -89,6 +95,7 @@
     "zustand": "^5.0.4"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.1.2",
     "@hookform/devtools": "^4.4.0",
     "@svgr/cli": "^8.1.0",
     "@tanstack/react-query": "^5.76.1",
@@ -99,19 +106,9 @@
     "@types/node": "^20.17.48",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitejs/plugin-react-swc": "^3.9.0",
     "autoprefixer": "^10.4.21",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-prettier": "^5.4.0",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "eslint-plugin-simple-import-sort": "^10.0.0",
     "npm-run-all": "^4.1.5",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
@@ -119,7 +116,6 @@
     "typedoc": "^0.25.13",
     "typesafe-i18n": "^5.26.2",
     "typescript": "^5.8.3",
-    "typescript-eslint-language-service": "^5.0.5",
     "vite": "^4.5.14"
   },
   "volta": {

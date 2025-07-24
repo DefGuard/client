@@ -3,14 +3,14 @@ import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
-import {
+import type {
   SelectOption,
   SelectProps,
   SelectSelectedValue,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
-import { ClientView } from '../../../../clientAPI/types';
+import type { ClientView } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { CommonWireguardFields } from '../../../../types';
+import type { CommonWireguardFields } from '../../../../types';
 
 interface StatsLayoutSelect {
   locations: CommonWireguardFields[] | undefined;

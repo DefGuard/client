@@ -2,16 +2,16 @@ import byteSize from 'byte-size';
 import classNames from 'classnames';
 import dayjs from 'dayjs';
 import { floor, isUndefined } from 'lodash-es';
-import { ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useI18nContext } from '../../../../../../../../../../../i18n/i18n-react';
 import {
-  ListHeader,
-  ListRowCell,
+  type ListHeader,
+  type ListRowCell,
   ListSortDirection,
 } from '../../../../../../../../../../../shared/defguard-ui/components/Layout/VirtualizedList/types';
 import { VirtualizedList } from '../../../../../../../../../../../shared/defguard-ui/components/Layout/VirtualizedList/VirtualizedList';
-import { Connection } from '../../../../../../../../../types';
+import type { Connection } from '../../../../../../../../../types';
 
 type Props = {
   connections: Connection[];

@@ -9,7 +9,7 @@ import { FloatingMenu } from '../../../../../../../../shared/defguard-ui/compone
 import { FloatingMenuProvider } from '../../../../../../../../shared/defguard-ui/components/Layout/FloatingMenu/FloatingMenuProvider';
 import { FloatingMenuTrigger } from '../../../../../../../../shared/defguard-ui/components/Layout/FloatingMenu/FloatingMenuTrigger';
 import SvgIconConnection from '../../../../../../../../shared/defguard-ui/components/svg/IconConnection';
-import { CommonWireguardFields } from '../../../../../../types';
+import type { CommonWireguardFields } from '../../../../../../types';
 
 type Props = {
   location?: CommonWireguardFields;

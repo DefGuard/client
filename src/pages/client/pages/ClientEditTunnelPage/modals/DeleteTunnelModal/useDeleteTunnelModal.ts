@@ -1,6 +1,6 @@
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { Tunnel } from '../../../../types';
+import type { Tunnel } from '../../../../types';
 
 const defaultValues: StoreValues = {
   isOpen: false,

@@ -3,11 +3,11 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
 
 import { clientApi } from '../clientAPI/clientApi';
-import { AppConfig, ClientView } from '../clientAPI/types';
+import type { AppConfig, ClientView } from '../clientAPI/types';
 import {
-  CommonWireguardFields,
-  DefguardInstance,
-  SelectedInstance,
+  type CommonWireguardFields,
+  type DefguardInstance,
+  type SelectedInstance,
   WireguardInstanceType,
 } from '../types';
 

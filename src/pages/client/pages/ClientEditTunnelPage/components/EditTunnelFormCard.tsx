@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
@@ -25,7 +25,7 @@ import {
 import { routes } from '../../../../../shared/routes';
 import { validateIpOrDomainList } from '../../../../../shared/validators/tunnel';
 import { clientApi } from '../../../clientAPI/clientApi';
-import { Tunnel } from '../../../types';
+import type { Tunnel } from '../../../types';
 
 type Props = {
   tunnel: Tunnel;

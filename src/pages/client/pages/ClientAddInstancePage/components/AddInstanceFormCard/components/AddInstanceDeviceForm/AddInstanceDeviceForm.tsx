@@ -3,7 +3,7 @@ import './style.scss';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Body, fetch } from '@tauri-apps/api/http';
 import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import {
+import type {
   CreateDeviceRequest,
   CreateDeviceResponse,
 } from '../../../../../../../../shared/hooks/api/types';
@@ -24,8 +24,8 @@ import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
-import { AddInstanceInitResponse } from '../../types';
+import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import type { AddInstanceInitResponse } from '../../types';
 
 const { getInstances, saveConfig } = clientApi;
 

@@ -1,7 +1,7 @@
 import './style.scss';
 
 import dayjs from 'dayjs';
-import { ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { debug, error } from 'tauri-plugin-log-api';
 import { useBreakpoint } from 'use-breakpoint';

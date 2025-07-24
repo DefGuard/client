@@ -6,7 +6,7 @@ import { Body, fetch } from '@tauri-apps/api/http';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
@@ -26,7 +26,7 @@ import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toa
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import {
-  DefguardInstance,
+  type DefguardInstance,
   LocationMfaType,
   WireguardInstanceType,
 } from '../../../../../../types';

@@ -16,7 +16,11 @@ import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
-import { DeadConDroppedPayload, DeadConReconnectedPayload, TauriEventKey } from './types';
+import {
+  type DeadConDroppedPayload,
+  type DeadConReconnectedPayload,
+  TauriEventKey,
+} from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
 

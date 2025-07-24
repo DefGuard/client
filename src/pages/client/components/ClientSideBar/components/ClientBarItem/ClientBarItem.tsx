@@ -7,7 +7,7 @@ import { useMatch, useNavigate } from 'react-router-dom';
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { SelectedInstance, WireguardInstanceType } from '../../../../types';
+import { type SelectedInstance, WireguardInstanceType } from '../../../../types';
 
 type Props = {
   itemType: WireguardInstanceType;

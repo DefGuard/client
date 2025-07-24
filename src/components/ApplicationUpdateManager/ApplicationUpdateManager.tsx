@@ -1,13 +1,13 @@
 import { getVersion } from '@tauri-apps/api/app';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
 
 import { clientApi } from '../../pages/client/clientAPI/clientApi.ts';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { TauriEventKey } from '../../pages/client/types';
-import { NewApplicationVersionInfo } from '../../shared/hooks/api/types';
+import type { NewApplicationVersionInfo } from '../../shared/hooks/api/types';
 import {
-  ApplicationUpdateStore,
+  type ApplicationUpdateStore,
   useApplicationUpdateStore,
 } from './useApplicationUpdateStore';
 

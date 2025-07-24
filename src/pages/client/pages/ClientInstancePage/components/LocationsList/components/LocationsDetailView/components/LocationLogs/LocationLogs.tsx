@@ -2,7 +2,7 @@ import './style.scss';
 
 import { clipboard } from '@tauri-apps/api';
 import { save } from '@tauri-apps/api/dialog';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { writeTextFile } from '@tauri-apps/api/fs';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
@@ -11,9 +11,12 @@ import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
 import { ActionButtonVariant } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
-import { LogItem, LogLevel } from '../../../../../../../../clientAPI/types';
+import type { LogItem, LogLevel } from '../../../../../../../../clientAPI/types';
 import { useClientStore } from '../../../../../../../../hooks/useClientStore';
-import { DefguardLocation, WireguardInstanceType } from '../../../../../../../../types';
+import type {
+  DefguardLocation,
+  WireguardInstanceType,
+} from '../../../../../../../../types';
 import { LocationLogsSelect } from './LocationLogsSelect';
 
 type Props = {

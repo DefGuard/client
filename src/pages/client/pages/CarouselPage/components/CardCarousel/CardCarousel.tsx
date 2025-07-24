@@ -3,11 +3,11 @@ import './style.scss';
 import classNames from 'classnames';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isUndefined } from 'lodash-es';
-import { HTMLProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type HTMLProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { interval } from 'rxjs';
 
 import { CarouselControls } from './components/CarouselControl/CarouselControl';
-import { CarouselItem } from './types';
+import type { CarouselItem } from './types';
 
 type Props = {
   cards: CarouselItem[];

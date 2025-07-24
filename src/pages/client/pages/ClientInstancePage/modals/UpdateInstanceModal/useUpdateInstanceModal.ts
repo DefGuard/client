@@ -1,6 +1,6 @@
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { DefguardInstance } from '../../../../types';
+import type { DefguardInstance } from '../../../../types';
 
 const defaultValues: StoreValues = {
   isOpen: false,

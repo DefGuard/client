@@ -12,7 +12,7 @@ import { routes } from '../../../../shared/routes';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
-import { DefguardInstance, WireguardInstanceType } from '../../types';
+import { type DefguardInstance, WireguardInstanceType } from '../../types';
 import { LocationsList } from './components/LocationsList/LocationsList';
 import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 import { StatsLayoutSelect } from './components/StatsLayoutSelect/StatsLayoutSelect';
