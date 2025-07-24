@@ -4,17 +4,13 @@
     color: var(--text-body-primary);
   }
 
-  & > header {
+  &>header {
     padding-bottom: 60px;
   }
 
   h2 {
     @include typography(app-body-1);
     color: var(--text-body-primary);
-  }
-
-  path {
-    fill: var(--surface-icon-secondary);
   }
 
   h1,
@@ -28,7 +24,7 @@
     cursor: pointer;
   }
 
-  & > .content {
+  &>.content {
     width: 100%;
     display: grid;
     grid-template-columns: 1fr;
@@ -61,7 +57,7 @@
       min-height: 800px;
       border-radius: 15px;
 
-      & > img {
+      &>img {
         width: 100%;
         height: auto;
         border-top-left-radius: var(--card-radius);
@@ -74,7 +70,7 @@
         width: 270px;
         margin-bottom: 20px;
 
-        & > span {
+        &>span {
           @include typography(app-button-l);
           text-decoration: none;
           color: var(--text-button-secondary) !important;
