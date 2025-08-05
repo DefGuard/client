@@ -324,7 +324,6 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
         error!("InstanceInfo is missing from the received enrollment start response: {response:?}");
         return Err(CliError::MissingData);
     }
-    // eprintln!("COOKIES {:?}", cookies.cookies(base_url));
 
     // Generate a pair of WireGuard keys.
     let prvkey = Key::generate();
