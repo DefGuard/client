@@ -648,7 +648,7 @@ async fn main() {
             Err(err) => {
                 if let CliError::ConfigNotFound(path) = err {
                     error!(
-                        "No CLI confioguration file found at \"{path}\". Proceed with \
+                        "No CLI configuration file found at \"{path}\". Proceed with \
                         enrollment first using \"dg enroll -t <TOKEN> -u <URL>\" or pass a valid \
                         configuration file path using the \"--config\" option. Use \"dg --help\" \
                         to display all options."
