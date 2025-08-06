@@ -63,6 +63,13 @@ in
       # copy client binary
       mkdir -p $out/bin
       cp src-tauri/target/release/${pname} $out/bin/
+      # copy service binary
+      mkdir -p $out/bin
+      cp src-tauri/target/release/defguard-service $out/bin/
+      # copy cli binary
+      mkdir -p $out/bin
+      cp src-tauri/target/release/dg $out/bin/
+
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
     '';
