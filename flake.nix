@@ -3,6 +3,9 @@
     nixpkgs.url = "nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
+
+    # include git submodules
+    self.submodules = true;
   };
 
   outputs = {
