@@ -52,7 +52,7 @@ pub async fn purge_stats(handle: AppHandle) {
             error!(
                 "Failed to commit database transaction for stats purging: {err}. Retrying in {}h",
                 PURGE_INTERVAL.as_secs() / 3600
-            )
+            );
         }
     }
 }

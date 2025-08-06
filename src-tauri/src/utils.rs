@@ -296,8 +296,9 @@ pub(crate) async fn stats_handler(
                 // commit transaction
                 if let Err(err) = transaction.commit().await {
                     error!(
-                "Failed to commit database transaction for saving location/tunnel stats: {err}",
-            )
+                        "Failed to commit database transaction for saving location/tunnel stats: \
+                        {err}",
+                    );
                 }
             }
             Ok(None) => {
