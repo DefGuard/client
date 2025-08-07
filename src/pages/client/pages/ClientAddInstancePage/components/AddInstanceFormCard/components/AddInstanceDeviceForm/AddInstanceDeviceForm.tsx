@@ -1,11 +1,11 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
+import { error } from '@tauri-apps/plugin-log';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
@@ -90,7 +90,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
     try {
       await fetch(`${proxyUrl}/enrollment/create_device`, {
         headers,
-        body: Body.json(data),
+        body: JSON.stringify(data),
         method: 'POST',
       }).then((r) => {
         if (!r.ok) {

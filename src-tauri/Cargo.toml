@@ -26,7 +26,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2", features = [] }
 tonic-prost-build = { version = "0.14" }
 vergen-git2 = { version = "1.0", features = ["build"] }
 
@@ -49,39 +49,34 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "3.11"
 sqlx = { version = "0.8", features = [
-    "chrono",
-    "sqlite",
-    "runtime-tokio",
-    "uuid",
-    "macros",
+  "chrono",
+  "sqlite",
+  "runtime-tokio",
+  "uuid",
+  "macros",
 ] }
 struct-patch = "0.10"
 strum = { version = "0.27", features = ["derive"] }
-tauri = { version = "1.8", features = [
-    "notification-all",
-    "dialog-all",
-    "clipboard-all",
-    "http-all",
-    "window-all",
-    "system-tray",
-    "native-tls-vendored",
-    "icon-png",
-    "fs-all",
+tauri = { version = "2", features = [
+  "native-tls-vendored",
+  "image-png",
+  "tray-icon",
 ] }
-tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
+tauri-plugin-notification = "2"
+tauri-plugin-log = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
 thiserror = "2.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tokio-util = "0.7"
 tonic = { version = "0.14", default-features = false, features = [
-    "codegen",
-    "gzip",
-    "router",
-    "tls-native-roots",
-    "tls-ring",
-    "transport",
+  "codegen",
+  "gzip",
+  "router",
+  "tls-native-roots",
+  "tls-ring",
+  "transport",
 ] }
 tonic-prost = "0.14"
 tracing = "0.1"
@@ -89,9 +84,9 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 webbrowser = "1.0"
 x25519-dalek = { version = "2", features = [
-    "getrandom",
-    "serde",
-    "static_secrets",
+  "getrandom",
+  "serde",
+  "static_secrets",
 ] }
 
 [target.'cfg(unix)'.dependencies]

@@ -1,13 +1,13 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch, type Response } from '@tauri-apps/api/http';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
+import { fetch, type Response } from '@tauri-apps/plugin-http';
+import { debug, error, info } from '@tauri-apps/plugin-log';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
@@ -99,7 +99,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     fetch<EnrollmentStartResponse>(endpointUrl, {
       method: 'POST',
       headers,
-      body: Body.json(data),
+      body: JSON.stringify(data),
     })
       .then(async (res: Response<EnrollmentStartResponse | EnrollmentError>) => {
         if (!res.ok) {
@@ -158,7 +158,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
-            body: Body.json({
+            body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
           }).then(async (res) => {

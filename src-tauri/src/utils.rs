@@ -3,7 +3,7 @@ use std::{env, path::Path, process::Command, str::FromStr};
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tonic::{transport::Channel, Code};
 use tracing::Level;
 #[cfg(target_os = "windows")]
@@ -632,7 +632,7 @@ pub(crate) async fn handle_connection_for_location(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit_all(
+    handle.emit(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
@@ -669,7 +669,7 @@ pub(crate) async fn handle_connection_for_tunnel(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit_all(
+    handle.emit(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
@@ -943,7 +943,7 @@ async fn check_connection(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    app_handle.emit_all(
+    app_handle.emit(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),

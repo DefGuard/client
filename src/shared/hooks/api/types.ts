@@ -1,4 +1,4 @@
-import type { Response } from '@tauri-apps/api/http';
+import type { Response } from '@tauri-apps/plugin-http';
 
 import type { DefguardInstance } from '../../../pages/client/types';
 

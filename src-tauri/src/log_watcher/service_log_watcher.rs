@@ -14,7 +14,7 @@ use std::{
 };
 
 use chrono::{DateTime, NaiveDate, Utc};
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
+use tauri::{async_runtime::TokioJoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -105,7 +105,7 @@ impl<'a> ServiceLogWatcher<'a> {
                     // emit event with all relevant log lines
                     if !parsed_lines.is_empty() {
                         trace!("Emitting {} log lines for the frontend", parsed_lines.len());
-                        self.handle.emit_all(&self.event_topic, &parsed_lines)?;
+                        self.handle.emit(&self.event_topic, &parsed_lines)?;
                     }
                     parsed_lines.clear();
 

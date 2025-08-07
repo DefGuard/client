@@ -7,13 +7,13 @@ use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use strum::{Display, EnumString};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 static APP_CONFIG_FILE_NAME: &str = "config.json";
 
 fn get_config_file_path(app: &AppHandle) -> PathBuf {
     let mut config_file_path = app
-        .path_resolver()
+        .path()
         .app_data_dir()
         .expect("Failed to access app data");
     if !config_file_path.exists() {

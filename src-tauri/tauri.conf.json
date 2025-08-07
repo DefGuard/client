@@ -3,46 +3,52 @@
   "build": {
     "beforeBuildCommand": "pnpm build",
     "beforeDevCommand": "pnpm dev",
-    "devPath": "http://localhost:3001",
-    "distDir": "../dist"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:3001"
   },
-  "package": {
-    "productName": "defguard-client",
-    "version": "1.5.0"
-  },
-  "tauri": {
-    "systemTray": {
-      "iconPath": "resources/icons/tray-32x32-color.png",
-      "iconAsTemplate": false
-    },
-    "allowlist": {
-      "all": false,
-      "window": {
-        "all": true
-      },
-      "http": {
-        "all": true,
-        "request": true,
-        "scope": ["https://**", "http://**"]
-      },
-      "fs": {
-        "all": true,
-        "scope": ["$RESOURCE/*", "$APPDATA/*"]
-      },
-      "clipboard": {
-        "all": true
-      },
-      "dialog": {
-        "all": true
-      },
-      "notification": {
-        "all": true
+  "bundle": {
+    "active": true,
+    "category": "Utility",
+    "copyright": "teonite",
+    "targets": [
+      "deb",
+      "app"
+    ],
+    "externalBin": [],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "template": "./resources-windows/main.wxs",
+        "fragmentPaths": [
+          "./resources-windows/service-fragment.wxs"
+        ],
+        "componentRefs": [
+          "DefGuardServiceFragment"
+        ]
       }
     },
-    "bundle": {
-      "active": true,
-      "category": "Utility",
-      "copyright": "teonite",
+    "longDescription": "Defguard desktop client.",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    },
+    "resources": [
+      "resources/*"
+    ],
+    "shortDescription": "",
+    "linux": {
       "deb": {
         "files": {
           "/usr/sbin/defguard-service": "target/release/defguard-service",
@@ -52,43 +58,18 @@
           "../control/prerm": "../resources-linux/prerm",
           "../control/postrm": "../resources-linux/postrm"
         }
-      },
-      "externalBin": [],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "net.defguard",
-      "longDescription": "Defguard desktop client.",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "resources": ["resources/*"],
-      "shortDescription": "",
-      "targets": ["deb", "app"],
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": "",
-        "wix": {
-          "template": "./resources-windows/main.wxs",
-          "fragmentPaths": ["./resources-windows/service-fragment.wxs"],
-          "componentRefs": ["DefGuardServiceFragment"]
-        }
       }
-    },
-    "security": {
-      "csp": null
-    },
-    "updater": {
-      "active": false
+    }
+  },
+  "productName": "defguard-client",
+  "mainBinaryName": "defguard-client",
+  "version": "1.5.0",
+  "identifier": "net.defguard",
+  "plugins": {},
+  "app": {
+    "trayIcon": {
+      "iconPath": "resources/icons/tray-32x32-color.png",
+      "iconAsTemplate": false
     },
     "windows": [
       {
@@ -103,8 +84,12 @@
         "title": "Defguard",
         "width": 992,
         "minWidth": 650,
-        "minHeight": 450
+        "minHeight": 450,
+        "useHttpsScheme": true
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
   }
 }

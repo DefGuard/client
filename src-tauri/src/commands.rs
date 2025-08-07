@@ -9,7 +9,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 static UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
@@ -116,7 +116,7 @@ pub async fn disconnect(
         trace!("Connection: {connection:?}");
         disconnect_interface(&connection, &state).await?;
         debug!("Emitting the event informing the frontend about the disconnection from {connection_type} {name}({location_id})");
-        handle.emit_all(
+        handle.emit(
             CONNECTION_CHANGED,
             Payload {
                 message: "Created new connection".into(),
@@ -182,7 +182,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     };
     poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
-    handle.emit_all(INSTANCE_UPDATE, ())?;
+    handle.emit(INSTANCE_UPDATE, ())?;
     Ok(())
 }
 
@@ -267,7 +267,7 @@ pub async fn save_device_config(
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(&app_state.db, instance.id).await?;
     trace!("Created following locations: {locations:#?}");
-    handle.emit_all(INSTANCE_UPDATE, ())?;
+    handle.emit(INSTANCE_UPDATE, ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -433,7 +433,7 @@ pub async fn update_instance(
         do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        app_handle.emit_all(INSTANCE_UPDATE, ())?;
+        app_handle.emit(INSTANCE_UPDATE, ())?;
         reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
@@ -763,7 +763,7 @@ pub async fn update_location_routing(
                 location.route_all_traffic = route_all_traffic;
                 location.save(&app_state.db).await?;
                 debug!("Location routing updated for location {name}(ID: {location_id})");
-                handle.emit_all(
+                handle.emit(
                     LOCATION_UPDATE,
                     Payload {
                         message: "Location routing updated".into(),
@@ -782,7 +782,7 @@ pub async fn update_location_routing(
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&app_state.db).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
-                handle.emit_all(
+                handle.emit(
                     LOCATION_UPDATE,
                     Payload {
                         message: "Tunnel routing updated".into(),
@@ -841,7 +841,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
-    handle.emit_all(INSTANCE_UPDATE, ())?;
+    handle.emit(INSTANCE_UPDATE, ())?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -863,7 +863,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
     debug!("Received tunnel configuration to update: {tunnel:?}");
     tunnel.save(&app_state.db).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
-    handle.emit_all(
+    handle.emit(
         LOCATION_UPDATE,
         Payload {
             message: "Tunnel saved".into(),
@@ -878,7 +878,7 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     debug!("Received tunnel configuration to save: {tunnel:?}");
     let tunnel = tunnel.save(&app_state.db).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
-    handle.emit_all(
+    handle.emit(
         LOCATION_UPDATE,
         Payload {
             message: "Tunnel saved".into(),
@@ -1112,7 +1112,7 @@ pub fn command_set_app_config(
         }
     }
     if emit_event {
-        match app_handle.emit_all(APPLICATION_CONFIG_CHANGED, ()) {
+        match app_handle.emit(APPLICATION_CONFIG_CHANGED, ()) {
             Ok(()) => debug!("Config changed event emitted successfully"),
             Err(err) => {
                 error!("Failed to emit config change event. Reason: {err}");

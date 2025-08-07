@@ -2,7 +2,7 @@ use std::{str::FromStr, time::Duration};
 
 use reqwest::{Client, StatusCode};
 use sqlx::{Sqlite, Transaction};
-use tauri::{AppHandle, Manager, State, Url};
+use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tokio::time::sleep;
 
 use crate::{
@@ -81,7 +81,7 @@ pub async fn poll_config(handle: AppHandle) {
         if let Err(err) = transaction.commit().await {
             error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
         }
-        if let Err(err) = handle.emit_all(INSTANCE_UPDATE, ()) {
+        if let Err(err) = handle.emit(INSTANCE_UPDATE, ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
         }
         if config_retrieved > 0 {
@@ -209,7 +209,7 @@ pub async fn poll_instance(
             "Emitting config-changed event for instance {}({})",
             instance.name, instance.id,
         );
-        let _ = handle.emit_all(CONFIG_CHANGED, &instance.name);
+        let _ = handle.emit(CONFIG_CHANGED, &instance.name);
         info!(
             "Emitted config-changed event for instance {}({})",
             instance.name, instance.id,

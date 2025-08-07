@@ -2,10 +2,10 @@ import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { debug, error, info } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
-import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';

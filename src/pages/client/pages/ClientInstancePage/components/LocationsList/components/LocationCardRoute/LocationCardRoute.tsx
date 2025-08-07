@@ -1,7 +1,7 @@
 import './style.scss';
 
+import { error } from '@tauri-apps/plugin-log';
 import { useMemo } from 'react';
-import { error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';

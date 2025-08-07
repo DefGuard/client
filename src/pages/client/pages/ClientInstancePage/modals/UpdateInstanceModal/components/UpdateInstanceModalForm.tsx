@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
 import { useMemo } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -97,7 +97,7 @@ export const UpdateInstanceModalForm = () => {
     const res = await fetch<EnrollmentStartResponse>(endpointUrl, {
       method: 'POST',
       headers,
-      body: Body.json(data),
+      body: JSON.stringify(data),
     });
     if (res.ok) {
       const enrollmentData = res.data;
@@ -125,7 +125,7 @@ export const UpdateInstanceModalForm = () => {
           {
             method: 'POST',
             headers,
-            body: Body.json({
+            body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
           },

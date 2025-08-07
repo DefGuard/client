@@ -1,4 +1,4 @@
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import type {
@@ -24,7 +24,7 @@ export const useEnrollmentApi = (): UseApi => {
           'Content-Type': 'application/json',
           Cookie: cookie,
         },
-        body: Body.json(data),
+        body: JSON.stringify(data),
       },
     );
     return response;
@@ -39,7 +39,7 @@ export const useEnrollmentApi = (): UseApi => {
           'Content-Type': 'application/json',
           Cookie: cookie,
         },
-        body: Body.json(data),
+        body: JSON.stringify(data),
       },
     );
 
@@ -55,7 +55,7 @@ export const useEnrollmentApi = (): UseApi => {
           'Content-Type': 'application/json',
           Cookie: cookie,
         },
-        body: Body.json(data),
+        body: JSON.stringify(data),
       },
     );
 

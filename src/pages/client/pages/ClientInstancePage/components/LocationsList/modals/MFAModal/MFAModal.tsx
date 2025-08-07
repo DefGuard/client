@@ -2,13 +2,13 @@ import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
+import { error } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
-import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -123,7 +123,7 @@ export const MFAModal = () => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: Body.json(data),
+      body: JSON.stringify(data),
     });
 
     if (response.ok) {
@@ -425,7 +425,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
           headers: {
             'Content-Type': 'application/json',
           },
-          body: Body.json(data),
+          body: JSON.stringify(data),
         },
       );
 
@@ -547,7 +547,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         headers: {
           'Content-Type': 'application/json',
         },
-        body: Body.json(data),
+        body: JSON.stringify(data),
       },
     );
 

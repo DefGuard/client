@@ -1,11 +1,9 @@
 {
-    "tauri": {
-        "bundle": {
-            "targets": ["msi"],
-            "resources": [
-                "resources-windows/binaries/*",
-                "resources/*"
-            ]
-        }
-    }
+  "bundle": {
+    "targets": ["msi"],
+    "resources": [
+      "resources-windows/binaries/*",
+      "resources/icons/*"
+    ]
+  }
 }
