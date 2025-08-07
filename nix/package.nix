@@ -4,8 +4,6 @@
   stdenv,
   rustPlatform,
   makeDesktopItem,
-  buildInputs,
-  nativeBuildInputs,
 }: let
   pname = "defguard-client";
   version = "1.5.0"; # TODO: Get this from Cargo.toml or git
@@ -18,6 +16,35 @@
     genericName = "Defguard VPN Client";
     categories = ["Network" "Security"];
   };
+
+  rustToolchain = pkgs.rust-bin.stable.latest.default;
+
+  buildInputs = with pkgs; [
+    gtk3
+    cairo
+    gdk-pixbuf
+    glib
+    dbus
+    openssl
+    librsvg
+    libsoup_3
+    webkitgtk_4_0
+    libayatana-appindicator
+  ];
+
+  nativeBuildInputs = with pkgs; [
+    rustToolchain
+    pkg-config
+    cargo-tauri_1
+    nodejs_24
+    pnpm
+    # configures pnpm to use pre-fetched dependencies
+    pnpm.configHook
+    protobuf
+    # configures cargo to use pre-fetched dependencies
+    rustPlatform.cargoSetupHook
+    perl
+  ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
     inherit pname version buildInputs nativeBuildInputs;
