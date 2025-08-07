@@ -45,7 +45,10 @@
         cargo-tauri_1
         nodejs_24
         pnpm
+        # configures pnpm to use pre-fetched dependencies
+        pnpm.configHook
         protobuf
+        # configures cargo to use pre-fetched dependencies
         rustPlatform.cargoSetupHook
         perl
       ];

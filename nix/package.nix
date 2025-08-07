@@ -24,36 +24,31 @@ in
 
     src = ../.;
 
+    # prefetch cargo dependencies
     cargoRoot = "src-tauri";
     buildAndTestSubdir = "src-tauri";
 
     cargoDeps = rustPlatform.importCargoLock {
       lockFile = ../src-tauri/Cargo.lock;
+      # specify hashes for git dependencies
       outputHashes = {
         "defguard_wireguard_rs-0.7.4" = "sha256-pxwN43BntOEYtp+TlpQFX78gg1ko4zuXEGctZIfSrhg=";
         "tauri-plugin-log-0.0.0" = "sha256-jGzlN/T29Hya4bKe9Dwl2mRRFLXMywrHk+32zgwrpJ0=";
       };
     };
 
+    # prefetch pnpm dependencies
     pnpmDeps = pkgs.pnpm.fetchDeps {
       inherit
         (finalAttrs)
         pname
         version
+        src
         ;
 
-      src = ../.;
-
       fetcherVersion = 2;
-      hash = "sha256-OIm8OCvE7V77uuWsfeY/ax7T5SSE9Rt0EKrsnuDzOYk=";
+      hash = "sha256-lQUhwy1/zz3mUN7wNLQyKeULYPQiu2UvMS2REu9XxEc=";
     };
-
-    configurePhase = ''
-      export HOME=$TMPDIR
-      pnpm config set store-dir ${pnpmDeps}
-      pnpm config set offline true
-      pnpm install --frozen-lockfile --ignore-scripts
-    '';
 
     buildPhase = ''
       pnpm tauri build
