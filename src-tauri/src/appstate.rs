@@ -1,9 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use tauri::{
-    async_runtime::{spawn, JoinHandle, Mutex},
-    AppHandle,
-};
+use tauri::async_runtime::{spawn, JoinHandle, Mutex};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -129,7 +126,7 @@ impl AppState {
         connection_ids
     }
 
-    pub(crate) async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
+    pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
         debug!("Closing all active connections");
         let active_connections = self.active_connections.lock().await;
         let active_connections_count = active_connections.len();
@@ -192,13 +189,5 @@ impl AppState {
             .filter(|connection| locations.contains(&connection.location_id))
             .cloned()
             .collect())
-    }
-
-    /// Close all connections, then terminate the application.
-    pub fn quit(&self, app_handle: &AppHandle) {
-        tauri::async_runtime::block_on(async {
-            let _ = self.close_all_connections().await;
-            app_handle.exit(0);
-        });
     }
 }

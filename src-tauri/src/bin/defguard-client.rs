@@ -18,7 +18,7 @@ use defguard_client::{
     events::SINGLE_INSTANCE,
     periodic::run_periodic_tasks,
     service,
-    tray::{configure_tray_icon, handle_tray_event, reload_tray_menu},
+    tray::{configure_tray_icon, reload_tray_menu},
     utils::load_log_targets,
     VERSION,
 };
@@ -45,7 +45,6 @@ static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
 async fn startup(app_handle: &AppHandle) {
     debug!("Running database migrations, if there are any.");
-    // let app_state: State<AppState> = app_handle.state();
     sqlx::migrate!()
         .run(&*DB_POOL)
         .await
@@ -90,24 +89,13 @@ async fn startup(app_handle: &AppHandle) {
         };
     }
 
-    // FIXME: panic
-    // // Configure tray.
-    // debug!("Configuring tray icon.");
-    // if let Ok(app_config) = &app_state.app_config.lock() {
-    //     let _ = configure_tray_icon(&app_handle, &app_config.tray_theme);
-    //     debug!("Tray icon has been configured successfully");
-    // } else {
-    //     error!("Could not lock app config guard for tray configuration during app init.");
-    // }
-
     // Run periodic tasks.
     let periodic_tasks_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         run_periodic_tasks(&periodic_tasks_handle).await;
         // One of the tasks exited, so something went wrong, quit the app
         error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
-        let app_state: State<AppState> = periodic_tasks_handle.state();
-        app_state.quit(&periodic_tasks_handle);
+        periodic_tasks_handle.exit(0);
     });
     debug!("Periodic tasks have been started");
 
@@ -116,7 +104,7 @@ async fn startup(app_handle: &AppHandle) {
         "Re-generating tray menu to show all available instances and locations as we have \
         connected to the database."
     );
-    reload_tray_menu(&app_handle).await;
+    reload_tray_menu(app_handle).await;
     debug!("Tray menu has been re-generated successfully");
 }
 
@@ -137,15 +125,6 @@ fn main() {
         );
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
-
-    // setup logging
-    // use config default if deriving from env value fails so that env can override config file
-    let config_log_level = LevelFilter::Info; // FIXME: used to be config.log_level;
-    let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
-        Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
-        Err(_) => config_log_level,
-    };
-    // info!("App setup completed, log level: {log_level}");
 
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -189,91 +168,96 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let _ = app.emit(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
-        .plugin(
-            tauri_plugin_log::Builder::new()
-                .format(move |out, message, record| {
-                    out.finish(format_args!(
-                        "{}[{}][{}] {}",
-                        tauri_plugin_log::TimezoneStrategy::UseUtc
-                            .get_now()
-                            // Sets the time format. Service's logs have a subsecond part, so we
-                            // also need to include it here, otherwise the logs couldn't be sorted
-                            // correctly when displayed together in the UI.
-                            .format(&time::macros::format_description!(
+        .setup(|app| {
+            let app_handle = app.app_handle();
+
+            // Prepare `AppConfig`.
+            let config = AppConfig::new(&app_handle);
+
+            // Setup logging.
+
+            // If deriving from env value fails, use config default (env overrides config file).
+            let config_log_level = config.log_level;
+            let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
+                Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
+                Err(_) => config_log_level,
+            };
+            app_handle.plugin(
+                tauri_plugin_log::Builder::new()
+                    .format(move |out, message, record| {
+                        out.finish(format_args!(
+                            "{}[{}][{}] {}",
+                            tauri_plugin_log::TimezoneStrategy::UseUtc
+                                .get_now()
+                                // Sets the time format. Service's logs have a subsecond part, so we
+                                // also need to include it here, otherwise the logs couldn't be sorted
+                                // correctly when displayed together in the UI.
+                                .format(&time::macros::format_description!(
                                 "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]"
                             ))
-                            .unwrap(),
-                        record.level(),
-                        record.target(),
-                        message
-                    ));
-                })
-                .targets([
-                    Target::new(TargetKind::Stdout),
-                    Target::new(TargetKind::LogDir { file_name: None }),
-                ])
-                .level(log_level)
-                .filter(|metadata| {
-                    if metadata.level() == Level::Error {
-                        return true;
-                    }
-                    if !LOG_INCLUDES.is_empty() {
-                        for target in &*LOG_INCLUDES {
-                            if metadata.target().contains(target) {
-                                return true;
-                            }
+                                .unwrap(),
+                            record.level(),
+                            record.target(),
+                            message
+                        ));
+                    })
+                    .targets([
+                        Target::new(TargetKind::Stdout),
+                        Target::new(TargetKind::LogDir { file_name: None }),
+                    ])
+                    .level(log_level)
+                    .filter(|metadata| {
+                        if metadata.level() == Level::Error {
+                            return true;
                         }
-                        return false;
-                    }
-                    true
-                })
-                .filter(|metadata| {
-                    // Log all errors, warnings and infos.
-                    let level = metadata.level();
-                    if level == LevelFilter::Error
-                        || level == LevelFilter::Warn
-                        || level == LevelFilter::Info
-                    {
-                        return true;
-                    }
-                    // Otherwise do not log these targets.
-                    for target in &LOGGING_TARGET_IGNORE_LIST {
-                        if metadata.target().contains(target) {
+                        if !LOG_INCLUDES.is_empty() {
+                            for target in &*LOG_INCLUDES {
+                                if metadata.target().contains(target) {
+                                    return true;
+                                }
+                            }
                             return false;
                         }
-                    }
-                    true
-                })
-                .build(),
-        )
-        .setup(|app| {
-            // Prepare `AppConfig`.
-            let config = AppConfig::new(&app.app_handle());
+                        true
+                    })
+                    .filter(|metadata| {
+                        // Log all errors, warnings and infos.
+                        let level = metadata.level();
+                        if level == LevelFilter::Error
+                            || level == LevelFilter::Warn
+                            || level == LevelFilter::Info
+                        {
+                            return true;
+                        }
+                        // Otherwise do not log these targets.
+                        for target in &LOGGING_TARGET_IGNORE_LIST {
+                            if metadata.target().contains(target) {
+                                return false;
+                            }
+                        }
+                        true
+                    })
+                    .build(),
+            )?;
+
+            // Configure tray.
+            debug!("Configuring tray icon.");
+            match configure_tray_icon(&app_handle, &config.tray_theme) {
+                Ok(()) => debug!("Tray icon has been configured successfully"),
+                Err(err) => error!("Failed to configure tray icon: {err}"),
+            }
 
             let state = AppState::new(config);
             app.manage(state);
 
+            info!("App setup completed, log level: {log_level}");
             Ok(())
         })
-        .on_tray_icon_event(handle_tray_event)
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .build(tauri::generate_context!())
         .expect("Failed to build Tauri application");
 
     info!("Starting Defguard client version {VERSION}");
-    // initialize database
-
-    // Handle Ctrl-C.
-    // debug!("Setting up Ctrl-C handler.");
-    // tauri::async_runtime::spawn(async move {
-    //     tokio::signal::ctrl_c()
-    //         .await
-    //         .expect("Signal handler failure");
-    //     debug!("Ctrl-C handler: quitting the app");
-    //     let app_state: State<AppState> = app_handle.state();
-    //     app_state.quit(&app_handle);
-    // });
-    // debug!("Ctrl-C handler has been set up successfully");
 
     // Run application.
     debug!("Starting the main application event loop.");
@@ -295,19 +279,36 @@ fn main() {
                     .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()),
                 service::config::DEFAULT_LOG_DIR
             );
-
             tauri::async_runtime::block_on(startup(app_handle));
+
+            // Handle Ctrl-C.
+            debug!("Setting up Ctrl-C handler.");
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::signal::ctrl_c()
+                    .await
+                    .expect("Signal handler failure");
+                debug!("Ctrl-C handler: quitting the app");
+                app_handle_clone.exit(0);
+            });
+            debug!("Ctrl-C handler has been set up successfully");
         }
         // Prevent shutdown on window close.
-        RunEvent::ExitRequested { api, .. } => {
+        RunEvent::ExitRequested { code, api, .. } => {
             debug!("Received exit request");
-            api.prevent_exit();
+            // `None` when the exit is requested by user interaction.
+            if code.is_none() {
+                api.prevent_exit();
+            } else {
+                let app_state = app_handle.state::<State<AppState>>();
+                tauri::async_runtime::block_on(async {
+                    let _ = app_state.close_all_connections().await;
+                });
+            }
         }
         // Handle shutdown.
         RunEvent::Exit => {
             debug!("Exiting the application's main event loop.");
-            let app_state: State<AppState> = app_handle.state();
-            app_state.quit(app_handle);
         }
         _ => {
             trace!("Received event: {event:?}");

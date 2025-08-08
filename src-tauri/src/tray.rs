@@ -1,9 +1,9 @@
 use tauri::{
     image::Image,
-    menu::{MenuBuilder, MenuItem, SubmenuBuilder},
+    menu::{MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
-    tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, State,
+    tray::{TrayIcon, TrayIconBuilder},
+    AppHandle, Emitter, Manager,
 };
 
 use crate::{
@@ -15,67 +15,83 @@ use crate::{
     ConnectionType,
 };
 
-static SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
-static JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
-static FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
+const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
+const JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
+const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
-static TRAY_ICON_ID: &str = "tray";
+const TRAY_ICON_ID: &str = "tray";
+
+const TRAY_EVENT_QUIT: &str = "quit";
+const TRAY_EVENT_SHOW: &str = "show";
+const TRAY_EVENT_HIDE: &str = "hide";
+const TRAY_EVENT_UPDATES: &str = "updates";
+const TRAY_EVENT_COMMINITY: &str = "community";
+const TRAY_EVENT_FOLLOW: &str = "follow";
 
 pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
     let app_state = app.state::<AppState>();
     debug!("Generating tray menu.");
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-    let hide = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)?;
+    let hide = MenuItem::with_id(app, TRAY_EVENT_HIDE, "Hide", true, None::<&str>)?;
     let subscribe_updates = MenuItem::with_id(
         app,
-        "subscribe_updates",
+        TRAY_EVENT_UPDATES,
         "Subscribe for updates",
         true,
         None::<&str>,
     )?;
     let join_community = MenuItem::with_id(
         app,
-        "join_community",
-        "Join our Community",
+        TRAY_EVENT_COMMINITY,
+        "Join our community",
         true,
         None::<&str>,
     )?;
-    let follow_us = MenuItem::with_id(app, "follow_us", "Follow us", true, None::<&str>)?;
+    let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)?;
 
     // INSTANCE SECTION
     let mut instance_menu = SubmenuBuilder::new(app, "Instances");
     debug!("Getting all instances information for the tray menu");
-    let all_instances = all_instances(app_state.clone()).await;
-    if let Ok(instances) = all_instances {
-        let instance_count = instances.len();
-        debug!("Got {instance_count} instances to display in the tray menu");
-        for instance in instances {
-            let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
-            debug!(
-                "Found {} locations for the {} instance to display in the tray menu",
-                all_locations.len(),
-                instance
-            );
+    match all_instances(app_state.clone()).await {
+        Ok(instances) => {
+            let instance_count = instances.len();
+            debug!("Got {instance_count} instances to display in the tray menu");
+            for instance in instances {
+                let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
+                debug!(
+                    "Found {} locations for the {} instance to display in the tray menu",
+                    all_locations.len(),
+                    instance
+                );
 
-            // TODO: apply icons instead of Connect/Disconnect when defguard utilizes tauri v2
-            for location in all_locations {
-                let item_name = if location.active {
-                    format!("Disconnect: {}", location.name)
-                } else {
-                    format!("Connect: {}", location.name)
-                };
-                let menu_item =
-                    MenuItem::with_id(app, location.id.to_string(), item_name, true, None::<&str>)?;
-                instance_menu = instance_menu.item(&menu_item);
-                debug!("Added new tray menu item (instance {instance}) for location: {location}");
+                // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
+                for location in all_locations {
+                    let item_name = format!(
+                        "{}: {}",
+                        if location.active {
+                            "Disconnect"
+                        } else {
+                            "Connect"
+                        },
+                        location.name
+                    );
+                    let menu_item = MenuItem::with_id(
+                        app,
+                        location.id.to_string(),
+                        item_name,
+                        true,
+                        None::<&str>,
+                    )?;
+                    instance_menu = instance_menu.item(&menu_item);
+                }
             }
         }
-    } else if let Err(err) = all_instances {
-        warn!("Cannot load instance menu: {err:?}");
+        Err(err) => {
+            warn!("Cannot load instance menu: {err:?}");
+        }
     }
 
-    // Load rest of tray menu options
     let tray_menu = MenuBuilder::new(app)
         .items(&[&instance_menu.build()?])
         .separator()
@@ -89,16 +105,15 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
     let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
+        .on_menu_event(handle_tray_event)
         .build(app)?;
-    debug!("Successfully generated tray menu");
+
+    debug!("Tray menu successfully generated");
     Ok(tray)
 }
 
 pub async fn reload_tray_menu(app_handle: &AppHandle) {
-    let _system_menu = generate_tray_menu(app_handle).await.unwrap();
-    // if let Err(err) = app_handle.tray_handle().set_menu(system_menu) {
-    //     warn!("Unable to update tray menu {err:?}");
-    // }
+    generate_tray_menu(app_handle).await.unwrap();
 }
 
 fn show_main_window(app: &AppHandle) {
@@ -118,44 +133,44 @@ fn show_main_window(app: &AppHandle) {
 }
 
 /// Handle tray actions.
-pub fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
+pub fn handle_tray_event(app: &AppHandle, event: MenuEvent) {
     let handle = app.clone();
-    if let TrayIconEvent::Click { id, .. } = event {
-        match id.0.as_str() {
-            "quit" => {
-                info!("Received QUIT request. Initiating shutdown...");
-                let app_state: State<AppState> = app.state();
-                app_state.quit(app);
-            }
-            "show" => show_main_window(app),
-            "hide" => {
-                if let Some(main_window) = app.get_webview_window("main") {
-                    if main_window.is_visible().unwrap_or_default() {
-                        let _ = main_window.hide();
-                    }
+    match event.id.as_ref() {
+        TRAY_EVENT_QUIT => {
+            info!("Received QUIT request. Initiating shutdown...");
+            handle.exit(0);
+        }
+        TRAY_EVENT_SHOW => show_main_window(app),
+        TRAY_EVENT_HIDE => {
+            if let Some(main_window) = app.get_webview_window("main") {
+                if main_window.is_visible().unwrap_or_default() {
+                    let _ = main_window.hide();
                 }
             }
-            "subscribe_updates" => {
-                let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
-            }
-            "join_community" => {
-                let _ = webbrowser::open(JOIN_COMMUNITY_LINK);
-            }
-            "follow_us" => {
-                let _ = webbrowser::open(FOLLOW_US_LINK);
-            }
-            idstr if idstr.chars().all(char::is_numeric) => {
-                tauri::async_runtime::spawn(async move {
-                    handle_location_tray_menu(id.0, &handle).await;
-                });
-            }
-            _ => {}
         }
+        TRAY_EVENT_UPDATES => {
+            let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
+        }
+        TRAY_EVENT_COMMINITY => {
+            let _ = webbrowser::open(JOIN_COMMUNITY_LINK);
+        }
+        TRAY_EVENT_FOLLOW => {
+            let _ = webbrowser::open(FOLLOW_US_LINK);
+        }
+        id if id.chars().all(char::is_numeric) => {
+            tauri::async_runtime::spawn(async move {
+                handle_location_tray_menu(event.id.0, &handle).await;
+            });
+        }
+        _ => {}
     }
 }
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &AppTrayTheme) -> Result<(), Error> {
-    let tray_icon = app.tray_by_id(TRAY_ICON_ID).unwrap(); // FIXME: remove unwrap
+    let Some(tray_icon) = app.tray_by_id(TRAY_ICON_ID) else {
+        eprintln!("AAAAAAARRRGH!");
+        return Ok(());
+    };
     let resource_str = format!("resources/icons/tray-32x32-{theme}.png");
     debug!("Trying to load the tray icon from {resource_str}");
     if let Ok(icon_path) = app.path().resolve(&resource_str, BaseDirectory::Resource) {
