@@ -165,6 +165,13 @@ fn main() {
                 api.prevent_close();
             }
         })
+        // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let _ = app.emit(SINGLE_INSTANCE, Payload { args: argv, cwd });
         }))
@@ -253,7 +260,6 @@ fn main() {
             info!("App setup completed, log level: {log_level}");
             Ok(())
         })
-        .plugin(tauri_plugin_window_state::Builder::default().build())
         .build(tauri::generate_context!())
         .expect("Failed to build Tauri application");
 

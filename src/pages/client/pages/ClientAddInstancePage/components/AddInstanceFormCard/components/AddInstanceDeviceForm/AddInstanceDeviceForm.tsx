@@ -99,7 +99,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             (r.data as ErrorData)?.error ? `${(r.data as ErrorData).error}, ` : ''
           }`;
           error(
-            `Failed to create device check enrollment and defguard logs, details: ${details} Error status code: ${r.status}`,
+            `Failed to create device check enrollment and Defguard logs, details: ${details} Error status code: ${r.status}`,
           );
           throw Error(`Failed to create device, details: ${details}`);
         }

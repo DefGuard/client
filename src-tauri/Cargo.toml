@@ -62,8 +62,13 @@ tauri = { version = "2", features = [
     "image-png",
     "tray-icon",
 ] }
-tauri-plugin-notification = "2"
+# Must match Tauri plugins in package.json.
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
 tauri-plugin-log = "2"
+tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 thiserror = "2.0"

@@ -123,7 +123,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // There may be other set-cookies, set by e.g. a proxy
         // Get only the defguard_proxy cookie
-        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
+        const authCookie = res.headers.getSetCookie().find((cookie) =>
           cookie.startsWith('defguard_proxy='),
         );
         if (!authCookie) {

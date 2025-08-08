@@ -108,7 +108,7 @@ export const UpdateInstanceModalForm = () => {
       proxy_api_url = `${proxy_api_url}/api/v1`;
       const instance = clientInstances.find((i) => i.uuid === enrollmentData.instance.id);
       if (instance) {
-        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
+        const authCookie = res.headers.getSetCookie().find((cookie) =>
           cookie.startsWith('defguard_proxy='),
         );
         if (!authCookie) {
