@@ -10,7 +10,7 @@ use crate::{
     app_config::AppTrayTheme,
     appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
-    database::models::location::Location,
+    database::{models::location::Location, DB_POOL},
     error::Error,
     ConnectionType,
 };
@@ -183,7 +183,7 @@ struct Payload {
 async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
     match id.parse::<i64>() {
         Ok(location_id) => {
-            match Location::find_by_id(&handle.state::<AppState>().db, location_id).await {
+            match Location::find_by_id(&*DB_POOL, location_id).await {
                 Ok(Some(location)) => {
                     let active_locations_ids = handle
                         .state::<AppState>()

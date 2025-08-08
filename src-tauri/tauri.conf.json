@@ -45,7 +45,7 @@
       "signingIdentity": null
     },
     "resources": [
-      "resources/*"
+      "resources/icons/*"
     ],
     "shortDescription": "",
     "linux": {

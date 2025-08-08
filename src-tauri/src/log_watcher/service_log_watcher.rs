@@ -274,7 +274,7 @@ pub async fn spawn_log_watcher_task(
         }
     }
 
-    let name = get_tunnel_or_location_name(location_id, connection_type, &app_state).await;
+    let name = get_tunnel_or_location_name(location_id, connection_type).await;
     info!(
         "A background task has been spawned to watch the defguard service log file for \
         {connection_type} {name} (interface {interface_name}), location's specific collected logs \

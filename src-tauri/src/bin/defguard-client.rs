@@ -11,7 +11,10 @@ use defguard_client::{
     app_config::AppConfig,
     appstate::AppState,
     commands::*,
-    database::models::{location_stats::LocationStats, tunnel::TunnelStats},
+    database::{
+        models::{location_stats::LocationStats, tunnel::TunnelStats},
+        DB_POOL,
+    },
     events::SINGLE_INSTANCE,
     periodic::run_periodic_tasks,
     service,
@@ -40,8 +43,82 @@ const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "
 
 static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
-#[tokio::main]
-async fn main() {
+async fn startup(app_handle: &AppHandle) {
+    debug!("Running database migrations, if there are any.");
+    // let app_state: State<AppState> = app_handle.state();
+    sqlx::migrate!()
+        .run(&*DB_POOL)
+        .await
+        .expect("Failed to apply database migrations.");
+    debug!("Applied all database migrations that were pending. If any.");
+    debug!("Database setup has been completed successfully.");
+
+    debug!("Purging old stats from the database.");
+    if let Err(err) = LocationStats::purge(&*DB_POOL).await {
+        error!("Failed to purge location stats: {err}");
+    } else {
+        debug!("Old location stats have been purged successfully.");
+    }
+    if let Err(err) = TunnelStats::purge(&*DB_POOL).await {
+        error!("Failed to purge tunnel stats: {err}");
+    } else {
+        debug!("Old tunnel stats have been purged successfully.");
+    }
+
+    // Sync already active connections on windows.
+    // When windows is restarted, the app doesn't close the active connections
+    // and they are still running after the restart. We sync them here to
+    // reflect the real system's state.
+    // TODO: Find a way to intercept the shutdown event and close all connections
+    #[cfg(target_os = "windows")]
+    {
+        match sync_connections(&app_handle).await {
+            Ok(_) => {
+                info!(
+                    "Synchronized application's active connections with the connections \
+                    already open on the system, if there were any."
+                )
+            }
+            Err(err) => {
+                warn!(
+                "Failed to synchronize application's active connections with the connections already open on the system. \
+                The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error: {err}"
+            )
+            }
+        };
+    }
+
+    // FIXME: panic
+    // // Configure tray.
+    // debug!("Configuring tray icon.");
+    // if let Ok(app_config) = &app_state.app_config.lock() {
+    //     let _ = configure_tray_icon(&app_handle, &app_config.tray_theme);
+    //     debug!("Tray icon has been configured successfully");
+    // } else {
+    //     error!("Could not lock app config guard for tray configuration during app init.");
+    // }
+
+    // Run periodic tasks.
+    let periodic_tasks_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        run_periodic_tasks(&periodic_tasks_handle).await;
+        // One of the tasks exited, so something went wrong, quit the app
+        error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
+        let app_state: State<AppState> = periodic_tasks_handle.state();
+        app_state.quit(&periodic_tasks_handle);
+    });
+    debug!("Periodic tasks have been started");
+
+    // // Load tray menu after database initialization, so all instance and locations can be shown.
+    // debug!(
+    //     "Re-generating tray menu to show all available instances and locations as we have \
+    //     connected to the database."
+    // );
+    // reload_tray_menu(&app_handle).await;
+    // debug!("Tray menu has been re-generated successfully");
+}
+
+fn main() {
     // add bundled `wireguard-go` binary to PATH
     #[cfg(target_os = "macos")]
     {
@@ -59,8 +136,16 @@ async fn main() {
         debug!("Added binary dir {current_bin_dir:?} to PATH");
     }
 
+    // setup logging
+    // use config default if deriving from env value fails so that env can override config file
+    let config_log_level = LevelFilter::Info; // FIXME: used to be config.log_level;
+    let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
+        Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
+        Err(_) => config_log_level,
+    };
+    // info!("App setup completed, log level: {log_level}");
+
     let app = Builder::default()
-        // .manage(AppState::new(config))
         .invoke_handler(tauri::generate_handler![
             all_locations,
             save_device_config,
@@ -109,8 +194,9 @@ async fn main() {
                         "{}[{}][{}] {}",
                         tauri_plugin_log::TimezoneStrategy::UseUtc
                             .get_now()
-                            // Sets the time format. Service's logs have a subsecond part, so we also need to include it here,
-                            // otherwise the logs couldn't be sorted correctly when displayed together in the UI.
+                            // Sets the time format. Service's logs have a subsecond part, so we
+                            // also need to include it here, otherwise the logs couldn't be sorted
+                            // correctly when displayed together in the UI.
                             .format(&time::macros::format_description!(
                                 "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]"
                             ))
@@ -124,7 +210,7 @@ async fn main() {
                     Target::new(TargetKind::Stdout),
                     Target::new(TargetKind::LogDir { file_name: None }),
                 ])
-                .level(LevelFilter::Info) // FIXME
+                .level(log_level)
                 .filter(|metadata| {
                     if metadata.level() == Level::Error {
                         return true;
@@ -141,9 +227,10 @@ async fn main() {
                 })
                 .filter(|metadata| {
                     // Log all errors, warnings and infos.
-                    if metadata.level() == LevelFilter::Error
-                        || metadata.level() == LevelFilter::Warn
-                        || metadata.level() == LevelFilter::Info
+                    let level = metadata.level();
+                    if level == LevelFilter::Error
+                        || level == LevelFilter::Warn
+                        || level == LevelFilter::Info
                     {
                         return true;
                     }
@@ -158,143 +245,65 @@ async fn main() {
                 .build(),
         )
         .setup(|app| {
-            eprintln!("SETUP");
-            // prepare config
+            // Prepare `AppConfig`.
             let config = AppConfig::new(&app.app_handle());
-
-            // setup logging
-            // use config default if deriving from env value fails so that env can override config file
-            // let config_log_level = config.log_level;
-            // let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
-            //     Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
-            //     Err(_) => config_log_level,
-            // };
 
             let state = AppState::new(config);
             app.manage(state);
-
-            // info!("App setup completed, log level: {log_level}");
 
             Ok(())
         })
         .on_tray_icon_event(handle_tray_event)
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .build(tauri::generate_context!())
-        .expect("failed to build Tauri application");
+        .expect("Failed to build Tauri application");
 
     info!("Starting Defguard client version {VERSION}");
     // initialize database
-    let app_handle = app.handle().clone(); // FIXME: don't clone; maybe use `app`.
 
-    info!(
-        "The application data (database file) will be stored in: {:?} \
-        and the application logs in: {:?}. Logs of the background defguard service responsible for \
-        managing the VPN connections at the network level will be stored in: {}.",
-        // display the path to the app data directory, convert option<pathbuf> to option<&str>
-        app_handle
-            .path()
-            .app_data_dir()
-            .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into()),
-        app_handle
-            .path()
-            .app_log_dir()
-            .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()),
-        service::config::DEFAULT_LOG_DIR
-    );
+    // Handle Ctrl-C.
+    // debug!("Setting up Ctrl-C handler.");
+    // tauri::async_runtime::spawn(async move {
+    //     tokio::signal::ctrl_c()
+    //         .await
+    //         .expect("Signal handler failure");
+    //     debug!("Ctrl-C handler: quitting the app");
+    //     let app_state: State<AppState> = app_handle.state();
+    //     app_state.quit(&app_handle);
+    // });
+    // debug!("Ctrl-C handler has been set up successfully");
 
-    async fn startup(app_handle: &AppHandle) {
-        debug!("Running database migrations, if there are any.");
-        let app_state: State<AppState> = app_handle.state();
-        sqlx::migrate!()
-            .run(&app_state.db)
-            .await
-            .expect("Failed to apply database migrations");
-        debug!("Applied all database migrations that were pending. If any.");
-        debug!("Database setup has been completed successfully.");
-
-        debug!("Purging old stats from the database...");
-        if let Err(err) = LocationStats::purge(&app_state.db).await {
-            error!("Failed to purge location stats: {err}");
-        } else {
-            debug!("Old location stats have been purged successfully.");
-        }
-        if let Err(err) = TunnelStats::purge(&app_state.db).await {
-            error!("Failed to purge tunnel stats: {err}");
-        } else {
-            debug!("Old tunnel stats have been purged successfully.");
-        }
-
-        // Sync already active connections on windows.
-        // When windows is restarted, the app doesn't close the active connections
-        // and they are still running after the restart. We sync them here to
-        // reflect the real system's state.
-        // TODO: Find a way to intercept the shutdown event and close all connections
-        #[cfg(target_os = "windows")]
-        {
-            match sync_connections(&app_handle).await {
-                Ok(_) => {
-                    info!("Synchronized application's active connections with the connections already open on the system, if there were any.")
-                }
-                Err(err) => {
-                    warn!(
-                    "Failed to synchronize application's active connections with the connections already open on the system. \
-                    The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error: {err}"
-                )
-                }
-            };
-        }
-
-        // configure tray
-        debug!("Configuring tray icon...");
-        if let Ok(app_config) = &app_state.app_config.lock() {
-            let _ = configure_tray_icon(&app_handle, &app_config.tray_theme);
-            debug!("Tray icon has been configured successfully");
-        } else {
-            error!("Could not lock app config guard for tray configuration during app init.");
-        }
-
-        // run periodic tasks
-        let periodic_tasks_handle = app_handle.clone();
-        tauri::async_runtime::spawn(async move {
-            run_periodic_tasks(&periodic_tasks_handle).await;
-            // One of the tasks exited, so something went wrong, quit the app
-            error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
-            let app_state: State<AppState> = periodic_tasks_handle.state();
-            app_state.quit(&periodic_tasks_handle);
-        });
-        debug!("Periodic tasks have been started");
-
-        // load tray menu after database initialization to show all instance and locations
-        debug!("Re-generating tray menu to show all available instances and locations as we have connected to the database...");
-        reload_tray_menu(&app_handle).await;
-        debug!("Tray menu has been re-generated successfully");
-    }
-
-    // Handle Ctrl-C
-    debug!("Setting up Ctrl-C handler...");
-    tauri::async_runtime::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Signal handler failure");
-        debug!("Ctrl-C handler: quitting the app");
-        let app_state: State<AppState> = app_handle.state();
-        app_state.quit(&app_handle);
-    });
-    debug!("Ctrl-C handler has been set up successfully");
-
-    // run app
-    debug!("Starting the main application event loop...");
+    // Run application.
+    debug!("Starting the main application event loop.");
     app.run(|app_handle, event| match event {
         // Startup tasks
-        RunEvent::Ready => eprintln!("READY"),
-        // prevent shutdown on window close
+        RunEvent::Ready => {
+            info!(
+                "Application data (database file) will be stored in: {:?} and application logs in: {:?}. \
+                Logs of the background Defguard service responsible for managing VPN connections at the \
+                network level will be stored in: {}.",
+                // display the path to the app data directory, convert option<pathbuf> to option<&str>
+                app_handle
+                    .path()
+                    .app_data_dir()
+                    .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into()),
+                app_handle
+                    .path()
+                    .app_log_dir()
+                    .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()),
+                service::config::DEFAULT_LOG_DIR
+            );
+
+            tauri::async_runtime::block_on(startup(app_handle));
+        }
+        // Prevent shutdown on window close.
         RunEvent::ExitRequested { api, .. } => {
             debug!("Received exit request");
             api.prevent_exit();
         }
-        // handle shutdown
+        // Handle shutdown.
         RunEvent::Exit => {
-            debug!("Exiting the application's main event loop...");
+            debug!("Exiting the application's main event loop.");
             let app_state: State<AppState> = app_handle.state();
             app_state.quit(app_handle);
         }

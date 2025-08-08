@@ -99,7 +99,7 @@ impl AppConfig {
             Ok(patch) => {
                 app_config.apply(patch);
             }
-            // if deserialization failed, remove file and return default
+            // If deserialization fails, remove file and return the default.
             Err(err) => {
                 eprintln!(
                     "Failed to deserialize application configuration file: {err}. Using defaults."

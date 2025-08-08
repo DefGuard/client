@@ -4,41 +4,44 @@ use std::{
     env,
     fs::{create_dir_all, File},
     str::FromStr,
+    sync::LazyLock,
 };
 
-use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 
 use crate::{app_data_dir, error::Error};
 
 const DB_NAME: &str = "defguard.db";
 
-pub(crate) type DbPool = sqlx::SqlitePool;
+pub(crate) type DbPool = SqlitePool;
 
-/// Initializes the database
-pub fn init_db() -> Result<DbPool, Error> {
-    let db_url = prepare_db_url()?;
-    let opts = SqliteConnectOptions::from_str(&db_url)?
-        .auto_vacuum(sqlx::sqlite::SqliteAutoVacuum::Incremental)
-        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
+pub static DB_POOL: LazyLock<SqlitePool> = LazyLock::new(|| {
+    let db_url = prepare_db_url().expect("Wrong database URL.");
+    let opts = SqliteConnectOptions::from_str(&db_url)
+        .expect("Failed to set database connenction options.")
+        .auto_vacuum(SqliteAutoVacuum::Incremental)
+        .journal_mode(SqliteJournalMode::Wal);
     debug!("Connecting to database: {db_url} with options: {opts:?}");
-    let pool = DbPool::connect_lazy_with(opts);
+    SqlitePool::connect_lazy_with(opts)
+});
 
-    Ok(pool)
-}
-
-/// Returns database url. Checks for custom url in `DATABASE_URL` env variable.
+/// Returns database URL. Checks for custom URL in `DATABASE_URL` environment variable.
 /// Handles creating appropriate directories if they don't exist.
 fn prepare_db_url() -> Result<String, Error> {
     if let Ok(url) = env::var("DATABASE_URL") {
-        info!("The default database location has been just overridden by the DATABASE_URL environment variable. The application will use the database located at: {url}");
+        info!(
+            "The default database location has been just overridden by the DATABASE_URL \
+            environment variable. The application will use the database located at: {url}"
+        );
         Ok(url)
     } else {
         debug!("A production database will be used as no custom DATABASE_URL was provided.");
         // Check if database directory and file exists, create if they don't.
-        let app_dir = app_data_dir()
-            .ok_or(Error::Config(
-                "Application data directory is not defined. Cannot proceed. Is the application running on a supported platform?".to_string()
-            ))?;
+        let app_dir = app_data_dir().ok_or(Error::Config(
+            "Application data directory is not defined. Cannot proceed. Is the application \
+            running on a supported platform?"
+                .to_string(),
+        ))?;
         if app_dir.exists() {
             debug!(
                 "Application data directory already exists at: {}, skipping its creation.",
@@ -68,7 +71,8 @@ fn prepare_db_url() -> Result<String, Error> {
             );
             File::create(&db_path)?;
             info!(
-                "A new, empty database file has been created at: {} as no previous database file was found. This file will be used to store application data.",
+                "A new, empty database file has been created at: {} as no previous database file \
+                was found. This file will be used to store application data.",
                 db_path.to_string_lossy()
             );
         }

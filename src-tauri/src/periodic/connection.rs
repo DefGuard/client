@@ -7,11 +7,14 @@ use tokio::time::interval;
 use crate::{
     appstate::AppState,
     commands::{connect, disconnect},
-    database::models::{
-        location::Location,
-        location_stats::LocationStats,
-        tunnel::{Tunnel, TunnelStats},
-        Id,
+    database::{
+        models::{
+            location::Location,
+            location_stats::LocationStats,
+            tunnel::{Tunnel, TunnelStats},
+            Id,
+        },
+        DB_POOL,
     },
     events::{DeadConnDroppedOut, DeadConnReconnected},
     ConnectionType,
@@ -95,7 +98,7 @@ async fn disconnect_dead_connection(
 /// Only the download change is verified, as the upload change doesn't guarantee that packets are being received from the gateway.
 pub async fn verify_active_connections(app_handle: AppHandle) {
     let app_state = app_handle.state::<AppState>();
-    let pool = &app_state.db;
+    let pool = &*DB_POOL;
     debug!("Active connections verification started.");
 
     // Both vectors contain (ID, allow_reconnect) tuples.
@@ -155,7 +158,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
                                           "There wasn't any activity for Location {} since its \
                                           connection at {}; The amount of time passed since the connection \
                                           is {time_since_connection}, the connection will be terminated when it reaches \
-                                          {peer_alive_period}", 
+                                          {peer_alive_period}",
                                         con.location_id, con.start);
                                     }
                                 } else {

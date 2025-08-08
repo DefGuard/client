@@ -8,7 +8,10 @@ use tokio::time::sleep;
 use crate::{
     appstate::AppState,
     commands::{do_update_instance, locations_changed},
-    database::models::{instance::Instance, Id},
+    database::{
+        models::{instance::Instance, Id},
+        DB_POOL,
+    },
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
@@ -22,10 +25,9 @@ static POLLING_ENDPOINT: &str = "/api/v1/poll";
 /// Updates are only performed if no connections are established to the [`Instance`],
 /// otherwise event is emmited and UI message is displayed.
 pub async fn poll_config(handle: AppHandle) {
-    debug!("Starting the configuration polling loop...");
-    let state: State<AppState> = handle.state();
+    debug!("Starting the configuration polling loop.");
     loop {
-        let Ok(mut transaction) = state.db.begin().await else {
+        let Ok(mut transaction) = DB_POOL.begin().await else {
             error!(
                 "Failed to begin database transaction for config polling, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
