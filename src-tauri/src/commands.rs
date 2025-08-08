@@ -11,7 +11,7 @@ use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-static UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
+const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
@@ -64,14 +64,17 @@ pub async fn connect(
     if connection_type == ConnectionType::Location {
         if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
             debug!(
-                "Identified location with ID {location_id} as \"{}\", handling connection...",
+                "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
             handle_connection_for_location(&location, preshared_key, handle.clone()).await?;
             reload_tray_menu(&handle).await;
             info!("Connected to location {location}");
         } else {
-            error!("Location with ID {location_id} not found in the database, aborting connection attempt");
+            error!(
+                "Location with ID {location_id} not found in the database, aborting connection \
+                attempt"
+            );
             return Err(Error::NotFound);
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
@@ -112,12 +115,21 @@ pub async fn disconnect(
     let name = get_tunnel_or_location_name(location_id, connection_type).await;
     debug!("Received a command to disconnect from the {connection_type} {name}({location_id})");
 
-    debug!("Removing active connection for {connection_type} {name}({location_id}) from the application's state, if it exists...");
+    debug!(
+        "Removing active connection for {connection_type} {name}({location_id}) from the \
+        application's state, if it exists..."
+    );
     if let Some(connection) = state.remove_connection(location_id, connection_type).await {
-        debug!("Found and removed active connection from the application's state for {connection_type} {name}({location_id})");
+        debug!(
+            "Found and removed active connection from the application's state for \
+            {connection_type} {name}({location_id})"
+        );
         trace!("Connection: {connection:?}");
         disconnect_interface(&connection).await?;
-        debug!("Emitting the event informing the frontend about the disconnection from {connection_type} {name}({location_id})");
+        debug!(
+            "Emitting the event informing the frontend about the disconnection from \
+            {connection_type} {name}({location_id})"
+        );
         handle.emit(
             CONNECTION_CHANGED,
             Payload {
@@ -224,10 +236,14 @@ pub async fn save_device_config(
         .expect("Missing instance info in device config response");
     let mut instance: Instance = instance_info.into();
     if response.token.is_some() {
-        debug!("The newly saved device config has a polling token, automatic configuration polling will be possible if the core has an enterprise license.");
+        debug!(
+            "The newly saved device config has a polling token, automatic configuration \
+            polling will be possible if the core has an enterprise license."
+        );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an update, configuration polling won't work",
+            "Missing polling token for instance {}, core and/or proxy services may need an \
+            update, configuration polling won't work",
             instance.name,
         );
     }
@@ -346,7 +362,10 @@ pub async fn all_locations(
     app_state: State<'_, AppState>,
 ) -> Result<Vec<LocationInfo>, Error> {
     let Some(instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? else {
-        error!("Tried to get all locations for the instance with ID {instance_id}, but the instance was not found.");
+        error!(
+            "Tried to get all locations for the instance with ID {instance_id}, but the \
+            instance was not found."
+        );
         return Err(Error::NotFound);
     };
     trace!(
@@ -679,7 +698,8 @@ pub async fn active_connection(
     }
     trace!("Connection retrieved:\n{connection:#?}");
     debug!(
-        "Active connection information for location {name}(ID: {location_id}) has been found, returning connection information",
+        "Active connection information for location {name}(ID: {location_id}) has been found, \
+        returning connection information",
     );
     Ok(connection)
 }
@@ -738,7 +758,9 @@ pub async fn update_location_routing(
                     .ok_or(Error::NotFound)?;
                 if instance.disable_all_traffic && route_all_traffic {
                     error!(
-                        "Couldn't update location routing: instance with id {} has route_all_traffic disabled.", instance.id
+                        "Couldn't update location routing: instance with id {} has \
+                        route_all_traffic disabled.",
+                        instance.id
                     );
                     return Err(Error::InternalError(
                         "Instance has route_all_traffic disabled".into(),
@@ -798,7 +820,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     let instance_locations = Location::find_by_instance_id(&mut *transaction, instance_id).await?;
     if !instance_locations.is_empty() {
         debug!(
-            "Found locations associated with the instance {instance}, closing their connections..."
+            "Found locations associated with the instance {instance}, closing their connections."
         );
     }
     for location in instance_locations {
@@ -812,12 +834,21 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
                 endpoint: location.endpoint.clone(),
             };
             client.remove_interface(request).await.map_err(|status| {
-                    error!("Error occurred while removing interface {} for location {location}, status: {status}", connection.interface_name);
-                    Error::InternalError(format!(
-                        "There was an error while removing interface for location {location}, error message: {}. Check logs for more details.", status.message()
-                    ))
-                })?;
-            info!("The connection to location {location} has been closed, as it was associated with the instance {instance} that is being deleted.");
+                error!(
+                    "Error occurred while removing interface {} for location {location}, \
+                    status: {status}",
+                    connection.interface_name
+                );
+                Error::InternalError(format!(
+                    "There was an error while removing interface for location {location}, \
+                    error message: {}. Check logs for more details.",
+                    status.message()
+                ))
+            })?;
+            info!(
+                "The connection to location {location} has been closed, as it was associated \
+                with the instance {instance} that is being deleted."
+            );
         }
     }
     instance.delete(&mut *transaction).await?;
@@ -1034,7 +1065,10 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     request_data.insert("client_version", &app_version);
     request_data.insert("operating_system", operating_system);
 
-    debug!("Fetching latest application version, client metadata: current version: {app_version} and operating system: {operating_system}");
+    debug!(
+        "Fetching latest application version, client metadata: current version: {app_version} \
+        and operating system: {operating_system}"
+    );
 
     let client = reqwest::Client::new();
     let res = client.post(UPDATE_URL).json(&request_data).send().await;
@@ -1048,7 +1082,8 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         })?;
 
         info!(
-            "The latest release version of the application available for download is {}, it was released on {}.",
+            "The latest release version of the application available for download is {}, it was \
+            released on {}.",
             response.version, response.release_date
         );
         Ok(response)

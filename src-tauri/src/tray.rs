@@ -1,6 +1,6 @@
 use tauri::{
     image::Image,
-    menu::{MenuBuilder, MenuItem},
+    menu::{MenuBuilder, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
     tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State,
@@ -42,8 +42,42 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         None::<&str>,
     )?;
     let follow_us = MenuItem::with_id(app, "follow_us", "Follow us", true, None::<&str>)?;
+
+    // INSTANCE SECTION
+    let mut instance_menu = SubmenuBuilder::new(app, "Instances");
+    debug!("Getting all instances information for the tray menu");
+    let all_instances = all_instances(app_state.clone()).await;
+    if let Ok(instances) = all_instances {
+        let instance_count = instances.len();
+        debug!("Got {instance_count} instances to display in the tray menu");
+        for instance in instances {
+            let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
+            debug!(
+                "Found {} locations for the {} instance to display in the tray menu",
+                all_locations.len(),
+                instance
+            );
+
+            // TODO: apply icons instead of Connect/Disconnect when defguard utilizes tauri v2
+            for location in all_locations {
+                let item_name = if location.active {
+                    format!("Disconnect: {}", location.name)
+                } else {
+                    format!("Connect: {}", location.name)
+                };
+                let menu_item =
+                    MenuItem::with_id(app, location.id.to_string(), item_name, true, None::<&str>)?;
+                instance_menu = instance_menu.item(&menu_item);
+                debug!("Added new tray menu item (instance {instance}) for location: {location}");
+            }
+        }
+    } else if let Err(err) = all_instances {
+        warn!("Cannot load instance menu: {err:?}");
+    }
+
+    // Load rest of tray menu options
     let tray_menu = MenuBuilder::new(app)
-        // TODO: instances
+        .items(&[&instance_menu.build()?])
         .separator()
         .items(&[&show, &hide])
         .separator()
@@ -51,46 +85,6 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         .separator()
         .item(&quit)
         .build()?;
-
-    // INSTANCE SECTION
-    debug!("Getting all instances information for the tray menu");
-    let all_instances = all_instances(app_state).await;
-    // if let Ok(instances) = all_instances {
-    //     let instance_count = instances.len();
-    // debug!("Got {instance_count} instances to display in the tray menu");
-    //     for instance in instances {
-    //         let mut instance_menu = SystemTrayMenu::new();
-    //         let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
-    //         debug!(
-    //             "Found {} locations for the {} instance to display in the tray menu",
-    //             all_locations.len(),
-    //             instance
-    //         );
-
-    //         // TODO: apply icons instead of Connect/Disconnect when defguard utilizes tauri v2
-    //         for location in all_locations {
-    //             let item_name = if location.active {
-    //                 format!("Disconnect: {}", location.name)
-    //             } else {
-    //                 format!("Connect: {}", location.name)
-    //             };
-    //             instance_menu = instance_menu.add_item(MenuItem::with_id(
-    //                 app,
-    //                 location.id.to_string(),
-    //                 item_name,
-    //                 true,
-    //                 None,
-    //             ));
-    //             debug!("Added new tray menu item (instance {instance}) for location: {location}");
-    //         }
-    //         tray_menu = tray_menu.add_submenu(SystemTraySubmenu::new(instance.name, instance_menu));
-    //     }
-    // } else if let Err(err) = all_instances {
-    //     warn!("Cannot load instance menu: {err:?}");
-    // }
-
-    // Load rest of tray menu options
-    // TODO: move from above
 
     let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)

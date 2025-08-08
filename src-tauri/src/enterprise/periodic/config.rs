@@ -46,7 +46,7 @@ pub async fn poll_config(handle: AppHandle) {
         };
         debug!(
             "Found {} instances with a config polling token, proceeding with polling their \
-            configuration...",
+            configuration.",
             instances.len()
         );
         let mut config_retrieved = 0;
@@ -81,7 +81,10 @@ pub async fn poll_config(handle: AppHandle) {
             }
         }
         if let Err(err) = transaction.commit().await {
-            error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
+            error!(
+                "Failed to commit config polling transaction, configuration won't be updated: \
+                {err}"
+            );
         }
         if let Err(err) = handle.emit(INSTANCE_UPDATE, ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
@@ -141,12 +144,14 @@ pub async fn poll_instance(
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
-            "Instance {}({}) has enterprise features disabled, checking if this state is reflected on our end...",
+            "Instance {}({}) has enterprise features disabled, checking if this state is reflected \
+            on our end.",
             instance.name, instance.id
         );
         if instance.enterprise_enabled {
             info!(
-                "Instance {}({}) has enterprise features disabled, but we have them enabled, disabling...",
+                "Instance {}({}) has enterprise features disabled, but we have them enabled, \
+                disabling.",
                 instance.name, instance.id
             );
             instance
@@ -154,7 +159,8 @@ pub async fn poll_instance(
                 .await?;
         } else {
             debug!(
-                "Instance {}({}) has enterprise features disabled, and we have them disabled as well, no action needed",
+                "Instance {}({}) has enterprise features disabled, and we have them disabled as \
+                well, no action needed",
                 instance.name, instance.id
             );
         }
@@ -163,7 +169,7 @@ pub async fn poll_instance(
 
     // Parse the response
     debug!(
-        "Parsing the config response for instance {}...",
+        "Parsing the config response for instance {}.",
         instance.name
     );
     let response: InstanceInfoResponse = response.json().await.map_err(|err| {

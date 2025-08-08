@@ -14,7 +14,7 @@ use std::{
 };
 
 use chrono::{DateTime, NaiveDate, Utc};
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Emitter, Manager};
+use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -255,10 +255,11 @@ pub async fn spawn_log_watcher_task(
     );
 
     // spawn task
-    let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        log_watcher.run()?;
-        Ok(())
-    });
+    let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
+        tauri::async_runtime::spawn(async move {
+            log_watcher.run()?;
+            Ok(())
+        });
 
     // store `CancellationToken` to manually stop watcher thread
     // keep this in a block as we .await later, which should not be done while holding a lock like this

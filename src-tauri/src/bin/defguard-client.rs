@@ -81,9 +81,11 @@ async fn startup(app_handle: &AppHandle) {
             }
             Err(err) => {
                 warn!(
-                "Failed to synchronize application's active connections with the connections already open on the system. \
-                The connections' state in the application may not reflect system's state. Reconnect manually to reset them. Error: {err}"
-            )
+                    "Failed to synchronize application's active connections with the connections \
+                    already open on the system. \
+                    The connections' state in the application may not reflect system's state. \
+                    Reconnect manually to reset them. Error: {err}"
+                )
             }
         };
     }
@@ -109,13 +111,13 @@ async fn startup(app_handle: &AppHandle) {
     });
     debug!("Periodic tasks have been started");
 
-    // // Load tray menu after database initialization, so all instance and locations can be shown.
-    // debug!(
-    //     "Re-generating tray menu to show all available instances and locations as we have \
-    //     connected to the database."
-    // );
-    // reload_tray_menu(&app_handle).await;
-    // debug!("Tray menu has been re-generated successfully");
+    // Load tray menu after database initialization, so all instance and locations can be shown.
+    debug!(
+        "Re-generating tray menu to show all available instances and locations as we have \
+        connected to the database."
+    );
+    reload_tray_menu(&app_handle).await;
+    debug!("Tray menu has been re-generated successfully");
 }
 
 fn main() {

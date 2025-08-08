@@ -13,7 +13,7 @@ use std::{
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Emitter, Manager};
+use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -411,10 +411,12 @@ pub async fn spawn_global_log_watcher_task(
     let token_clone = token.clone();
 
     // spawn the task
-    let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?.run()?;
-        Ok(())
-    });
+    let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
+        tauri::async_runtime::spawn(async move {
+            GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?
+                .run()?;
+            Ok(())
+        });
 
     // store `CancellationToken` to manually stop watcher thread
     let mut log_watchers = app_state

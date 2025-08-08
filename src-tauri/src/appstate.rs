@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use tauri::{
-    async_runtime::{spawn, JoinHandle},
+    async_runtime::{spawn, JoinHandle, Mutex},
     AppHandle,
 };
-use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -197,11 +196,9 @@ impl AppState {
 
     /// Close all connections, then terminate the application.
     pub fn quit(&self, app_handle: &AppHandle) {
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let _ = self.close_all_connections().await;
-                app_handle.exit(0);
-            });
+        tauri::async_runtime::block_on(async {
+            let _ = self.close_all_connections().await;
+            app_handle.exit(0);
         });
     }
 }
