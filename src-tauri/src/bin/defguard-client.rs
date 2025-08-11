@@ -97,7 +97,7 @@ async fn startup(app_handle: &AppHandle) {
         error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
         periodic_tasks_handle.exit(0);
     });
-    debug!("Periodic tasks have been started");
+    debug!("Periodic tasks have been started.");
 
     // Load tray menu after database initialization, so all instance and locations can be shown.
     debug!(
@@ -105,7 +105,13 @@ async fn startup(app_handle: &AppHandle) {
         connected to the database."
     );
     reload_tray_menu(app_handle).await;
-    debug!("Tray menu has been re-generated successfully");
+    let state = app_handle.state::<AppState>();
+    let theme = &state.app_config.lock().unwrap().tray_theme;
+    match configure_tray_icon(app_handle, &theme) {
+        Ok(_) => info!("System tray configured."),
+        Err(err) => error!("Failed to configure system tray: {err}"),
+    }
+    debug!("Tray menu has been re-generated successfully.");
 }
 
 fn main() {

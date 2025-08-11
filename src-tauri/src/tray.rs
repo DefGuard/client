@@ -113,7 +113,10 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
 }
 
 pub async fn reload_tray_menu(app_handle: &AppHandle) {
-    generate_tray_menu(app_handle).await.unwrap();
+    match generate_tray_menu(app_handle).await {
+        Ok(_) => debug!("System tray menu re-generarted."),
+        Err(err) => error!("Failed to re-generate system tray menu."),
+    }
 }
 
 fn show_main_window(app: &AppHandle) {
@@ -122,13 +125,12 @@ fn show_main_window(app: &AppHandle) {
         let minimized = main_window.is_minimizable().unwrap_or_default();
         let visible = main_window.is_visible().unwrap_or_default();
         if minimized {
-            let _ = main_window.unminimize();
-            let _ = main_window.set_focus();
+            let _ = main_window.hide();
         }
         if !visible {
             let _ = main_window.show();
-            let _ = main_window.set_focus();
         }
+        let _ = main_window.set_focus();
     }
 }
 
