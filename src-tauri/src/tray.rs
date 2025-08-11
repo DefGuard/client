@@ -115,7 +115,7 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
 pub async fn reload_tray_menu(app_handle: &AppHandle) {
     match generate_tray_menu(app_handle).await {
         Ok(_) => debug!("System tray menu re-generarted."),
-        Err(err) => error!("Failed to re-generate system tray menu."),
+        Err(err) => error!("Failed to re-generate system tray menu: {err}"),
     }
 }
 
@@ -170,7 +170,7 @@ pub fn handle_tray_event(app: &AppHandle, event: MenuEvent) {
 
 pub fn configure_tray_icon(app: &AppHandle, theme: &AppTrayTheme) -> Result<(), Error> {
     let Some(tray_icon) = app.tray_by_id(TRAY_ICON_ID) else {
-        eprintln!("AAAAAAARRRGH!");
+        error!("System tray menu not initialized.");
         return Ok(());
     };
     let resource_str = format!("resources/icons/tray-32x32-{theme}.png");
