@@ -94,13 +94,13 @@ export const UpdateInstanceModalForm = () => {
       token: values.token,
     };
 
-    const res = await fetch<EnrollmentStartResponse>(endpointUrl, {
+    const res = await fetch(endpointUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const enrollmentData = res.data;
+      const enrollmentData = await res.json() as EnrollmentStartResponse;
       let proxy_api_url = values.url;
       if (proxy_api_url[proxy_api_url.length - 1] === '/') {
         proxy_api_url = proxy_api_url.slice(0, -1);
@@ -120,7 +120,7 @@ export const UpdateInstanceModalForm = () => {
           return;
         }
         headers.Cookie = authCookie;
-        const instanceInfoResponse = await fetch<CreateDeviceResponse>(
+        const instanceInfoResponse = await fetch(
           `${proxy_api_url}/enrollment/network_info`,
           {
             method: 'POST',
@@ -131,9 +131,10 @@ export const UpdateInstanceModalForm = () => {
           },
         );
         if (instanceInfoResponse.ok) {
+          const data = await instanceInfoResponse.json() as CreateDeviceResponse;
           updateInstance({
             instanceId: instance.id,
-            response: instanceInfoResponse.data,
+            response: data,
           })
             .then(() => {
               invalidateOnSuccess.forEach((k) => {

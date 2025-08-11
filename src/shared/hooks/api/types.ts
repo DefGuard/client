@@ -1,5 +1,3 @@
-import type { Response } from '@tauri-apps/plugin-http';
-
 import type { DefguardInstance } from '../../../pages/client/types';
 
 export type EmptyApiResponse = Record<string, never>;
@@ -107,11 +105,11 @@ export type NewApplicationVersionInfo = {
 // FIXME: strong types
 export type UseApi = {
   enrollment: {
-    start: (data: EnrollmentStartRequest) => Promise<Response<EnrollmentStartResponse>>;
-    activateUser: (data: ActivateUserRequest) => Promise<Response<ActivateUserResponse>>;
-    createDevice: (data: CreateDeviceRequest) => Promise<Response<CreateDeviceResponse>>;
+    start: (data: EnrollmentStartRequest) => Promise<Response>;
+    activateUser: (data: ActivateUserRequest) => Promise<Response>;
+    createDevice: (data: CreateDeviceRequest) => Promise<Response>;
   };
-  getAppInfo: () => Promise<Response<AppInfo>>;
+  getAppInfo: () => Promise<Response>;
 };
 
 export type EnrollmentError = {

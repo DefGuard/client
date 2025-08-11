@@ -1,13 +1,7 @@
 import { fetch } from '@tauri-apps/plugin-http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
-import type {
-  ActivateUserResponse,
-  AppInfo,
-  CreateDeviceResponse,
-  EnrollmentStartResponse,
-  UseApi,
-} from '../../../shared/hooks/api/types';
+import type { UseApi } from '../../../shared/hooks/api/types';
 
 export const useEnrollmentApi = (): UseApi => {
   const [proxyUrl, cookie] = useEnrollmentStore((state) => [
@@ -15,15 +9,15 @@ export const useEnrollmentApi = (): UseApi => {
     state.cookie,
   ]);
 
-  const startEnrollment: UseApi['enrollment']['start'] = async (data) => {
-    const response = await fetch<EnrollmentStartResponse>(
+  const start: UseApi['enrollment']['start'] = async (data) => {
+    const response = await fetch(
       `${proxyUrl}/enrollment/start`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Cookie: cookie,
-        },
+        } as Record<string, string>,
         body: JSON.stringify(data),
       },
     );
@@ -31,14 +25,14 @@ export const useEnrollmentApi = (): UseApi => {
   };
 
   const activateUser: UseApi['enrollment']['activateUser'] = async (data) => {
-    const response = await fetch<ActivateUserResponse>(
+    const response = await fetch(
       `${proxyUrl}/enrollment/activate_user`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Cookie: cookie,
-        },
+        } as Record<string, string>,
         body: JSON.stringify(data),
       },
     );
@@ -47,14 +41,14 @@ export const useEnrollmentApi = (): UseApi => {
   };
 
   const createDevice: UseApi['enrollment']['createDevice'] = async (data) => {
-    const response = await fetch<CreateDeviceResponse>(
+    const response = await fetch(
       `${proxyUrl}/enrollment/create_device`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Cookie: cookie,
-        },
+        } as Record<string, string>,
         body: JSON.stringify(data),
       },
     );
@@ -63,12 +57,12 @@ export const useEnrollmentApi = (): UseApi => {
   };
 
   const getAppInfo: UseApi['getAppInfo'] = async () => {
-    const response = await fetch<AppInfo>(`${proxyUrl}/info`, {
+    const response = await fetch(`${proxyUrl}/info`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
-      },
+      } as Record<string, string>,
     });
 
     return response;
@@ -76,7 +70,7 @@ export const useEnrollmentApi = (): UseApi => {
 
   return {
     enrollment: {
-      start: startEnrollment,
+      start,
       activateUser,
       createDevice,
     },
