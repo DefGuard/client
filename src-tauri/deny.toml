@@ -72,22 +72,19 @@ feature-depth = 1
 ignore = [
     { id = "RUSTSEC-2024-0429", reason = "https://github.com/tauri-apps/tauri/issues/12048" },
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained netlink dependency" },
-
-    # The "unmaintained" advisories below stem from our use of Tauri v1, which
+    # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
-    # These issues are expected to be resolved once we migrate to Tauri v2.
-    { id = "RUSTSEC-2024-0415", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0370", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0384", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0419", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0420", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0411", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0418", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0412", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0388", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0416", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0413", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0414", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0411", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0412", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0413", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0415", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0416", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0414", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0417", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0418", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0419", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0420", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
