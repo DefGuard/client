@@ -109,7 +109,7 @@ allow = [
     "MPL-2.0",
     "BSD-3-Clause",
     "Unicode-3.0",
-    "Unicode-DFS-2016", # unicode-ident
+    "Unicode-DFS-2016",               # unicode-ident
     "Zlib",
     "ISC",
     "BSL-1.0",
@@ -126,8 +126,12 @@ confidence-threshold = 0.8
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
-    { allow = ["AGPL-3.0"], crate = "common" },
-    { allow = ["AGPL-3.0"], crate = "defguard-client" },
+    { allow = [
+        "AGPL-3.0",
+    ], crate = "common" },
+    { allow = [
+        "AGPL-3.0",
+    ], crate = "defguard-client" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
@@ -247,11 +251,6 @@ unknown-git = "warn"
 # List of URLs for allowed crate registries. Defaults to the crates.io index
 # if not specified. If it is specified but empty, no registries are allowed.
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# List of URLs for allowed Git repositories
-allow-git = [
-  "https://github.com/DefGuard/wireguard-rs",
-  "https://github.com/tauri-apps/plugins-workspace",
-]
 
 [sources.allow-org]
 # github.com organizations to allow git sources for
