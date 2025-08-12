@@ -107,8 +107,8 @@ async fn startup(app_handle: &AppHandle) {
     reload_tray_menu(app_handle).await;
     let state = app_handle.state::<AppState>();
     let theme = &state.app_config.lock().unwrap().tray_theme;
-    match configure_tray_icon(app_handle, &theme) {
-        Ok(_) => info!("System tray configured."),
+    match configure_tray_icon(app_handle, theme) {
+        Ok(()) => info!("System tray configured."),
         Err(err) => error!("Failed to configure system tray: {err}"),
     }
     debug!("Tray menu has been re-generated successfully.");
@@ -166,7 +166,7 @@ fn main() {
                 let _ = window.hide();
 
                 #[cfg(target_os = "macos")]
-                let _ = tauri::AppHandle::hide(&window.app_handle());
+                let _ = tauri::AppHandle::hide(window.app_handle());
 
                 api.prevent_close();
             }
@@ -185,7 +185,7 @@ fn main() {
             let app_handle = app.app_handle();
 
             // Prepare `AppConfig`.
-            let config = AppConfig::new(&app_handle);
+            let config = AppConfig::new(app_handle);
 
             // Setup logging.
 
@@ -255,7 +255,7 @@ fn main() {
 
             // Configure tray.
             debug!("Configuring tray icon.");
-            match configure_tray_icon(&app_handle, &config.tray_theme) {
+            match configure_tray_icon(app_handle, &config.tray_theme) {
                 Ok(()) => debug!("Tray icon has been configured successfully"),
                 Err(err) => error!("Failed to configure tray icon: {err}"),
             }
