@@ -5,18 +5,18 @@ on:
     branches:
       - main
       - dev
-      - 'release/**'
+      - "release/**"
     paths-ignore:
-      - '*.md'
-      - 'LICENSE'
+      - "*.md"
+      - "LICENSE"
   pull_request:
     branches:
       - main
       - dev
-      - 'release/**'
+      - "release/**"
     paths-ignore:
-      - '*.md'
-      - 'LICENSE'
+      - "*.md"
+      - "LICENSE"
 
 env:
   CARGO_TERM_COLOR: always
@@ -41,7 +41,7 @@ jobs:
       - name: Install required packages
         run: |
           apt-get update
-          apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
+          apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip
       - name: Install protobuf compiler
         run: |
           PB_REL='https://github.com/protocolbuffers/protobuf/releases'
