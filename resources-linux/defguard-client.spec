@@ -5,7 +5,7 @@ Summary:  Defguard desktop client
 
 License:  Apache-2.0
 URL:      https://defguard.net/
-Requires: libappindicator-gtk3 webkit2gtk4.0
+Requires: libayatana-appindicator3-dev webkit2gtk4.1
 
 %description
 Desktop client for managing WireGuard VPN connections

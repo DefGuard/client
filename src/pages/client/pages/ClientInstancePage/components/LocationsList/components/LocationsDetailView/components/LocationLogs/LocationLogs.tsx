@@ -1,12 +1,11 @@
 import './style.scss';
 
-import { clipboard } from '@tauri-apps/api';
-import { save } from '@tauri-apps/api/dialog';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { writeTextFile } from '@tauri-apps/api/fs';
+import * as clipboard from '@tauri-apps/plugin-clipboard-manager';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
-
 import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
 import { ActionButtonVariant } from '../../../../../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';

@@ -1,32 +1,22 @@
 use std::collections::{HashMap, HashSet};
 
-use tauri::{
-    async_runtime::{spawn, JoinHandle},
-    AppHandle,
-};
-use tokio::sync::Mutex;
+use tauri::async_runtime::{spawn, JoinHandle, Mutex};
 use tokio_util::sync::CancellationToken;
-use tonic::transport::Channel;
 
 use crate::{
     app_config::AppConfig,
     database::{
-        init_db,
         models::{connection::ActiveConnection, instance::Instance, location::Location, Id},
-        DbPool,
+        DB_POOL,
     },
     error::Error,
-    service::{
-        proto::desktop_daemon_service_client::DesktopDaemonServiceClient, utils::setup_client,
-    },
+    service::utils::DAEMON_CLIENT,
     utils::{disconnect_interface, stats_handler},
     ConnectionType,
 };
 
 pub struct AppState {
-    pub db: DbPool,
     pub active_connections: Mutex<Vec<ActiveConnection>>,
-    pub client: DesktopDaemonServiceClient<Channel>,
     pub log_watchers: std::sync::Mutex<HashMap<String, CancellationToken>>,
     pub app_config: std::sync::Mutex<AppConfig>,
     stat_threads: std::sync::Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
@@ -36,9 +26,7 @@ impl AppState {
     #[must_use]
     pub fn new(config: AppConfig) -> Self {
         AppState {
-            db: init_db().expect("Failed to initalize database"),
             active_connections: Mutex::new(Vec::new()),
-            client: setup_client().expect("Failed to setup gRPC client"),
             log_watchers: std::sync::Mutex::new(HashMap::new()),
             app_config: std::sync::Mutex::new(config),
             stat_threads: std::sync::Mutex::new(HashMap::new()),
@@ -61,10 +49,10 @@ impl AppState {
 
         debug!("Spawning thread for network statistics for location ID {location_id}");
         let handle = spawn(stats_handler(
-            self.db.clone(),
+            DB_POOL.clone(),
             ifname,
             connection_type,
-            self.client.clone(),
+            DAEMON_CLIENT.clone(),
         ));
         let Some(old_handle) = self
             .stat_threads
@@ -138,7 +126,7 @@ impl AppState {
         connection_ids
     }
 
-    pub(crate) async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
+    pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
         debug!("Closing all active connections");
         let active_connections = self.active_connections.lock().await;
         let active_connections_count = active_connections.len();
@@ -150,7 +138,7 @@ impl AppState {
             );
             trace!("Connection: {connection:#?}");
             debug!("Removing interface {}", connection.interface_name);
-            disconnect_interface(connection, self).await?;
+            disconnect_interface(connection).await?;
         }
         if active_connections_count > 0 {
             info!("All active connections ({active_connections_count}) have been closed.");
@@ -188,7 +176,7 @@ impl AppState {
         &self,
         instance: &Instance<Id>,
     ) -> Result<Vec<ActiveConnection>, Error> {
-        let locations: HashSet<Id> = Location::find_by_instance_id(&self.db, instance.id)
+        let locations: HashSet<Id> = Location::find_by_instance_id(&*DB_POOL, instance.id)
             .await?
             .iter()
             .map(|location| location.id)
@@ -201,15 +189,5 @@ impl AppState {
             .filter(|connection| locations.contains(&connection.location_id))
             .cloned()
             .collect())
-    }
-
-    /// Close all connections, then terminate the application.
-    pub fn quit(&self, app_handle: &AppHandle) {
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let _ = self.close_all_connections().await;
-                app_handle.exit(0);
-            });
-        });
     }
 }

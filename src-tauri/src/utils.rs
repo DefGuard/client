@@ -3,7 +3,7 @@ use std::{env, path::Path, process::Command, str::FromStr};
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tonic::{transport::Channel, Code};
 use tracing::Level;
 #[cfg(target_os = "windows")]
@@ -26,14 +26,17 @@ use crate::{
             wireguard_keys::WireguardKeys,
             Id,
         },
-        DbPool,
+        DbPool, DB_POOL,
     },
     error::Error,
     events::CONNECTION_CHANGED,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    service::proto::{
-        desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
-        ReadInterfaceDataRequest, RemoveInterfaceRequest,
+    service::{
+        proto::{
+            desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
+            ReadInterfaceDataRequest, RemoveInterfaceRequest,
+        },
+        utils::DAEMON_CLIENT,
     },
     ConnectionType,
 };
@@ -623,8 +626,8 @@ pub(crate) async fn handle_connection_for_location(
         location,
         interface_name.clone(),
         preshared_key,
-        &state.db,
-        state.client.clone(),
+        &DB_POOL,
+        DAEMON_CLIENT.clone(),
     )
     .await?;
     state
@@ -632,7 +635,7 @@ pub(crate) async fn handle_connection_for_location(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit_all(
+    handle.emit(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
@@ -663,13 +666,13 @@ pub(crate) async fn handle_connection_for_tunnel(
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
     let interface_name = get_interface_name(&tunnel.name);
-    setup_interface_tunnel(tunnel, interface_name.clone(), state.client.clone()).await?;
+    setup_interface_tunnel(tunnel, interface_name.clone(), DAEMON_CLIENT.clone()).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit_all(
+    handle.emit(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
@@ -719,19 +722,18 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
 /// Helper function to remove interface and close connection
 pub(crate) async fn disconnect_interface(
     active_connection: &ActiveConnection,
-    state: &AppState,
 ) -> Result<(), Error> {
     debug!(
-        "Disconnecting interface {}...",
+        "Disconnecting interface {}.",
         active_connection.interface_name
     );
-    let mut client = state.client.clone();
+    let mut client = DAEMON_CLIENT.clone();
     let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
     match active_connection.connection_type {
         ConnectionType::Location => {
-            let Some(location) = Location::find_by_id(&state.db, location_id).await? else {
+            let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
                 error!(
                     "Error while disconnecting interface {interface_name}, location with ID \
                     {location_id} not found"
@@ -765,7 +767,7 @@ pub(crate) async fn disconnect_interface(
                 return Err(Error::InternalError(msg));
             }
             let connection: Connection = active_connection.into();
-            let connection = connection.save(&state.db).await?;
+            let connection = connection.save(&*DB_POOL).await?;
             debug!(
                 "Saved location {} new connection status in the database",
                 location.name
@@ -778,7 +780,7 @@ pub(crate) async fn disconnect_interface(
             debug!("Finished disconnecting from location {}", location.name);
         }
         ConnectionType::Tunnel => {
-            let Some(tunnel) = Tunnel::find_by_id(&state.db, location_id).await? else {
+            let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? else {
                 error!(
                     "Error while disconnecting interface {interface_name}, tunnel with ID \
                     {location_id} not found"
@@ -826,7 +828,7 @@ pub(crate) async fn disconnect_interface(
                 );
             }
             let connection: TunnelConnection = active_connection.into();
-            let connection = connection.save(&state.db).await?;
+            let connection = connection.save(&*DB_POOL).await?;
             debug!(
                 "Saved new tunnel {} connection status in the database",
                 tunnel.name
@@ -846,17 +848,13 @@ pub(crate) async fn disconnect_interface(
 /// Helper function to get the name of a tunnel or location by its ID
 /// Returns the name of the tunnel or location if it exists, otherwise "UNKNOWN"
 /// This is for logging purposes.
-pub async fn get_tunnel_or_location_name(
-    id: Id,
-    connection_type: ConnectionType,
-    appstate: &AppState,
-) -> String {
+pub async fn get_tunnel_or_location_name(id: Id, connection_type: ConnectionType) -> String {
     let name = match connection_type {
-        ConnectionType::Location => Location::find_by_id(&appstate.db, id)
+        ConnectionType::Location => Location::find_by_id(&*DB_POOL, id)
             .await
             .ok()
             .and_then(|l| l.map(|l| l.name)),
-        ConnectionType::Tunnel => Tunnel::find_by_id(&appstate.db, id)
+        ConnectionType::Tunnel => Tunnel::find_by_id(&*DB_POOL, id)
             .await
             .ok()
             .and_then(|t| t.map(|t| t.name)),
@@ -882,7 +880,7 @@ async fn check_connection(
     id: Id,
     name: &str,
     connection_type: ConnectionType,
-    app_handle: AppHandle,
+    app_handle: &AppHandle,
 ) -> Result<(), Error> {
     let appstate = app_handle.state::<AppState>();
     let interface_name = get_interface_name(name);
@@ -943,7 +941,7 @@ async fn check_connection(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    app_handle.emit_all(
+    app_handle.emit(
         CONNECTION_CHANGED,
         Payload {
             message: "Created new connection".into(),
@@ -972,8 +970,7 @@ async fn check_connection(
 #[cfg(target_os = "windows")]
 pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
-    let appstate = app_handle.state::<AppState>();
-    let all_locations = Location::all(&appstate.db).await?;
+    let all_locations = Location::all(&*DB_POOL).await?;
     let service_manager =
         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(
             |err| {
@@ -999,20 +996,20 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
             location.id,
             &location.name,
             ConnectionType::Location,
-            app_handle.clone(),
+            app_handle,
         )
         .await?;
     }
 
     debug!("Synchronizing active connections for tunnels...");
     // Do the same for tunnels
-    for tunnel in Tunnel::all(&appstate.db).await? {
+    for tunnel in Tunnel::all(&*DB_POOL).await? {
         check_connection(
             &service_manager,
             tunnel.id,
             &tunnel.name,
             ConnectionType::Tunnel,
-            app_handle.clone(),
+            app_handle,
         )
         .await?;
     }

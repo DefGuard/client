@@ -2,13 +2,13 @@ import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
+import { error } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
-import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -118,16 +118,17 @@ export const MFAModal = () => {
       location_id: location.network_id,
     };
 
-    const response = await fetch<MFAStartResponse>(mfaStartUrl, {
+    const response = await fetch(mfaStartUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: Body.json(data),
+      body: JSON.stringify(data),
     });
 
     if (response.ok) {
-      const { token } = response.data;
+      const data = await response.json() as MFAStartResponse;
+      const { token } = data;
 
       switch (selectedMethod) {
         case 0:
@@ -145,16 +146,16 @@ export const MFAModal = () => {
       }
       setMFAToken(token);
 
-      return response.data;
+      return data;
     } else {
-      const errorData = (response.data as unknown as MFAError).error;
+      const errorData = (await response.json() as unknown as MFAError).error;
       error(`MFA failed to start with the following error: ${errorData}`);
       if (selectedMethod === 2) {
         setScreen('openid_unavailable');
         return;
       }
 
-      if (errorData === 'selected MFA method not available') {
+      if (errorData === 'selected MFA method is not available') {
         toaster.error(localLL.errors.mfaNotConfigured());
       } else {
         toaster.error(localLL.errors.mfaStartGeneric());
@@ -417,15 +418,15 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
         return;
       }
 
-      const data = { token };
-      const response = await fetch<MFAFinishResponse>(
+      const body_token = { token };
+      const response = await fetch(
         `${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: Body.json(data),
+          body: JSON.stringify(body_token),
         },
       );
 
@@ -433,11 +434,11 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
         clearInterval(interval);
         clearTimeout(timeoutId);
         closeModal();
-
+        const data = await response.json() as MFAFinishResponse;
         await connect({
           locationId: location?.id,
           connectionType: location.connection_type,
-          presharedKey: response.data.preshared_key,
+          presharedKey: data.preshared_key,
         });
         return;
       }
@@ -450,16 +451,17 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       // Other errors: stop polling and handle
       clearInterval(interval);
       clearTimeout(timeoutId);
-      const { error: errorMessage } = response.data as unknown as MFAError;
+      const data = await response.json() as unknown as MFAError;
+      const { error: errorMessage } = data;
 
       if (errorMessage === 'invalid token') {
-        error(JSON.stringify(response.data, null, 2));
+        error(JSON.stringify(data, null, 2));
         setErrorMessage(localLL.errors.tokenExpired());
       } else if (errorMessage === 'login session not found') {
-        error(JSON.stringify(response.data, null, 2));
+        error(JSON.stringify(data, null, 2));
         setErrorMessage(localLL.errors.sessionInvalidated());
       } else {
-        error(JSON.stringify(response.data, null, 2));
+        error(JSON.stringify(data, null, 2));
         setErrorMessage(localLL.errors.mfaStartGeneric());
       }
     };
@@ -540,27 +542,28 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
 
     const data = { token, code: code };
 
-    const response = await fetch<MFAFinishResponse>(
+    const response = await fetch(
       `${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: Body.json(data),
+        body: JSON.stringify(data),
       },
     );
 
     if (response.ok) {
       closeModal();
-
+      const data = await response.json() as MFAFinishResponse;
       await connect({
         locationId: location?.id,
         connectionType: location.connection_type,
-        presharedKey: response.data.preshared_key,
+        presharedKey: data.preshared_key,
       });
     } else {
-      const { error: errorMessage } = response.data as unknown as MFAError;
+      const data = await response.json() as unknown as MFAError;
+      const { error: errorMessage } = data;
       let message = '';
 
       if (errorMessage === 'Unauthorized') {
@@ -569,17 +572,17 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         errorMessage === 'invalid token' ||
         errorMessage === 'login session not found'
       ) {
-        console.error(response.data);
+        console.error(data);
         toaster.error(localLL.errors.tokenExpired());
         resetState();
-        error(JSON.stringify(response.data));
+        error(JSON.stringify(data));
         return;
       } else {
         toaster.error(localLL.errors.mfaStartGeneric());
       }
 
       setMFAError(message);
-      error(JSON.stringify(response.data));
+      error(JSON.stringify(data));
       return;
     }
   };

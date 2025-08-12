@@ -1,7 +1,7 @@
-import { invoke } from '@tauri-apps/api';
-import type { InvokeArgs } from '@tauri-apps/api/tauri';
+import type { InvokeArgs } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+import { debug, error, trace } from '@tauri-apps/plugin-log';
 import pTimeout, { TimeoutError } from 'p-timeout';
-import { debug, error, trace } from 'tauri-plugin-log-api';
 
 import type { NewApplicationVersionInfo } from '../../../shared/hooks/api/types';
 import type {

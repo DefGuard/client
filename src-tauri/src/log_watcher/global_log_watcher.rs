@@ -13,7 +13,7 @@ use std::{
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
+use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -40,13 +40,9 @@ impl LogDirs {
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
         debug!("Getting log directories for service and client to watch.");
         let service_log_dir = get_service_log_dir().to_path_buf();
-        let client_log_dir =
-            handle
-                .path_resolver()
-                .app_log_dir()
-                .ok_or(LogWatcherError::LogPathError(
-                    "Path to client logs directory is empty.".to_string(),
-                ))?;
+        let client_log_dir = handle.path().app_log_dir().map_err(|_| {
+            LogWatcherError::LogPathError("Path to client logs directory is empty.".to_string())
+        })?;
         debug!(
             "Log directories of service and client have been identified by the global log watcher: \
             {service_log_dir:?} and {client_log_dir:?}"
@@ -280,7 +276,7 @@ impl GlobalLogWatcher {
             if !parsed_lines.is_empty() {
                 parsed_lines.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
                 trace!("Emitting parsed lines for the frontend");
-                self.handle.emit_all(&self.event_topic, &parsed_lines)?;
+                self.handle.emit(&self.event_topic, &parsed_lines)?;
                 trace!("Emitted {} lines to the frontend", parsed_lines.len());
                 parsed_lines.clear();
             }
@@ -415,10 +411,12 @@ pub async fn spawn_global_log_watcher_task(
     let token_clone = token.clone();
 
     // spawn the task
-    let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?.run()?;
-        Ok(())
-    });
+    let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
+        tauri::async_runtime::spawn(async move {
+            GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?
+                .run()?;
+            Ok(())
+        });
 
     // store `CancellationToken` to manually stop watcher thread
     let mut log_watchers = app_state

@@ -1,13 +1,13 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch, type Response } from '@tauri-apps/api/http';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
+import { fetch } from '@tauri-apps/plugin-http';
+import { debug, error, info } from '@tauri-apps/plugin-log';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
@@ -96,17 +96,16 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     };
 
     setIsLoading(true);
-    fetch<EnrollmentStartResponse>(endpointUrl, {
+    fetch(endpointUrl, {
       method: 'POST',
       headers,
-      body: Body.json(data),
+      body: JSON.stringify(data),
     })
-      .then(async (res: Response<EnrollmentStartResponse | EnrollmentError>) => {
+      .then(async (res: Response) => {
         if (!res.ok) {
           setIsLoading(false);
-          error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
-          const errorMessage = (res.data as EnrollmentError).error;
+          const errorMessage = (await res.json() as EnrollmentError).error;
 
           switch (errorMessage) {
             case 'token expired': {
@@ -123,7 +122,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // There may be other set-cookies, set by e.g. a proxy
         // Get only the defguard_proxy cookie
-        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
+        const authCookie = res.headers.getSetCookie().find((cookie) =>
           cookie.startsWith('defguard_proxy='),
         );
         if (!authCookie) {
@@ -140,7 +139,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           );
         }
         debug('Response received with status OK');
-        const r = res.data as EnrollmentStartResponse;
+        const r = await res.json() as EnrollmentStartResponse;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
         const instance = clientInstances.find((i) => i.uuid === r.instance.id);
@@ -155,16 +154,16 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           debug('Instance already exists, fetching update');
           // update already registered instance instead
           headers.Cookie = authCookie;
-          fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
+          fetch(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
-            body: Body.json({
+            body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
           }).then(async (res) => {
             invoke<void>('update_instance', {
               instanceId: instance.id,
-              response: res.data,
+              response: await res.json() as CreateDeviceResponse,
             })
               .then(() => {
                 info('Configured device');

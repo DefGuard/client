@@ -3,8 +3,9 @@
 use std::{fmt, path::PathBuf};
 
 use chrono::NaiveDateTime;
-use database::models::NoId;
 use serde::{Deserialize, Serialize};
+
+use self::database::models::{Id, NoId};
 
 pub mod app_config;
 pub mod appstate;
@@ -65,7 +66,7 @@ pub mod proto {
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 // This must match tauri.bundle.identifier from tauri.conf.json.
-static BUNDLE_IDENTIFIER: &str = "net.defguard";
+const BUNDLE_IDENTIFIER: &str = "net.defguard";
 // Returns the path to the user’s data directory.
 #[must_use]
 pub fn app_data_dir() -> Option<PathBuf> {
@@ -91,13 +92,11 @@ impl fmt::Display for ConnectionType {
 #[macro_use]
 extern crate log;
 
-use self::database::models::Id;
-
 /// Common fields for Tunnel and Location
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommonWireguardFields {
     pub instance_id: Id,
-    // Native id of network from defguard
+    // Native network ID from Defguard Core.
     pub network_id: Id,
     pub name: String,
     pub address: String,

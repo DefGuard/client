@@ -26,7 +26,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2", features = [] }
 tonic-prost-build = { version = "0.14" }
 vergen-git2 = { version = "1.0", features = ["build"] }
 
@@ -57,20 +57,20 @@ sqlx = { version = "0.8", features = [
 ] }
 struct-patch = "0.10"
 strum = { version = "0.27", features = ["derive"] }
-tauri = { version = "1.8", features = [
-    "notification-all",
-    "dialog-all",
-    "clipboard-all",
-    "http-all",
-    "window-all",
-    "system-tray",
+tauri = { version = "2", features = [
     "native-tls-vendored",
-    "icon-png",
-    "fs-all",
+    "image-png",
+    "tray-icon",
 ] }
-tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
+# Must match Tauri plugins in package.json.
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
+tauri-plugin-log = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
 thiserror = "2.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }

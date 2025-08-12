@@ -2,13 +2,16 @@ use std::{str::FromStr, time::Duration};
 
 use reqwest::{Client, StatusCode};
 use sqlx::{Sqlite, Transaction};
-use tauri::{AppHandle, Manager, State, Url};
+use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tokio::time::sleep;
 
 use crate::{
     appstate::AppState,
     commands::{do_update_instance, locations_changed},
-    database::models::{instance::Instance, Id},
+    database::{
+        models::{instance::Instance, Id},
+        DB_POOL,
+    },
     error::Error,
     events::{CONFIG_CHANGED, INSTANCE_UPDATE},
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
@@ -22,10 +25,9 @@ static POLLING_ENDPOINT: &str = "/api/v1/poll";
 /// Updates are only performed if no connections are established to the [`Instance`],
 /// otherwise event is emmited and UI message is displayed.
 pub async fn poll_config(handle: AppHandle) {
-    debug!("Starting the configuration polling loop...");
-    let state: State<AppState> = handle.state();
+    debug!("Starting the configuration polling loop.");
     loop {
-        let Ok(mut transaction) = state.db.begin().await else {
+        let Ok(mut transaction) = DB_POOL.begin().await else {
             error!(
                 "Failed to begin database transaction for config polling, retrying in {}s",
                 INTERVAL_SECONDS.as_secs()
@@ -44,7 +46,7 @@ pub async fn poll_config(handle: AppHandle) {
         };
         debug!(
             "Found {} instances with a config polling token, proceeding with polling their \
-            configuration...",
+            configuration.",
             instances.len()
         );
         let mut config_retrieved = 0;
@@ -79,9 +81,12 @@ pub async fn poll_config(handle: AppHandle) {
             }
         }
         if let Err(err) = transaction.commit().await {
-            error!("Failed to commit config polling transaction, configuration won't be updated: {err}");
+            error!(
+                "Failed to commit config polling transaction, configuration won't be updated: \
+                {err}"
+            );
         }
-        if let Err(err) = handle.emit_all(INSTANCE_UPDATE, ()) {
+        if let Err(err) = handle.emit(INSTANCE_UPDATE, ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
         }
         if config_retrieved > 0 {
@@ -139,12 +144,14 @@ pub async fn poll_instance(
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
-            "Instance {}({}) has enterprise features disabled, checking if this state is reflected on our end...",
+            "Instance {}({}) has enterprise features disabled, checking if this state is reflected \
+            on our end.",
             instance.name, instance.id
         );
         if instance.enterprise_enabled {
             info!(
-                "Instance {}({}) has enterprise features disabled, but we have them enabled, disabling...",
+                "Instance {}({}) has enterprise features disabled, but we have them enabled, \
+                disabling.",
                 instance.name, instance.id
             );
             instance
@@ -152,7 +159,8 @@ pub async fn poll_instance(
                 .await?;
         } else {
             debug!(
-                "Instance {}({}) has enterprise features disabled, and we have them disabled as well, no action needed",
+                "Instance {}({}) has enterprise features disabled, and we have them disabled as \
+                well, no action needed",
                 instance.name, instance.id
             );
         }
@@ -161,7 +169,7 @@ pub async fn poll_instance(
 
     // Parse the response
     debug!(
-        "Parsing the config response for instance {}...",
+        "Parsing the config response for instance {}.",
         instance.name
     );
     let response: InstanceInfoResponse = response.json().await.map_err(|err| {
@@ -209,7 +217,7 @@ pub async fn poll_instance(
             "Emitting config-changed event for instance {}({})",
             instance.name, instance.id,
         );
-        let _ = handle.emit_all(CONFIG_CHANGED, &instance.name);
+        let _ = handle.emit(CONFIG_CHANGED, &instance.name);
         info!(
             "Emitted config-changed event for instance {}({})",
             instance.name, instance.id,

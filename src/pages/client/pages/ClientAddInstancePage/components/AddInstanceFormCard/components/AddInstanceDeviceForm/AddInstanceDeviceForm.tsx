@@ -1,11 +1,11 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
+import { error } from '@tauri-apps/plugin-log';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
@@ -90,20 +90,19 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
     try {
       await fetch(`${proxyUrl}/enrollment/create_device`, {
         headers,
-        body: Body.json(data),
+        body: JSON.stringify(data),
         method: 'POST',
-      }).then((r) => {
+      }).then(async (r) => {
         if (!r.ok) {
           setIsLoading(false);
-          const details = `${
-            (r.data as ErrorData)?.error ? `${(r.data as ErrorData).error}, ` : ''
-          }`;
+          const data = await r.json() as ErrorData;
+          const details = `${data?.error ? `${data.error}, ` : ''}`;
           error(
-            `Failed to create device check enrollment and defguard logs, details: ${details} Error status code: ${r.status}`,
+            `Failed to create device check enrollment and Defguard logs, details: ${details} Error status code: ${r.status} `,
           );
-          throw Error(`Failed to create device, details: ${details}`);
+          throw Error(`Failed to create device, details: ${details} `);
         }
-        const deviceResp = r.data as CreateDeviceResponse;
+        const deviceResp = await r.json() as CreateDeviceResponse;
         saveConfig({
           privateKey: privateKey,
           response: deviceResp,
