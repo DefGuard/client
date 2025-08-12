@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Mutex};
 
 use tauri::async_runtime::{spawn, JoinHandle};
 use tokio_util::sync::CancellationToken;
@@ -16,18 +16,18 @@ use crate::{
 };
 
 pub struct AppState {
-    pub log_watchers: std::sync::Mutex<HashMap<String, CancellationToken>>,
-    pub app_config: std::sync::Mutex<AppConfig>,
-    stat_threads: std::sync::Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
+    pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
+    pub app_config: Mutex<AppConfig>,
+    stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
 }
 
 impl AppState {
     #[must_use]
     pub fn new(config: AppConfig) -> Self {
         AppState {
-            log_watchers: std::sync::Mutex::new(HashMap::new()),
-            app_config: std::sync::Mutex::new(config),
-            stat_threads: std::sync::Mutex::new(HashMap::new()),
+            log_watchers: Mutex::new(HashMap::new()),
+            app_config: Mutex::new(config),
+            stat_threads: Mutex::new(HashMap::new()),
         }
     }
 
