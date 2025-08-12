@@ -880,7 +880,7 @@ async fn check_connection(
     id: Id,
     name: &str,
     connection_type: ConnectionType,
-    app_handle: AppHandle,
+    app_handle: &AppHandle,
 ) -> Result<(), Error> {
     let appstate = app_handle.state::<AppState>();
     let interface_name = get_interface_name(name);
@@ -970,8 +970,7 @@ async fn check_connection(
 #[cfg(target_os = "windows")]
 pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
-    let appstate = app_handle.state::<AppState>();
-    let all_locations = Location::all(&appstate.db).await?;
+    let all_locations = Location::all(&*DB_POOL).await?;
     let service_manager =
         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(
             |err| {
@@ -997,20 +996,20 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
             location.id,
             &location.name,
             ConnectionType::Location,
-            app_handle.clone(),
+            app_handle,
         )
         .await?;
     }
 
     debug!("Synchronizing active connections for tunnels...");
     // Do the same for tunnels
-    for tunnel in Tunnel::all(&appstate.db).await? {
+    for tunnel in Tunnel::all(&*DB_POOL).await? {
         check_connection(
             &service_manager,
             tunnel.id,
             &tunnel.name,
             ConnectionType::Tunnel,
-            app_handle.clone(),
+            app_handle,
         )
         .await?;
     }
