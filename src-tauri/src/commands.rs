@@ -14,6 +14,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
+    active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
@@ -293,7 +294,7 @@ pub async fn save_device_config(
 }
 
 #[tauri::command(async)]
-pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<InstanceInfo<Id>>, Error> {
+pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     debug!("Getting information about all instances.");
     let instances = Instance::all(&*DB_POOL).await?;
     trace!(
@@ -302,9 +303,7 @@ pub async fn all_instances(app_state: State<'_, AppState>) -> Result<Vec<Instanc
     );
     trace!("Instances found: {instances:#?}");
     let mut instance_info = Vec::new();
-    let connection_ids = app_state
-        .get_connection_id_by_type(ConnectionType::Location)
-        .await;
+    let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
         let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
         let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
@@ -357,10 +356,7 @@ impl fmt::Display for LocationInfo {
 }
 
 #[tauri::command(async)]
-pub async fn all_locations(
-    instance_id: Id,
-    app_state: State<'_, AppState>,
-) -> Result<Vec<LocationInfo>, Error> {
+pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> {
     let Some(instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? else {
         error!(
             "Tried to get all locations for the instance with ID {instance_id}, but the \
@@ -377,9 +373,7 @@ pub async fn all_locations(
         "Found {} locations for instance {instance} to return information about.",
         locations.len()
     );
-    let active_locations_ids = app_state
-        .get_connection_id_by_type(ConnectionType::Location)
-        .await;
+    let active_locations_ids = get_connection_id_by_type(ConnectionType::Location).await;
     let mut location_info = Vec::new();
     for location in locations {
         let info = LocationInfo {
@@ -687,12 +681,10 @@ pub async fn all_tunnel_connections(location_id: Id) -> Result<Vec<TunnelConnect
 pub async fn active_connection(
     location_id: Id,
     connection_type: ConnectionType,
-    handle: AppHandle,
 ) -> Result<Option<ActiveConnection>, Error> {
-    let state = handle.state::<AppState>();
     let name = get_tunnel_or_location_name(location_id, connection_type).await;
     debug!("Checking if there is an active connection for location {name}(ID: {location_id})");
-    let connection = state.find_connection(location_id, connection_type).await;
+    let connection = find_connection(location_id, connection_type).await;
     if connection.is_some() {
         debug!("Found active connection for location {name}(ID: {location_id})");
     }
@@ -913,16 +905,14 @@ pub struct TunnelInfo<I = NoId> {
 }
 
 #[tauri::command(async)]
-pub async fn all_tunnels(app_state: State<'_, AppState>) -> Result<Vec<TunnelInfo<Id>>, Error> {
+pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
     trace!("Getting information about all tunnels");
 
     let tunnels = Tunnel::all(&*DB_POOL).await?;
     trace!("Found ({}) tunnels to get information about", tunnels.len());
     trace!("Tunnels found: {tunnels:#?}");
     let mut tunnel_info = Vec::new();
-    let active_tunnel_ids = app_state
-        .get_connection_id_by_type(ConnectionType::Tunnel)
-        .await;
+    let active_tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
 
     for tunnel in tunnels {
         tunnel_info.push(TunnelInfo {

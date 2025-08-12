@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use self::database::models::{Id, NoId};
 
+pub mod active_connections;
 pub mod app_config;
 pub mod appstate;
 pub mod commands;

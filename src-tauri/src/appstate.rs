@@ -1,22 +1,21 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use tauri::async_runtime::{spawn, JoinHandle, Mutex};
+use tauri::async_runtime::{spawn, JoinHandle};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    active_connections::ACTIVE_CONNECTIONS,
     app_config::AppConfig,
     database::{
-        models::{connection::ActiveConnection, instance::Instance, location::Location, Id},
+        models::{connection::ActiveConnection, Id},
         DB_POOL,
     },
-    error::Error,
     service::utils::DAEMON_CLIENT,
-    utils::{disconnect_interface, stats_handler},
+    utils::stats_handler,
     ConnectionType,
 };
 
 pub struct AppState {
-    pub active_connections: Mutex<Vec<ActiveConnection>>,
     pub log_watchers: std::sync::Mutex<HashMap<String, CancellationToken>>,
     pub app_config: std::sync::Mutex<AppConfig>,
     stat_threads: std::sync::Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
@@ -26,7 +25,6 @@ impl AppState {
     #[must_use]
     pub fn new(config: AppConfig) -> Self {
         AppState {
-            active_connections: Mutex::new(Vec::new()),
             log_watchers: std::sync::Mutex::new(HashMap::new()),
             app_config: std::sync::Mutex::new(config),
             stat_threads: std::sync::Mutex::new(HashMap::new()),
@@ -42,7 +40,7 @@ impl AppState {
         let ifname = interface_name.into();
         let connection = ActiveConnection::new(location_id, ifname.clone(), connection_type);
         debug!("Adding active connection for location ID: {location_id}");
-        let mut connections = self.active_connections.lock().await;
+        let mut connections = ACTIVE_CONNECTIONS.lock().await;
         connections.push(connection);
         trace!("Current active connections: {connections:?}");
         drop(connections);
@@ -92,7 +90,7 @@ impl AppState {
             }
         }
 
-        let mut connections = self.active_connections.lock().await;
+        let mut connections = ACTIVE_CONNECTIONS.lock().await;
         if let Some(index) = connections.iter().position(|conn| {
             conn.location_id == location_id && conn.connection_type == connection_type
         }) {
@@ -104,90 +102,5 @@ impl AppState {
             debug!("No active connection found with location ID: {location_id}");
             None
         }
-    }
-
-    pub(crate) async fn get_connection_id_by_type(
-        &self,
-        connection_type: ConnectionType,
-    ) -> Vec<Id> {
-        let active_connections = self.active_connections.lock().await;
-
-        let connection_ids = active_connections
-            .iter()
-            .filter_map(|con| {
-                if con.connection_type == connection_type {
-                    Some(con.location_id)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        connection_ids
-    }
-
-    pub async fn close_all_connections(&self) -> Result<(), crate::error::Error> {
-        debug!("Closing all active connections");
-        let active_connections = self.active_connections.lock().await;
-        let active_connections_count = active_connections.len();
-        debug!("Found {active_connections_count} active connections");
-        for connection in active_connections.iter() {
-            debug!(
-                "Found active connection with location {}",
-                connection.location_id
-            );
-            trace!("Connection: {connection:#?}");
-            debug!("Removing interface {}", connection.interface_name);
-            disconnect_interface(connection).await?;
-        }
-        if active_connections_count > 0 {
-            info!("All active connections ({active_connections_count}) have been closed.");
-        } else {
-            debug!("There were no active connections to close, nothing to do.");
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn find_connection(
-        &self,
-        id: Id,
-        connection_type: ConnectionType,
-    ) -> Option<ActiveConnection> {
-        let connections = self.active_connections.lock().await;
-        trace!(
-            "Checking for active connection with ID {id}, type {connection_type} in active connections."
-        );
-
-        if let Some(connection) = connections
-            .iter()
-            .find(|conn| conn.location_id == id && conn.connection_type == connection_type)
-        {
-            // 'connection' now contains the first element with the specified id and connection_type
-            trace!("Found connection: {connection:?}");
-            Some(connection.to_owned())
-        } else {
-            debug!("Couldn't find connection with ID {id}, type: {connection_type} in active connections.");
-            None
-        }
-    }
-
-    /// Returns active connections for a given instance.
-    pub(crate) async fn active_connections(
-        &self,
-        instance: &Instance<Id>,
-    ) -> Result<Vec<ActiveConnection>, Error> {
-        let locations: HashSet<Id> = Location::find_by_instance_id(&*DB_POOL, instance.id)
-            .await?
-            .iter()
-            .map(|location| location.id)
-            .collect();
-        Ok(self
-            .active_connections
-            .lock()
-            .await
-            .iter()
-            .filter(|connection| locations.contains(&connection.location_id))
-            .cloned()
-            .collect())
     }
 }

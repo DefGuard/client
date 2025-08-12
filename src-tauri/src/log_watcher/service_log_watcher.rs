@@ -181,7 +181,10 @@ impl<'a> ServiceLogWatcher<'a> {
     /// Log files are rotated daily and have a knows naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        trace!("Getting latest log file from directory: {:?}", self.log_dir);
+        trace!(
+            "Getting latest log file from directory: {}",
+            self.log_dir.display()
+        );
         let entries = read_dir(self.log_dir)?;
 
         let mut latest_log = None;

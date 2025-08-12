@@ -2,11 +2,11 @@ use std::{str::FromStr, time::Duration};
 
 use reqwest::{Client, StatusCode};
 use sqlx::{Sqlite, Transaction};
-use tauri::{AppHandle, Emitter, Manager, State, Url};
+use tauri::{AppHandle, Emitter, Url};
 use tokio::time::sleep;
 
 use crate::{
-    appstate::AppState,
+    active_connections::active_connections,
     commands::{do_update_instance, locations_changed},
     database::{
         models::{instance::Instance, Id},
@@ -201,8 +201,8 @@ pub async fn poll_instance(
 
     // Config changed. If there are no active connections for this instance, update the database.
     // Otherwise just display a message to reconnect.
-    let state: State<'_, AppState> = handle.state();
-    if state.active_connections(instance).await?.is_empty() {
+    //
+    if active_connections(instance).await?.is_empty() {
         debug!(
             "Updating instance {}({}) configuration: {device_config:?}",
             instance.name, instance.id,
