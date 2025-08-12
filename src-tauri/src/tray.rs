@@ -2,7 +2,7 @@ use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
-    tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
+    tray::{TrayIcon, TrayIconBuilder},
     AppHandle, Emitter, Manager,
 };
 
@@ -104,11 +104,21 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         .item(&quit)
         .build()?;
 
+    // On macOS, always show menu under system tray icon.
+    #[cfg(target_os = "macos")]
+    let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
+        .menu(&tray_menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(handle_tray_menu_event)
+        .build(app)?;
+    // On other systems (especially Windows), system tray menu is on right-click,
+    // and double-click shows the main window.
+    #[cfg(not(target_os = "macos"))]
     let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|icon, event| {
-            if let TrayIconEvent::DoubleClick { .. } = event {
+            if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
                 show_main_window(icon.app_handle())
             }
         })
