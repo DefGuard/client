@@ -32,10 +32,6 @@ jobs:
         working-directory: ./src-tauri
 
     steps:
-      - name: Debug
-        run: |
-          echo ${{ github.ref_name }}
-          ls -al
       - name: Checkout
         uses: actions/checkout@v5
         with:
