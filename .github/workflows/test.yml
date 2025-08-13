@@ -25,6 +25,9 @@ jobs:
   test:
     runs-on: [self-hosted, Linux, X64]
     container: rust:1
+    defaults:
+      run:
+        working-directory: ./src-tauri
 
     steps:
       - name: Checkout
