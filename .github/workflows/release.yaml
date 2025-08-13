@@ -12,7 +12,7 @@ jobs:
         architecture: [arm64, amd64]
     runs-on: [self-hosted, macOS]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: WireGuard/wireguard-go
           ref: master
@@ -71,7 +71,7 @@ jobs:
             deb_arch: amd64
             binary_arch: x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: "recursive"
       - name: Write release version
@@ -230,7 +230,7 @@ jobs:
       APPLE_ID: "kamil@defguard.net"
       APPLE_TEAM_ID: "82GZ7KN29J"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: "recursive"
       - name: Write release version
@@ -312,7 +312,7 @@ jobs:
       - create-release
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: "recursive"
       - name: Write release version
