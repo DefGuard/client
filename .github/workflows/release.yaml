@@ -81,7 +81,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: pnpm/action-setup@v2
         with:
           version: 9
@@ -240,7 +240,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: pnpm/action-setup@v2
         with:
           version: 9
@@ -322,7 +322,7 @@ jobs:
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: pnpm/action-setup@v2
         with:
           version: 9
