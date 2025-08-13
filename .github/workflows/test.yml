@@ -24,10 +24,12 @@ env:
 jobs:
   test:
     runs-on: [self-hosted, Linux, X64]
-    container: rust:1
-    # defaults:
-    #   run:
-    #     working-directory: ./src-tauri
+    container:
+      image: rust:1
+      options: --user root
+    defaults:
+      run:
+        working-directory: ./src-tauri
 
     steps:
       - name: Checkout
@@ -45,15 +47,15 @@ jobs:
       - name: Check format
         run: |
           rustup component add rustfmt
-          cd src-tauri && cargo fmt -- --check
+          cargo fmt -- --check
       - name: Run clippy linter
         run: |
           mkdir ../dist
           rustup component add clippy
-          cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy --all-targets --all-features -- -D warnings
       - name: Run cargo deny
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: ./src-tauri/Cargo.toml
       - name: Run tests
-        run: cd src-tauri && cargo test --locked --no-fail-fast
+        run: cargo test --locked --no-fail-fast
