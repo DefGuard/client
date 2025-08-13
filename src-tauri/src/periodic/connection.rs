@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager};
 use tokio::time::interval;
 
 use crate::{
+    active_connections::ACTIVE_CONNECTIONS,
     appstate::AppState,
     commands::{connect, disconnect},
     database::{
@@ -111,7 +112,7 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
 
     loop {
         interval.tick().await;
-        let connections = app_state.active_connections.lock().await;
+        let connections = ACTIVE_CONNECTIONS.lock().await;
         let connection_count = connections.len();
         if connection_count == 0 {
             debug!(

@@ -8,6 +8,7 @@ use std::{env, str::FromStr, sync::LazyLock};
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
+    active_connections::close_all_connections,
     app_config::AppConfig,
     appstate::AppState,
     commands::*,
@@ -25,7 +26,7 @@ use defguard_client::{
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{process, Env};
-use tauri::{AppHandle, Builder, Emitter, Manager, RunEvent, State, WindowEvent};
+use tauri::{AppHandle, Builder, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[derive(Clone, serde::Serialize)]
@@ -129,7 +130,7 @@ fn main() {
             "PATH",
             format!("{current_path}:{}", current_bin_dir.to_str().unwrap()),
         );
-        debug!("Added binary dir {current_bin_dir:?} to PATH");
+        debug!("Added binary dir {} to PATH", current_bin_dir.display());
     }
 
     let app = Builder::default()
@@ -277,18 +278,18 @@ fn main() {
         // Startup tasks
         RunEvent::Ready => {
             info!(
-                "Application data (database file) will be stored in: {:?} and application logs in: {:?}. \
+                "Application data (database file) will be stored in: {} and application logs in: {}. \
                 Logs of the background Defguard service responsible for managing VPN connections at the \
                 network level will be stored in: {}.",
                 // display the path to the app data directory, convert option<pathbuf> to option<&str>
                 app_handle
                     .path()
                     .app_data_dir()
-                    .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into()),
+                    .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into()).display(),
                 app_handle
                     .path()
                     .app_log_dir()
-                    .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()),
+                    .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()).display(),
                 service::config::DEFAULT_LOG_DIR
             );
             tauri::async_runtime::block_on(startup(app_handle));
@@ -305,22 +306,17 @@ fn main() {
             });
             debug!("Ctrl-C handler has been set up successfully");
         }
-        // Prevent shutdown on window close.
-        RunEvent::ExitRequested { code, api, .. } => {
+        RunEvent::ExitRequested { api, .. } => {
             debug!("Received exit request");
-            // `None` when the exit is requested by user interaction.
-            if code.is_none() {
-                api.prevent_exit();
-            } else {
-                let app_state = app_handle.state::<State<AppState>>();
-                tauri::async_runtime::block_on(async {
-                    let _ = app_state.close_all_connections().await;
-                });
-            }
+            // Prevent shutdown on window close.
+            api.prevent_exit();
         }
         // Handle shutdown.
         RunEvent::Exit => {
             debug!("Exiting the application's main event loop.");
+            tauri::async_runtime::block_on(async {
+                let _ = close_all_connections().await;
+            });
         }
         _ => {
             trace!("Received event: {event:?}");

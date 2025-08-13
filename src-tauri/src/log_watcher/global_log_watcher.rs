@@ -45,7 +45,7 @@ impl LogDirs {
         })?;
         debug!(
             "Log directories of service and client have been identified by the global log watcher: \
-            {service_log_dir:?} and {client_log_dir:?}"
+            {} and {}", service_log_dir.display(), client_log_dir.display()
         );
 
         Ok(Self {
@@ -61,8 +61,8 @@ impl LogDirs {
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         trace!(
-            "Getting latest log file from directory: {:?}",
-            self.service_log_dir
+            "Getting latest log file from directory: {}",
+            self.service_log_dir.display()
         );
         let entries = read_dir(&self.service_log_dir)?;
 
@@ -107,15 +107,15 @@ impl LogDirs {
 
     fn get_client_file(&self) -> Result<File, LogWatcherError> {
         trace!(
-            "Opening the log file for the client, using directory: {:?}",
-            self.client_log_dir
+            "Opening the log file for the client, using directory: {}",
+            self.client_log_dir.display()
         );
         let dir_str = self
             .client_log_dir
             .to_str()
             .ok_or(LogWatcherError::LogPathError(format!(
-                "Couldn't convert the client log directory path ({:?}) to a string slice",
-                self.client_log_dir
+                "Couldn't convert the client log directory path ({}) to a string slice",
+                self.client_log_dir.display()
             )))?;
         let path = format!("{dir_str}/defguard-client.log");
         trace!("Constructed client log file path: {path}");
@@ -185,8 +185,9 @@ impl GlobalLogWatcher {
         trace!("Checking if log files are available");
         if service_reader.is_none() && client_reader.is_none() {
             warn!(
-                "Couldn't read files at {:?} and {:?}, there will be no logs reported in the client.",
-                self.log_dirs.current_service_log_file, self.log_dirs.client_log_dir
+                "Couldn't read files at {:?} and {}, there will be no logs reported in the client.",
+                self.log_dirs.current_service_log_file,
+                self.log_dirs.client_log_dir.display()
             );
             // Wait for logs to appear.
             sleep(DELAY);

@@ -7,8 +7,8 @@ use tauri::{
 };
 
 use crate::{
+    active_connections::get_connection_id_by_type,
     app_config::AppTrayTheme,
-    appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
     error::Error,
@@ -18,6 +18,8 @@ use crate::{
 const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 const JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
+
+const MAIN_WINDOW_ID: &str = "main";
 
 const TRAY_ICON_ID: &str = "tray";
 
@@ -29,7 +31,6 @@ const TRAY_EVENT_COMMINITY: &str = "community";
 const TRAY_EVENT_FOLLOW: &str = "follow";
 
 pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
-    let app_state = app.state::<AppState>();
     debug!("Generating tray menu.");
     let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)?;
     let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)?;
@@ -53,12 +54,12 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
     // INSTANCE SECTION
     let mut instance_menu = SubmenuBuilder::new(app, "Instances");
     debug!("Getting all instances information for the tray menu");
-    match all_instances(app_state.clone()).await {
+    match all_instances().await {
         Ok(instances) => {
             let instance_count = instances.len();
             debug!("Got {instance_count} instances to display in the tray menu");
             for instance in instances {
-                let all_locations = all_locations(instance.id, app_state.clone()).await.unwrap();
+                let all_locations = all_locations(instance.id).await.unwrap();
                 debug!(
                     "Found {} locations for the {} instance to display in the tray menu",
                     all_locations.len(),
@@ -102,10 +103,25 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         .item(&quit)
         .build()?;
 
+    // On macOS, always show menu under system tray icon.
+    #[cfg(target_os = "macos")]
     let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
-        .on_menu_event(handle_tray_event)
+        .on_menu_event(handle_tray_menu_event)
+        .build(app)?;
+    // On other systems (especially Windows), system tray menu is on right-click,
+    // and double-click shows the main window.
+    #[cfg(not(target_os = "macos"))]
+    let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
+        .menu(&tray_menu)
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|icon, event| {
+            if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                show_main_window(icon.app_handle())
+            }
+        })
+        .on_menu_event(handle_tray_menu_event)
         .build(app)?;
 
     debug!("Tray menu successfully generated");
@@ -119,23 +135,30 @@ pub async fn reload_tray_menu(app_handle: &AppHandle) {
     }
 }
 
-fn show_main_window(app: &AppHandle) {
-    if let Some(main_window) = app.get_webview_window("main") {
-        // If this fails, Tauri has a problem.
-        let minimized = main_window.is_minimizable().unwrap_or_default();
-        let visible = main_window.is_visible().unwrap_or_default();
-        if minimized {
-            let _ = main_window.hide();
+fn hide_main_window(app: &AppHandle) {
+    if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
+        if let Err(err) = main_window.hide() {
+            warn!("Failed to hide main window: {err}");
         }
-        if !visible {
-            let _ = main_window.show();
+    }
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
+        if main_window.is_minimized().unwrap_or_default() {
+            if let Err(err) = main_window.unminimize() {
+                warn!("Failed to unminimize main window: {err}");
+            }
+        }
+        if let Err(err) = main_window.show() {
+            warn!("Failed to show main window: {err}");
         }
         let _ = main_window.set_focus();
     }
 }
 
 /// Handle tray actions.
-pub fn handle_tray_event(app: &AppHandle, event: MenuEvent) {
+pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
     let handle = app.clone();
     match event.id.as_ref() {
         TRAY_EVENT_QUIT => {
@@ -143,13 +166,7 @@ pub fn handle_tray_event(app: &AppHandle, event: MenuEvent) {
             handle.exit(0);
         }
         TRAY_EVENT_SHOW => show_main_window(app),
-        TRAY_EVENT_HIDE => {
-            if let Some(main_window) = app.get_webview_window("main") {
-                if main_window.is_visible().unwrap_or_default() {
-                    let _ = main_window.hide();
-                }
-            }
-        }
+        TRAY_EVENT_HIDE => hide_main_window(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
         }
@@ -196,10 +213,8 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
         Ok(location_id) => {
             match Location::find_by_id(&*DB_POOL, location_id).await {
                 Ok(Some(location)) => {
-                    let active_locations_ids = handle
-                        .state::<AppState>()
-                        .get_connection_id_by_type(ConnectionType::Location)
-                        .await;
+                    let active_locations_ids =
+                        get_connection_id_by_type(ConnectionType::Location).await;
 
                     if active_locations_ids.contains(&location_id) {
                         info!("Disconnect location with ID {id}");

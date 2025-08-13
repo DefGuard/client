@@ -9,7 +9,7 @@
   "bundle": {
     "active": true,
     "category": "Utility",
-    "copyright": "teonite",
+    "copyright": "Defguard",
     "targets": [
       "deb",
       "app"
