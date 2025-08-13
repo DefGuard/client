@@ -23,7 +23,8 @@ env:
 
 jobs:
   test:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
     container: rust:1
     defaults:
       run:
