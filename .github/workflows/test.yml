@@ -37,7 +37,9 @@ jobs:
         with:
           submodules: recursive
       - name: Debug
-        run: echo ${{ github.ref_name }}
+        run: |
+          echo ${{ github.ref_name }}
+          ls -al
       - name: Cache
         uses: Swatinem/rust-cache@v2
       - name: Install required packages
