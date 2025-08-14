@@ -23,10 +23,13 @@ env:
 
 jobs:
   test:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+
     container:
       image: rust:1
       options: --user root
+
     defaults:
       run:
         working-directory: ./src-tauri
