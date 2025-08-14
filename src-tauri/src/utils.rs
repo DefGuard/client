@@ -41,6 +41,9 @@ use crate::{
     ConnectionType,
 };
 
+#[cfg(target_os = "windows")]
+use crate::active_connections::find_connection;
+
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
@@ -927,11 +930,7 @@ async fn check_connection(
         }
     }
 
-    if appstate
-        .find_connection(id, connection_type)
-        .await
-        .is_some()
-    {
+    if find_connection(id, connection_type).await.is_some() {
         debug!("{connection_type} {name} has already a connected state, skipping synchronization");
         return Ok(());
     }

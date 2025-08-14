@@ -306,10 +306,13 @@ fn main() {
             });
             debug!("Ctrl-C handler has been set up successfully");
         }
-        RunEvent::ExitRequested { api, .. } => {
+        RunEvent::ExitRequested { code, api, .. } => {
             debug!("Received exit request");
-            // Prevent shutdown on window close.
-            api.prevent_exit();
+            // `code` is `None` when the exit is requested by user interaction.
+            if code.is_none() {
+                // Prevent shutdown on window close.
+                api.prevent_exit();
+            }
         }
         // Handle shutdown.
         RunEvent::Exit => {
