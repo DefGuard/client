@@ -124,10 +124,10 @@ confidence-threshold = 0.8
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
     { allow = [
-        "AGPL-3.0",
+        "AGPL-3.0-only",
     ], crate = "common" },
     { allow = [
-        "AGPL-3.0",
+        "AGPL-3.0-only",
     ], crate = "defguard-client" },
 ]
 
