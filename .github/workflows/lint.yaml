@@ -6,15 +6,22 @@ on:
       - main
       - dev
       - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
   pull_request:
     branches:
       - main
       - dev
       - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
 
 jobs:
   lint-web:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - uses: actions/checkout@v5
