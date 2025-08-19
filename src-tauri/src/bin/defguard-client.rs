@@ -196,7 +196,7 @@ fn main() {
             let app_handle = app.app_handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for link in event.urls() {
-                    if link.path() == "/enrollment" {
+                    if link.path() == "/addinstance" {
                         let mut token = None;
                         let mut url = None;
                         for (key, value) in link.query_pairs() {
@@ -209,7 +209,7 @@ fn main() {
                         }
                         if let (Some(token), Some(url)) = (token, url) {
                             let _ = app_handle.emit(
-                                EventKey::DoEntrollment.into(),
+                                EventKey::AddInstance.into(),
                                 EntrollmentTriggerPayload {
                                     token: &token,
                                     url: &url,

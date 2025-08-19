@@ -16,7 +16,7 @@ pub enum EventKey {
     DeadConnectionDropped,
     DeadConnectionReconnected,
     ApplicationConfigChanged,
-    DoEntrollment,
+    AddInstance,
 }
 
 impl From<EventKey> for &'static str {
@@ -31,7 +31,7 @@ impl From<EventKey> for &'static str {
             EventKey::DeadConnectionDropped => "dead-connection-dropped",
             EventKey::DeadConnectionReconnected => "dead-connection-reconnected",
             EventKey::ApplicationConfigChanged => "application-config-changed",
-            EventKey::DoEntrollment => "do-enrollment",
+            EventKey::AddInstance => "add-instance",
         }
     }
 }

@@ -19,7 +19,7 @@ import { clientQueryKeys } from './query';
 import {
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
-  DoEnrollmentPayload,
+  type AddInstancePayload,
   TauriEventKey,
 } from './types';
 
@@ -136,7 +136,8 @@ export const ClientPage = () => {
       },
     );
 
-    const doEnrollment = listen<DoEnrollmentPayload>(TauriEventKey.DO_ENROLLMENT, (_data) => {
+    const doEnrollment = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
+      useClientStore.setState({ instanceConfig: data.payload });
       navigate(routes.client.addInstance, { replace: true });
     });
 
