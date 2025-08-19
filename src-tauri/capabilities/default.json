@@ -6,9 +6,6 @@
   "windows": [
     "main"
   ],
-  "remote": {
-    "urls": ["https://*.tauri.app"]
-  },
   "permissions": [
     "core:default",
     "core:window:allow-create",
@@ -44,12 +41,26 @@
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-start-dragging",
     "core:webview:allow-print",
+    "deep-link:default",
     "fs:default",
     "log:default",
     "notification:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://**/" }, { "url": "http://**/" }]
+      "allow": [
+        {
+          "url": "https://**"
+        },
+        {
+          "url": "http://**"
+        },
+        {
+          "url": "https://*:*"
+        },
+        {
+          "url": "http://*:*"
+        }
+      ]
     }
   ]
 }

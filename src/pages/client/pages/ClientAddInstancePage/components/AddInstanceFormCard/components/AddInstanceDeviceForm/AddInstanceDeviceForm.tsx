@@ -119,6 +119,8 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
               selectedInstance: _selectedInstance,
               instances,
             });
+            // Clear token and URL values.
+            useClientStore.setState({ instanceConfig: { token: '', url: '' } });
             navigate(routes.client.instancePage, { replace: true });
           })
           .catch((e) => {

@@ -204,8 +204,8 @@ pub fn configure_tray_icon(app: &AppHandle, theme: &AppTrayTheme) -> Result<(), 
 }
 
 #[derive(Clone, serde::Serialize)]
-struct Payload {
-    message: String,
+struct MfaPayload<'a> {
+    message: &'a str,
 }
 
 async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
@@ -228,14 +228,12 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                                 "MFA enabled for location with ID {:?}, trigger MFA modal",
                                 location.id
                             );
-                            handle
-                                .emit(
-                                    "mfa-trigger",
-                                    Payload {
-                                        message: "Trigger MFA event".into(),
-                                    },
-                                )
-                                .unwrap();
+                            let _ = handle.emit(
+                                "mfa-trigger",
+                                MfaPayload {
+                                    message: "Trigger MFA event",
+                                },
+                            );
                         } else if let Err(err) =
                             connect(location_id, ConnectionType::Location, None, handle.clone())
                                 .await

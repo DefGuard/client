@@ -16,7 +16,7 @@ use defguard_client::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
-    events::SINGLE_INSTANCE,
+    events::EventKey,
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, reload_tray_menu},
@@ -27,12 +27,19 @@ use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{process, Env};
 use tauri::{AppHandle, Builder, Emitter, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{Target, TargetKind};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
     args: Vec<String>,
     cwd: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct EntrollmentTriggerPayload<'a> {
+    token: &'a str,
+    url: &'a str,
 }
 
 #[macro_use]
@@ -173,16 +180,46 @@ fn main() {
             }
         })
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
+        // Single instance plugin should always be the first to register.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            let _ = app.emit(EventKey::SingleInstance.into(), Payload { args: argv, cwd });
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            let _ = app.emit(SINGLE_INSTANCE, Payload { args: argv, cwd });
-        }))
         .setup(|app| {
+            // Handle deep-links.
+            let app_handle = app.app_handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for link in event.urls() {
+                    if link.path() == "/addinstance" {
+                        let mut token = None;
+                        let mut url = None;
+                        for (key, value) in link.query_pairs() {
+                            if key == "token" {
+                                token = Some(value.clone());
+                            }
+                            if key == "url" {
+                                url = Some(value.clone());
+                            }
+                        }
+                        if let (Some(token), Some(url)) = (token, url) {
+                            let _ = app_handle.emit(
+                                EventKey::AddInstance.into(),
+                                EntrollmentTriggerPayload {
+                                    token: &token,
+                                    url: &url,
+                                },
+                            );
+                        }
+                    }
+                }
+            });
+
             let app_handle = app.app_handle();
 
             // Prepare `AppConfig`.

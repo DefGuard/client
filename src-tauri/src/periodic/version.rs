@@ -3,7 +3,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::time::interval;
 
-use crate::{appstate::AppState, commands::get_latest_app_version, events::APP_VERSION_FETCH};
+use crate::{appstate::AppState, commands::get_latest_app_version, events::EventKey};
 
 const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
 
@@ -31,7 +31,7 @@ pub async fn poll_version(app_handle: AppHandle) {
                 let response = get_latest_app_version(app_handle.clone()).await;
                 if let Ok(result) = response {
                     debug!("Fetched latest application version info: {result:?}");
-                    let _ = app_handle.emit(APP_VERSION_FETCH, &result);
+                    let _ = app_handle.emit(EventKey::AppVersionFetch.into(), &result);
                 } else {
                     let err = response.err().unwrap();
                     error!("Error while fetching latest application version: {err}");
