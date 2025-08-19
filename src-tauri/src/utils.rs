@@ -641,7 +641,7 @@ pub(crate) async fn handle_connection_for_location(
     handle.emit(
         EventKey::ConfigChanged.into(),
         Payload {
-            message: "Created new connection".into(),
+            message: "Created new connection",
         },
     )?;
     debug!("Event informing the frontend that a new connection has been created sent.");
@@ -678,7 +678,7 @@ pub(crate) async fn handle_connection_for_tunnel(
     handle.emit(
         EventKey::ConfigChanged.into(),
         Payload {
-            message: "Created new connection".into(),
+            message: "Created new connection",
         },
     )?;
     debug!("Event informing the frontend that a new connection has been created sent.");
@@ -941,9 +941,9 @@ async fn check_connection(
 
     debug!("Sending event informing the frontend that a new connection has been created.");
     app_handle.emit(
-        CONNECTION_CHANGED,
+        EventKey::ConnectionChanged.into(),
         Payload {
-            message: "Created new connection".into(),
+            message: "Created new connection",
         },
     )?;
     debug!("Event informing the frontend that a new connection has been created sent.");
