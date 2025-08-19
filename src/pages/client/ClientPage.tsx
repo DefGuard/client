@@ -11,6 +11,7 @@ import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
+import { MfaModalProvider } from './components/MfaModalProvider';
 import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/DeadConDroppedModal';
 import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/store';
 import { useClientFlags } from './hooks/useClientFlags';
@@ -182,7 +183,9 @@ export const ClientPage = () => {
 
   return (
     <>
-      <Outlet />
+      <MfaModalProvider>
+        <Outlet />
+      </MfaModalProvider>
       <DeadConDroppedModal />
       <ClientSideBar />
     </>

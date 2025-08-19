@@ -3,12 +3,7 @@
   "identifier": "main-capability",
   "description": "Capability for the main window",
   "local": true,
-  "windows": [
-    "main"
-  ],
-  "remote": {
-    "urls": ["https://*.tauri.app"]
-  },
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-create",
@@ -49,7 +44,20 @@
     "notification:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://**/" }, { "url": "http://**/" }]
+      "allow": [
+        {
+          "url": "http://*"
+        },
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*:*"
+        },
+        {
+          "url": "https://*:*"
+        }
+      ]
     }
   ]
 }

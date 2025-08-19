@@ -105,7 +105,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         if (!res.ok) {
           setIsLoading(false);
           error(JSON.stringify(res.status));
-          const errorMessage = (await res.json() as EnrollmentError).error;
+          const errorMessage = ((await res.json()) as EnrollmentError).error;
 
           switch (errorMessage) {
             case 'token expired': {
@@ -122,9 +122,9 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // There may be other set-cookies, set by e.g. a proxy
         // Get only the defguard_proxy cookie
-        const authCookie = res.headers.getSetCookie().find((cookie) =>
-          cookie.startsWith('defguard_proxy='),
-        );
+        const authCookie = res.headers
+          .getSetCookie()
+          .find((cookie) => cookie.startsWith('defguard_proxy='));
         if (!authCookie) {
           setIsLoading(false);
           error(
@@ -139,7 +139,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           );
         }
         debug('Response received with status OK');
-        const r = await res.json() as EnrollmentStartResponse;
+        const r = (await res.json()) as EnrollmentStartResponse;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
         const instance = clientInstances.find((i) => i.uuid === r.instance.id);
@@ -163,7 +163,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           }).then(async (res) => {
             invoke<void>('update_instance', {
               instanceId: instance.id,
-              response: await res.json() as CreateDeviceResponse,
+              response: (await res.json()) as CreateDeviceResponse,
             })
               .then(() => {
                 info('Configured device');

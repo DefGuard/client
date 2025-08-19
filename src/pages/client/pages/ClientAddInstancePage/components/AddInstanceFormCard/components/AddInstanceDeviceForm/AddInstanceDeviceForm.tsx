@@ -95,14 +95,14 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       }).then(async (r) => {
         if (!r.ok) {
           setIsLoading(false);
-          const data = await r.json() as ErrorData;
+          const data = (await r.json()) as ErrorData;
           const details = `${data?.error ? `${data.error}, ` : ''}`;
           error(
             `Failed to create device check enrollment and Defguard logs, details: ${details} Error status code: ${r.status} `,
           );
           throw Error(`Failed to create device, details: ${details} `);
         }
-        const deviceResp = await r.json() as CreateDeviceResponse;
+        const deviceResp = (await r.json()) as CreateDeviceResponse;
         saveConfig({
           privateKey: privateKey,
           response: deviceResp,
@@ -162,18 +162,18 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
         <div className="controls">
           <Button
             size={ButtonSize.LARGE}
+            styleVariant={ButtonStyleVariant.STANDARD}
+            type="button"
+            text={LL.common.controls.cancel()}
+            disabled={isLoading}
+            onClick={() => navigate(routes.client.instancePage)}
+          />
+          <Button
+            size={ButtonSize.LARGE}
             styleVariant={ButtonStyleVariant.PRIMARY}
             type="submit"
             text={localLL.submit()}
             loading={isLoading}
-          />
-          <Button
-            size={ButtonSize.LARGE}
-            styleVariant={ButtonStyleVariant.STANDARD}
-            type="button"
-            text={LL.common.controls.cancel()}
-            loading={isLoading}
-            onClick={() => navigate(routes.client.instancePage)}
           />
         </div>
       </form>
