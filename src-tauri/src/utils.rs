@@ -29,7 +29,7 @@ use crate::{
         DbPool, DB_POOL,
     },
     error::Error,
-    events::CONNECTION_CHANGED,
+    events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     service::{
         proto::{
@@ -639,7 +639,7 @@ pub(crate) async fn handle_connection_for_location(
 
     debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit(
-        CONNECTION_CHANGED,
+        EventKey::ConfigChanged.into(),
         Payload {
             message: "Created new connection".into(),
         },
@@ -676,7 +676,7 @@ pub(crate) async fn handle_connection_for_tunnel(
 
     debug!("Sending event informing the frontend that a new connection has been created.");
     handle.emit(
-        CONNECTION_CHANGED,
+        EventKey::ConfigChanged.into(),
         Payload {
             message: "Created new connection".into(),
         },

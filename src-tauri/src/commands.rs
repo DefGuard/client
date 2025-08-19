@@ -31,7 +31,7 @@ use crate::{
     },
     enterprise::periodic::config::poll_instance,
     error::Error,
-    events::{APPLICATION_CONFIG_CHANGED, CONNECTION_CHANGED, INSTANCE_UPDATE, LOCATION_UPDATE},
+    events::EventKey,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
@@ -49,8 +49,8 @@ use crate::{
 };
 
 #[derive(Clone, Serialize)]
-pub(crate) struct Payload {
-    pub message: String,
+pub(crate) struct Payload<'a> {
+    pub(crate) message: &'a str,
 }
 
 // Create new WireGuard interface
@@ -132,9 +132,9 @@ pub async fn disconnect(
             {connection_type} {name}({location_id})"
         );
         handle.emit(
-            CONNECTION_CHANGED,
+            EventKey::ConfigChanged.into(),
             Payload {
-                message: "Created new connection".into(),
+                message: "Created new connection",
             },
         )?;
         debug!("Event emitted successfully");
@@ -196,7 +196,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     };
     poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
-    handle.emit(INSTANCE_UPDATE, ())?;
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
     Ok(())
 }
 
@@ -284,7 +284,7 @@ pub async fn save_device_config(
     trace!("Created following instance: {instance:#?}");
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
     trace!("Created following locations: {locations:#?}");
-    handle.emit(INSTANCE_UPDATE, ())?;
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -442,7 +442,7 @@ pub async fn update_instance(
         do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        app_handle.emit(INSTANCE_UPDATE, ())?;
+        app_handle.emit(EventKey::InstanceUpdate.into(), ())?;
         reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
@@ -763,9 +763,9 @@ pub async fn update_location_routing(
                 location.save(&*DB_POOL).await?;
                 debug!("Location routing updated for location {name}(ID: {location_id})");
                 handle.emit(
-                    LOCATION_UPDATE,
+                    EventKey::LocationUpdate.into(),
                     Payload {
-                        message: "Location routing updated".into(),
+                        message: "Location routing updated",
                     },
                 )?;
                 Ok(())
@@ -782,9 +782,9 @@ pub async fn update_location_routing(
                 tunnel.save(&*DB_POOL).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
                 handle.emit(
-                    LOCATION_UPDATE,
+                    EventKey::LocationUpdate.into(),
                     Payload {
-                        message: "Tunnel routing updated".into(),
+                        message: "Tunnel routing updated",
                     },
                 )?;
                 Ok(())
@@ -849,7 +849,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
-    handle.emit(INSTANCE_UPDATE, ())?;
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -871,9 +871,9 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
     handle.emit(
-        LOCATION_UPDATE,
+        EventKey::LocationUpdate.into(),
         Payload {
-            message: "Tunnel saved".into(),
+            message: "Tunnel saved",
         },
     )?;
     Ok(())
@@ -885,9 +885,9 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
     handle.emit(
-        LOCATION_UPDATE,
+        EventKey::LocationUpdate.into(),
         Payload {
-            message: "Tunnel saved".into(),
+            message: "Tunnel saved",
         },
     )?;
     Ok(())
@@ -1117,7 +1117,7 @@ pub fn command_set_app_config(
         }
     }
     if emit_event {
-        match app_handle.emit(APPLICATION_CONFIG_CHANGED, ()) {
+        match app_handle.emit(EventKey::ApplicationConfigChanged.into(), ()) {
             Ok(()) => debug!("Config changed event emitted successfully"),
             Err(err) => {
                 error!("Failed to emit config change event. Reason: {err}");
