@@ -37,7 +37,9 @@ export const ApplicationUpdateManager = () => {
 
     // Stop listening if "check for updates" setting has been turned off.
     if (!checkForUpdates) {
-      subs.forEach((sub) => sub());
+      subs.forEach((sub) => {
+        sub();
+      });
       return;
     }
 
@@ -56,7 +58,9 @@ export const ApplicationUpdateManager = () => {
     });
 
     return () => {
-      subs.forEach((sub) => sub());
+      subs.forEach((sub) => {
+        sub();
+      });
     };
   }, [checkForUpdates, setApplicationUpdateData]);
 

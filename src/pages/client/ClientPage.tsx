@@ -77,20 +77,20 @@ export const ClientPage = () => {
         clientQueryKeys.getLocations,
         clientQueryKeys.getTunnels,
       ];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const locationUpdate = listen(TauriEventKey.LOCATION_UPDATE, () => {
       const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const connectionChanged = listen(TauriEventKey.CONNECTION_CHANGED, () => {
@@ -103,11 +103,11 @@ export const ClientPage = () => {
         clientQueryKeys.getInstances,
         clientQueryKeys.getTunnels,
       ];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const configChanged = listen(TauriEventKey.CONFIG_CHANGED, (data) => {
