@@ -27,7 +27,11 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { type AddInstancePayload, type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import {
+  type AddInstancePayload,
+  type SelectedInstance,
+  WireguardInstanceType,
+} from '../../../../../../types';
 import type { AddInstanceInitResponse } from '../../types';
 
 type Props = {

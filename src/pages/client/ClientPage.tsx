@@ -18,9 +18,9 @@ import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
 import {
+  type AddInstancePayload,
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
-  type AddInstancePayload,
   TauriEventKey,
 } from './types';
 
@@ -137,10 +137,13 @@ export const ClientPage = () => {
       },
     );
 
-    const doEnrollment = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
-      useClientStore.setState({ instanceConfig: data.payload });
-      navigate(routes.client.addInstance, { replace: true });
-    });
+    const doEnrollment = listen<AddInstancePayload>(
+      TauriEventKey.ADD_INSTANCE,
+      (data) => {
+        useClientStore.setState({ instanceConfig: data.payload });
+        navigate(routes.client.addInstance, { replace: true });
+      },
+    );
 
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
