@@ -1,13 +1,13 @@
 use tauri::{
     image::Image,
-    menu::{MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
+    menu::{Menu, MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
-    tray::{TrayIcon, TrayIconBuilder},
-    AppHandle, Emitter, Manager,
+    tray::TrayIconBuilder,
+    AppHandle, Emitter, Manager, Runtime,
 };
 
 use crate::{
-    active_connections::get_connection_id_by_type,
+    active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     app_config::AppTrayTheme,
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
@@ -30,7 +30,8 @@ const TRAY_EVENT_UPDATES: &str = "updates";
 const TRAY_EVENT_COMMINITY: &str = "community";
 const TRAY_EVENT_FOLLOW: &str = "follow";
 
-pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
+/// Generate contents of system tray menu.
+async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error> {
     debug!("Generating tray menu.");
     let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)?;
     let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)?;
@@ -51,7 +52,6 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
     )?;
     let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)?;
 
-    // INSTANCE SECTION
     let mut instance_menu = SubmenuBuilder::new(app, "Instances");
     debug!("Getting all instances information for the tray menu");
     match all_instances().await {
@@ -93,8 +93,9 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         }
     }
 
-    let tray_menu = MenuBuilder::new(app)
-        .items(&[&instance_menu.build()?])
+    let submenu = instance_menu.build()?;
+    let menu = MenuBuilder::new(app)
+        .items(&[&submenu])
         .separator()
         .items(&[&show, &hide])
         .separator()
@@ -102,10 +103,17 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         .separator()
         .item(&quit)
         .build()?;
+    Ok(menu)
+}
+
+/// Setup system tray.
+/// This function should only be called once.
+pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
+    let tray_menu = generate_tray_menu(app).await?;
 
     // On macOS, always show menu under system tray icon.
     #[cfg(target_os = "macos")]
-    let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
+    TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
         .on_menu_event(handle_tray_menu_event)
@@ -113,7 +121,7 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
     // On other systems (especially Windows), system tray menu is on right-click,
     // and double-click shows the main window.
     #[cfg(not(target_os = "macos"))]
-    let tray = TrayIconBuilder::with_id(TRAY_ICON_ID)
+    TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|icon, event| {
@@ -125,12 +133,19 @@ pub async fn generate_tray_menu(app: &AppHandle) -> Result<TrayIcon, Error> {
         .build(app)?;
 
     debug!("Tray menu successfully generated");
-    Ok(tray)
+    Ok(())
 }
 
-pub async fn reload_tray_menu(app_handle: &AppHandle) {
-    match generate_tray_menu(app_handle).await {
-        Ok(_) => debug!("System tray menu re-generarted."),
+/// Reload menu contents in system tray.
+pub(crate) async fn reload_tray_menu(app: &AppHandle) {
+    let Some(tray) = app.tray_by_id(TRAY_ICON_ID) else {
+        error!("System tray menu not initialized.");
+        return;
+    };
+
+    let menu = generate_tray_menu(app).await.ok();
+    match tray.set_menu(menu) {
+        Ok(()) => debug!("System tray menu re-generarted."),
         Err(err) => error!("Failed to re-generate system tray menu: {err}"),
     }
 }
@@ -185,12 +200,19 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 }
 
-pub fn configure_tray_icon(app: &AppHandle, theme: &AppTrayTheme) -> Result<(), Error> {
+pub async fn configure_tray_icon(app: &AppHandle, theme: AppTrayTheme) -> Result<(), Error> {
     let Some(tray_icon) = app.tray_by_id(TRAY_ICON_ID) else {
         error!("System tray menu not initialized.");
         return Ok(());
     };
-    let resource_str = format!("resources/icons/tray-32x32-{theme}.png");
+
+    let mut resource_str = String::from("resources/icons/tray-32x32-");
+    resource_str.push_str(&theme.to_string());
+    let active_connections = ACTIVE_CONNECTIONS.lock().await;
+    if !active_connections.is_empty() {
+        resource_str.push_str("-active");
+    }
+    resource_str.push_str(".png");
     debug!("Trying to load the tray icon from {resource_str}");
     if let Ok(icon_path) = app.path().resolve(&resource_str, BaseDirectory::Resource) {
         let icon = Image::from_path(icon_path)?;
