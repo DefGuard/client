@@ -27,21 +27,11 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import { type AddInstancePayload, type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
 import type { AddInstanceInitResponse } from '../../types';
 
 type Props = {
   nextStep: (data: AddInstanceInitResponse) => void;
-};
-
-type FormFields = {
-  url: string;
-  token: string;
-};
-
-const defaultValues: FormFields = {
-  url: '',
-  token: '',
 };
 
 export const AddInstanceInitForm = ({ nextStep }: Props) => {
@@ -52,6 +42,7 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const initEnrollment = useEnrollmentStore((state) => state.init);
   const setClientState = useClientStore((state) => state.setState);
+  const instanceConfig = useClientStore((state) => state.instanceConfig);
 
   const schema = useMemo(
     () =>
@@ -66,13 +57,18 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     [LL.form.errors],
   );
 
-  const { handleSubmit, control } = useForm<FormFields>({
+  const defaultValues: AddInstancePayload = {
+    url: instanceConfig.url,
+    token: instanceConfig.token,
+  };
+
+  const { handleSubmit, control } = useForm<AddInstancePayload>({
     resolver: zodResolver(schema),
     defaultValues,
     mode: 'all',
   });
 
-  const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
+  const handleValidSubmit: SubmitHandler<AddInstancePayload> = async (values) => {
     debug('Sending token to proxy');
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';

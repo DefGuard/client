@@ -27,7 +27,9 @@
     "bracketSpacing": true,
     "expand": "auto",
     "useEditorconfig": true,
-    "includes": ["./src/**"]
+    "includes": [
+      "./src/**"
+    ]
   },
   "linter": {
     "enabled": true,
@@ -67,7 +69,9 @@
         "noArrayIndexKey": "off"
       }
     },
-    "includes": ["src/**"]
+    "includes": [
+      "src/**"
+    ]
   },
   "javascript": {
     "formatter": {
@@ -89,7 +93,9 @@
   },
   "overrides": [
     {
-      "includes": ["**/*.js"]
+      "includes": [
+        "**/*.js"
+      ]
     }
   ],
   "assist": {

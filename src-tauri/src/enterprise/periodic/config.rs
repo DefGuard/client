@@ -13,7 +13,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::{CONFIG_CHANGED, INSTANCE_UPDATE},
+    events::EventKey,
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
 };
 
@@ -86,7 +86,7 @@ pub async fn poll_config(handle: AppHandle) {
                 {err}"
             );
         }
-        if let Err(err) = handle.emit(INSTANCE_UPDATE, ()) {
+        if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
         }
         if config_retrieved > 0 {
@@ -217,7 +217,7 @@ pub async fn poll_instance(
             "Emitting config-changed event for instance {}({})",
             instance.name, instance.id,
         );
-        let _ = handle.emit(CONFIG_CHANGED, &instance.name);
+        let _ = handle.emit(EventKey::ConfigChanged.into(), &instance.name);
         info!(
             "Emitted config-changed event for instance {}({})",
             instance.name, instance.id,

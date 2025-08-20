@@ -20,6 +20,7 @@ import { clientQueryKeys } from './query';
 import {
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
+  type AddInstancePayload,
   TauriEventKey,
 } from './types';
 
@@ -136,6 +137,11 @@ export const ClientPage = () => {
       },
     );
 
+    const doEnrollment = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
+      useClientStore.setState({ instanceConfig: data.payload });
+      navigate(routes.client.addInstance, { replace: true });
+    });
+
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
       deadConnectionReconnected.then((cleanup) => cleanup());
@@ -143,7 +149,8 @@ export const ClientPage = () => {
       connectionChanged.then((cleanup) => cleanup());
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
-      appConfigChanged.then((c) => c());
+      appConfigChanged.then((cleanup) => cleanup());
+      doEnrollment.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
