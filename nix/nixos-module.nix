@@ -8,7 +8,7 @@ with lib; let
   defguard-client = pkgs.callPackage ./package.nix {};
   cfg = config.programs.defguard-client;
 in {
-  options.programs.defguard.client = {
+  options.programs.defguard-client = {
     enable = mkEnableOption "Defguard VPN client and service";
 
     package = mkOption {
