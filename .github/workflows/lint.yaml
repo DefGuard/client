@@ -1,28 +1,35 @@
-name: 'lint'
+name: "lint"
 
 on:
   push:
     branches:
       - main
       - dev
-      - 'release/**'
+      - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
   pull_request:
     branches:
       - main
       - dev
-      - 'release/**'
+      - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
 
 jobs:
   lint-web:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
-          submodules: 'recursive'
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "22"
 
       - uses: pnpm/action-setup@v2
         with:
@@ -34,7 +41,7 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
           path: ${{ env.STORE_PATH }}

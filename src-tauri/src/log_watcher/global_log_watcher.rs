@@ -13,7 +13,7 @@ use std::{
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
+use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -40,16 +40,12 @@ impl LogDirs {
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
         debug!("Getting log directories for service and client to watch.");
         let service_log_dir = get_service_log_dir().to_path_buf();
-        let client_log_dir =
-            handle
-                .path_resolver()
-                .app_log_dir()
-                .ok_or(LogWatcherError::LogPathError(
-                    "Path to client logs directory is empty.".to_string(),
-                ))?;
+        let client_log_dir = handle.path().app_log_dir().map_err(|_| {
+            LogWatcherError::LogPathError("Path to client logs directory is empty.".to_string())
+        })?;
         debug!(
             "Log directories of service and client have been identified by the global log watcher: \
-            {service_log_dir:?} and {client_log_dir:?}"
+            {} and {}", service_log_dir.display(), client_log_dir.display()
         );
 
         Ok(Self {
@@ -65,8 +61,8 @@ impl LogDirs {
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         trace!(
-            "Getting latest log file from directory: {:?}",
-            self.service_log_dir
+            "Getting latest log file from directory: {}",
+            self.service_log_dir.display()
         );
         let entries = read_dir(&self.service_log_dir)?;
 
@@ -111,15 +107,15 @@ impl LogDirs {
 
     fn get_client_file(&self) -> Result<File, LogWatcherError> {
         trace!(
-            "Opening the log file for the client, using directory: {:?}",
-            self.client_log_dir
+            "Opening the log file for the client, using directory: {}",
+            self.client_log_dir.display()
         );
         let dir_str = self
             .client_log_dir
             .to_str()
             .ok_or(LogWatcherError::LogPathError(format!(
-                "Couldn't convert the client log directory path ({:?}) to a string slice",
-                self.client_log_dir
+                "Couldn't convert the client log directory path ({}) to a string slice",
+                self.client_log_dir.display()
             )))?;
         let path = format!("{dir_str}/defguard-client.log");
         trace!("Constructed client log file path: {path}");
@@ -189,8 +185,9 @@ impl GlobalLogWatcher {
         trace!("Checking if log files are available");
         if service_reader.is_none() && client_reader.is_none() {
             warn!(
-                "Couldn't read files at {:?} and {:?}, there will be no logs reported in the client.",
-                self.log_dirs.current_service_log_file, self.log_dirs.client_log_dir
+                "Couldn't read files at {:?} and {}, there will be no logs reported in the client.",
+                self.log_dirs.current_service_log_file,
+                self.log_dirs.client_log_dir.display()
             );
             // Wait for logs to appear.
             sleep(DELAY);
@@ -280,7 +277,7 @@ impl GlobalLogWatcher {
             if !parsed_lines.is_empty() {
                 parsed_lines.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
                 trace!("Emitting parsed lines for the frontend");
-                self.handle.emit_all(&self.event_topic, &parsed_lines)?;
+                self.handle.emit(&self.event_topic, &parsed_lines)?;
                 trace!("Emitted {} lines to the frontend", parsed_lines.len());
                 parsed_lines.clear();
             }
@@ -415,10 +412,12 @@ pub async fn spawn_global_log_watcher_task(
     let token_clone = token.clone();
 
     // spawn the task
-    let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?.run()?;
-        Ok(())
-    });
+    let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
+        tauri::async_runtime::spawn(async move {
+            GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?
+                .run()?;
+            Ok(())
+        });
 
     // store `CancellationToken` to manually stop watcher thread
     let mut log_watchers = app_state

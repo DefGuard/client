@@ -2,10 +2,10 @@ import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { debug, error, info } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
-import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -92,12 +92,13 @@ export const DesktopSetup = () => {
     const deviceResponse = await createDeviceMutation({
       name: values.name,
       pubkey: publicKey,
-    }).then((res) => {
+    }).then(async (res) => {
       if (!res.ok) {
         error(
           `Failed to create device during the enrollment. Error details: ${JSON.stringify(
-            res.data,
-          )} Error status code: ${res.status}`,
+            await res.json()
+          )
+          } Error status code: ${res.status} `,
         );
       }
       return res;
@@ -105,21 +106,23 @@ export const DesktopSetup = () => {
     mutateUserActivation({
       password: userPassword,
       phone_number: userInfo.phone_number,
-    }).then((res) => {
+    }).then(async (res) => {
       if (!res.ok) {
         error(
-          `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
-            res.data,
-          )} Error status code: ${res.status}`,
+          `Failed to activate user during the enrollment.Error details: ${JSON.stringify(
+            await res.json(),
+          )
+          } Error status code: ${res.status} `,
         );
         throw Error('Failed to activate user');
       }
       info('User activated');
       setIsLoading(true);
       debug('Invoking save_device_config');
+      const response = await deviceResponse.json() as CreateDeviceResponse;
       saveConfig({
         privateKey,
-        response: deviceResponse.data as CreateDeviceResponse,
+        response,
       })
         .then(() => {
           debug('Config saved');

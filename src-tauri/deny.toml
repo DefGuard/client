@@ -72,22 +72,19 @@ feature-depth = 1
 ignore = [
     { id = "RUSTSEC-2024-0429", reason = "https://github.com/tauri-apps/tauri/issues/12048" },
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained netlink dependency" },
-
-    # The "unmaintained" advisories below stem from our use of Tauri v1, which
+    # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
-    # These issues are expected to be resolved once we migrate to Tauri v2.
-    { id = "RUSTSEC-2024-0415", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0370", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0384", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0419", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0420", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0411", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0418", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0412", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0388", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0416", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0413", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0414", reason = "Tauri v1 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0411", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0412", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0413", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0415", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0416", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0414", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0417", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0418", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0419", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
+    { id = "RUSTSEC-2024-0420", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -109,7 +106,7 @@ allow = [
     "MPL-2.0",
     "BSD-3-Clause",
     "Unicode-3.0",
-    "Unicode-DFS-2016", # unicode-ident
+    "Unicode-DFS-2016",               # unicode-ident
     "Zlib",
     "ISC",
     "BSL-1.0",
@@ -126,8 +123,12 @@ confidence-threshold = 0.8
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
-    { allow = ["AGPL-3.0"], crate = "common" },
-    { allow = ["AGPL-3.0"], crate = "defguard-client" },
+    { allow = [
+        "AGPL-3.0-only",
+    ], crate = "common" },
+    { allow = [
+        "AGPL-3.0-only",
+    ], crate = "defguard-client" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
@@ -247,11 +248,6 @@ unknown-git = "warn"
 # List of URLs for allowed crate registries. Defaults to the crates.io index
 # if not specified. If it is specified but empty, no registries are allowed.
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# List of URLs for allowed Git repositories
-allow-git = [
-  "https://github.com/DefGuard/wireguard-rs",
-  "https://github.com/tauri-apps/plugins-workspace",
-]
 
 [sources.allow-org]
 # github.com organizations to allow git sources for

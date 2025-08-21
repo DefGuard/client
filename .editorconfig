@@ -5,22 +5,21 @@ charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 indent_style = space
-indent_size = 2
 
 [*.{ts,tsx}]
 indent_style = space
 indent_size = 2
-rulers = 90
+rulers = 100
 
 [*.{scss}]
 indent_style = space
 indent_size = 2
-rulers = 90
+rulers = 100
 
 [*.{html}]
 indent_style = space
 indent_size = 2
-rulers = 90
+rulers = 100
 
 [*.{json,yaml}]
 indent_style = space
@@ -30,4 +29,4 @@ rulers = 80
 [*.{rs}]
 indent_style = space
 indent_size = 4
-rulers = 90
+rulers = 100

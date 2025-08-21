@@ -1,13 +1,9 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
-    "target": "ES2022",
-    "types": [
-      "vite/client"
-    ],
+    "target": "ES2023",
     "useDefineForClassFields": true,
     "lib": [
-      "EsNext",
+      "ESNext",
       "DOM",
       "DOM.Iterable"
     ],
@@ -30,6 +26,9 @@
       {
         "name": "typescript-eslint-language-service"
       }
+    ],
+    "types": [
+      "vite/client"
     ]
   },
   "include": [
@@ -39,10 +38,5 @@
     "node_modules",
     "dist",
     "build"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
   ]
 }

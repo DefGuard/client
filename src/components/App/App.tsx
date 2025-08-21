@@ -4,6 +4,7 @@ import '../../shared/scss/index.scss';
 
 import { QueryClient } from '@tanstack/query-core';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { debug } from '@tauri-apps/plugin-log';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
 import duration from 'dayjs/plugin/duration';
@@ -14,7 +15,6 @@ import updateLocale from 'dayjs/plugin/updateLocale';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { debug } from 'tauri-plugin-log-api';
 import { localStorageDetector } from 'typesafe-i18n/detectors';
 
 import TypesafeI18n from '../../i18n/i18n-react';
@@ -120,7 +120,7 @@ const router = createBrowserRouter([
 const detectedLocale = detectLocale(localStorageDetector);
 
 export const App = () => {
-  //workaround ensure effect once in dev mode, thanks react :3
+  // Workaround: ensure effect once in dev mode, thanks react :3
   const tauriInitLoadRef = useRef(false);
   const localeLoadRef = useRef(false);
   const [localeLoaded, setWasLoaded] = useState(false);
@@ -146,13 +146,13 @@ export const App = () => {
     }
   }, []);
 
-  // load settings from tauri first time
+  // Load settings from Tauri for the first time.
   // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     if (!tauriInitLoadRef.current) {
       tauriInitLoadRef.current = true;
       const loadTauriState = async () => {
-        debug('App init state from tauri');
+        debug('App init state from Tauri');
         const appConfig = await getAppConfig();
         const instances = await getInstances();
         const tunnels = await getTunnels();
