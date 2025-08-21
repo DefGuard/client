@@ -46,7 +46,7 @@
     ]
   },
   "dependencies": {
-    "@floating-ui/react": "^0.27.15",
+    "@floating-ui/react": "^0.27.16",
     "@hookform/resolvers": "^3.10.0",
     "@react-hook/resize-observer": "^2.0.2",
     "@stablelib/base64": "^2.0.1",
@@ -56,9 +56,9 @@
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.0",
     "@tauri-apps/plugin-deep-link": "^2.4.1",
-    "@tauri-apps/plugin-dialog": "^2.3.2",
-    "@tauri-apps/plugin-fs": "^2.4.1",
-    "@tauri-apps/plugin-http": "^2.5.1",
+    "@tauri-apps/plugin-dialog": "^2.3.3",
+    "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-http": "^2.5.2",
     "@tauri-apps/plugin-log": "^2.6.0",
     "@tauri-apps/plugin-notification": "^2.3.0",
     "@tauri-apps/plugin-window-state": "^2.4.0",
