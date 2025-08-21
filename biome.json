@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.1.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
   "vcs": {
     "enabled": false,
     "clientKind": "git",
@@ -12,7 +12,7 @@
       "!src/i18n/*.ts",
       "!src/i18n/*.tsx",
       "!src/i18n/i18n-util",
-      "!dist/**"
+      "!dist"
     ]
   },
   "formatter": {
@@ -39,6 +39,7 @@
         "noUselessTypeConstraint": "error"
       },
       "correctness": {
+        "useUniqueElementIds": "off",
         "noChildrenProp": "error",
         "noPrecisionLoss": "error",
         "noUnusedVariables": "error",

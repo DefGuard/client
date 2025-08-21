@@ -442,7 +442,6 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
 
   useEffect(() => {
     const TIMEOUT_DURATION = 5 * 1000 * 60; // 5 minutes timeout
-    // biome-ignore lint/style/useConst: false positive
     let timeoutId: NodeJS.Timeout;
 
     const pollMFAStatus = async () => {
