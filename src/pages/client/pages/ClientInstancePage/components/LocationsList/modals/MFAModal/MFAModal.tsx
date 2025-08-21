@@ -3,7 +3,7 @@ import './style.scss';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { fetch } from '@tauri-apps/plugin-http';
-import { error } from '@tauri-apps/plugin-log';
+import { debug, error } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AuthCode from 'react-auth-code-input';
@@ -72,23 +72,15 @@ export const MFAModal = () => {
   const [proxyUrl, setProxyUrl] = useState('');
 
   const localLL = LL.modals.mfa.authentication;
-  const isOpen = useMFAModal((state) => state.isOpen);
-  const location = useMFAModal((state) => state.instance);
+  const [isOpen, location] = useMFAModal((state) => [state.isOpen, state.instance]);
   const [close, reset] = useMFAModal((state) => [state.close, state.reset], shallow);
-  const [selectedInstanceId, selectedInstanceType] = useClientStore((state) => [
-    state.selectedInstance?.id,
-    state.selectedInstance?.type,
-  ]);
   const instances = useClientStore((state) => state.instances);
   const selectedInstance = useMemo((): DefguardInstance | undefined => {
-    if (
-      !isUndefined(selectedInstanceId) &&
-      selectedInstanceType &&
-      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE
-    ) {
-      return instances.find((i) => i.id === selectedInstanceId);
+    const instanceId = location?.instance_id;
+    if (!isUndefined(instanceId)) {
+      return instances.find((i) => i.id === instanceId);
     }
-  }, [selectedInstanceId, selectedInstanceType, instances]);
+  }, [location, instances]);
 
   const resetState = () => {
     reset();
