@@ -42,7 +42,7 @@ pub enum AppTheme {
     Dark,
 }
 
-#[derive(Clone, Debug, Deserialize, Display, EnumString, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display, EnumString, PartialEq, Serialize)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AppTrayTheme {

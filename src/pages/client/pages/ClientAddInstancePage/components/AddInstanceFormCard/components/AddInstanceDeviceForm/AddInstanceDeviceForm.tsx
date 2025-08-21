@@ -98,7 +98,7 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
           const data = (await r.json()) as ErrorData;
           const details = `${data?.error ? `${data.error}, ` : ''}`;
           error(
-            `Failed to create device check enrollment and Defguard logs, details: ${details} Error status code: ${r.status} `,
+            `Failed to create device. Check enrollment and Defguard logs, details: ${details}. Error status code: ${r.status}`,
           );
           throw Error(`Failed to create device, details: ${details} `);
         }
@@ -111,14 +111,11 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             setIsLoading(false);
             toaster.success(localLL.messages.addSuccess());
             const instances = await getInstances();
-            const _selectedInstance: SelectedInstance = {
+            const selectedInstance: SelectedInstance = {
               id: res.instance.id,
               type: WireguardInstanceType.DEFGUARD_INSTANCE,
             };
-            setClientStore({
-              selectedInstance: _selectedInstance,
-              instances,
-            });
+            setClientStore({ selectedInstance, instances });
             // Clear token and URL values.
             useClientStore.setState({ instanceConfig: { token: '', url: '' } });
             navigate(routes.client.instancePage, { replace: true });

@@ -19,7 +19,7 @@ use defguard_client::{
     events::EventKey,
     periodic::run_periodic_tasks,
     service,
-    tray::{configure_tray_icon, reload_tray_menu},
+    tray::{configure_tray_icon, setup_tray},
     utils::load_log_targets,
     VERSION,
 };
@@ -112,10 +112,12 @@ async fn startup(app_handle: &AppHandle) {
         "Re-generating tray menu to show all available instances and locations as we have \
         connected to the database."
     );
-    reload_tray_menu(app_handle).await;
+    if let Err(err) = setup_tray(app_handle).await {
+        error!("Failed to setup system tray: {err}");
+    }
     let state = app_handle.state::<AppState>();
-    let theme = &state.app_config.lock().unwrap().tray_theme;
-    match configure_tray_icon(app_handle, theme) {
+    let theme = state.app_config.lock().unwrap().tray_theme;
+    match configure_tray_icon(app_handle, theme).await {
         Ok(()) => info!("System tray configured."),
         Err(err) => error!("Failed to configure system tray: {err}"),
     }
@@ -291,13 +293,6 @@ fn main() {
                     .build(),
             )?;
 
-            // Configure tray.
-            debug!("Configuring tray icon.");
-            match configure_tray_icon(app_handle, &config.tray_theme) {
-                Ok(()) => debug!("Tray icon has been configured successfully"),
-                Err(err) => error!("Failed to configure tray icon: {err}"),
-            }
-
             let state = AppState::new(config);
             app.manage(state);
 
@@ -356,6 +351,8 @@ fn main() {
             debug!("Exiting the application's main event loop.");
             tauri::async_runtime::block_on(async {
                 let _ = close_all_connections().await;
+                // This will clean the database file, pruning write-ahead log.
+                DB_POOL.close().await;
             });
         }
         _ => {
