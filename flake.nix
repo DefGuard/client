@@ -5,7 +5,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
 
     # include git submodules
-    self.submodules = true;
+    # self.submodules = true;
   };
 
   outputs = {
@@ -32,16 +32,6 @@
       formatter = pkgs.alejandra;
     })
     // {
-      nixosModules.default = {
-        nixpkgs,
-        lib,
-        config,
-        ...
-      }:
-        import ./nix/nixos-module.nix {
-          inherit lib;
-          inherit (nixpkgs) pkgs;
-          inherit config;
-        };
+      nixosModules.default = import ./nix/nixos-module.nix;
     };
 }
