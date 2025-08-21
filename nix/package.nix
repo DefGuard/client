@@ -6,7 +6,7 @@
   makeDesktopItem,
 }: let
   pname = "defguard-client";
-  version = "1.5.0"; # TODO: Get this from Cargo.toml or git
+  version = "1.5.1"; # TODO: Get this from Cargo.toml or git
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -20,30 +20,40 @@
   rustToolchain = pkgs.rust-bin.stable.latest.default;
 
   buildInputs = with pkgs; [
-    gtk3
+    at-spi2-atk
+    atkmm
     cairo
+    dbus
     gdk-pixbuf
     glib
-    dbus
-    openssl
+    glib-networking
+    gtk4
+    harfbuzz
     librsvg
     libsoup_3
-    webkitgtk_4_0
+    pango
+    webkitgtk_4_1
+    openssl
     libayatana-appindicator
+    mesa
+    libGL
+    libGLU
   ];
 
   nativeBuildInputs = with pkgs; [
     rustToolchain
     pkg-config
-    cargo-tauri_1
+    gobject-introspection
+    cargo-tauri
     nodejs_24
+    protobuf
     pnpm
     # configures pnpm to use pre-fetched dependencies
     pnpm.configHook
-    protobuf
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
     perl
+    wrapGAppsHook
   ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
@@ -58,10 +68,10 @@ in
     cargoDeps = rustPlatform.importCargoLock {
       lockFile = ../src-tauri/Cargo.lock;
       # specify hashes for git dependencies
-      outputHashes = {
-        "defguard_wireguard_rs-0.7.4" = "sha256-pxwN43BntOEYtp+TlpQFX78gg1ko4zuXEGctZIfSrhg=";
-        "tauri-plugin-log-0.0.0" = "sha256-jGzlN/T29Hya4bKe9Dwl2mRRFLXMywrHk+32zgwrpJ0=";
-      };
+      # outputHashes = {
+      # "defguard_wireguard_rs-0.7.5" = "sha256-pxwN43BntOEYtp+TlpQFX78gg1ko4zuXEGctZIfSrhg=";
+      # "tauri-plugin-log-0.0.0" = "sha256-jGzlN/T29Hya4bKe9Dwl2mRRFLXMywrHk+32zgwrpJ0=";
+      # };
     };
 
     # prefetch pnpm dependencies
@@ -74,7 +84,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-lQUhwy1/zz3mUN7wNLQyKeULYPQiu2UvMS2REu9XxEc=";
+      hash = "sha256-ccSwlPY3sOnUJoYfB4MWs0gU8/Aq/CiCrLWouQ7PqhY=";
     };
 
     buildPhase = ''
