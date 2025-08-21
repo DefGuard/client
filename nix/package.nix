@@ -54,6 +54,8 @@
     rustPlatform.cargoSetupHook
     perl
     wrapGAppsHook
+    # helper to add dynamic library paths
+    makeWrapper
   ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
@@ -101,6 +103,10 @@ in
       # copy cli binary
       mkdir -p $out/bin
       cp src-tauri/target/release/dg $out/bin/
+
+      # add required library to client binary RPATH
+      wrapProgram $out/bin/${pname} \
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator]}
 
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
