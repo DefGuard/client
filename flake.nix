@@ -32,6 +32,16 @@
       formatter = pkgs.alejandra;
     })
     // {
-      nixosModules.default = import ./nix/nixos-module.nix;
+      nixosModules.default = {
+        nixpkgs,
+        lib,
+        config,
+        ...
+      }:
+        import ./nix/nixos-module.nix {
+          inherit lib;
+          inherit (nixpkgs) pkgs;
+          inherit config;
+        };
     };
 }

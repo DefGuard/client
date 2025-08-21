@@ -5,10 +5,10 @@
   ...
 }:
 with lib; let
-  cfg = config.programs.defguard-client;
   defguard-client = pkgs.callPackage ./package.nix {};
+  cfg = config.programs.defguard-client;
 in {
-  options.services.defguard = {
+  options.programs.defguard.client = {
     enable = mkEnableOption "Defguard VPN client and service";
 
     package = mkOption {
@@ -46,6 +46,22 @@ in {
         Group = "defguard";
         StateDirectory = "defguard";
         LogsDirectory = "defguard";
+        # Add capabilities to manage network interfaces
+        CapabilityBoundingSet = "CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_MODULE";
+        AmbientCapabilities = "CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_MODULE";
+        # Allow access to /dev/net/tun for TUN/TAP devices
+        DeviceAllow = "/dev/net/tun rw";
+        # Access to /sys for network configuration
+        BindReadOnlyPaths = [
+          "/sys"
+          "/proc"
+        ];
+        # Protect the system while giving necessary access
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        NoNewPrivileges = true;
+        # Allow the service to manage network namespaces
+        PrivateNetwork = false;
       };
     };
 
