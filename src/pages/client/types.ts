@@ -104,8 +104,8 @@ export type DeadConReconnectedPayload = {
 };
 
 export type AddInstancePayload = {
-  token: string,
-  url: string,
+  token: string;
+  url: string;
 };
 
 export enum TauriEventKey {

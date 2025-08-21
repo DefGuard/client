@@ -11,19 +11,20 @@ import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
+import { MfaModalProvider } from './components/MfaModalProvider';
 import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/DeadConDroppedModal';
 import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/store';
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
+import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
 import {
-  type DeadConDroppedPayload,
-  type DeadConReconnectedPayload,
   type AddInstancePayload,
   type CommonWireguardFields,
+  type DeadConDroppedPayload,
+  type DeadConReconnectedPayload,
   TauriEventKey,
 } from './types';
-import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
 
@@ -144,9 +145,12 @@ export const ClientPage = () => {
       navigate(routes.client.addInstance, { replace: true });
     });
 
-    const mfaTrigger = listen<CommonWireguardFields>(TauriEventKey.MFA_TRIGGER, (data) => {
-      openMFAModal(data.payload);
-    });
+    const mfaTrigger = listen<CommonWireguardFields>(
+      TauriEventKey.MFA_TRIGGER,
+      (data) => {
+        openMFAModal(data.payload);
+      },
+    );
 
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
@@ -197,7 +201,9 @@ export const ClientPage = () => {
 
   return (
     <>
-      <Outlet />
+      <MfaModalProvider>
+        <Outlet />
+      </MfaModalProvider>
       <DeadConDroppedModal />
       <ClientSideBar />
     </>

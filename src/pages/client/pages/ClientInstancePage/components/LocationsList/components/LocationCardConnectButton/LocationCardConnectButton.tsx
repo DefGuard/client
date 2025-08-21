@@ -24,10 +24,10 @@ type Props = {
 };
 
 export const LocationCardConnectButton = ({ location }: Props) => {
+  const openMFAModal = useMFAModal((state) => state.open);
   const toaster = useToaster();
   const [isLoading, setIsLoading] = useState(false);
   const { LL } = useI18nContext();
-  const openMFAModal = useMFAModal((state) => state.open);
 
   const cn = classNames('location-card-connect-button', {
     connected: location?.active,

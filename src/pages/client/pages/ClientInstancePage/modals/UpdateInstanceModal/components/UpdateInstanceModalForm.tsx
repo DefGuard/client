@@ -100,7 +100,7 @@ export const UpdateInstanceModalForm = () => {
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const enrollmentData = await res.json() as EnrollmentStartResponse;
+      const enrollmentData = (await res.json()) as EnrollmentStartResponse;
       let proxy_api_url = values.url;
       if (proxy_api_url[proxy_api_url.length - 1] === '/') {
         proxy_api_url = proxy_api_url.slice(0, -1);
@@ -108,9 +108,9 @@ export const UpdateInstanceModalForm = () => {
       proxy_api_url = `${proxy_api_url}/api/v1`;
       const instance = clientInstances.find((i) => i.uuid === enrollmentData.instance.id);
       if (instance) {
-        const authCookie = res.headers.getSetCookie().find((cookie) =>
-          cookie.startsWith('defguard_proxy='),
-        );
+        const authCookie = res.headers
+          .getSetCookie()
+          .find((cookie) => cookie.startsWith('defguard_proxy='));
         if (!authCookie) {
           toaster.error(
             LL.common.messages.errorWithMessage({
@@ -131,7 +131,7 @@ export const UpdateInstanceModalForm = () => {
           },
         );
         if (instanceInfoResponse.ok) {
-          const data = await instanceInfoResponse.json() as CreateDeviceResponse;
+          const data = (await instanceInfoResponse.json()) as CreateDeviceResponse;
           updateInstance({
             instanceId: instance.id,
             response: data,

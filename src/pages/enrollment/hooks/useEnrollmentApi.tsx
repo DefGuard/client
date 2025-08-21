@@ -10,48 +10,39 @@ export const useEnrollmentApi = (): UseApi => {
   ]);
 
   const start: UseApi['enrollment']['start'] = async (data) => {
-    const response = await fetch(
-      `${proxyUrl}/enrollment/start`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        } as Record<string, string>,
-        body: JSON.stringify(data),
-      },
-    );
+    const response = await fetch(`${proxyUrl}/enrollment/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
     return response;
   };
 
   const activateUser: UseApi['enrollment']['activateUser'] = async (data) => {
-    const response = await fetch(
-      `${proxyUrl}/enrollment/activate_user`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        } as Record<string, string>,
-        body: JSON.stringify(data),
-      },
-    );
+    const response = await fetch(`${proxyUrl}/enrollment/activate_user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
 
     return response;
   };
 
   const createDevice: UseApi['enrollment']['createDevice'] = async (data) => {
-    const response = await fetch(
-      `${proxyUrl}/enrollment/create_device`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        } as Record<string, string>,
-        body: JSON.stringify(data),
-      },
-    );
+    const response = await fetch(`${proxyUrl}/enrollment/create_device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
 
     return response;
   };

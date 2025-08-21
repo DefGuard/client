@@ -1,0 +1,9 @@
+#mobile-approve-mfa {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: var(--spacing-m) var(--spacing-s);
+  gap: var(--spacing-m);
+}
