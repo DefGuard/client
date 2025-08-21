@@ -20,8 +20,10 @@ import {
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
   type AddInstancePayload,
+  type CommonWireguardFields,
   TauriEventKey,
 } from './types';
+import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
 
@@ -40,6 +42,7 @@ export const ClientPage = () => {
   const location = useLocation();
   const toaster = useToaster();
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
+  const openMFAModal = useMFAModal((state) => state.open);
   const { LL } = useI18nContext();
 
   const { data: instances } = useQuery({
@@ -136,9 +139,13 @@ export const ClientPage = () => {
       },
     );
 
-    const doEnrollment = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
+    const addInstance = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
       useClientStore.setState({ instanceConfig: data.payload });
       navigate(routes.client.addInstance, { replace: true });
+    });
+
+    const mfaTrigger = listen<CommonWireguardFields>(TauriEventKey.MFA_TRIGGER, (data) => {
+      openMFAModal(data.payload);
     });
 
     return () => {
@@ -149,7 +156,8 @@ export const ClientPage = () => {
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
       appConfigChanged.then((cleanup) => cleanup());
-      doEnrollment.then((cleanup) => cleanup());
+      addInstance.then((cleanup) => cleanup());
+      mfaTrigger.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

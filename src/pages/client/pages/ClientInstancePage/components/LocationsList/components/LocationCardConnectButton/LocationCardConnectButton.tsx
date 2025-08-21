@@ -1,9 +1,8 @@
 import './style.scss';
 
-import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import classNames from 'classnames';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import SvgIconCheckmarkSmall from '../../../../../../../../shared/components/svg/IconCheckmarkSmall';
@@ -21,10 +20,6 @@ import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
 const { connect, disconnect } = clientApi;
 
 type Props = {
-  location?: CommonWireguardFields;
-};
-
-type Payload = {
   location?: CommonWireguardFields;
 };
 
@@ -75,17 +70,6 @@ export const LocationCardConnectButton = ({ location }: Props) => {
       console.error(e);
     }
   };
-
-  useEffect(() => {
-    async function listenMFAEvent() {
-      await listen<Payload>('mfa-trigger', () => {
-        if (location) {
-          openMFAModal(location);
-        }
-      });
-    }
-    listenMFAEvent();
-  }, [openMFAModal, location]);
 
   return (
     <Button
