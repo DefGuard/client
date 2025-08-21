@@ -96,9 +96,8 @@ export const DesktopSetup = () => {
       if (!res.ok) {
         error(
           `Failed to create device during the enrollment. Error details: ${JSON.stringify(
-            await res.json()
-          )
-          } Error status code: ${res.status} `,
+            await res.json(),
+          )} Error status code: ${res.status} `,
         );
       }
       return res;
@@ -111,15 +110,14 @@ export const DesktopSetup = () => {
         error(
           `Failed to activate user during the enrollment.Error details: ${JSON.stringify(
             await res.json(),
-          )
-          } Error status code: ${res.status} `,
+          )} Error status code: ${res.status} `,
         );
         throw Error('Failed to activate user');
       }
       info('User activated');
       setIsLoading(true);
       debug('Invoking save_device_config');
-      const response = await deviceResponse.json() as CreateDeviceResponse;
+      const response = (await deviceResponse.json()) as CreateDeviceResponse;
       saveConfig({
         privateKey,
         response,

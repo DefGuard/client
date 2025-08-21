@@ -11,15 +11,16 @@ import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
+import { MfaModalProvider } from './components/MfaModalProvider';
 import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/DeadConDroppedModal';
 import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/store';
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
 import { clientQueryKeys } from './query';
 import {
+  type AddInstancePayload,
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
-  type AddInstancePayload,
   TauriEventKey,
 } from './types';
 
@@ -136,10 +137,13 @@ export const ClientPage = () => {
       },
     );
 
-    const doEnrollment = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
-      useClientStore.setState({ instanceConfig: data.payload });
-      navigate(routes.client.addInstance, { replace: true });
-    });
+    const doEnrollment = listen<AddInstancePayload>(
+      TauriEventKey.ADD_INSTANCE,
+      (data) => {
+        useClientStore.setState({ instanceConfig: data.payload });
+        navigate(routes.client.addInstance, { replace: true });
+      },
+    );
 
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
@@ -189,7 +193,9 @@ export const ClientPage = () => {
 
   return (
     <>
-      <Outlet />
+      <MfaModalProvider>
+        <Outlet />
+      </MfaModalProvider>
       <DeadConDroppedModal />
       <ClientSideBar />
     </>
