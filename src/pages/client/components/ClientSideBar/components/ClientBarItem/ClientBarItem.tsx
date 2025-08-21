@@ -7,7 +7,7 @@ import { useMatch, useNavigate } from 'react-router-dom';
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { type SelectedInstance, WireguardInstanceType } from '../../../../types';
+import type { WireguardInstanceType } from '../../../../types';
 
 type Props = {
   itemType: WireguardInstanceType;
@@ -47,26 +47,12 @@ export const ClientBarItem = ({ itemType, itemId, label, active = false }: Props
         className={cn}
         ref={refs.setReference}
         onClick={() => {
-          switch (itemType) {
-            case WireguardInstanceType.DEFGUARD_INSTANCE: {
-              const _selectedInstance: SelectedInstance = {
-                id: itemId,
-                type: WireguardInstanceType.DEFGUARD_INSTANCE,
-              };
-              setClientStore({
-                selectedInstance: _selectedInstance,
-              });
-              break;
-            }
-            case WireguardInstanceType.TUNNEL:
-              setClientStore({
-                selectedInstance: {
-                  id: itemId,
-                  type: WireguardInstanceType.TUNNEL,
-                },
-              });
-              break;
-          }
+          setClientStore({
+            selectedInstance: {
+              id: itemId,
+              type: itemType,
+            },
+          });
           if (!instancePage) {
             navigate(routes.client.instancePage, { replace: true });
           }

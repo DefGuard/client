@@ -29,7 +29,6 @@ import { useClientStore } from '../../../../../../hooks/useClientStore';
 import {
   type DefguardInstance,
   LocationMfaType,
-  WireguardInstanceType,
 } from '../../../../../../types';
 import { MfaMobileApprove } from './components/MfaMobileApprove/MfaMobileApprove';
 import { BrowserErrorIcon, BrowserPendingIcon, GoToBrowserIcon } from './Icons';
@@ -76,23 +75,15 @@ export const MFAModal = () => {
   const [startResponse, setStartResponse] = useState<MFAStartResponse>();
 
   const localLL = LL.modals.mfa.authentication;
-  const isOpen = useMFAModal((state) => state.isOpen);
-  const location = useMFAModal((state) => state.instance);
+  const [isOpen, location] = useMFAModal((state) => [state.isOpen, state.instance]);
   const [close, reset] = useMFAModal((state) => [state.close, state.reset], shallow);
-  const [selectedInstanceId, selectedInstanceType] = useClientStore((state) => [
-    state.selectedInstance?.id,
-    state.selectedInstance?.type,
-  ]);
   const instances = useClientStore((state) => state.instances);
   const selectedInstance = useMemo((): DefguardInstance | undefined => {
-    if (
-      !isUndefined(selectedInstanceId) &&
-      selectedInstanceType &&
-      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE
-    ) {
-      return instances.find((i) => i.id === selectedInstanceId);
+    const instanceId = location?.instance_id;
+    if (!isUndefined(instanceId)) {
+      return instances.find((i) => i.id === instanceId);
     }
-  }, [selectedInstanceId, selectedInstanceType, instances]);
+  }, [location, instances]);
 
   const resetState = () => {
     reset();

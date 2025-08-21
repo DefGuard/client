@@ -12,6 +12,7 @@ use crate::{
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
     error::Error,
+    events::EventKey,
     ConnectionType,
 };
 
@@ -225,11 +226,6 @@ pub async fn configure_tray_icon(app: &AppHandle, theme: AppTrayTheme) -> Result
     }
 }
 
-#[derive(Clone, serde::Serialize)]
-struct MfaPayload<'a> {
-    message: &'a str,
-}
-
 async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
     match id.parse::<i64>() {
         Ok(location_id) => {
@@ -244,18 +240,13 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                             disconnect(location_id, ConnectionType::Location, handle.clone()).await;
                     } else {
                         info!("Connect location with ID {id}");
-                        // check is mfa enabled and trigger modal on frontend
+                        // Check if MFA is enabled. If so, trigger modal on frontend.
                         if location.mfa_enabled() {
                             info!(
                                 "MFA enabled for location with ID {:?}, trigger MFA modal",
                                 location.id
                             );
-                            let _ = handle.emit(
-                                "mfa-trigger",
-                                MfaPayload {
-                                    message: "Trigger MFA event",
-                                },
-                            );
+                            let _ = handle.emit(EventKey::MfaTrigger.into(), &location);
                         } else if let Err(err) =
                             connect(location_id, ConnectionType::Location, None, handle.clone())
                                 .await
