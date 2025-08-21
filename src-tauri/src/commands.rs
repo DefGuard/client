@@ -48,11 +48,6 @@ use crate::{
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 
-#[derive(Clone, Serialize)]
-pub(crate) struct Payload<'a> {
-    pub(crate) message: &'a str,
-}
-
 // Create new WireGuard interface
 #[tauri::command(async)]
 pub async fn connect(
@@ -137,12 +132,7 @@ pub async fn disconnect(
             "Emitting the event informing the frontend about the disconnection from \
             {connection_type} {name}({location_id})"
         );
-        handle.emit(
-            EventKey::ConfigChanged.into(),
-            Payload {
-                message: "Created new connection",
-            },
-        )?;
+        handle.emit(EventKey::ConnectionChanged.into(), ())?;
         debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
         reload_tray_menu(&handle).await;
@@ -774,12 +764,7 @@ pub async fn update_location_routing(
                 location.route_all_traffic = route_all_traffic;
                 location.save(&*DB_POOL).await?;
                 debug!("Location routing updated for location {name}(ID: {location_id})");
-                handle.emit(
-                    EventKey::LocationUpdate.into(),
-                    Payload {
-                        message: "Location routing updated",
-                    },
-                )?;
+                handle.emit(EventKey::LocationUpdate.into(), ())?;
                 Ok(())
             } else {
                 error!(
@@ -793,12 +778,7 @@ pub async fn update_location_routing(
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&*DB_POOL).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
-                handle.emit(
-                    EventKey::LocationUpdate.into(),
-                    Payload {
-                        message: "Tunnel routing updated",
-                    },
-                )?;
+                handle.emit(EventKey::LocationUpdate.into(), ())?;
                 Ok(())
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
@@ -882,12 +862,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
     debug!("Received tunnel configuration to update: {tunnel:?}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
-    handle.emit(
-        EventKey::LocationUpdate.into(),
-        Payload {
-            message: "Tunnel saved",
-        },
-    )?;
+    handle.emit(EventKey::LocationUpdate.into(), ())?;
     Ok(())
 }
 
@@ -896,12 +871,7 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     debug!("Received tunnel configuration to save: {tunnel:?}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
-    handle.emit(
-        EventKey::LocationUpdate.into(),
-        Payload {
-            message: "Tunnel saved",
-        },
-    )?;
+    handle.emit(EventKey::LocationUpdate.into(), ())?;
     Ok(())
 }
 
