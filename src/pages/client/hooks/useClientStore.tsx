@@ -39,8 +39,8 @@ const defaultValues: StoreValues = {
   },
   instanceConfig: {
     token: '',
-    url: ''
-  }
+    url: '',
+  },
 };
 
 export const useClientStore = createWithEqualityFn<Store>()(
@@ -115,7 +115,7 @@ type StoreValues = {
   listChecked: boolean;
   selectedView: ClientView;
   appConfig: AppConfig;
-  instanceConfig: AddInstancePayload,
+  instanceConfig: AddInstancePayload;
 };
 
 type StoreMethods = {
