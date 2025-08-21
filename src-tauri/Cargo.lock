@@ -770,7 +770,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -823,9 +823,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-if"
-version = "1.0.1"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
+checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
 
 [[package]]
 name = "cfg_aliases"
@@ -1267,7 +1267,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "time",
  "tokio",
  "tokio-stream",
@@ -1299,7 +1299,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1322,7 +1322,7 @@ dependencies = [
  "netlink-sys",
  "nix",
  "serde",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "x25519-dalek",
 ]
 
@@ -3233,7 +3233,7 @@ dependencies = [
  "once_cell",
  "png",
  "serde",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "windows-sys 0.60.2",
 ]
 
@@ -4169,7 +4169,7 @@ checksum = "3af6b589e163c5a788fab00ce0c0366f6efbb9959c2f9874b224936af7fce7e1"
 dependencies = [
  "base64 0.22.1",
  "indexmap 2.10.0",
- "quick-xml 0.38.1",
+ "quick-xml 0.38.2",
  "serde",
  "time",
 ]
@@ -4429,9 +4429,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.1"
+version = "0.38.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9845d9dccf565065824e69f9f235fafba1587031eda353c1f1561cd6a6be78f4"
+checksum = "d200a41a7797e6461bd04e4e95c3347053a731c32c87f066f2f0dda22dbdbba8"
 dependencies = [
  "memchr",
 ]
@@ -4450,7 +4450,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2 0.5.10",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tokio",
  "tracing",
  "web-time",
@@ -4471,7 +4471,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tinyvec",
  "tracing",
  "web-time",
@@ -4656,7 +4656,7 @@ checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
 dependencies = [
  "getrandom 0.2.16",
  "libredox",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -5535,7 +5535,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "smallvec",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5619,7 +5619,7 @@ dependencies = [
  "smallvec",
  "sqlx-core",
  "stringprep",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tracing",
  "uuid",
  "whoami",
@@ -5658,7 +5658,7 @@ dependencies = [
  "smallvec",
  "sqlx-core",
  "stringprep",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tracing",
  "uuid",
  "whoami",
@@ -5684,7 +5684,7 @@ dependencies = [
  "serde",
  "serde_urlencoded",
  "sqlx-core",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tracing",
  "url",
  "uuid",
@@ -5943,9 +5943,9 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tauri"
-version = "2.8.1"
+version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2a95cd68dd3e97bfe689ed6076ea16c68389feabc51ec4a63138bbe4892c8d7"
+checksum = "a54629607ea3084a8b455c1ebe888cbdfc4de02fa5edb2e40db0dc97091007e3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -5983,7 +5983,7 @@ dependencies = [
  "tauri-runtime",
  "tauri-runtime-wry",
  "tauri-utils",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tokio",
  "tray-icon",
  "url",
@@ -6036,7 +6036,7 @@ dependencies = [
  "sha2",
  "syn 2.0.106",
  "tauri-utils",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "time",
  "url",
  "uuid",
@@ -6086,7 +6086,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -6102,7 +6102,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-utils",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tracing",
  "url",
  "windows-registry",
@@ -6111,9 +6111,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-dialog"
-version = "2.3.2"
+version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37e5858cc7b455a73ab4ea2ebc08b5be33682c00ff1bf4cad5537d4fb62499d9"
+checksum = "0ee5a3c416dc59d7d9aa0de5490a82d6e201c67ffe97388979d77b69b08cda40"
 dependencies = [
  "log",
  "raw-window-handle",
@@ -6123,15 +6123,15 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-plugin-fs",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "url",
 ]
 
 [[package]]
 name = "tauri-plugin-fs"
-version = "2.4.1"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c6ef84ee2f2094ce093e55106d90d763ba343fad57566992962e8f76d113f99"
+checksum = "315784ec4be45e90a987687bae7235e6be3d6e9e350d2b75c16b8a4bf22c1db7"
 dependencies = [
  "anyhow",
  "dunce",
@@ -6144,16 +6144,16 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-utils",
- "thiserror 2.0.15",
- "toml 0.8.23",
+ "thiserror 2.0.16",
+ "toml 0.9.5",
  "url",
 ]
 
 [[package]]
 name = "tauri-plugin-http"
-version = "2.5.1"
+version = "2.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcde333d97e565a7765aad82f32d8672458f7bd77b6ee653830d5dded9d7b5c2"
+checksum = "938a3d7051c9a82b431e3a0f3468f85715b3442b3c3a3913095e9fa509e2652c"
 dependencies = [
  "bytes",
  "cookie_store",
@@ -6167,7 +6167,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-plugin-fs",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tokio",
  "url",
  "urlpattern",
@@ -6191,7 +6191,7 @@ dependencies = [
  "swift-rs",
  "tauri",
  "tauri-plugin",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "time",
 ]
 
@@ -6209,7 +6209,7 @@ dependencies = [
  "serde_repr",
  "tauri",
  "tauri-plugin",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "time",
  "url",
 ]
@@ -6224,7 +6224,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin-deep-link",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tracing",
  "windows-sys 0.60.2",
  "zbus",
@@ -6242,7 +6242,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
@@ -6263,7 +6263,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tauri-utils",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "url",
  "webkit2gtk",
  "webview2-com",
@@ -6327,7 +6327,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "swift-rs",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "toml 0.9.5",
  "url",
  "urlpattern",
@@ -6352,22 +6352,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b1e66e07de489fe43a46678dd0b8df65e0c973909df1b60ba33874e297ba9b9"
 dependencies = [
  "quick-xml 0.37.5",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "windows",
  "windows-version",
 ]
 
 [[package]]
 name = "tempfile"
-version = "3.20.0"
+version = "3.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a64e3985349f2441a1a9ef0b853f869006c3855f2cda6862a94d26ebb9d6a1"
+checksum = "15b61f8f20e3a6f7e0649d825294eaf317edce30f82cf6026e7e4cb9222a7d1e"
 dependencies = [
  "fastrand",
  "getrandom 0.3.3",
  "once_cell",
  "rustix 1.0.8",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6392,11 +6392,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.15"
+version = "2.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80d76d3f064b981389ecb4b6b7f45a0bf9fdac1d5b9204c7bd6714fecc302850"
+checksum = "3467d614147380f2e4e374161426ff399c91084acd2363eaf549172b3d5e60c0"
 dependencies = [
- "thiserror-impl 2.0.15",
+ "thiserror-impl 2.0.16",
 ]
 
 [[package]]
@@ -6412,9 +6412,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.15"
+version = "2.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44d29feb33e986b6ea906bd9c3559a856983f92371b3eaa5e83782a351623de0"
+checksum = "6c5e1be1c48b9172ee610da68fd9cd2770e7a4056cb3fc98710ee6906f0c7960"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6661,7 +6661,6 @@ dependencies = [
  "serde",
  "serde_spanned 0.6.9",
  "toml_datetime 0.6.11",
- "toml_write",
  "winnow 0.7.12",
 ]
 
@@ -6673,12 +6672,6 @@ checksum = "b551886f449aa90d4fe2bdaa9f4a2577ad2dde302c61ecf262d80b116db95c10"
 dependencies = [
  "winnow 0.7.12",
 ]
-
-[[package]]
-name = "toml_write"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "toml_writer"
@@ -6911,7 +6904,7 @@ dependencies = [
  "once_cell",
  "png",
  "serde",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "windows-sys 0.59.0",
 ]
 
@@ -7520,7 +7513,7 @@ version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36695906a1b53a3bf5c4289621efedac12b73eeb0b89e7e1a89b517302d5d75c"
 dependencies = [
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "windows",
  "windows-core",
 ]
@@ -7565,11 +7558,11 @@ checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 
 [[package]]
 name = "winapi-util"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
+checksum = "0978bf7171b3d90bac376700cb56d606feb40f251a475a5d6634613564460b22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8081,7 +8074,7 @@ dependencies = [
  "os_pipe",
  "rustix 0.38.44",
  "tempfile",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "tree_magic_mini",
  "wayland-backend",
  "wayland-client",
@@ -8129,7 +8122,7 @@ dependencies = [
  "sha2",
  "soup3",
  "tao-macros",
- "thiserror 2.0.15",
+ "thiserror 2.0.16",
  "url",
  "webkit2gtk",
  "webkit2gtk-sys",

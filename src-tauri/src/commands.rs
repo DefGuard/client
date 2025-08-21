@@ -89,6 +89,12 @@ pub async fn connect(
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound);
     }
+
+    // Update tray icon to reflect connection state.
+    let app_state: State<AppState> = handle.state();
+    let theme = { app_state.app_config.lock().unwrap().tray_theme };
+    configure_tray_icon(&handle, theme).await?;
+
     Ok(())
 }
 
@@ -168,6 +174,12 @@ pub async fn disconnect(
             };
         }
         info!("Disconnected from {connection_type} {name}(ID: {location_id})");
+
+        // Update tray icon to reflect connection state.
+        let app_state: State<AppState> = handle.state();
+        let theme = { app_state.app_config.lock().unwrap().tray_theme };
+        configure_tray_icon(&handle, theme).await?;
+
         Ok(())
     } else {
         warn!(
@@ -1092,8 +1104,8 @@ pub fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfi
     Ok(res)
 }
 
-#[tauri::command]
-pub fn command_set_app_config(
+#[tauri::command(async)]
+pub async fn command_set_app_config(
     config_patch: AppConfigPatch,
     emit_event: bool,
     app_handle: AppHandle,
@@ -1111,7 +1123,7 @@ pub fn command_set_app_config(
     info!("Config changed successfully");
     if tray_changed {
         debug!("Tray theme included in config change, tray will be updated.");
-        match configure_tray_icon(&app_handle, &res.tray_theme) {
+        match configure_tray_icon(&app_handle, res.tray_theme).await {
             Ok(()) => debug!("Tray updated upon config change"),
             Err(err) => error!("Tray change failed. Reason: {err}"),
         }

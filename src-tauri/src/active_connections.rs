@@ -60,8 +60,8 @@ pub(crate) async fn find_connection(
 ) -> Option<ActiveConnection> {
     let connections = ACTIVE_CONNECTIONS.lock().await;
     trace!(
-            "Checking for active connection with ID {id}, type {connection_type} in active connections."
-        );
+        "Checking for active connection with ID {id}, type {connection_type} in active connections."
+    );
 
     if let Some(connection) = connections
         .iter()
