@@ -1,6 +1,6 @@
 import { pick } from 'lodash-es';
 import { Subject } from 'rxjs';
-import { createJSONStorage, devtools, persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
 
 import type { AdminInfo, UserInfo } from '../../../../shared/hooks/api/types';
@@ -34,36 +34,34 @@ const persistKeys: Array<keyof StoreValues> = [
 ];
 
 export const useEnrollmentStore = createWithEqualityFn<Store>()(
-  devtools(
-    persist(
-      (set, get) => ({
-        ...defaultValues,
-        init: (values) => set({ ...defaultValues, ...values }),
-        setState: (newValues) => set((old) => ({ ...old, ...newValues })),
-        reset: () => set(defaultValues),
-        nextStep: () => {
-          const current = get().step;
-          const max = get().stepsMax;
+  persist(
+    (set, get) => ({
+      ...defaultValues,
+      init: (values) => set({ ...defaultValues, ...values }),
+      setState: (newValues) => set((old) => ({ ...old, ...newValues })),
+      reset: () => set(defaultValues),
+      nextStep: () => {
+        const current = get().step;
+        const max = get().stepsMax;
 
-          if (current < max) {
-            return set({ step: current + 1 });
-          }
-        },
-        perviousStep: () => {
-          const current = get().step;
-
-          if (current > 0) {
-            return set({ step: current - 1 });
-          }
-        },
-      }),
-      {
-        name: 'enrollment-storage',
-        version: 0.1,
-        storage: createJSONStorage(() => sessionStorage),
-        partialize: (state) => pick(state, persistKeys),
+        if (current < max) {
+          return set({ step: current + 1 });
+        }
       },
-    ),
+      perviousStep: () => {
+        const current = get().step;
+
+        if (current > 0) {
+          return set({ step: current - 1 });
+        }
+      },
+    }),
+    {
+      name: 'enrollment-storage',
+      version: 0.1,
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => pick(state, persistKeys),
+    },
   ),
   Object.is,
 );
