@@ -6,4 +6,23 @@
   box-sizing: border-box;
   padding: var(--spacing-m) var(--spacing-s);
   gap: var(--spacing-m);
+
+  .message-box {
+    p {
+      display: inline-flex;
+      column-gap: 10px;
+      align-items: center;
+    }
+  }
+
+  .example-mobile-button {
+    border-radius: 15px;
+    background-color: var(--surface-main-primary);
+    display: inline-flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+  }
 }
