@@ -19,6 +19,7 @@ import { MessageBox } from '../../../../shared/defguard-ui/components/Layout/Mes
 import SvgIconCopy from '../../../../shared/defguard-ui/components/svg/IconCopy';
 import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { useClipboard } from '../../../../shared/hooks/useClipboard';
+import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
 
 const formSchema = z.object({
   code: z.string().min(6, 'Enter valid code').max(6, 'Enter valid code'),
@@ -104,7 +105,10 @@ export const TotpEnrollmentStep = () => {
       )}
       {!isLoading && (
         <>
-          <h3>Configure MFA</h3>
+          <div>
+            <EnrollmentStepIndicator />
+            <h3>Configure MFA</h3>
+          </div>
           <MessageBox
             message={
               'To setup your MFA, scan this QR code with your authenticator app, then enter the code in the field below:'

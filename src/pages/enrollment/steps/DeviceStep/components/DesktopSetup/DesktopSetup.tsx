@@ -19,6 +19,7 @@ import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Car
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import type { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
+import { EnrollmentStepIndicator } from '../../../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
 
@@ -97,6 +98,7 @@ export const DesktopSetup = () => {
 
   return (
     <Card id="desktop-device-setup">
+      <EnrollmentStepIndicator />
       <h3>{stepLL.desktopSetup.title()}</h3>
       <form onSubmit={handleSubmit(handleValidSubmit)}>
         <FormInput
