@@ -1,4 +1,5 @@
 import type { DefguardInstance } from '../../../pages/client/types';
+import type { MfaMethod } from '../../types';
 
 export type EmptyApiResponse = Record<string, never>;
 
@@ -102,12 +103,28 @@ export type NewApplicationVersionInfo = {
   update_url: string;
 };
 
+export type RegisterCodeMfaFinishRequest = {
+  code: string;
+};
+
+export type RegisterCodeMfaStartResponse = {
+  totp_secret?: string;
+};
+
+export type RegisterCodeMfaFinishResponse = {
+  recovery_codes: string[];
+};
+
 // FIXME: strong types
 export type UseApi = {
   enrollment: {
     start: (data: EnrollmentStartRequest) => Promise<Response>;
     activateUser: (data: ActivateUserRequest) => Promise<Response>;
     createDevice: (data: CreateDeviceRequest) => Promise<Response>;
+    registerCodeMfaStart: (method: MfaMethod) => Promise<RegisterCodeMfaStartResponse>;
+    registerCodeMfaFinish: (
+      data: RegisterCodeMfaFinishRequest,
+    ) => Promise<RegisterCodeMfaFinishResponse>;
   };
   getAppInfo: () => Promise<Response>;
 };

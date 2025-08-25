@@ -11,6 +11,7 @@
     "typesafe-i18n": "typesafe-i18n",
     "generate-translation-types": "typesafe-i18n --no-watch",
     "fix": "biome check --fix && prettier src/**/*.scss -w --log-level silent",
+    "fix-unsafe": "biome check --fix --unsafe && prettier src/**/*.scss -w --log-level silent",
     "lint": "biome lint && pnpm run typecheck && prettier src/**/*.scss --check --log-level error",
     "lint-ci": "biome ci && pnpm run typecheck && prettier src/**/*.scss --check --log-level error",
     "vite": "vite",

@@ -2,14 +2,14 @@ import './style.scss';
 
 import { getVersion } from '@tauri-apps/api/app';
 import classNames from 'classnames';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
-import type { LocalizedString } from 'typesafe-i18n';
-
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Divider } from '../../../../shared/defguard-ui/components/Layout/Divider/Divider.tsx';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { AdminInfo } from '../AdminInfo/AdminInfo';
 import { TimeLeft } from '../TimeLeft/TimeLeft';
+import type { EnrollmentSideBarData } from '../types.ts';
 
 export const EnrollmentSideBar = () => {
   const { LL } = useI18nContext();
@@ -23,15 +23,40 @@ export const EnrollmentSideBar = () => {
 
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
 
-  const steps = useMemo((): LocalizedString[] => {
+  const steps = useMemo((): EnrollmentSideBarData[] => {
     const steps = LL.pages.enrollment.sideBar.steps;
     const vpnStep = vpnOptional ? `${steps.vpn()}*` : steps.vpn();
     return [
-      steps.welcome(),
-      steps.verification(),
-      steps.password(),
-      vpnStep as LocalizedString,
-      steps.finish(),
+      {
+        label: steps.welcome(),
+        stepDisplayNumber: 1,
+        stepIndex: 0,
+      },
+      {
+        label: steps.verification(),
+        stepDisplayNumber: 2,
+        stepIndex: 1,
+      },
+      {
+        label: steps.password(),
+        stepDisplayNumber: 3,
+        stepIndex: 2,
+      },
+      {
+        label: vpnStep,
+        stepDisplayNumber: 4,
+        stepIndex: 3,
+      },
+      {
+        label: `${steps.mfa()}*`,
+        stepDisplayNumber: 5,
+        stepIndex: 4,
+      },
+      {
+        label: steps.finish(),
+        stepDisplayNumber: 6,
+        stepIndex: 5,
+      },
     ];
   }, [LL.pages.enrollment.sideBar.steps, vpnOptional]);
 
@@ -53,8 +78,11 @@ export const EnrollmentSideBar = () => {
       </div>
       <Divider />
       <div className="steps">
-        {steps.map((text, index) => (
-          <Step text={text} index={index} key={index} />
+        {steps.map((data) => (
+          <Step
+            data={data}
+            key={Array.isArray(data.stepIndex) ? data.stepIndex[0] : data.stepIndex}
+          />
         ))}
       </div>
       {currentStep !== stepsMax && (
@@ -68,9 +96,9 @@ export const EnrollmentSideBar = () => {
       <Divider />
       <div className="copyright">
         <p>
-          Copyright © 2023{' '}
-          <a href="https://teonite.com" target="_blank" rel="noopener noreferrer">
-            teonite
+          Copyright © {`${dayjs().year}`}
+          <a href="https://defguard.net" target="_blank" rel="noopener noreferrer">
+            defguard
           </a>
         </p>
         <p>
@@ -82,14 +110,15 @@ export const EnrollmentSideBar = () => {
 };
 
 type StepProps = {
-  text: LocalizedString;
-  index: number;
+  data: EnrollmentSideBarData;
 };
 
-const Step = ({ index, text }: StepProps) => {
+const Step = ({ data: { label, stepIndex, stepDisplayNumber } }: StepProps) => {
   const currentStep = useEnrollmentStore((state) => state.step);
 
-  const active = currentStep === index;
+  const active = Array.isArray(stepIndex)
+    ? stepIndex.includes(currentStep)
+    : stepIndex === currentStep;
 
   const cn = classNames('step', {
     active,
@@ -98,8 +127,8 @@ const Step = ({ index, text }: StepProps) => {
   return (
     <div className={cn}>
       <p>
-        {index + 1}.{'  '}
-        {text}
+        {stepDisplayNumber}.{'  '}
+        {label}
       </p>
       {active && <div className="active-step-line"></div>}
     </div>

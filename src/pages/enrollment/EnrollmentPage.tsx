@@ -29,6 +29,8 @@ import { DataVerificationStep } from './steps/DataVerificationStep/DataVerificat
 import { DeviceStep } from './steps/DeviceStep/DeviceStep';
 import { FinishStep } from './steps/FinishStep/FinishStep';
 import { PasswordStep } from './steps/PasswordStep/PasswordStep';
+import { SendFinishStep } from './steps/SendFinishStep/SendFinishStep';
+import { TotpEnrollmentStep } from './steps/Totp/TotpEnrollmentStep';
 import { WelcomeStep } from './steps/WelcomeStep/WelcomeStep';
 
 export const EnrollmentPage = () => {
@@ -51,10 +53,17 @@ export const EnrollmentPage = () => {
 
   // ensure number of steps is correct
   useEffect(() => {
-    if (stepsMax !== steps.length - 1) {
-      setEnrollmentState({ stepsMax: steps.length - 1 });
-    }
-  }, [setEnrollmentState, stepsMax]);
+    const stepsIgnored: number[] = [];
+    steps.forEach((step, index) => {
+      if (step.ignoreCount) {
+        stepsIgnored.push(index);
+      }
+    });
+    setEnrollmentState({
+      stepsIgnored,
+      stepsMax: steps.length - 1,
+    });
+  }, [setEnrollmentState]);
 
   useEffect(() => {
     if (!enrollmentFinished.current) {
@@ -64,7 +73,7 @@ export const EnrollmentPage = () => {
         if (diff > 0) {
           const timeout = setTimeout(() => {
             if (!enrollmentFinished.current) {
-              debug('Enrollment session time ended, navigatig to timeout page.');
+              debug('Enrollment session time ended, navigating to timeout page.');
               navigate(routes.timeout, { replace: true });
             }
           }, diff);
@@ -72,11 +81,11 @@ export const EnrollmentPage = () => {
             clearTimeout(timeout);
           };
         } else {
-          debug('Enrollment session time ended, navigatig to timeout page.');
+          debug('Enrollment session time ended, navigating to timeout page.');
           navigate(routes.timeout, { replace: true });
         }
       } else {
-        error('Seesion end time not found, navigating to timeout page.');
+        error('Session end time not found, navigating to timeout page.');
         navigate(routes.timeout, { replace: true });
       }
     }
@@ -139,7 +148,18 @@ const steps: EnrollmentStep[] = [
   },
   {
     key: 4,
-    step: <FinishStep key={4} />,
+    step: <TotpEnrollmentStep key={4} />,
+    backDisabled: true,
+  },
+  {
+    key: 5,
+    step: <SendFinishStep key={5} />,
+    backDisabled: true,
+    ignoreCount: true,
+  },
+  {
+    key: 6,
+    step: <FinishStep key={6} />,
     backDisabled: true,
   },
 ];
@@ -147,5 +167,6 @@ const steps: EnrollmentStep[] = [
 type EnrollmentStep = {
   backDisabled?: boolean;
   key: string | number;
+  ignoreCount?: boolean;
   step: ReactNode;
 };
