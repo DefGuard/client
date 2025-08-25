@@ -35,11 +35,11 @@
     justify-content: center;
     row-gap: var(--spacing-m);
 
-    &>.input {
+    & > .input {
       width: 100%;
     }
 
-    input[type="submit"] {
+    input[type='submit'] {
       @include visually-hidden();
     }
   }
