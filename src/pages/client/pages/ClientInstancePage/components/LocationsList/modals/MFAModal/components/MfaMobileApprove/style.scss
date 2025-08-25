@@ -10,6 +10,7 @@
   .message-box {
     p {
       display: inline-flex;
+      flex-flow: row wrap;
       column-gap: 10px;
       align-items: center;
     }
