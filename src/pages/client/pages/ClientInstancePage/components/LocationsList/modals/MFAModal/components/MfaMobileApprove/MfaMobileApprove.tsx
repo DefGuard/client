@@ -47,15 +47,9 @@ export const MfaMobileApprove = ({
     [proxyUrl],
   );
 
-  const { lastMessage, readyState } = useWebSocket(wsUrl, {
+  const { lastMessage } = useWebSocket(wsUrl, {
     queryParams: {
       token,
-    },
-    onOpen: () => {
-      console.log('Websocket connected');
-    },
-    onClose: () => {
-      console.log('Websocket closed');
     },
   });
 
@@ -70,10 +64,6 @@ export const MfaMobileApprove = ({
     const encoded = textEncoder.encode(jsonString);
     return fromUint8Array(encoded);
   }, [token, challenge, instanceUuid]);
-
-  useEffect(() => {
-    console.log(`Last msg: ${lastMessage}\nState ${readyState}`);
-  }, [lastMessage, readyState]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Side effect
   useEffect(() => {

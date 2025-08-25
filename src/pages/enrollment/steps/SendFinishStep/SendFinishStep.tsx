@@ -1,12 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { debug, error, info } from '@tauri-apps/plugin-log';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { LoaderSpinner } from '../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
 import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import { isPresent } from '../../../../shared/defguard-ui/utils/isPresent';
 import type {
   ActivateUserRequest,
   CreateDeviceResponse,
@@ -16,6 +15,7 @@ import { clientQueryKeys } from '../../../client/query';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../hooks/useEnrollmentApi';
 import './style.scss';
+import useEffectOnce from '../../../../shared/defguard-ui/utils/useEffectOnce';
 
 const { saveConfig } = clientApi;
 
@@ -91,7 +91,7 @@ export const SendFinishStep = () => {
     ],
   );
 
-  const { mutate, isPending, isSuccess } = useMutation({
+  const { mutate } = useMutation({
     mutationFn: () =>
       queryFn(
         finishData,
@@ -99,6 +99,7 @@ export const SendFinishStep = () => {
         deviceKeys?.private as string,
       ),
     onError: (e) => {
+      setEnrollmentStore({ loading: false });
       toaster.error(
         LL.common.messages.errorWithMessage({
           message: String(e),
@@ -108,28 +109,19 @@ export const SendFinishStep = () => {
       error(String(e));
     },
     onSuccess: () => {
+      setEnrollmentStore({ loading: false });
       next();
     },
   });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: onMount
-  useEffect(() => {
-    console.log({
-      isPending,
-      finishData,
-      deviceKeys,
-      deviceResponse,
+  useEffectOnce(() => {
+    setEnrollmentStore({
+      loading: true,
     });
-    if (
-      !isPending &&
-      !isSuccess &&
-      isPresent(finishData) &&
-      isPresent(deviceKeys) &&
-      isPresent(deviceResponse)
-    ) {
+    setTimeout(() => {
       mutate();
-    }
-  }, [finishData, deviceKeys, deviceResponse]);
+    }, 250);
+  });
 
   return (
     <Card id="enrollment-finish-request-step">

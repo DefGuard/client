@@ -80,7 +80,7 @@ export const DesktopSetup = () => {
           )} Error status code: ${res.status} `,
         );
       }
-      return res;
+      return await res.json();
     })) as CreateDeviceResponse;
     toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
     setEnrollmentStore({

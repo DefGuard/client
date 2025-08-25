@@ -50,12 +50,12 @@ export const EnrollmentSideBar = () => {
       {
         label: `${steps.mfa()}*`,
         stepDisplayNumber: 5,
-        stepIndex: 4,
+        stepIndex: [4, 5],
       },
       {
         label: steps.finish(),
         stepDisplayNumber: 6,
-        stepIndex: 5,
+        stepIndex: 6,
       },
     ];
   }, [LL.pages.enrollment.sideBar.steps, vpnOptional]);

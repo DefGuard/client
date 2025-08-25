@@ -13,7 +13,6 @@ export const useEnrollmentApi = (): UseApi => {
   const registerCodeMfaStart: UseApi['enrollment']['registerCodeMfaStart'] = async (
     method,
   ) => {
-    console.log(cookie);
     const response = await fetch(`${proxyUrl}/enrollment/register-mfa/start`, {
       method: 'POST',
       headers: {
