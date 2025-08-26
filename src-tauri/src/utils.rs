@@ -16,7 +16,7 @@ use windows_service::{
 
 use crate::{
     appstate::AppState,
-    commands::{LocationInterfaceDetails, Payload},
+    commands::LocationInterfaceDetails,
     database::{
         models::{
             connection::{ActiveConnection, Connection},
@@ -638,12 +638,7 @@ pub(crate) async fn handle_connection_for_location(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit(
-        EventKey::ConfigChanged.into(),
-        Payload {
-            message: "Created new connection",
-        },
-    )?;
+    handle.emit(EventKey::ConnectionChanged.into(), ())?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
@@ -675,12 +670,7 @@ pub(crate) async fn handle_connection_for_tunnel(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit(
-        EventKey::ConfigChanged.into(),
-        Payload {
-            message: "Created new connection",
-        },
-    )?;
+    handle.emit(EventKey::ConnectionChanged.into(), ())?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
@@ -887,7 +877,7 @@ async fn check_connection(
 ) -> Result<(), Error> {
     let appstate = app_handle.state::<AppState>();
     let interface_name = get_interface_name(name);
-    let service_name = format!("WireGuardTunnel${}", interface_name);
+    let service_name = format!("WireGuardTunnel${interface_name}");
     let service = match service_manager.open_service(&service_name, ServiceAccess::QUERY_STATUS) {
         Ok(service) => service,
         Err(windows_service::Error::Winapi(err))
@@ -940,12 +930,7 @@ async fn check_connection(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    app_handle.emit(
-        EventKey::ConnectionChanged.into(),
-        Payload {
-            message: "Created new connection",
-        },
-    )?;
+    app_handle.emit(EventKey::ConnectionChanged.into(), ())?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     debug!("Spawning service log watcher for {connection_type} {name}...");
@@ -974,12 +959,12 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(
             |err| {
                 error!(
-            "Failed to open service control manager while trying to sync client's connections \
-            with the host state: {err}"
-        );
+                    "Failed to open service control manager while trying to sync client's \
+                    connections with the host state: {err}"
+                );
                 Error::InternalError(
-                    "Failed to open service control manager while trying to sync client's
-            connections with the host state"
+                    "Failed to open service control manager while trying to sync client's \
+                    connections with the host state"
                         .to_string(),
                 )
             },

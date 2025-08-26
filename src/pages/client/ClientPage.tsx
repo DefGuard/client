@@ -16,9 +16,11 @@ import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/Dea
 import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/store';
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
+import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
 import {
   type AddInstancePayload,
+  type CommonWireguardFields,
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
   TauriEventKey,
@@ -41,6 +43,7 @@ export const ClientPage = () => {
   const location = useLocation();
   const toaster = useToaster();
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
+  const openMFAModal = useMFAModal((state) => state.open);
   const { LL } = useI18nContext();
 
   const { data: instances } = useQuery({
@@ -77,20 +80,20 @@ export const ClientPage = () => {
         clientQueryKeys.getLocations,
         clientQueryKeys.getTunnels,
       ];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const locationUpdate = listen(TauriEventKey.LOCATION_UPDATE, () => {
       const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const connectionChanged = listen(TauriEventKey.CONNECTION_CHANGED, () => {
@@ -103,11 +106,11 @@ export const ClientPage = () => {
         clientQueryKeys.getInstances,
         clientQueryKeys.getTunnels,
       ];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const configChanged = listen(TauriEventKey.CONFIG_CHANGED, (data) => {
@@ -137,11 +140,15 @@ export const ClientPage = () => {
       },
     );
 
-    const doEnrollment = listen<AddInstancePayload>(
-      TauriEventKey.ADD_INSTANCE,
+    const addInstance = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
+      useClientStore.setState({ instanceConfig: data.payload });
+      navigate(routes.client.addInstance, { replace: true });
+    });
+
+    const mfaTrigger = listen<CommonWireguardFields>(
+      TauriEventKey.MFA_TRIGGER,
       (data) => {
-        useClientStore.setState({ instanceConfig: data.payload });
-        navigate(routes.client.addInstance, { replace: true });
+        openMFAModal(data.payload);
       },
     );
 
@@ -153,7 +160,8 @@ export const ClientPage = () => {
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
       appConfigChanged.then((cleanup) => cleanup());
-      doEnrollment.then((cleanup) => cleanup());
+      addInstance.then((cleanup) => cleanup());
+      mfaTrigger.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
