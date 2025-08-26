@@ -116,7 +116,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: RPMS/${{ matrix.binary_arch }}/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+          asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_content_type: application/octet-stream
       - name: Upload DEB
