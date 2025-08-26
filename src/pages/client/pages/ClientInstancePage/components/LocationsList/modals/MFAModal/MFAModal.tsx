@@ -26,10 +26,7 @@ import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toa
 import { isPresent } from '../../../../../../../../shared/defguard-ui/utils/isPresent';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import {
-  type DefguardInstance,
-  LocationMfaType,
-} from '../../../../../../types';
+import { type DefguardInstance, LocationMfaType } from '../../../../../../types';
 import { MfaMobileApprove } from './components/MfaMobileApprove/MfaMobileApprove';
 import { BrowserErrorIcon, BrowserPendingIcon, GoToBrowserIcon } from './Icons';
 import { useMFAModal } from './useMFAModal';
