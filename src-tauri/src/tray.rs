@@ -159,7 +159,7 @@ fn hide_main_window(app: &AppHandle) {
     }
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
         if main_window.is_minimized().unwrap_or_default() {
             if let Err(err) = main_window.unminimize() {

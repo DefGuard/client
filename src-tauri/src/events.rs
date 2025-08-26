@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Url};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::ConnectionType;
+use crate::{tray::show_main_window, ConnectionType};
 
 // Match src/page/client/types.ts.
 #[non_exhaustive]
@@ -113,6 +113,7 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
                 }
             }
             if let (Some(token), Some(url)) = (token, url) {
+                show_main_window(app_handle);
                 let _ = app_handle.emit(
                     EventKey::AddInstance.into(),
                     AddInstancePayload {
