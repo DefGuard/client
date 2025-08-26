@@ -13,7 +13,7 @@ export const useEnrollmentApi = (): UseApi => {
   const registerCodeMfaStart: UseApi['enrollment']['registerCodeMfaStart'] = async (
     method,
   ) => {
-    const response = await fetch(`${proxyUrl}/enrollment/register-mfa/start`, {
+    const response = await fetch(`${proxyUrl}/enrollment/register-mfa/code/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ export const useEnrollmentApi = (): UseApi => {
   const registerCodeMfaFinish: UseApi['enrollment']['registerCodeMfaFinish'] = async (
     data,
   ) => {
-    const response = await fetch(`${proxyUrl}/enrollment/register-mfa/finish`, {
+    const response = await fetch(`${proxyUrl}/enrollment/register-mfa/code/finish`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
