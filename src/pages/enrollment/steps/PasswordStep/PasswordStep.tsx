@@ -38,9 +38,14 @@ export const PasswordStep = () => {
           password: passwordValidator(LL),
           repeat: z.string().min(1, LL.form.errors.required()),
         })
-        .refine((values) => values.password === values.repeat, {
-          message: pageLL.form.fields.repeat.errors.matching(),
-          path: ['repeat'],
+        .superRefine((values, ctx) => {
+          if (values.password !== values.repeat && values.repeat.length >= 1) {
+            ctx.addIssue({
+              path: ['repeat'],
+              message: pageLL.form.fields.repeat.errors.matching(),
+              code: 'custom',
+            });
+          }
         }),
     [LL, pageLL.form.fields.repeat.errors],
   );
@@ -85,7 +90,13 @@ export const PasswordStep = () => {
       >
         <FormInput
           label={pageLL.form.fields.password.label()}
-          controller={{ control, name: 'password' }}
+          controller={{
+            control,
+            name: 'password',
+            rules: {
+              deps: ['repeat'],
+            },
+          }}
           type="password"
           floatingErrors={{
             title: LL.form.errors.password.floatingTitle(),
@@ -94,7 +105,13 @@ export const PasswordStep = () => {
         />
         <FormInput
           label={pageLL.form.fields.repeat.label()}
-          controller={{ control, name: 'repeat' }}
+          controller={{
+            control,
+            name: 'repeat',
+            rules: {
+              deps: ['password'],
+            },
+          }}
           type="password"
           autoComplete="new-password"
         />

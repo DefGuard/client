@@ -2,15 +2,19 @@ import { pick } from 'lodash-es';
 import { Subject } from 'rxjs';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
-
-import type { AdminInfo, UserInfo } from '../../../../shared/hooks/api/types';
+import type {
+  AdminInfo,
+  CreateDeviceResponse,
+  UserInfo,
+} from '../../../../shared/hooks/api/types';
 
 const defaultValues: StoreValues = {
   // assume default dev
   proxy_url: '/api/v1/',
   loading: false,
   step: 0,
-  stepsMax: 4,
+  stepsMax: 6,
+  stepsIgnored: [],
   sessionStart: undefined,
   sessionEnd: undefined,
   userInfo: undefined,
@@ -19,10 +23,14 @@ const defaultValues: StoreValues = {
   userPassword: undefined,
   cookie: undefined,
   nextSubject: new Subject<void>(),
+  deviceKeys: undefined,
+  deviceResponse: undefined,
 };
 
 const persistKeys: Array<keyof StoreValues> = [
   'step',
+  'stepsMax',
+  'stepsIgnored',
   'userInfo',
   'userPassword',
   'sessionEnd',
@@ -31,6 +39,8 @@ const persistKeys: Array<keyof StoreValues> = [
   'deviceName',
   'endContent',
   'vpnOptional',
+  'deviceKeys',
+  'deviceResponse',
 ];
 
 export const useEnrollmentStore = createWithEqualityFn<Store>()(
@@ -73,6 +83,7 @@ type StoreValues = {
   loading: boolean;
   step: number;
   stepsMax: number;
+  stepsIgnored: number[];
   nextSubject: Subject<void>;
   // Date
   proxy_url: string;
@@ -86,6 +97,11 @@ type StoreValues = {
   endContent?: string;
   deviceName?: string;
   cookie?: string;
+  deviceKeys?: {
+    public: string;
+    private: string;
+  };
+  deviceResponse?: CreateDeviceResponse;
 };
 
 type StoreMethods = {

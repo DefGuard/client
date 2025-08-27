@@ -1126,6 +1126,10 @@ type RootTranslation = {
 					 * F​i​n​i​s​h
 					 */
 					finish: string
+					/**
+					 * C​o​n​f​i​g​u​r​e​ ​m​f​a
+					 */
+					mfa: string
 				}
 				/**
 				 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n
@@ -2790,6 +2794,10 @@ export type TranslationFunctions = {
 					 * Finish
 					 */
 					finish: () => LocalizedString
+					/**
+					 * Configure mfa
+					 */
+					mfa: () => LocalizedString
 				}
 				/**
 				 * Application version
