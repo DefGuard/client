@@ -153,6 +153,20 @@ export const UpdateInstanceModalForm = () => {
             .catch(() => {
               toaster.error(LL.common.messages.error());
             });
+        } else {
+          // Device does not match used enrollment token.
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: 'Token is not valid for this device',
+            }),
+          );
+          setError(
+            'token',
+            {
+              message: localLL.form.fieldErrors.token.rejected(),
+            },
+            { shouldFocus: true },
+          );
         }
       } else {
         // Instance not found in client, use add instance.
