@@ -5,7 +5,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
 
     # include git submodules
-    # self.submodules = true;
+    self.submodules = true;
   };
 
   outputs = {

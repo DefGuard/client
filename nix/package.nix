@@ -6,7 +6,7 @@
   makeDesktopItem,
 }: let
   pname = "defguard-client";
-  version = "1.5.1"; # TODO: Get this from Cargo.toml or git
+  version = "1.5.0"; # TODO: Get this from Cargo.toml or git
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -35,9 +35,6 @@
     webkitgtk_4_1
     openssl
     libayatana-appindicator
-    mesa
-    libGL
-    libGLU
   ];
 
   nativeBuildInputs = with pkgs; [
@@ -52,7 +49,7 @@
     pnpm.configHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
-    perl
+    # perl
     wrapGAppsHook
     # helper to add dynamic library paths
     makeWrapper
@@ -69,11 +66,6 @@ in
 
     cargoDeps = rustPlatform.importCargoLock {
       lockFile = ../src-tauri/Cargo.lock;
-      # specify hashes for git dependencies
-      # outputHashes = {
-      # "defguard_wireguard_rs-0.7.5" = "sha256-pxwN43BntOEYtp+TlpQFX78gg1ko4zuXEGctZIfSrhg=";
-      # "tauri-plugin-log-0.0.0" = "sha256-jGzlN/T29Hya4bKe9Dwl2mRRFLXMywrHk+32zgwrpJ0=";
-      # };
     };
 
     # prefetch pnpm dependencies
@@ -86,7 +78,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-ccSwlPY3sOnUJoYfB4MWs0gU8/Aq/CiCrLWouQ7PqhY=";
+      hash = "sha256-h2nnwmjGnjxefq6KflaKgIH0HWPcyRvn6rxslwbYuwo=";
     };
 
     buildPhase = ''
