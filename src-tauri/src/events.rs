@@ -1,8 +1,8 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Url};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::ConnectionType;
+use crate::{tray::show_main_window, ConnectionType};
 
 // Match src/page/client/types.ts.
 #[non_exhaustive]
@@ -39,7 +39,7 @@ impl From<EventKey> for &'static str {
 }
 
 /// Used as payload for [`DEAD_CONNECTION_DROPPED`] event
-#[derive(Serialize, Clone, Debug)]
+#[derive(Clone, Serialize)]
 pub struct DeadConnDroppedOut {
     pub(crate) name: String,
     pub(crate) con_type: ConnectionType,
@@ -66,7 +66,7 @@ impl DeadConnDroppedOut {
 }
 
 /// Used as payload for [`DEAD_CONNECTION_RECONNECTED`] event
-#[derive(Serialize, Clone, Debug)]
+#[derive(Clone, Serialize)]
 pub struct DeadConnReconnected {
     pub(crate) name: String,
     pub(crate) con_type: ConnectionType,
@@ -88,6 +88,40 @@ impl DeadConnReconnected {
         }
         if let Err(err) = app_handle.emit(EventKey::DeadConnectionReconnected.into(), self) {
             error!("Event Dead Connection Reconnected was not emitted. Reason: {err}");
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct AddInstancePayload<'a> {
+    token: &'a str,
+    url: &'a str,
+}
+
+/// Handle deep-link URLs.
+pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
+    for link in urls {
+        if link.path() == "/addinstance" {
+            let mut token = None;
+            let mut url = None;
+            for (key, value) in link.query_pairs() {
+                if key == "token" {
+                    token = Some(value.clone());
+                }
+                if key == "url" {
+                    url = Some(value.clone());
+                }
+            }
+            if let (Some(token), Some(url)) = (token, url) {
+                show_main_window(app_handle);
+                let _ = app_handle.emit(
+                    EventKey::AddInstance.into(),
+                    AddInstancePayload {
+                        token: &token,
+                        url: &url,
+                    },
+                );
+            }
         }
     }
 }
