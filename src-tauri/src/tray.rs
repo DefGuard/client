@@ -53,13 +53,14 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
     )?;
     let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)?;
 
-    let mut instance_menu = SubmenuBuilder::new(app, "Instances");
+    let mut menu = MenuBuilder::new(app);
     debug!("Getting all instances information for the tray menu");
     match all_instances().await {
         Ok(instances) => {
             let instance_count = instances.len();
             debug!("Got {instance_count} instances to display in the tray menu");
             for instance in instances {
+                let mut instance_menu = SubmenuBuilder::new(app, &instance.name);
                 let all_locations = all_locations(instance.id).await.unwrap();
                 debug!(
                     "Found {} locations for the {} instance to display in the tray menu",
@@ -87,6 +88,8 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                     )?;
                     instance_menu = instance_menu.item(&menu_item);
                 }
+                let submenu = instance_menu.build()?;
+                menu = menu.item(&submenu);
             }
         }
         Err(err) => {
@@ -94,17 +97,14 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         }
     }
 
-    let submenu = instance_menu.build()?;
-    let menu = MenuBuilder::new(app)
-        .items(&[&submenu])
+    Ok(menu
         .separator()
         .items(&[&show, &hide])
         .separator()
         .items(&[&subscribe_updates, &join_community, &follow_us])
         .separator()
         .item(&quit)
-        .build()?;
-    Ok(menu)
+        .build()?)
 }
 
 /// Setup system tray.

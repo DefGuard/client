@@ -68,7 +68,7 @@
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",
     "compare-versions": "^6.1.1",
-    "dayjs": "^1.11.13",
+    "dayjs": "^1.11.14",
     "deepmerge-ts": "^7.1.5",
     "detect-browser": "^5.3.0",
     "fast-deep-equal": "^3.1.3",
