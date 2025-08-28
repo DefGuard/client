@@ -1,3 +1,4 @@
+import type { Dayjs } from 'dayjs';
 import { pick } from 'lodash-es';
 import { Subject } from 'rxjs';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -23,6 +24,7 @@ const defaultValues: StoreValues = {
     smtp_configured: false,
     vpn_setup_optional: true,
   },
+  emailResendTimestamp: undefined,
   step: EnrollmentStepKey.WELCOME,
   mfaMethod: MfaMethod.TOTP,
   recoveryCodes: [],
@@ -88,6 +90,7 @@ type StoreValues = {
   enrollmentSettings: EnrollmentSettings;
   step: EnrollmentStepKey;
   mfaMethod: MfaMethod;
+  emailResendTimestamp?: Dayjs;
   nextSubject: Subject<EnrollmentNavDirection>;
   // Date
   proxy_url: string;

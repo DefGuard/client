@@ -75,10 +75,6 @@ export const EnrollmentPage = () => {
     enrollmentFinished.current = currentStep === EnrollmentStepKey.FINISH;
   }, [currentStep]);
 
-  useEffect(() => {
-    console.log(currentStepConfig);
-  }, [currentStepConfig]);
-
   return (
     <PageContainer id="enrollment">
       <EnrollmentSideBar />

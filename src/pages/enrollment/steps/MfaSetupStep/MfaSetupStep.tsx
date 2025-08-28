@@ -1,27 +1,25 @@
+import './style.scss';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { error } from '@tauri-apps/plugin-log';
+import { type Ref, useEffect, useRef } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
-import QRCode from 'react-qr-code';
 import z from 'zod';
 import { shallow } from 'zustand/shallow';
 import { FormInput } from '../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { LoaderSpinner } from '../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
+import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { isPresent } from '../../../../shared/defguard-ui/utils/isPresent';
 import { MfaMethod } from '../../../../shared/types';
-import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
-import { useEnrollmentApi } from '../../hooks/useEnrollmentApi';
-import './style.scss';
-import { error } from '@tauri-apps/plugin-log';
-import { Button } from '../../../../shared/defguard-ui/components/Layout/Button/Button';
-import { MessageBox } from '../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
-import SvgIconCopy from '../../../../shared/defguard-ui/components/svg/IconCopy';
-import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import { useClipboard } from '../../../../shared/hooks/useClipboard';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
 import { EnrollmentStepKey } from '../../const';
+import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { EnrollmentNavDirection } from '../../hooks/types';
+import { useEnrollmentApi } from '../../hooks/useEnrollmentApi';
+import { MfaSetupEmail } from './MfaSetupEmail';
+import { MfaSetupTotp } from './MfaSetupTotp';
 
 const formSchema = z.object({
   code: z.string().trim().min(6, 'Enter valid code').max(6, 'Enter valid code'),
@@ -30,7 +28,6 @@ const formSchema = z.object({
 type FormFields = z.infer<typeof formSchema>;
 
 export const MfaSetupStep = () => {
-  const toaster = useToaster();
   const submitRef = useRef<HTMLInputElement>(null);
   const [userInfo, mfaMethod] = useEnrollmentStore((s) => [s.userInfo, s.mfaMethod]);
   const [nextSubject, setStoreState] = useEnrollmentStore(
@@ -39,15 +36,77 @@ export const MfaSetupStep = () => {
   );
 
   const {
-    enrollment: { registerCodeMfaFinish, registerCodeMfaStart },
+    enrollment: { registerCodeMfaStart },
   } = useEnrollmentApi();
 
-  const { data: startData, isLoading: startLoading } = useQuery({
+  const {
+    data: startData,
+    isLoading: startLoading,
+    refetch,
+  } = useQuery({
     queryFn: () => registerCodeMfaStart(mfaMethod),
     queryKey: ['register-mfa', mfaMethod],
     refetchOnWindowFocus: false,
     enabled: isPresent(mfaMethod),
   });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs sub
+  useEffect(() => {
+    const sub = nextSubject.subscribe((direction) => {
+      switch (direction) {
+        case EnrollmentNavDirection.NEXT:
+          submitRef.current?.click();
+          break;
+        case EnrollmentNavDirection.BACK:
+          setStoreState({ step: EnrollmentStepKey.MFA_CHOICE });
+          break;
+      }
+    });
+    return () => {
+      sub.unsubscribe();
+    };
+  }, [nextSubject]);
+
+  return (
+    <Card id="enrollment-totp-card">
+      <div>
+        <EnrollmentStepIndicator />
+        <h3>Configure MFA</h3>
+      </div>
+      {startLoading && (
+        <div className="loading">
+          <LoaderSpinner size={64} />
+        </div>
+      )}
+      {!startLoading && isPresent(userInfo) && (
+        <>
+          {mfaMethod === MfaMethod.TOTP && isPresent(startData?.totp_secret) && (
+            <MfaSetupTotp email={userInfo.email} secret={startData.totp_secret}>
+              <CodeForm inputRef={submitRef} />
+            </MfaSetupTotp>
+          )}
+          {mfaMethod === MfaMethod.EMAIL && (
+            <MfaSetupEmail refetch={refetch} userEmail={userInfo.email}>
+              <CodeForm inputRef={submitRef} />
+            </MfaSetupEmail>
+          )}
+        </>
+      )}
+    </Card>
+  );
+};
+
+type CodeFormProps = {
+  inputRef: Ref<HTMLInputElement>;
+};
+
+const CodeForm = ({ inputRef }: CodeFormProps) => {
+  const toaster = useToaster();
+  const mfaMethod = useEnrollmentStore((s) => s.mfaMethod);
+  const setStoreState = useEnrollmentStore((s) => s.setState);
+  const {
+    enrollment: { registerCodeMfaFinish },
+  } = useEnrollmentApi();
 
   const { handleSubmit, control, setError } = useForm<FormFields>({
     resolver: zodResolver(formSchema),
@@ -79,8 +138,6 @@ export const MfaSetupStep = () => {
     },
   });
 
-  const isLoading = startLoading || isPending;
-
   const submitHandler: SubmitHandler<FormFields> = (data) => {
     const sendData = {
       code: data.code,
@@ -92,93 +149,17 @@ export const MfaSetupStep = () => {
   // biome-ignore lint/correctness/useExhaustiveDependencies: sideEffect
   useEffect(() => {
     setStoreState({
-      loading: startLoading || isPending,
+      loading: isPending,
     });
-  }, [startLoading, isPending]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs sub
-  useEffect(() => {
-    const sub = nextSubject.subscribe((direction) => {
-      switch (direction) {
-        case EnrollmentNavDirection.NEXT:
-          submitRef.current?.click();
-          break;
-        case EnrollmentNavDirection.BACK:
-          setStoreState({ step: EnrollmentStepKey.MFA_CHOICE });
-          break;
-      }
-    });
-    return () => {
-      sub.unsubscribe();
-    };
-  }, [nextSubject]);
+  }, [isPending]);
 
   return (
-    <Card id="enrollment-totp-card">
-      <div>
-        <EnrollmentStepIndicator />
-        <h3>Configure MFA</h3>
-      </div>
-      {isLoading && (
-        <div className="loading">
-          <LoaderSpinner size={64} />
-        </div>
-      )}
-      {!isLoading && isPresent(userInfo) && (
-        <>
-          {mfaMethod === MfaMethod.TOTP && (
-            <>
-              <MessageBox
-                message={
-                  'To setup your MFA, scan this QR code with your authenticator app, then enter the code in the field below:'
-                }
-              />
-              {isPresent(startData?.totp_secret) && (
-                <TotpQr email={userInfo.email} secret={startData.totp_secret} />
-              )}
-            </>
-          )}
-          {mfaMethod === MfaMethod.EMAIL && (
-            <MessageBox>
-              <p>
-                To setup your MFA, enter the code that was sent to your account email:
-                <br />
-                <strong>{userInfo.email}</strong>
-              </p>
-            </MessageBox>
-          )}
-          <form onSubmit={handleSubmit(submitHandler)}>
-            <FormInput
-              controller={{ control, name: 'code' }}
-              label={mfaMethod === MfaMethod.TOTP ? 'Authenticator code' : 'Email code'}
-            />
-            <input type="submit" ref={submitRef} />
-          </form>
-        </>
-      )}
-    </Card>
-  );
-};
-
-type TotpProps = {
-  email: string;
-  secret: string;
-};
-
-const TotpQr = ({ email, secret }: TotpProps) => {
-  const { writeToClipboard } = useClipboard();
-  return (
-    <div className="totp-info">
-      <div className="qr">
-        <QRCode value={`otpauth://totp/Defguard:${email}?secret=${secret}`} />
-      </div>
-      <Button
-        text="Copy TOTP"
-        icon={<SvgIconCopy />}
-        onClick={() => {
-          writeToClipboard(secret);
-        }}
+    <form onSubmit={handleSubmit(submitHandler)}>
+      <FormInput
+        controller={{ control, name: 'code' }}
+        label={mfaMethod === MfaMethod.TOTP ? 'Authenticator code' : 'Email code'}
       />
-    </div>
+      <input type="submit" ref={inputRef} />
+    </form>
   );
 };

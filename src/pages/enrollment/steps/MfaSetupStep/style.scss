@@ -36,12 +36,30 @@
     }
   }
 
+  .btn.resend {
+    width: 100%;
+  }
+
+  .totp-setup,
+  .email-setup {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    row-gap: var(--spacing-s);
+  }
+
+  .resend {
+    width: 100%;
+  }
+
   form {
     display: flex;
     flex-flow: column;
     align-items: center;
     justify-content: center;
     row-gap: var(--spacing-m);
+    width: 100%;
 
     & > .input {
       width: 100%;
