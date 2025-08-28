@@ -22,6 +22,8 @@ type SideBarItem = {
 export const EnrollmentSideBar = () => {
   const { LL } = useI18nContext();
 
+  const enrollmentSettings = useEnrollmentStore((s) => s.enrollmentSettings);
+
   const vpnOptional = useEnrollmentStore((state) => state.vpnOptional);
 
   const currentStep = useEnrollmentStore((state) => state.step);
@@ -41,7 +43,7 @@ export const EnrollmentSideBar = () => {
         case EnrollmentStepKey.DEVICE:
           return `${stepsLL.vpn()}${vpnOptional ? '*' : ''}`;
         case EnrollmentStepKey.MFA:
-          return stepsLL.mfa();
+          return `${stepsLL.mfa()}${enrollmentSettings.mfa_required ? '' : '*'}`;
         case EnrollmentStepKey.MFA_CHOICE:
           return stepsLL.mfaChoice();
         case EnrollmentStepKey.MFA_SETUP:
@@ -56,7 +58,7 @@ export const EnrollmentSideBar = () => {
           return '';
       }
     },
-    [LL.pages.enrollment.sideBar.steps, vpnOptional],
+    [LL.pages.enrollment.sideBar.steps, vpnOptional, enrollmentSettings.mfa_required],
   );
 
   const stepsData = useMemo(

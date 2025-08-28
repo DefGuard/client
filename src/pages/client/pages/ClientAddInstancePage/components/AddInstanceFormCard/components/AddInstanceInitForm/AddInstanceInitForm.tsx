@@ -139,10 +139,12 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           );
         }
         debug('Response received with status OK');
-        const r = (await res.json()) as EnrollmentStartResponse;
+        const startResponse = (await res.json()) as EnrollmentStartResponse;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
-        const instance = clientInstances.find((i) => i.uuid === r.instance.id);
+        const instance = clientInstances.find(
+          (i) => i.uuid === startResponse.instance.id,
+        );
         let proxy_api_url = values.url;
         if (proxy_api_url[proxy_api_url.length - 1] === '/') {
           proxy_api_url = proxy_api_url.slice(0, -1);
@@ -191,24 +193,29 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // register new instance
         // is user in need of full enrollment ?
-        if (r.user.enrolled) {
+        if (startResponse.user.enrolled) {
           //no, only create new device for desktop client
           debug('User already active, adding device only.');
           nextStep({
             url: proxy_api_url,
             cookie: authCookie,
-            device_names: r.user.device_names,
+            device_names: startResponse.user.device_names,
           });
         } else {
           // yes, enroll the user
           debug('User is not active. Starting enrollment.');
-          const sessionEnd = dayjs.unix(r.deadline_timestamp).utc().local().format();
+          const sessionEnd = dayjs
+            .unix(startResponse.deadline_timestamp)
+            .utc()
+            .local()
+            .format();
           const sessionStart = dayjs().local().format();
           initEnrollment({
-            userInfo: r.user,
-            adminInfo: r.admin,
-            endContent: r.final_page_content,
+            userInfo: startResponse.user,
+            adminInfo: startResponse.admin,
+            endContent: startResponse.final_page_content,
             proxy_url: proxy_api_url,
+            enrollmentSettings: startResponse.settings,
             sessionEnd,
             sessionStart,
             cookie: authCookie,
