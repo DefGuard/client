@@ -78,18 +78,18 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - uses: actions/setup-node@v3
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
           run_install: false
       - name: Get pnpm store directory
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
       - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
@@ -108,16 +108,15 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create RPM
-        run: |
-          rpmbuild --build-in-place --define "_topdir $(pwd)" --define "version ${{ env.VERSION }}" -bb resources-linux/defguard-client.spec
+        with:
+          args: "--bundles deb,rpm"
       - name: Upload RPM
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: RPMS/${{ matrix.binary_arch }}/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+          asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_content_type: application/octet-stream
       - name: Upload DEB
@@ -237,17 +236,17 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - uses: actions/setup-node@v3
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
           run_install: false
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
       - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
@@ -320,16 +319,16 @@ jobs:
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
           echo Version: $env:VERSION
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
           run_install: false
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $env:GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
       - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
@@ -376,7 +375,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
       - name: Download unsigned bundle & burn-engine
         uses: actions/download-artifact@v4
         with:
@@ -422,7 +421,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
       - name: Download unsigned bundle & signed burn-engine
         uses: actions/download-artifact@v4
         with:

@@ -53,13 +53,14 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
     )?;
     let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)?;
 
-    let mut instance_menu = SubmenuBuilder::new(app, "Instances");
+    let mut menu = MenuBuilder::new(app);
     debug!("Getting all instances information for the tray menu");
     match all_instances().await {
         Ok(instances) => {
             let instance_count = instances.len();
             debug!("Got {instance_count} instances to display in the tray menu");
             for instance in instances {
+                let mut instance_menu = SubmenuBuilder::new(app, &instance.name);
                 let all_locations = all_locations(instance.id).await.unwrap();
                 debug!(
                     "Found {} locations for the {} instance to display in the tray menu",
@@ -87,6 +88,8 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                     )?;
                     instance_menu = instance_menu.item(&menu_item);
                 }
+                let submenu = instance_menu.build()?;
+                menu = menu.item(&submenu);
             }
         }
         Err(err) => {
@@ -94,17 +97,14 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         }
     }
 
-    let submenu = instance_menu.build()?;
-    let menu = MenuBuilder::new(app)
-        .items(&[&submenu])
+    Ok(menu
         .separator()
         .items(&[&show, &hide])
         .separator()
         .items(&[&subscribe_updates, &join_community, &follow_us])
         .separator()
         .item(&quit)
-        .build()?;
-    Ok(menu)
+        .build()?)
 }
 
 /// Setup system tray.
@@ -159,7 +159,7 @@ fn hide_main_window(app: &AppHandle) {
     }
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
         if main_window.is_minimized().unwrap_or_default() {
             if let Err(err) = main_window.unminimize() {
@@ -226,7 +226,7 @@ pub async fn configure_tray_icon(app: &AppHandle, theme: AppTrayTheme) -> Result
     }
 }
 
-async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
+async fn handle_location_tray_menu(id: String, app: &AppHandle) {
     match id.parse::<i64>() {
         Ok(location_id) => {
             match Location::find_by_id(&*DB_POOL, location_id).await {
@@ -237,7 +237,7 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                     if active_locations_ids.contains(&location_id) {
                         info!("Disconnect location with ID {id}");
                         let _ =
-                            disconnect(location_id, ConnectionType::Location, handle.clone()).await;
+                            disconnect(location_id, ConnectionType::Location, app.clone()).await;
                     } else {
                         info!("Connect location with ID {id}");
                         // Check if MFA is enabled. If so, trigger modal on frontend.
@@ -246,10 +246,10 @@ async fn handle_location_tray_menu(id: String, handle: &AppHandle) {
                                 "MFA enabled for location with ID {:?}, trigger MFA modal",
                                 location.id
                             );
-                            let _ = handle.emit(EventKey::MfaTrigger.into(), &location);
+                            show_main_window(app);
+                            let _ = app.emit(EventKey::MfaTrigger.into(), &location);
                         } else if let Err(err) =
-                            connect(location_id, ConnectionType::Location, None, handle.clone())
-                                .await
+                            connect(location_id, ConnectionType::Location, None, app.clone()).await
                         {
                             info!(
                                 "Unable to connect location with ID {}, error: {err:?}",

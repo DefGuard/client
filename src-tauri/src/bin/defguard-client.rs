@@ -16,7 +16,7 @@ use defguard_client::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
-    events::EventKey,
+    events::{handle_deep_link, EventKey},
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, setup_tray},
@@ -34,12 +34,6 @@ use tauri_plugin_log::{Target, TargetKind};
 struct Payload {
     args: Vec<String>,
     cwd: String,
-}
-
-#[derive(Clone, serde::Serialize)]
-struct EntrollmentTriggerPayload<'a> {
-    token: &'a str,
-    url: &'a str,
 }
 
 #[macro_use]
@@ -197,30 +191,16 @@ fn main() {
         .setup(|app| {
             // Handle deep-links.
             let app_handle = app.app_handle().clone();
+            // Apparently, this is needed, regardless what the documentation claims.
+            #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+            app.deep_link().register_all()?;
+            // Handle URLs that triggered the opening of the application.
+            if let Some(urls) = app.deep_link().get_current()? {
+                handle_deep_link(&app_handle, &urls);
+            }
+            // Handle URLs for running application.
             app.deep_link().on_open_url(move |event| {
-                for link in event.urls() {
-                    if link.path() == "/addinstance" {
-                        let mut token = None;
-                        let mut url = None;
-                        for (key, value) in link.query_pairs() {
-                            if key == "token" {
-                                token = Some(value.clone());
-                            }
-                            if key == "url" {
-                                url = Some(value.clone());
-                            }
-                        }
-                        if let (Some(token), Some(url)) = (token, url) {
-                            let _ = app_handle.emit(
-                                EventKey::AddInstance.into(),
-                                EntrollmentTriggerPayload {
-                                    token: &token,
-                                    url: &url,
-                                },
-                            );
-                        }
-                    }
-                }
+                handle_deep_link(&app_handle, &event.urls());
             });
 
             let app_handle = app.app_handle();

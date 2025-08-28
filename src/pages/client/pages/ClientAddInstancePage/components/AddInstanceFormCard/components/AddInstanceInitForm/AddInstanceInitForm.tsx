@@ -45,8 +45,10 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
   const localLL = LL.pages.client.pages.addInstancePage.forms.initInstance;
   const [isLoading, setIsLoading] = useState(false);
   const initEnrollment = useEnrollmentStore((state) => state.init);
-  const setClientState = useClientStore((state) => state.setState);
-  const instanceConfig = useClientStore((state) => state.instanceConfig);
+  const [setClientState, instanceConfig] = useClientStore((state) => [
+    state.setState,
+    state.instanceConfig,
+  ]);
 
   const schema = useMemo(
     () =>
@@ -61,14 +63,12 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     [LL.form.errors],
   );
 
-  const defaultValues: AddInstancePayload = {
-    url: instanceConfig.url,
-    token: instanceConfig.token,
-  };
-
   const { handleSubmit, control } = useForm<AddInstancePayload>({
     resolver: zodResolver(schema),
-    defaultValues,
+    defaultValues: {
+      url: instanceConfig.url,
+      token: instanceConfig.token,
+    },
     mode: 'all',
   });
 
