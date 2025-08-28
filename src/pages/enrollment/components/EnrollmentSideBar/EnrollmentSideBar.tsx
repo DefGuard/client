@@ -1,7 +1,6 @@
 import './style.scss';
 
 import { getVersion } from '@tauri-apps/api/app';
-import { openPath } from '@tauri-apps/plugin-opener';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
@@ -128,14 +127,7 @@ export const EnrollmentSideBar = () => {
       <div className="copyright">
         <p>
           Copyright © {`${dayjs().year()} `}
-          <a
-            href="https://defguard.net"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              void openPath('https://defguard.net');
-            }}
-          >
+          <a href="https://defguard.net" target="_blank" rel="noopener noreferrer">
             defguard
           </a>
         </p>

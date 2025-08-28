@@ -21,9 +21,10 @@ import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToast
 import { useClipboard } from '../../../../shared/hooks/useClipboard';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
 import { EnrollmentStepKey } from '../../const';
+import { EnrollmentNavDirection } from '../../hooks/types';
 
 const formSchema = z.object({
-  code: z.string().min(6, 'Enter valid code').max(6, 'Enter valid code'),
+  code: z.string().trim().min(6, 'Enter valid code').max(6, 'Enter valid code'),
 });
 
 type FormFields = z.infer<typeof formSchema>;
@@ -70,7 +71,7 @@ export const MfaSetupStep = () => {
           type: 'value',
         },
         {
-          shouldFocus: true,
+          shouldFocus: false,
         },
       );
       error(`MFA configuration failed! \nReason: ${err.message}`);
@@ -95,9 +96,17 @@ export const MfaSetupStep = () => {
     });
   }, [startLoading, isPending]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs sub
   useEffect(() => {
-    const sub = nextSubject.subscribe(() => {
-      submitRef.current?.click();
+    const sub = nextSubject.subscribe((direction) => {
+      switch (direction) {
+        case EnrollmentNavDirection.NEXT:
+          submitRef.current?.click();
+          break;
+        case EnrollmentNavDirection.BACK:
+          setStoreState({ step: EnrollmentStepKey.MFA_CHOICE });
+          break;
+      }
     });
     return () => {
       sub.unsubscribe();
@@ -161,7 +170,7 @@ const TotpQr = ({ email, secret }: TotpProps) => {
   return (
     <div className="totp-info">
       <div className="qr">
-        <QRCode value={`otpauth://totp/defguard:${email}?secret=${secret}`} />
+        <QRCode value={`otpauth://totp/Defguard:${email}?secret=${secret}`} />
       </div>
       <Button
         text="Copy TOTP"
