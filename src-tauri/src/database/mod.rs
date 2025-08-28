@@ -19,6 +19,7 @@ pub static DB_POOL: LazyLock<SqlitePool> = LazyLock::new(|| {
     let db_url = prepare_db_url().expect("Wrong database URL.");
     let opts = SqliteConnectOptions::from_str(&db_url)
         .expect("Failed to set database connenction options.")
+        .create_if_missing(true)
         .auto_vacuum(SqliteAutoVacuum::Incremental)
         .journal_mode(SqliteJournalMode::Wal);
     debug!("Connecting to database: {db_url} with options: {opts:?}");

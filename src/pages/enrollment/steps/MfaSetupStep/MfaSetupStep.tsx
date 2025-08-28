@@ -20,20 +20,21 @@ import SvgIconCopy from '../../../../shared/defguard-ui/components/svg/IconCopy'
 import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { useClipboard } from '../../../../shared/hooks/useClipboard';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../const';
+import { EnrollmentNavDirection } from '../../hooks/types';
 
 const formSchema = z.object({
-  code: z.string().min(6, 'Enter valid code').max(6, 'Enter valid code'),
+  code: z.string().trim().min(6, 'Enter valid code').max(6, 'Enter valid code'),
 });
 
 type FormFields = z.infer<typeof formSchema>;
 
-export const TotpEnrollmentStep = () => {
+export const MfaSetupStep = () => {
   const toaster = useToaster();
   const submitRef = useRef<HTMLInputElement>(null);
-  const { writeToClipboard } = useClipboard();
-  const userInfo = useEnrollmentStore((s) => s.userInfo);
-  const [nextSubject, setStoreState, nextStep] = useEnrollmentStore(
-    (s) => [s.nextSubject, s.setState, s.nextStep],
+  const [userInfo, mfaMethod] = useEnrollmentStore((s) => [s.userInfo, s.mfaMethod]);
+  const [nextSubject, setStoreState] = useEnrollmentStore(
+    (s) => [s.nextSubject, s.setState],
     shallow,
   );
 
@@ -42,9 +43,10 @@ export const TotpEnrollmentStep = () => {
   } = useEnrollmentApi();
 
   const { data: startData, isLoading: startLoading } = useQuery({
-    queryFn: () => registerCodeMfaStart(MfaMethod.TOTP),
-    queryKey: ['enrollment', 'register-mfa', 'start'],
+    queryFn: () => registerCodeMfaStart(mfaMethod),
+    queryKey: ['register-mfa', mfaMethod],
     refetchOnWindowFocus: false,
+    enabled: isPresent(mfaMethod),
   });
 
   const { handleSubmit, control, setError } = useForm<FormFields>({
@@ -53,10 +55,13 @@ export const TotpEnrollmentStep = () => {
 
   const { mutate, isPending } = useMutation({
     mutationFn: registerCodeMfaFinish,
-    onSuccess: () => {
+    onSuccess: (response) => {
       toaster.success('MFA configured');
-      setStoreState({ loading: false });
-      nextStep();
+      setStoreState({
+        loading: false,
+        step: EnrollmentStepKey.MFA_RECOVERY,
+        recoveryCodes: response.recovery_codes,
+      });
     },
     onError: (err) => {
       setError(
@@ -66,7 +71,7 @@ export const TotpEnrollmentStep = () => {
           type: 'value',
         },
         {
-          shouldFocus: true,
+          shouldFocus: false,
         },
       );
       error(`MFA configuration failed! \nReason: ${err.message}`);
@@ -77,7 +82,11 @@ export const TotpEnrollmentStep = () => {
   const isLoading = startLoading || isPending;
 
   const submitHandler: SubmitHandler<FormFields> = (data) => {
-    mutate(data);
+    const sendData = {
+      code: data.code,
+      method: mfaMethod,
+    };
+    mutate(sendData);
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sideEffect
@@ -87,9 +96,17 @@ export const TotpEnrollmentStep = () => {
     });
   }, [startLoading, isPending]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs sub
   useEffect(() => {
-    const sub = nextSubject.subscribe(() => {
-      submitRef.current?.click();
+    const sub = nextSubject.subscribe((direction) => {
+      switch (direction) {
+        case EnrollmentNavDirection.NEXT:
+          submitRef.current?.click();
+          break;
+        case EnrollmentNavDirection.BACK:
+          setStoreState({ step: EnrollmentStepKey.MFA_CHOICE });
+          break;
+      }
     });
     return () => {
       sub.unsubscribe();
@@ -98,47 +115,70 @@ export const TotpEnrollmentStep = () => {
 
   return (
     <Card id="enrollment-totp-card">
+      <div>
+        <EnrollmentStepIndicator />
+        <h3>Configure MFA</h3>
+      </div>
       {isLoading && (
         <div className="loading">
           <LoaderSpinner size={64} />
         </div>
       )}
-      {!isLoading && (
+      {!isLoading && isPresent(userInfo) && (
         <>
-          <div>
-            <EnrollmentStepIndicator />
-            <h3>Configure MFA</h3>
-          </div>
-          <MessageBox
-            message={
-              'To setup your MFA, scan this QR code with your authenticator app, then enter the code in the field below:'
-            }
-          />
-          <form onSubmit={handleSubmit(submitHandler)}>
-            {!isLoading &&
-              isPresent(startData) &&
-              isPresent(startData.totp_secret) &&
-              isPresent(userInfo) && (
-                <>
-                  <div className="qr">
-                    <QRCode
-                      value={`otpauth://totp/defguard:${userInfo?.email}?secret=${startData?.totp_secret}`}
-                    />
-                  </div>
-                  <Button
-                    text="Copy TOTP"
-                    icon={<SvgIconCopy />}
-                    onClick={() => {
-                      writeToClipboard(startData.totp_secret as string);
-                    }}
-                  />
-                  <FormInput controller={{ control, name: 'code' }} label="Code" />
-                  <input type="submit" ref={submitRef} />
-                </>
+          {mfaMethod === MfaMethod.TOTP && (
+            <>
+              <MessageBox
+                message={
+                  'To setup your MFA, scan this QR code with your authenticator app, then enter the code in the field below:'
+                }
+              />
+              {isPresent(startData?.totp_secret) && (
+                <TotpQr email={userInfo.email} secret={startData.totp_secret} />
               )}
+            </>
+          )}
+          {mfaMethod === MfaMethod.EMAIL && (
+            <MessageBox>
+              <p>
+                To setup your MFA, enter the code that was sent to your account email:
+                <br />
+                <strong>{userInfo.email}</strong>
+              </p>
+            </MessageBox>
+          )}
+          <form onSubmit={handleSubmit(submitHandler)}>
+            <FormInput
+              controller={{ control, name: 'code' }}
+              label={mfaMethod === MfaMethod.TOTP ? 'Authenticator code' : 'Email code'}
+            />
+            <input type="submit" ref={submitRef} />
           </form>
         </>
       )}
     </Card>
+  );
+};
+
+type TotpProps = {
+  email: string;
+  secret: string;
+};
+
+const TotpQr = ({ email, secret }: TotpProps) => {
+  const { writeToClipboard } = useClipboard();
+  return (
+    <div className="totp-info">
+      <div className="qr">
+        <QRCode value={`otpauth://totp/Defguard:${email}?secret=${secret}`} />
+      </div>
+      <Button
+        text="Copy TOTP"
+        icon={<SvgIconCopy />}
+        onClick={() => {
+          writeToClipboard(secret);
+        }}
+      />
+    </div>
   );
 };

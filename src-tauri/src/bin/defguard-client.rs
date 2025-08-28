@@ -187,6 +187,7 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // Handle deep-links.
             let app_handle = app.app_handle().clone();

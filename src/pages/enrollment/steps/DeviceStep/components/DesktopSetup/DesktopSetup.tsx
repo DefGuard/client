@@ -20,6 +20,7 @@ import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/us
 import type { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { EnrollmentStepIndicator } from '../../../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../../../const';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
 
@@ -40,7 +41,6 @@ export const DesktopSetup = () => {
     state.userPassword,
   ]);
   const setEnrollmentStore = useEnrollmentStore((state) => state.setState);
-  const next = useEnrollmentStore((state) => state.nextStep);
   const [isLoading, setIsLoading] = useState(false);
 
   const { mutateAsync: createDeviceMutation, isPending: createDevicePending } =
@@ -85,15 +85,15 @@ export const DesktopSetup = () => {
     })) as CreateDeviceResponse;
     toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
     setEnrollmentStore({
+      deviceResponse,
+      step: EnrollmentStepKey.MFA_CHOICE,
       deviceName: values.name,
       deviceKeys: {
         private: privateKey,
         public: publicKey,
       },
-      deviceResponse,
     });
     setIsLoading(false);
-    next();
   };
 
   return (

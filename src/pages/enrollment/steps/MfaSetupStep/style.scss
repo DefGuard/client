@@ -15,17 +15,25 @@
     min-height: 25dvh;
   }
 
-  .qr {
+  .totp-info {
     display: flex;
-    flex-flow: row;
+    flex-flow: column;
     align-items: center;
     justify-content: center;
-  }
+    row-gap: var(--spacing-s);
 
-  .btn {
-    width: unset;
-    flex-grow: 0;
-    width: min-content;
+    .qr {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn {
+      width: unset;
+      flex-grow: 0;
+      width: min-content;
+    }
   }
 
   form {

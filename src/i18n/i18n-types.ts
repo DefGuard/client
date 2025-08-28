@@ -1130,6 +1130,18 @@ type RootTranslation = {
 					 * C​o​n​f​i​g​u​r​e​ ​M​F​A
 					 */
 					mfa: string
+					/**
+					 * C​h​o​o​s​e​ ​m​e​t​h​o​d
+					 */
+					mfaChoice: string
+					/**
+					 * C​o​m​p​l​e​t​e​ ​m​e​t​h​o​d
+					 */
+					mfaSetup: string
+					/**
+					 * R​e​c​o​v​e​r​y​ ​c​o​d​e​s
+					 */
+					mfaRecovery: string
 				}
 				/**
 				 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n
@@ -2798,6 +2810,18 @@ export type TranslationFunctions = {
 					 * Configure MFA
 					 */
 					mfa: () => LocalizedString
+					/**
+					 * Choose method
+					 */
+					mfaChoice: () => LocalizedString
+					/**
+					 * Complete method
+					 */
+					mfaSetup: () => LocalizedString
+					/**
+					 * Recovery codes
+					 */
+					mfaRecovery: () => LocalizedString
 				}
 				/**
 				 * Application version

@@ -11,7 +11,9 @@ import { FormInput } from '../../../../shared/defguard-ui/components/Form/FormIn
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { passwordValidator } from '../../../../shared/validators/password';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../const';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
+import { EnrollmentNavDirection } from '../../hooks/types';
 
 type FormFields = {
   password: string;
@@ -22,10 +24,9 @@ export const PasswordStep = () => {
   const submitRef = useRef<HTMLInputElement | null>(null);
   const { LL } = useI18nContext();
 
-  const setStore = useEnrollmentStore((state) => state.setState);
   const userPassword = useEnrollmentStore((state) => state.userPassword);
-  const [nextSubject, next] = useEnrollmentStore(
-    (state) => [state.nextSubject, state.nextStep],
+  const [nextSubject, setStore] = useEnrollmentStore(
+    (state) => [state.nextSubject, state.setState],
     shallow,
   );
 
@@ -61,13 +62,20 @@ export const PasswordStep = () => {
   });
 
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
-    setStore({ userPassword: values.password });
-    next();
+    setStore({ userPassword: values.password, step: EnrollmentStepKey.DEVICE });
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs
   useEffect(() => {
-    const sub = nextSubject.subscribe(() => {
-      submitRef.current?.click();
+    const sub = nextSubject.subscribe((direction) => {
+      switch (direction) {
+        case EnrollmentNavDirection.BACK:
+          setStore({ step: EnrollmentStepKey.DATA_VERIFICATION });
+          break;
+        case EnrollmentNavDirection.NEXT:
+          submitRef.current?.click();
+          break;
+      }
     });
 
     return () => {

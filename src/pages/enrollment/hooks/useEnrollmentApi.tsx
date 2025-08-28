@@ -2,7 +2,6 @@ import { fetch } from '@tauri-apps/plugin-http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import type { UseApi } from '../../../shared/hooks/api/types';
-import { MfaMethod } from '../../../shared/types';
 
 export const useEnrollmentApi = (): UseApi => {
   const [proxyUrl, cookie] = useEnrollmentStore((state) => [
@@ -35,8 +34,9 @@ export const useEnrollmentApi = (): UseApi => {
         'Content-Type': 'application/json',
         Cookie: cookie,
       } as Record<string, string>,
-      body: JSON.stringify({ ...data, method: MfaMethod.TOTP.valueOf() }),
+      body: JSON.stringify(data),
     });
+    if (!response.ok) throw Error('Register finish request failed');
     return await response.json();
   };
 

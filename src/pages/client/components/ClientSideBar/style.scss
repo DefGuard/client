@@ -281,7 +281,8 @@
       padding-right: 5px;
     }
 
-    & > span {
+    & > a {
+      color: inherit;
       cursor: pointer;
     }
   }

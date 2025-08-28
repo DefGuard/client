@@ -5,6 +5,7 @@ import '../../shared/scss/index.scss';
 import { QueryClient } from '@tanstack/query-core';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { debug } from '@tauri-apps/plugin-log';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
 import duration from 'dayjs/plugin/duration';
@@ -164,6 +165,26 @@ export const App = () => {
       loadTauriState();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | undefined;
+      if (target) {
+        const link = target.closest('a');
+        if (
+          link instanceof HTMLAnchorElement &&
+          link.target === '_blank' &&
+          link.href.startsWith('https')
+        ) {
+          void openUrl(link.href);
+        }
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, []);
 
   if (!appLoaded) return null;
