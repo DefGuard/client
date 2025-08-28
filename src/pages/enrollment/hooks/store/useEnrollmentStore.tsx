@@ -7,14 +7,17 @@ import type {
   CreateDeviceResponse,
   UserInfo,
 } from '../../../../shared/hooks/api/types';
+import { MfaMethod } from '../../../../shared/types';
+import { EnrollmentStepKey } from '../../const';
+import { EnrollmentNavDirection } from '../types';
 
 const defaultValues: StoreValues = {
   // assume default dev
   proxy_url: '/api/v1/',
   loading: false,
-  step: 0,
-  stepsMax: 6,
-  stepsIgnored: [],
+  step: EnrollmentStepKey.WELCOME,
+  mfaMethod: MfaMethod.TOTP,
+  recoveryCodes: [],
   sessionStart: undefined,
   sessionEnd: undefined,
   userInfo: undefined,
@@ -22,17 +25,18 @@ const defaultValues: StoreValues = {
   vpnOptional: undefined,
   userPassword: undefined,
   cookie: undefined,
-  nextSubject: new Subject<void>(),
+  nextSubject: new Subject(),
   deviceKeys: undefined,
   deviceResponse: undefined,
 };
 
 const persistKeys: Array<keyof StoreValues> = [
   'step',
-  'stepsMax',
-  'stepsIgnored',
+  'proxy_url',
   'userInfo',
   'userPassword',
+  'recoveryCodes',
+  'mfaMethod',
   'sessionEnd',
   'sessionStart',
   'adminInfo',
@@ -41,6 +45,7 @@ const persistKeys: Array<keyof StoreValues> = [
   'vpnOptional',
   'deviceKeys',
   'deviceResponse',
+  'cookie',
 ];
 
 export const useEnrollmentStore = createWithEqualityFn<Store>()(
@@ -50,25 +55,16 @@ export const useEnrollmentStore = createWithEqualityFn<Store>()(
       init: (values) => set({ ...defaultValues, ...values }),
       setState: (newValues) => set((old) => ({ ...old, ...newValues })),
       reset: () => set(defaultValues),
-      nextStep: () => {
-        const current = get().step;
-        const max = get().stepsMax;
-
-        if (current < max) {
-          return set({ step: current + 1 });
-        }
+      next: () => {
+        get().nextSubject.next(EnrollmentNavDirection.NEXT);
       },
-      perviousStep: () => {
-        const current = get().step;
-
-        if (current > 0) {
-          return set({ step: current - 1 });
-        }
+      back: () => {
+        get().nextSubject.next(EnrollmentNavDirection.BACK);
       },
     }),
     {
       name: 'enrollment-storage',
-      version: 0.1,
+      version: 2,
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => pick(state, persistKeys),
     },
@@ -81,12 +77,12 @@ type Store = StoreValues & StoreMethods;
 type StoreValues = {
   // next and back are disabled
   loading: boolean;
-  step: number;
-  stepsMax: number;
-  stepsIgnored: number[];
-  nextSubject: Subject<void>;
+  step: EnrollmentStepKey;
+  mfaMethod: MfaMethod;
+  nextSubject: Subject<EnrollmentNavDirection>;
   // Date
   proxy_url: string;
+  recoveryCodes: string[];
   sessionStart?: string;
   sessionEnd?: string;
   userInfo?: UserInfo;
@@ -106,8 +102,8 @@ type StoreValues = {
 
 type StoreMethods = {
   setState: (values: Partial<StoreValues>) => void;
-  reset: () => void;
-  nextStep: () => void;
-  perviousStep: () => void;
   init: (initValues: Partial<StoreValues>) => void;
+  next: () => void;
+  back: () => void;
+  reset: () => void;
 };

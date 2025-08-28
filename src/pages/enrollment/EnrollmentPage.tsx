@@ -2,7 +2,7 @@ import './style.scss';
 
 import { debug, error } from '@tauri-apps/plugin-log';
 import dayjs from 'dayjs';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBreakpoint } from 'use-breakpoint';
 import { shallow } from 'zustand/shallow';
@@ -24,14 +24,8 @@ import {
 import { routes } from '../../shared/routes';
 import { EnrollmentSideBar } from './components/EnrollmentSideBar/EnrollmentSideBar';
 import { EnrollmentStepControls } from './components/EnrollmentStepControls/EnrollmentStepControls';
+import { EnrollmentStepKey, enrollmentSteps, flattenEnrollConf } from './const';
 import { useEnrollmentStore } from './hooks/store/useEnrollmentStore';
-import { DataVerificationStep } from './steps/DataVerificationStep/DataVerificationStep';
-import { DeviceStep } from './steps/DeviceStep/DeviceStep';
-import { FinishStep } from './steps/FinishStep/FinishStep';
-import { PasswordStep } from './steps/PasswordStep/PasswordStep';
-import { SendFinishStep } from './steps/SendFinishStep/SendFinishStep';
-import { TotpEnrollmentStep } from './steps/Totp/TotpEnrollmentStep';
-import { WelcomeStep } from './steps/WelcomeStep/WelcomeStep';
 
 export const EnrollmentPage = () => {
   const enrollmentFinished = useRef(false);
@@ -40,30 +34,16 @@ export const EnrollmentPage = () => {
   const { breakpoint } = useBreakpoint(deviceBreakpoints);
   const sessionEnd = useEnrollmentStore((state) => state.sessionEnd);
   const currentStep = useEnrollmentStore((state) => state.step);
-  const stepsMax = useEnrollmentStore((state) => state.stepsMax);
   const loading = useEnrollmentStore((state) => state.loading);
 
-  const [setEnrollmentState, back, _reset, nextSubject] = useEnrollmentStore(
-    (state) => [state.setState, state.perviousStep, state.reset, state.nextSubject],
-    shallow,
-  );
+  const [back, next] = useEnrollmentStore((state) => [state.back, state.next], shallow);
 
   const controlsSize: ButtonSize =
     breakpoint !== 'desktop' ? ButtonSize.SMALL : ButtonSize.LARGE;
 
-  // ensure number of steps is correct
-  useEffect(() => {
-    const stepsIgnored: number[] = [];
-    steps.forEach((step, index) => {
-      if (step.ignoreCount) {
-        stepsIgnored.push(index);
-      }
-    });
-    setEnrollmentState({
-      stepsIgnored,
-      stepsMax: steps.length - 1,
-    });
-  }, [setEnrollmentState]);
+  const flatConf = useMemo(() => flattenEnrollConf(), []);
+
+  const currentStepConfig = flatConf[currentStep];
 
   useEffect(() => {
     if (!enrollmentFinished.current) {
@@ -92,8 +72,8 @@ export const EnrollmentPage = () => {
   }, [sessionEnd, navigate]);
 
   useEffect(() => {
-    enrollmentFinished.current = stepsMax === currentStep;
-  }, [currentStep, stepsMax]);
+    enrollmentFinished.current = currentStep === EnrollmentStepKey.FINISH;
+  }, [currentStep]);
 
   return (
     <PageContainer id="enrollment">
@@ -105,7 +85,7 @@ export const EnrollmentPage = () => {
           size={controlsSize}
           styleVariant={ButtonStyleVariant.STANDARD}
           onClick={() => back()}
-          disabled={(steps[currentStep].backDisabled ?? false) || loading}
+          disabled={(currentStepConfig.backEnabled ?? false) || loading}
           icon={
             <ArrowSingle
               size={ArrowSingleSize.SMALL}
@@ -115,58 +95,16 @@ export const EnrollmentPage = () => {
         />
         <Button
           data-testid="enrollment-next"
+          disabled={currentStepConfig.nextDisabled}
           loading={loading}
           text={LL.common.controls.next()}
           size={controlsSize}
           styleVariant={ButtonStyleVariant.PRIMARY}
-          onClick={() => nextSubject.next()}
+          onClick={() => next()}
           rightIcon={<ArrowSingle size={ArrowSingleSize.SMALL} />}
         />
       </EnrollmentStepControls>
-      {steps[currentStep].step ?? null}
+      {enrollmentSteps[currentStep]}
     </PageContainer>
   );
-};
-
-const steps: EnrollmentStep[] = [
-  {
-    key: 0,
-    step: <WelcomeStep key={0} />,
-    backDisabled: true,
-  },
-  {
-    key: 1,
-    step: <DataVerificationStep key={1} />,
-  },
-  {
-    key: 2,
-    step: <PasswordStep key={2} />,
-  },
-  {
-    key: 3,
-    step: <DeviceStep key={3} />,
-  },
-  {
-    key: 4,
-    step: <TotpEnrollmentStep key={4} />,
-    backDisabled: true,
-  },
-  {
-    key: 5,
-    step: <SendFinishStep key={5} />,
-    backDisabled: true,
-    ignoreCount: true,
-  },
-  {
-    key: 6,
-    step: <FinishStep key={6} />,
-    backDisabled: true,
-  },
-];
-
-type EnrollmentStep = {
-  backDisabled?: boolean;
-  key: string | number;
-  ignoreCount?: boolean;
-  step: ReactNode;
 };

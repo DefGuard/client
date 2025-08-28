@@ -1,0 +1,27 @@
+#enrollment-mfa-recovery-codes-step {
+  width: 100%;
+  max-width: 650px;
+  padding: 50px 40px;
+  display: flex;
+  flex-flow: column;
+  gap: var(--spacing-m);
+
+  & > .codes {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-s);
+
+    ul {
+      li {
+        &:not(:last-child) {
+          margin-bottom: var(--spacing-xs);
+        }
+
+        @include typography(app-code);
+        font-size: 14px;
+      }
+    }
+  }
+}

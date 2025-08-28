@@ -62,6 +62,7 @@
     "@tauri-apps/plugin-http": "^2.5.2",
     "@tauri-apps/plugin-log": "^2.6.0",
     "@tauri-apps/plugin-notification": "^2.3.0",
+    "@tauri-apps/plugin-opener": "^2.5.0",
     "@tauri-apps/plugin-window-state": "^2.4.0",
     "@types/byte-size": "^8.1.2",
     "@use-gesture/react": "^10.3.1",

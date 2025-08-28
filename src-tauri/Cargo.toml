@@ -94,6 +94,7 @@ x25519-dalek = { version = "2", features = [
     "serde",
     "static_secrets",
 ] }
+tauri-plugin-opener = "2.5.0"
 
 [target.'cfg(unix)'.dependencies]
 tokio-stream = "0.1"

@@ -105,6 +105,7 @@ export type NewApplicationVersionInfo = {
 
 export type RegisterCodeMfaFinishRequest = {
   code: string;
+  method: MfaMethod;
 };
 
 export type RegisterCodeMfaStartResponse = {

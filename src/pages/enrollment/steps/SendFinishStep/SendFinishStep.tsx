@@ -16,6 +16,7 @@ import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../hooks/useEnrollmentApi';
 import './style.scss';
 import useEffectOnce from '../../../../shared/defguard-ui/utils/useEffectOnce';
+import { EnrollmentStepKey } from '../../const';
 
 const { saveConfig } = clientApi;
 
@@ -35,10 +36,7 @@ export const SendFinishStep = () => {
   const deviceKeys = useEnrollmentStore((s) => s.deviceKeys);
   const deviceResponse = useEnrollmentStore((s) => s.deviceResponse);
 
-  const [setEnrollmentStore, next] = useEnrollmentStore(
-    (state) => [state.setState, state.nextStep],
-    shallow,
-  );
+  const [setEnrollmentStore] = useEnrollmentStore((state) => [state.setState], shallow);
 
   const queryFn = useCallback(
     async (
@@ -62,7 +60,6 @@ export const SendFinishStep = () => {
               queryKey: [key],
             });
           });
-          next();
         })
         .catch((e) => {
           if (typeof e === 'string') {
@@ -84,7 +81,6 @@ export const SendFinishStep = () => {
       LL.common.messages.errorWithMessage,
       LL.common.messages.networkError,
       activateUser,
-      next,
       queryClient.invalidateQueries,
       setEnrollmentStore,
       toaster.error,
@@ -109,8 +105,7 @@ export const SendFinishStep = () => {
       error(String(e));
     },
     onSuccess: () => {
-      setEnrollmentStore({ loading: false });
-      next();
+      setEnrollmentStore({ loading: false, step: EnrollmentStepKey.FINISH });
     },
   });
 
