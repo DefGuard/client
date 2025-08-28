@@ -351,6 +351,17 @@ pub struct LocationInfo {
     pub location_mfa_mode: LocationMfaMode,
 }
 
+impl LocationInfo {
+    /// Label used in system tray menu.
+    pub(crate) fn menu_label(&self) -> String {
+        format!(
+            "{}: {}",
+            if self.active { "Disconnect" } else { "Connect" },
+            self.name
+        )
+    }
+}
+
 impl fmt::Display for LocationInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)
