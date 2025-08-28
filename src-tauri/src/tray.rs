@@ -59,37 +59,49 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         Ok(instances) => {
             let instance_count = instances.len();
             debug!("Got {instance_count} instances to display in the tray menu");
-            for instance in instances {
-                let mut instance_menu = SubmenuBuilder::new(app, &instance.name);
-                let all_locations = all_locations(instance.id).await.unwrap();
-                debug!(
-                    "Found {} locations for the {} instance to display in the tray menu",
-                    all_locations.len(),
-                    instance
-                );
 
+            // One instance omits sub-menu.
+            if instance_count == 1 {
+                let instance = &instances[0];
+                let all_locations = all_locations(instance.id).await?;
+                debug!(
+                    "Found {} locations for the {instance} instance to display in the tray menu",
+                    all_locations.len(),
+                );
                 // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
                 for location in all_locations {
-                    let item_name = format!(
-                        "{}: {}",
-                        if location.active {
-                            "Disconnect"
-                        } else {
-                            "Connect"
-                        },
-                        location.name
-                    );
                     let menu_item = MenuItem::with_id(
                         app,
                         location.id.to_string(),
-                        item_name,
+                        location.menu_label(),
                         true,
                         None::<&str>,
                     )?;
-                    instance_menu = instance_menu.item(&menu_item);
+                    menu = menu.item(&menu_item);
                 }
-                let submenu = instance_menu.build()?;
-                menu = menu.item(&submenu);
+            } else {
+                for instance in instances {
+                    let mut instance_menu = SubmenuBuilder::new(app, &instance.name);
+                    let all_locations = all_locations(instance.id).await?;
+                    debug!(
+                        "Found {} locations for the {instance} instance to display in the tray menu",
+                        all_locations.len(),
+                    );
+
+                    // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
+                    for location in all_locations {
+                        let menu_item = MenuItem::with_id(
+                            app,
+                            location.id.to_string(),
+                            location.menu_label(),
+                            true,
+                            None::<&str>,
+                        )?;
+                        instance_menu = instance_menu.item(&menu_item);
+                    }
+                    let submenu = instance_menu.build()?;
+                    menu = menu.item(&submenu);
+                }
             }
         }
         Err(err) => {
