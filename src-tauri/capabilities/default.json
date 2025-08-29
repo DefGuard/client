@@ -43,6 +43,8 @@
     "fs:default",
     "log:default",
     "notification:default",
+    "os:default",
+    "os:allow-hostname",
     {
       "identifier": "http:default",
       "allow": [

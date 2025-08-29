@@ -7,6 +7,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../i18n/i18n-react';
+import { DeepLinkProvider } from '../../shared/components/providers/DeppLinkProvider';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
@@ -19,7 +20,6 @@ import { useClientStore } from './hooks/useClientStore';
 import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
 import {
-  type AddInstancePayload,
   type CommonWireguardFields,
   type DeadConDroppedPayload,
   type DeadConReconnectedPayload,
@@ -140,11 +140,6 @@ export const ClientPage = () => {
       },
     );
 
-    const addInstance = listen<AddInstancePayload>(TauriEventKey.ADD_INSTANCE, (data) => {
-      useClientStore.setState({ instanceConfig: data.payload });
-      navigate(routes.client.addInstance, { replace: true });
-    });
-
     const mfaTrigger = listen<CommonWireguardFields>(
       TauriEventKey.MFA_TRIGGER,
       (data) => {
@@ -160,7 +155,6 @@ export const ClientPage = () => {
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
       appConfigChanged.then((cleanup) => cleanup());
-      addInstance.then((cleanup) => cleanup());
       mfaTrigger.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,12 +194,12 @@ export const ClientPage = () => {
   }, [navigate, listChecked, instances, tunnels]);
 
   return (
-    <>
+    <DeepLinkProvider>
       <MfaModalProvider>
         <Outlet />
       </MfaModalProvider>
       <DeadConDroppedModal />
       <ClientSideBar />
-    </>
+    </DeepLinkProvider>
   );
 };

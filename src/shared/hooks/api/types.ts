@@ -22,6 +22,7 @@ export type UserInfo = {
 
 export type EnrollmentStartRequest = {
   token: string;
+  proxyUrl?: string;
 };
 
 export type EnrollmentSettings = {
@@ -103,6 +104,9 @@ export type EnrollmentInstanceInfo = {
   id: string;
   name: string;
   url: string;
+  proxy_url?: string;
+  username: string;
+  openid_display_name?: string;
 };
 
 export type NewApplicationVersionInfo = {

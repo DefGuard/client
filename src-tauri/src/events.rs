@@ -7,7 +7,6 @@ use crate::{tray::show_main_window, ConnectionType};
 // Match src/page/client/types.ts.
 #[non_exhaustive]
 pub enum EventKey {
-    SingleInstance,
     ConnectionChanged,
     InstanceUpdate,
     LocationUpdate,
@@ -23,7 +22,6 @@ pub enum EventKey {
 impl From<EventKey> for &'static str {
     fn from(key: EventKey) -> &'static str {
         match key {
-            EventKey::SingleInstance => "single-instance",
             EventKey::ConnectionChanged => "connection-changed",
             EventKey::InstanceUpdate => "instance-update",
             EventKey::LocationUpdate => "location-update",

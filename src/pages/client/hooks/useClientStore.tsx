@@ -5,7 +5,6 @@ import { createWithEqualityFn } from 'zustand/traditional';
 import { clientApi } from '../clientAPI/clientApi';
 import type { AppConfig, ClientView } from '../clientAPI/types';
 import {
-  type AddInstancePayload,
   type CommonWireguardFields,
   type DefguardInstance,
   type SelectedInstance,
@@ -36,10 +35,6 @@ const defaultValues: StoreValues = {
     tray_theme: 'color',
     check_for_updates: true,
     peer_alive_period: 300,
-  },
-  instanceConfig: {
-    token: '',
-    url: '',
   },
 };
 
@@ -115,7 +110,6 @@ type StoreValues = {
   listChecked: boolean;
   selectedView: ClientView;
   appConfig: AppConfig;
-  instanceConfig: AddInstancePayload;
 };
 
 type StoreMethods = {
