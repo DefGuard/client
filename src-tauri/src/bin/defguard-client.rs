@@ -169,8 +169,7 @@ fn main() {
         })
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
         // Single instance plugin should always be the first to register.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            let _ = app.emit(EventKey::SingleInstance.into(), Payload { args: argv, cwd });
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // Running instance might be hidden, so show it.
             show_main_window(app);
         }))

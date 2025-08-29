@@ -61,7 +61,7 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
     enrollment: { start },
   } = useEnrollmentApi();
 
-  const setEnrollmentState = useEnrollmentStore((s) => s.setState);
+  const setEnrollmentState = useEnrollmentStore((s) => s.init);
   const setAddInstanceState = useAddInstanceStore((s) => s.setState);
 
   const navigate = useNavigate();
@@ -110,7 +110,7 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
                 sessionEnd,
                 sessionStart,
               });
-              navigate('enrollment', { replace: true });
+              navigate('/enrollment', { replace: true });
             } else {
               setAddInstanceState({
                 step: AddInstanceFormStep.DEVICE,
@@ -120,7 +120,7 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
                   url: proxy_api_url,
                 },
               });
-              navigate('client/add-instance', { replace: true });
+              navigate('/client/add-instance', { replace: true });
             }
           } else {
             error(
