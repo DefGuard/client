@@ -18,7 +18,7 @@ use defguard_client::{
     },
     periodic::run_periodic_tasks,
     service,
-    tray::{configure_tray_icon, setup_tray},
+    tray::{configure_tray_icon, setup_tray, show_main_window},
     utils::load_log_targets,
     VERSION,
 };
@@ -169,7 +169,11 @@ fn main() {
         })
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
         // Single instance plugin should always be the first to register.
-        .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            let _ = app.emit(EventKey::SingleInstance.into(), Payload { args: argv, cwd });
+            // Running instance might be hidden, so show it.
+            show_main_window(app);
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
