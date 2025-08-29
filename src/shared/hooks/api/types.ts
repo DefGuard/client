@@ -24,13 +24,22 @@ export type EnrollmentStartRequest = {
   token: string;
 };
 
+export type EnrollmentSettings = {
+  admin_device_management: boolean;
+  mfa_required: boolean;
+  only_client_activation: boolean;
+  smtp_configured: boolean;
+  vpn_setup_optional: boolean;
+};
+
 export type EnrollmentStartResponse = {
   admin: AdminInfo;
   user: UserInfo;
+  instance: EnrollmentInstanceInfo;
   deadline_timestamp: number;
   final_page_content: string;
   vpn_setup_optional: boolean;
-  instance: EnrollmentInstanceInfo;
+  settings: EnrollmentSettings;
 };
 
 export type ActivateUserRequest = {

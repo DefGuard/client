@@ -1,3 +1,4 @@
+import type { Dayjs } from 'dayjs';
 import { pick } from 'lodash-es';
 import { Subject } from 'rxjs';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -5,6 +6,7 @@ import { createWithEqualityFn } from 'zustand/traditional';
 import type {
   AdminInfo,
   CreateDeviceResponse,
+  EnrollmentSettings,
   UserInfo,
 } from '../../../../shared/hooks/api/types';
 import { MfaMethod } from '../../../../shared/types';
@@ -15,6 +17,14 @@ const defaultValues: StoreValues = {
   // assume default dev
   proxy_url: '/api/v1/',
   loading: false,
+  enrollmentSettings: {
+    admin_device_management: false,
+    mfa_required: false,
+    only_client_activation: false,
+    smtp_configured: false,
+    vpn_setup_optional: true,
+  },
+  emailResendTimestamp: undefined,
   step: EnrollmentStepKey.WELCOME,
   mfaMethod: MfaMethod.TOTP,
   recoveryCodes: [],
@@ -46,6 +56,7 @@ const persistKeys: Array<keyof StoreValues> = [
   'deviceKeys',
   'deviceResponse',
   'cookie',
+  'enrollmentSettings',
 ];
 
 export const useEnrollmentStore = createWithEqualityFn<Store>()(
@@ -75,10 +86,11 @@ export const useEnrollmentStore = createWithEqualityFn<Store>()(
 type Store = StoreValues & StoreMethods;
 
 type StoreValues = {
-  // next and back are disabled
   loading: boolean;
+  enrollmentSettings: EnrollmentSettings;
   step: EnrollmentStepKey;
   mfaMethod: MfaMethod;
+  emailResendTimestamp?: Dayjs;
   nextSubject: Subject<EnrollmentNavDirection>;
   // Date
   proxy_url: string;

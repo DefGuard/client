@@ -18,6 +18,7 @@ import { EnrollmentNavDirection } from '../../hooks/types';
 
 export const ChooseMfaStep = () => {
   const selectedMethod = useEnrollmentStore((s) => s.mfaMethod);
+  const enrollmentSettings = useEnrollmentStore((s) => s.enrollmentSettings);
   const [setStore, navSubject] = useEnrollmentStore(
     (s) => [s.setState, s.nextSubject],
     shallow,
@@ -55,6 +56,7 @@ export const ChooseMfaStep = () => {
           }}
         />
         <LabeledRadio
+          disabled={!enrollmentSettings.smtp_configured}
           active={selectedMethod === MfaMethod.EMAIL}
           label="Email"
           onClick={() => {
@@ -63,17 +65,19 @@ export const ChooseMfaStep = () => {
         />
       </div>
       <div className="controls">
-        <Button
-          size={ButtonSize.SMALL}
-          styleVariant={ButtonStyleVariant.LINK}
-          text="Skip MFA Setup"
-          onClick={() => {
-            setStore({
-              loading: false,
-              step: EnrollmentStepKey.ACTIVATE_USER,
-            });
-          }}
-        />
+        {!enrollmentSettings.mfa_required && (
+          <Button
+            size={ButtonSize.SMALL}
+            styleVariant={ButtonStyleVariant.LINK}
+            text="Skip MFA Setup"
+            onClick={() => {
+              setStore({
+                loading: false,
+                step: EnrollmentStepKey.ACTIVATE_USER,
+              });
+            }}
+          />
+        )}
         <Button
           text="Setup selected MFA"
           size={ButtonSize.SMALL}
