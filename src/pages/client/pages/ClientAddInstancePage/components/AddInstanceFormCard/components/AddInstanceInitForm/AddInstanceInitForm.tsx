@@ -27,28 +27,19 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import {
-  type AddInstancePayload,
-  type SelectedInstance,
-  WireguardInstanceType,
-} from '../../../../../../types';
-import type { AddInstanceInitResponse } from '../../types';
+import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import { AddInstanceFormStep } from '../../../../hooks/types';
+import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 
-type Props = {
-  nextStep: (data: AddInstanceInitResponse) => void;
-};
-
-export const AddInstanceInitForm = ({ nextStep }: Props) => {
+export const AddInstanceInitForm = () => {
+  const setPageState = useAddInstanceStore((s) => s.setState);
   const toaster = useToaster();
   const navigate = useNavigate();
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.addInstancePage.forms.initInstance;
   const [isLoading, setIsLoading] = useState(false);
   const initEnrollment = useEnrollmentStore((state) => state.init);
-  const [setClientState, instanceConfig] = useClientStore((state) => [
-    state.setState,
-    state.instanceConfig,
-  ]);
+  const setClientState = useClientStore((state) => state.setState);
 
   const schema = useMemo(
     () =>
@@ -63,17 +54,18 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     [LL.form.errors],
   );
 
-  const { handleSubmit, control } = useForm<AddInstancePayload>({
+  type FormFields = z.infer<typeof schema>;
+
+  const { handleSubmit, control } = useForm<FormFields>({
     resolver: zodResolver(schema),
     defaultValues: {
-      url: instanceConfig.url,
-      token: instanceConfig.token,
+      url: '',
+      token: '',
     },
     mode: 'all',
   });
 
-  const handleValidSubmit: SubmitHandler<AddInstancePayload> = async (values) => {
-    debug('Sending token to proxy');
+  const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';
       let base: string;
@@ -196,10 +188,13 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         if (startResponse.user.enrolled) {
           //no, only create new device for desktop client
           debug('User already active, adding device only.');
-          nextStep({
-            url: proxy_api_url,
-            cookie: authCookie,
-            device_names: startResponse.user.device_names,
+          setPageState({
+            step: AddInstanceFormStep.DEVICE,
+            response: {
+              url: proxy_api_url,
+              cookie: authCookie,
+              device_names: startResponse.user.device_names,
+            },
           });
         } else {
           // yes, enroll the user

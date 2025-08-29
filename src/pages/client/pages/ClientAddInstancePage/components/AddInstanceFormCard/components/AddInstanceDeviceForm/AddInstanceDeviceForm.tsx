@@ -3,11 +3,11 @@ import './style.scss';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { fetch } from '@tauri-apps/plugin-http';
 import { error } from '@tauri-apps/plugin-log';
-import { useMemo, useState } from 'react';
+import { hostname } from '@tauri-apps/plugin-os';
+import { useCallback, useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -25,33 +25,24 @@ import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGK
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 import type { AddInstanceInitResponse } from '../../types';
 
 const { getInstances, saveConfig } = clientApi;
-
-type Props = {
-  response: AddInstanceInitResponse;
-};
-
-type FormFields = {
-  name: string;
-};
 
 type ErrorData = {
   error: string;
 };
 
-const defaultValues: FormFields = {
-  name: '',
-};
-
-export const AddInstanceDeviceForm = ({ response }: Props) => {
+export const AddInstanceDeviceForm = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.addInstancePage.forms.device;
   const toaster = useToaster();
   const setClientStore = useClientStore((state) => state.setState);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const response = useAddInstanceStore((s) => s.response as AddInstanceInitResponse);
+  const resetAddInstanceStore = useAddInstanceStore((s) => s.reset);
 
   const { url: proxyUrl, cookie, device_names } = response;
 
@@ -68,6 +59,15 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       }),
     [LL.form.errors, device_names],
   );
+
+  type FormFields = z.infer<typeof schema>;
+
+  const defaultValues = useCallback(async (): Promise<FormFields> => {
+    const name = await hostname();
+    return {
+      name: name ?? '',
+    };
+  }, []);
 
   const { control, handleSubmit } = useForm<FormFields>({
     defaultValues: defaultValues,
@@ -116,8 +116,9 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
               type: WireguardInstanceType.DEFGUARD_INSTANCE,
             };
             setClientStore({ selectedInstance, instances });
-            // Clear token and URL values.
-            useClientStore.setState({ instanceConfig: { token: '', url: '' } });
+            setTimeout(() => {
+              resetAddInstanceStore();
+            }, 250);
             navigate(routes.client.instancePage, { replace: true });
           })
           .catch((e) => {
