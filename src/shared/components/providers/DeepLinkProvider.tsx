@@ -12,7 +12,7 @@ import { useEnrollmentApi } from '../../../pages/enrollment/hooks/useEnrollmentA
 import type { EnrollmentStartResponse } from '../../hooks/api/types';
 
 enum DeepLink {
-  AddInstance = 'addinstance',
+  AddInstance = '/addinstance',
 }
 
 const linkStorageKey = 'lastSuccessfullyHandledDeepLink';
@@ -42,10 +42,9 @@ type LinkPayload = z.infer<typeof validLinkPayload>;
 const linkIntoPayload = (link: URL | null): LinkPayload | null => {
   if (link == null) return null;
 
-  const host = link.host;
   const searchData = Object.fromEntries(new URLSearchParams(link.search));
   const payload = {
-    link: host,
+    link: link.pathname,
     data: searchData,
   };
   const result = validLinkPayload.safeParse(payload);
