@@ -1,7 +1,6 @@
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    f32::MIN,
     str::FromStr,
     sync::{LazyLock, Mutex},
     time::Duration,
@@ -393,7 +392,6 @@ fn check_min_version(
         if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload) {
             error!("Failed to emit version mismatch event to the frontend: {err}");
         } else {
-            // Mark this instance as notified
             notified_instances.insert(instance.id);
         }
     }
