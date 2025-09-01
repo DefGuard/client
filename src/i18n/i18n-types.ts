@@ -184,6 +184,15 @@ type RootTranslation = {
 				 */
 				success: string
 			}
+			/**
+			 * Y​o​u​r​ ​D​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​"​{​i​n​s​t​a​n​c​e​_​n​a​m​e​}​"​ ​v​e​r​s​i​o​n​ ​i​s​ ​n​o​t​ ​s​u​p​p​o​r​t​e​d​ ​b​y​ ​y​o​u​r​ ​D​e​f​g​u​a​r​d​ ​C​l​i​e​n​t​ ​v​e​r​s​i​o​n​.​ ​ ​ ​ ​ ​ ​ ​ ​ ​D​e​f​g​u​a​r​d​ ​C​o​r​e​ ​v​e​r​s​i​o​n​:​ ​{​c​o​r​e​_​v​e​r​s​i​o​n​}​ ​(​r​e​q​u​i​r​e​d​:​ ​{​c​o​r​e​_​r​e​q​u​i​r​e​d​_​v​e​r​s​i​o​n​}​)​,​ ​D​e​f​g​u​a​r​d​ ​P​r​o​x​y​ ​v​e​r​s​i​o​n​:​ ​{​p​r​o​x​y​_​v​e​r​s​i​o​n​}​ ​(​r​e​q​u​i​r​e​d​:​ ​{​p​r​o​x​y​_​r​e​q​u​i​r​e​d​_​v​e​r​s​i​o​n​}​)​.​ ​ ​ ​ ​ ​ ​ ​ ​ ​P​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+			 * @param {string} core_required_version
+			 * @param {string} core_version
+			 * @param {string} instance_name
+			 * @param {string} proxy_required_version
+			 * @param {string} proxy_version
+			 */
+			versionMismatch: RequiredParams<'core_required_version' | 'core_version' | 'instance_name' | 'proxy_required_version' | 'proxy_version'>
 		}
 	}
 	components: {
@@ -1871,6 +1880,10 @@ export type TranslationFunctions = {
 				 */
 				success: () => LocalizedString
 			}
+			/**
+			 * Your Defguard instance "{instance_name}" version is not supported by your Defguard Client version.         Defguard Core version: {core_version} (required: {core_required_version}), Defguard Proxy version: {proxy_version} (required: {proxy_required_version}).         Please contact your administrator.
+			 */
+			versionMismatch: (arg: { core_required_version: string, core_version: string, instance_name: string, proxy_required_version: string, proxy_version: string }) => LocalizedString
 		}
 	}
 	components: {

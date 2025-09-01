@@ -87,6 +87,29 @@ export const ClientPage = () => {
       });
     });
 
+    const verionMismatch = listen(TauriEventKey.VERSION_MISMATCH, (data) => {
+      const payload = data.payload as {
+        instance_name: string;
+        instance_id: number;
+        core_version: string;
+        proxy_version: string;
+        core_required_version: string;
+        proxy_required_version: string;
+        core_compatible: boolean;
+        proxy_compatible: boolean;
+      };
+      toaster.error(
+        LL.common.messages.versionMismatch({
+          instance_name: payload.instance_name,
+          core_version: payload.core_version,
+          proxy_version: payload.proxy_version,
+          core_required_version: payload.core_required_version,
+          proxy_required_version: payload.proxy_required_version,
+        }),
+        { lifetime: -1 },
+      );
+    });
+
     const locationUpdate = listen(TauriEventKey.LOCATION_UPDATE, () => {
       const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
       invalidate.forEach((key) => {
@@ -162,6 +185,7 @@ export const ClientPage = () => {
       appConfigChanged.then((cleanup) => cleanup());
       addInstance.then((cleanup) => cleanup());
       mfaTrigger.then((cleanup) => cleanup());
+      verionMismatch.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
