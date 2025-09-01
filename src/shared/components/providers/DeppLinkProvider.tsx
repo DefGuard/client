@@ -15,6 +15,16 @@ enum DeepLink {
   AddInstance = 'addinstance',
 }
 
+const linkStorageKey = 'lastSuccessfullyHandledDeepLink';
+
+const storeLink = (value: string) => {
+  sessionStorage.setItem(linkStorageKey, value);
+};
+
+const readStoreLink = (): string | null => {
+  return sessionStorage.getItem(linkStorageKey);
+};
+
 const addInstanceLinkSchema = z.object({
   token: string().trim().min(1),
   url: string().trim().min(1).url(),
@@ -67,7 +77,7 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
   const navigate = useNavigate();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: should init once
-  const handleValidLink = useCallback(async (payload: LinkPayload) => {
+  const handleValidLink = useCallback(async (payload: LinkPayload, rawLink?: string) => {
     const { data, link } = payload;
     switch (link) {
       case DeepLink.AddInstance:
@@ -130,6 +140,9 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
         });
         break;
     }
+    if (rawLink) {
+      storeLink(rawLink);
+    }
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: only on mount
@@ -141,8 +154,14 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
       (async () => {
         const start = await getCurrent();
         if (start != null) {
+          const lastLink = readStoreLink();
+          // if the link is exact as last successfully executed link
+          // this is only necessary bcs in dev mode window is hot reloaded causing the startup link to be handled multiple times over.
+          if (lastLink != null && lastLink === start[0]) {
+            return;
+          }
           const payload = linkIntoPayload(new URL(start[0]));
-          if (payload != null) handleValidLink(payload);
+          if (payload != null) handleValidLink(payload, start[0]);
         }
         unlisten = await onOpenUrl((urls) => {
           if (urls?.length) {
