@@ -132,6 +132,11 @@ export type RegisterCodeMfaFinishResponse = {
 // FIXME: strong types
 export type UseApi = {
   enrollment: {
+    networkInfo: (
+      data: { pubkey: string },
+      proxyUrl?: string,
+      cookie?: string,
+    ) => Promise<CreateDeviceResponse>;
     start: (data: EnrollmentStartRequest) => Promise<Response>;
     activateUser: (data: ActivateUserRequest) => Promise<Response>;
     createDevice: (data: CreateDeviceRequest) => Promise<Response>;

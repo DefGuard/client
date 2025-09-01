@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { fetch } from '@tauri-apps/plugin-http';
 import { error } from '@tauri-apps/plugin-log';
 import { hostname } from '@tauri-apps/plugin-os';
@@ -16,6 +17,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { isPresent } from '../../../../../../../../shared/defguard-ui/utils/isPresent';
 import type {
   CreateDeviceRequest,
   CreateDeviceResponse,
@@ -45,6 +47,12 @@ export const AddInstanceDeviceForm = () => {
   const resetAddInstanceStore = useAddInstanceStore((s) => s.reset);
 
   const { url: proxyUrl, cookie, device_names } = response;
+
+  const { data: instancesCount } = useQuery({
+    queryFn: getInstances,
+    queryKey: ['instance', 'count'],
+    select: (data) => data.length,
+  });
 
   const schema = useMemo(
     () =>
@@ -165,8 +173,14 @@ export const AddInstanceDeviceForm = () => {
             styleVariant={ButtonStyleVariant.STANDARD}
             type="button"
             text={LL.common.controls.cancel()}
-            disabled={isLoading}
-            onClick={() => navigate(routes.client.instancePage)}
+            disabled={isLoading || !isPresent(instancesCount)}
+            onClick={() => {
+              if (instancesCount) {
+                navigate(routes.client.base);
+              } else {
+                resetAddInstanceStore();
+              }
+            }}
           />
           <Button
             size={ButtonSize.LARGE}
