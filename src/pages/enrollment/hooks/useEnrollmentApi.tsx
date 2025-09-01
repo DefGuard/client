@@ -9,6 +9,22 @@ export const useEnrollmentApi = (): UseApi => {
     state.cookie,
   ]);
 
+  const networkInfo: UseApi['enrollment']['networkInfo'] = async (
+    data,
+    url?: string,
+    overrideCookie?: string,
+  ) => {
+    const response = await fetch(`${url ?? proxyUrl}/enrollment/network_info`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: overrideCookie ?? cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
+    return await response.json();
+  };
+
   const registerCodeMfaStart: UseApi['enrollment']['registerCodeMfaStart'] = async (
     method,
   ) => {
@@ -41,13 +57,15 @@ export const useEnrollmentApi = (): UseApi => {
   };
 
   const start: UseApi['enrollment']['start'] = async (data) => {
-    const response = await fetch(`${proxyUrl}/enrollment/start`, {
+    const response = await fetch(`${data.proxyUrl ?? proxyUrl}/enrollment/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
       } as Record<string, string>,
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        token: data.token,
+      }),
     });
     return response;
   };
@@ -97,6 +115,7 @@ export const useEnrollmentApi = (): UseApi => {
       createDevice,
       registerCodeMfaStart,
       registerCodeMfaFinish,
+      networkInfo,
     },
     getAppInfo,
   };

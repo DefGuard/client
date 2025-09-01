@@ -16,7 +16,6 @@ use defguard_client::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
-    events::{handle_deep_link, EventKey},
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
@@ -26,15 +25,8 @@ use defguard_client::{
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{process, Env};
-use tauri::{AppHandle, Builder, Emitter, Manager, RunEvent, WindowEvent};
-use tauri_plugin_deep_link::DeepLinkExt;
+use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
-
-#[derive(Clone, serde::Serialize)]
-struct Payload {
-    args: Vec<String>,
-    cwd: String,
-}
 
 #[macro_use]
 extern crate log;
@@ -73,7 +65,7 @@ async fn startup(app_handle: &AppHandle) {
     // TODO: Find a way to intercept the shutdown event and close all connections
     #[cfg(target_os = "windows")]
     {
-        match sync_connections(&app_handle).await {
+        match sync_connections(app_handle).await {
             Ok(_) => {
                 info!(
                     "Synchronized application's active connections with the connections \
@@ -177,8 +169,7 @@ fn main() {
         })
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
         // Single instance plugin should always be the first to register.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            let _ = app.emit(EventKey::SingleInstance.into(), Payload { args: argv, cwd });
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // Running instance might be hidden, so show it.
             show_main_window(app);
         }))
@@ -190,20 +181,14 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         .setup(|app| {
-            // Handle deep-links.
-            let app_handle = app.app_handle().clone();
-            // Apparently, this is needed, regardless what the documentation claims.
+            // Register for linux and dev windows builds
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
-            app.deep_link().register_all()?;
-            // Handle URLs that triggered the opening of the application.
-            if let Some(urls) = app.deep_link().get_current()? {
-                handle_deep_link(&app_handle, &urls);
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                app.deep_link().register_all()?;
             }
-            // Handle URLs for running application.
-            app.deep_link().on_open_url(move |event| {
-                handle_deep_link(&app_handle, &event.urls());
-            });
 
             let app_handle = app.app_handle();
 

@@ -178,17 +178,15 @@ fn hide_main_window(app: &AppHandle) {
 
 pub fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
+        if let Err(err) = main_window.unminimize() {
+            warn!("Failed to unminimize main window: {err}");
+        }
         #[cfg(target_os = "macos")]
         if let Err(err) = app.show() {
             warn!("Failed to show application: {err}");
         }
         #[cfg(not(target_os = "macos"))]
         {
-            if main_window.is_minimized().unwrap_or_default() {
-                if let Err(err) = main_window.unminimize() {
-                    warn!("Failed to unminimize main window: {err}");
-                }
-            }
             if let Err(err) = main_window.show() {
                 warn!("Failed to show main window: {err}");
             }

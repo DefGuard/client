@@ -103,13 +103,7 @@ export type DeadConReconnectedPayload = {
   peer_alive_period: number;
 };
 
-export type AddInstancePayload = {
-  token: string;
-  url: string;
-};
-
 export enum TauriEventKey {
-  SINGLE_INSTANCE = 'single-instance',
   CONNECTION_CHANGED = 'connection-changed',
   INSTANCE_UPDATE = 'instance-update',
   LOCATION_UPDATE = 'location-update',
@@ -118,7 +112,6 @@ export enum TauriEventKey {
   DEAD_CONNECTION_DROPPED = 'dead-connection-dropped',
   DEAD_CONNECTION_RECONNECTED = 'dead-connection-reconnected',
   APPLICATION_CONFIG_CHANGED = 'application-config-changed',
-  ADD_INSTANCE = 'add-instance',
   MFA_TRIGGER = 'mfa-trigger',
   VERSION_MISMATCH = 'version-mismatch',
 }

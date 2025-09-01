@@ -22,6 +22,7 @@ export type UserInfo = {
 
 export type EnrollmentStartRequest = {
   token: string;
+  proxyUrl?: string;
 };
 
 export type EnrollmentSettings = {
@@ -103,6 +104,9 @@ export type EnrollmentInstanceInfo = {
   id: string;
   name: string;
   url: string;
+  proxy_url?: string;
+  username: string;
+  openid_display_name?: string;
 };
 
 export type NewApplicationVersionInfo = {
@@ -128,6 +132,11 @@ export type RegisterCodeMfaFinishResponse = {
 // FIXME: strong types
 export type UseApi = {
   enrollment: {
+    networkInfo: (
+      data: { pubkey: string },
+      proxyUrl?: string,
+      cookie?: string,
+    ) => Promise<CreateDeviceResponse>;
     start: (data: EnrollmentStartRequest) => Promise<Response>;
     activateUser: (data: ActivateUserRequest) => Promise<Response>;
     createDevice: (data: CreateDeviceRequest) => Promise<Response>;
