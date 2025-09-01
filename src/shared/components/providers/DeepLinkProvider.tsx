@@ -107,7 +107,6 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
             const proxy_api_url = prepareProxyUrl(
               respData.instance.proxy_url ?? respData.instance.url,
             );
-            // this is not add instance case ignore it then
             const existingInstance = instances.find(
               (instance) => instance.uuid === respData.instance.id,
             );
@@ -158,6 +157,7 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
               });
               navigate('/enrollment', { replace: true });
             } else {
+              // only needs to register this device
               setAddInstanceState({
                 step: AddInstanceFormStep.DEVICE,
                 response: {
