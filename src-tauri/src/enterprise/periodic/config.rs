@@ -26,7 +26,6 @@ use crate::{
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
-const INITIAL_POLL_DELAY: Duration = Duration::from_secs(3);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -35,8 +34,8 @@ static POLLING_ENDPOINT: &str = "/api/v1/poll";
 /// otherwise event is emmited and UI message is displayed.
 pub async fn poll_config(handle: AppHandle) {
     debug!("Starting the configuration polling loop.");
-    // Polling starts sooner than app's frontend may load, causing events (toasts) to be lost, wait a bit before starting.
-    sleep(INITIAL_POLL_DELAY).await;
+    // Polling starts sooner than app's frontend may load in dev builds, causing events (toasts) to be lost,
+    // you may want to wait here before starting if you want to debug it.
     loop {
         let Ok(mut transaction) = DB_POOL.begin().await else {
             error!(
