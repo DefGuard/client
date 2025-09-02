@@ -17,6 +17,7 @@ pub enum EventKey {
     ApplicationConfigChanged,
     AddInstance,
     MfaTrigger,
+    VersionMismatch,
 }
 
 impl From<EventKey> for &'static str {
@@ -32,6 +33,7 @@ impl From<EventKey> for &'static str {
             EventKey::ApplicationConfigChanged => "application-config-changed",
             EventKey::AddInstance => "add-instance",
             EventKey::MfaTrigger => "mfa-trigger",
+            EventKey::VersionMismatch => "version-mismatch",
         }
     }
 }

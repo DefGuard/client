@@ -1250,6 +1250,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rust-ini",
+ "semver",
  "serde",
  "serde_json",
  "serde_with",

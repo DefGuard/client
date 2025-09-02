@@ -1,6 +1,13 @@
-use std::{str::FromStr, time::Duration};
+use std::{
+    cmp::Ordering,
+    collections::HashSet,
+    str::FromStr,
+    sync::{LazyLock, Mutex},
+    time::Duration,
+};
 
 use reqwest::{Client, StatusCode};
+use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter, Url};
 use tokio::time::sleep;
@@ -15,6 +22,7 @@ use crate::{
     error::Error,
     events::EventKey,
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
+    MIN_CORE_VERSION, MIN_PROXY_VERSION,
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
@@ -26,6 +34,8 @@ static POLLING_ENDPOINT: &str = "/api/v1/poll";
 /// otherwise event is emmited and UI message is displayed.
 pub async fn poll_config(handle: AppHandle) {
     debug!("Starting the configuration polling loop.");
+    // Polling starts sooner than app's frontend may load in dev builds, causing events (toasts) to be lost,
+    // you may want to wait here before starting if you want to debug it.
     loop {
         let Ok(mut transaction) = DB_POOL.begin().await else {
             error!(
@@ -141,6 +151,8 @@ pub async fn poll_instance(
         instance.name
     );
 
+    check_min_version(&response, instance, handle)?;
+
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
@@ -255,4 +267,133 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
     Ok(InstanceInfoRequest {
         token: (*token).to_string(),
     })
+}
+
+/// Tracks instance IDs that for which we already sent notification about version mismatches
+/// to prevent duplicate notifications in the app's lifetime.
+static NOTIFIED_INSTANCES: LazyLock<Mutex<HashSet<Id>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+const CORE_VERSION_HEADER: &str = "defguard-core-version";
+const PROXY_VERSION_HEADER: &str = "defguard-component-version";
+
+#[derive(Clone, Serialize)]
+struct VersionMismatchPayload {
+    instance_name: String,
+    instance_id: Id,
+    core_version: String,
+    proxy_version: String,
+    core_required_version: String,
+    proxy_required_version: String,
+    core_compatible: bool,
+    proxy_compatible: bool,
+}
+
+fn check_min_version(
+    response: &reqwest::Response,
+    instance: &Instance<Id>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
+    let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
+    if notified_instances.contains(&instance.id) {
+        debug!(
+            "Instance {}({}) already notified about version mismatch, skipping",
+            instance.name, instance.id
+        );
+        return Ok(());
+    }
+
+    let detected_core_version: String;
+    let detected_proxy_version: String;
+
+    let core_compatible = if let Some(core_version) = response.headers().get(CORE_VERSION_HEADER) {
+        if let Ok(core_version) = core_version.to_str() {
+            if let Ok(core_version) = semver::Version::from_str(core_version) {
+                detected_core_version = core_version.to_string();
+                core_version.cmp_precedence(&MIN_CORE_VERSION) != Ordering::Less
+            } else {
+                warn!(
+                    "Core version header not a valid semver string in response for instance {}({}): \
+                    '{core_version}'",
+                    instance.name, instance.id
+                );
+                detected_core_version = core_version.to_string();
+                false
+            }
+        } else {
+            warn!(
+                "Core version header not a valid string in response for instance {}({}): \
+                '{core_version:?}'",
+                instance.name, instance.id
+            );
+            detected_core_version = "unknown".to_string();
+            false
+        }
+    } else {
+        warn!(
+            "Core version header not present in response for instance {}({})",
+            instance.name, instance.id
+        );
+        detected_core_version = "unknown".to_string();
+        false
+    };
+
+    let proxy_compatible = if let Some(proxy_version) = response.headers().get(PROXY_VERSION_HEADER)
+    {
+        if let Ok(proxy_version) = proxy_version.to_str() {
+            if let Ok(proxy_version) = semver::Version::from_str(proxy_version) {
+                detected_proxy_version = proxy_version.to_string();
+                proxy_version.cmp_precedence(&MIN_PROXY_VERSION) != Ordering::Less
+            } else {
+                warn!(
+                    "Proxy version header not a valid semver string in response for instance {}({}): \
+                    '{proxy_version}'",
+                    instance.name, instance.id
+                );
+                detected_proxy_version = proxy_version.to_string();
+                false
+            }
+        } else {
+            warn!(
+                "Proxy version header not a valid string in response for instance {}({}): \
+                '{proxy_version:?}'",
+                instance.name, instance.id
+            );
+            detected_proxy_version = "unknown".to_string();
+            false
+        }
+    } else {
+        warn!(
+            "Proxy version header not present in response for instance {}({})",
+            instance.name, instance.id
+        );
+        detected_proxy_version = "unknown".to_string();
+        false
+    };
+
+    if !core_compatible || !proxy_compatible {
+        warn!(
+            "Instance {} is running incompatible versions: core {detected_core_version}, proxy {detected_proxy_version}. Required \
+            versions: core >= {MIN_CORE_VERSION}, proxy >= {MIN_PROXY_VERSION}",
+            instance.name,
+        );
+
+        let payload = VersionMismatchPayload {
+            instance_name: instance.name.clone(),
+            instance_id: instance.id,
+            core_version: detected_core_version,
+            proxy_version: detected_proxy_version,
+            core_required_version: MIN_CORE_VERSION.to_string(),
+            proxy_required_version: MIN_PROXY_VERSION.to_string(),
+            core_compatible,
+            proxy_compatible,
+        };
+        if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload) {
+            error!("Failed to emit version mismatch event to the frontend: {err}");
+        } else {
+            notified_instances.insert(instance.id);
+        }
+    }
+
+    Ok(())
 }

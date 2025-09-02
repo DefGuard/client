@@ -5,18 +5,18 @@ on:
     branches:
       - main
       - dev
-      - "release/**"
+      - 'release/**'
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
   pull_request:
     branches:
       - main
       - dev
-      - "release/**"
+      - 'release/**'
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,7 +27,7 @@ jobs:
       - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     container:
-      image: rust:1
+      image: public.ecr.aws/docker/library/rust:1
       options: --user root
 
     defaults:

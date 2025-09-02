@@ -60,6 +60,10 @@ const en = {
         error: 'Clipboard is not accessible.',
         success: 'Content copied to clipboard.',
       },
+      versionMismatch:
+        'Your Defguard instance "{instance_name: string}" version is not supported by your Defguard Client version. \
+        Defguard Core version: {core_version: string} (required: {core_required_version: string}), Defguard Proxy version: {proxy_version: string} (required: {proxy_required_version: string}). \
+        Please contact your administrator.',
     },
   },
   components: {
