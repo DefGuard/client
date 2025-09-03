@@ -5,7 +5,12 @@
     targets = ["x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-pc-windows-gnu"];
   };
 
-  defguard-client = pkgs.callPackage ./package.nix {};
+  rustPlatform = pkgs.makeRustPlatform {
+    cargo = rustToolchain;
+    rustc = rustToolchain;
+  };
+
+  defguard-client = pkgs.callPackage ./package.nix {inherit rustPlatform;};
 
   # runtime libraries needed to run the dev server
   libraries = with pkgs; [

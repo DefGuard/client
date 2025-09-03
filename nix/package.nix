@@ -17,8 +17,6 @@
     categories = ["Network" "Security"];
   };
 
-  rustToolchain = pkgs.rust-bin.stable.latest.default;
-
   buildInputs = with pkgs; [
     at-spi2-atk
     atkmm
@@ -35,10 +33,12 @@
     webkitgtk_4_1
     openssl
     libayatana-appindicator
+    desktop-file-utils
   ];
 
   nativeBuildInputs = with pkgs; [
-    rustToolchain
+    cargo
+    rustc
     pkg-config
     gobject-introspection
     cargo-tauri
@@ -78,7 +78,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-h2nnwmjGnjxefq6KflaKgIH0HWPcyRvn6rxslwbYuwo=";
+      hash = "sha256-GlgQuPpOibPrItt6X9EqV4QmCOyajZh5yy7gHh+O+ME=";
     };
 
     buildPhase = ''
