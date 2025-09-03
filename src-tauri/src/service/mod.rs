@@ -350,8 +350,8 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
 
     // Set socket permissions to allow client access
-    // 0o666 allows read/write for owner, group, and others
-    fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o666))?;
+    // 0o660 allows read/write for owner and group only
+    fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
 
     let uds_stream = UnixListenerStream::new(uds);
 
