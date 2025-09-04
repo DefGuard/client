@@ -1,3 +1,36 @@
-systemctl daemon-reload
-systemctl enable defguard-service
-systemctl start defguard-service
+#!/bin/sh
+set -e
+
+GROUP_NAME="defguard"
+
+case "$1" in
+    configure)
+        # Create the group if it doesn't exist
+        if ! getent group "$GROUP_NAME" >/dev/null; then
+            addgroup --system "$GROUP_NAME"
+            echo "Created group $GROUP_NAME"
+        fi
+        
+        # Determine target user
+        TARGET_USER=""
+        if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+            TARGET_USER="$SUDO_USER"
+        elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
+            TARGET_USER="$USER"
+        fi
+        
+        # Add user to group if we found a valid target
+        if [ -n "$TARGET_USER" ]; then
+            if getent passwd "$TARGET_USER" >/dev/null; then
+                usermod -a -G "$GROUP_NAME" "$TARGET_USER"
+                echo "Added user $TARGET_USER to group $GROUP_NAME"
+            fi
+        fi
+    ;;
+
+    # Enable and start background service
+    systemctl daemon-reload
+    systemctl enable defguard-service
+    systemctl start defguard-service
+esac
+
