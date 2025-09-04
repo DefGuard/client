@@ -5,6 +5,7 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
+Group=defguard
 ExecReload=/bin/kill -HUP $MAINPID
 ExecStart=/usr/sbin/defguard-service
 KillMode=process
