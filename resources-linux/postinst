@@ -2,6 +2,7 @@
 set -e
 
 GROUP_NAME="defguard"
+SERVICE_NAME="defguard-service"
 
 case "$1" in
     configure)
@@ -26,11 +27,28 @@ case "$1" in
                 echo "Added user $TARGET_USER to group $GROUP_NAME"
             fi
         fi
-    ;;
 
-    # Enable and start background service
-    systemctl daemon-reload
-    systemctl enable defguard-service
-    systemctl start defguard-service
+        # Handle systemd service
+        if [ -d /run/systemd/system ]; then
+            # Reload systemd to recognize new service file
+            systemctl daemon-reload
+            
+            # Enable service to start on boot
+            systemctl enable "$SERVICE_NAME"
+            
+            # Start the service now
+            systemctl start "$SERVICE_NAME"
+        fi
+        ;;
+    
+    abort-upgrade|abort-remove|abort-deconfigure)
+        # On failed operations, ensure service is running if it should be
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+            if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
+                systemctl start "$SERVICE_NAME" || true
+            fi
+        fi
+        ;;
 esac
 
