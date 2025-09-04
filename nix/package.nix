@@ -35,6 +35,7 @@
     webkitgtk_4_1
     openssl
     libayatana-appindicator
+    desktop-file-utils
   ];
 
   nativeBuildInputs = with pkgs; [
