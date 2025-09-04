@@ -1,1 +1,24 @@
-systemctl daemon-reload
+#!/bin/sh
+set -e
+
+GROUP_NAME="defguard"
+SERVICE_NAME="defguard-service"
+
+case "$1" in
+    remove)
+        # Service file still exists, just disable it
+        if [ -d /run/systemd/system ]; then
+            systemctl disable "$SERVICE_NAME" || true
+            systemctl daemon-reload
+        fi
+        ;;
+        
+    purge)
+        # Complete removal - clean up group too
+        if getent group "$GROUP_NAME" >/dev/null; then
+            delgroup "$GROUP_NAME" || true
+        fi
+        ;;
+esac
+
+#DEBHELPER#
