@@ -17,6 +17,6 @@ http://www.apple.com/DTDs/PropertyList-1.0.dtd >
     <key>RunAtLoad</key>
     <true/>
     <key>GroupName</key>
-    <string>defguard</string>
+    <string>staff</string>
 </dict>
 </plist>
