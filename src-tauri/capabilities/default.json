@@ -45,6 +45,8 @@
     "notification:default",
     "os:default",
     "os:allow-hostname",
+    "dialog:default",
+    "clipboard-manager:allow-write-text",
     {
       "identifier": "http:default",
       "allow": [

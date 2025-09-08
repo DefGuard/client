@@ -55,8 +55,9 @@ jobs:
           rustup component add clippy
           cargo clippy --all-targets --all-features -- -D warnings
       - name: Run cargo deny
-        uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          manifest-path: ./src-tauri/Cargo.toml
+        working-directory: ./src-tauri
+        run: |
+          cargo install cargo-deny
+          cargo deny check
       - name: Run tests
         run: cargo test --locked --no-fail-fast

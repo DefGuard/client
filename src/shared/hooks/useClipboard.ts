@@ -1,3 +1,4 @@
+import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { useCallback } from 'react';
 
 import { useI18nContext } from '../../i18n/i18n-react';
@@ -10,20 +11,16 @@ export const useClipboard = () => {
 
   const writeToClipboard = useCallback(
     async (content: string, customMessage?: string) => {
-      if (window.isSecureContext) {
-        try {
-          await navigator.clipboard.writeText(content);
-          if (customMessage) {
-            toaster.success(customMessage);
-          } else {
-            toaster.success(LL.common.messages.clipboard.success());
-          }
-        } catch (e) {
-          toaster.error(LL.common.messages.clipboard.error());
-          console.error(e);
+      try {
+        await writeText(content);
+        if (customMessage) {
+          toaster.success(customMessage);
+        } else {
+          toaster.success(LL.common.messages.clipboard.success());
         }
-      } else {
-        toaster.warning(LL.common.messages.insecureContext());
+      } catch (e) {
+        toaster.error(LL.common.messages.clipboard.error());
+        console.error(e);
       }
     },
     [LL.common.messages, toaster],
