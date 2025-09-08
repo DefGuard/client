@@ -6,8 +6,6 @@ pub mod utils;
 #[cfg(windows)]
 pub mod windows;
 
-#[cfg(target_os = "macos")]
-use nix::unistd::{chown, Group};
 #[cfg(windows)]
 use std::net::{Ipv4Addr, SocketAddr};
 use std::{
@@ -17,6 +15,8 @@ use std::{
     str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+#[cfg(unix)]
+use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
@@ -29,12 +29,12 @@ use defguard_wireguard_rs::{
     net::IpAddrMask,
     InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
+#[cfg(target_os = "macos")]
+use nix::unistd::{chown, Group};
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
-#[cfg(unix)]
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 use thiserror::Error;
 #[cfg(unix)]
 use tokio::net::UnixListener;
@@ -50,6 +50,7 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use super::VERSION;
+use crate::error::Error;
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
@@ -358,8 +359,10 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     {
         // get the group ID by name
-        let group = Group::from_name(DAEMON_SOCKET_GROUP)?
-            .ok_or_else(|| format!("Group '{}' not found", DAEMON_SOCKET_GROUP))?;
+        let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
+            error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
+            Error::InternalError(format!("Group '{}' not found", DAEMON_SOCKET_GROUP))
+        })?;
 
         // change ownership - keep current user, change group
         chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
