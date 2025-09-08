@@ -86,6 +86,7 @@ ignore = [
     { id = "RUSTSEC-2024-0419", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
     { id = "RUSTSEC-2024-0420", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0052", reason = "Discontinued, but dark-light v2.0.0 needs it" },
+    { id = "RUSTSEC-2025-0057", reason = "Tauri needs it" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
