@@ -35,7 +35,6 @@
         ]
       }
     },
-    "longDescription": "Defguard desktop client.",
     "macOS": {
       "entitlements": null,
       "exceptionDomain": "",
@@ -46,7 +45,8 @@
     "resources": [
       "resources/icons/*"
     ],
-    "shortDescription": "",
+    "shortDescription": "Defguard desktop client",
+    "longDescription": "Defguard desktop client",
     "linux": {
       "deb": {
         "files": {
