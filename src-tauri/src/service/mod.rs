@@ -29,7 +29,7 @@ use defguard_wireguard_rs::{
     net::IpAddrMask,
     InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 use nix::unistd::{chown, Group};
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
@@ -62,6 +62,9 @@ pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 
 #[cfg(target_os = "macos")]
 pub(super) const DAEMON_SOCKET_GROUP: &str = "staff";
+
+#[cfg(target_os = "linux")]
+pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -356,17 +359,14 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
 
     // change owner group for socket file
-    #[cfg(target_os = "macos")]
-    {
-        // get the group ID by name
-        let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
-            error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
-            Error::InternalError(format!("Group '{}' not found", DAEMON_SOCKET_GROUP))
-        })?;
+    // get the group ID by name
+    let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
+        error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
+        Error::InternalError(format!("Group '{}' not found", DAEMON_SOCKET_GROUP))
+    })?;
 
-        // change ownership - keep current user, change group
-        chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
-    }
+    // change ownership - keep current user, change group
+    chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
 
     // Set socket permissions to allow client access
     // 0o660 allows read/write for owner and group only
