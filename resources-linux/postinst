@@ -23,8 +23,22 @@ case "$1" in
         # Add user to group if we found a valid target
         if [ -n "$TARGET_USER" ]; then
             if getent passwd "$TARGET_USER" >/dev/null; then
-                usermod -a -G "$GROUP_NAME" "$TARGET_USER"
-                echo "Added user $TARGET_USER to group $GROUP_NAME"
+                # Try to add user to group and check if it succeeded
+                if usermod -a -G "$GROUP_NAME" "$TARGET_USER"; then
+                    echo "Added user $TARGET_USER to group $GROUP_NAME"
+
+                    # Only show reboot message if user was actually added
+                    echo "================================================"
+                    echo "  IMPORTANT: Reboot or Re-login Required"
+                    echo "================================================"
+                    echo "The user has been added to the defguard group."
+                    echo "Please reboot or log out and back in for the"
+                    echo "group membership changes to take effect."
+                    echo "================================================"
+                else
+                    echo "Warning: Failed to add user $TARGET_USER to group $GROUP_NAME"
+                    exit 1
+                fi
             fi
         fi
 
