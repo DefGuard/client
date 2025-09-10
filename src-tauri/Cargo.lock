@@ -1246,6 +1246,7 @@ dependencies = [
  "dirs-next",
  "hyper-util",
  "log",
+ "nix",
  "prost",
  "regex",
  "reqwest",
