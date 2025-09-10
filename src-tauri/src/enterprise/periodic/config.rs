@@ -206,7 +206,13 @@ pub async fn poll_instance(
         return Ok(());
     }
 
-    check_uuid_mismatch(&response, instance, handle)?;
+    if check_uuid_mismatch(&response, instance, handle)? {
+        warn!("Instance {}({}) has UUID mismatch, it's config won't be automatically updated. Remove \
+            the instance and add it again, or contact your administrator.",
+            instance.name, instance.id
+        );
+        return Ok(());
+    }
 
     debug!(
         "Config for instance {}({}) changed",
@@ -291,20 +297,13 @@ fn check_uuid_mismatch(
     response: &InstanceInfoResponse,
     instance: &Instance<Id>,
     handle: &AppHandle,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     debug!(
         "Checking UUID mismatch for instance {}({})",
         instance.name, instance.id
     );
 
     let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
-    if notified_instances.contains(&(instance.id, NotificationType::UuidMismatch)) {
-        debug!(
-            "Instance {}({}) already notified about UUID mismatch, skipping",
-            instance.name, instance.id
-        );
-        return Ok(());
-    }
 
     debug!(
         "Instance {}({}) local UUID: {}, checking against response...",
@@ -324,25 +323,34 @@ fn check_uuid_mismatch(
             );
 
             if info.id != instance.uuid {
-                warn!(
+                error!(
                     "Instance {}({}) has mismatching UUIDs: local {}, remote {}",
                     instance.name, instance.id, instance.uuid, info.id
                 );
 
-                if let Err(err) = handle.emit(
-                    EventKey::UuidMismatch.into(),
-                    UuidMismatchPayload {
-                        instance_name: instance.name.clone(),
-                    },
-                ) {
-                    error!("Failed to emit UUID mismatch event to the frontend: {err}");
+                if !notified_instances.contains(&(instance.id, NotificationType::UuidMismatch)) {
+                    if let Err(err) = handle.emit(
+                        EventKey::UuidMismatch.into(),
+                        UuidMismatchPayload {
+                            instance_name: instance.name.clone(),
+                        },
+                    ) {
+                        error!("Failed to emit UUID mismatch event to the frontend: {err}");
+                    } else {
+                        debug!(
+                            "Successfully emitted UUID mismatch event for instance {}({})",
+                            instance.name, instance.id
+                        );
+                        notified_instances.insert((instance.id, NotificationType::UuidMismatch));
+                    }
                 } else {
                     debug!(
-                        "Successfully emitted UUID mismatch event for instance {}({})",
+                        "Instance {}({}) already notified about UUID mismatch, skipping",
                         instance.name, instance.id
                     );
-                    notified_instances.insert((instance.id, NotificationType::UuidMismatch));
                 }
+
+                return Ok(true);
             } else {
                 debug!(
                     "UUIDs match for instance {}({}): {}",
@@ -362,7 +370,7 @@ fn check_uuid_mismatch(
         );
     }
 
-    Ok(())
+    Ok(false)
 }
 
 const CORE_VERSION_HEADER: &str = "defguard-core-version";
