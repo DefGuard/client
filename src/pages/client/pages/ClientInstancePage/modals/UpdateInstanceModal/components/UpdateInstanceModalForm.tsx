@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
 import { useMemo } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -14,7 +14,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import {
+import type {
   CreateDeviceResponse,
   EnrollmentStartResponse,
 } from '../../../../../../../shared/hooks/api/types';
@@ -94,23 +94,23 @@ export const UpdateInstanceModalForm = () => {
       token: values.token,
     };
 
-    const res = await fetch<EnrollmentStartResponse>(endpointUrl, {
+    const res = await fetch(endpointUrl, {
       method: 'POST',
       headers,
-      body: Body.json(data),
+      body: JSON.stringify(data),
     });
     if (res.ok) {
-      const enrollmentData = res.data;
+      const enrollmentData = (await res.json()) as EnrollmentStartResponse;
       let proxy_api_url = values.url;
       if (proxy_api_url[proxy_api_url.length - 1] === '/') {
         proxy_api_url = proxy_api_url.slice(0, -1);
       }
-      proxy_api_url = proxy_api_url + '/api/v1';
+      proxy_api_url = `${proxy_api_url}/api/v1`;
       const instance = clientInstances.find((i) => i.uuid === enrollmentData.instance.id);
       if (instance) {
-        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
-          cookie.startsWith('defguard_proxy='),
-        );
+        const authCookie = res.headers
+          .getSetCookie()
+          .find((cookie) => cookie.startsWith('defguard_proxy='));
         if (!authCookie) {
           toaster.error(
             LL.common.messages.errorWithMessage({
@@ -119,21 +119,22 @@ export const UpdateInstanceModalForm = () => {
           );
           return;
         }
-        headers['Cookie'] = authCookie;
-        const instanceInfoResponse = await fetch<CreateDeviceResponse>(
+        headers.Cookie = authCookie;
+        const instanceInfoResponse = await fetch(
           `${proxy_api_url}/enrollment/network_info`,
           {
             method: 'POST',
             headers,
-            body: Body.json({
+            body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
           },
         );
         if (instanceInfoResponse.ok) {
+          const data = (await instanceInfoResponse.json()) as CreateDeviceResponse;
           updateInstance({
             instanceId: instance.id,
-            response: instanceInfoResponse.data,
+            response: data,
           })
             .then(() => {
               invalidateOnSuccess.forEach((k) => {
@@ -152,6 +153,20 @@ export const UpdateInstanceModalForm = () => {
             .catch(() => {
               toaster.error(LL.common.messages.error());
             });
+        } else {
+          // Device does not match used enrollment token.
+          toaster.error(
+            LL.common.messages.errorWithMessage({
+              message: 'Token is not valid for this device',
+            }),
+          );
+          setError(
+            'token',
+            {
+              message: localLL.form.fieldErrors.token.rejected(),
+            },
+            { shouldFocus: true },
+          );
         }
       } else {
         // Instance not found in client, use add instance.

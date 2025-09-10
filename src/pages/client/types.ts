@@ -8,7 +8,14 @@ export type DefguardInstance = {
   active: boolean;
   pubkey: string;
   disable_all_traffic: boolean;
+  openid_display_name?: string;
 };
+
+export enum LocationMfaType {
+  DISABLED = 'disabled',
+  INTERNAL = 'internal',
+  EXTERNAL = 'external',
+}
 
 export type DefguardLocation = {
   instance_id: number;
@@ -58,7 +65,7 @@ export type CommonWireguardFields = {
   // Tunnel or Location
   connection_type: WireguardInstanceType;
   // Available in Location only
-  mfa_enabled: boolean | undefined;
+  location_mfa_mode?: LocationMfaType;
   pubkey: string;
   instance_id: number;
   network_id: number;
@@ -97,7 +104,6 @@ export type DeadConReconnectedPayload = {
 };
 
 export enum TauriEventKey {
-  SINGLE_INSTANCE = 'single-instance',
   CONNECTION_CHANGED = 'connection-changed',
   INSTANCE_UPDATE = 'instance-update',
   LOCATION_UPDATE = 'location-update',
@@ -106,4 +112,7 @@ export enum TauriEventKey {
   DEAD_CONNECTION_DROPPED = 'dead-connection-dropped',
   DEAD_CONNECTION_RECONNECTED = 'dead-connection-reconnected',
   APPLICATION_CONFIG_CHANGED = 'application-config-changed',
+  MFA_TRIGGER = 'mfa-trigger',
+  VERSION_MISMATCH = 'version-mismatch',
+  UUID_MISMATCH = 'uuid-mismatch',
 }

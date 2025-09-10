@@ -1,0 +1,72 @@
+#enrollment-totp-card {
+  width: 100%;
+  max-width: 650px;
+  padding: 50px 40px;
+  display: flex;
+  flex-flow: column;
+  row-gap: var(--spacing-m);
+
+  .loading {
+    width: 100%;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center;
+    min-height: 25dvh;
+  }
+
+  .totp-info {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    row-gap: var(--spacing-s);
+
+    .qr {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn {
+      width: unset;
+      flex-grow: 0;
+      width: min-content;
+    }
+  }
+
+  .btn.resend {
+    width: 100%;
+  }
+
+  .totp-setup,
+  .email-setup {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    row-gap: var(--spacing-s);
+  }
+
+  .resend {
+    width: 100%;
+  }
+
+  form {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    row-gap: var(--spacing-m);
+    width: 100%;
+
+    & > .input {
+      width: 100%;
+    }
+
+    input[type='submit'] {
+      @include visually-hidden();
+    }
+  }
+}

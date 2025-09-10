@@ -1,6 +1,14 @@
-use std::io::stdout;
+use std::{io::stdout, sync::LazyLock};
 
+#[cfg(unix)]
+use hyper_util::rt::TokioIo;
+#[cfg(unix)]
+use tokio::net::UnixStream;
 use tonic::transport::channel::{Channel, Endpoint};
+#[cfg(unix)]
+use tonic::transport::Uri;
+#[cfg(unix)]
+use tower::service_fn;
 use tracing::{debug, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
@@ -8,17 +16,35 @@ use tracing_subscriber::{
     Layer,
 };
 
-use crate::service::{
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DaemonError, DAEMON_BASE_URL,
-};
+use crate::service::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
+#[cfg(windows)]
+use crate::service::DAEMON_BASE_URL;
+#[cfg(unix)]
+use crate::service::DAEMON_SOCKET_PATH;
 
-pub fn setup_client() -> Result<DesktopDaemonServiceClient<Channel>, DaemonError> {
-    debug!("Setting up gRPC client");
-    let endpoint = Endpoint::from_shared(DAEMON_BASE_URL)?;
-    let channel = endpoint.connect_lazy();
-    let client = DesktopDaemonServiceClient::new(channel);
-    Ok(client)
-}
+#[cfg(unix)]
+pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
+    LazyLock::new(|| {
+        debug!("Setting up gRPC client");
+        let endpoint = Endpoint::try_from("http://[::]:50051").unwrap(); // Should not panic.
+        let channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
+            // Connect to a Unix domain socket.
+            let stream = UnixStream::connect(DAEMON_SOCKET_PATH)
+                .await
+                .expect("Failed to connect to Unix domain socket.");
+            Ok::<_, std::io::Error>(TokioIo::new(stream))
+        }));
+        DesktopDaemonServiceClient::new(channel)
+    });
+
+#[cfg(windows)]
+pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
+    LazyLock::new(|| {
+        debug!("Setting up gRPC client");
+        let endpoint = Endpoint::from_shared(DAEMON_BASE_URL).unwrap(); // Should not panic.
+        let channel = endpoint.connect_lazy();
+        DesktopDaemonServiceClient::new(channel)
+    });
 
 pub fn logging_setup(log_dir: &str, log_level: &str) -> WorkerGuard {
     // prepare log file appender

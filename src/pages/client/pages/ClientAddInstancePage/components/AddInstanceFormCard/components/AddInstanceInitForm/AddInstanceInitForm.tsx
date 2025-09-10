@@ -1,13 +1,13 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch, Response } from '@tauri-apps/api/http';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
+import { fetch } from '@tauri-apps/plugin-http';
+import { debug, error, info } from '@tauri-apps/plugin-log';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { debug, error, info } from 'tauri-plugin-log-api';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
@@ -18,7 +18,7 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import {
+import type {
   CreateDeviceResponse,
   EnrollmentError,
   EnrollmentStartResponse,
@@ -27,24 +27,12 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
-import { AddInstanceInitResponse } from '../../types';
+import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import { AddInstanceFormStep } from '../../../../hooks/types';
+import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 
-type Props = {
-  nextStep: (data: AddInstanceInitResponse) => void;
-};
-
-type FormFields = {
-  url: string;
-  token: string;
-};
-
-const defaultValues: FormFields = {
-  url: '',
-  token: '',
-};
-
-export const AddInstanceInitForm = ({ nextStep }: Props) => {
+export const AddInstanceInitForm = () => {
+  const setPageState = useAddInstanceStore((s) => s.setState);
   const toaster = useToaster();
   const navigate = useNavigate();
   const { LL } = useI18nContext();
@@ -66,14 +54,18 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     [LL.form.errors],
   );
 
+  type FormFields = z.infer<typeof schema>;
+
   const { handleSubmit, control } = useForm<FormFields>({
     resolver: zodResolver(schema),
-    defaultValues,
+    defaultValues: {
+      url: '',
+      token: '',
+    },
     mode: 'all',
   });
 
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
-    debug('Sending token to proxy');
     const url = () => {
       const endpoint = '/api/v1/enrollment/start';
       let base: string;
@@ -96,17 +88,16 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
     };
 
     setIsLoading(true);
-    fetch<EnrollmentStartResponse>(endpointUrl, {
+    fetch(endpointUrl, {
       method: 'POST',
       headers,
-      body: Body.json(data),
+      body: JSON.stringify(data),
     })
-      .then(async (res: Response<EnrollmentStartResponse | EnrollmentError>) => {
+      .then(async (res: Response) => {
         if (!res.ok) {
           setIsLoading(false);
-          error(JSON.stringify(res.data));
           error(JSON.stringify(res.status));
-          const errorMessage = (res.data as EnrollmentError).error;
+          const errorMessage = ((await res.json()) as EnrollmentError).error;
 
           switch (errorMessage) {
             case 'token expired': {
@@ -123,9 +114,9 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // There may be other set-cookies, set by e.g. a proxy
         // Get only the defguard_proxy cookie
-        const authCookie = res.rawHeaders['set-cookie'].find((cookie) =>
-          cookie.startsWith('defguard_proxy='),
-        );
+        const authCookie = res.headers
+          .getSetCookie()
+          .find((cookie) => cookie.startsWith('defguard_proxy='));
         if (!authCookie) {
           setIsLoading(false);
           error(
@@ -140,31 +131,33 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
           );
         }
         debug('Response received with status OK');
-        const r = res.data as EnrollmentStartResponse;
+        const startResponse = (await res.json()) as EnrollmentStartResponse;
         // get client registered instances
         const clientInstances = await clientApi.getInstances();
-        const instance = clientInstances.find((i) => i.uuid === r.instance.id);
+        const instance = clientInstances.find(
+          (i) => i.uuid === startResponse.instance.id,
+        );
         let proxy_api_url = values.url;
         if (proxy_api_url[proxy_api_url.length - 1] === '/') {
           proxy_api_url = proxy_api_url.slice(0, -1);
         }
-        proxy_api_url = proxy_api_url + '/api/v1';
+        proxy_api_url = `${proxy_api_url}/api/v1`;
         setIsLoading(false);
 
         if (instance) {
           debug('Instance already exists, fetching update');
           // update already registered instance instead
-          headers['Cookie'] = authCookie;
-          fetch<CreateDeviceResponse>(`${proxy_api_url}/enrollment/network_info`, {
+          headers.Cookie = authCookie;
+          fetch(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
-            body: Body.json({
+            body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
           }).then(async (res) => {
             invoke<void>('update_instance', {
               instanceId: instance.id,
-              response: res.data,
+              response: (await res.json()) as CreateDeviceResponse,
             })
               .then(() => {
                 info('Configured device');
@@ -192,24 +185,32 @@ export const AddInstanceInitForm = ({ nextStep }: Props) => {
         }
         // register new instance
         // is user in need of full enrollment ?
-        if (r.user.enrolled) {
+        if (startResponse.user.enrolled) {
           //no, only create new device for desktop client
           debug('User already active, adding device only.');
-          nextStep({
-            url: proxy_api_url,
-            cookie: authCookie,
-            device_names: r.user.device_names,
+          setPageState({
+            step: AddInstanceFormStep.DEVICE,
+            response: {
+              url: proxy_api_url,
+              cookie: authCookie,
+              device_names: startResponse.user.device_names,
+            },
           });
         } else {
           // yes, enroll the user
           debug('User is not active. Starting enrollment.');
-          const sessionEnd = dayjs.unix(r.deadline_timestamp).utc().local().format();
+          const sessionEnd = dayjs
+            .unix(startResponse.deadline_timestamp)
+            .utc()
+            .local()
+            .format();
           const sessionStart = dayjs().local().format();
           initEnrollment({
-            userInfo: r.user,
-            adminInfo: r.admin,
-            endContent: r.final_page_content,
+            userInfo: startResponse.user,
+            adminInfo: startResponse.admin,
+            endContent: startResponse.final_page_content,
             proxy_url: proxy_api_url,
+            enrollmentSettings: startResponse.settings,
             sessionEnd,
             sessionStart,
             cookie: authCookie,

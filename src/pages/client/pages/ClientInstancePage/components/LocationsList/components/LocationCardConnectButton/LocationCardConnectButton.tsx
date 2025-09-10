@@ -1,9 +1,8 @@
 import './style.scss';
 
-import { listen } from '@tauri-apps/api/event';
+import { error } from '@tauri-apps/plugin-log';
 import classNames from 'classnames';
-import { useEffect, useState } from 'react';
-import { error } from 'tauri-plugin-log-api';
+import { useState } from 'react';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import SvgIconCheckmarkSmall from '../../../../../../../../shared/components/svg/IconCheckmarkSmall';
@@ -15,7 +14,7 @@ import {
 import SvgIconX from '../../../../../../../../shared/defguard-ui/components/svg/IconX';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { CommonWireguardFields } from '../../../../../../types';
+import { type CommonWireguardFields, LocationMfaType } from '../../../../../../types';
 import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
 
 const { connect, disconnect } = clientApi;
@@ -24,19 +23,20 @@ type Props = {
   location?: CommonWireguardFields;
 };
 
-type Payload = {
-  location?: CommonWireguardFields;
-};
-
 export const LocationCardConnectButton = ({ location }: Props) => {
+  const openMFAModal = useMFAModal((state) => state.open);
   const toaster = useToaster();
   const [isLoading, setIsLoading] = useState(false);
   const { LL } = useI18nContext();
-  const openMFAModal = useMFAModal((state) => state.open);
 
   const cn = classNames('location-card-connect-button', {
     connected: location?.active,
   });
+
+  const mfaEnabled =
+    location?.location_mfa_mode &&
+    (location.location_mfa_mode === LocationMfaType.INTERNAL ||
+      location.location_mfa_mode === LocationMfaType.EXTERNAL);
 
   const handleClick = async () => {
     setIsLoading(true);
@@ -48,7 +48,7 @@ export const LocationCardConnectButton = ({ location }: Props) => {
             connectionType: location.connection_type,
           });
         } else {
-          if (location.mfa_enabled) {
+          if (mfaEnabled) {
             openMFAModal(location);
           } else {
             await connect({
@@ -70,17 +70,6 @@ export const LocationCardConnectButton = ({ location }: Props) => {
       console.error(e);
     }
   };
-
-  useEffect(() => {
-    async function listenMFAEvent() {
-      await listen<Payload>('mfa-trigger', () => {
-        if (location) {
-          openMFAModal(location);
-        }
-      });
-    }
-    listenMFAEvent();
-  }, [openMFAModal, location]);
 
   return (
     <Button

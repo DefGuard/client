@@ -1,16 +1,33 @@
+import type { Dayjs } from 'dayjs';
 import { pick } from 'lodash-es';
 import { Subject } from 'rxjs';
-import { createJSONStorage, devtools, persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
-
-import { AdminInfo, UserInfo } from '../../../../shared/hooks/api/types';
+import type {
+  AdminInfo,
+  CreateDeviceResponse,
+  EnrollmentSettings,
+  UserInfo,
+} from '../../../../shared/hooks/api/types';
+import { MfaMethod } from '../../../../shared/types';
+import { EnrollmentStepKey } from '../../const';
+import { EnrollmentNavDirection } from '../types';
 
 const defaultValues: StoreValues = {
   // assume default dev
   proxy_url: '/api/v1/',
   loading: false,
-  step: 0,
-  stepsMax: 4,
+  enrollmentSettings: {
+    admin_device_management: false,
+    mfa_required: false,
+    only_client_activation: false,
+    smtp_configured: false,
+    vpn_setup_optional: true,
+  },
+  emailResendTimestamp: undefined,
+  step: EnrollmentStepKey.WELCOME,
+  mfaMethod: MfaMethod.TOTP,
+  recoveryCodes: [],
   sessionStart: undefined,
   sessionEnd: undefined,
   userInfo: undefined,
@@ -18,52 +35,50 @@ const defaultValues: StoreValues = {
   vpnOptional: undefined,
   userPassword: undefined,
   cookie: undefined,
-  nextSubject: new Subject<void>(),
+  nextSubject: new Subject(),
+  deviceKeys: undefined,
+  deviceResponse: undefined,
 };
 
 const persistKeys: Array<keyof StoreValues> = [
   'step',
+  'proxy_url',
   'userInfo',
   'userPassword',
+  'recoveryCodes',
+  'mfaMethod',
   'sessionEnd',
   'sessionStart',
   'adminInfo',
   'deviceName',
   'endContent',
   'vpnOptional',
+  'deviceKeys',
+  'deviceResponse',
+  'cookie',
+  'enrollmentSettings',
 ];
 
 export const useEnrollmentStore = createWithEqualityFn<Store>()(
-  devtools(
-    persist(
-      (set, get) => ({
-        ...defaultValues,
-        init: (values) => set({ ...defaultValues, ...values }),
-        setState: (newValues) => set((old) => ({ ...old, ...newValues })),
-        reset: () => set(defaultValues),
-        nextStep: () => {
-          const current = get().step;
-          const max = get().stepsMax;
-
-          if (current < max) {
-            return set({ step: current + 1 });
-          }
-        },
-        perviousStep: () => {
-          const current = get().step;
-
-          if (current > 0) {
-            return set({ step: current - 1 });
-          }
-        },
-      }),
-      {
-        name: 'enrollment-storage',
-        version: 0.1,
-        storage: createJSONStorage(() => sessionStorage),
-        partialize: (state) => pick(state, persistKeys),
+  persist(
+    (set, get) => ({
+      ...defaultValues,
+      init: (values) => set({ ...defaultValues, ...values }),
+      setState: (newValues) => set((old) => ({ ...old, ...newValues })),
+      reset: () => set(defaultValues),
+      next: () => {
+        get().nextSubject.next(EnrollmentNavDirection.NEXT);
       },
-    ),
+      back: () => {
+        get().nextSubject.next(EnrollmentNavDirection.BACK);
+      },
+    }),
+    {
+      name: 'enrollment-storage',
+      version: 2,
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => pick(state, persistKeys),
+    },
   ),
   Object.is,
 );
@@ -71,13 +86,15 @@ export const useEnrollmentStore = createWithEqualityFn<Store>()(
 type Store = StoreValues & StoreMethods;
 
 type StoreValues = {
-  // next and back are disabled
   loading: boolean;
-  step: number;
-  stepsMax: number;
-  nextSubject: Subject<void>;
+  enrollmentSettings: EnrollmentSettings;
+  step: EnrollmentStepKey;
+  mfaMethod: MfaMethod;
+  emailResendTimestamp?: Dayjs;
+  nextSubject: Subject<EnrollmentNavDirection>;
   // Date
   proxy_url: string;
+  recoveryCodes: string[];
   sessionStart?: string;
   sessionEnd?: string;
   userInfo?: UserInfo;
@@ -88,12 +105,17 @@ type StoreValues = {
   endContent?: string;
   deviceName?: string;
   cookie?: string;
+  deviceKeys?: {
+    public: string;
+    private: string;
+  };
+  deviceResponse?: CreateDeviceResponse;
 };
 
 type StoreMethods = {
   setState: (values: Partial<StoreValues>) => void;
-  reset: () => void;
-  nextStep: () => void;
-  perviousStep: () => void;
   init: (initValues: Partial<StoreValues>) => void;
+  next: () => void;
+  back: () => void;
+  reset: () => void;
 };

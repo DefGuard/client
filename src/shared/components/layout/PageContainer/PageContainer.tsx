@@ -1,7 +1,7 @@
 import './style.scss';
 
 import classNames from 'classnames';
-import { HtmlHTMLAttributes, ReactNode, useMemo } from 'react';
+import { type HtmlHTMLAttributes, type ReactNode, useMemo } from 'react';
 
 type Props = HtmlHTMLAttributes<HTMLDivElement> & {
   children?: ReactNode;

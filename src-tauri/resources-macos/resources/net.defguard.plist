@@ -16,5 +16,7 @@ http://www.apple.com/DTDs/PropertyList-1.0.dtd >
     <true/>
     <key>RunAtLoad</key>
     <true/>
+    <key>GroupName</key>
+    <string>staff</string>
 </dict>
 </plist>

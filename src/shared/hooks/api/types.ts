@@ -1,6 +1,5 @@
-import { Response } from '@tauri-apps/api/http';
-
-import { DefguardInstance } from '../../../pages/client/types';
+import type { DefguardInstance } from '../../../pages/client/types';
+import type { MfaMethod } from '../../types';
 
 export type EmptyApiResponse = Record<string, never>;
 
@@ -23,15 +22,25 @@ export type UserInfo = {
 
 export type EnrollmentStartRequest = {
   token: string;
+  proxyUrl?: string;
+};
+
+export type EnrollmentSettings = {
+  admin_device_management: boolean;
+  mfa_required: boolean;
+  only_client_activation: boolean;
+  smtp_configured: boolean;
+  vpn_setup_optional: boolean;
 };
 
 export type EnrollmentStartResponse = {
   admin: AdminInfo;
   user: UserInfo;
+  instance: EnrollmentInstanceInfo;
   deadline_timestamp: number;
   final_page_content: string;
   vpn_setup_optional: boolean;
-  instance: EnrollmentInstanceInfo;
+  settings: EnrollmentSettings;
 };
 
 export type ActivateUserRequest = {
@@ -95,6 +104,9 @@ export type EnrollmentInstanceInfo = {
   id: string;
   name: string;
   url: string;
+  proxy_url?: string;
+  username: string;
+  openid_display_name?: string;
 };
 
 export type NewApplicationVersionInfo = {
@@ -104,14 +116,36 @@ export type NewApplicationVersionInfo = {
   update_url: string;
 };
 
+export type RegisterCodeMfaFinishRequest = {
+  code: string;
+  method: MfaMethod;
+};
+
+export type RegisterCodeMfaStartResponse = {
+  totp_secret?: string;
+};
+
+export type RegisterCodeMfaFinishResponse = {
+  recovery_codes: string[];
+};
+
 // FIXME: strong types
 export type UseApi = {
   enrollment: {
-    start: (data: EnrollmentStartRequest) => Promise<Response<EnrollmentStartResponse>>;
-    activateUser: (data: ActivateUserRequest) => Promise<Response<ActivateUserResponse>>;
-    createDevice: (data: CreateDeviceRequest) => Promise<Response<CreateDeviceResponse>>;
+    networkInfo: (
+      data: { pubkey: string },
+      proxyUrl?: string,
+      cookie?: string,
+    ) => Promise<CreateDeviceResponse>;
+    start: (data: EnrollmentStartRequest) => Promise<Response>;
+    activateUser: (data: ActivateUserRequest) => Promise<Response>;
+    createDevice: (data: CreateDeviceRequest) => Promise<Response>;
+    registerCodeMfaStart: (method: MfaMethod) => Promise<RegisterCodeMfaStartResponse>;
+    registerCodeMfaFinish: (
+      data: RegisterCodeMfaFinishRequest,
+    ) => Promise<RegisterCodeMfaFinishResponse>;
   };
-  getAppInfo: () => Promise<Response<AppInfo>>;
+  getAppInfo: () => Promise<Response>;
 };
 
 export type EnrollmentError = {

@@ -14,7 +14,7 @@ use std::{
 };
 
 use chrono::{DateTime, NaiveDate, Utc};
-use tauri::{async_runtime::TokioJoinHandle, AppHandle, Manager};
+use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -105,7 +105,7 @@ impl<'a> ServiceLogWatcher<'a> {
                     // emit event with all relevant log lines
                     if !parsed_lines.is_empty() {
                         trace!("Emitting {} log lines for the frontend", parsed_lines.len());
-                        self.handle.emit_all(&self.event_topic, &parsed_lines)?;
+                        self.handle.emit(&self.event_topic, &parsed_lines)?;
                     }
                     parsed_lines.clear();
 
@@ -181,7 +181,10 @@ impl<'a> ServiceLogWatcher<'a> {
     /// Log files are rotated daily and have a knows naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        trace!("Getting latest log file from directory: {:?}", self.log_dir);
+        trace!(
+            "Getting latest log file from directory: {}",
+            self.log_dir.display()
+        );
         let entries = read_dir(self.log_dir)?;
 
         let mut latest_log = None;
@@ -255,10 +258,11 @@ pub async fn spawn_log_watcher_task(
     );
 
     // spawn task
-    let _join_handle: TokioJoinHandle<Result<(), LogWatcherError>> = tokio::spawn(async move {
-        log_watcher.run()?;
-        Ok(())
-    });
+    let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
+        tauri::async_runtime::spawn(async move {
+            log_watcher.run()?;
+            Ok(())
+        });
 
     // store `CancellationToken` to manually stop watcher thread
     // keep this in a block as we .await later, which should not be done while holding a lock like this
@@ -274,7 +278,7 @@ pub async fn spawn_log_watcher_task(
         }
     }
 
-    let name = get_tunnel_or_location_name(location_id, connection_type, &app_state).await;
+    let name = get_tunnel_or_location_name(location_id, connection_type).await;
     info!(
         "A background task has been spawned to watch the defguard service log file for \
         {connection_type} {name} (interface {interface_name}), location's specific collected logs \

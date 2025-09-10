@@ -1,13 +1,13 @@
 import './style.scss';
 
+import { error } from '@tauri-apps/plugin-log';
 import { useMemo } from 'react';
-import { error } from 'tauri-plugin-log-api';
 
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
-import { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
+import type { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { CommonWireguardFields, DefguardInstance } from '../../../../../../types';
+import type { CommonWireguardFields, DefguardInstance } from '../../../../../../types';
 
 type Props = {
   location?: CommonWireguardFields;
@@ -18,7 +18,7 @@ const { updateLocationRouting } = clientApi;
 export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props) => {
   const handleChange = async (value: boolean) => {
     try {
-      if (location && location.connection_type) {
+      if (location?.connection_type) {
         await updateLocationRouting({
           locationId: location?.id,
           connectionType: location.connection_type,

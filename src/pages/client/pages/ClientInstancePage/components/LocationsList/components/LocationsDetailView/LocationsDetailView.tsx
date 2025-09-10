@@ -7,14 +7,14 @@ import { useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
 
 import { CardTabs } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/CardTabs';
-import { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
+import type { CardTabsData } from '../../../../../../../../shared/defguard-ui/components/Layout/CardTabs/types';
 import { routes } from '../../../../../../../../shared/routes';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
 import {
-  CommonWireguardFields,
-  DefguardInstance,
+  type CommonWireguardFields,
+  type DefguardInstance,
   WireguardInstanceType,
 } from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';

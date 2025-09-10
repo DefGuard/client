@@ -1,6 +1,6 @@
-import { ThemeKey } from '../../../shared/defguard-ui/hooks/theme/types';
-import { CreateDeviceResponse } from '../../../shared/hooks/api/types';
-import { DefguardInstance, DefguardLocation, WireguardInstanceType } from '../types';
+import type { ThemeKey } from '../../../shared/defguard-ui/hooks/theme/types';
+import type { CreateDeviceResponse } from '../../../shared/hooks/api/types';
+import type { DefguardInstance, DefguardLocation, WireguardInstanceType } from '../types';
 
 export type GetLocationsRequest = {
   instanceId: number;

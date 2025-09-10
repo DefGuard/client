@@ -2,7 +2,7 @@ import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo, useRef } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -12,6 +12,7 @@ import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card
 import { MessageBox } from '../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
 import { MessageBoxType } from '../../../../shared/defguard-ui/components/Layout/MessageBox/types';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../const';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 
 const phonePattern = /^\+?[0-9]+( [0-9]+)?$/;
@@ -28,10 +29,7 @@ export const DataVerificationStep = () => {
 
   const userInfo = useEnrollmentStore((state) => state.userInfo);
 
-  const [setEnrollment, next] = useEnrollmentStore(
-    (state) => [state.setState, state.nextStep],
-    shallow,
-  );
+  const [setEnrollment] = useEnrollmentStore((state) => [state.setState], shallow);
 
   const pageLL = LL.pages.enrollment.steps.dataVerification;
 
@@ -61,8 +59,8 @@ export const DataVerificationStep = () => {
     if (userInfo) {
       setEnrollment({
         userInfo: { ...userInfo, phone_number: values.phone },
+        step: EnrollmentStepKey.PASSWORD,
       });
-      next();
     }
   };
 

@@ -3,14 +3,14 @@ import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
-import {
+import type {
   SelectOption,
   SelectProps,
   SelectSelectedValue,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
-import { ClientView } from '../../../../clientAPI/types';
+import type { ClientView } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import { CommonWireguardFields } from '../../../../types';
+import type { CommonWireguardFields } from '../../../../types';
 
 interface StatsLayoutSelect {
   locations: CommonWireguardFields[] | undefined;
@@ -42,8 +42,8 @@ export const StatsLayoutSelect = ({ locations }: StatsLayoutSelect) => {
           key: selected.key,
           displayValue: selected.label,
         };
-      } else if (selected == null && locations != undefined) {
-        if (locations.length == 1) {
+      } else if (selected == null && locations !== undefined) {
+        if (locations.length === 1) {
           return {
             key: 'detail',
             displayValue: localLL.header.filters.views.detail(),

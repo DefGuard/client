@@ -16,13 +16,11 @@ import { IconContainer } from '../../../../shared/defguard-ui/components/Layout/
 import SvgIconPlus from '../../../../shared/defguard-ui/components/svg/IconPlus';
 import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconSettings';
 import { routes } from '../../../../shared/routes';
-import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
+import { useAddInstanceStore } from '../../pages/ClientAddInstancePage/hooks/useAddInstanceStore';
 import { WireguardInstanceType } from '../../types';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 import { NewApplicationVersionAvailableInfo } from './components/NewApplicationVersionAvailableInfo/NewApplicationVersionAvailableInfo';
-
-const { openLink } = clientApi;
 
 export const ClientSideBar = () => {
   const navigate = useNavigate();
@@ -133,13 +131,19 @@ const FooterApplicationInfo = () => {
     <div id="footer-application-info">
       <p>
         Copyright © {new Date().getFullYear()}{' '}
-        <span onClick={() => openLink('https://teonite.com/')}>teonite</span>
+        <a href="https://defguard.net" target="_blank" rel="noopener">
+          defguard
+        </a>
       </p>
       <p>
         {LL.pages.client.sideBar.applicationVersion()}
-        <span onClick={() => openLink('https://github.com/DefGuard/client/releases')}>
+        <a
+          href="https://github.com/DefGuard/client/releases"
+          target="_blank"
+          rel="noopener"
+        >
           {appVersion}
-        </span>
+        </a>
       </p>
     </div>
   );
@@ -168,11 +172,13 @@ const SettingsNav = () => {
 const AddInstance = () => {
   const { LL } = useI18nContext();
   const navigate = useNavigate();
+  const resetStore = useAddInstanceStore((s) => s.reset);
   return (
     <div
       id="add-instance"
       className="client-bar-item clickable"
       onClick={() => {
+        resetStore();
         navigate(routes.client.addInstance, { replace: true });
       }}
     >

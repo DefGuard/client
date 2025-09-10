@@ -1,4 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: intended
 export const removeNulls = (obj: any) => {
   return JSON.parse(JSON.stringify(obj), (_, value) => {
     if (value == null) return undefined;
