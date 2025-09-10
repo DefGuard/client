@@ -206,6 +206,8 @@ pub async fn poll_instance(
         return Ok(());
     }
 
+    check_uuid_mismatch(&response, instance, handle)?;
+
     debug!(
         "Config for instance {}({}) changed",
         instance.name, instance.id
@@ -269,10 +271,99 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
     })
 }
 
+#[derive(PartialEq, Eq, Hash)]
+enum NotificationType {
+    VersionMismatch,
+    UuidMismatch,
+}
+
 /// Tracks instance IDs that for which we already sent notification about version mismatches
 /// to prevent duplicate notifications in the app's lifetime.
-static NOTIFIED_INSTANCES: LazyLock<Mutex<HashSet<Id>>> =
+static NOTIFIED_INSTANCES: LazyLock<Mutex<HashSet<(Id, NotificationType)>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
+
+#[derive(Clone, Serialize)]
+struct UuidMismatchPayload {
+    instance_name: String,
+}
+
+fn check_uuid_mismatch(
+    response: &InstanceInfoResponse,
+    instance: &Instance<Id>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
+    debug!(
+        "Checking UUID mismatch for instance {}({})",
+        instance.name, instance.id
+    );
+
+    let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
+    if notified_instances.contains(&(instance.id, NotificationType::UuidMismatch)) {
+        debug!(
+            "Instance {}({}) already notified about UUID mismatch, skipping",
+            instance.name, instance.id
+        );
+        return Ok(());
+    }
+
+    debug!(
+        "Instance {}({}) local UUID: {}, checking against response...",
+        instance.name, instance.id, instance.uuid
+    );
+
+    if let Some(device_config) = &response.device_config {
+        debug!(
+            "Found device_config for instance {}({})",
+            instance.name, instance.id
+        );
+
+        if let Some(info) = &device_config.instance {
+            debug!(
+                "Found instance info in device_config for instance {}({}), core UUID: {}",
+                instance.name, instance.id, info.id
+            );
+
+            if info.id != instance.uuid {
+                warn!(
+                    "Instance {}({}) has mismatching UUIDs: local {}, remote {}",
+                    instance.name, instance.id, instance.uuid, info.id
+                );
+
+                if let Err(err) = handle.emit(
+                    EventKey::UuidMismatch.into(),
+                    UuidMismatchPayload {
+                        instance_name: instance.name.clone(),
+                    },
+                ) {
+                    error!("Failed to emit UUID mismatch event to the frontend: {err}");
+                } else {
+                    debug!(
+                        "Successfully emitted UUID mismatch event for instance {}({})",
+                        instance.name, instance.id
+                    );
+                    notified_instances.insert((instance.id, NotificationType::UuidMismatch));
+                }
+            } else {
+                debug!(
+                    "UUIDs match for instance {}({}): {}",
+                    instance.name, instance.id, instance.uuid
+                );
+            }
+        } else {
+            debug!(
+                "No instance info found in device_config for instance {}({})",
+                instance.name, instance.id
+            );
+        }
+    } else {
+        debug!(
+            "No device_config found in response for instance {}({})",
+            instance.name, instance.id
+        );
+    }
+
+    Ok(())
+}
 
 const CORE_VERSION_HEADER: &str = "defguard-core-version";
 const PROXY_VERSION_HEADER: &str = "defguard-component-version";
@@ -295,7 +386,7 @@ fn check_min_version(
     handle: &AppHandle,
 ) -> Result<(), Error> {
     let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
-    if notified_instances.contains(&instance.id) {
+    if notified_instances.contains(&(instance.id, NotificationType::VersionMismatch)) {
         debug!(
             "Instance {}({}) already notified about version mismatch, skipping",
             instance.name, instance.id
@@ -391,7 +482,7 @@ fn check_min_version(
         if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload) {
             error!("Failed to emit version mismatch event to the frontend: {err}");
         } else {
-            notified_instances.insert(instance.id);
+            notified_instances.insert((instance.id, NotificationType::VersionMismatch));
         }
     }
 

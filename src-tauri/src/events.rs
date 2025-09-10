@@ -18,6 +18,7 @@ pub enum EventKey {
     AddInstance,
     MfaTrigger,
     VersionMismatch,
+    UuidMismatch,
 }
 
 impl From<EventKey> for &'static str {
@@ -34,6 +35,7 @@ impl From<EventKey> for &'static str {
             EventKey::AddInstance => "add-instance",
             EventKey::MfaTrigger => "mfa-trigger",
             EventKey::VersionMismatch => "version-mismatch",
+            EventKey::UuidMismatch => "uuid-mismatch",
         }
     }
 }

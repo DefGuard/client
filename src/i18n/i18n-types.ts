@@ -193,6 +193,11 @@ type RootTranslation = {
 			 * @param {string} proxy_version
 			 */
 			versionMismatch: RequiredParams<'core_required_version' | 'core_version' | 'instance_name' | 'proxy_required_version' | 'proxy_version'>
+			/**
+			 * T​h​e​ ​i​d​e​n​t​i​f​i​e​r​ ​(​U​U​I​D​)​ ​o​f​ ​t​h​e​ ​r​e​m​o​t​e​ ​D​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​"​{​i​n​s​t​a​n​c​e​_​n​a​m​e​}​"​ ​d​o​e​s​ ​n​o​t​ ​m​a​t​c​h​ ​t​h​e​ ​o​n​e​ ​s​t​o​r​e​d​ ​l​o​c​a​l​l​y​.​ ​ ​ ​ ​ ​ ​ ​ ​ ​B​e​c​a​u​s​e​ ​o​f​ ​t​h​i​s​,​ ​s​o​m​e​ ​f​e​a​t​u​r​e​s​ ​m​a​y​ ​n​o​t​ ​w​o​r​k​ ​c​o​r​r​e​c​t​l​y​.​ ​T​o​ ​r​e​s​o​l​v​e​ ​t​h​i​s​ ​i​s​s​u​e​,​ ​r​e​m​o​v​e​ ​t​h​e​ ​i​n​s​t​a​n​c​e​ ​a​n​d​ ​a​d​d​ ​i​t​ ​a​g​a​i​n​,​ ​o​r​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+			 * @param {string} instance_name
+			 */
+			uuidMismatch: RequiredParams<'instance_name'>
 		}
 	}
 	components: {
@@ -1884,6 +1889,10 @@ export type TranslationFunctions = {
 			 * Your Defguard instance "{instance_name}" version is not supported by your Defguard Client version.         Defguard Core version: {core_version} (required: {core_required_version}), Defguard Proxy version: {proxy_version} (required: {proxy_required_version}).         Please contact your administrator.
 			 */
 			versionMismatch: (arg: { core_required_version: string, core_version: string, instance_name: string, proxy_required_version: string, proxy_version: string }) => LocalizedString
+			/**
+			 * The identifier (UUID) of the remote Defguard instance "{instance_name}" does not match the one stored locally.         Because of this, some features may not work correctly. To resolve this issue, remove the instance and add it again, or contact your administrator.
+			 */
+			uuidMismatch: (arg: { instance_name: string }) => LocalizedString
 		}
 	}
 	components: {

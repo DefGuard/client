@@ -110,6 +110,20 @@ export const ClientPage = () => {
       );
     });
 
+    const uuidMismatch = listen<{
+      instance_name: string;
+      local_uuid: string;
+      core_uuid: string;
+    }>(TauriEventKey.UUID_MISMATCH, (data) => {
+      const payload = data.payload;
+      toaster.error(
+        LL.common.messages.uuidMismatch({
+          instance_name: payload.instance_name,
+        }),
+        { lifetime: -1 },
+      );
+    });
+
     const locationUpdate = listen(TauriEventKey.LOCATION_UPDATE, () => {
       const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
       invalidate.forEach((key) => {
@@ -180,6 +194,7 @@ export const ClientPage = () => {
       appConfigChanged.then((cleanup) => cleanup());
       mfaTrigger.then((cleanup) => cleanup());
       verionMismatch.then((cleanup) => cleanup());
+      uuidMismatch.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
