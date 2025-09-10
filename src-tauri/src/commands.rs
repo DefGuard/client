@@ -516,6 +516,7 @@ pub(crate) async fn do_update_instance(
     instance.disable_all_traffic = instance_info.disable_all_traffic;
     instance.enterprise_enabled = instance_info.enterprise_enabled;
     instance.openid_display_name = instance_info.openid_display_name;
+    instance.uuid = instance_info.id;
     // Token may be empty if it was not issued
     // This happens during polling, as core doesn't issue a new token for polling request
     if response.token.is_some() {

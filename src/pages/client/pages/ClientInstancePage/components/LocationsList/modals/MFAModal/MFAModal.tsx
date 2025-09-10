@@ -153,7 +153,7 @@ export const MFAModal = () => {
           return;
         }
 
-        if (errorData === 'selected MFA method is not available') {
+        if (errorData === 'selected MFA method not available') {
           toaster.error(localLL.errors.mfaNotConfigured());
         } else {
           toaster.error(localLL.errors.mfaStartGeneric());
