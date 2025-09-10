@@ -64,6 +64,9 @@ const en = {
         'Your Defguard instance "{instance_name: string}" version is not supported by your Defguard Client version. \
         Defguard Core version: {core_version: string} (required: {core_required_version: string}), Defguard Proxy version: {proxy_version: string} (required: {proxy_required_version: string}). \
         Please contact your administrator.',
+      uuidMismatch:
+        'The identifier (UUID) of the remote Defguard instance "{instance_name: string}" does not match the one stored locally. \
+        Because of this, some features may not work correctly. To resolve this issue, remove the instance and add it again, or contact your administrator.',
     },
   },
   components: {
