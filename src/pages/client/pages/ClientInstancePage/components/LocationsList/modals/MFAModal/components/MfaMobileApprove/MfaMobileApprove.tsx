@@ -9,6 +9,7 @@ import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import type { CommonWireguardFields } from '../../../../../../../../types';
 import { useMFAModal } from '../../useMFAModal';
 import './style.scss';
+import { debug, error } from '@tauri-apps/plugin-log';
 import { Button } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import { MessageBox } from '../../../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
 
@@ -50,6 +51,17 @@ export const MfaMobileApprove = ({
   const { lastMessage } = useWebSocket(wsUrl, {
     queryParams: {
       token,
+    },
+    onClose: () => {
+      debug('WebSocket connection to proxy for mobile app MFA closed.');
+    },
+    onError: () => {
+      toaster.error('Unexpected error in WebSocket connection to proxy');
+      error(
+        'MFA auth using mobile app failed. Unexpected error in WebSocket connection to proxy.',
+      );
+      // go back to previous step
+      onCancel();
     },
   });
 
