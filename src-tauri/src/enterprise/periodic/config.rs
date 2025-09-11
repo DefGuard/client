@@ -275,6 +275,7 @@ static NOTIFIED_INSTANCES: LazyLock<Mutex<HashSet<Id>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
 const CORE_VERSION_HEADER: &str = "defguard-core-version";
+const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
 const PROXY_VERSION_HEADER: &str = "defguard-component-version";
 
 #[derive(Clone, Serialize)]
@@ -305,6 +306,17 @@ fn check_min_version(
 
     let detected_core_version: String;
     let detected_proxy_version: String;
+    let defguard_core_connected: Option<bool> = response
+        .headers()
+        .get(CORE_CONNECTED_HEADER)
+        .and_then(|v| {
+            debug!(
+                "Defguard core connection status header for instance {}({}): {v:?}",
+                instance.name, instance.id
+            );
+            v.to_str().ok()
+        })
+        .and_then(|s| s.parse().ok());
 
     let core_compatible = if let Some(core_version) = response.headers().get(CORE_VERSION_HEADER) {
         if let Ok(core_version) = core_version.to_str() {
@@ -371,12 +383,36 @@ fn check_min_version(
         false
     };
 
-    if !core_compatible || !proxy_compatible {
+    let should_inform = match defguard_core_connected {
+        Some(true) => {
+            debug!(
+                "Defguard core is connected for instance {}({})",
+                instance.name, instance.id
+            );
+            true
+        }
+        Some(false) => {
+            info!(
+                "Defguard core is not connected for instance {}({})",
+                instance.name, instance.id
+            );
+            false
+        }
+        None => {
+            debug!(
+                "Defguard core connection status unknown for instance {}({})",
+                instance.name, instance.id
+            );
+            true
+        }
+    };
+
+    if should_inform && (!core_compatible || !proxy_compatible) {
         warn!(
-            "Instance {} is running incompatible versions: core {detected_core_version}, proxy {detected_proxy_version}. Required \
-            versions: core >= {MIN_CORE_VERSION}, proxy >= {MIN_PROXY_VERSION}",
-            instance.name,
-        );
+                "Instance {} is running incompatible versions: core {detected_core_version}, proxy {detected_proxy_version}. Required \
+                versions: core >= {MIN_CORE_VERSION}, proxy >= {MIN_PROXY_VERSION}",
+                instance.name,
+            );
 
         let payload = VersionMismatchPayload {
             instance_name: instance.name.clone(),
