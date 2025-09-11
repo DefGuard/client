@@ -51,6 +51,11 @@ export const MfaMobileApprove = ({
     queryParams: {
       token,
     },
+    onError: () => {
+      toaster.error('Unexpected error in WebSocket connection to proxy');
+      // go back to previous step
+      onCancel();
+    },
   });
 
   const qrString = useMemo(() => {
