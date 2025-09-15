@@ -7,10 +7,10 @@ import { useMatch, useNavigate } from 'react-router-dom';
 import SvgIconConnection from '../../../../../../shared/defguard-ui/components/svg/IconConnection';
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
-import type { WireguardInstanceType } from '../../../../types';
+import type { ClientConnectionType } from '../../../../types';
 
 type Props = {
-  itemType: WireguardInstanceType;
+  itemType: ClientConnectionType;
   itemId: number;
   label: string;
   active?: boolean;

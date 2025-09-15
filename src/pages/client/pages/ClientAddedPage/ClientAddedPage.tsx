@@ -11,17 +11,17 @@ import {
 } from '../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { routes } from '../../../../shared/routes';
-import { WireguardInstanceType } from '../../types';
+import { ClientConnectionType } from '../../types';
 
 type Props = {
-  pageType: WireguardInstanceType;
+  pageType: ClientConnectionType;
 };
 
 export const ClientAddedPage = ({ pageType }: Props) => {
   const { LL } = useI18nContext();
   const navigate = useNavigate();
   const [localLL, navigateRoute] =
-    pageType === WireguardInstanceType.TUNNEL
+    pageType === ClientConnectionType.TUNNEL
       ? [LL.pages.client.pages.createdPage.tunnel, routes.client.addTunnel]
       : [LL.pages.client.pages.createdPage.instance, routes.client.addInstance];
 

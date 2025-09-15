@@ -12,13 +12,13 @@ import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
 import type {
   DefguardLocation,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../../../../../../../../types';
 import { LocationLogs } from '../LocationLogs/LocationLogs';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  connectionType: WireguardInstanceType;
+  connectionType: ClientConnectionType;
 };
 
 const { getLocationDetails } = clientApi;

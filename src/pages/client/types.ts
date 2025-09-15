@@ -63,7 +63,7 @@ export type CommonWireguardFields = {
   // Connected
   active: boolean;
   // Tunnel or Location
-  connection_type: WireguardInstanceType;
+  connection_type: ClientConnectionType;
   // Available in Location only
   location_mfa_mode?: LocationMfaType;
   pubkey: string;
@@ -71,14 +71,9 @@ export type CommonWireguardFields = {
   network_id: number;
 };
 
-export enum WireguardInstanceType {
-  TUNNEL = 'Tunnel',
-  DEFGUARD_INSTANCE = 'Instance',
-}
-
 export type SelectedInstance = {
   id?: number;
-  type: WireguardInstanceType;
+  type: ClientConnectionType;
 };
 
 export enum ClientConnectionType {
@@ -92,12 +87,6 @@ export enum DeadConDroppedOutReason {
 }
 
 export type DeadConDroppedPayload = {
-  name: string;
-  con_type: ClientConnectionType;
-  peer_alive_period: number;
-};
-
-export type DeadConReconnectedPayload = {
   name: string;
   con_type: ClientConnectionType;
   peer_alive_period: number;

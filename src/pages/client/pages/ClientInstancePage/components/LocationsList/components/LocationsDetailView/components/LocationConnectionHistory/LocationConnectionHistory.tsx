@@ -8,14 +8,14 @@ import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
 import type {
   DefguardLocation,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../../../../../../../../types';
 import { LocationCardNeverConnected } from '../../../LocationCardNeverConnected/LocationCardNeverConnected';
 import { LocationHistoryTable } from './LocationHistoryTable/LocationHistoryTable';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  connectionType: WireguardInstanceType;
+  connectionType: ClientConnectionType;
   connected: boolean;
 };
 

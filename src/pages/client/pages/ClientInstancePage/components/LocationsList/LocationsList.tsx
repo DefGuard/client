@@ -11,7 +11,7 @@ import { useClientStore } from '../../../../hooks/useClientStore';
 import {
   type CommonWireguardFields,
   type DefguardInstance,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
@@ -34,7 +34,7 @@ export const LocationsList = ({
   const toaster = useToaster();
   const navigate = useNavigate();
 
-  const isTunnelType = selectedInstance?.type === WireguardInstanceType.TUNNEL;
+  const isTunnelType = selectedInstance?.type === ClientConnectionType.TUNNEL;
 
   useEffect(() => {
     if (isError) {
@@ -45,7 +45,7 @@ export const LocationsList = ({
   useEffect(() => {
     if (
       locations?.length === 0 &&
-      selectedInstance?.type === WireguardInstanceType.TUNNEL
+      selectedInstance?.type === ClientConnectionType.TUNNEL
     ) {
       navigate(routes.client.addTunnel, { replace: true });
     }

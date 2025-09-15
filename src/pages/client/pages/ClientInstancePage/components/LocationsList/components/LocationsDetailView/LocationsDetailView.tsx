@@ -15,7 +15,7 @@ import { clientQueryKeys } from '../../../../../../query';
 import {
   type CommonWireguardFields,
   type DefguardInstance,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../../../../../../types';
 import { LocationConnectionHistory } from './components/LocationConnectionHistory/LocationConnectionHistory';
 import { LocationDetailCard } from './components/LocationDetailCard/LocationDetailCard';
@@ -23,7 +23,7 @@ import { LocationDetails } from './components/LocationDetails/LocationDetails';
 
 type Props = {
   locations: CommonWireguardFields[];
-  connectionType?: WireguardInstanceType;
+  connectionType?: ClientConnectionType;
   selectedDefguardInstance?: DefguardInstance;
 };
 
@@ -36,7 +36,7 @@ const { getTunnels } = clientApi;
 
 export const LocationsDetailView = ({
   locations,
-  connectionType = WireguardInstanceType.DEFGUARD_INSTANCE,
+  connectionType = ClientConnectionType.LOCATION,
   selectedDefguardInstance,
 }: Props) => {
   const selectedInstance = useClientStore((state) => state.selectedInstance);
@@ -80,7 +80,7 @@ export const LocationsDetailView = ({
     queryKey: [clientQueryKeys.getTunnels],
     queryFn: () => getTunnels(),
     enabled: !!(
-      selectedInstance?.id && selectedInstance?.type === WireguardInstanceType.TUNNEL
+      selectedInstance?.id && selectedInstance?.type === ClientConnectionType.TUNNEL
     ),
   });
 
@@ -97,7 +97,7 @@ export const LocationsDetailView = ({
 
   return (
     <div id="locations-detail-view">
-      {connectionType === WireguardInstanceType.DEFGUARD_INSTANCE && (
+      {connectionType === ClientConnectionType.LOCATION && (
         <>
           <CardTabs tabs={tabs} />
           {activeLocation && (
@@ -122,7 +122,7 @@ export const LocationsDetailView = ({
           )}
         </>
       )}
-      {connectionType === WireguardInstanceType.TUNNEL && (
+      {connectionType === ClientConnectionType.TUNNEL && (
         <>
           {tunnel && <LocationDetailCard location={tunnel} />}
           {tunnel && (

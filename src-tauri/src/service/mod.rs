@@ -362,7 +362,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     // get the group ID by name
     let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
         error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
-        Error::InternalError(format!("Group '{}' not found", DAEMON_SOCKET_GROUP))
+        Error::InternalError(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
     })?;
 
     // change ownership - keep current user, change group

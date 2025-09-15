@@ -30,7 +30,7 @@ import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPag
 import { ClientEditTunnelPage } from '../../pages/client/pages/ClientEditTunnelPage/ClientEditTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
-import { WireguardInstanceType } from '../../pages/client/types';
+import { ClientConnectionType } from '../../pages/client/types';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
@@ -87,7 +87,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/client/instance-created',
-        element: <ClientAddedPage pageType={WireguardInstanceType.DEFGUARD_INSTANCE} />,
+        element: <ClientAddedPage pageType={ClientConnectionType.LOCATION} />,
       },
       {
         path: '/client/add-tunnel',
@@ -95,7 +95,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/client/tunnel-created',
-        element: <ClientAddedPage pageType={WireguardInstanceType.TUNNEL} />,
+        element: <ClientAddedPage pageType={ClientConnectionType.TUNNEL} />,
       },
       {
         path: '/client/edit-tunnel',

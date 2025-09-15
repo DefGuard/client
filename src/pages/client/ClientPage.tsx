@@ -22,8 +22,8 @@ import { clientQueryKeys } from './query';
 import {
   type CommonWireguardFields,
   type DeadConDroppedPayload,
-  type DeadConReconnectedPayload,
   TauriEventKey,
+  ClientConnectionType,
 } from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
@@ -162,7 +162,7 @@ export const ClientPage = () => {
       },
     );
 
-    const deadConnectionReconnected = listen<DeadConReconnectedPayload>(
+    const deadConnectionReconnected = listen<DeadConDroppedPayload>(
       TauriEventKey.DEAD_CONNECTION_RECONNECTED,
       (data) => {
         toaster.warning(
@@ -180,6 +180,8 @@ export const ClientPage = () => {
     const mfaTrigger = listen<CommonWireguardFields>(
       TauriEventKey.MFA_TRIGGER,
       (data) => {
+        // Set connection type, as it is not transferred from Rust and MFA is only for locations.
+        data.payload.connection_type = ClientConnectionType.LOCATION;
         openMFAModal(data.payload);
       },
     );
