@@ -27,7 +27,7 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import { type SelectedInstance, ClientConnectionType } from '../../../../../../types';
 import { AddInstanceFormStep } from '../../../../hooks/types';
 import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 
@@ -166,7 +166,7 @@ export const AddInstanceInitForm = () => {
                 );
                 const _selectedInstance: SelectedInstance = {
                   id: instance.id,
-                  type: WireguardInstanceType.DEFGUARD_INSTANCE,
+                  type: ClientConnectionType.LOCATION,
                 };
                 setClientState({
                   selectedInstance: _selectedInstance,

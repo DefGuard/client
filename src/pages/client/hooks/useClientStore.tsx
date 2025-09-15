@@ -8,7 +8,7 @@ import {
   type CommonWireguardFields,
   type DefguardInstance,
   type SelectedInstance,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../types';
 
 const { getInstances, setAppConfig } = clientApi;
@@ -49,7 +49,7 @@ export const useClientStore = createWithEqualityFn<Store>()(
             instances: values,
             selectedInstance: {
               id: values[0]?.id,
-              type: WireguardInstanceType.DEFGUARD_INSTANCE,
+              type: ClientConnectionType.LOCATION,
             },
           });
         }
@@ -59,7 +59,7 @@ export const useClientStore = createWithEqualityFn<Store>()(
         if (isUndefined(get().selectedInstance)) {
           return set({
             tunnels: values,
-            selectedInstance: { id: values[0]?.id, type: WireguardInstanceType.TUNNEL },
+            selectedInstance: { id: values[0]?.id, type: ClientConnectionType.TUNNEL },
           });
         }
         return set({ tunnels: values });
@@ -73,11 +73,11 @@ export const useClientStore = createWithEqualityFn<Store>()(
         // check if currently selected instances is in updated instances
         if (!isUndefined(selected) && res.length && selected.id) {
           if (!res.map((i) => i.id).includes(selected.id)) {
-            selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARD_INSTANCE };
+            selected = { id: res[0].id, type: ClientConnectionType.LOCATION };
           }
         }
         if (isUndefined(selected) && res.length) {
-          selected = { id: res[0].id, type: WireguardInstanceType.DEFGUARD_INSTANCE };
+          selected = { id: res[0].id, type: ClientConnectionType.LOCATION };
         }
         set({ instances: res, selectedInstance: selected });
       },

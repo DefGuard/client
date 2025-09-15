@@ -18,7 +18,7 @@ import SvgIconSettings from '../../../../shared/defguard-ui/components/svg/IconS
 import { routes } from '../../../../shared/routes';
 import { useClientStore } from '../../hooks/useClientStore';
 import { useAddInstanceStore } from '../../pages/ClientAddInstancePage/hooks/useAddInstanceStore';
-import { WireguardInstanceType } from '../../types';
+import { ClientConnectionType } from '../../types';
 import { ClientBarItem } from './components/ClientBarItem/ClientBarItem';
 import { NewApplicationVersionAvailableInfo } from './components/NewApplicationVersionAvailableInfo/NewApplicationVersionAvailableInfo';
 
@@ -30,7 +30,7 @@ export const ClientSideBar = () => {
   );
   const tunnelPathActive =
     selectedInstance?.id === undefined &&
-    selectedInstance?.type === WireguardInstanceType.TUNNEL;
+    selectedInstance?.type === ClientConnectionType.TUNNEL;
 
   return (
     <div id="client-page-side">
@@ -60,12 +60,11 @@ export const ClientSideBar = () => {
         </div>
         {instances.map((instance) => (
           <ClientBarItem
-            key={`${
-              instance.id
-            }-${WireguardInstanceType.DEFGUARD_INSTANCE.valueOf().toLowerCase()}`}
+            key={`${instance.id
+              }-${ClientConnectionType.LOCATION.valueOf().toLowerCase()}`}
             label={instance.name}
             itemId={instance.id}
-            itemType={WireguardInstanceType.DEFGUARD_INSTANCE}
+            itemType={ClientConnectionType.LOCATION}
             active={instance.active}
           />
         ))}
@@ -82,7 +81,7 @@ export const ClientSideBar = () => {
             setClientStore({
               selectedInstance: {
                 id: undefined,
-                type: WireguardInstanceType.TUNNEL,
+                type: ClientConnectionType.TUNNEL,
               },
             });
             navigate(routes.client.base, { replace: true });
@@ -95,9 +94,9 @@ export const ClientSideBar = () => {
           <ClientBarItem
             itemId={tunnel.id}
             label={tunnel.name}
-            itemType={WireguardInstanceType.TUNNEL}
+            itemType={ClientConnectionType.TUNNEL}
             active={tunnel.active}
-            key={`${tunnel.id}-${WireguardInstanceType.TUNNEL.valueOf().toLowerCase()}`}
+            key={`${tunnel.id}-${ClientConnectionType.TUNNEL.valueOf().toLowerCase()}`}
           />
         ))}
         <AddTunnel />

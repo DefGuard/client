@@ -65,7 +65,8 @@ impl Location<Id> {
         query_as!(
           Self,
           "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
-          route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
+          route_all_traffic, keepalive_interval, \
+          location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
           FROM location ORDER BY name ASC;"
       )
         .fetch_all(executor)
@@ -110,7 +111,8 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic,  keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
+            network_id, route_all_traffic,  keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
             FROM location WHERE id = $1",
             location_id
         )

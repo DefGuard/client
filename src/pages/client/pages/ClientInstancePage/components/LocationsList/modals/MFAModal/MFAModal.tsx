@@ -571,6 +571,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
     if (response.ok) {
       closeModal();
       const data = (await response.json()) as MFAFinishResponse;
+      error(`ARSE ${location.connection_type}`);
       await connect({
         locationId: location?.id,
         connectionType: location.connection_type,

@@ -15,7 +15,7 @@ import { routes } from '../../../../shared/routes';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
-import { WireguardInstanceType } from '../../types';
+import { ClientConnectionType } from '../../types';
 import { EditTunnelFormCard } from './components/EditTunnelFormCard';
 import { DeleteTunnelModal } from './modals/DeleteTunnelModal/DeleteTunnelModal';
 import { useDeleteTunnelModal } from './modals/DeleteTunnelModal/useDeleteTunnelModal';
@@ -31,7 +31,7 @@ export const ClientEditTunnelPage = () => {
   useEffect(() => {
     if (
       selectedInstance?.id === undefined ||
-      selectedInstance.type !== WireguardInstanceType.TUNNEL
+      selectedInstance.type !== ClientConnectionType.TUNNEL
     ) {
       navigate(routes.client.base, { replace: true });
     }

@@ -14,13 +14,13 @@ import type { LogItem, LogLevel } from '../../../../../../../../clientAPI/types'
 import { useClientStore } from '../../../../../../../../hooks/useClientStore';
 import type {
   DefguardLocation,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../../../../../../../../types';
 import { LocationLogsSelect } from './LocationLogsSelect';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  connectionType: WireguardInstanceType;
+  connectionType: ClientConnectionType;
 };
 
 export const LocationLogs = ({ locationId, connectionType }: Props) => {
@@ -66,7 +66,7 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
                 const element = createLogLineElement(messageString);
                 const scrollAfterAppend =
                   logsContainerElement.current.scrollHeight -
-                    logsContainerElement.current.scrollTop ===
+                  logsContainerElement.current.scrollTop ===
                   logsContainerElement.current.clientHeight;
                 logsContainerElement.current.appendChild(element);
                 // auto scroll to bottom if user didn't scroll up

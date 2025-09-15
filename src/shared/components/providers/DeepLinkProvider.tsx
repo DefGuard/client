@@ -9,7 +9,7 @@ import { clientApi } from '../../../pages/client/clientAPI/clientApi';
 import { useClientStore } from '../../../pages/client/hooks/useClientStore';
 import { AddInstanceFormStep } from '../../../pages/client/pages/ClientAddInstancePage/hooks/types';
 import { useAddInstanceStore } from '../../../pages/client/pages/ClientAddInstancePage/hooks/useAddInstanceStore';
-import { WireguardInstanceType } from '../../../pages/client/types';
+import { ClientConnectionType } from '../../../pages/client/types';
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../pages/enrollment/hooks/useEnrollmentApi';
 import type { EnrollmentStartResponse } from '../../hooks/api/types';
@@ -125,7 +125,7 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
               });
               setClientState({
                 selectedInstance: {
-                  type: WireguardInstanceType.DEFGUARD_INSTANCE,
+                  type: ClientConnectionType.LOCATION,
                   id: existingInstance.id,
                 },
               });

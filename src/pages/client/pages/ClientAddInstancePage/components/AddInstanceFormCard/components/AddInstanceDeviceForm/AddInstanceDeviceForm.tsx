@@ -26,7 +26,7 @@ import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { type SelectedInstance, WireguardInstanceType } from '../../../../../../types';
+import { type SelectedInstance, ClientConnectionType } from '../../../../../../types';
 import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 import type { AddInstanceInitResponse } from '../../types';
 
@@ -121,7 +121,7 @@ export const AddInstanceDeviceForm = () => {
             const instances = await getInstances();
             const selectedInstance: SelectedInstance = {
               id: res.instance.id,
-              type: WireguardInstanceType.DEFGUARD_INSTANCE,
+              type: ClientConnectionType.LOCATION,
             };
             setClientStore({ selectedInstance, instances });
             setTimeout(() => {
