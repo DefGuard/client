@@ -12,10 +12,10 @@ import { getStatsFilterValue } from '../../../../../../../../shared/utils/getSta
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
-import {
+import type {
   CommonWireguardFields,
   DefguardInstance,
-  WireguardInstanceType,
+  ClientConnectionType,
 } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';
@@ -86,7 +86,7 @@ const GridItem = ({ location, selectedDefguardInstance }: GridItemProps) => {
     queryFn: () =>
       getLocationStats({
         locationId: location.id as number,
-        connectionType: location.connection_type as WireguardInstanceType,
+        connectionType: location.connection_type as ClientConnectionType,
         from: getStatsFilterValue(statsFilter),
       }),
     enabled: !!location.id,

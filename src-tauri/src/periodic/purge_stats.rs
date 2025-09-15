@@ -1,11 +1,10 @@
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager, State};
 use tokio::time::interval;
 
-use crate::{
-    appstate::AppState,
-    database::models::{location_stats::LocationStats, tunnel::TunnelStats},
+use crate::database::{
+    models::{location_stats::LocationStats, tunnel::TunnelStats},
+    DB_POOL,
 };
 
 // 12 hours
@@ -15,11 +14,8 @@ const PURGE_INTERVAL: Duration = Duration::from_secs(12 * 60 * 60);
 ///
 /// By design this happens infrequently to not overload the DB connection.
 /// There is a separate purge done at client startup.
-pub async fn purge_stats(handle: AppHandle) {
-    debug!("Starting the stats purging loop...");
-    let app_state: State<AppState> = handle.state();
-    let pool = &app_state.db;
-
+pub async fn purge_stats() {
+    debug!("Starting the stats purging loop.");
     let mut interval = interval(PURGE_INTERVAL);
 
     loop {
@@ -27,7 +23,7 @@ pub async fn purge_stats(handle: AppHandle) {
         interval.tick().await;
 
         // begin transaction
-        let Ok(mut transaction) = pool.begin().await else {
+        let Ok(mut transaction) = DB_POOL.begin().await else {
             error!(
                 "Failed to begin database transaction for stats purging, retrying in {}h",
                 PURGE_INTERVAL.as_secs() / 3600
@@ -52,7 +48,7 @@ pub async fn purge_stats(handle: AppHandle) {
             error!(
                 "Failed to commit database transaction for stats purging: {err}. Retrying in {}h",
                 PURGE_INTERVAL.as_secs() / 3600
-            )
+            );
         }
     }
 }

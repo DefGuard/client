@@ -25,7 +25,7 @@ pub async fn run_periodic_tasks(app_handle: &AppHandle) {
         () = verify_active_connections(app_handle.clone()) => {
             error!("Active connection verification task has stopped unexpectedly");
         }
-        () = purge_stats(app_handle.clone()) => {
+        () = purge_stats() => {
             error!("Stats purging task has stopped unexpectedly");
         }
     };

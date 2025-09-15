@@ -11,7 +11,7 @@ import { routes } from '../../../../../../shared/routes';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../query';
-import { WireguardInstanceType } from '../../../../types';
+import { ClientConnectionType } from '../../../../types';
 import { useDeleteTunnelModal } from './useDeleteTunnelModal';
 
 const { deleteTunnel } = clientApi;
@@ -48,7 +48,7 @@ export const DeleteTunnelModal = () => {
       setClientStore({
         selectedInstance: {
           id: undefined,
-          type: WireguardInstanceType.TUNNEL,
+          type: ClientConnectionType.TUNNEL,
         },
       });
       navigate(routes.client.base, { replace: true });

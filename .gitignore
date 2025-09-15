@@ -27,5 +27,11 @@ dist-ssr
 *.db-shm
 *.db-wal
 
+src-tauri/gen/
+
 .direnv
 .envrc
+.aider*
+
+# nix stuff
+result

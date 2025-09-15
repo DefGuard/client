@@ -1,6 +1,6 @@
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { CommonWireguardFields } from '../../../../../../types';
+import type { CommonWireguardFields } from '../../../../../../types';
 
 const defaultValues: StoreValues = {
   isOpen: false,

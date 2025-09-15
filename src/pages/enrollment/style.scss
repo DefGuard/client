@@ -16,7 +16,7 @@
         text-align: left;
       }
 
-      & > h3 {
+      h3 {
         @include typography(app-body-1);
 
         color: var(--text-body-primary);

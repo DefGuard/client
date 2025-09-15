@@ -156,7 +156,7 @@ impl Settings {
             .await?;
         } else {
             debug!("Found previous app settings, using them.");
-            debug!("Found settings: {:?}", current_config);
+            debug!("Found settings: {current_config:?}");
         }
         Ok(())
     }

@@ -55,6 +55,18 @@ const en = {
       deadConDropped:
         'Detected that the {con_type: string} {interface_name: string} has disconnected, trying to reconnect...',
       noCookie: 'No defguard_proxy set-cookie received',
+      insecureContext: 'Context is not secure.',
+      clipboard: {
+        error: 'Clipboard is not accessible.',
+        success: 'Content copied to clipboard.',
+      },
+      versionMismatch:
+        'Your Defguard instance "{instance_name: string}" version is not supported by your Defguard Client version. \
+        Defguard Core version: {core_version: string} (required: {core_required_version: string}), Defguard Proxy version: {proxy_version: string} (required: {proxy_required_version: string}). \
+        Please contact your administrator.',
+      uuidMismatch:
+        'The identifier (UUID) of the remote Defguard instance "{instance_name: string}" does not match the one stored locally. \
+        Because of this, some features may not work correctly. To resolve this issue, remove the instance and add it again, or contact your administrator.',
     },
   },
   components: {
@@ -485,6 +497,10 @@ If this will not change, please contact your administrator.`,
           password: 'Create password',
           vpn: 'Configure VPN',
           finish: 'Finish',
+          mfa: 'Configure MFA',
+          mfaChoice: 'Choose method',
+          mfaSetup: 'Complete method',
+          mfaRecovery: 'Recovery codes',
         },
         appVersion: 'Application version',
       },

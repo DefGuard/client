@@ -15,6 +15,8 @@ use std::{
     str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+#[cfg(unix)]
+use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
@@ -27,12 +29,12 @@ use defguard_wireguard_rs::{
     net::IpAddrMask,
     InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
+#[cfg(unix)]
+use nix::unistd::{chown, Group};
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
-#[cfg(unix)]
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 use thiserror::Error;
 #[cfg(unix)]
 use tokio::net::UnixListener;
@@ -48,13 +50,21 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use super::VERSION;
+use crate::error::Error;
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
 #[cfg(windows)]
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
+#[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
+
+#[cfg(target_os = "macos")]
+pub(super) const DAEMON_SOCKET_GROUP: &str = "staff";
+
+#[cfg(target_os = "linux")]
+pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -348,9 +358,19 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
 
+    // change owner group for socket file
+    // get the group ID by name
+    let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
+        error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
+        Error::InternalError(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
+    })?;
+
+    // change ownership - keep current user, change group
+    chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
+
     // Set socket permissions to allow client access
-    // 0o666 allows read/write for owner, group, and others
-    fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o666))?;
+    // 0o660 allows read/write for owner and group only
+    fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
 
     let uds_stream = UnixListenerStream::new(uds);
 

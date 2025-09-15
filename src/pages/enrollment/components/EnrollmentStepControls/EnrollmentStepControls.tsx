@@ -1,7 +1,7 @@
 import './style.scss';
 
 import classNames from 'classnames';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { AdminInfo } from '../AdminInfo/AdminInfo';
 import { TimeLeft } from '../TimeLeft/TimeLeft';

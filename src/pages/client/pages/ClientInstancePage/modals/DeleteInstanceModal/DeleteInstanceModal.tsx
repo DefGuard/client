@@ -67,7 +67,7 @@ export const DeleteInstanceModal = () => {
   useEffect(() => {
     reset();
     // eslint-disable-next-line
-  }, []);
+  }, [reset]);
 
   return (
     <ConfirmModal

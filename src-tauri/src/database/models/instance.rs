@@ -17,7 +17,6 @@ pub struct Instance<I = NoId> {
     pub token: Option<String>,
     pub disable_all_traffic: bool,
     pub enterprise_enabled: bool,
-    pub use_openid_for_mfa: bool,
     pub openid_display_name: Option<String>,
 }
 
@@ -39,7 +38,6 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
             token: None,
             disable_all_traffic: instance_info.disable_all_traffic,
             enterprise_enabled: instance_info.enterprise_enabled,
-            use_openid_for_mfa: instance_info.use_openid_for_mfa,
             openid_display_name: instance_info.openid_display_name,
         }
     }
@@ -52,7 +50,7 @@ impl Instance<Id> {
     {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
-            disable_all_traffic = $6, enterprise_enabled = $7, token = $8, use_openid_for_mfa = $9, openid_display_name = $10 WHERE id = $11;",
+            disable_all_traffic = $6, enterprise_enabled = $7, token = $8, openid_display_name = $9 WHERE id = $10;",
             self.name,
             self.uuid,
             self.url,
@@ -61,7 +59,6 @@ impl Instance<Id> {
             self.disable_all_traffic,
             self.enterprise_enabled,
             self.token,
-            self.use_openid_for_mfa,
             self.openid_display_name,
             self.id
         )
@@ -77,7 +74,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name FROM instance;"
+            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
@@ -91,7 +88,7 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name FROM instance WHERE id = $1;",
+            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance WHERE id = $1;",
             id
         )
         .fetch_optional(executor)
@@ -125,8 +122,8 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
-            disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name FROM instance
-            WHERE token IS NOT NULL;"
+            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance
+            WHERE token IS NOT NULL ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
@@ -144,7 +141,6 @@ impl PartialEq<proto::InstanceInfo> for Instance<Id> {
             && self.username == other.username
             && self.disable_all_traffic == other.disable_all_traffic
             && self.enterprise_enabled == other.enterprise_enabled
-            && self.use_openid_for_mfa == other.use_openid_for_mfa
             && self.openid_display_name == other.openid_display_name
     }
 }
@@ -181,7 +177,6 @@ impl Instance<NoId> {
             token: self.token,
             disable_all_traffic: self.disable_all_traffic,
             enterprise_enabled: self.enterprise_enabled,
-            use_openid_for_mfa: self.use_openid_for_mfa,
             openid_display_name: self.openid_display_name,
         })
     }
@@ -198,7 +193,6 @@ pub struct InstanceInfo<I = NoId> {
     pub pubkey: String,
     pub disable_all_traffic: bool,
     pub enterprise_enabled: bool,
-    pub use_openid_for_mfa: bool,
     pub openid_display_name: Option<String>,
 }
 

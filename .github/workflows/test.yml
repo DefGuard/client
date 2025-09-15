@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - 'release/**'
     paths-ignore:
       - '*.md'
       - 'LICENSE'
@@ -12,6 +13,7 @@ on:
     branches:
       - main
       - dev
+      - 'release/**'
     paths-ignore:
       - '*.md'
       - 'LICENSE'
@@ -21,30 +23,28 @@ env:
 
 jobs:
   test:
-    runs-on: [self-hosted, Linux, X64]
-    container: rust:1
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+
+    container:
+      image: public.ecr.aws/docker/library/rust:1
+      options: --user root
+
     defaults:
       run:
         working-directory: ./src-tauri
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
-      - name: Debug
-        run: echo ${{ github.ref_name }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
       - name: Install required packages
         run: |
           apt-get update
-          apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev unzip
-      - name: Install protobuf compiler
-        run: |
-          PB_REL='https://github.com/protocolbuffers/protobuf/releases'
-          PB_VERSION='3.20.0' && curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
-          unzip protoc-$PB_VERSION-linux-x86_64.zip bin/protoc include/google/* -d /usr/local
+          apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler
       - name: Check format
         run: |
           rustup component add rustfmt
@@ -55,8 +55,9 @@ jobs:
           rustup component add clippy
           cargo clippy --all-targets --all-features -- -D warnings
       - name: Run cargo deny
-        uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          manifest-path: ./src-tauri/Cargo.toml
+        working-directory: ./src-tauri
+        run: |
+          cargo install cargo-deny
+          cargo deny check
       - name: Run tests
         run: cargo test --locked --no-fail-fast

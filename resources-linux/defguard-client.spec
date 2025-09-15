@@ -5,7 +5,7 @@ Summary:  Defguard desktop client
 
 License:  Apache-2.0
 URL:      https://defguard.net/
-Requires: libappindicator-gtk3 webkit2gtk4.0
+Requires: libayatana-appindicator3-dev webkit2gtk4.1
 
 %description
 Desktop client for managing WireGuard VPN connections
@@ -22,9 +22,13 @@ Desktop client for managing WireGuard VPN connections
 %{__install} -m 755 src-tauri/target/release/defguard-client %{buildroot}/%{_bindir}/
 %{__install} -m 755 src-tauri/target/release/defguard-service %{buildroot}/%{_sbindir}/
 %{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-black.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-black.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-black-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-black-active.png
 %{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-color.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-color.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-color-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-color-active.png
 %{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-gray.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-gray.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-gray-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-gray-active.png
 %{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-white.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-white.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-white-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-white-active.png
 %{__install} -m 644 resources-linux/defguard-service.service %{buildroot}/%{_prefix}/lib/systemd/system/
 %{__install} -m 644 resources-linux/defguard-client.desktop %{buildroot}/%{_datadir}/applications/defguard-client.desktop
 %{__install} -m 644 src-tauri/icons/128x128.png %{buildroot}/%{_datadir}/icons/hicolor/128x128/apps/defguard-client.png
@@ -54,9 +58,13 @@ systemctl daemon-reload
 %{_bindir}/defguard-client
 %{_sbindir}/defguard-service
 %{_prefix}/lib/defguard-client/resources/icons/tray-32x32-black.png
+%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-black-active.png
 %{_prefix}/lib/defguard-client/resources/icons/tray-32x32-color.png
+%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-color-active.png
 %{_prefix}/lib/defguard-client/resources/icons/tray-32x32-gray.png
+%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-gray-active.png
 %{_prefix}/lib/defguard-client/resources/icons/tray-32x32-white.png
+%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-white-active.png
 %{_prefix}/lib/systemd/system/defguard-service.service
 %{_datadir}/applications/defguard-client.desktop
 %{_datadir}/icons/hicolor/128x128/apps/defguard-client.png

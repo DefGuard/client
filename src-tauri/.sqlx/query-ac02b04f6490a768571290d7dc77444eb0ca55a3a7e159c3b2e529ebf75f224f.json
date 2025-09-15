@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled, use_openid_for_mfa, openid_display_name FROM instance;",
+  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" FROM location WHERE pubkey = $1;",
   "describe": {
     "columns": [
       {
@@ -9,60 +9,66 @@
         "type_info": "Integer"
       },
       {
-        "name": "name",
+        "name": "instance_id",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Integer"
       },
       {
-        "name": "uuid",
+        "name": "name",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "url",
+        "name": "address",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "proxy_url",
+        "name": "pubkey",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "username",
+        "name": "endpoint",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "token?",
+        "name": "allowed_ips",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "disable_all_traffic",
+        "name": "dns",
         "ordinal": 7,
-        "type_info": "Bool"
+        "type_info": "Text"
       },
       {
-        "name": "enterprise_enabled",
+        "name": "network_id",
         "ordinal": 8,
-        "type_info": "Bool"
+        "type_info": "Integer"
       },
       {
-        "name": "use_openid_for_mfa",
+        "name": "route_all_traffic",
         "ordinal": 9,
         "type_info": "Bool"
       },
       {
-        "name": "openid_display_name",
+        "name": "keepalive_interval",
         "ordinal": 10,
-        "type_info": "Text"
+        "type_info": "Integer"
+      },
+      {
+        "name": "location_mfa_mode: LocationMfaMode",
+        "ordinal": 11,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -73,8 +79,8 @@
       false,
       false,
       false,
-      true
+      false
     ]
   },
-  "hash": "79c5c710bc12a1353875219d3cd2198b6c2cf5b476774034d3160a3f28df08d7"
+  "hash": "ac02b04f6490a768571290d7dc77444eb0ca55a3a7e159c3b2e529ebf75f224f"
 }

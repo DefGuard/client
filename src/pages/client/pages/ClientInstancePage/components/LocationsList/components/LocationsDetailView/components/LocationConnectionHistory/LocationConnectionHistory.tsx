@@ -6,13 +6,16 @@ import { useI18nContext } from '../../../../../../../../../../i18n/i18n-react';
 import { Card } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
-import { DefguardLocation, WireguardInstanceType } from '../../../../../../../../types';
+import type {
+  DefguardLocation,
+  ClientConnectionType,
+} from '../../../../../../../../types';
 import { LocationCardNeverConnected } from '../../../LocationCardNeverConnected/LocationCardNeverConnected';
 import { LocationHistoryTable } from './LocationHistoryTable/LocationHistoryTable';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  connectionType: WireguardInstanceType;
+  connectionType: ClientConnectionType;
   connected: boolean;
 };
 

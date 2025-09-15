@@ -12,7 +12,7 @@ import { routes } from '../../../../shared/routes';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
-import { DefguardInstance, WireguardInstanceType } from '../../types';
+import { type DefguardInstance, ClientConnectionType } from '../../types';
 import { LocationsList } from './components/LocationsList/LocationsList';
 import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 import { StatsLayoutSelect } from './components/StatsLayoutSelect/StatsLayoutSelect';
@@ -37,7 +37,7 @@ export const ClientInstancePage = () => {
     if (
       !isUndefined(selectedInstanceId) &&
       selectedInstanceType &&
-      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE
+      selectedInstanceType === ClientConnectionType.LOCATION
     ) {
       return instances.find((i) => i.id === selectedInstanceId);
     }
@@ -45,12 +45,12 @@ export const ClientInstancePage = () => {
 
   const navigate = useNavigate();
 
-  const isLocationPage = selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE;
+  const isLocationPage = selectedInstanceType === ClientConnectionType.LOCATION;
 
   const openUpdateInstanceModal = useUpdateInstanceModal((state) => state.open);
 
   const queryKey = useMemo(() => {
-    if (selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE) {
+    if (selectedInstanceType === ClientConnectionType.LOCATION) {
       return [clientQueryKeys.getLocations, selectedInstanceId as number];
     } else {
       return [clientQueryKeys.getTunnels];
@@ -58,7 +58,7 @@ export const ClientInstancePage = () => {
   }, [selectedInstanceId, selectedInstanceType]);
 
   const queryFn = useCallback(() => {
-    if (selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE) {
+    if (selectedInstanceType === ClientConnectionType.LOCATION) {
       return getLocations({ instanceId: selectedInstanceId as number });
     } else {
       return getTunnels();
@@ -73,8 +73,8 @@ export const ClientInstancePage = () => {
 
   useEffect(() => {
     const isDefguardInstance =
-      selectedInstanceType === WireguardInstanceType.DEFGUARD_INSTANCE;
-    const isTunnelInstance = selectedInstanceType === WireguardInstanceType.TUNNEL;
+      selectedInstanceType === ClientConnectionType.LOCATION;
+    const isTunnelInstance = selectedInstanceType === ClientConnectionType.TUNNEL;
 
     if (isDefguardInstance && !selectedInstance) {
       navigate(routes.client.addInstance, { replace: true });

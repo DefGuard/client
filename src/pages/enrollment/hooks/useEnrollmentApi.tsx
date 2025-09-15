@@ -1,13 +1,7 @@
-import { Body, fetch } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
-import {
-  ActivateUserResponse,
-  AppInfo,
-  CreateDeviceResponse,
-  EnrollmentStartResponse,
-  UseApi,
-} from '../../../shared/hooks/api/types';
+import type { UseApi } from '../../../shared/hooks/api/types';
 
 export const useEnrollmentApi = (): UseApi => {
   const [proxyUrl, cookie] = useEnrollmentStore((state) => [
@@ -15,60 +9,100 @@ export const useEnrollmentApi = (): UseApi => {
     state.cookie,
   ]);
 
-  const startEnrollment: UseApi['enrollment']['start'] = async (data) => {
-    const response = await fetch<EnrollmentStartResponse>(
-      `${proxyUrl}/enrollment/start`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        },
-        body: Body.json(data),
-      },
-    );
+  const networkInfo: UseApi['enrollment']['networkInfo'] = async (
+    data,
+    url?: string,
+    overrideCookie?: string,
+  ) => {
+    const response = await fetch(`${url ?? proxyUrl}/enrollment/network_info`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: overrideCookie ?? cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
+    return await response.json();
+  };
+
+  const registerCodeMfaStart: UseApi['enrollment']['registerCodeMfaStart'] = async (
+    method,
+  ) => {
+    const response = await fetch(`${proxyUrl}/enrollment/register-mfa/code/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify({
+        method: method.valueOf(),
+      }),
+    });
+    return await response.json();
+  };
+
+  const registerCodeMfaFinish: UseApi['enrollment']['registerCodeMfaFinish'] = async (
+    data,
+  ) => {
+    const response = await fetch(`${proxyUrl}/enrollment/register-mfa/code/finish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw Error('Register finish request failed');
+    return await response.json();
+  };
+
+  const start: UseApi['enrollment']['start'] = async (data) => {
+    const response = await fetch(`${data.proxyUrl ?? proxyUrl}/enrollment/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify({
+        token: data.token,
+      }),
+    });
     return response;
   };
 
   const activateUser: UseApi['enrollment']['activateUser'] = async (data) => {
-    const response = await fetch<ActivateUserResponse>(
-      `${proxyUrl}/enrollment/activate_user`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        },
-        body: Body.json(data),
-      },
-    );
+    const response = await fetch(`${proxyUrl}/enrollment/activate_user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
 
     return response;
   };
 
   const createDevice: UseApi['enrollment']['createDevice'] = async (data) => {
-    const response = await fetch<CreateDeviceResponse>(
-      `${proxyUrl}/enrollment/create_device`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-        },
-        body: Body.json(data),
-      },
-    );
+    const response = await fetch(`${proxyUrl}/enrollment/create_device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      } as Record<string, string>,
+      body: JSON.stringify(data),
+    });
 
     return response;
   };
 
   const getAppInfo: UseApi['getAppInfo'] = async () => {
-    const response = await fetch<AppInfo>(`${proxyUrl}/info`, {
+    const response = await fetch(`${proxyUrl}/info`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
-      },
+      } as Record<string, string>,
     });
 
     return response;
@@ -76,9 +110,12 @@ export const useEnrollmentApi = (): UseApi => {
 
   return {
     enrollment: {
-      start: startEnrollment,
+      start,
       activateUser,
       createDevice,
+      registerCodeMfaStart,
+      registerCodeMfaFinish,
+      networkInfo,
     },
     getAppInfo,
   };

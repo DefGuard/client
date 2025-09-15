@@ -1,6 +1,6 @@
 import { createWithEqualityFn } from 'zustand/traditional';
 
-import { DeadConDroppedPayload } from '../../../types';
+import type { DeadConDroppedPayload } from '../../../types';
 
 const defaultValues: StoreValues = {
   visible: false,

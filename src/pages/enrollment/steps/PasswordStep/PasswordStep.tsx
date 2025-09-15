@@ -2,7 +2,7 @@ import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo, useRef } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
 
@@ -11,7 +11,9 @@ import { FormInput } from '../../../../shared/defguard-ui/components/Form/FormIn
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { passwordValidator } from '../../../../shared/validators/password';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../const';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
+import { EnrollmentNavDirection } from '../../hooks/types';
 
 type FormFields = {
   password: string;
@@ -22,10 +24,9 @@ export const PasswordStep = () => {
   const submitRef = useRef<HTMLInputElement | null>(null);
   const { LL } = useI18nContext();
 
-  const setStore = useEnrollmentStore((state) => state.setState);
   const userPassword = useEnrollmentStore((state) => state.userPassword);
-  const [nextSubject, next] = useEnrollmentStore(
-    (state) => [state.nextSubject, state.nextStep],
+  const [nextSubject, setStore] = useEnrollmentStore(
+    (state) => [state.nextSubject, state.setState],
     shallow,
   );
 
@@ -38,9 +39,14 @@ export const PasswordStep = () => {
           password: passwordValidator(LL),
           repeat: z.string().min(1, LL.form.errors.required()),
         })
-        .refine((values) => values.password === values.repeat, {
-          message: pageLL.form.fields.repeat.errors.matching(),
-          path: ['repeat'],
+        .superRefine((values, ctx) => {
+          if (values.password !== values.repeat && values.repeat.length >= 1) {
+            ctx.addIssue({
+              path: ['repeat'],
+              message: pageLL.form.fields.repeat.errors.matching(),
+              code: 'custom',
+            });
+          }
         }),
     [LL, pageLL.form.fields.repeat.errors],
   );
@@ -56,24 +62,31 @@ export const PasswordStep = () => {
   });
 
   const handleValidSubmit: SubmitHandler<FormFields> = (values) => {
-    setStore({ userPassword: values.password });
-    next();
+    setStore({ userPassword: values.password, step: EnrollmentStepKey.DEVICE });
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs
   useEffect(() => {
-    const sub = nextSubject.subscribe(() => {
-      submitRef.current?.click();
+    const sub = nextSubject.subscribe((direction) => {
+      switch (direction) {
+        case EnrollmentNavDirection.BACK:
+          setStore({ step: EnrollmentStepKey.DATA_VERIFICATION });
+          break;
+        case EnrollmentNavDirection.NEXT:
+          submitRef.current?.click();
+          break;
+      }
     });
 
     return () => {
       sub.unsubscribe();
     };
-  }, [nextSubject, submitRef]);
+  }, [nextSubject]);
 
   useEffect(() => {
     reset();
     //eslint-disable-next-line
-  }, []);
+  }, [reset]);
 
   return (
     <Card id="enrollment-password-card">
@@ -85,7 +98,13 @@ export const PasswordStep = () => {
       >
         <FormInput
           label={pageLL.form.fields.password.label()}
-          controller={{ control, name: 'password' }}
+          controller={{
+            control,
+            name: 'password',
+            rules: {
+              deps: ['repeat'],
+            },
+          }}
           type="password"
           floatingErrors={{
             title: LL.form.errors.password.floatingTitle(),
@@ -94,7 +113,13 @@ export const PasswordStep = () => {
         />
         <FormInput
           label={pageLL.form.fields.repeat.label()}
-          controller={{ control, name: 'repeat' }}
+          controller={{
+            control,
+            name: 'repeat',
+            rules: {
+              deps: ['password'],
+            },
+          }}
           type="password"
           autoComplete="new-password"
         />

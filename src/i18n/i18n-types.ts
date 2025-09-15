@@ -170,6 +170,34 @@ type RootTranslation = {
 			 * N​o​ ​d​e​f​g​u​a​r​d​_​p​r​o​x​y​ ​s​e​t​-​c​o​o​k​i​e​ ​r​e​c​e​i​v​e​d
 			 */
 			noCookie: string
+			/**
+			 * C​o​n​t​e​x​t​ ​i​s​ ​n​o​t​ ​s​e​c​u​r​e​.
+			 */
+			insecureContext: string
+			clipboard: {
+				/**
+				 * C​l​i​p​b​o​a​r​d​ ​i​s​ ​n​o​t​ ​a​c​c​e​s​s​i​b​l​e​.
+				 */
+				error: string
+				/**
+				 * C​o​n​t​e​n​t​ ​c​o​p​i​e​d​ ​t​o​ ​c​l​i​p​b​o​a​r​d​.
+				 */
+				success: string
+			}
+			/**
+			 * Y​o​u​r​ ​D​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​"​{​i​n​s​t​a​n​c​e​_​n​a​m​e​}​"​ ​v​e​r​s​i​o​n​ ​i​s​ ​n​o​t​ ​s​u​p​p​o​r​t​e​d​ ​b​y​ ​y​o​u​r​ ​D​e​f​g​u​a​r​d​ ​C​l​i​e​n​t​ ​v​e​r​s​i​o​n​.​ ​ ​ ​ ​ ​ ​ ​ ​ ​D​e​f​g​u​a​r​d​ ​C​o​r​e​ ​v​e​r​s​i​o​n​:​ ​{​c​o​r​e​_​v​e​r​s​i​o​n​}​ ​(​r​e​q​u​i​r​e​d​:​ ​{​c​o​r​e​_​r​e​q​u​i​r​e​d​_​v​e​r​s​i​o​n​}​)​,​ ​D​e​f​g​u​a​r​d​ ​P​r​o​x​y​ ​v​e​r​s​i​o​n​:​ ​{​p​r​o​x​y​_​v​e​r​s​i​o​n​}​ ​(​r​e​q​u​i​r​e​d​:​ ​{​p​r​o​x​y​_​r​e​q​u​i​r​e​d​_​v​e​r​s​i​o​n​}​)​.​ ​ ​ ​ ​ ​ ​ ​ ​ ​P​l​e​a​s​e​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+			 * @param {string} core_required_version
+			 * @param {string} core_version
+			 * @param {string} instance_name
+			 * @param {string} proxy_required_version
+			 * @param {string} proxy_version
+			 */
+			versionMismatch: RequiredParams<'core_required_version' | 'core_version' | 'instance_name' | 'proxy_required_version' | 'proxy_version'>
+			/**
+			 * T​h​e​ ​i​d​e​n​t​i​f​i​e​r​ ​(​U​U​I​D​)​ ​o​f​ ​t​h​e​ ​r​e​m​o​t​e​ ​D​e​f​g​u​a​r​d​ ​i​n​s​t​a​n​c​e​ ​"​{​i​n​s​t​a​n​c​e​_​n​a​m​e​}​"​ ​d​o​e​s​ ​n​o​t​ ​m​a​t​c​h​ ​t​h​e​ ​o​n​e​ ​s​t​o​r​e​d​ ​l​o​c​a​l​l​y​.​ ​ ​ ​ ​ ​ ​ ​ ​ ​B​e​c​a​u​s​e​ ​o​f​ ​t​h​i​s​,​ ​s​o​m​e​ ​f​e​a​t​u​r​e​s​ ​m​a​y​ ​n​o​t​ ​w​o​r​k​ ​c​o​r​r​e​c​t​l​y​.​ ​T​o​ ​r​e​s​o​l​v​e​ ​t​h​i​s​ ​i​s​s​u​e​,​ ​r​e​m​o​v​e​ ​t​h​e​ ​i​n​s​t​a​n​c​e​ ​a​n​d​ ​a​d​d​ ​i​t​ ​a​g​a​i​n​,​ ​o​r​ ​c​o​n​t​a​c​t​ ​y​o​u​r​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+			 * @param {string} instance_name
+			 */
+			uuidMismatch: RequiredParams<'instance_name'>
 		}
 	}
 	components: {
@@ -1112,6 +1140,22 @@ type RootTranslation = {
 					 * F​i​n​i​s​h
 					 */
 					finish: string
+					/**
+					 * C​o​n​f​i​g​u​r​e​ ​M​F​A
+					 */
+					mfa: string
+					/**
+					 * C​h​o​o​s​e​ ​m​e​t​h​o​d
+					 */
+					mfaChoice: string
+					/**
+					 * C​o​m​p​l​e​t​e​ ​m​e​t​h​o​d
+					 */
+					mfaSetup: string
+					/**
+					 * R​e​c​o​v​e​r​y​ ​c​o​d​e​s
+					 */
+					mfaRecovery: string
 				}
 				/**
 				 * A​p​p​l​i​c​a​t​i​o​n​ ​v​e​r​s​i​o​n
@@ -1827,6 +1871,28 @@ export type TranslationFunctions = {
 			 * No defguard_proxy set-cookie received
 			 */
 			noCookie: () => LocalizedString
+			/**
+			 * Context is not secure.
+			 */
+			insecureContext: () => LocalizedString
+			clipboard: {
+				/**
+				 * Clipboard is not accessible.
+				 */
+				error: () => LocalizedString
+				/**
+				 * Content copied to clipboard.
+				 */
+				success: () => LocalizedString
+			}
+			/**
+			 * Your Defguard instance "{instance_name}" version is not supported by your Defguard Client version.         Defguard Core version: {core_version} (required: {core_required_version}), Defguard Proxy version: {proxy_version} (required: {proxy_required_version}).         Please contact your administrator.
+			 */
+			versionMismatch: (arg: { core_required_version: string, core_version: string, instance_name: string, proxy_required_version: string, proxy_version: string }) => LocalizedString
+			/**
+			 * The identifier (UUID) of the remote Defguard instance "{instance_name}" does not match the one stored locally.         Because of this, some features may not work correctly. To resolve this issue, remove the instance and add it again, or contact your administrator.
+			 */
+			uuidMismatch: (arg: { instance_name: string }) => LocalizedString
 		}
 	}
 	components: {
@@ -2762,6 +2828,22 @@ export type TranslationFunctions = {
 					 * Finish
 					 */
 					finish: () => LocalizedString
+					/**
+					 * Configure MFA
+					 */
+					mfa: () => LocalizedString
+					/**
+					 * Choose method
+					 */
+					mfaChoice: () => LocalizedString
+					/**
+					 * Complete method
+					 */
+					mfaSetup: () => LocalizedString
+					/**
+					 * Recovery codes
+					 */
+					mfaRecovery: () => LocalizedString
 				}
 				/**
 				 * Application version

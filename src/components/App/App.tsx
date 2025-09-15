@@ -4,6 +4,8 @@ import '../../shared/scss/index.scss';
 
 import { QueryClient } from '@tanstack/query-core';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { debug } from '@tauri-apps/plugin-log';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
 import duration from 'dayjs/plugin/duration';
@@ -14,14 +16,12 @@ import updateLocale from 'dayjs/plugin/updateLocale';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { debug } from 'tauri-plugin-log-api';
 import { localStorageDetector } from 'typesafe-i18n/detectors';
-
 import TypesafeI18n from '../../i18n/i18n-react';
 import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
-import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { ClientPage } from '../../pages/client/ClientPage';
+import { clientApi } from '../../pages/client/clientAPI/clientApi';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
 import { ClientAddedPage } from '../../pages/client/pages/ClientAddedPage/ClientAddedPage';
@@ -30,7 +30,7 @@ import { ClientAddTunnelPage } from '../../pages/client/pages/ClientAddTunnelPag
 import { ClientEditTunnelPage } from '../../pages/client/pages/ClientEditTunnelPage/ClientEditTunnelPage';
 import { ClientInstancePage } from '../../pages/client/pages/ClientInstancePage/ClientInstancePage';
 import { ClientSettingsPage } from '../../pages/client/pages/ClientSettingsPage/ClientSettingsPage';
-import { WireguardInstanceType } from '../../pages/client/types';
+import { ClientConnectionType } from '../../pages/client/types';
 import { EnrollmentPage } from '../../pages/enrollment/EnrollmentPage';
 import { SessionTimeoutPage } from '../../pages/sessionTimeout/SessionTimeoutPage';
 import { ToastManager } from '../../shared/defguard-ui/components/Layout/ToastManager/ToastManager';
@@ -87,7 +87,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/client/instance-created',
-        element: <ClientAddedPage pageType={WireguardInstanceType.DEFGUARD_INSTANCE} />,
+        element: <ClientAddedPage pageType={ClientConnectionType.LOCATION} />,
       },
       {
         path: '/client/add-tunnel',
@@ -95,7 +95,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/client/tunnel-created',
-        element: <ClientAddedPage pageType={WireguardInstanceType.TUNNEL} />,
+        element: <ClientAddedPage pageType={ClientConnectionType.TUNNEL} />,
       },
       {
         path: '/client/edit-tunnel',
@@ -120,7 +120,7 @@ const router = createBrowserRouter([
 const detectedLocale = detectLocale(localStorageDetector);
 
 export const App = () => {
-  //workaround ensure effect once in dev mode, thanks react :3
+  // Workaround: ensure effect once in dev mode, thanks react :3
   const tauriInitLoadRef = useRef(false);
   const localeLoadRef = useRef(false);
   const [localeLoaded, setWasLoaded] = useState(false);
@@ -146,12 +146,13 @@ export const App = () => {
     }
   }, []);
 
-  // load settings from tauri first time
+  // Load settings from Tauri for the first time.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     if (!tauriInitLoadRef.current) {
       tauriInitLoadRef.current = true;
       const loadTauriState = async () => {
-        debug('App init state from tauri');
+        debug('App init state from Tauri');
         const appConfig = await getAppConfig();
         const instances = await getInstances();
         const tunnels = await getTunnels();
@@ -163,6 +164,26 @@ export const App = () => {
       loadTauriState();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | undefined;
+      if (target) {
+        const link = target.closest('a');
+        if (
+          link instanceof HTMLAnchorElement &&
+          link.target === '_blank' &&
+          link.href.startsWith('https')
+        ) {
+          void openUrl(link.href);
+        }
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, []);
 
   if (!appLoaded) return null;
