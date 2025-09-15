@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import * as clipboard from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef } from 'react';
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { ActionButton } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/ActionButton';
@@ -29,10 +30,20 @@ export const GlobalLogs = () => {
   const { startGlobalLogWatcher, stopGlobalLogWatcher } = clientApi;
 
   const handleLogsDownload = async () => {
-    const path = await save({});
+    const path = await save({
+      filters: [
+        {
+          name: 'Logs',
+          extensions: ['txt', 'log'],
+        },
+      ],
+    });
+
     if (path) {
       const logs = getAllLogs();
       await writeTextFile(path, logs);
+    } else {
+      error('Failed to save logs! Path was null');
     }
   };
 
