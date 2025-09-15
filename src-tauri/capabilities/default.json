@@ -41,6 +41,7 @@
     "core:webview:allow-print",
     "deep-link:default",
     "fs:default",
+    "fs:allow-write-text-file",
     "log:default",
     "notification:default",
     "os:default",
