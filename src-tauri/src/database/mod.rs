@@ -6,10 +6,15 @@ use std::{
     str::FromStr,
     sync::LazyLock,
 };
+#[cfg(not(windows))]
+use std::{
+    fs::{set_permissions, Permissions},
+    os::unix::fs::PermissionsExt,
+};
 
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 
-use crate::{app_data_dir, error::Error};
+use crate::{app_data_dir, error::Error, set_perms};
 
 const DB_NAME: &str = "defguard.db";
 
@@ -59,6 +64,7 @@ fn prepare_db_url() -> Result<String, Error> {
                 app_dir.to_string_lossy()
             );
         }
+        set_perms(&app_dir, true);
         let db_path = app_dir.join(DB_NAME);
         if db_path.exists() {
             debug!(
@@ -77,6 +83,7 @@ fn prepare_db_url() -> Result<String, Error> {
                 db_path.to_string_lossy()
             );
         }
+        set_perms(&db_path, false);
         debug!(
             "Application's database file is located at: {}",
             db_path.to_string_lossy()

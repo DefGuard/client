@@ -14,19 +14,10 @@ use std::{
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
-    active_connections::close_all_connections,
-    app_config::AppConfig,
-    appstate::AppState,
-    commands::*,
-    database::{
+    active_connections::close_all_connections, app_config::AppConfig, appstate::AppState, commands::*, database::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
-    },
-    periodic::run_periodic_tasks,
-    service,
-    tray::{configure_tray_icon, setup_tray, show_main_window},
-    utils::load_log_targets,
-    VERSION,
+    }, periodic::run_periodic_tasks, service, set_perms, tray::{configure_tray_icon, setup_tray, show_main_window}, utils::load_log_targets, VERSION
 };
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
@@ -293,21 +284,8 @@ fn main() {
                 .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into());
 
             // Ensure directories have appropriate permissions (dg25-28).
-            #[cfg(not(windows))]
-            {
-                if let Err(err) = set_permissions(&data_dir, Permissions::from_mode(0o700)) {
-                    warn!(
-                        "Failed to set permissions on data directory {}: {err}",
-                        data_dir.display()
-                    );
-                }
-                if let Err(err) = set_permissions(&log_dir, Permissions::from_mode(0o700)) {
-                    warn!(
-                        "Failed to set permissions on log directory {}: {err}",
-                        log_dir.display()
-                    );
-                }
-            }
+            set_perms(&data_dir, true);
+            set_perms(&log_dir, true);
             info!(
                 "Application data (database file) will be stored in: {data_dir:?} and application logs in: {log_dir:?}. \
                 Logs of the background Defguard service responsible for managing VPN connections at the \
