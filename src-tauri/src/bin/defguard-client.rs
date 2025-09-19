@@ -3,7 +3,13 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, str::FromStr, sync::LazyLock};
+use std::{
+    env,
+    fs::{set_permissions, Permissions},
+    os::unix::fs::PermissionsExt,
+    str::FromStr,
+    sync::LazyLock,
+};
 
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
@@ -277,15 +283,22 @@ fn main() {
     app.run(|app_handle, event| match event {
         // Startup tasks
         RunEvent::Ready => {
+            // Ensure data directory has appropriate permissions (dg25-28)
+            let data_dir = app_handle
+                    .path()
+                    .app_data_dir()
+                    .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
+            if let Err(err) = set_permissions(&data_dir, Permissions::from_mode(0o700)) {
+                warn!(
+                    "Failed to set permissions on data directory {}: {err}",
+                    data_dir.display()
+                );
+            }
             info!(
                 "Application data (database file) will be stored in: {} and application logs in: {}. \
                 Logs of the background Defguard service responsible for managing VPN connections at the \
                 network level will be stored in: {}.",
-                // display the path to the app data directory, convert option<pathbuf> to option<&str>
-                app_handle
-                    .path()
-                    .app_data_dir()
-                    .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into()).display(),
+                data_dir.display(),
                 app_handle
                     .path()
                     .app_log_dir()
