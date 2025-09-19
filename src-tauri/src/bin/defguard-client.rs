@@ -294,20 +294,20 @@ fn main() {
 
             // Ensure directories have appropriate permissions (dg25-28).
             #[cfg(not(windows))]
-                {
-                    if let Err(err) = set_permissions(&data_dir, Permissions::from_mode(0o700)) {
-                        warn!(
-                            "Failed to set permissions on data directory {}: {err}",
-                            data_dir.display()
-                        );
-                    }
-                    if let Err(err) = set_permissions(&log_dir, Permissions::from_mode(0o700)) {
-                        warn!(
-                            "Failed to set permissions on log directory {}: {err}",
-                            log_dir.display()
-                        );
-                    }
+            {
+                if let Err(err) = set_permissions(&data_dir, Permissions::from_mode(0o700)) {
+                    warn!(
+                        "Failed to set permissions on data directory {}: {err}",
+                        data_dir.display()
+                    );
                 }
+                if let Err(err) = set_permissions(&log_dir, Permissions::from_mode(0o700)) {
+                    warn!(
+                        "Failed to set permissions on log directory {}: {err}",
+                        log_dir.display()
+                    );
+                }
+            }
             info!(
                 "Application data (database file) will be stored in: {data_dir:?} and application logs in: {log_dir:?}. \
                 Logs of the background Defguard service responsible for managing VPN connections at the \
