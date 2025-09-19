@@ -1,15 +1,8 @@
-pub mod models;
-
 use std::{
     env,
     fs::{create_dir_all, File},
     str::FromStr,
     sync::LazyLock,
-};
-#[cfg(not(windows))]
-use std::{
-    fs::{set_permissions, Permissions},
-    os::unix::fs::PermissionsExt,
 };
 
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqlitePool};
@@ -17,6 +10,8 @@ use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, Sq
 use crate::{app_data_dir, error::Error, set_perms};
 
 const DB_NAME: &str = "defguard.db";
+
+pub mod models;
 
 pub(crate) type DbPool = SqlitePool;
 

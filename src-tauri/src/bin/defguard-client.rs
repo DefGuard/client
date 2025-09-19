@@ -3,21 +3,24 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{
-    env,
-    fs::{set_permissions, Permissions},
-    os::unix::fs::PermissionsExt,
-    str::FromStr,
-    sync::LazyLock,
-};
+use std::{env, str::FromStr, sync::LazyLock};
 
 #[cfg(target_os = "windows")]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
-    active_connections::close_all_connections, app_config::AppConfig, appstate::AppState, commands::*, database::{
+    active_connections::close_all_connections,
+    app_config::AppConfig,
+    appstate::AppState,
+    commands::*,
+    database::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
-    }, periodic::run_periodic_tasks, service, set_perms, tray::{configure_tray_icon, setup_tray, show_main_window}, utils::load_log_targets, VERSION
+    },
+    periodic::run_periodic_tasks,
+    service, set_perms,
+    tray::{configure_tray_icon, setup_tray, show_main_window},
+    utils::load_log_targets,
+    VERSION,
 };
 use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
