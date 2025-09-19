@@ -59,7 +59,7 @@ fn prepare_db_url() -> Result<String, Error> {
                 app_dir.to_string_lossy()
             );
         }
-        set_perms(&app_dir, true);
+        set_perms(&app_dir);
         let db_path = app_dir.join(DB_NAME);
         if db_path.exists() {
             debug!(
@@ -78,7 +78,7 @@ fn prepare_db_url() -> Result<String, Error> {
                 db_path.to_string_lossy()
             );
         }
-        set_perms(&db_path, false);
+        set_perms(&db_path);
         debug!(
             "Application's database file is located at: {}",
             db_path.to_string_lossy()

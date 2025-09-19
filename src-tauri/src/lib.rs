@@ -85,10 +85,10 @@ pub fn app_data_dir() -> Option<PathBuf> {
 /// Ensures path has appropriate permissions set (dg25-28):
 /// - 700 for directories
 /// - 600 for files
-pub fn set_perms(path: &PathBuf, is_directory: bool) {
+pub fn set_perms(path: &PathBuf) {
     #[cfg(not(windows))]
     {
-        let perms = if is_directory { 0o700 } else { 0o600 };
+        let perms = if path.is_dir() { 0o700 } else { 0o600 };
         if let Err(err) = set_permissions(path, Permissions::from_mode(perms)) {
             warn!("Failed to set permissions on path {path:?}: {err}");
         }

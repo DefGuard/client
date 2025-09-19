@@ -287,8 +287,8 @@ fn main() {
                 .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into());
 
             // Ensure directories have appropriate permissions (dg25-28).
-            set_perms(&data_dir, true);
-            set_perms(&log_dir, true);
+            set_perms(&data_dir);
+            set_perms(&log_dir);
             info!(
                 "Application data (database file) will be stored in: {data_dir:?} and application logs in: {log_dir:?}. \
                 Logs of the background Defguard service responsible for managing VPN connections at the \
