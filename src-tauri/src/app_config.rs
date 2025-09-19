@@ -9,6 +9,8 @@ use struct_patch::Patch;
 use strum::{Display, EnumString};
 use tauri::{AppHandle, Manager};
 
+use crate::set_perms;
+
 static APP_CONFIG_FILE_NAME: &str = "config.json";
 
 fn get_config_file_path(app: &AppHandle) -> PathBuf {
@@ -19,7 +21,9 @@ fn get_config_file_path(app: &AppHandle) -> PathBuf {
     if !config_file_path.exists() {
         create_dir_all(&config_file_path).expect("Failed to create missing app data dir");
     }
+    set_perms(&config_file_path);
     config_file_path.push(APP_CONFIG_FILE_NAME);
+    set_perms(&config_file_path);
     config_file_path
 }
 
