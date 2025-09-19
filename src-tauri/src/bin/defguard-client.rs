@@ -283,26 +283,35 @@ fn main() {
     app.run(|app_handle, event| match event {
         // Startup tasks
         RunEvent::Ready => {
-            // Ensure data directory has appropriate permissions (dg25-28)
             let data_dir = app_handle
                     .path()
                     .app_data_dir()
                     .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
-            if let Err(err) = set_permissions(&data_dir, Permissions::from_mode(0o700)) {
-                warn!(
-                    "Failed to set permissions on data directory {}: {err}",
-                    data_dir.display()
-                );
-            }
+            let log_dir = app_handle
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into());
+
+            // Ensure directories have appropriate permissions (dg25-28).
+            #[cfg(not(windows))]
+                {
+                    if let Err(err) = set_permissions(&data_dir, Permissions::from_mode(0o700)) {
+                        warn!(
+                            "Failed to set permissions on data directory {}: {err}",
+                            data_dir.display()
+                        );
+                    }
+                    if let Err(err) = set_permissions(&log_dir, Permissions::from_mode(0o700)) {
+                        warn!(
+                            "Failed to set permissions on log directory {}: {err}",
+                            log_dir.display()
+                        );
+                    }
+                }
             info!(
-                "Application data (database file) will be stored in: {} and application logs in: {}. \
+                "Application data (database file) will be stored in: {data_dir:?} and application logs in: {log_dir:?}. \
                 Logs of the background Defguard service responsible for managing VPN connections at the \
                 network level will be stored in: {}.",
-                data_dir.display(),
-                app_handle
-                    .path()
-                    .app_log_dir()
-                    .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()).display(),
                 service::config::DEFAULT_LOG_DIR
             );
             tauri::async_runtime::block_on(startup(app_handle));
