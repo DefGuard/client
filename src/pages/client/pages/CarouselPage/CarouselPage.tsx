@@ -11,7 +11,7 @@ import {
   WelcomeCardSlide,
 } from './cards/CarouselCards';
 import { CardCarousel } from './components/CardCarousel/CardCarousel';
-import { CarouselItem } from './components/CardCarousel/types';
+import type { CarouselItem } from './components/CardCarousel/types';
 
 const slides: CarouselItem[] = [
   {

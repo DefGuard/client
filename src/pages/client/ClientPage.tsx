@@ -7,16 +7,24 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
 
 import { useI18nContext } from '../../i18n/i18n-react';
+import { DeepLinkProvider } from '../../shared/components/providers/DeepLinkProvider';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
+import { MfaModalProvider } from './components/MfaModalProvider';
 import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/DeadConDroppedModal';
 import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/store';
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
+import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
-import { DeadConDroppedPayload, DeadConReconnectedPayload, TauriEventKey } from './types';
+import {
+  type CommonWireguardFields,
+  type DeadConDroppedPayload,
+  TauriEventKey,
+  ClientConnectionType,
+} from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
 
@@ -35,6 +43,7 @@ export const ClientPage = () => {
   const location = useLocation();
   const toaster = useToaster();
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
+  const openMFAModal = useMFAModal((state) => state.open);
   const { LL } = useI18nContext();
 
   const { data: instances } = useQuery({
@@ -58,6 +67,7 @@ export const ClientPage = () => {
     refetchOnWindowFocus: false,
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     const appConfigChanged = listen(TauriEventKey.APPLICATION_CONFIG_CHANGED, () => {
       queryClient.invalidateQueries({
@@ -70,20 +80,57 @@ export const ClientPage = () => {
         clientQueryKeys.getLocations,
         clientQueryKeys.getTunnels,
       ];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
+        });
+      });
+    });
+
+    const verionMismatch = listen(TauriEventKey.VERSION_MISMATCH, (data) => {
+      const payload = data.payload as {
+        instance_name: string;
+        instance_id: number;
+        core_version: string;
+        proxy_version: string;
+        core_required_version: string;
+        proxy_required_version: string;
+        core_compatible: boolean;
+        proxy_compatible: boolean;
+      };
+      toaster.error(
+        LL.common.messages.versionMismatch({
+          instance_name: payload.instance_name,
+          core_version: payload.core_version,
+          proxy_version: payload.proxy_version,
+          core_required_version: payload.core_required_version,
+          proxy_required_version: payload.proxy_required_version,
         }),
+        { lifetime: -1 },
+      );
+    });
+
+    const uuidMismatch = listen<{
+      instance_name: string;
+      local_uuid: string;
+      core_uuid: string;
+    }>(TauriEventKey.UUID_MISMATCH, (data) => {
+      const payload = data.payload;
+      toaster.error(
+        LL.common.messages.uuidMismatch({
+          instance_name: payload.instance_name,
+        }),
+        { lifetime: -1 },
       );
     });
 
     const locationUpdate = listen(TauriEventKey.LOCATION_UPDATE, () => {
       const invalidate = [clientQueryKeys.getLocations, clientQueryKeys.getTunnels];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const connectionChanged = listen(TauriEventKey.CONNECTION_CHANGED, () => {
@@ -96,11 +143,11 @@ export const ClientPage = () => {
         clientQueryKeys.getInstances,
         clientQueryKeys.getTunnels,
       ];
-      invalidate.forEach((key) =>
+      invalidate.forEach((key) => {
         queryClient.invalidateQueries({
           queryKey: [key],
-        }),
-      );
+        });
+      });
     });
 
     const configChanged = listen(TauriEventKey.CONFIG_CHANGED, (data) => {
@@ -115,7 +162,7 @@ export const ClientPage = () => {
       },
     );
 
-    const deadConnectionReconnected = listen<DeadConReconnectedPayload>(
+    const deadConnectionReconnected = listen<DeadConDroppedPayload>(
       TauriEventKey.DEAD_CONNECTION_RECONNECTED,
       (data) => {
         toaster.warning(
@@ -130,6 +177,15 @@ export const ClientPage = () => {
       },
     );
 
+    const mfaTrigger = listen<CommonWireguardFields>(
+      TauriEventKey.MFA_TRIGGER,
+      (data) => {
+        // Set connection type, as it is not transferred from Rust and MFA is only for locations.
+        data.payload.connection_type = ClientConnectionType.LOCATION;
+        openMFAModal(data.payload);
+      },
+    );
+
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
       deadConnectionReconnected.then((cleanup) => cleanup());
@@ -137,7 +193,10 @@ export const ClientPage = () => {
       connectionChanged.then((cleanup) => cleanup());
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
-      appConfigChanged.then((c) => c());
+      appConfigChanged.then((cleanup) => cleanup());
+      mfaTrigger.then((cleanup) => cleanup());
+      verionMismatch.then((cleanup) => cleanup());
+      uuidMismatch.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -152,15 +211,9 @@ export const ClientPage = () => {
       setListChecked(true);
       setTunnels(tunnels);
     }
-  }, [
-    instances,
-    setInstances,
-    tunnels,
-    setTunnels,
-    setListChecked,
-    openDeadConDroppedModal,
-  ]);
+  }, [instances, setInstances, tunnels, setTunnels, setListChecked]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
     if (appConfig) {
       setClientState({ appConfig });
@@ -182,10 +235,12 @@ export const ClientPage = () => {
   }, [navigate, listChecked, instances, tunnels]);
 
   return (
-    <>
-      <Outlet />
+    <DeepLinkProvider>
+      <MfaModalProvider>
+        <Outlet />
+      </MfaModalProvider>
       <DeadConDroppedModal />
       <ClientSideBar />
-    </>
+    </DeepLinkProvider>
   );
 };

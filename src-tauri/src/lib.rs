@@ -1,11 +1,19 @@
 // FIXME: actually refactor errors instead
 #![allow(clippy::result_large_err)]
 use std::{fmt, path::PathBuf};
+#[cfg(not(windows))]
+use std::{
+    fs::{set_permissions, Permissions},
+    os::unix::fs::PermissionsExt,
+};
 
 use chrono::NaiveDateTime;
-use database::models::NoId;
+use semver::Version;
 use serde::{Deserialize, Serialize};
 
+use self::database::models::{Id, NoId};
+
+pub mod active_connections;
 pub mod app_config;
 pub mod appstate;
 pub mod commands;
@@ -21,13 +29,30 @@ pub mod utils;
 pub mod wg_config;
 
 pub mod proto {
-    use crate::database::models::{location::Location, Id, NoId};
+    use crate::database::models::{
+        location::{Location, LocationMfaMode as MfaMode},
+        Id, NoId,
+    };
 
     tonic::include_proto!("defguard.proxy");
 
     impl DeviceConfig {
         #[must_use]
         pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
+            let location_mfa_mode = match self.location_mfa_mode {
+                Some(_location_mfa_mode) => self.location_mfa_mode().into(),
+                None => {
+                    // handle legacy core response
+                    // DEPRECATED(1.5): superseeded by location_mfa_mode
+                    #[allow(deprecated)]
+                    if self.mfa_enabled {
+                        MfaMode::Internal
+                    } else {
+                        MfaMode::Disabled
+                    }
+                }
+            };
+
             Location {
                 id: NoId,
                 instance_id,
@@ -39,20 +64,35 @@ pub mod proto {
                 allowed_ips: self.allowed_ips,
                 dns: self.dns,
                 route_all_traffic: false,
-                mfa_enabled: self.mfa_enabled,
                 keepalive_interval: self.keepalive_interval.into(),
+                location_mfa_mode,
             }
         }
     }
 }
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
+pub const MIN_CORE_VERSION: Version = Version::new(1, 5, 0);
+pub const MIN_PROXY_VERSION: Version = Version::new(1, 5, 0);
 // This must match tauri.bundle.identifier from tauri.conf.json.
-static BUNDLE_IDENTIFIER: &str = "net.defguard";
+const BUNDLE_IDENTIFIER: &str = "net.defguard";
 // Returns the path to the user’s data directory.
 #[must_use]
 pub fn app_data_dir() -> Option<PathBuf> {
     dirs_next::data_dir().map(|dir| dir.join(BUNDLE_IDENTIFIER))
+}
+
+/// Ensures path has appropriate permissions set (dg25-28):
+/// - 700 for directories
+/// - 600 for files
+pub fn set_perms(path: &PathBuf) {
+    #[cfg(not(windows))]
+    {
+        let perms = if path.is_dir() { 0o700 } else { 0o600 };
+        if let Err(err) = set_permissions(path, Permissions::from_mode(perms)) {
+            warn!("Failed to set permissions on path {path:?}: {err}");
+        }
+    }
 }
 
 /// Location type used in commands to check if we using tunnel or location
@@ -74,13 +114,11 @@ impl fmt::Display for ConnectionType {
 #[macro_use]
 extern crate log;
 
-use self::database::models::Id;
-
 /// Common fields for Tunnel and Location
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommonWireguardFields {
     pub instance_id: Id,
-    // Native id of network from defguard
+    // Native network ID from Defguard Core.
     pub network_id: Id,
     pub name: String,
     pub address: String,

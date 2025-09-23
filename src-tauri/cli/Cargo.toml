@@ -8,21 +8,23 @@ rust-version.workspace = true
 version.workspace = true
 
 [build-dependencies]
-prost-build = "0.13"
+tonic-prost-build.workspace = true
 
 [dependencies]
-clap = { version = "4.5", features = ["cargo", "derive", "env"] }
+clap.workspace = true
 common = { path = "../common" }
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
-dirs-next = "2.0"
-prost = "0.13"
-reqwest = { version = "0.12", features = ["cookies", "json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+dirs-next.workspace = true
+prost.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 # Dummy feature to let tauri build the release.
 [features]

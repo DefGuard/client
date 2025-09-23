@@ -3,8 +3,27 @@ members = ["cli", "common"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
-# defguard_wireguard_rs = { version = "0.7.4" }
+clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 defguard_wireguard_rs = { path = "../../wireguard-rs" }
+dirs-next = "2.0"
+prost = "0.14"
+reqwest = { version = "0.12", features = ["cookies", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tonic = { version = "0.14", default-features = false, features = [
+    "codegen",
+    "gzip",
+    "router",
+    "tls-native-roots",
+    "tls-ring",
+    "transport",
+] }
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 [workspace.package]
 authors = ["Defguard"]
@@ -12,7 +31,7 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.80"
-version = "1.4.0"
+version = "1.5.0"
 
 [package]
 name = "defguard-client"
@@ -27,27 +46,28 @@ rust-version.workspace = true
 version.workspace = true
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
-tonic-build = { version = "0.12" }
-prost-build = { version = "0.13" }
+tauri-build = { version = "2", features = [] }
+tonic-prost-build.workspace = true
 vergen-git2 = { version = "1.0", features = ["build"] }
 
 [dependencies]
 anyhow = "1.0"
 base64 = "0.22"
-clap = { version = "4.5", features = ["cargo", "derive", "env"] }
+clap.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 common = { path = "common" }
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
-dirs-next = "2.0"
+dirs-next.workspace = true
 log = { version = "0.4", features = ["serde"] }
-prost = "0.13"
+prost.workspace = true
 regex = "1.11"
-reqwest = { version = "0.12", features = ["cookies", "json"] }
-rust-ini = "0.21"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+reqwest.workspace = true
+# 0.21.2 causes config parsing errors
+rust-ini = "=0.21.1"
+semver = "1.0"
+serde.workspace = true
+serde_json.workspace = true
 serde_with = "3.11"
 sqlx = { version = "0.8", features = [
     "chrono",
@@ -56,36 +76,46 @@ sqlx = { version = "0.8", features = [
     "uuid",
     "macros",
 ] }
-struct-patch = "0.9"
+struct-patch = "0.10"
 strum = { version = "0.27", features = ["derive"] }
-tauri = { version = "1.8", features = [
-    "notification-all",
-    "dialog-all",
-    "clipboard-all",
-    "http-all",
-    "window-all",
-    "system-tray",
+tauri = { version = "2", features = [
     "native-tls-vendored",
-    "icon-png",
-    "fs-all",
+    "image-png",
+    "tray-icon",
 ] }
-tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-log = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-thiserror = "2.0"
+# Must match Tauri plugins in package.json.
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
+tauri-plugin-log = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2.5.0"
+tauri-plugin-os = "2.3.1"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-window-state = "2"
+thiserror.workspace = true
 time = { version = "0.3", features = ["formatting", "macros"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio.workspace = true
 tokio-util = "0.7"
-tonic = "0.12"
-tracing = "0.1"
+tonic.workspace = true
+tonic-prost.workspace = true
+tracing.workspace = true
 tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber.workspace = true
 webbrowser = "1.0"
 x25519-dalek = { version = "2", features = [
     "getrandom",
     "serde",
     "static_secrets",
 ] }
+
+[target.'cfg(unix)'.dependencies]
+hyper-util = "0.1"
+nix = { version = "0.30.1", features = ["user", "fs"] }
+tokio-stream = "0.1"
+tower = "0.5"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winsvc", "winerror"] }

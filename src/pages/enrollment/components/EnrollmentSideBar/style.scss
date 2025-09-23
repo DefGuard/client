@@ -81,9 +81,11 @@
     align-items: center;
     justify-content: flex-start;
     box-sizing: border-box;
-    padding: 62px 0 0 0;
     position: relative;
     user-select: none;
+    flex-grow: 1;
+    padding: var(--spacing-s) 0;
+    justify-content: center;
 
     & > .step {
       position: relative;
@@ -94,13 +96,16 @@
       justify-content: flex-start;
       color: var(--text-body-tertiary);
       box-sizing: border-box;
-      padding: 15px 10px 10px 32px;
-      min-height: 58px;
       user-select: none;
+      padding: var(--spacing-xs) var(--spacing-s);
 
       transition-property: color;
       transition-timing-function: ease-in-out;
       transition-duration: 250ms;
+
+      &.child {
+        padding-left: calc(var(--spacing-s) * 2);
+      }
 
       &.active {
         color: var(--text-body-primary);
@@ -127,7 +132,6 @@
   }
 
   & > .time-left {
-    margin-top: auto;
     box-sizing: border-box;
     margin-bottom: 20px;
     padding: 0 40px;

@@ -1,0 +1,30 @@
+#enrollment-choose-mfa-step {
+  width: 100%;
+  max-width: 650px;
+  padding: 50px 40px;
+  display: flex;
+  flex-flow: column;
+  row-gap: var(--spacing-m);
+
+  .choices {
+    display: flex;
+    flex-flow: row wrap;
+    width: 100%;
+    align-items: start;
+    justify-content: space-between;
+    column-gap: var(--spacing-s);
+    row-gap: var(--spacing-s);
+
+    & > div {
+      width: calc(50% - (var(--spacing-s) / 2));
+    }
+  }
+
+  .controls {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-s);
+  }
+}

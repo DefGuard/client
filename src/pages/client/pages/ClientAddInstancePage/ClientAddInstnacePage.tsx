@@ -7,7 +7,7 @@ import { AddInstanceGuide } from './components/AddInstanceGuide/AddInstanceGuide
 export const ClientAddInstancePage = () => {
   const { LL } = useI18nContext();
   return (
-    <section className="client-page" id="client-add-instnace-page">
+    <section className="client-page" id="client-add-instance-page">
       <header>
         <h1>{LL.pages.client.pages.addInstancePage.title()}</h1>
       </header>

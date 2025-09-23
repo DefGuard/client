@@ -1,7 +1,7 @@
-import { ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
 
 import { useClientStore } from '../../../pages/client/hooks/useClientStore';
-import { ThemeKey } from '../../defguard-ui/hooks/theme/types';
+import type { ThemeKey } from '../../defguard-ui/hooks/theme/types';
 
 type Props = {
   children: ReactNode;
@@ -13,7 +13,7 @@ export const ThemeProvider = ({ children }: Props) => {
 
   useEffect(() => {
     const current = document.documentElement.dataset.theme as ThemeKey;
-    if (currentTheme != current) {
+    if (currentTheme !== current) {
       document.documentElement.dataset.theme = currentTheme;
     }
   }, [currentTheme]);

@@ -1,39 +1,93 @@
 import './style.scss';
 
 import { getVersion } from '@tauri-apps/api/app';
-import classNames from 'classnames';
-import { useEffect, useMemo, useState } from 'react';
-import { LocalizedString } from 'typesafe-i18n';
-
+import clsx from 'clsx';
+import dayjs from 'dayjs';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Divider } from '../../../../shared/defguard-ui/components/Layout/Divider/Divider.tsx';
+import { isPresent } from '../../../../shared/defguard-ui/utils/isPresent.ts';
+import { EnrollmentStepKey, enrollmentStepsConfig } from '../../const.tsx';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { AdminInfo } from '../AdminInfo/AdminInfo';
 import { TimeLeft } from '../TimeLeft/TimeLeft';
 
+type SideBarItem = {
+  stepKey: EnrollmentStepKey;
+  label: string;
+  activeKeys: EnrollmentStepKey[];
+  children?: SideBarItem[];
+};
+
 export const EnrollmentSideBar = () => {
   const { LL } = useI18nContext();
 
+  const enrollmentSettings = useEnrollmentStore((s) => s.enrollmentSettings);
+
   const vpnOptional = useEnrollmentStore((state) => state.vpnOptional);
 
-  const [currentStep, stepsMax] = useEnrollmentStore((state) => [
-    state.step,
-    state.stepsMax,
-  ]);
+  const currentStep = useEnrollmentStore((state) => state.step);
 
   const [appVersion, setAppVersion] = useState<string | undefined>(undefined);
 
-  const steps = useMemo((): LocalizedString[] => {
-    const steps = LL.pages.enrollment.sideBar.steps;
-    const vpnStep = vpnOptional ? `${steps.vpn()}*` : steps.vpn();
-    return [
-      steps.welcome(),
-      steps.verification(),
-      steps.password(),
-      vpnStep as LocalizedString,
-      steps.finish(),
-    ];
-  }, [LL.pages.enrollment.sideBar.steps, vpnOptional]);
+  const translateStep = useCallback(
+    (step: EnrollmentStepKey) => {
+      const stepsLL = LL.pages.enrollment.sideBar.steps;
+      switch (step) {
+        case EnrollmentStepKey.WELCOME:
+          return stepsLL.welcome();
+        case EnrollmentStepKey.DATA_VERIFICATION:
+          return stepsLL.verification();
+        case EnrollmentStepKey.PASSWORD:
+          return stepsLL.password();
+        case EnrollmentStepKey.DEVICE:
+          return `${stepsLL.vpn()}${vpnOptional ? '*' : ''}`;
+        case EnrollmentStepKey.MFA:
+          return `${stepsLL.mfa()}${enrollmentSettings.mfa_required ? '' : '*'}`;
+        case EnrollmentStepKey.MFA_CHOICE:
+          return stepsLL.mfaChoice();
+        case EnrollmentStepKey.MFA_SETUP:
+          return stepsLL.mfaSetup();
+        case EnrollmentStepKey.MFA_RECOVERY:
+          return stepsLL.mfaRecovery();
+        case EnrollmentStepKey.ACTIVATE_USER:
+          return '';
+        case EnrollmentStepKey.FINISH:
+          return stepsLL.finish();
+        default:
+          return '';
+      }
+    },
+    [LL.pages.enrollment.sideBar.steps, vpnOptional, enrollmentSettings.mfa_required],
+  );
+
+  const stepsData = useMemo(
+    (): SideBarItem[] =>
+      Object.values(enrollmentStepsConfig)
+        .filter((item) => !item.hidden)
+        .map((item, index) => {
+          const res: SideBarItem = {
+            label: `${index + 1}. ${translateStep(item.key)}`,
+            stepKey: item.key,
+            activeKeys: [item.key],
+          };
+          if (item.children) {
+            res.children = item.children
+              .filter((child) => !child.hidden)
+              .map((child, childIndex) => {
+                res.activeKeys.push(child.key);
+                const labelPrefix = String.fromCharCode(97 + childIndex);
+                return {
+                  label: `${labelPrefix}. ${translateStep(child.key)}`,
+                  stepKey: child.key,
+                  activeKeys: [child.key],
+                };
+              });
+          }
+          return res;
+        }),
+    [translateStep],
+  );
 
   useEffect(() => {
     const getAppVersion = async () => {
@@ -53,24 +107,30 @@ export const EnrollmentSideBar = () => {
       </div>
       <Divider />
       <div className="steps">
-        {steps.map((text, index) => (
-          <Step text={text} index={index} key={index} />
+        {stepsData.map((step) => (
+          <Fragment key={step.stepKey}>
+            <Step data={step} />
+            {isPresent(step.children) &&
+              step.children.map((child) => (
+                <Step key={child.stepKey} data={child} child />
+              ))}
+          </Fragment>
         ))}
       </div>
-      {currentStep !== stepsMax && (
+      {currentStep !== EnrollmentStepKey.FINISH && (
         <>
           <TimeLeft />
           <Divider />
         </>
       )}
-      {currentStep === stepsMax && <Divider className="push" />}
+      {currentStep === EnrollmentStepKey.FINISH && <Divider className="push" />}
       <AdminInfo />
       <Divider />
       <div className="copyright">
         <p>
-          Copyright © 2023{' '}
-          <a href="https://teonite.com" target="_blank" rel="noopener noreferrer">
-            teonite
+          Copyright © {`${dayjs().year()} `}
+          <a href="https://defguard.net" target="_blank" rel="noopener noreferrer">
+            defguard
           </a>
         </p>
         <p>
@@ -82,26 +142,24 @@ export const EnrollmentSideBar = () => {
 };
 
 type StepProps = {
-  text: LocalizedString;
-  index: number;
+  data: SideBarItem;
+  child?: boolean;
 };
 
-const Step = ({ index, text }: StepProps) => {
+const Step = ({ data, child = false }: StepProps) => {
   const currentStep = useEnrollmentStore((state) => state.step);
 
-  const active = currentStep === index;
-
-  const cn = classNames('step', {
-    active,
-  });
+  const active = data.activeKeys.includes(currentStep);
 
   return (
-    <div className={cn}>
-      <p>
-        {index + 1}.{'  '}
-        {text}
-      </p>
-      {active && <div className="active-step-line"></div>}
+    <div
+      className={clsx('step', {
+        active,
+        child,
+      })}
+    >
+      <p>{data.label}</p>
+      {active && !isPresent(data.children) && <div className="active-step-line"></div>}
     </div>
   );
 };

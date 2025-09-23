@@ -7,19 +7,23 @@ use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use strum::{Display, EnumString};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
+
+use crate::set_perms;
 
 static APP_CONFIG_FILE_NAME: &str = "config.json";
 
 fn get_config_file_path(app: &AppHandle) -> PathBuf {
     let mut config_file_path = app
-        .path_resolver()
+        .path()
         .app_data_dir()
         .expect("Failed to access app data");
     if !config_file_path.exists() {
         create_dir_all(&config_file_path).expect("Failed to create missing app data dir");
     }
+    set_perms(&config_file_path);
     config_file_path.push(APP_CONFIG_FILE_NAME);
+    set_perms(&config_file_path);
     config_file_path
 }
 
@@ -42,7 +46,7 @@ pub enum AppTheme {
     Dark,
 }
 
-#[derive(Clone, Debug, Deserialize, Display, EnumString, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display, EnumString, PartialEq, Serialize)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AppTrayTheme {
@@ -99,7 +103,7 @@ impl AppConfig {
             Ok(patch) => {
                 app_config.apply(patch);
             }
-            // if deserialization failed, remove file and return default
+            // If deserialization fails, remove file and return the default.
             Err(err) => {
                 eprintln!(
                     "Failed to deserialize application configuration file: {err}. Using defaults."

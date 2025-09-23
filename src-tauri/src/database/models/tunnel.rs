@@ -120,7 +120,7 @@ impl Tunnel<Id> {
             "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, \
             allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, \
             post_up, pre_down, post_down \
-            FROM tunnel;"
+            FROM tunnel ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
@@ -399,7 +399,7 @@ impl TunnelStats<Id> {
     }
 
     /// Purge old statistics.
-    pub(crate) async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    pub async fn purge<'e, E>(executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {

@@ -3,11 +3,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { Select } from '../../../../../../shared/defguard-ui/components/Layout/Select/Select';
 import {
-  SelectOption,
-  SelectSelectedValue,
+  type SelectOption,
+  type SelectSelectedValue,
   SelectSizeVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
-import { LogSource } from '../../../../clientAPI/types';
+import type { LogSource } from '../../../../clientAPI/types';
 
 type Props = {
   initSelected: LogSource;

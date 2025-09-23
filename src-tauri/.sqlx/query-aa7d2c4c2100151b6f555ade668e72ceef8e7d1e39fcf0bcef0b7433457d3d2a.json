@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled FROM instance WHERE id = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", disable_all_traffic, enterprise_enabled, openid_display_name FROM instance WHERE id = $1;",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,11 @@
         "name": "enterprise_enabled",
         "ordinal": 8,
         "type_info": "Bool"
+      },
+      {
+        "name": "openid_display_name",
+        "ordinal": 9,
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -61,8 +66,9 @@
       false,
       true,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "c688e91a89197793b2a63dcefc41c652fc89286481300450763a7a9b66d146f9"
+  "hash": "aa7d2c4c2100151b6f555ade668e72ceef8e7d1e39fcf0bcef0b7433457d3d2a"
 }

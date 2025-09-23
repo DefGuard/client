@@ -4,9 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  SubmitHandler,
+  type SubmitHandler,
+  type UseControllerProps,
   useController,
-  UseControllerProps,
   useForm,
 } from 'react-hook-form';
 import { z } from 'zod';
@@ -23,20 +23,20 @@ import {
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
 import {
-  SelectOption,
-  SelectSelectedValue,
+  type SelectOption,
+  type SelectSelectedValue,
   SelectSizeVariant,
 } from '../../../../../../shared/defguard-ui/components/Layout/Select/types';
 import {
   availableThemes,
-  ThemeKey,
+  type ThemeKey,
 } from '../../../../../../shared/defguard-ui/hooks/theme/types';
 import {
-  AppConfig,
+  type AppConfig,
   availableLogLevels,
   availableTrayThemes,
-  LogLevel,
-  TrayIconTheme,
+  type LogLevel,
+  type TrayIconTheme,
 } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
 

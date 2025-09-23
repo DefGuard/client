@@ -10,12 +10,15 @@ import { Divider } from '../../../../../../../../../../shared/defguard-ui/compon
 import { Label } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Label/Label';
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
-import { DefguardLocation, WireguardInstanceType } from '../../../../../../../../types';
+import type {
+  DefguardLocation,
+  ClientConnectionType,
+} from '../../../../../../../../types';
 import { LocationLogs } from '../LocationLogs/LocationLogs';
 
 type Props = {
   locationId: DefguardLocation['id'];
-  connectionType: WireguardInstanceType;
+  connectionType: ClientConnectionType;
 };
 
 const { getLocationDetails } = clientApi;
@@ -90,14 +93,18 @@ const InfoSection = memo(({ locationId, connectionType }: Props) => {
         <div className="info">
           <Label>{localLL.info.vpn.allowedIps()}</Label>
           <div className="values ips">
-            {data && data.allowed_ips.split(',').map((ip) => <p key={ip}>{ip}</p>)}
+            {data?.allowed_ips.split(',').map((ip) => (
+              <p key={ip}>{ip}</p>
+            ))}
           </div>
         </div>
         <div className="info">
           <Label>{localLL.info.vpn.dns()}</Label>
           <div className="values">
             <p>
-              {data && data.dns && data.dns.split(',').map((d) => <p key={d}>{d}</p>)}
+              {data?.dns?.split(',').map((d) => (
+                <p key={d}>{d}</p>
+              ))}
             </p>
           </div>
         </div>

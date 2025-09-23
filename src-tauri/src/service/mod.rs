@@ -6,14 +6,18 @@ pub mod utils;
 #[cfg(windows)]
 pub mod windows;
 
+#[cfg(windows)]
+use std::net::{Ipv4Addr, SocketAddr};
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::IpAddr,
     pin::Pin,
     str::FromStr,
     sync::RwLock,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+#[cfg(unix)]
+use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
@@ -26,12 +30,18 @@ use defguard_wireguard_rs::{
     net::IpAddrMask,
     InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
+#[cfg(unix)]
+use nix::unistd::{chown, Group};
 use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
 use thiserror::Error;
+#[cfg(unix)]
+use tokio::net::UnixListener;
 use tokio::{sync::mpsc, time::interval};
+#[cfg(unix)]
+use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{
     codegen::tokio_stream::{wrappers::ReceiverStream, Stream},
     transport::Server,
@@ -41,9 +51,21 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use super::VERSION;
+use crate::error::Error;
 
+#[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
+#[cfg(windows)]
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
+
+#[cfg(unix)]
+pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
+
+#[cfg(target_os = "macos")]
+pub(super) const DAEMON_SOCKET_GROUP: &str = "staff";
+
+#[cfg(target_os = "linux")]
+pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
 #[derive(Error, Debug)]
 pub enum DaemonError {
@@ -78,6 +100,7 @@ impl DaemonService {
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
 #[cfg(not(target_os = "macos"))]
+#[allow(clippy::result_large_err)]
 pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
     let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
@@ -89,6 +112,7 @@ pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
 }
 
 #[cfg(target_os = "macos")]
+#[allow(clippy::result_large_err)]
 pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
     let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
         let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
@@ -101,6 +125,8 @@ pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
 
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
+    type ReadInterfaceDataStream = InterfaceDataStream;
+
     async fn create_interface(
         &self,
         request: tonic::Request<CreateInterfaceRequest>,
@@ -233,8 +259,6 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    type ReadInterfaceDataStream = InterfaceDataStream;
-
     async fn read_interface_data(
         &self,
         request: tonic::Request<ReadInterfaceDataRequest>,
@@ -331,13 +355,55 @@ impl DesktopDaemonService for DaemonService {
     }
 }
 
+#[cfg(unix)]
+pub async fn run_server(config: Config) -> anyhow::Result<()> {
+    debug!("Starting Defguard interface management daemon");
+
+    let daemon_service = DaemonService::new(&config);
+
+    // Remove existing socket if it exists
+    if Path::new(DAEMON_SOCKET_PATH).exists() {
+        fs::remove_file(DAEMON_SOCKET_PATH)?;
+    }
+
+    let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
+
+    // change owner group for socket file
+    // get the group ID by name
+    let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
+        error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
+        Error::InternalError(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
+    })?;
+
+    // change ownership - keep current user, change group
+    chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
+
+    // Set socket permissions to allow client access
+    // 0o660 allows read/write for owner and group only
+    fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
+
+    let uds_stream = UnixListenerStream::new(uds);
+
+    info!("Defguard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
+    debug!("Defguard daemon configuration: {config:?}");
+
+    Server::builder()
+        .trace_fn(|_| tracing::info_span!("defguard_service"))
+        .add_service(DesktopDaemonServiceServer::new(daemon_service))
+        .serve_with_incoming(uds_stream)
+        .await?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let daemon_service = DaemonService::new(&config);
 
-    info!("Defguard daemon version {VERSION} started, listening on {addr}");
+    info!("Defguard daemon version {VERSION} started, listening on {addr}",);
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()

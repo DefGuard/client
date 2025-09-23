@@ -1,13 +1,14 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Body, fetch } from '@tauri-apps/api/http';
-import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
+import { fetch } from '@tauri-apps/plugin-http';
+import { error } from '@tauri-apps/plugin-log';
+import { hostname } from '@tauri-apps/plugin-os';
+import { useCallback, useMemo, useState } from 'react';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { error } from 'tauri-plugin-log-api';
 import { z } from 'zod';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -16,7 +17,8 @@ import {
   ButtonStyleVariant,
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import {
+import { isPresent } from '../../../../../../../../shared/defguard-ui/utils/isPresent';
+import type {
   CreateDeviceRequest,
   CreateDeviceResponse,
 } from '../../../../../../../../shared/hooks/api/types';
@@ -24,36 +26,33 @@ import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { SelectedInstance, WireguardInstanceType } from '../../../../../../types';
-import { AddInstanceInitResponse } from '../../types';
+import { type SelectedInstance, ClientConnectionType } from '../../../../../../types';
+import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
+import type { AddInstanceInitResponse } from '../../types';
 
 const { getInstances, saveConfig } = clientApi;
-
-type Props = {
-  response: AddInstanceInitResponse;
-};
-
-type FormFields = {
-  name: string;
-};
 
 type ErrorData = {
   error: string;
 };
 
-const defaultValues: FormFields = {
-  name: '',
-};
-
-export const AddInstanceDeviceForm = ({ response }: Props) => {
+export const AddInstanceDeviceForm = () => {
   const { LL } = useI18nContext();
   const localLL = LL.pages.client.pages.addInstancePage.forms.device;
   const toaster = useToaster();
   const setClientStore = useClientStore((state) => state.setState);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const response = useAddInstanceStore((s) => s.response as AddInstanceInitResponse);
+  const resetAddInstanceStore = useAddInstanceStore((s) => s.reset);
 
   const { url: proxyUrl, cookie, device_names } = response;
+
+  const { data: instancesCount } = useQuery({
+    queryFn: getInstances,
+    queryKey: ['instance', 'count'],
+    select: (data) => data.length,
+  });
 
   const schema = useMemo(
     () =>
@@ -68,6 +67,15 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
       }),
     [LL.form.errors, device_names],
   );
+
+  type FormFields = z.infer<typeof schema>;
+
+  const defaultValues = useCallback(async (): Promise<FormFields> => {
+    const name = await hostname();
+    return {
+      name: name ?? '',
+    };
+  }, []);
 
   const { control, handleSubmit } = useForm<FormFields>({
     defaultValues: defaultValues,
@@ -90,20 +98,19 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
     try {
       await fetch(`${proxyUrl}/enrollment/create_device`, {
         headers,
-        body: Body.json(data),
+        body: JSON.stringify(data),
         method: 'POST',
-      }).then((r) => {
+      }).then(async (r) => {
         if (!r.ok) {
           setIsLoading(false);
-          const details = `${
-            (r.data as ErrorData)?.error ? (r.data as ErrorData).error + ', ' : ''
-          }`;
+          const data = (await r.json()) as ErrorData;
+          const details = `${data?.error ? `${data.error}, ` : ''}`;
           error(
-            `Failed to create device check enrollment and defguard logs, details: ${details} Error status code: ${r.status}`,
+            `Failed to create device. Check enrollment and Defguard logs, details: ${details}. Error status code: ${r.status}`,
           );
-          throw Error(`Failed to create device, details: ${details}`);
+          throw Error(`Failed to create device, details: ${details} `);
         }
-        const deviceResp = r.data as CreateDeviceResponse;
+        const deviceResp = (await r.json()) as CreateDeviceResponse;
         saveConfig({
           privateKey: privateKey,
           response: deviceResp,
@@ -112,14 +119,14 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
             setIsLoading(false);
             toaster.success(localLL.messages.addSuccess());
             const instances = await getInstances();
-            const _selectedInstance: SelectedInstance = {
+            const selectedInstance: SelectedInstance = {
               id: res.instance.id,
-              type: WireguardInstanceType.DEFGUARD_INSTANCE,
+              type: ClientConnectionType.LOCATION,
             };
-            setClientStore({
-              selectedInstance: _selectedInstance,
-              instances,
-            });
+            setClientStore({ selectedInstance, instances });
+            setTimeout(() => {
+              resetAddInstanceStore();
+            }, 250);
             navigate(routes.client.instancePage, { replace: true });
           })
           .catch((e) => {
@@ -163,18 +170,24 @@ export const AddInstanceDeviceForm = ({ response }: Props) => {
         <div className="controls">
           <Button
             size={ButtonSize.LARGE}
+            styleVariant={ButtonStyleVariant.STANDARD}
+            type="button"
+            text={LL.common.controls.cancel()}
+            disabled={isLoading || !isPresent(instancesCount)}
+            onClick={() => {
+              if (instancesCount) {
+                navigate(routes.client.base);
+              } else {
+                resetAddInstanceStore();
+              }
+            }}
+          />
+          <Button
+            size={ButtonSize.LARGE}
             styleVariant={ButtonStyleVariant.PRIMARY}
             type="submit"
             text={localLL.submit()}
             loading={isLoading}
-          />
-          <Button
-            size={ButtonSize.LARGE}
-            styleVariant={ButtonStyleVariant.STANDARD}
-            type="button"
-            text={LL.common.controls.cancel()}
-            loading={isLoading}
-            onClick={() => navigate(routes.client.instancePage)}
           />
         </div>
       </form>

@@ -1,4 +1,7 @@
+import './style.scss';
+
 import { useEffect } from 'react';
+import Markdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -6,13 +9,12 @@ import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/us
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import {
-  CommonWireguardFields,
-  DefguardInstance,
-  WireguardInstanceType,
+  type CommonWireguardFields,
+  type DefguardInstance,
+  ClientConnectionType,
 } from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';
-import { MFAModal } from './modals/MFAModal/MFAModal';
 
 interface LocationsListProps {
   locations: CommonWireguardFields[] | undefined;
@@ -32,7 +34,7 @@ export const LocationsList = ({
   const toaster = useToaster();
   const navigate = useNavigate();
 
-  const isTunnelType = selectedInstance?.type === WireguardInstanceType.TUNNEL;
+  const isTunnelType = selectedInstance?.type === ClientConnectionType.TUNNEL;
 
   useEffect(() => {
     if (isError) {
@@ -43,17 +45,24 @@ export const LocationsList = ({
   useEffect(() => {
     if (
       locations?.length === 0 &&
-      selectedInstance?.type === WireguardInstanceType.TUNNEL
+      selectedInstance?.type === ClientConnectionType.TUNNEL
     ) {
       navigate(routes.client.addTunnel, { replace: true });
     }
   }, [locations, navigate, selectedInstance]);
+
+  // Listen for rust requesting MFA for connection
 
   // TODO: add loader or another placeholder view pointing to opening enter token modal if no instances are found / present
   if (!selectedInstance || !locations) return null;
 
   return (
     <>
+      {locations && locations.length === 0 && (
+        <div id="locations-no-data">
+          <Markdown>{LL.pages.client.pages.instancePage.noData().trim()}</Markdown>
+        </div>
+      )}
       {locations.length === 1 && selectedView === null && !isTunnelType && (
         <LocationsDetailView
           locations={locations}
@@ -75,8 +84,6 @@ export const LocationsList = ({
           selectedDefguardInstance={selectedDefguardInstance}
         />
       )}
-
-      <MFAModal />
     </>
   );
 };

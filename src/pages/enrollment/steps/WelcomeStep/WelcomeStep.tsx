@@ -10,6 +10,7 @@ import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { AdminInfo } from '../../components/AdminInfo/AdminInfo';
 import { EnrollmentStepIndicator } from '../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../const';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 
 export const WelcomeStep = () => {
@@ -20,8 +21,8 @@ export const WelcomeStep = () => {
   ]);
   const userInfo = useEnrollmentStore((state) => state.userInfo);
 
-  const [nextSubject, next] = useEnrollmentStore(
-    (state) => [state.nextSubject, state.nextStep],
+  const [nextSubject, setStore] = useEnrollmentStore(
+    (state) => [state.nextSubject, state.setState],
     shallow,
   );
 
@@ -36,27 +37,26 @@ export const WelcomeStep = () => {
     });
   }, [LL.pages.enrollment.steps.welcome, sessionEnd, sessionStart]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rxjs sub
   useEffect(() => {
     const sub = nextSubject.subscribe(() => {
-      next();
+      setStore({ step: EnrollmentStepKey.DATA_VERIFICATION });
     });
     return () => {
       sub.unsubscribe();
     };
-  }, [next, nextSubject]);
+  }, [nextSubject]);
 
   return (
-    <>
-      <Card id="enrollment-welcome-card">
-        <EnrollmentStepIndicator />
-        <h3>
-          {LL.pages.enrollment.steps.welcome.title({ name: `${userInfo?.first_name}` })}
-        </h3>
-        <div className="explenation">
-          <ReactMarkdown rehypePlugins={[rehypeSanitaze]}>{markdown}</ReactMarkdown>
-        </div>
-        <AdminInfo />
-      </Card>
-    </>
+    <Card id="enrollment-welcome-card">
+      <EnrollmentStepIndicator />
+      <h3>
+        {LL.pages.enrollment.steps.welcome.title({ name: `${userInfo?.first_name}` })}
+      </h3>
+      <div className="explenation">
+        <ReactMarkdown rehypePlugins={[rehypeSanitaze]}>{markdown}</ReactMarkdown>
+      </div>
+      <AdminInfo />
+    </Card>
   );
 };

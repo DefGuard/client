@@ -23,4 +23,32 @@
     color: var(--text-body-primary);
     text-align: left;
   }
+
+  & > .assigned-ip-container {
+    cursor: help;
+
+    & > label {
+      text-align: right;
+    }
+
+    & > p {
+      @include typography(app-button-xl);
+
+      color: var(--text-body-primary);
+      text-align: right;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+}
+
+.location-card-info-ip {
+  justify-items: flex-end;
+  justify-content: flex-end;
+  align-items: flex-end;
+
+  & > label {
+    text-align: right;
+  }
 }

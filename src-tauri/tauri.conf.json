@@ -1,48 +1,53 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
   "build": {
     "beforeBuildCommand": "pnpm build",
     "beforeDevCommand": "pnpm dev",
-    "devPath": "http://localhost:3000",
-    "distDir": "../dist"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:3001"
   },
-  "package": {
-    "productName": "defguard-client",
-    "version": "1.4.0"
-  },
-  "tauri": {
-    "systemTray": {
-      "iconPath": "resources/icons/tray-32x32-color.png",
-      "iconAsTemplate": false
-    },
-    "allowlist": {
-      "all": false,
-      "window": {
-        "all": true
-      },
-      "http": {
-        "all": true,
-        "request": true,
-        "scope": ["https://**", "http://**"]
-      },
-      "fs": {
-        "all": true,
-        "scope": ["$RESOURCE/*", "$APPDATA/*"]
-      },
-      "clipboard": {
-        "all": true
-      },
-      "dialog": {
-        "all": true
-      },
-      "notification": {
-        "all": true
+  "bundle": {
+    "active": true,
+    "category": "Utility",
+    "copyright": "Defguard",
+    "targets": [
+      "deb",
+      "app"
+    ],
+    "externalBin": [],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "fragmentPaths": [
+          "./resources-windows/service-fragment.wxs"
+        ],
+        "componentRefs": [
+          "DefGuardServiceFragment"
+        ]
       }
     },
-    "bundle": {
-      "active": true,
-      "category": "Utility",
-      "copyright": "teonite",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null
+    },
+    "resources": [
+      "resources/icons/*"
+    ],
+    "shortDescription": "Defguard desktop client",
+    "longDescription": "Defguard desktop client",
+    "linux": {
       "deb": {
         "files": {
           "/usr/sbin/defguard-service": "target/release/defguard-service",
@@ -53,42 +58,27 @@
           "../control/postrm": "../resources-linux/postrm"
         }
       },
-      "externalBin": [],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "net.defguard",
-      "longDescription": "Defguard desktop client.",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "resources": ["resources/*"],
-      "shortDescription": "",
-      "targets": ["deb", "app"],
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": "",
-        "wix": {
-          "template": "./resources-windows/main.wxs",
-          "fragmentPaths": ["./resources-windows/service-fragment.wxs"],
-          "componentRefs": ["DefGuardServiceFragment"]
-        }
+      "rpm": {
+        "files": {
+          "/usr/sbin/defguard-service": "target/release/defguard-service",
+          "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
+        },
+        "postInstallScript": "../resources-linux/postinst",
+        "preRemoveScript": "../resources-linux/prerm",
+        "postRemoveScript": "../resources-linux/postrm"
       }
-    },
+    }
+  },
+  "productName": "defguard-client",
+  "mainBinaryName": "defguard-client",
+  "identifier": "net.defguard",
+  "version": "1.5.0",
+  "app": {
     "security": {
+      "capabilities": [
+        "main-capability"
+      ],
       "csp": null
-    },
-    "updater": {
-      "active": false
     },
     "windows": [
       {
@@ -103,8 +93,18 @@
         "title": "Defguard",
         "width": 992,
         "minWidth": 650,
-        "minHeight": 450
+        "minHeight": 450,
+        "useHttpsScheme": true
       }
     ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "defguard"
+        ]
+      }
+    }
   }
 }

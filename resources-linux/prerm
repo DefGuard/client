@@ -1,2 +1,15 @@
-systemctl stop defguard-service
-systemctl disable defguard-service
+#!/bin/sh
+set -e
+
+SERVICE_NAME="defguard-service"
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        if [ -d /run/systemd/system ]; then
+            # Stop the service before removal/upgrade
+            systemctl stop "$SERVICE_NAME" || true
+        fi
+        ;;
+esac
+
+#DEBHELPER#

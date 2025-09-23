@@ -1,11 +1,11 @@
 import './style.scss';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { error } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
-import { SubmitHandler, useForm } from 'react-hook-form';
-import { debug, error, info } from 'tauri-plugin-log-api';
+import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
@@ -17,26 +17,23 @@ import {
 } from '../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
-import { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
+import type { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
-import { clientApi } from '../../../../../client/clientAPI/clientApi';
-import { clientQueryKeys } from '../../../../../client/query';
+import { EnrollmentStepIndicator } from '../../../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
+import { EnrollmentStepKey } from '../../../../const';
 import { useEnrollmentStore } from '../../../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../../../hooks/useEnrollmentApi';
-
-const { saveConfig } = clientApi;
 
 type FormFields = {
   name: string;
 };
 
 export const DesktopSetup = () => {
-  const queryClient = useQueryClient();
   const { LL } = useI18nContext();
   const toaster = useToaster();
   const stepLL = LL.pages.enrollment.steps.deviceSetup;
   const {
-    enrollment: { createDevice, activateUser },
+    enrollment: { createDevice },
   } = useEnrollmentApi();
   const deviceName = useEnrollmentStore((state) => state.deviceName);
   const [userInfo, userPassword] = useEnrollmentStore((state) => [
@@ -44,23 +41,7 @@ export const DesktopSetup = () => {
     state.userPassword,
   ]);
   const setEnrollmentStore = useEnrollmentStore((state) => state.setState);
-  const next = useEnrollmentStore((state) => state.nextStep);
   const [isLoading, setIsLoading] = useState(false);
-
-  const { mutateAsync: mutateUserActivation, isPending: activationPending } = useMutation(
-    {
-      mutationFn: activateUser,
-      onError: (e) => {
-        toaster.error(
-          LL.common.messages.errorWithMessage({
-            message: String(e),
-          }),
-        );
-        console.error(e);
-        error(String(e));
-      },
-    },
-  );
 
   const { mutateAsync: createDeviceMutation, isPending: createDevicePending } =
     useMutation({
@@ -89,73 +70,35 @@ export const DesktopSetup = () => {
   const handleValidSubmit: SubmitHandler<FormFields> = async (values) => {
     if (!userInfo || !userPassword) return;
     const { publicKey, privateKey } = generateWGKeys();
-    const deviceResponse = await createDeviceMutation({
+    const deviceResponse = (await createDeviceMutation({
       name: values.name,
       pubkey: publicKey,
-    }).then((res) => {
+    }).then(async (res) => {
       if (!res.ok) {
         error(
           `Failed to create device during the enrollment. Error details: ${JSON.stringify(
-            res.data,
-          )} Error status code: ${res.status}`,
+            await res.json(),
+          )} Error status code: ${res.status} `,
         );
       }
-      return res;
+      return await res.json();
+    })) as CreateDeviceResponse;
+    toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
+    setEnrollmentStore({
+      deviceResponse,
+      step: EnrollmentStepKey.MFA_CHOICE,
+      deviceName: values.name,
+      deviceKeys: {
+        private: privateKey,
+        public: publicKey,
+      },
     });
-    mutateUserActivation({
-      password: userPassword,
-      phone_number: userInfo.phone_number,
-    }).then((res) => {
-      if (!res.ok) {
-        error(
-          `Failed to activate user during the enrollment. Error details: ${JSON.stringify(
-            res.data,
-          )} Error status code: ${res.status}`,
-        );
-        throw Error('Failed to activate user');
-      }
-      info('User activated');
-      setIsLoading(true);
-      debug('Invoking save_device_config');
-      saveConfig({
-        privateKey,
-        response: deviceResponse.data as CreateDeviceResponse,
-      })
-        .then(() => {
-          debug('Config saved');
-          setIsLoading(false);
-          setEnrollmentStore({ deviceName: values.name });
-          toaster.success(stepLL.desktopSetup.messages.deviceConfigured());
-          const invalidate = [clientQueryKeys.getInstances, clientQueryKeys.getLocations];
-          invalidate.forEach((key) => {
-            queryClient.invalidateQueries({
-              queryKey: [key],
-            });
-          });
-          next();
-        })
-        .catch((e) => {
-          setIsLoading(false);
-
-          if (typeof e === 'string') {
-            if (e.includes('Network Error')) {
-              toaster.error(LL.common.messages.networkError());
-              return;
-            }
-            toaster.error(LL.common.messages.errorWithMessage({ message: String(e) }));
-          } else {
-            toaster.error(
-              LL.common.messages.errorWithMessage({
-                message: String(e),
-              }),
-            );
-          }
-        });
-    });
+    setIsLoading(false);
   };
 
   return (
     <Card id="desktop-device-setup">
+      <EnrollmentStepIndicator />
       <h3>{stepLL.desktopSetup.title()}</h3>
       <form onSubmit={handleSubmit(handleValidSubmit)}>
         <FormInput
@@ -173,7 +116,7 @@ export const DesktopSetup = () => {
               : stepLL.desktopSetup.controls.create()
           }
           disabled={!isUndefined(deviceName)}
-          loading={isLoading || activationPending || createDevicePending}
+          loading={isLoading || createDevicePending}
         />
       </form>
     </Card>

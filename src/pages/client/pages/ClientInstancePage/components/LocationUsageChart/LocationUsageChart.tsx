@@ -9,7 +9,7 @@ import { Bar, BarChart, Line, LineChart, XAxis, YAxis } from 'recharts';
 import { NetworkSpeed } from '../../../../../../shared/defguard-ui/components/Layout/NetworkSpeed/NetworkSpeed';
 import { NetworkDirection } from '../../../../../../shared/defguard-ui/components/Layout/NetworkSpeed/types';
 import { useTheme } from '../../../../../../shared/defguard-ui/hooks/theme/useTheme';
-import { LocationStats } from '../../../../types';
+import type { LocationStats } from '../../../../types';
 import { LocationUsageChartType } from './types';
 
 type ChartBoxSpacing = {
