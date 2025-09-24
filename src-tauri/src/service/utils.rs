@@ -29,7 +29,22 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
         {
             channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
                 // Connect to a Unix domain socket.
-                let stream = UnixStream::connect(crate::service::DAEMON_SOCKET_PATH).await?;
+                let stream = match UnixStream::connect(crate::service::DAEMON_SOCKET_PATH).await {
+                    Ok(stream) => stream,
+                    Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+                        error!(
+                            "Permission denied for UNIX domain socket; please refer to \
+                            https://docs.defguard.net/support-1/troubleshooting#\
+                            unix-socket-permission-errors-when-desktop-client-attempts-to-connect-\
+                            to-vpn-on-linux-machines"
+                        );
+                        return Err(err);
+                    }
+                    Err(err) => {
+                        error!("Problem connecting to UNIX domain socket: {err}");
+                        return Err(err);
+                    }
+                };
                 Ok::<_, std::io::Error>(TokioIo::new(stream))
             }));
         };
