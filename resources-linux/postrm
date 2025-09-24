@@ -12,7 +12,7 @@ case "$1" in
             systemctl daemon-reload
         fi
         ;;
-        
+
     purge)
         # Complete removal - clean up group too
         if getent group "$GROUP_NAME" >/dev/null; then
