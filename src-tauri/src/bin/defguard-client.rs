@@ -5,7 +5,9 @@
 
 use std::{env, str::FromStr, sync::LazyLock};
 
-#[cfg(target_os = "windows")]
+#[cfg(unix)]
+use defguard_client::set_perms;
+#[cfg(windows)]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
     active_connections::close_all_connections,
@@ -277,19 +279,24 @@ fn main() {
     app.run(|app_handle, event| match event {
         // Startup tasks
         RunEvent::Ready => {
+            let data_dir = app_handle
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
+            let log_dir = app_handle
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into());
+
+            // Ensure directories have appropriate permissions (dg25-28).
+            #[cfg(unix)]
+            set_perms(&data_dir);
+            #[cfg(unix)]
+            set_perms(&log_dir);
             info!(
-                "Application data (database file) will be stored in: {} and application logs in: {}. \
-                Logs of the background Defguard service responsible for managing VPN connections at the \
-                network level will be stored in: {}.",
-                // display the path to the app data directory, convert option<pathbuf> to option<&str>
-                app_handle
-                    .path()
-                    .app_data_dir()
-                    .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into()).display(),
-                app_handle
-                    .path()
-                    .app_log_dir()
-                    .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into()).display(),
+                "Application data (database file) will be stored in: {data_dir:?} and application \
+                logs in: {log_dir:?}. Logs of the background Defguard service responsible for \
+                managing VPN connections at the network level will be stored in: {}.",
                 service::config::DEFAULT_LOG_DIR
             );
             tauri::async_runtime::block_on(startup(app_handle));

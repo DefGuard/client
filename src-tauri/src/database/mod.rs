@@ -1,5 +1,3 @@
-pub mod models;
-
 use std::{
     env,
     fs::{create_dir_all, File},
@@ -9,9 +7,13 @@ use std::{
 
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 
+#[cfg(unix)]
+use crate::set_perms;
 use crate::{app_data_dir, error::Error};
 
 const DB_NAME: &str = "defguard.db";
+
+pub mod models;
 
 pub(crate) type DbPool = SqlitePool;
 
@@ -59,6 +61,8 @@ fn prepare_db_url() -> Result<String, Error> {
                 app_dir.to_string_lossy()
             );
         }
+        #[cfg(unix)]
+        set_perms(&app_dir);
         let db_path = app_dir.join(DB_NAME);
         if db_path.exists() {
             debug!(
@@ -77,6 +81,8 @@ fn prepare_db_url() -> Result<String, Error> {
                 db_path.to_string_lossy()
             );
         }
+        #[cfg(unix)]
+        set_perms(&db_path);
         debug!(
             "Application's database file is located at: {}",
             db_path.to_string_lossy()

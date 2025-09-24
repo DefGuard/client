@@ -1,6 +1,13 @@
 // FIXME: actually refactor errors instead
 #![allow(clippy::result_large_err)]
+#[cfg(unix)]
+use std::path::Path;
 use std::{fmt, path::PathBuf};
+#[cfg(not(windows))]
+use std::{
+    fs::{set_permissions, Permissions},
+    os::unix::fs::PermissionsExt,
+};
 
 use chrono::NaiveDateTime;
 use semver::Version;
@@ -75,6 +82,17 @@ const BUNDLE_IDENTIFIER: &str = "net.defguard";
 #[must_use]
 pub fn app_data_dir() -> Option<PathBuf> {
     dirs_next::data_dir().map(|dir| dir.join(BUNDLE_IDENTIFIER))
+}
+
+/// Ensures path has appropriate permissions set (dg25-28):
+/// - 700 for directories
+/// - 600 for files
+#[cfg(unix)]
+pub fn set_perms(path: &Path) {
+    let perms = if path.is_dir() { 0o700 } else { 0o600 };
+    if let Err(err) = set_permissions(path, Permissions::from_mode(perms)) {
+        warn!("Failed to set permissions on path {path:?}: {err}");
+    }
 }
 
 /// Location type used in commands to check if we using tunnel or location
