@@ -35,7 +35,6 @@ use proto::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
-use thiserror::Error;
 #[cfg(unix)]
 use tokio::net::UnixListener;
 use tokio::{sync::mpsc, time::interval};
@@ -50,11 +49,9 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use super::VERSION;
-use crate::error::Error;
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
-#[cfg(windows)]
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
 #[cfg(unix)]
@@ -66,7 +63,7 @@ pub(super) const DAEMON_SOCKET_GROUP: &str = "staff";
 #[cfg(target_os = "linux")]
 pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
     #[error(transparent)]
     WireguardError(#[from] WireguardInterfaceError),
@@ -361,8 +358,8 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     // change owner group for socket file
     // get the group ID by name
     let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
-        error!("Group '{}' not found", DAEMON_SOCKET_GROUP);
-        Error::InternalError(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
+        error!("Group '{DAEMON_SOCKET_GROUP}' not found");
+        super::error::Error::InternalError(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
     })?;
 
     // change ownership - keep current user, change group

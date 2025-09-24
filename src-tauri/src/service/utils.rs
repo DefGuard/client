@@ -16,33 +16,27 @@ use tracing_subscriber::{
     Layer,
 };
 
-use crate::service::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
-#[cfg(windows)]
-use crate::service::DAEMON_BASE_URL;
-#[cfg(unix)]
-use crate::service::DAEMON_SOCKET_PATH;
+use crate::service::{
+    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
+};
 
-#[cfg(unix)]
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {
         debug!("Setting up gRPC client");
-        let endpoint = Endpoint::try_from("http://[::]:50051").unwrap(); // Should not panic.
-        let channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
-            // Connect to a Unix domain socket.
-            let stream = UnixStream::connect(DAEMON_SOCKET_PATH)
-                .await
-                .expect("Failed to connect to Unix domain socket.");
-            Ok::<_, std::io::Error>(TokioIo::new(stream))
-        }));
-        DesktopDaemonServiceClient::new(channel)
-    });
-
-#[cfg(windows)]
-pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
-    LazyLock::new(|| {
-        debug!("Setting up gRPC client");
-        let endpoint = Endpoint::from_shared(DAEMON_BASE_URL).unwrap(); // Should not panic.
-        let channel = endpoint.connect_lazy();
+        let endpoint = Endpoint::from_static(DAEMON_BASE_URL); // Should not panic.
+        let channel;
+        #[cfg(unix)]
+        {
+            channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
+                // Connect to a Unix domain socket.
+                let stream = UnixStream::connect(crate::service::DAEMON_SOCKET_PATH).await?;
+                Ok::<_, std::io::Error>(TokioIo::new(stream))
+            }));
+        };
+        #[cfg(windows)]
+        {
+            channel = endpoint.connect_lazy();
+        }
         DesktopDaemonServiceClient::new(channel)
     });
 
