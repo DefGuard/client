@@ -5,10 +5,10 @@ GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
 
 case "$1" in
-    configure)
+    1|configure)
         # Create the group if it doesn't exist
         if ! getent group "$GROUP_NAME" >/dev/null; then
-            addgroup --system "$GROUP_NAME"
+            groupadd --system "$GROUP_NAME"
             echo "Created group $GROUP_NAME"
         fi
 
