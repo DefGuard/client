@@ -10,7 +10,6 @@ use crate::{
         models::{connection::ActiveConnection, Id},
         DB_POOL,
     },
-    service::utils::DAEMON_CLIENT,
     utils::stats_handler,
     ConnectionType,
 };
@@ -46,12 +45,7 @@ impl AppState {
         drop(connections);
 
         debug!("Spawning thread for network statistics for location ID {location_id}");
-        let handle = spawn(stats_handler(
-            DB_POOL.clone(),
-            ifname,
-            connection_type,
-            DAEMON_CLIENT.clone(),
-        ));
+        let handle = spawn(stats_handler(DB_POOL.clone(), ifname, connection_type));
         let Some(old_handle) = self
             .stat_threads
             .lock()
