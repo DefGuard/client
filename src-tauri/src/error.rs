@@ -1,9 +1,8 @@
 use std::net::AddrParseError;
 
 use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
-use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -54,11 +53,5 @@ impl serde::Serialize for Error {
         S: serde::ser::Serializer,
     {
         serializer.serialize_str(self.to_string().as_ref())
-    }
-}
-
-impl<T> From<std::sync::PoisonError<T>> for Error {
-    fn from(value: std::sync::PoisonError<T>) -> Self {
-        Self::PoisonError(value.to_string())
     }
 }
