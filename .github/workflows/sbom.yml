@@ -32,7 +32,8 @@ jobs:
           format: 'spdx-json'
           output: "defguard-client-${{ env.VERSION }}.sbom.json"
           scan-ref: '.'
-          severity: "CRITICAL,HIGH,MEDIUM"
+          severity: "CRITICAL,HIGH,MEDIUM,LOW"
+          scanners: "vuln"
 
       - name: Upload SBOM
         uses: shogo82148/actions-upload-release-asset@v1
