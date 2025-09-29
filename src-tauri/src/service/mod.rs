@@ -13,7 +13,7 @@ use std::{
     net::IpAddr,
     pin::Pin,
     str::FromStr,
-    sync::RwLock,
+    sync::{Arc, RwLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 #[cfg(unix)]
@@ -74,13 +74,16 @@ pub enum DaemonError {
     TransportError(#[from] tonic::transport::Error),
 }
 
+type IfName = String;
+#[cfg(not(target_os = "macos"))]
+type WG = WGApi<Kernel>;
+#[cfg(target_os = "macos")]
+type WG = WGApi<Userspace>;
+
 #[derive(Default)]
 pub(crate) struct DaemonService {
     // Map of running `WGApi`s; key is interface name.
-    #[cfg(target_os = "macos")]
-    wgapis: RwLock<HashMap<String, WGApi<Userspace>>>,
-    #[cfg(not(target_os = "macos"))]
-    wgapis: HashMap<String, WGApi<Kernel>>,
+    wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
 }
 
@@ -88,7 +91,7 @@ impl DaemonService {
     #[must_use]
     pub fn new(config: &Config) -> Self {
         Self {
-            wgapis: RwLock::new(HashMap::new()),
+            wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
         }
     }
@@ -96,23 +99,9 @@ impl DaemonService {
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-#[cfg(not(target_os = "macos"))]
-#[allow(clippy::result_large_err)]
-pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
-    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
-        let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
-        error!("{msg}");
-        Status::new(Code::Internal, msg)
-    })?;
-
-    Ok(wgapi)
-}
-
-#[cfg(target_os = "macos")]
-#[allow(clippy::result_large_err)]
-pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
-    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
-        let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
+fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
+    let wgapi = WG::new(ifname).map_err(|err| {
+        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
@@ -140,7 +129,10 @@ impl DesktopDaemonService for DaemonService {
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
         // Setup WireGuard API.
-        let mut wgapis_map = self.wgapis.write().unwrap();
+        let Ok(mut wgapis_map) = self.wgapis.write() else {
+            error!("Failed to acquire read-write lock for WGApis");
+            return Err(Status::new(Code::Internal, "read-write lock error"));
+        };
         let wgapi = wgapis_map
             .entry(ifname.clone())
             .or_insert(setup_wgapi(ifname)?);
@@ -231,7 +223,17 @@ impl DesktopDaemonService for DaemonService {
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         debug!("Removing interface {ifname}");
 
-        let wgapi = setup_wgapi(&ifname)?;
+        let wgapi = {
+            let Ok(mut wgapis_map) = self.wgapis.write() else {
+                error!("Failed to acquire read-write lock for WGApis");
+                return Err(Status::new(Code::Internal, "read-write lock error"));
+            };
+            let Some(wgapi) = wgapis_map.remove(&ifname) else {
+                error!("Unknown interface {ifname}");
+                return Err(Status::new(Code::Internal, "unknown interface"));
+            };
+            wgapi
+        };
 
         #[cfg(not(windows))]
         {
@@ -268,8 +270,7 @@ impl DesktopDaemonService for DaemonService {
         );
         let span = info_span!("read_interface_data", interface_name = &ifname);
 
-        // Setup WireGuard API.
-        let wgapi = setup_wgapi(&ifname)?;
+        let wgapis = Arc::clone(&self.wgapis);
         let mut interval = interval(self.stats_period);
         let (tx, rx) = mpsc::channel(64);
 
@@ -288,7 +289,18 @@ impl DesktopDaemonService for DaemonService {
                     interval.tick().await;
                     debug!(
                     "Gathering network usage statistics for client's network activity on {ifname}");
-                    match wgapi.read_interface_data() {
+                    let result = {
+                        let Ok(wgapis_map) = wgapis.read() else {
+                            error!("Failed to acquire read-write lock for WGApis");
+                            break;
+                        };
+                        let Some(wgapi) = wgapis_map.get(&ifname) else {
+                            error!("Unknown interface {ifname}");
+                            break;
+                        };
+                        wgapi.read_interface_data()
+                    };
+                    match result {
                         Ok(mut host) => {
                             let peers = &mut host.peers;
                             debug!(
@@ -297,7 +309,7 @@ impl DesktopDaemonService for DaemonService {
                             );
                             // Filter out never connected peers.
                             peers.retain(|_, peer| {
-                                // Last handshake time-stamp must exist...
+                                // Last handshake time-stamp must exist.
                                 if let Some(last_hs) = peer.last_handshake {
                                     // ...and not be UNIX epoch.
                                     if last_hs != SystemTime::UNIX_EPOCH
