@@ -5,13 +5,13 @@ GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
 
 case "$1" in
-    configure)
+    1|configure)
         # Create the group if it doesn't exist
         if ! getent group "$GROUP_NAME" >/dev/null; then
-            addgroup --system "$GROUP_NAME"
+            groupadd --system "$GROUP_NAME"
             echo "Created group $GROUP_NAME"
         fi
-        
+
         # Determine target user
         TARGET_USER=""
         if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
@@ -19,7 +19,7 @@ case "$1" in
         elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
             TARGET_USER="$USER"
         fi
-        
+
         # Add user to group if we found a valid target
         if [ -n "$TARGET_USER" ]; then
             if getent passwd "$TARGET_USER" >/dev/null; then
@@ -46,15 +46,15 @@ case "$1" in
         if [ -d /run/systemd/system ]; then
             # Reload systemd to recognize new service file
             systemctl daemon-reload
-            
+
             # Enable service to start on boot
             systemctl enable "$SERVICE_NAME"
-            
+
             # Start the service now
             systemctl start "$SERVICE_NAME"
         fi
         ;;
-    
+
     abort-upgrade|abort-remove|abort-deconfigure)
         # On failed operations, ensure service is running if it should be
         if [ -d /run/systemd/system ]; then
@@ -67,4 +67,3 @@ case "$1" in
 esac
 
 #DEBHELPER#
-

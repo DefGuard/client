@@ -5,18 +5,18 @@ GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
 
 case "$1" in
-    remove)
+    0|1|remove)
         # Service file still exists, just disable it
         if [ -d /run/systemd/system ]; then
             systemctl disable "$SERVICE_NAME" || true
             systemctl daemon-reload
         fi
         ;;
-        
-    purge)
+
+    0|purge)
         # Complete removal - clean up group too
         if getent group "$GROUP_NAME" >/dev/null; then
-            delgroup "$GROUP_NAME" || true
+            groupdel "$GROUP_NAME" || true
         fi
         ;;
 esac
