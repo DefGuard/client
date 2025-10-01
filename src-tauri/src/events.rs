@@ -4,7 +4,7 @@ use tauri_plugin_notification::NotificationExt;
 
 use crate::{tray::show_main_window, ConnectionType};
 
-// Match src/page/client/types.ts.
+// Match src/pages/client/types.ts.
 #[non_exhaustive]
 pub enum EventKey {
     ConnectionChanged,
