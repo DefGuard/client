@@ -91,8 +91,8 @@ tauri-plugin-fs = "2"
 tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-opener = "2.5.0"
-tauri-plugin-os = "2.3.1"
+tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
 thiserror.workspace = true

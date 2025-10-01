@@ -13,7 +13,7 @@ use std::{
     net::IpAddr,
     pin::Pin,
     str::FromStr,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 #[cfg(unix)]
@@ -38,7 +38,7 @@ use proto::{
 };
 #[cfg(unix)]
 use tokio::net::UnixListener;
-use tokio::{sync::mpsc, time::interval};
+use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{
@@ -85,6 +85,7 @@ pub(crate) struct DaemonService {
     // Map of running `WGApi`s; key is interface name.
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
+    stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
 }
 
 impl DaemonService {
@@ -93,6 +94,7 @@ impl DaemonService {
         Self {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
+            stat_tasks: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -223,6 +225,14 @@ impl DesktopDaemonService for DaemonService {
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         debug!("Removing interface {ifname}");
 
+        // Stop stats task.
+        if let Ok(mut tasks) = self.stat_tasks.lock() {
+            if let Some(handle) = tasks.remove(&ifname) {
+                info!("Stopping statistics collector task for interface {ifname}");
+                handle.abort();
+            }
+        }
+
         let wgapi = {
             let Ok(mut wgapis_map) = self.wgapis.write() else {
                 error!("Failed to acquire read-write lock for WGApis");
@@ -263,7 +273,7 @@ impl DesktopDaemonService for DaemonService {
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
-        let ifname = request.interface_name;
+        let ifname = request.interface_name.clone();
         debug!(
             "Received a request to start a new network usage stats data stream for interface \
             {ifname}"
@@ -277,8 +287,7 @@ impl DesktopDaemonService for DaemonService {
         span.in_scope(|| {
             info!("Spawning statistics collector task for interface {ifname}");
         });
-
-        tokio::spawn(
+        let handle = tokio::spawn(
             async move {
                 // Helper map to track if peer data is actually changing to avoid sending duplicate
                 // stats.
@@ -356,6 +365,9 @@ impl DesktopDaemonService for DaemonService {
             }
             .instrument(span),
         );
+        if let Ok(mut tasks) = self.stat_tasks.lock() {
+            tasks.insert(request.interface_name, handle);
+        }
 
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(
