@@ -57,6 +57,10 @@ pub async fn connect(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
+    swift_rs::swift!(fn start_tunnel());
+    unsafe {
+        start_tunnel();
+    }
     if connection_type == ConnectionType::Location {
         if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
             debug!(
