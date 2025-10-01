@@ -3,6 +3,8 @@
   lib,
   stdenv,
   rustPlatform,
+  rustc,
+  cargo,
   makeDesktopItem,
 }: let
   pname = "defguard-client";
@@ -17,7 +19,7 @@
     categories = ["Network" "Security"];
   };
 
-  rustToolchain = pkgs.rust-bin.stable.latest.default;
+  pnpm = pkgs.pnpm_10;
 
   buildInputs = with pkgs; [
     at-spi2-atk
@@ -38,22 +40,21 @@
     desktop-file-utils
   ];
 
-  nativeBuildInputs = with pkgs; [
-    rustToolchain
-    pkg-config
-    gobject-introspection
-    cargo-tauri
-    nodejs_24
-    protobuf
+  nativeBuildInputs = [
+    rustc
+    cargo
+    pkgs.pkg-config
+    pkgs.gobject-introspection
+    pkgs.cargo-tauri
+    pkgs.nodejs_24
+    pkgs.protobuf
     pnpm
     # configures pnpm to use pre-fetched dependencies
     pnpm.configHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
-    # perl
-    wrapGAppsHook
     # helper to add dynamic library paths
-    makeWrapper
+    pkgs.makeWrapper
   ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
@@ -79,7 +80,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-GlgQuPpOibPrItt6X9EqV4QmCOyajZh5yy7gHh+O+ME=";
+      hash = "sha256-Ao3m8qNJsA267ah3qyfpIFeTveiDh8SKKoZ/Q59YjbQ=";
     };
 
     buildPhase = ''
@@ -99,7 +100,7 @@ in
 
       # add required library to client binary RPATH
       wrapProgram $out/bin/${pname} \
-      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator]}
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator pkgs.desktop-file-utils]}
 
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
