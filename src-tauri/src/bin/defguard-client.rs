@@ -290,9 +290,11 @@ fn main() {
 
             // Ensure directories have appropriate permissions (dg25-28).
             #[cfg(unix)]
-            set_perms(&data_dir);
-            #[cfg(unix)]
-            set_perms(&log_dir);
+            {
+                set_perms(&data_dir);
+                set_perms(&log_dir);
+            }
+
             info!(
                 "Application data (database file) will be stored in: {data_dir:?} and application \
                 logs in: {log_dir:?}. Logs of the background Defguard service responsible for \
