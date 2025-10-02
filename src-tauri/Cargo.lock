@@ -671,6 +671,7 @@ dependencies = [
 [[package]]
 name = "boringtun"
 version = "0.6.0"
+source = "git+https://github.com/DefGuard/wireguard-rs?rev=42d478b980cb3f7549f20f2f492c896a7389a79d#42d478b980cb3f7549f20f2f492c896a7389a79d"
 dependencies = [
  "aead",
  "base64 0.22.1",
@@ -1470,7 +1471,8 @@ dependencies = [
 
 [[package]]
 name = "defguard_wireguard_rs"
-version = "0.7.8"
+version = "0.8.0"
+source = "git+https://github.com/DefGuard/wireguard-rs?rev=42d478b980cb3f7549f20f2f492c896a7389a79d#42d478b980cb3f7549f20f2f492c896a7389a79d"
 dependencies = [
  "base64 0.22.1",
  "boringtun",
@@ -5318,9 +5320,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.6"
+version = "0.103.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8572f3c2cb9934231157b45499fc41e1f58c589fdfb81a844ba873265e80f8eb"
+checksum = "e10b3f4191e8a80e6b43eebabfac91e5dcecebb27a71f04e820c47ec41d314bf"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -7377,9 +7379,9 @@ checksum = "bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c"
 
 [[package]]
 name = "typenum"
-version = "1.18.0"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "uds_windows"
