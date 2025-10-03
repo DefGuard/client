@@ -84,7 +84,7 @@ jobs:
           . $HOME/.cargo/env
       - name: Clone repository
         run: |
-          git clone https://github.com/defguard/defguard-client.git .
+          git clone https://github.com/DefGuard/client.git
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
       - name: Build Tauri app
