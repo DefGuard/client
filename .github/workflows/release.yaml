@@ -112,7 +112,7 @@ jobs:
           pnpm install --frozen-lockfile
       - name: Build Tauri app
         run: |
-          source $HOME/.cargo/env
+          export PATH="$HOME/.cargo/bin:$PATH"
           pnpm tauri build
       - name: Upload artifact
         uses: actions/upload-artifact@v4
