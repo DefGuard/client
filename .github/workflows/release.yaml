@@ -5,40 +5,6 @@ on:
       - v*.*.*
 
 jobs:
-  build-wireguard-go:
-    strategy:
-      fail-fast: false
-      matrix:
-        architecture: [arm64, amd64]
-    runs-on: [self-hosted, macOS]
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          repository: WireGuard/wireguard-go
-          ref: master
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.24"
-      - name: Build wireguard-go binary
-        run: make
-        env:
-          GOOS: darwin
-          GOARCH: ${{ matrix.architecture }}
-      - name: Upload binary artifact arm64
-        if: matrix.architecture == 'arm64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: wireguard-go-aarch64-apple-darwin
-          path: wireguard-go
-      - name: Upload binary artifact amd64
-        if: matrix.architecture == 'amd64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: wireguard-go-x86_64-apple-darwin
-          path: wireguard-go
-
   create-release:
     name: create-release
     runs-on: self-hosted
@@ -85,12 +51,12 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: "24"
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.17
           run_install: false
       - name: Get pnpm store directory
         shell: bash
@@ -221,7 +187,6 @@ jobs:
   build-macos:
     needs:
       - create-release
-      - build-wireguard-go
     strategy:
       fail-fast: false
       matrix:
@@ -267,15 +232,6 @@ jobs:
         run: brew install protobuf
       - name: Install ARM target
         run: rustup target add aarch64-apple-darwin
-      - name: Download wireguard-go binary
-        uses: actions/download-artifact@v4
-        with:
-          name: wireguard-go-${{ matrix.target }}
-          path: src-tauri/resources-macos/binaries
-      - name: Rename wireguard-go binary
-        run: |
-          ls -l src-tauri/resources-macos/binaries
-          mv src-tauri/resources-macos/binaries/wireguard-go src-tauri/resources-macos/binaries/wireguard-go-${{ matrix.target }}
       - name: Unlock keychain
         run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
       - name: Build app
