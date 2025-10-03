@@ -64,6 +64,17 @@ jobs:
       - self-hosted
       - Linux
       - ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [ARM64, X64]
+        include:
+          - architecture: ARM64
+            deb_arch: arm64
+            binary_arch: aarch64
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
     container:
       image: ubuntu:22.04
     steps:
