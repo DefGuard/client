@@ -82,6 +82,12 @@ jobs:
         run: |
           apt-get update
           apt-get install -y git
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory /__w/client/client
+          git config --global --add safe.directory /__w/client/client/src-tauri/proto
+          git config --global --add safe.directory /__w/client/client/src/shared/defguard-ui
+          git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
         with:
           submodules: "recursive"
