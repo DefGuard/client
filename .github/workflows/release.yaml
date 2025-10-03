@@ -83,7 +83,7 @@ jobs:
       - name: git install
         run: |
           apt-get update
-          apt-get install -y git
+          apt-get install -y git curl ca-certificates
           git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
         with:
