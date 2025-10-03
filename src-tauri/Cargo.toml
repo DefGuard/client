@@ -4,7 +4,7 @@ default-members = [".", "cli"]
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = "0.7.7"
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs", rev = "42d478b980cb3f7549f20f2f492c896a7389a79d" }
 dirs-next = "2.0"
 prost = "0.14"
 reqwest = { version = "0.12", features = ["cookies", "json"] }
@@ -91,8 +91,8 @@ tauri-plugin-fs = "2"
 tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-opener = "2.5.0"
-tauri-plugin-os = "2.3.1"
+tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
 thiserror.workspace = true
