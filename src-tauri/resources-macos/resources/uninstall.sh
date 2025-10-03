@@ -2,7 +2,6 @@
 
 SERVICE_BINARY=defguard-service
 DAEMON_PROPERTY_FILE=net.defguard.plist
-WIREGUARD_GO_BINARY=wireguard-go
 DAEMON_NAME=net.defguard
 PACKAGE_ID=net.defguard
 
@@ -11,9 +10,6 @@ if (( $EUID != 0 )); then
     echo "Please run as root."
     exit
 fi
-
-# Remove wireguard-go shortcut at /usr/local/bin
-rm -f /usr/local/bin/${WIREGUARD_GO_BINARY}
 
 # Remove service shortcut at /usr/local/bin
 rm -f /usr/local/bin/${SERVICE_BINARY}
