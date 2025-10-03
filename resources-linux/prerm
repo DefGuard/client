@@ -4,7 +4,7 @@ set -e
 SERVICE_NAME="defguard-service"
 
 case "$1" in
-    remove|upgrade|deconfigure)
+    0|1|remove|upgrade|deconfigure)
         if [ -d /run/systemd/system ]; then
             # Stop the service before removal/upgrade
             systemctl stop "$SERVICE_NAME" || true

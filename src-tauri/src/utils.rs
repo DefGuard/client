@@ -4,7 +4,7 @@ use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
-use tonic::{transport::Channel, Code};
+use tonic::Code;
 use tracing::Level;
 #[cfg(target_os = "windows")]
 use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
@@ -32,10 +32,7 @@ use crate::{
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     service::{
-        proto::{
-            desktop_daemon_service_client::DesktopDaemonServiceClient, CreateInterfaceRequest,
-            ReadInterfaceDataRequest, RemoveInterfaceRequest,
-        },
+        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
         utils::DAEMON_CLIENT,
     },
     ConnectionType,
@@ -53,7 +50,6 @@ pub(crate) async fn setup_interface(
     interface_name: String,
     preshared_key: Option<String>,
     pool: &DbPool,
-    mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
     debug!("Setting up interface for location: {location}");
 
@@ -166,7 +162,7 @@ pub(crate) async fn setup_interface(
         allowed_ips,
         dns: location.dns.clone(),
     };
-    if let Err(error) = client.create_interface(request).await {
+    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
         if error.code() == Code::Unavailable {
             error!(
                 "Failed to set up connection for location {location}; background service is \
@@ -201,12 +197,12 @@ pub(crate) async fn stats_handler(
     pool: DbPool,
     interface_name: String,
     connection_type: ConnectionType,
-    mut client: DesktopDaemonServiceClient<Channel>,
 ) {
     let request = ReadInterfaceDataRequest {
         interface_name: interface_name.clone(),
     };
-    let mut stream = client
+    let mut stream = DAEMON_CLIENT
+        .clone()
         .read_interface_data(request)
         .await
         .expect("Failed to connect to interface stats stream for interface {interface_name}")
@@ -351,7 +347,6 @@ pub fn get_service_log_dir() -> &'static Path {
 pub async fn setup_interface_tunnel(
     tunnel: &Tunnel<Id>,
     interface_name: String,
-    mut client: DesktopDaemonServiceClient<Channel>,
 ) -> Result<(), Error> {
     debug!("Setting up interface for tunnel {tunnel}");
     // prepare peer config
@@ -465,7 +460,7 @@ pub async fn setup_interface_tunnel(
             interface_config.name
         );
     }
-    if let Err(error) = client.create_interface(request).await {
+    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
         error!(
             "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
             interface_config.name
@@ -625,14 +620,7 @@ pub(crate) async fn handle_connection_for_location(
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
     let interface_name = get_interface_name(&location.name);
-    setup_interface(
-        location,
-        interface_name.clone(),
-        preshared_key,
-        &DB_POOL,
-        DAEMON_CLIENT.clone(),
-    )
-    .await?;
+    setup_interface(location, interface_name.clone(), preshared_key, &DB_POOL).await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
@@ -642,7 +630,7 @@ pub(crate) async fn handle_connection_for_location(
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
-    debug!("Spawning service log watcher for location {location}...");
+    debug!("Spawning service log watcher for location {location}.");
     spawn_log_watcher_task(
         handle,
         location.id,
@@ -664,7 +652,7 @@ pub(crate) async fn handle_connection_for_tunnel(
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
     let interface_name = get_interface_name(&tunnel.name);
-    setup_interface_tunnel(tunnel, interface_name.clone(), DAEMON_CLIENT.clone()).await?;
+    setup_interface_tunnel(tunnel, interface_name.clone()).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
