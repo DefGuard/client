@@ -105,7 +105,8 @@ jobs:
       - name: Install Rust
         run: |
           curl https://sh.rustup.rs -sSf | sh -s -- -y
-          source $HOME/.cargo/env
+          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /root/.bashrc
+          export PATH="$HOME/.cargo/bin:$PATH"
       - name: Install Node dependencies
         run: |
           source $HOME/.cargo/env
