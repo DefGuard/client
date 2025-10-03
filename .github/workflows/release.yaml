@@ -109,7 +109,6 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
       - name: Install Node dependencies
         run: |
-          source $HOME/.cargo/env
           pnpm install --frozen-lockfile
       - name: Build Tauri app
         run: |
