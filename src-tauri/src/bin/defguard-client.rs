@@ -25,8 +25,6 @@ use defguard_client::{
     VERSION,
 };
 use log::{Level, LevelFilter};
-#[cfg(target_os = "macos")]
-use tauri::{process, Env};
 use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -113,23 +111,6 @@ async fn startup(app_handle: &AppHandle) {
 }
 
 fn main() {
-    // add bundled `wireguard-go` binary to PATH
-    #[cfg(target_os = "macos")]
-    {
-        debug!("Adding bundled wireguard-go binary to PATH");
-        let current_bin_path =
-            process::current_binary(&Env::default()).expect("Failed to get current binary path");
-        let current_bin_dir = current_bin_path
-            .parent()
-            .expect("Failed to get current binary directory");
-        let current_path = env::var("PATH").expect("Failed to get current PATH variable");
-        env::set_var(
-            "PATH",
-            format!("{current_path}:{}", current_bin_dir.to_str().unwrap()),
-        );
-        debug!("Added binary dir {} to PATH", current_bin_dir.display());
-    }
-
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
