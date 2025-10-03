@@ -82,7 +82,8 @@ jobs:
     steps:
       - name: git install
         run: |
-          sudo apt-get install -y git
+          apt-get update
+          apt-get install -y git
       - uses: actions/checkout@v5
         with:
           submodules: "recursive"
@@ -114,7 +115,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: |
-          sudo apt-get update
           apt-get install -y curl ca-certificates build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
