@@ -92,8 +92,10 @@ jobs:
         with:
           version: 10.17
           run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
       - name: Get pnpm store directory
-        shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
       - name: Write release version
@@ -101,9 +103,6 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
       - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
