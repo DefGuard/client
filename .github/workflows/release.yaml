@@ -77,6 +77,8 @@ jobs:
             binary_arch: x86_64
     container:
       image: ubuntu:22.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Update apt and install git
         run: |
@@ -103,26 +105,25 @@ jobs:
       - name: Install Rust
         run: |
           curl https://sh.rustup.rs -sSf | sh -s -- -y
-          . $HOME/.cargo/env
-      - name: Clone repository
-        run: |
-          git clone https://github.com/DefGuard/client.git
+          source $HOME/.cargo/env
       - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          source $HOME/.cargo/env
+          pnpm install --frozen-lockfile
       - name: Build Tauri app
         run: |
-          . $HOME/.cargo/env
+          source $HOME/.cargo/env
           pnpm tauri build
-      - name: Build project
-        run: |
-          cargo build --release
-          mkdir -p output
-          cp target/release/binary output/
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 2204-build
-          path: output/
+          name: ubuntu-2204-build-${{ matrix.architecture }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/defguard-client
+            src-tauri/target/release/defguard-service
+            src-tauri/target/release/dg
 
   build-linux:
     needs:
