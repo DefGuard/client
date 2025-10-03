@@ -5,7 +5,17 @@
     targets = ["x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-pc-windows-gnu"];
   };
 
-  defguard-client = pkgs.callPackage ./package.nix {};
+  # share custom toolchain with package
+  rustPlatform = pkgs.makeRustPlatform {
+    cargo = rustToolchain;
+    rustc = rustToolchain;
+  };
+
+  defguard-client = pkgs.callPackage ./package.nix {
+    inherit rustPlatform;
+    cargo = rustToolchain;
+    rustc = rustToolchain;
+  };
 
   # runtime libraries needed to run the dev server
   libraries = with pkgs; [
@@ -18,6 +28,7 @@ in
 
     # add additional dev tools
     packages = with pkgs; [
+      rustToolchain
       trunk
       sqlx-cli
       vtsls
