@@ -1,8 +1,8 @@
 name: "Build app and create release"
 on:
   push:
-    tags:
-      - v*.*.*
+    branches:
+      - ubuntu_22.04-lts-fix
 
 jobs:
   build-wireguard-go:
@@ -57,6 +57,84 @@ jobs:
     uses: ./.github/workflows/sbom.yml
     with:
       upload_url: ${{ needs.create-release.outputs.upload_url }}
+  ubuntu-22-04-build:
+    needs:
+      - create-release
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [ARM64, X64]
+        include:
+          - architecture: ARM64
+            deb_arch: arm64
+            binary_arch: aarch64
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
+    container:
+      image: ubuntu:22.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        HOME: /root
+        RUSTUP_HOME: /root/.rustup
+        CARGO_HOME: /root/.cargo
+    steps:
+      - name: git install
+        run: |
+          apt-get update
+          apt-get install -y git curl ca-certificates
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@v5
+        with:
+          submodules: "recursive"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Get pnpm store directory
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: |
+          apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: "--bundles deb,rpm"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-2204-build-${{ matrix.architecture }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/defguard-client
+            src-tauri/target/release/defguard-service
+            src-tauri/target/release/dg
 
   build-linux:
     needs:
