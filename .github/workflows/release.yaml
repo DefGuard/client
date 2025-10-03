@@ -80,36 +80,39 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
     steps:
-      - name: Update apt and install git
-        run: |
-          apt-get update
-          apt-get install -y git
-      - name: Configure Git safe directory
-        run: |
-          git config --global --add safe.directory /__w/client/client
-          git config --global --add safe.directory /__w/client/client/src-tauri/proto
-          git config --global --add safe.directory /__w/client/client/src/shared/defguard-ui
-          git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
         with:
           submodules: "recursive"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17
+          run_install: false
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: |
-          apt-get install -y curl ca-certificates build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip git protobuf-compiler libprotobuf-dev rpm
-      - name: Install Node.js
-        run: |
-          curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-          apt-get install -y nodejs
-      - name: Install pnpm
-        run: npm install -g pnpm@10.17
-      - name: Install Rust
-        run: |
-          curl https://sh.rustup.rs -sSf | sh -s -- -y
-          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /root/.bashrc
-          export PATH="$HOME/.cargo/bin:$PATH"
-      - name: Install Node dependencies
-        run: |
-          pnpm install --frozen-lockfile
+          sudo apt-get update
+          apt-get install -y curl ca-certificates build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
