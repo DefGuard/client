@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "nix",
 ]
@@ -1392,7 +1392,7 @@ checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 
 [[package]]
 name = "defguard-client"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1450,7 +1450,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-dg"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "clap",
  "common",
@@ -2578,12 +2578,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashbrown"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
-
-[[package]]
 name = "hashlink"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2975,7 +2969,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b0f83760fb341a774ed326568e19f5a863af4a952def8c39f9ab92fd95b88e5"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.15.5",
  "serde",
  "serde_core",
 ]

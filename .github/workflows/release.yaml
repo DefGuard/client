@@ -51,12 +51,12 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: "24"
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.17
           run_install: false
       - name: Get pnpm store directory
         shell: bash
