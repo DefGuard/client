@@ -110,10 +110,12 @@ jobs:
       - name: Install Node dependencies
         run: |
           pnpm install --frozen-lockfile
-      - name: Build Tauri app
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          pnpm tauri build
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: "--bundles deb,rpm"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
