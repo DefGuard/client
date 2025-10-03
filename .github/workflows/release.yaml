@@ -80,6 +80,9 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
     steps:
+      - name: git install
+        run: |
+          sudo apt-get install -y git
       - uses: actions/checkout@v5
         with:
           submodules: "recursive"
