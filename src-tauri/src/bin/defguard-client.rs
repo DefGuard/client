@@ -18,6 +18,7 @@ use defguard_client::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
+    enterprise::provisioning::handle_client_initialization,
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
@@ -295,6 +296,15 @@ fn main() {
                 app_handle_clone.exit(0);
             });
             debug!("Ctrl-C handler has been set up successfully");
+
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                // Wait for frontend to be ready
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+
+                // Handle client initialization if necessary
+                handle_client_initialization(&app_handle_clone).await;
+            });
         }
         RunEvent::ExitRequested { code, api, .. } => {
             debug!("Received exit request");

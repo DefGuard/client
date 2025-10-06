@@ -2,13 +2,14 @@ import './style.scss';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
+import { error } from '@tauri-apps/plugin-log';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
-
 import { useI18nContext } from '../../i18n/i18n-react';
 import { DeepLinkProvider } from '../../shared/components/providers/DeepLinkProvider';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
+import useAddInstance from '../../shared/hooks/useAddInstance';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
@@ -20,10 +21,11 @@ import { useClientStore } from './hooks/useClientStore';
 import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
 import {
+  type AddInstancePayload,
+  ClientConnectionType,
   type CommonWireguardFields,
   type DeadConDroppedPayload,
   TauriEventKey,
-  ClientConnectionType,
 } from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
@@ -45,6 +47,7 @@ export const ClientPage = () => {
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
   const openMFAModal = useMFAModal((state) => state.open);
   const { LL } = useI18nContext();
+  const { handleAddInstance } = useAddInstance();
 
   const { data: instances } = useQuery({
     queryFn: getInstances,
@@ -66,6 +69,17 @@ export const ClientPage = () => {
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
+
+  const handleProvisioning = async (data: AddInstancePayload) => {
+    try {
+      console.log('adding with: ', data);
+      await handleAddInstance(data);
+    } catch (e) {
+      error(
+        `Failed to handle automatic add instance ${JSON.stringify(data)}!\n${JSON.stringify(e)}`,
+      );
+    }
+  };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
@@ -186,6 +200,14 @@ export const ClientPage = () => {
       },
     );
 
+    const addInstance = listen<AddInstancePayload>(
+      TauriEventKey.ADD_INSTANCE,
+      async (data) => {
+        console.log('adding instance');
+        await handleProvisioning(data.payload);
+      },
+    );
+
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
       deadConnectionReconnected.then((cleanup) => cleanup());
@@ -197,6 +219,7 @@ export const ClientPage = () => {
       mfaTrigger.then((cleanup) => cleanup());
       verionMismatch.then((cleanup) => cleanup());
       uuidMismatch.then((cleanup) => cleanup());
+      addInstance.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

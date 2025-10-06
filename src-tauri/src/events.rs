@@ -95,9 +95,9 @@ impl DeadConnReconnected {
 }
 
 #[derive(Clone, Serialize)]
-struct AddInstancePayload<'a> {
-    token: &'a str,
-    url: &'a str,
+pub struct AddInstancePayload<'a> {
+    pub token: &'a str,
+    pub url: &'a str,
 }
 
 /// Handle deep-link URLs.

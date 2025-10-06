@@ -67,7 +67,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
