@@ -124,17 +124,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--bundles deb,rpm"
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+          args: "--bundles deb"
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ubuntu-2204-build-${{ matrix.architecture }}
-          path: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/rpm/*.rpm
-            src-tauri/target/release/defguard-client
-            src-tauri/target/release/defguard-service
-            src-tauri/target/release/dg
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_content_type: application/octet-stream
 
   build-linux:
     needs:
