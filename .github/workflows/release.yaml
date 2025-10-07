@@ -217,6 +217,10 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm git openssh base-devel
+      - name: Create non-root user
+        run: |
+          useradd -m -G wheel -s /bin/bash builduser
+          echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -228,6 +232,7 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
           git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
+          chown -R builduser:builduser aur-repo
       - name: Update PKGBUILD version
         run: |
           cd aur-repo
@@ -246,15 +251,19 @@ jobs:
       - name: Update .SRCINFO
         run: |
           cd aur-repo
-          makepkg --printsrcinfo > .SRCINFO
+          sudo -u builduser makepkg --printsrcinfo > .SRCINFO
           
       - name: Commit and push changes
         run: |
-          # git config user.name "GitHub Actions"
-          # git config user.email "actions@github.com"
-          # git add PKGBUILD .SRCINFO
-          # git commit -m "Update to version ${GITHUB_REF_NAME#v}"
-          # git p u s h
+      - name: Commit and push changes
+        run: |
+          cd aur-repo
+          # chown -R builduser:builduser .
+          # sudo -u builduser git config user.name "GitHub Actions"
+          # sudo -u builduser git config user.email "actions@github.com"
+          # sudo -u builduser git add PKGBUILD .SRCINFO
+          # sudo -u builduser git commit -m "Update to version 1.5.4"
+          # sudo -u builduser git push
           cat PKGBUILD
   build-macos:
     needs:
