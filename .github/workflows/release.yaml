@@ -2,7 +2,7 @@ name: "Build app and create release"
 on:
   push:
     branches:
-      - ubuntu_22.04-lts-fix
+      - aur_packages
 
 jobs:
   create-release:
