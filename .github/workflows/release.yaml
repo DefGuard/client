@@ -1,8 +1,8 @@
 name: "Build app and create release"
 on:
   push:
-    tags:
-      - v*.*.*
+    branches:
+      - aur_packages
 
 jobs:
   create-release:
