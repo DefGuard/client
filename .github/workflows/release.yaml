@@ -1,8 +1,8 @@
 name: "Build app and create release"
 on:
   push:
-    branches:
-      - aur_packages
+    tags:
+      - v*.*.*
 
 jobs:
   create-release:
@@ -52,7 +52,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=1.5.2" >> ${GITHUB_ENV}
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -253,12 +253,12 @@ jobs:
       - name: Commit and push changes
         run: |
           cd aur-repo
-          # chown -R builduser:builduser .
-          # sudo -u builduser git config user.name "GitHub Actions"
-          # sudo -u builduser git config user.email "actions@github.com"
-          # sudo -u builduser git add PKGBUILD .SRCINFO
-          # sudo -u builduser git commit -m "Updated to $VERSION"
-          # sudo -u builduser git push
+          chown -R builduser:builduser .
+          sudo -u builduser git config user.name "GitHub Actions"
+          sudo -u builduser git config user.email "actions@github.com"
+          sudo -u builduser git add PKGBUILD .SRCINFO
+          sudo -u builduser git commit -m "Updated to $VERSION"
+          sudo -u builduser git push
           cat PKGBUILD
           cat .SRCINFO
   build-macos:
