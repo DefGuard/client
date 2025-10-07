@@ -52,7 +52,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+          echo "VERSION=1.5.3" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -198,7 +198,7 @@ jobs:
   update-aur:
     needs:
       - create-release
-      # - build-linux
+      - build-linux
     runs-on:
       - self-hosted
       - Linux
@@ -237,14 +237,13 @@ jobs:
       - name: Update PKGBUILD version
         run: |
           cd aur-repo
-          # VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          VERSION="1.5.4"
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+
           echo "Updating to version: $VERSION"
 
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
           
-          # AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
-          AMD64_SHA="24875c55f04d970a36d3403a414a8b72beb46eaecbc803895323c49fe033322e"
+          AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
           
           echo "AMD64 DEB SHA256: $AMD64_SHA"
           
@@ -253,9 +252,6 @@ jobs:
         run: |
           cd aur-repo
           sudo -u builduser makepkg --printsrcinfo > .SRCINFO
-          
-      - name: Commit and push changes
-        run: |
       - name: Commit and push changes
         run: |
           cd aur-repo
@@ -263,7 +259,7 @@ jobs:
           # sudo -u builduser git config user.name "GitHub Actions"
           # sudo -u builduser git config user.email "actions@github.com"
           # sudo -u builduser git add PKGBUILD .SRCINFO
-          # sudo -u builduser git commit -m "Update to version 1.5.4"
+          # sudo -u builduser git commit -m "Updated to $VERSION"
           # sudo -u builduser git push
           cat PKGBUILD
           cat .SRCINFO
