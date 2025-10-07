@@ -248,7 +248,7 @@ jobs:
           
           echo "AMD64 DEB SHA256: $AMD64_SHA"
           
-          sed -i "s/^sha256sums=.*/sha256sums=('$AMD64_SHA')/" PKGBUILD
+          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
       - name: Update .SRCINFO
         run: |
           cd aur-repo
