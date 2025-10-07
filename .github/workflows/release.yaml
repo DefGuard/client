@@ -52,7 +52,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+          echo "VERSION=1.5.2" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
