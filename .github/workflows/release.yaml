@@ -266,6 +266,7 @@ jobs:
           # sudo -u builduser git commit -m "Update to version 1.5.4"
           # sudo -u builduser git push
           cat PKGBUILD
+          cat .SRCINFO
   build-macos:
     needs:
       - create-release
