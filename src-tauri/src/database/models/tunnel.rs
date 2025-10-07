@@ -14,13 +14,13 @@ use crate::{
 };
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Tunnel<I = NoId> {
     pub id: I,
     pub name: String,
-    // user keys
-    pub pubkey: String,
-    pub prvkey: String,
+    // encryption keys
+    pub pubkey: String, // Remote
+    pub prvkey: String, // Local
     // server config
     pub address: String,
     pub server_pubkey: String,
@@ -32,7 +32,7 @@ pub struct Tunnel<I = NoId> {
     pub endpoint: String,
     #[serde_as(as = "NoneAsEmptyString")]
     pub dns: Option<String>,
-    pub persistent_keep_alive: i64, // New field
+    pub persistent_keep_alive: i64,
     pub route_all_traffic: bool,
     // additional commands
     #[serde_as(as = "NoneAsEmptyString")]
@@ -48,6 +48,12 @@ pub struct Tunnel<I = NoId> {
 impl fmt::Display for Tunnel<Id> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}(ID: {})", self.name, self.id)
+    }
+}
+
+impl fmt::Display for Tunnel<NoId> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 

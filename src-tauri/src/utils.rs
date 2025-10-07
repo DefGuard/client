@@ -3,6 +3,8 @@ use std::{env, path::Path, process::Command, str::FromStr};
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
+#[cfg(target_os = "macos")]
+use swift_rs::{swift, SRString};
 use tauri::{AppHandle, Emitter, Manager};
 use tonic::Code;
 use tracing::Level;
@@ -44,7 +46,7 @@ use crate::active_connections::find_connection;
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
-/// Setup client interface
+/// Setup client interface for `Instance`.
 pub(crate) async fn setup_interface(
     location: &Location<Id>,
     interface_name: String,
@@ -53,144 +55,68 @@ pub(crate) async fn setup_interface(
 ) -> Result<(), Error> {
     debug!("Setting up interface for location: {location}");
 
-    debug!("Looking for WireGuard keys for location {location} instance");
-    let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? else {
-        error!("No keys found for instance: {}", location.instance_id);
-        return Err(Error::InternalError(
-            "No keys found for instance".to_string(),
-        ));
-    };
-    debug!("WireGuard keys found for location {location} instance");
-
-    // prepare peer config
-    debug!(
-        "Decoding location {location} public key: {}.",
-        location.pubkey
-    );
-    let peer_key: Key = Key::from_str(&location.pubkey)?;
-    debug!("Location {location} public key decoded: {peer_key}");
-    let mut peer = Peer::new(peer_key);
-
-    debug!(
-        "Parsing location {location} endpoint: {}",
-        location.endpoint
-    );
-    peer.set_endpoint(&location.endpoint)?;
-    peer.persistent_keepalive_interval = Some(25);
-    debug!("Parsed location {location} endpoint: {}", location.endpoint);
-
-    if let Some(psk) = preshared_key {
-        debug!("Decoding location {location} preshared key.");
-        let peer_psk = Key::from_str(&psk)?;
-        info!("Location {location} preshared key decoded.");
-        peer.preshared_key = Some(peer_psk);
-    }
-
-    debug!(
-        "Parsing location {location} allowed IPs: {}",
-        location.allowed_ips
-    );
-    let allowed_ips = if location.route_all_traffic {
-        debug!(
-            "Using all traffic routing for location {location}: {DEFAULT_ROUTE_IPV4} \
-            {DEFAULT_ROUTE_IPV6}"
-        );
-        vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
-    } else {
-        debug!(
-            "Using predefined location {location} traffic: {}",
-            location.allowed_ips
-        );
-        location
-            .allowed_ips
-            .split(',')
-            .map(str::to_string)
-            .collect()
-    };
-    for allowed_ip in &allowed_ips {
-        match IpAddrMask::from_str(allowed_ip) {
-            Ok(addr) => {
-                peer.allowed_ips.push(addr);
-            }
-            Err(err) => {
-                // Handle the error from IpAddrMask::from_str, if needed
-                error!(
-                    "Error parsing IP address {allowed_ip} while setting up interface for \
-                    location {location}, error details: {err}"
-                );
-            }
-        }
-    }
-    debug!(
-        "Parsed allowed IPs for location {location}: {:?}",
-        peer.allowed_ips
-    );
-
     // request interface configuration
-    debug!("Looking for a free port for interface {interface_name}...");
-    let Some(port) = find_free_tcp_port() else {
-        let msg = format!(
-            "Couldn't find free port during interface {interface_name} setup for location \
-            {location}"
-        );
-        error!("{msg}");
-        return Err(Error::InternalError(msg));
-    };
-    debug!("Found free port: {port} for interface {interface_name}.");
-    let addresses = location
-        .address
-        .split(',')
-        .map(str::trim)
-        .map(IpAddrMask::from_str)
-        .collect::<Result<_, _>>()
-        .map_err(|err| {
-            let msg = format!("Failed to parse IP addresses '{}': {err}", location.address);
-            error!("{msg}");
-            Error::InternalError(msg)
-        })?;
-    let interface_config = InterfaceConfiguration {
-        name: interface_name,
-        prvkey: keys.prvkey,
-        addresses,
-        port: port.into(),
-        peers: vec![peer.clone()],
-        mtu: None,
-    };
-    debug!("Creating interface for location {location} with configuration {interface_config:?}");
-    let request = CreateInterfaceRequest {
-        config: Some(interface_config.clone().into()),
-        allowed_ips,
-        dns: location.dns.clone(),
-    };
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-        if error.code() == Code::Unavailable {
-            error!(
-                "Failed to set up connection for location {location}; background service is \
-                unavailable. Make sure the service is running. Error: {error}, Interface \
-                configuration: {interface_config:?}"
-            );
-            Err(Error::InternalError(
-                "Background service is unavailable. Make sure the service is running.".into(),
-            ))
-        } else {
-            error!(
-                "Failed to send a request to the background service to create an interface for \
-                location {location} with the following configuration: {interface_config:?}. \
-                Error: {error}"
-            );
-            Err(Error::InternalError(format!(
-                "Failed to send a request to the background service to create an interface for \
-                location {location}. Error: {error}. Check logs for details."
-            )))
-        }
-    } else {
-        info!(
-            "The interface for location {location} has been created successfully, interface \
-            name: {}.",
-            interface_config.name
-        );
-        Ok(())
+    // debug!("Looking for a free port for interface {interface_name}.");
+    // let Some(port) = find_free_tcp_port() else {
+    //     let msg = format!(
+    //         "Couldn't find free port during interface {interface_name} setup for location \
+    //         {location}"
+    //     );
+    //     error!("{msg}");
+    //     return Err(Error::InternalError(msg));
+    // };
+    // debug!("Found free port: {port} for interface {interface_name}.");
+
+    let (dns, dns_search) = location.dns();
+    let tunnel_config = location
+        .tunnel_configurarion(pool, interface_name, preshared_key, dns, dns_search)
+        .await?;
+    // tunnel_config.port = port;
+
+    swift!(fn start_tunnel(prvkey: &SRString));
+    unsafe {
+        let prvkey: SRString = serde_json::to_string(&tunnel_config)
+            .unwrap()
+            .as_str()
+            .into();
+        start_tunnel(&prvkey);
     }
+    Ok(())
+
+    // debug!("Creating interface for location {location} with configuration {interface_config:?}");
+    // let request = CreateInterfaceRequest {
+    //     config: Some(interface_config.clone().into()),
+    //     dns: location.dns.clone(),
+    // };
+    // if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+    //     if error.code() == Code::Unavailable {
+    //         error!(
+    //             "Failed to set up connection for location {location}; background service is \
+    //             unavailable. Make sure the service is running. Error: {error}, Interface \
+    //             configuration: {interface_config:?}"
+    //         );
+    //         Err(Error::InternalError(
+    //             "Background service is unavailable. Make sure the service is running.".into(),
+    //         ))
+    //     } else {
+    //         error!(
+    //             "Failed to send a request to the background service to create an interface for \
+    //             location {location} with the following configuration: {interface_config:?}. \
+    //             Error: {error}"
+    //         );
+    //         Err(Error::InternalError(format!(
+    //             "Failed to send a request to the background service to create an interface for \
+    //             location {location}. Error: {error}. Check logs for details."
+    //         )))
+    //     }
+    // } else {
+    //     info!(
+    //         "The interface for location {location} has been created successfully, interface \
+    //         name: {}.",
+    //         interface_config.name
+    //     );
+    //     Ok(())
+    // }
 }
 
 pub(crate) async fn stats_handler(
@@ -380,10 +306,7 @@ pub async fn setup_interface_tunnel(
         tunnel.allowed_ips
     );
     let allowed_ips = if tunnel.route_all_traffic {
-        debug!(
-            "Using all traffic routing for tunnel {tunnel}: {DEFAULT_ROUTE_IPV4} \
-            {DEFAULT_ROUTE_IPV6}"
-        );
+        debug!("Using all traffic routing for tunnel {tunnel}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         let msg = match &tunnel.allowed_ips {
@@ -412,7 +335,7 @@ pub async fn setup_interface_tunnel(
     debug!("Parsed tunnel {tunnel} allowed IPs: {:?}", peer.allowed_ips);
 
     // request interface configuration
-    debug!("Looking for a free port for interface {interface_name}...");
+    debug!("Looking for a free port for interface {interface_name}.");
     let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port for interface {interface_name} while setting up tunnel {tunnel}"
@@ -444,7 +367,6 @@ pub async fn setup_interface_tunnel(
     debug!("Creating interface {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
-        allowed_ips,
         dns: tunnel.dns.clone(),
     };
     if let Some(pre_up) = &tunnel.pre_up {

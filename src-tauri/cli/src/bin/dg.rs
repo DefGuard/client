@@ -237,7 +237,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         name: config.instance_info.name.clone(),
         prvkey: config.private_key.to_string(),
         addresses,
-        port: u32::from(find_free_tcp_port().ok_or(CliError::FreeTCPPort)?),
+        port: find_free_tcp_port().ok_or(CliError::FreeTCPPort)?,
         peers: vec![peer.clone()],
         mtu: None,
     };

@@ -26,9 +26,11 @@ public struct TunnelStartData: Codable {
     public var locationId: Int
     public var instanceId: Int
 
-    public init(publicKey: String, privateKey: String, address: String, dns: String? = nil,
-                endpoint: String, allowedIps: String, keepalive: Int, presharedKey: String? = nil,
-                traffic: TunnelTraffic, locationName: String, locationId: Int, instanceId: Int) {
+    public init(
+        publicKey: String, privateKey: String, address: String, dns: String? = nil,
+        endpoint: String, allowedIps: String, keepalive: Int, presharedKey: String? = nil,
+        traffic: TunnelTraffic, locationName: String, locationId: Int, instanceId: Int
+    ) {
         self.publicKey = publicKey
         self.privateKey = privateKey
         self.address = address
@@ -48,7 +50,7 @@ public struct ActiveTunnelData: Codable {
     var locationId: Int
     var instanceId: Int
     var traffic: TunnelTraffic
-    
+
     init(fromConfig: TunnelStartData) {
         self.locationId = fromConfig.locationId
         self.instanceId = fromConfig.instanceId

@@ -447,7 +447,7 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(","),
-            port: config.port,
+            port: u32::from(config.port),
             peers: config.peers.into_iter().map(Into::into).collect(),
         }
     }
@@ -464,7 +464,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             name: config.name,
             prvkey: config.prvkey,
             addresses,
-            port: config.port,
+            port: config.port as u16,
             peers: config.peers.into_iter().map(Into::into).collect(),
             mtu: None,
         }

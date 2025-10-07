@@ -1,10 +1,16 @@
-use std::fmt;
+use std::{fmt, net::IpAddr, str::FromStr};
 
+use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
-use crate::{error::Error, proto::LocationMfaMode as ProtoLocationMfaMode};
+use crate::{
+    database::models::wireguard_keys::WireguardKeys,
+    error::Error,
+    proto::LocationMfaMode as ProtoLocationMfaMode,
+    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
+};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
@@ -35,7 +41,7 @@ pub struct Location<I = NoId> {
     pub network_id: Id,
     pub name: String,
     pub address: String,
-    pub pubkey: String,
+    pub pubkey: String, // Remote
     pub endpoint: String,
     pub allowed_ips: String,
     pub dns: Option<String>,
@@ -188,6 +194,115 @@ impl Location<Id> {
             LocationMfaMode::Disabled => false,
             LocationMfaMode::Internal | LocationMfaMode::External => true,
         }
+    }
+
+    /// Split DNS settings into resolver IP addresses and search domains.
+    pub(crate) fn dns(&self) -> (Vec<IpAddr>, Vec<String>) {
+        let mut dns = Vec::new();
+        let mut dns_search = Vec::new();
+
+        if let Some(dns_string) = &self.dns {
+            for entry in dns_string.split(',').map(str::trim) {
+                // Assume that every entry that can't be parsed as an IP address is a domain name.
+                if let Ok(ip) = entry.parse::<IpAddr>() {
+                    dns.push(ip);
+                } else {
+                    dns_search.push(entry.into());
+                }
+            }
+        }
+
+        (dns, dns_search)
+    }
+
+    pub(crate) async fn interface_configurarion<'e, E>(
+        &self,
+        executor: E,
+        interface_name: String,
+        preshared_key: Option<String>,
+    ) -> Result<InterfaceConfiguration, Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        debug!("Looking for WireGuard keys for location {self} instance");
+        let Some(keys) = WireguardKeys::find_by_instance_id(executor, self.instance_id).await?
+        else {
+            error!("No keys found for instance: {}", self.instance_id);
+            return Err(Error::InternalError(
+                "No keys found for instance".to_string(),
+            ));
+        };
+        debug!("WireGuard keys found for location {self} instance");
+
+        // prepare peer config
+        debug!("Decoding location {self} public key: {}.", self.pubkey);
+        let peer_key = Key::from_str(&self.pubkey)?;
+        debug!("Location {self} public key decoded: {peer_key}");
+        let mut peer = Peer::new(peer_key);
+
+        debug!("Parsing location {self} endpoint: {}", self.endpoint);
+        peer.set_endpoint(&self.endpoint)?;
+        peer.persistent_keepalive_interval = Some(25);
+        debug!("Parsed location {self} endpoint: {}", self.endpoint);
+
+        if let Some(psk) = preshared_key {
+            debug!("Decoding location {self} preshared key.");
+            let peer_psk = Key::from_str(&psk)?;
+            info!("Location {self} preshared key decoded.");
+            peer.preshared_key = Some(peer_psk);
+        }
+
+        debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
+        let allowed_ips = if self.route_all_traffic {
+            debug!("Using all traffic routing for location {self}");
+            vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
+        } else {
+            debug!(
+                "Using predefined location {self} traffic: {}",
+                self.allowed_ips
+            );
+            self.allowed_ips.split(',').map(str::to_string).collect()
+        };
+        for allowed_ip in &allowed_ips {
+            match IpAddrMask::from_str(allowed_ip) {
+                Ok(addr) => {
+                    peer.allowed_ips.push(addr);
+                }
+                Err(err) => {
+                    // Handle the error from IpAddrMask::from_str, if needed
+                    error!(
+                        "Error parsing IP address {allowed_ip} while setting up interface for \
+                        location {self}, error details: {err}"
+                    );
+                }
+            }
+        }
+        debug!(
+            "Parsed allowed IPs for location {self}: {:?}",
+            peer.allowed_ips
+        );
+
+        let addresses = self
+            .address
+            .split(',')
+            .map(str::trim)
+            .map(IpAddrMask::from_str)
+            .collect::<Result<_, _>>()
+            .map_err(|err| {
+                let msg = format!("Failed to parse IP addresses '{}': {err}", self.address);
+                error!("{msg}");
+                Error::InternalError(msg)
+            })?;
+        let interface_config = InterfaceConfiguration {
+            name: interface_name,
+            prvkey: keys.prvkey,
+            addresses,
+            port: 0,
+            peers: vec![peer],
+            mtu: None,
+        };
+
+        Ok(interface_config)
     }
 }
 

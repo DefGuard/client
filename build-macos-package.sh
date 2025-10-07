@@ -19,7 +19,7 @@ pkgbuild \
     --analyze \
     --root ${APP_ROOT} \
     "${TARGET_DIRECTORY}/defguard-client.plist"
-    
+
 PACKAGE_PATH="${TARGET_DIRECTORY}/package/defguard.pkg"
 
 pkgbuild \

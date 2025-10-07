@@ -42,8 +42,6 @@ pub enum Error {
     NoToken,
     #[error("Failed to lock app state member.")]
     StateLockFail,
-    #[error("Failed to acquire lock on mutex. {0}")]
-    PoisonError(String),
 }
 
 // we must manually implement serde::Serialize
