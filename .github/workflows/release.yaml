@@ -1,8 +1,8 @@
 name: "Build app and create release"
 on:
   push:
-    branches:
-      - aur_packages
+    tags:
+      - v*.*.*
 
 jobs:
   create-release:
@@ -52,7 +52,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=1.5.3" >> ${GITHUB_ENV}
+          echo "VERSION=1.5.2" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -240,13 +240,11 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
 
           echo "Updating to version: $VERSION"
-
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
           
           AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
           
           echo "AMD64 DEB SHA256: $AMD64_SHA"
-          
           sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
       - name: Update .SRCINFO
         run: |
