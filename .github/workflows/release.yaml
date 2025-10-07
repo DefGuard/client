@@ -223,6 +223,7 @@ jobs:
           ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
       - name: Checkout AUR repository
         run: |
+          mkdir -p ~/.ssh
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
       - name: Update PKGBUILD version
