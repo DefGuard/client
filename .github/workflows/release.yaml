@@ -203,6 +203,14 @@ jobs:
       - Linux
       - ${{ matrix.architecture }}
     container: archlinux:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [X64]
+        include:
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
     steps:
       - name: Install dependencies
         run: |
