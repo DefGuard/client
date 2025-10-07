@@ -231,6 +231,7 @@ jobs:
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
+          rm -rf aur-repo
           git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
           chown -R builduser:builduser aur-repo
       - name: Update PKGBUILD version
