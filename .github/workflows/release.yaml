@@ -52,7 +52,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=1.5.2" >> ${GITHUB_ENV}
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -86,6 +86,7 @@ jobs:
           args: "--bundles deb,rpm"
       - name: Calculate DEB SHA256
         id: calculate-sha256
+        if: matrix.deb_arch == 'amd64'
         run: |
           DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
           DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
@@ -197,7 +198,7 @@ jobs:
   update-aur:
     needs:
       - create-release
-      - build-linux
+      # - build-linux
     runs-on:
       - self-hosted
       - Linux
@@ -216,25 +217,32 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm git openssh base-devel
-      - name: Checkout AUR repository
-        uses: actions/checkout@v5
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          repository: 'ssh://aur@aur.archlinux.org/defguard-client.git'
-          ssh-key: ${{ secrets.AUR_SSH_KEY }}
+          ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
+      - name: Checkout AUR repository
+        run: |
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+          git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
       - name: Update PKGBUILD version
         run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          cd aur-repo
+          # VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          VERSION="1.5.4"
           echo "Updating to version: $VERSION"
 
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
           
-          AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
+          # AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
+          AMD64_SHA="24875c55f04d970a36d3403a414a8b72beb46eaecbc803895323c49fe033322e"
           
           echo "AMD64 DEB SHA256: $AMD64_SHA"
           
           sed -i "s/^sha256sums=.*/sha256sums=('$AMD64_SHA')/" PKGBUILD
       - name: Update .SRCINFO
         run: |
+          cd aur-repo
           makepkg --printsrcinfo > .SRCINFO
           
       - name: Commit and push changes
