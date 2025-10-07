@@ -1,8 +1,8 @@
 name: "Build app and create release"
 on:
   push:
-    tags:
-      - v*.*.*
+    branches:
+      - ubuntu_22.04-lts-fix
 
 jobs:
   create-release:
@@ -27,6 +27,8 @@ jobs:
   build-linux:
     needs:
       - create-release
+    outputs:
+      deb_sha256_amd64: ${{ steps.calculate-sha256.outputs.deb_sha256_amd64 }}
     runs-on:
       - self-hosted
       - Linux
@@ -82,6 +84,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: "--bundles deb,rpm"
+      - name: Calculate DEB SHA256
+        id: calculate-sha256
+        run: |
+          DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
+          DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
+          echo "DEB SHA256: $DEB_SHA256"
+          echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
+          echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
       - name: Upload RPM
         uses: actions/upload-release-asset@v1
         env:
@@ -184,6 +194,49 @@ jobs:
           asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
           asset_content_type: application/octet-stream
 
+  update-aur:
+    needs:
+      - create-release
+      - build-linux
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.architecture }}
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git openssh base-devel
+      - name: Checkout AUR repository
+        uses: actions/checkout@v5
+        with:
+          repository: 'ssh://aur@aur.archlinux.org/defguard-client.git'
+          ssh-key: ${{ secrets.AUR_SSH_KEY }}
+      - name: Update PKGBUILD version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo "Updating to version: $VERSION"
+
+          sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
+          
+          AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
+          
+          echo "AMD64 DEB SHA256: $AMD64_SHA"
+          
+          sed -i "s/^sha256sums=.*/sha256sums=('$AMD64_SHA')/" PKGBUILD
+      - name: Update .SRCINFO
+        run: |
+          makepkg --printsrcinfo > .SRCINFO
+          
+      - name: Commit and push changes
+        run: |
+          # git config user.name "GitHub Actions"
+          # git config user.email "actions@github.com"
+          # git add PKGBUILD .SRCINFO
+          # git commit -m "Update to version ${GITHUB_REF_NAME#v}"
+          # git p u s h
+          cat PKGBUILD
   build-macos:
     needs:
       - create-release
