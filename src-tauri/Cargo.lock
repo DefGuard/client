@@ -1343,6 +1343,7 @@ dependencies = [
 [[package]]
 name = "defguard_wireguard_rs"
 version = "0.7.7"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=47a70b8ec45c9baa7ff48bf5b185a7bb2262b0d7#47a70b8ec45c9baa7ff48bf5b185a7bb2262b0d7"
 dependencies = [
  "base64 0.22.1",
  "ipnet",
