@@ -133,7 +133,7 @@ impl DesktopDaemonService for DaemonService {
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
         // setup WireGuard API
-        let mut wgapi = setup_wgapi(ifname)?;
+        let wgapi = setup_wgapi(ifname)?;
 
         #[cfg(not(windows))]
         {
