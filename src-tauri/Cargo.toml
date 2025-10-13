@@ -110,6 +110,7 @@ x25519-dalek = { version = "2", features = [
     "serde",
     "static_secrets",
 ] }
+tauri-plugin-global-shortcut = "2.3.0"
 
 [target.'cfg(unix)'.dependencies]
 hyper-util = "0.1"
