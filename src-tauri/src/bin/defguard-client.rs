@@ -263,6 +263,29 @@ fn main() {
                     .build(),
             )?;
 
+            use tauri_plugin_global_shortcut::{
+                Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
+            };
+            let ctrl_q_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyQ);
+            app_handle.plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(move |_app, shortcut, event| {
+                        info!("{:?}", shortcut);
+                        if shortcut == &ctrl_q_shortcut {
+                            match event.state() {
+                                ShortcutState::Pressed => {
+                                    info!("Ctrl-Q Pressed!");
+                                }
+                                ShortcutState::Released => {
+                                    info!("Ctrl-N Released!");
+                                }
+                            }
+                        }
+                    })
+                    .build(),
+            )?;
+            app.global_shortcut().register(ctrl_q_shortcut)?;
+
             let state = AppState::new(config);
             app.manage(state);
 
