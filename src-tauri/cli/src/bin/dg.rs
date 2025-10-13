@@ -156,9 +156,9 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
     debug!("Connecting to network {network_name}.");
 
     #[cfg(not(target_os = "macos"))]
-    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
+    let mut wgapi = WGApi::<Kernel>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
     #[cfg(target_os = "macos")]
-    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
+    let mut wgapi = WGApi::<Userspace>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
 
     #[cfg(not(windows))]
     {
