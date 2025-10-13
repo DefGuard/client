@@ -1,3 +1,9 @@
+name: "Build app and create release"
+on:
+  push:
+    tags:
+      - v*.*.*
+
 jobs:
   build-wireguard-go:
     strategy:
