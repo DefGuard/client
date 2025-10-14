@@ -40,118 +40,118 @@ jobs:
   #         name: wireguard-go-x86_64-apple-darwin
   #         path: wireguard-go
 
-  create-release:
-    name: create-release
-    runs-on: self-hosted
-    outputs:
-      upload_url: ${{ steps.release.outputs.upload_url }}
-    steps:
-      - name: Create GitHub release
-        id: release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          generate_release_notes: true
+  # create-release:
+  #   name: create-release
+  #   runs-on: self-hosted
+  #   outputs:
+  #     upload_url: ${{ steps.release.outputs.upload_url }}
+  #   steps:
+  #     - name: Create GitHub release
+  #       id: release
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         draft: true
+  #         generate_release_notes: true
 
-  # create-sbom:
-  #   needs: [create-release]
-  #   uses: ./.github/workflows/sbom.yml
-  #   with:
-  #     upload_url: ${{ needs.create-release.outputs.upload_url }}
-  ubuntu-22-04-build:
-    needs:
-      - create-release
-    runs-on:
-      - self-hosted
-      - Linux
-      - ${{ matrix.architecture }}
-    strategy:
-      fail-fast: false
-      matrix:
-        architecture: [ARM64, X64]
-        include:
-          - architecture: ARM64
-            deb_arch: arm64
-            binary_arch: aarch64
-          - architecture: X64
-            deb_arch: amd64
-            binary_arch: x86_64
-    container:
-      image: ubuntu:22.04
-      env:
-        DEBIAN_FRONTEND: noninteractive
-        HOME: /root
-        RUSTUP_HOME: /root/.rustup
-        CARGO_HOME: /root/.cargo
-    steps:
-      - name: git install
-        run: |
-          apt-get update
-          apt-get install -y git curl ca-certificates
-          git config --global --add safe.directory '*'
-      - uses: actions/checkout@v5
-        with:
-          submodules: "recursive"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.17
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-      - name: Get pnpm store directory
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-      # - name: Write release version
-      #   run: |
-      #     VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-      #     echo Version: $VERSION
-      #     echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - name: Write release version
-        run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=1.5.2" >> ${GITHUB_ENV}
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
-      - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install dependencies
-        run: |
-          apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm ruby
-          export PATH="/srv/github/defguard/.local/share/gem/ruby/3.3.0/bin:$PATH"
-          gem install deb-s3
-      - name: Build packages
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: "--bundles deb"
-      - name: Upload DEB
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
-          asset_content_type: application/octet-stream
-      - name: Upload DEB to apt repository on s3
-        run: |
-          export PATH="/srv/github/defguard/.local/share/gem/ruby/3.3.0/bin:$PATH"
-          COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
+  # # create-sbom:
+  # #   needs: [create-release]
+  # #   uses: ./.github/workflows/sbom.yml
+  # #   with:
+  # #     upload_url: ${{ needs.create-release.outputs.upload_url }}
+  # ubuntu-22-04-build:
+  #   needs:
+  #     - create-release
+  #   runs-on:
+  #     - self-hosted
+  #     - Linux
+  #     - ${{ matrix.architecture }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       architecture: [ARM64, X64]
+  #       include:
+  #         - architecture: ARM64
+  #           deb_arch: arm64
+  #           binary_arch: aarch64
+  #         - architecture: X64
+  #           deb_arch: amd64
+  #           binary_arch: x86_64
+  #   container:
+  #     image: ubuntu:22.04
+  #     env:
+  #       DEBIAN_FRONTEND: noninteractive
+  #       HOME: /root
+  #       RUSTUP_HOME: /root/.rustup
+  #       CARGO_HOME: /root/.cargo
+  #   steps:
+  #     - name: git install
+  #       run: |
+  #         apt-get update
+  #         apt-get install -y git curl ca-certificates
+  #         git config --global --add safe.directory '*'
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         submodules: "recursive"
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 10.17
+  #         run_install: false
+  #     - uses: actions/setup-node@v5
+  #       with:
+  #         node-version: "24"
+  #     - name: Get pnpm store directory
+  #       run: |
+  #         echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+  #     # - name: Write release version
+  #     #   run: |
+  #     #     VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  #     #     echo Version: $VERSION
+  #     #     echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+  #     - name: Write release version
+  #       run: |
+  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  #         echo Version: $VERSION
+  #         echo "VERSION=1.5.2" >> ${GITHUB_ENV}
+  #     - uses: actions/cache@v4
+  #       name: Setup pnpm cache
+  #       with:
+  #         path: ${{ env.STORE_PATH }}
+  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pnpm-build-store-
+  #     - name: Install Node dependencies
+  #       run: pnpm install --frozen-lockfile
+  #     - uses: dtolnay/rust-toolchain@stable
+  #     - name: Install dependencies
+  #       run: |
+  #         apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm ruby
+  #         export PATH="/srv/github/defguard/.local/share/gem/ruby/3.3.0/bin:$PATH"
+  #         gem install deb-s3
+  #     - name: Build packages
+  #       uses: tauri-apps/tauri-action@v0
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         args: "--bundles deb"
+  #     - name: Upload DEB
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+  #         asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+  #         asset_content_type: application/octet-stream
+  #     - name: Upload DEB to apt repository on s3
+  #       run: |
+  #         export PATH="/srv/github/defguard/.local/share/gem/ruby/3.3.0/bin:$PATH"
+  #         COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
 
-          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY }} --secret-access-key=${{ secrets.AWS_SECRET_KEY }} --s3-region=eu-north-1 --no-fail-if-exists --codename=bookworm --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+  #         deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY }} --secret-access-key=${{ secrets.AWS_SECRET_KEY }} --s3-region=eu-north-1 --no-fail-if-exists --codename=bookworm --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
 
   apt-sign:
-    needs: 
-      - ubuntu-22-04-build
+    # needs: 
+      # - ubuntu-22-04-build
       # - build-linux
     runs-on:
       - self-hosted
@@ -160,13 +160,15 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - name: Sign APT repository
+      - name: Sign APT repository on trixie 
         run: |
           export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY }}
           export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY }}
           export AWS_REGION=eu-north-1
           sudo apt update -y
           sudo apt install -y awscli curl jq
+
+          #For trixie
           aws s3 cp s3://apt.defguard.net/dists/trixie/Release .
           curl -X POST "${{ secrets.DEFGUARD_SIGNING_URL }}?signature_type=both" \
           -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
@@ -176,6 +178,17 @@ jobs:
           cat response.json | jq -r '.files.Release.content' | base64 --decode > InRelease
           aws s3 cp Release.gpg s3://apt.defguard.net/dists/trixie/ --acl public-read
           aws s3 cp InRelease s3://apt.defguard.net/dists/trixie/ --acl public-read
+
+          #For bookworm
+          aws s3 cp s3://apt.defguard.net/dists/bookworm/Release .
+          curl -X POST "${{ secrets.DEFGUARD_SIGNING_URL }}?signature_type=both" \
+          -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
+          -F "file=@Release" \
+          -o response.json
+          cat response.json | jq -r '.files["Release.gpg"].content' | base64 --decode > Release.gpg
+          cat response.json | jq -r '.files.Release.content' | base64 --decode > InRelease
+          aws s3 cp Release.gpg s3://apt.defguard.net/dists/bookworm/ --acl public-read
+          aws s3 cp InRelease s3://apt.defguard.net/dists/bookworm/ --acl public-read
 
   # build-linux:
   #   needs:
