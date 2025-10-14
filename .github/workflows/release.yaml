@@ -148,7 +148,7 @@ jobs:
       - self-hosted
       - Linux
       - X64
-    startegy:
+    strategy:
       fail-fast: false
     steps:
       - name: Sign APT repository
