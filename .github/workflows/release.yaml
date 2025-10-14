@@ -157,7 +157,7 @@ jobs:
           export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY }}
           export AWS_REGION=eu-north-1
           sudo apt update -y
-          sudo apt install -y awscli curl jq base64
+          sudo apt install -y awscli curl jq
           aws s3 cp s3://apt.defguard.net/dists/trixie/Release .
           curl -X POST "${{ secrets.DEFGUARD_SIGNING_API_KEY }}?signature_type=both" \
           -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
