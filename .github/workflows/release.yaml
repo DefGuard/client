@@ -40,18 +40,18 @@ jobs:
   #         name: wireguard-go-x86_64-apple-darwin
   #         path: wireguard-go
 
-  # create-release:
-  #   name: create-release
-  #   runs-on: self-hosted
-  #   outputs:
-  #     upload_url: ${{ steps.release.outputs.upload_url }}
-  #   steps:
-  #     - name: Create GitHub release
-  #       id: release
-  #       uses: softprops/action-gh-release@v2
-  #       with:
-  #         draft: true
-  #         generate_release_notes: true
+  create-release:
+    name: create-release
+    runs-on: self-hosted
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+    steps:
+      - name: Create GitHub release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
 
   # create-sbom:
   #   needs: [create-release]
@@ -59,8 +59,8 @@ jobs:
   #   with:
   #     upload_url: ${{ needs.create-release.outputs.upload_url }}
   ubuntu-22-04-build:
-    # needs:
-    #   - create-release
+    needs:
+      - create-release
     runs-on:
       - self-hosted
       - Linux
