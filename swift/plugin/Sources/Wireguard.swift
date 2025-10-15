@@ -23,7 +23,11 @@ public func startTunnel(json: SRString) {
     }
 
     logger.log("Starting tunnel with config: \(String(describing: config))")
-    try? plugin.startTunnel(config: config) { result in
-        // nothing here for the time being
+    plugin.startTunnel(config: config) { result in
+        if result == nil {
+            logger.info("Tunnel started successfully")
+        } else {
+            logger.error("Tunnel failed to start with \(result)")
+        }
     }
 }

@@ -28,10 +28,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
     SwiftLinker::new("13")
         .with_ios("15")
-        .with_package("defguard-vpn-extension", "../swift/")
+        .with_package("defguard-vpn-plugin", "../swift/plugin")
         .link();
 
     println!("cargo:rerun-if-changed=proto");
+    #[cfg(target_os = "macos")]
     println!("cargo:rerun-if-changed=../swift");
     Ok(())
 }
