@@ -121,7 +121,7 @@ jobs:
         run: |
           COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
 
-          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY }} --secret-access-key=${{ secrets.AWS_SECRET_KEY }} --s3-region=eu-north-1 --no-fail-if-exists --codename=trixie --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=trixie --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
       - name: Rename client binary
         run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
       - name: Tar client binary
@@ -500,8 +500,8 @@ jobs:
     steps:
       - name: Sign APT repository
         run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY }}
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_APT }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY_APT }}
           export AWS_REGION=eu-north-1
           sudo apt update -y
           sudo apt install -y awscli curl jq
