@@ -199,6 +199,7 @@ jobs:
     needs:
       - create-release
       - build-linux
+    if: "!contains(github.ref_name, '-')"
     runs-on:
       - self-hosted
       - Linux
