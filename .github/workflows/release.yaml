@@ -111,7 +111,7 @@ jobs:
           asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_content_type: application/octet-stream
-      - name: Upload DEB to APT repository
+      - name: Upload DEB to APT repository #Add this to ubuntu 22.04 job (on merge dev -> main) 
         run: |
           export PATH="/srv/github/defguard/.local/share/gem/ruby/3.3.0/bin:$PATH"
           COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
@@ -484,7 +484,7 @@ jobs:
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
           asset_content_type: application/octet-stream
   apt-sign:
-    needs: 
+    needs: #Add needs: -ubuntu-22-04-build (on merge dev -> main) 
       - build-linux
     runs-on:
       - self-hosted
