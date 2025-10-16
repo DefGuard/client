@@ -102,14 +102,14 @@ function Save-DefguardEnrollmentData {
     }
 }
 
-# Get user info from on-premises AD
-function Get-OnPremisesADUserInfo {
+# Get Defguard client provisioning config from on-premises AD
+function Get-OnPremisesADProvisioningConfig {
     param([string]$Username)
     
     # Check if Active Directory module is available
     if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) {
         Write-Host "Active Directory module is not installed. Please install RSAT tools." -ForegroundColor Red
-        return $null
+        return
     }
 
     # Import the Active Directory module
@@ -117,7 +117,7 @@ function Get-OnPremisesADUserInfo {
         Import-Module ActiveDirectory -ErrorAction Stop
     } catch {
         Write-Host "Failed to import Active Directory module: $_" -ForegroundColor Red
-        return $null
+        return
     }
 
     # Fetch AD user information
@@ -140,23 +140,23 @@ function Get-OnPremisesADUserInfo {
         Write-Host "Distinguished Name:  $($adUser.DistinguishedName)"
         Write-Host "======================================================`n" -ForegroundColor Cyan
         
-        return $adUser
+        return
         
     } catch {
         Write-Host "Failed to retrieve AD user information for '$Username': $_" -ForegroundColor Red
-        return $null
+        return
     }
 }
 
-# Get user info from Entra ID
-function Get-EntraIDUserInfo {
+# Get Defguard client provisioning config from Entra ID
+function Get-EntraIDProvisioningConfig {
     param([bool]$SilentMode)
     
     # Check if Microsoft.Graph module is available
     if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Users)) {
         Write-Host "Microsoft.Graph.Users module is not installed." -ForegroundColor Yellow
         Write-Host "Install it with: Install-Module Microsoft.Graph.Users -Scope CurrentUser" -ForegroundColor Yellow
-        return $null
+        return
     }
 
     # Import the module
@@ -164,7 +164,7 @@ function Get-EntraIDUserInfo {
         Import-Module Microsoft.Graph.Users -ErrorAction Stop
     } catch {
         Write-Host "Failed to import Microsoft.Graph.Users module: $_" -ForegroundColor Red
-        return $null
+        return
     }
 
     # Connect to Microsoft Graph
@@ -174,7 +174,7 @@ function Get-EntraIDUserInfo {
         if (-not $context) {
             if ($SilentMode) {
                 Write-Host "Not authenticated to Microsoft Graph and silent mode is enabled. Cannot proceed." -ForegroundColor Yellow
-                return $null
+                return
             }
             
             Write-Host "Connecting to Microsoft Graph (authentication required)..." -ForegroundColor Yellow
@@ -187,6 +187,7 @@ function Get-EntraIDUserInfo {
                 Write-Host "Warning: Missing 'CustomSecAttributeAssignment.Read.All' permission." -ForegroundColor Yellow
                 Write-Host "Custom security attributes will not be available. Reconnect with:" -ForegroundColor Yellow
                 Write-Host "  Connect-MgGraph -Scopes 'User.Read', 'CustomSecAttributeAssignment.Read.All'" -ForegroundColor Gray
+                return
             }
         }
         
@@ -195,9 +196,6 @@ function Get-EntraIDUserInfo {
             "DisplayName",
             "UserPrincipalName",
             "Mail",
-            "JobTitle",
-            "Department",
-            "OfficeLocation",
             "AccountEnabled",
             "CreatedDateTime",
             "Id",
@@ -211,9 +209,6 @@ function Get-EntraIDUserInfo {
         Write-Host "Display Name:        $($mgUser.DisplayName)"
         Write-Host "User Principal Name: $($mgUser.UserPrincipalName)"
         Write-Host "Email:               $($mgUser.Mail)"
-        Write-Host "Department:          $($mgUser.Department)"
-        Write-Host "Title:               $($mgUser.JobTitle)"
-        Write-Host "Office:              $($mgUser.OfficeLocation)"
         Write-Host "Account Enabled:     $($mgUser.AccountEnabled)"
         Write-Host "Created:             $($mgUser.CreatedDateTime)"
         Write-Host "User ID:             $($mgUser.Id)"
@@ -254,13 +249,10 @@ function Get-EntraIDUserInfo {
         }
         
         Write-Host "=============================================`n" -ForegroundColor Cyan
-        
-        return $mgUser
-        
+                
     } catch {
         Write-Host "Failed to retrieve Entra ID user information: $_" -ForegroundColor Red
         Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Red
-        return $null
     }
 }
 
@@ -275,7 +267,7 @@ Write-Host "Join Type = '$joinType'" -ForegroundColor Magenta
 if ($joinType -eq "OnPremisesAD") {
         Write-Host "Connected to on-premises Active Directory: $($joinStatus.Domain)" -ForegroundColor Green
         $currentUser = $env:USERNAME
-        $userInfo = Get-OnPremisesADUserInfo -Username $currentUser
+        Get-OnPremisesADUserInfo -Username $currentUser
         exit 0
     
     
@@ -283,7 +275,7 @@ if ($joinType -eq "OnPremisesAD") {
         Write-Host "Hybrid join detected (both on-premises AD and Entra ID): $($joinStatus.Domain)" -ForegroundColor Green
         Write-Host "Querying on-premises Active Directory..." -ForegroundColor Gray
         $currentUser = $env:USERNAME
-        $userInfo = Get-OnPremisesADUserInfo -Username $currentUser
+        Get-OnPremisesADUserInfo -Username $currentUser
         exit 0
     
     
@@ -292,7 +284,7 @@ if ($joinType -eq "OnPremisesAD") {
         if ($joinStatus.Domain) {
             Write-Host "  Tenant: $($joinStatus.Domain)" -ForegroundColor Gray
         }
-        $userInfo = Get-EntraIDUserInfo -SilentMode $Silent
+        Get-EntraIDProvisioningConfig -SilentMode $Silent
         exit 0
     
     
