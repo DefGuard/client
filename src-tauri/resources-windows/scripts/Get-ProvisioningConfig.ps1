@@ -14,10 +14,14 @@
 
 .PARAMETER Silent
     Suppresses interactive authentication prompts for Entra ID (will fail if not already authenticated)
+
+.PARAMETER ExtensionAttribute
+    Specifies which extension attribute to read from AD (default: extensionAttribute1)
 #>
 
 param(
-    [switch]$Silent
+    [switch]$Silent,
+    [string]$ExtensionAttribute = "extensionAttribute1"
 )
 
 # Check device join status
@@ -105,7 +109,10 @@ function Save-DefguardEnrollmentData {
 
 # Get Defguard client provisioning config from on-premises AD
 function Get-OnPremisesADProvisioningConfig {
-    param([string]$Username)
+    param(
+        [string]$Username,
+        [string]$ExtensionAttribute
+    )
     
     # Check if Active Directory module is available
     if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) {
@@ -139,10 +146,10 @@ function Get-OnPremisesADProvisioningConfig {
         # Check for Defguard custom attributes in extension attributes
         Write-Host "`n--- Custom Attributes ---" -ForegroundColor Yellow
         
-        # Read JSON data from a single extension attribute (using extensionAttribute1)
-        $jsonData = $adUser.extensionAttribute1
+        # Read JSON data from the specified extension attribute
+        $jsonData = $adUser.$ExtensionAttribute
         
-        Write-Host "Defguard Enrollment JSON (extensionAttribute1): $jsonData"
+        Write-Host "Defguard Enrollment JSON ($ExtensionAttribute): $jsonData"
         
         if ($jsonData) {
             try {
@@ -166,7 +173,7 @@ function Get-OnPremisesADProvisioningConfig {
                     Write-Host "`nWarning: Incomplete Defguard enrollment data in JSON. Both URL and token are required." -ForegroundColor Yellow
                 }
             } catch {
-                Write-Host "Failed to parse JSON from extension attribute: $_" -ForegroundColor Red
+                Write-Host "Failed to parse JSON from extension attribute '$ExtensionAttribute': $_" -ForegroundColor Red
                 Write-Host "JSON data should be in format: {\`"enrollmentUrl\`":\`"https://...\`",\`"enrollmentToken\`":\`"token-value\`"}" -ForegroundColor Yellow
             }
         } else {
@@ -303,7 +310,7 @@ Write-Host "Join Type = '$joinType'" -ForegroundColor Magenta
 if ($joinType -eq "OnPremisesAD") {
         Write-Host "Connected to on-premises Active Directory: $($joinStatus.Domain)" -ForegroundColor Green
         $currentUser = $env:USERNAME
-        Get-OnPremisesADUserInfo -Username $currentUser
+        Get-OnPremisesADProvisioningConfig -Username $currentUser -ExtensionAttribute $ExtensionAttribute
         exit 0
     
     
@@ -311,7 +318,7 @@ if ($joinType -eq "OnPremisesAD") {
         Write-Host "Hybrid join detected (both on-premises AD and Entra ID): $($joinStatus.Domain)" -ForegroundColor Green
         Write-Host "Querying on-premises Active Directory..." -ForegroundColor Gray
         $currentUser = $env:USERNAME
-        Get-OnPremisesADUserInfo -Username $currentUser
+        Get-OnPremisesADProvisioningConfig -Username $currentUser -ExtensionAttribute $ExtensionAttribute
         exit 0
     
     
