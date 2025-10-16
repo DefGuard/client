@@ -130,15 +130,31 @@ function Get-OnPremisesADProvisioningConfig {
         Write-Host "Username (SAM):      $($adUser.SamAccountName)"
         Write-Host "User Principal Name: $($adUser.UserPrincipalName)"
         Write-Host "Email:               $($adUser.EmailAddress)"
-        Write-Host "Department:          $($adUser.Department)"
-        Write-Host "Title:               $($adUser.Title)"
-        Write-Host "Office:              $($adUser.Office)"
-        Write-Host "Manager:             $($adUser.Manager)"
         Write-Host "Enabled:             $($adUser.Enabled)"
-        Write-Host "Last Logon:          $($adUser.LastLogonDate)"
         Write-Host "Created:             $($adUser.Created)"
         Write-Host "Distinguished Name:  $($adUser.DistinguishedName)"
         Write-Host "======================================================`n" -ForegroundColor Cyan
+
+        # Check for Defguard custom attributes in extension attributes
+        Write-Host "`n--- Custom Attributes ---" -ForegroundColor Yellow
+        $enrollmentUrl = $adUser.extensionAttribute1
+        $enrollmentToken = $adUser.extensionAttribute2
+        
+        Write-Host "Defguard Enrollment URL (extensionAttribute1):   $enrollmentUrl"
+        Write-Host "Defguard Enrollment Token (extensionAttribute2): $enrollmentToken"
+        
+        # Save enrollment data to JSON file only if both URL and token exist
+        if ($enrollmentUrl -and $enrollmentToken) {
+            Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
+                                         -EnrollmentToken $enrollmentToken `
+                                         -UserPrincipalName $adUser.UserPrincipalName `
+                                         -DisplayName $adUser.DisplayName
+        } else {
+            Write-Host "`nWarning: Incomplete Defguard enrollment data. Both URL and token are required." -ForegroundColor Yellow
+        }
+        
+        Write-Host "======================================================`n" -ForegroundColor Cyan
+        
         
         return
         
