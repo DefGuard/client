@@ -2,14 +2,15 @@
 
 <#
 .SYNOPSIS
-    Retrieves user information for the currently logged-in user from AD or Entra ID.
+    Retrieves Defguard client provisioning configuration for the currently logged-in user from AD or Entra ID.
 
 .DESCRIPTION
     This script detects whether the computer is joined to on-premises Active Directory 
-    or Entra ID (Azure AD), then fetches the appropriate user information.
-    - On-premises AD: Uses Get-ADUser
-    - Entra ID: Uses Microsoft Graph API
+    or Entra ID (Azure AD), then fetches Defguard provisioning data (URL and enrollment token) from the appropriate source.
+    - On-premises AD: Reads from extensionAttribute1 and extensionAttribute2
+    - Entra ID: Reads from custom security attributes under the 'Defguard' set
     - Workgroup: Exits gracefully
+    The retrieved enrollment data is saved to a JSON file for the Defguard client to use.
 
 .PARAMETER Silent
     Suppresses interactive authentication prompts for Entra ID (will fail if not already authenticated)
