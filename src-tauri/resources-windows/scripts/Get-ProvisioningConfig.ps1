@@ -138,20 +138,39 @@ function Get-OnPremisesADProvisioningConfig {
 
         # Check for Defguard custom attributes in extension attributes
         Write-Host "`n--- Custom Attributes ---" -ForegroundColor Yellow
-        $enrollmentUrl = $adUser.extensionAttribute1
-        $enrollmentToken = $adUser.extensionAttribute2
         
-        Write-Host "Defguard Enrollment URL (extensionAttribute1):   $enrollmentUrl"
-        Write-Host "Defguard Enrollment Token (extensionAttribute2): $enrollmentToken"
+        # Read JSON data from a single extension attribute (using extensionAttribute1)
+        $jsonData = $adUser.extensionAttribute1
         
-        # Save enrollment data to JSON file only if both URL and token exist
-        if ($enrollmentUrl -and $enrollmentToken) {
-            Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
-                                         -EnrollmentToken $enrollmentToken `
-                                         -UserPrincipalName $adUser.UserPrincipalName `
-                                         -DisplayName $adUser.DisplayName
+        Write-Host "Defguard Enrollment JSON (extensionAttribute1): $jsonData"
+        
+        if ($jsonData) {
+            try {
+                # Parse the JSON data
+                $enrollmentConfig = $jsonData | ConvertFrom-Json -ErrorAction Stop
+                
+                # Extract URL and token from the parsed JSON
+                $enrollmentUrl = $enrollmentConfig.enrollmentUrl
+                $enrollmentToken = $enrollmentConfig.enrollmentToken
+                
+                Write-Host "Defguard Enrollment URL:   $enrollmentUrl"
+                Write-Host "Defguard Enrollment Token: $enrollmentToken"
+                
+                # Save enrollment data to JSON file only if both URL and token exist
+                if ($enrollmentUrl -and $enrollmentToken) {
+                    Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
+                                                 -EnrollmentToken $enrollmentToken `
+                                                 -UserPrincipalName $adUser.UserPrincipalName `
+                                                 -DisplayName $adUser.DisplayName
+                } else {
+                    Write-Host "`nWarning: Incomplete Defguard enrollment data in JSON. Both URL and token are required." -ForegroundColor Yellow
+                }
+            } catch {
+                Write-Host "Failed to parse JSON from extension attribute: $_" -ForegroundColor Red
+                Write-Host "JSON data should be in format: {\`"enrollmentUrl\`":\`"https://...\`",\`"enrollmentToken\`":\`"token-value\`"}" -ForegroundColor Yellow
+            }
         } else {
-            Write-Host "`nWarning: Incomplete Defguard enrollment data. Both URL and token are required." -ForegroundColor Yellow
+            Write-Host "No Defguard enrollment data found in extension attributes." -ForegroundColor Yellow
         }
         
         Write-Host "======================================================`n" -ForegroundColor Cyan
