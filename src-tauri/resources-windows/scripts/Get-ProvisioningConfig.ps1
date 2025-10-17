@@ -15,13 +15,13 @@
 .PARAMETER Silent
     Suppresses interactive authentication prompts for Entra ID (will fail if not already authenticated)
 
-.PARAMETER ExtensionAttribute
-    Specifies which extension attribute to read from AD (default: extensionAttribute1)
+.PARAMETER ADAttribute
+    Specifies which Active Directory attribute to read from (default: extensionAttribute1)
 #>
 
 param(
     [switch]$Silent,
-    [string]$ExtensionAttribute = "extensionAttribute1"
+    [string]$ADAttribute = "extensionAttribute1"
 )
 
 # Check device join status
@@ -111,7 +111,7 @@ function Save-DefguardEnrollmentData {
 function Get-OnPremisesADProvisioningConfig {
     param(
         [string]$Username,
-        [string]$ExtensionAttribute
+        [string]$ADAttribute
     )
     
     # Check if Active Directory module is available
@@ -143,13 +143,13 @@ function Get-OnPremisesADProvisioningConfig {
         Write-Host "Distinguished Name:  $($adUser.DistinguishedName)"
         Write-Host "======================================================`n" -ForegroundColor Cyan
 
-        # Check for Defguard custom attributes in extension attributes
-        Write-Host "`n--- Custom Attributes ---" -ForegroundColor Yellow
+        # Check for Defguard enrollment data in the specified AD attribute
+        Write-Host "`n--- Active Directory Attribute ---" -ForegroundColor Yellow
         
-        # Read JSON data from the specified extension attribute
-        $jsonData = $adUser.$ExtensionAttribute
+        # Read JSON data from the specified AD attribute
+        $jsonData = $adUser.$ADAttribute
         
-        Write-Host "Defguard Enrollment JSON ($ExtensionAttribute): $jsonData"
+        Write-Host "Defguard Enrollment JSON ($ADAttribute): $jsonData"
         
         if ($jsonData) {
             try {
@@ -173,11 +173,11 @@ function Get-OnPremisesADProvisioningConfig {
                     Write-Host "`nWarning: Incomplete Defguard enrollment data in JSON. Both URL and token are required." -ForegroundColor Yellow
                 }
             } catch {
-                Write-Host "Failed to parse JSON from extension attribute '$ExtensionAttribute': $_" -ForegroundColor Red
+                Write-Host "Failed to parse JSON from AD attribute '$ADAttribute': $_" -ForegroundColor Red
                 Write-Host "JSON data should be in format: {\`"enrollmentUrl\`":\`"https://...\`",\`"enrollmentToken\`":\`"token-value\`"}" -ForegroundColor Yellow
             }
         } else {
-            Write-Host "No Defguard enrollment data found in extension attributes." -ForegroundColor Yellow
+            Write-Host "No Defguard enrollment data found in the specified AD attribute." -ForegroundColor Yellow
         }
         
         Write-Host "======================================================`n" -ForegroundColor Cyan
@@ -310,7 +310,7 @@ Write-Host "Join Type = '$joinType'" -ForegroundColor Magenta
 if ($joinType -eq "OnPremisesAD") {
         Write-Host "Connected to on-premises Active Directory: $($joinStatus.Domain)" -ForegroundColor Green
         $currentUser = $env:USERNAME
-        Get-OnPremisesADProvisioningConfig -Username $currentUser -ExtensionAttribute $ExtensionAttribute
+        Get-OnPremisesADProvisioningConfig -Username $currentUser -ADAttribute $ADAttribute
         exit 0
     
     
@@ -318,7 +318,7 @@ if ($joinType -eq "OnPremisesAD") {
         Write-Host "Hybrid join detected (both on-premises AD and Entra ID): $($joinStatus.Domain)" -ForegroundColor Green
         Write-Host "Querying on-premises Active Directory..." -ForegroundColor Gray
         $currentUser = $env:USERNAME
-        Get-OnPremisesADProvisioningConfig -Username $currentUser -ExtensionAttribute $ExtensionAttribute
+        Get-OnPremisesADProvisioningConfig -Username $currentUser -ADAttribute $ADAttribute
         exit 0
     
     
