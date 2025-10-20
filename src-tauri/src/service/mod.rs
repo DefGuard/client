@@ -13,6 +13,7 @@ use std::{
     net::IpAddr,
     pin::Pin,
     str::FromStr,
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 #[cfg(unix)]
@@ -37,7 +38,7 @@ use proto::{
 };
 #[cfg(unix)]
 use tokio::net::UnixListener;
-use tokio::{sync::mpsc, time::interval};
+use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{
@@ -73,39 +74,36 @@ pub enum DaemonError {
     TransportError(#[from] tonic::transport::Error),
 }
 
-#[derive(Debug, Default)]
-pub struct DaemonService {
+type IfName = String;
+#[cfg(not(target_os = "macos"))]
+type WG = WGApi<Kernel>;
+#[cfg(target_os = "macos")]
+type WG = WGApi<Userspace>;
+
+#[derive(Default)]
+pub(crate) struct DaemonService {
+    // Map of running `WGApi`s; key is interface name.
+    wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
+    stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
 }
 
 impl DaemonService {
     #[must_use]
     pub fn new(config: &Config) -> Self {
         Self {
+            wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
+            stat_tasks: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-#[cfg(not(target_os = "macos"))]
-#[allow(clippy::result_large_err)]
-pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Kernel>, Status> {
-    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).map_err(|err| {
-        let msg = format!("Failed to setup kernel WireGuard API for interface {ifname}: {err}");
-        error!("{msg}");
-        Status::new(Code::Internal, msg)
-    })?;
-
-    Ok(wgapi)
-}
-
-#[cfg(target_os = "macos")]
-#[allow(clippy::result_large_err)]
-pub fn setup_wgapi(ifname: &str) -> Result<WGApi<Userspace>, Status> {
-    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).map_err(|err| {
-        let msg = format!("Failed to setup userspace WireGuard API for interface {ifname}: {err}");
+fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
+    let wgapi = WG::new(ifname).map_err(|err| {
+        let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         Status::new(Code::Internal, msg)
     })?;
@@ -132,8 +130,14 @@ impl DesktopDaemonService for DaemonService {
             .into();
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
-        // setup WireGuard API
-        let wgapi = setup_wgapi(ifname)?;
+        // Setup WireGuard API.
+        let Ok(mut wgapis_map) = self.wgapis.write() else {
+            error!("Failed to acquire read-write lock for WGApis");
+            return Err(Status::new(Code::Internal, "read-write lock error"));
+        };
+        let wgapi = wgapis_map
+            .entry(ifname.clone())
+            .or_insert(setup_wgapi(ifname)?);
 
         #[cfg(not(windows))]
         {
@@ -221,7 +225,25 @@ impl DesktopDaemonService for DaemonService {
         let _span = info_span!("remove_interface", interface_name = &ifname).entered();
         debug!("Removing interface {ifname}");
 
-        let wgapi = setup_wgapi(&ifname)?;
+        // Stop stats task.
+        if let Ok(mut tasks) = self.stat_tasks.lock() {
+            if let Some(handle) = tasks.remove(&ifname) {
+                info!("Stopping statistics collector task for interface {ifname}");
+                handle.abort();
+            }
+        }
+
+        let wgapi = {
+            let Ok(mut wgapis_map) = self.wgapis.write() else {
+                error!("Failed to acquire read-write lock for WGApis");
+                return Err(Status::new(Code::Internal, "read-write lock error"));
+            };
+            let Some(wgapi) = wgapis_map.remove(&ifname) else {
+                error!("Unknown interface {ifname}");
+                return Err(Status::new(Code::Internal, "unknown interface"));
+            };
+            wgapi
+        };
 
         #[cfg(not(windows))]
         {
@@ -251,23 +273,21 @@ impl DesktopDaemonService for DaemonService {
         request: tonic::Request<ReadInterfaceDataRequest>,
     ) -> Result<Response<Self::ReadInterfaceDataStream>, Status> {
         let request = request.into_inner();
-        let ifname = request.interface_name;
+        let ifname = request.interface_name.clone();
         debug!(
             "Received a request to start a new network usage stats data stream for interface \
             {ifname}"
         );
         let span = info_span!("read_interface_data", interface_name = &ifname);
 
-        // Setup WireGuard API.
-        let wgapi = setup_wgapi(&ifname)?;
+        let wgapis = Arc::clone(&self.wgapis);
         let mut interval = interval(self.stats_period);
         let (tx, rx) = mpsc::channel(64);
 
         span.in_scope(|| {
             info!("Spawning statistics collector task for interface {ifname}");
         });
-
-        tokio::spawn(
+        let handle = tokio::spawn(
             async move {
                 // Helper map to track if peer data is actually changing to avoid sending duplicate
                 // stats.
@@ -278,7 +298,18 @@ impl DesktopDaemonService for DaemonService {
                     interval.tick().await;
                     debug!(
                     "Gathering network usage statistics for client's network activity on {ifname}");
-                    match wgapi.read_interface_data() {
+                    let result = {
+                        let Ok(wgapis_map) = wgapis.read() else {
+                            error!("Failed to acquire read-write lock for WGApis");
+                            break;
+                        };
+                        let Some(wgapi) = wgapis_map.get(&ifname) else {
+                            error!("Unknown interface {ifname}");
+                            break;
+                        };
+                        wgapi.read_interface_data()
+                    };
+                    match result {
                         Ok(mut host) => {
                             let peers = &mut host.peers;
                             debug!(
@@ -287,7 +318,7 @@ impl DesktopDaemonService for DaemonService {
                             );
                             // Filter out never connected peers.
                             peers.retain(|_, peer| {
-                                // Last handshake time-stamp must exist...
+                                // Last handshake time-stamp must exist.
                                 if let Some(last_hs) = peer.last_handshake {
                                     // ...and not be UNIX epoch.
                                     if last_hs != SystemTime::UNIX_EPOCH
@@ -334,6 +365,9 @@ impl DesktopDaemonService for DaemonService {
             }
             .instrument(span),
         );
+        if let Ok(mut tasks) = self.stat_tasks.lock() {
+            tasks.insert(request.interface_name, handle);
+        }
 
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(

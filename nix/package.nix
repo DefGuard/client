@@ -3,10 +3,12 @@
   lib,
   stdenv,
   rustPlatform,
+  rustc,
+  cargo,
   makeDesktopItem,
 }: let
   pname = "defguard-client";
-  version = "1.5.1"; # TODO: Get this from Cargo.toml or git
+  version = "1.5.2"; # TODO: Get this from Cargo.toml or git
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -17,7 +19,7 @@
     categories = ["Network" "Security"];
   };
 
-  rustToolchain = pkgs.rust-bin.stable.latest.default;
+  pnpm = pkgs.pnpm_10;
 
   buildInputs = with pkgs; [
     at-spi2-atk
@@ -38,22 +40,21 @@
     desktop-file-utils
   ];
 
-  nativeBuildInputs = with pkgs; [
-    rustToolchain
-    pkg-config
-    gobject-introspection
-    cargo-tauri
-    nodejs_24
-    protobuf
+  nativeBuildInputs = [
+    rustc
+    cargo
+    pkgs.pkg-config
+    pkgs.gobject-introspection
+    pkgs.cargo-tauri
+    pkgs.nodejs_24
+    pkgs.protobuf
     pnpm
     # configures pnpm to use pre-fetched dependencies
     pnpm.configHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
-    # perl
-    wrapGAppsHook
     # helper to add dynamic library paths
-    makeWrapper
+    pkgs.makeWrapper
   ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
@@ -67,6 +68,9 @@ in
 
     cargoDeps = rustPlatform.importCargoLock {
       lockFile = ../src-tauri/Cargo.lock;
+      outputHashes = {
+        "boringtun-0.6.0" = "sha256-UlgcnHAdrWm3S1v5T4W0froF4jJNqRAsfcVuI2EMSgk=";
+      };
     };
 
     # prefetch pnpm dependencies
@@ -79,7 +83,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-GlgQuPpOibPrItt6X9EqV4QmCOyajZh5yy7gHh+O+ME=";
+      hash = "sha256-Qt4xC7BO7JZn236jXVe2VPAAFNnxdSJAvq+PYflW264=";
     };
 
     buildPhase = ''
@@ -99,7 +103,7 @@ in
 
       # add required library to client binary RPATH
       wrapProgram $out/bin/${pname} \
-      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator]}
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator pkgs.desktop-file-utils]}
 
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
