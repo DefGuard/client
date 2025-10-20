@@ -179,6 +179,11 @@ fn main() {
             // Prepare `AppConfig`.
             let config = AppConfig::new(app_handle);
 
+            // Check if client needs to be initialized
+            // and try to load provisioning config if necessary
+            let provisioning_config =
+                tauri::async_runtime::block_on(handle_client_initialization(app_handle));
+
             // Setup logging.
 
             // If deriving from env value fails, use config default (env overrides config file).
@@ -245,7 +250,7 @@ fn main() {
                     .build(),
             )?;
 
-            let state = AppState::new(config);
+            let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
             info!("App setup completed, log level: {log_level}");

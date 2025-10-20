@@ -1,14 +1,11 @@
 use std::{fs::OpenOptions, path::Path};
 
 use serde::Deserialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
-use crate::{
-    database::{models::instance::Instance, DB_POOL},
-    events::{AddInstancePayload, EventKey},
-};
+use crate::database::{models::instance::Instance, DB_POOL};
 
-const CONFIG_FILE_NAME: &str = "provisioning_config";
+const CONFIG_FILE_NAME: &str = "enrollment.json";
 
 #[derive(Debug, Deserialize)]
 pub struct ProvisioningConfig {
@@ -30,7 +27,7 @@ impl ProvisioningConfig {
             Ok(config) => Some(config),
             Err(err) => {
                 warn!("Failed to parse provisioning configuration file at {path:?}. Error details: {err}");
-                return None;
+                None
             }
         }
     }
@@ -44,9 +41,10 @@ pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningCo
 }
 
 /// Checks if the client has already been initialized
-/// and triggers the process of adding an instance if necessary
-pub async fn handle_client_initialization(app_handle: &AppHandle) {
+/// and tries to load provisioning config from file if necessary
+pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<ProvisioningConfig> {
     // check if client has already been initialized
+    // we assume that if any instances exist the client has been initialized
     match Instance::all(&*DB_POOL).await {
         Ok(instances) => {
             if instances.is_empty() {
@@ -63,13 +61,7 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) {
                             "Provisioning config found in {data_dir:?}. Triggering enrollment start."
                         );
                         debug!("Provisioning config: {config:?}");
-                        let _ = app_handle.emit(
-                            EventKey::AddInstance.into(),
-                            AddInstancePayload {
-                                token: &config.enrollment_token,
-                                url: &config.enrollment_url,
-                            },
-                        );
+                        return Some(config);
                     }
                     None => {
                         debug!("Provisioning config not found in {data_dir:?}. Proceeding with normal startup.")
@@ -81,4 +73,6 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) {
             error!("Failed to verify if the client has already been initialized: {err}")
         }
     }
+
+    None
 }
