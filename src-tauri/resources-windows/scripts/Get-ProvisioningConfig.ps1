@@ -174,7 +174,7 @@ function Get-OnPremisesADProvisioningConfig {
                 }
             } catch {
                 Write-Host "Failed to parse JSON from AD attribute '$ADAttribute': $_" -ForegroundColor Red
-                Write-Host "JSON data should be in format: {\`"enrollmentUrl\`":\`"https://...\`",\`"enrollmentToken\`":\`"token-value\`"}" -ForegroundColor Yellow
+                Write-Host "JSON data should be in format: {`"enrollmentUrl`":`"https://...`",`"enrollmentToken`":`"token-value`"}" -ForegroundColor Yellow
             }
         } else {
             Write-Host "No Defguard enrollment data found in the specified AD attribute." -ForegroundColor Yellow
