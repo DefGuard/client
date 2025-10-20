@@ -36,11 +36,16 @@
       }
     },
     "macOS": {
-      "entitlements": null,
+      "entitlements": "./Client.entitlements",
       "exceptionDomain": "",
+      "files": {
+        "embedded.provisionprofile": "Adam_Apollo_Defguard.provisionprofile",
+        "PlugIns": "/Users/adam/Library/Developer/Xcode/DerivedData/NetExt-bpogxtiuhfulrpbbfnqblorodxcp/Build/Products/Release/NetExt.app/Contents/PlugIns"
+      },
       "frameworks": [],
+      "minimumSystemVersion": "13.5",
       "providerShortName": null,
-      "signingIdentity": null
+      "signingIdentity": "692SQ9VLU5"
     },
     "resources": [
       "resources/icons/*"
@@ -71,7 +76,7 @@
   },
   "productName": "defguard-client",
   "mainBinaryName": "defguard-client",
-  "identifier": "net.defguard",
+  "identifier": "net.defguard.client",
   "version": "1.5.2",
   "app": {
     "security": {

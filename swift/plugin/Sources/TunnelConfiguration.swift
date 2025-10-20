@@ -109,4 +109,9 @@ final class TunnelConfiguration: Codable {
 
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
     }
+
+    /// Client connection expects one peer, so check for that.
+    func isValidForClientConnection() -> Bool {
+        return peers.count == 1
+    }
 }

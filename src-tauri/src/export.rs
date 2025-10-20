@@ -51,7 +51,6 @@ impl Location<Id> {
     pub(crate) async fn tunnel_configurarion<'e, E>(
         &self,
         executor: E,
-        name: String,
         preshared_key: Option<String>,
         dns: Vec<IpAddr>,
         dns_search: Vec<String>,
@@ -129,11 +128,11 @@ impl Location<Id> {
                 Error::InternalError(msg)
             })?;
         let interface_config = TunnelConfiguration {
-            name,
+            name: self.name.clone(),
             private_key: keys.prvkey,
             addresses,
             listen_port: Some(0),
-            peers: vec![],
+            peers: vec![peer],
             mtu: None,
             dns,
             dns_search,

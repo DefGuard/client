@@ -10,7 +10,7 @@ public class WireguardPlugin: NSObject {
     private var configurationObserver: NSObjectProtocol?
     private var vpnManager: VPNManagement
     private var logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "net.defguard.WireguardPlugin",
+        subsystem: appId,
         category: "WireguardPlugin")
 
     public init(vpnManager: VPNManagement? = nil) {
@@ -47,21 +47,21 @@ public class WireguardPlugin: NSObject {
 
     /// Loads the possibly already existing VPN manager and sets up observers for VPN connection status changes if its present.
     /// This is to ensure that the VPN status is observed and updated correctly when the app starts.
-    private func setupVPNManager(
-        completion: @escaping () -> Void
-    ) {
-        vpnManager.loadProviderManager { manager in
-            if manager == nil {
-                self.logger.log(
-                    "No provider manager found, the VPN status won't be observed until the VPN is started."
-                )
-            } else {
-                self.logger.log(
-                    "VPN manager loaded successfully, the VPN status will be observed and updated.")
-            }
-            completion()
-        }
-    }
+//    private func setupVPNManager(
+//        completion: @escaping () -> Void
+//    ) {
+//        vpnManager.loadProviderManager { manager in
+//            if manager == nil {
+//                self.logger.log(
+//                    "No provider manager found, the VPN status won't be observed until the VPN is started."
+//                )
+//            } else {
+//                self.logger.log(
+//                    "VPN manager loaded successfully, the VPN status will be observed and updated.")
+//            }
+//            completion()
+//        }
+//    }
 
     /// Sets up observers for VPN connection status changes.
     private func setupVPNObservers() {
@@ -229,18 +229,42 @@ public class WireguardPlugin: NSObject {
         defaults?.removeObject(forKey: "lastTunnelError")
     }
 
+//    private func saveConfig(config: TunnelConfiguration, result: @escaping (VPNError?) -> Void) {
+//        logger.info("Saving tunnel config: \(String(describing: config))")
+//
+//        vpnManager.saveProviderManager(providerManager) { saveError in
+//            if let saveError = saveError {
+//                self.logger.log("Failed to save preferences: \(saveError, privacy: .public)")
+//                result(
+//                    VPNError.saveError(
+//                        saveError
+//                    )
+//                )
+//                return
+//            }
+//        }
+//    }
+
     func startTunnel(
         config: TunnelConfiguration,
-        result: @escaping (VPNError?) -> Void
+        completion: @escaping (VPNError?) -> Void
     ) {
         logger.log("Starting tunnel with config: \(String(describing: config))")
 
-        vpnManager.loadProviderManager { manager in
-            let appId = Bundle.main.bundleIdentifier ?? "net.defguard.mobile"
+        if !config.isValidForClientConnection() {
+            completion(VPNError.invalidConfig)
+        }
+
+        vpnManager.loadProviderManager(name: config.name) { manager in
             let providerManager = manager ?? NETunnelProviderManager()
             let tunnelProtocol = NETunnelProviderProtocol()
             tunnelProtocol.providerBundleIdentifier = "\(appId).VPNExtension"
-            tunnelProtocol.serverAddress = ""  // config.endpoint
+            // `serverAddress` must have a non-nil string value for the protocol configuration to be valid.
+            if let endpoint = config.peers[0].endpoint {
+                tunnelProtocol.serverAddress = endpoint.toString()
+            } else {
+                tunnelProtocol.serverAddress = ""
+            }
             let configDict: [String: Any]
             do {
                 configDict = try config.toDictionary()
@@ -248,14 +272,14 @@ public class WireguardPlugin: NSObject {
                 self.logger.log(
                     "Failed to convert config to dictionary: \(error.localizedDescription, privacy: .public)"
                 )
-                result(
+                completion(
                     VPNError.configurationError(error)
                 )
                 return
             }
             tunnelProtocol.providerConfiguration = configDict
             providerManager.protocolConfiguration = tunnelProtocol
-            // providerManager.localizedDescription = config.locationName
+            providerManager.localizedDescription = config.name
             providerManager.isEnabled = true
 
             if let status = self.vpnManager.connectionStatus {
@@ -264,7 +288,7 @@ public class WireguardPlugin: NSObject {
                         try self.vpnManager.stopTunnel()
                     } catch {
                         self.logger.log("Failed to stop VPN tunnel: \(error, privacy: .public)")
-                        result(
+                        completion(
                             VPNError.stopError(
                                 error
                             )
@@ -277,7 +301,7 @@ public class WireguardPlugin: NSObject {
                     ) { status in
                         if let status = status {
                             self.logger.log("Timeout waiting for tunnel to disconnect")
-                            result(
+                            completion(
                                 VPNError.timeoutError(
                                     "The tunnel disconnection has failed to complete in a specified amount of time (\(tunnelStatusTimeout) seconds). Please check your configuration and try again. Current status: \(status.rawValue)"
                                 )
@@ -287,7 +311,7 @@ public class WireguardPlugin: NSObject {
                         self.saveAndStartTunnel(
                             providerManager: providerManager,
                             config: config,
-                            result: result
+                            result: completion
                         )
                         return
                     }
@@ -296,7 +320,7 @@ public class WireguardPlugin: NSObject {
             self.saveAndStartTunnel(
                 providerManager: providerManager,
                 config: config,
-                result: result
+                result: completion
             )
         }
     }
@@ -346,7 +370,7 @@ public class WireguardPlugin: NSObject {
         config: TunnelConfiguration,
         result: @escaping (VPNError?) -> Void
     ) {
-        self.vpnManager.saveProviderManager(providerManager) { saveError in
+        vpnManager.saveProviderManager(providerManager) { saveError in
             if let saveError = saveError {
                 self.logger.log("Failed to save preferences: \(saveError, privacy: .public)")
                 result(

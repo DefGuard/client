@@ -37,7 +37,7 @@ pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_G
 pub const MIN_CORE_VERSION: Version = Version::new(1, 5, 0);
 pub const MIN_PROXY_VERSION: Version = Version::new(1, 5, 0);
 // This must match tauri.bundle.identifier from tauri.conf.json.
-const BUNDLE_IDENTIFIER: &str = "net.defguard";
+const BUNDLE_IDENTIFIER: &str = "net.defguard.client";
 // Returns the path to the user’s data directory.
 #[must_use]
 pub fn app_data_dir() -> Option<PathBuf> {

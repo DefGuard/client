@@ -69,7 +69,7 @@ pub(crate) async fn setup_interface(
 
     let (dns, dns_search) = location.dns();
     let tunnel_config = location
-        .tunnel_configurarion(pool, interface_name, preshared_key, dns, dns_search)
+        .tunnel_configurarion(pool, preshared_key, dns, dns_search)
         .await?;
     // tunnel_config.port = port;
 
@@ -79,7 +79,8 @@ pub(crate) async fn setup_interface(
             .unwrap()
             .as_str()
             .into();
-        start_tunnel(&prvkey);
+        let result = start_tunnel(&prvkey);
+        error!("start_tunnel() returned {result:?}");
     }
     Ok(())
 
