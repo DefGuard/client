@@ -233,7 +233,7 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
-        let wgapi = {
+        let mut wgapi = {
             let Ok(mut wgapis_map) = self.wgapis.write() else {
                 error!("Failed to acquire read-write lock for WGApis");
                 return Err(Status::new(Code::Internal, "read-write lock error"));
