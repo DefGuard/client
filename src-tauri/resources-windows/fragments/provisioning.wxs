@@ -10,17 +10,22 @@
   </Fragment>
   
   <Fragment>
+    <!-- Define public properties that can be passed to the MSI -->
+    <!-- Uppercase names make them public and settable from command line -->
+    <Property Id="PROVISIONING" Secure="yes"/>
+    <Property Id="ADATTRIBUTE" Value="extensionAttribute1"/>
+    
     <!-- Custom action to run the PowerShell script -->
     <CustomAction Id="RunProvisioningScript"
                   Directory="INSTALLDIR"
                   Execute="deferred"
                   Impersonate="yes"
                   Return="check"
-                  ExeCommand="powershell.exe -ExecutionPolicy Bypass -File &quot;[#GetProvisioningConfigScript]&quot; -Silent"/>
+                  ExeCommand="powershell.exe -ExecutionPolicy Bypass -File &quot;[#GetProvisioningConfigScript]&quot; -Silent -ADAttribute &quot;[ADATTRIBUTE]&quot;"/>
     
-    <!-- Schedule the custom action to run after installation -->
+    <!-- Schedule the custom action to run only if PROVISIONING property is set -->
     <InstallExecuteSequence>
-      <Custom Action="RunProvisioningScript" After="InstallFiles">NOT REMOVE</Custom>
+      <Custom Action="RunProvisioningScript" After="InstallFiles">PROVISIONING AND NOT REMOVE</Custom>
     </InstallExecuteSequence>
   </Fragment>
 </Wix>

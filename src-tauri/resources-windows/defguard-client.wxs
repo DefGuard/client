@@ -36,7 +36,11 @@
                 Vital="yes"
                 Id="MainPackage"
                 SourceFile="src-tauri\target\release\bundle\msi\defguard-client_$(env.VERSION)_x64_en-US.msi"
-            />
+            >
+                <!-- Optional: Set provisioning properties at bundle level -->
+                <MsiProperty Name="PROVISIONING" Value="0" />
+                <MsiProperty Name="ADATTRIBUTE" Value="extensionAttribute1" />
+            </MsiPackage>
         </Chain>
     </Bundle>
 </Wix>
