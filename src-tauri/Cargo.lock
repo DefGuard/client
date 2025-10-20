@@ -647,7 +647,7 @@ dependencies = [
 [[package]]
 name = "boringtun"
 version = "0.6.0"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=518d9eb2847d1e1dbafa9e05abddae955a0d9b10#518d9eb2847d1e1dbafa9e05abddae955a0d9b10"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=f926bcac18a3c6926febab07138078832bb8b43c#f926bcac18a3c6926febab07138078832bb8b43c"
 dependencies = [
  "aead",
  "base64 0.22.1",
@@ -1448,7 +1448,7 @@ dependencies = [
 [[package]]
 name = "defguard_wireguard_rs"
 version = "0.8.0"
-source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=518d9eb2847d1e1dbafa9e05abddae955a0d9b10#518d9eb2847d1e1dbafa9e05abddae955a0d9b10"
+source = "git+https://github.com/DefGuard/wireguard-rs.git?rev=f926bcac18a3c6926febab07138078832bb8b43c#f926bcac18a3c6926febab07138078832bb8b43c"
 dependencies = [
  "base64 0.22.1",
  "boringtun",
