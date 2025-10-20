@@ -28,10 +28,12 @@
       "timestampUrl": "",
       "wix": {
         "fragmentPaths": [
-          "./resources-windows/service-fragment.wxs"
+          "./resources-windows/fragments/service.wxs",
+          "./resources-windows/fragments/provisioning.wxs"
         ],
         "componentRefs": [
-          "DefGuardServiceFragment"
+          "DefguardServiceFragment",
+          "ProvisioningScriptFragment"
         ]
       }
     },
