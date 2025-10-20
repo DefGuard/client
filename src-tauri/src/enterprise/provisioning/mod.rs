@@ -7,7 +7,7 @@ use crate::database::{models::instance::Instance, DB_POOL};
 
 const CONFIG_FILE_NAME: &str = "enrollment.json";
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ProvisioningConfig {
     pub enrollment_url: String,
     pub enrollment_token: String,
