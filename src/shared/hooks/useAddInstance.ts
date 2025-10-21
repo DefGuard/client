@@ -44,18 +44,18 @@ export default function useAddInstance() {
   const handleAddInstance = async (payload: AddInstancePayload, rawLink?: string) => {
     setLoading(true);
 
-    console.log('starting enrollment with: ', payload);
     await start({
       token: payload.token,
       proxyUrl: prepareProxyUrl(payload.url),
     }).then(async (response) => {
-      console.log('got start response from proxy: ', response);
       if (response.ok) {
         const authCookie = response.headers
           .getSetCookie()
           .find((cookie) => cookie.startsWith('defguard_proxy='));
         if (authCookie === undefined) {
-          error('Failed to open deep link, auth cookie missing from proxy response.');
+          error(
+            'Failed to automatically add new instance, auth cookie missing from proxy response.',
+          );
           return;
         }
         const respData = (await response.json()) as EnrollmentStartResponse;
@@ -126,7 +126,7 @@ export default function useAddInstance() {
         }
       } else {
         error(
-          `Add instance automatically failed! Proxy enrollment start request failed! status: ${response.status}`,
+          `Adding instance automatically failed. Proxy enrollment start request failed with status: ${response.status}`,
         );
       }
     });

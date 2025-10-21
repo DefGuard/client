@@ -1,13 +1,13 @@
 use std::{fs::OpenOptions, path::Path};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::database::{models::instance::Instance, DB_POOL};
 
 const CONFIG_FILE_NAME: &str = "enrollment.json";
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProvisioningConfig {
     pub enrollment_url: String,
     pub enrollment_token: String,
@@ -57,9 +57,7 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
                     .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
                 match try_get_provisioning_config(&data_dir) {
                     Some(config) => {
-                        info!(
-                            "Provisioning config found in {data_dir:?}. Triggering enrollment start."
-                        );
+                        info!("Provisioning config found in {data_dir:?}.");
                         debug!("Provisioning config: {config:?}");
                         return Some(config);
                     }

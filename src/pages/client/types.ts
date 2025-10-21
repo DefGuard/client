@@ -109,5 +109,4 @@ export enum TauriEventKey {
   MFA_TRIGGER = 'mfa-trigger',
   VERSION_MISMATCH = 'version-mismatch',
   UUID_MISMATCH = 'uuid-mismatch',
-  ADD_INSTANCE = 'add-instance',
 }

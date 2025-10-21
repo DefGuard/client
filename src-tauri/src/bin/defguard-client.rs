@@ -138,7 +138,8 @@ fn main() {
             start_global_logwatcher,
             stop_global_logwatcher,
             command_get_app_config,
-            command_set_app_config
+            command_set_app_config,
+            get_provisioning_config
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -178,11 +179,6 @@ fn main() {
 
             // Prepare `AppConfig`.
             let config = AppConfig::new(app_handle);
-
-            // Check if client needs to be initialized
-            // and try to load provisioning config if necessary
-            let provisioning_config =
-                tauri::async_runtime::block_on(handle_client_initialization(app_handle));
 
             // Setup logging.
 
@@ -249,6 +245,11 @@ fn main() {
                     })
                     .build(),
             )?;
+
+            // Check if client needs to be initialized
+            // and try to load provisioning config if necessary
+            let provisioning_config =
+                tauri::async_runtime::block_on(handle_client_initialization(app_handle));
 
             let state = AppState::new(config, provisioning_config);
             app.manage(state);

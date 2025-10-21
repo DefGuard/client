@@ -12,6 +12,7 @@ import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import useAddInstance from '../../shared/hooks/useAddInstance';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
+import type { ProvisioningConfig } from './clientAPI/types';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
 import { MfaModalProvider } from './components/MfaModalProvider';
 import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/DeadConDroppedModal';
@@ -21,14 +22,13 @@ import { useClientStore } from './hooks/useClientStore';
 import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
 import {
-  type AddInstancePayload,
   ClientConnectionType,
   type CommonWireguardFields,
   type DeadConDroppedPayload,
   TauriEventKey,
 } from './types';
 
-const { getInstances, getTunnels, getAppConfig } = clientApi;
+const { getInstances, getTunnels, getAppConfig, getProvisioningConfig } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
@@ -70,13 +70,25 @@ export const ClientPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const handleProvisioning = async (data: AddInstancePayload) => {
+  const { data: provisioningConfig } = useQuery({
+    queryFn: getProvisioningConfig,
+    queryKey: [clientQueryKeys.getProvisioningConfig],
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const handleProvisioning = async (config: ProvisioningConfig) => {
     try {
-      console.log('adding with: ', data);
-      await handleAddInstance(data);
+      await handleAddInstance({
+        url: config.enrollment_url,
+        token: config.enrollment_token,
+      });
     } catch (e) {
       error(
-        `Failed to handle automatic add instance ${JSON.stringify(data)}!\n${JSON.stringify(e)}`,
+        `Failed to handle automatic client provisioning with ${JSON.stringify(config)}.\n Error: ${JSON.stringify(e)}`,
+      );
+      toaster.error(
+        'Automatic client provisioning failed, please contact your administrator.',
       );
     }
   };
@@ -200,14 +212,6 @@ export const ClientPage = () => {
       },
     );
 
-    const addInstance = listen<AddInstancePayload>(
-      TauriEventKey.ADD_INSTANCE,
-      async (data) => {
-        console.log('adding instance');
-        await handleProvisioning(data.payload);
-      },
-    );
-
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
       deadConnectionReconnected.then((cleanup) => cleanup());
@@ -219,7 +223,6 @@ export const ClientPage = () => {
       mfaTrigger.then((cleanup) => cleanup());
       verionMismatch.then((cleanup) => cleanup());
       uuidMismatch.then((cleanup) => cleanup());
-      addInstance.then((cleanup) => cleanup());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -256,6 +259,13 @@ export const ClientPage = () => {
       navigate(routes.client.carousel, { replace: true });
     }
   }, [navigate, listChecked, instances, tunnels]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
+  useEffect(() => {
+    if (provisioningConfig) {
+      handleProvisioning(provisioningConfig);
+    }
+  }, [provisioningConfig]);
 
   return (
     <DeepLinkProvider>
