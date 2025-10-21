@@ -127,7 +127,7 @@
     "typedoc": "^0.28.13",
     "typesafe-i18n": "^5.26.2",
     "typescript": "^5.9.2",
-    "vite": "^7.1.7"
+    "vite": "^7.1.11"
   },
   "volta": {
     "node": "20.5.1"
