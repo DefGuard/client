@@ -28,7 +28,6 @@ use log::{Level, LevelFilter};
 #[cfg(target_os = "macos")]
 use tauri::{process, Env};
 use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[macro_use]
@@ -263,20 +262,6 @@ fn main() {
                     })
                     .build(),
             )?;
-
-            // Setup ctrl-q keyboard shortcut
-            let ctrl_q_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyQ);
-            app_handle.plugin(
-                tauri_plugin_global_shortcut::Builder::new()
-                    .with_handler(move |app, shortcut, event| {
-                        if shortcut == &ctrl_q_shortcut && event.state() == ShortcutState::Pressed {
-                            info!("Ctrl-Q pressed, closing active connections and exiting");
-                            app.exit(0);
-                        }
-                    })
-                    .build(),
-            )?;
-            app.global_shortcut().register(ctrl_q_shortcut)?;
 
             let state = AppState::new(config);
             app.manage(state);
