@@ -18,337 +18,337 @@ jobs:
           draft: true
           generate_release_notes: true
 
-  create-sbom:
-    needs: [create-release]
-    uses: ./.github/workflows/sbom.yml
-    with:
-      upload_url: ${{ needs.create-release.outputs.upload_url }}
+  # create-sbom:
+  #   needs: [create-release]
+  #   uses: ./.github/workflows/sbom.yml
+  #   with:
+  #     upload_url: ${{ needs.create-release.outputs.upload_url }}
 
-  build-linux:
-    needs:
-      - create-release
-    outputs:
-      deb_sha256_amd64: ${{ steps.calculate-sha256.outputs.deb_sha256_amd64 }}
-    runs-on:
-      - self-hosted
-      - Linux
-      - ${{ matrix.architecture }}
-    strategy:
-      fail-fast: false
-      matrix:
-        architecture: [ARM64, X64]
-        include:
-          - architecture: ARM64
-            deb_arch: arm64
-            binary_arch: aarch64
-          - architecture: X64
-            deb_arch: amd64
-            binary_arch: x86_64
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: "recursive"
-      - name: Write release version
-        run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.17
-          run_install: false
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
-      - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
-      - name: Build packages
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: "--bundles deb,rpm"
-      - name: Calculate DEB SHA256
-        id: calculate-sha256
-        if: matrix.deb_arch == 'amd64'
-        run: |
-          DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
-          DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
-          echo "DEB SHA256: $DEB_SHA256"
-          echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
-          echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
-      - name: Upload RPM
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
-          asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
-          asset_content_type: application/octet-stream
-      - name: Upload DEB
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_content_type: application/octet-stream
-      - name: Install ruby with deb-s3
-        if: matrix.build != 'freebsd'
-        run: |
-          sudo apt-get install -y ruby
-          gem install deb-s3
-          echo "$(ruby -r rubygems -e 'puts Gem.user_dir')/bin" >> $GITHUB_PATH
-      - name: Upload DEB to APT repository #Add this to ubuntu 22.04 job (on merge dev -> main) with --codename=bookworm 
-        run: |
-          COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
+  # build-linux:
+  #   needs:
+  #     - create-release
+  #   outputs:
+  #     deb_sha256_amd64: ${{ steps.calculate-sha256.outputs.deb_sha256_amd64 }}
+  #   runs-on:
+  #     - self-hosted
+  #     - Linux
+  #     - ${{ matrix.architecture }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       architecture: [ARM64, X64]
+  #       include:
+  #         - architecture: ARM64
+  #           deb_arch: arm64
+  #           binary_arch: aarch64
+  #         - architecture: X64
+  #           deb_arch: amd64
+  #           binary_arch: x86_64
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         submodules: "recursive"
+  #     - name: Write release version
+  #       run: |
+  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  #         echo Version: $VERSION
+  #         echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+  #     - uses: actions/setup-node@v5
+  #       with:
+  #         node-version: "24"
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 10.17
+  #         run_install: false
+  #     - name: Get pnpm store directory
+  #       shell: bash
+  #       run: |
+  #         echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+  #     - uses: actions/cache@v4
+  #       name: Setup pnpm cache
+  #       with:
+  #         path: ${{ env.STORE_PATH }}
+  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pnpm-build-store-
+  #     - name: Install Node dependencies
+  #       run: pnpm install --frozen-lockfile
+  #     - uses: dtolnay/rust-toolchain@stable
+  #     - name: Install Linux dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
+  #     - name: Build packages
+  #       uses: tauri-apps/tauri-action@v0
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         args: "--bundles deb,rpm"
+  #     - name: Calculate DEB SHA256
+  #       id: calculate-sha256
+  #       if: matrix.deb_arch == 'amd64'
+  #       run: |
+  #         DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
+  #         DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
+  #         echo "DEB SHA256: $DEB_SHA256"
+  #         echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
+  #         echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
+  #     - name: Upload RPM
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+  #         asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+  #         asset_content_type: application/octet-stream
+  #     - name: Upload DEB
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+  #         asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+  #         asset_content_type: application/octet-stream
+  #     - name: Install ruby with deb-s3
+  #       if: matrix.build != 'freebsd'
+  #       run: |
+  #         sudo apt-get install -y ruby
+  #         gem install deb-s3
+  #         echo "$(ruby -r rubygems -e 'puts Gem.user_dir')/bin" >> $GITHUB_PATH
+  #     - name: Upload DEB to APT repository #Add this to ubuntu 22.04 job (on merge dev -> main) with --codename=bookworm 
+  #       run: |
+  #         COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
 
-          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=trixie --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-      - name: Rename client binary
-        run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-      - name: Tar client binary
-        uses: a7ul/tar-action@v1.2.0
-        with:
-          command: c
-          files: |
-            defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-          outPath: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-      - name: Upload client archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Rename daemon binary
-        run: mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-      - name: Tar daemon binary
-        uses: a7ul/tar-action@v1.2.0
-        with:
-          command: c
-          files: |
-            defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-          outPath: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-      - name: Upload daemon archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/octet-stream
+  #         deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=trixie --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+  #     - name: Rename client binary
+  #       run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+  #     - name: Tar client binary
+  #       uses: a7ul/tar-action@v1.2.0
+  #       with:
+  #         command: c
+  #         files: |
+  #           defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+  #         outPath: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #     - name: Upload client archive
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #         asset_name: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #         asset_content_type: application/octet-stream
+  #     - name: Rename daemon binary
+  #       run: mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+  #     - name: Tar daemon binary
+  #       uses: a7ul/tar-action@v1.2.0
+  #       with:
+  #         command: c
+  #         files: |
+  #           defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+  #         outPath: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #     - name: Upload daemon archive
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #         asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #         asset_content_type: application/octet-stream
 
-      - name: Rename dg binary
-        run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-      - name: Tar dg binary
-        uses: a7ul/tar-action@v1.2.0
-        with:
-          command: c
-          files: |
-            dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-          outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-      - name: Upload dg archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/octet-stream
-      - name: Build dg deb
-        uses: defGuard/fpm-action@main
-        with:
-          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
-      - name: Upload DEB
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
-          asset_content_type: application/octet-stream
-      - name: Build dg rpm
-        uses: defGuard/fpm-action@main
-        with:
-          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
-      - name: Upload RPM
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
-          asset_content_type: application/octet-stream
+  #     - name: Rename dg binary
+  #       run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+  #     - name: Tar dg binary
+  #       uses: a7ul/tar-action@v1.2.0
+  #       with:
+  #         command: c
+  #         files: |
+  #           dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+  #         outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #     - name: Upload dg archive
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #         asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+  #         asset_content_type: application/octet-stream
+  #     - name: Build dg deb
+  #       uses: defGuard/fpm-action@main
+  #       with:
+  #         fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+  #         fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
+  #     - name: Upload DEB
+  #       uses: actions/upload-release-asset@v1.0.2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
+  #         asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
+  #         asset_content_type: application/octet-stream
+  #     - name: Build dg rpm
+  #       uses: defGuard/fpm-action@main
+  #       with:
+  #         fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+  #         fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
+  #     - name: Upload RPM
+  #       uses: actions/upload-release-asset@v1.0.2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
+  #         asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
+  #         asset_content_type: application/octet-stream
 
-  update-aur:
-    needs:
-      - create-release
-      - build-linux
-    if: "!contains(github.ref_name, '-')"
-    runs-on:
-      - self-hosted
-      - Linux
-      - ${{ matrix.architecture }}
-    container: archlinux:latest
-    strategy:
-      fail-fast: false
-      matrix:
-        architecture: [X64]
-        include:
-          - architecture: X64
-            deb_arch: amd64
-            binary_arch: x86_64
-    steps:
-      - name: Install dependencies
-        run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm git openssh base-devel
-      - name: Create non-root user
-        run: |
-          useradd -m -G wheel -s /bin/bash builduser
-          echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
-      - name: Checkout AUR repository
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
-          rm -rf aur-repo
-          git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
-          chown -R builduser:builduser aur-repo
-      - name: Update PKGBUILD version
-        run: |
-          cd aur-repo
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  # update-aur:
+  #   needs:
+  #     - create-release
+  #     - build-linux
+  #   if: "!contains(github.ref_name, '-')"
+  #   runs-on:
+  #     - self-hosted
+  #     - Linux
+  #     - ${{ matrix.architecture }}
+  #   container: archlinux:latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       architecture: [X64]
+  #       include:
+  #         - architecture: X64
+  #           deb_arch: amd64
+  #           binary_arch: x86_64
+  #   steps:
+  #     - name: Install dependencies
+  #       run: |
+  #         pacman -Syu --noconfirm
+  #         pacman -S --noconfirm git openssh base-devel
+  #     - name: Create non-root user
+  #       run: |
+  #         useradd -m -G wheel -s /bin/bash builduser
+  #         echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+  #     - name: Setup SSH
+  #       uses: webfactory/ssh-agent@v0.9.0
+  #       with:
+  #         ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
+  #     - name: Checkout AUR repository
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+  #         chmod 644 ~/.ssh/known_hosts
+  #         export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
+  #         rm -rf aur-repo
+  #         git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
+  #         chown -R builduser:builduser aur-repo
+  #     - name: Update PKGBUILD version
+  #       run: |
+  #         cd aur-repo
+  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
 
-          echo "Updating to version: $VERSION"
-          sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
+  #         echo "Updating to version: $VERSION"
+  #         sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
           
-          AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
+  #         AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
           
-          echo "AMD64 DEB SHA256: $AMD64_SHA"
-          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
-      - name: Update .SRCINFO
-        run: |
-          cd aur-repo
-          sudo -u builduser makepkg --printsrcinfo > .SRCINFO
-      - name: Commit and push changes
-        run: |
-          cd aur-repo
-          chown -R builduser:builduser .
-          sudo -u builduser git config user.name "Defguard Build System"
-          sudo -u builduser git config user.email "community@defguard.net"
-          sudo -u builduser git add PKGBUILD .SRCINFO
-          sudo -u builduser git commit -m "Updated to $VERSION"
-          sudo -u builduser git push
-          cat PKGBUILD
-          cat .SRCINFO
-  build-macos:
-    needs:
-      - create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [aarch64-apple-darwin, x86_64-apple-darwin]
-    runs-on:
-      - self-hosted
-      - macOS
-    env:
-      APPLE_SIGNING_IDENTITY_APPLICATION: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_SIGNING_IDENTITY_INSTALLER: "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_ID: "kamil@defguard.net"
-      APPLE_TEAM_ID: "82GZ7KN29J"
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: "recursive"
-      - name: Write release version
-        run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-          run_install: false
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install protobuf compiler
-        run: brew install protobuf
-      - name: Install ARM target
-        run: rustup target add aarch64-apple-darwin
-      - name: Unlock keychain
-        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
-      - name: Build app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ env.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
-        with:
-          args: --target ${{ matrix.target }} -v
-      - name: Build installation package
-        run: |
-          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}' /Users/admin/Library/Keychains/login.keychain
-          xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-          xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-      - name: Upload installation package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
-          asset_content_type: application/octet-stream
+  #         echo "AMD64 DEB SHA256: $AMD64_SHA"
+  #         sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
+  #     - name: Update .SRCINFO
+  #       run: |
+  #         cd aur-repo
+  #         sudo -u builduser makepkg --printsrcinfo > .SRCINFO
+  #     - name: Commit and push changes
+  #       run: |
+  #         cd aur-repo
+  #         chown -R builduser:builduser .
+  #         sudo -u builduser git config user.name "Defguard Build System"
+  #         sudo -u builduser git config user.email "community@defguard.net"
+  #         sudo -u builduser git add PKGBUILD .SRCINFO
+  #         sudo -u builduser git commit -m "Updated to $VERSION"
+  #         sudo -u builduser git push
+  #         cat PKGBUILD
+  #         cat .SRCINFO
+  # build-macos:
+  #   needs:
+  #     - create-release
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       target: [aarch64-apple-darwin, x86_64-apple-darwin]
+  #   runs-on:
+  #     - self-hosted
+  #     - macOS
+  #   env:
+  #     APPLE_SIGNING_IDENTITY_APPLICATION: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
+  #     APPLE_SIGNING_IDENTITY_INSTALLER: "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)"
+  #     APPLE_ID: "kamil@defguard.net"
+  #     APPLE_TEAM_ID: "82GZ7KN29J"
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         submodules: "recursive"
+  #     - name: Write release version
+  #       run: |
+  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  #         echo Version: $VERSION
+  #         echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "22"
+  #     - uses: pnpm/action-setup@v4
+  #       with:
+  #         version: 10
+  #         run_install: false
+  #     - name: Get pnpm store directory
+  #       shell: bash
+  #       run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+  #     - uses: actions/cache@v4
+  #       name: Setup pnpm cache
+  #       with:
+  #         path: ${{ env.STORE_PATH }}
+  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pnpm-build-store-
+  #     - name: Install deps
+  #       run: pnpm install --frozen-lockfile
+  #     - uses: dtolnay/rust-toolchain@stable
+  #     - name: Install protobuf compiler
+  #       run: brew install protobuf
+  #     - name: Install ARM target
+  #       run: rustup target add aarch64-apple-darwin
+  #     - name: Unlock keychain
+  #       run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
+  #     - name: Build app
+  #       uses: tauri-apps/tauri-action@v0
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
+  #         APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+  #         APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+  #         APPLE_ID: ${{ env.APPLE_ID }}
+  #         APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
+  #         APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+  #       with:
+  #         args: --target ${{ matrix.target }} -v
+  #     - name: Build installation package
+  #       run: |
+  #         bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}' /Users/admin/Library/Keychains/login.keychain
+  #         xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+  #         xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+  #     - name: Upload installation package
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
+  #         asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
+  #         asset_content_type: application/octet-stream
 
   # Building signed Windows bundle involves a few steps as described here:
   # https://wixtoolset.org/docs/tools/signing/#signing-bundles-at-the-command-line
@@ -370,7 +370,7 @@ jobs:
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
           echo Version: $env:VERSION
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - uses: pnpm/action-setup@v4
@@ -391,7 +391,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v2
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Remove "default-run" line from Cargo.toml
@@ -401,68 +401,67 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Bundle application
-        run: |
-          dotnet tool install --global wix --version 4.0.5
-          wix extension add WixToolset.Bal.wixext/4
-          wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\.wix\extensions\WixToolset.Bal.wixext\4\wixext4\WixToolset.Bal.wixext.dll
-          wix burn detach .\src-tauri\resources-windows\defguard-client.exe -engine .\src-tauri\resources-windows\burnengine.exe
-      - name: Upload unsigned bundle and burn-engine
+      # - name: Bundle application
+      #   run: |
+      #     dotnet tool install --global wix --version 4.0.5
+      #     wix extension add WixToolset.Bal.wixext/4
+      #     wix build .\src-tauri\resources-windows\defguard-client.wxs -ext .\.wix\extensions\WixToolset.Bal.wixext\4\wixext4\WixToolset.Bal.wixext.dll
+      #     wix burn detach .\src-tauri\resources-windows\defguard-client.exe -engine .\src-tauri\resources-windows\burnengine.exe
+      - name: Upload unsigned bundle
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-bundle-and-burnengine
-          path: |
-            src-tauri/resources-windows/defguard-client.exe
-            src-tauri/resources-windows/burnengine.exe
-  sign-burn-engine:
-    needs:
-      - build-windows
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    steps:
-      - name: Write release version
-        run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - name: Download unsigned bundle & burn-engine
-        uses: actions/download-artifact@v4
-        with:
-          name: unsigned-bundle-and-burnengine
-      - name: Sign burn-engine
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in burnengine.exe -out burnengine-signed.exe
-      - name: Upload bundle and burn-engine artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-bundle-and-signed-burnengine
-          path: |
-            defguard-client.exe
-            burnengine-signed.exe
-  reattach-burn-engine:
-    needs:
-      - sign-burn-engine
-    runs-on: windows-latest
-    steps:
-      - name: Download unsigned bundle and signed burn-engine
-        uses: actions/download-artifact@v4
-        with:
-          name: unsigned-bundle-and-signed-burnengine
-      - name: Reattach burn-engine
-        run: |
-          dotnet tool install --global wix --version 4.0.5
-          wix extension add WixToolset.Bal.wixext/4
-          wix burn reattach defguard-client.exe -engine burnengine-signed.exe -o defguard-client-reattached.exe
-      - name: Upload bundle with reattached burn-engine
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-bundle-with-reattached-signed-burn-engine
-          path: defguard-client-reattached.exe
+          name: unsigned-bundle
+          path: src-tauri/target/release/bundle/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+  # sign-burn-engine:
+  #   needs:
+  #     - build-windows
+  #   runs-on:
+  #     - self-hosted
+  #     - Linux
+  #     - X64
+  #   steps:
+  #     - name: Write release version
+  #       run: |
+  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  #         echo Version: $VERSION
+  #         echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+  #     - name: Download unsigned bundle & burn-engine
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: unsigned-bundle-and-burnengine
+  #     - name: Sign burn-engine
+  #       run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in burnengine.exe -out burnengine-signed.exe
+  #     - name: Upload bundle and burn-engine artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: unsigned-bundle-and-signed-burnengine
+  #         path: |
+  #           defguard-client.exe
+  #           burnengine-signed.exe
+  # reattach-burn-engine:
+  #   needs:
+  #     - sign-burn-engine
+  #   runs-on: windows-latest
+  #   steps:
+  #     - name: Download unsigned bundle and signed burn-engine
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: unsigned-bundle-and-signed-burnengine
+  #     - name: Reattach burn-engine
+  #       run: |
+  #         dotnet tool install --global wix --version 4.0.5
+  #         wix extension add WixToolset.Bal.wixext/4
+  #         wix burn reattach defguard-client.exe -engine burnengine-signed.exe -o defguard-client-reattached.exe
+  #     - name: Upload bundle with reattached burn-engine
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: unsigned-bundle-with-reattached-signed-burn-engine
+  #         path: defguard-client-reattached.exe
   sign-bundle:
     needs:
       - create-release
-      - reattach-burn-engine
+      # - reattach-burn-engine
+      - build-windows
     runs-on:
       - self-hosted
       - Linux
@@ -476,50 +475,59 @@ jobs:
       - name: Download unsigned bundle & signed burn-engine
         uses: actions/download-artifact@v4
         with:
-          name: unsigned-bundle-with-reattached-signed-burn-engine
+          name: unsigned-bundle
       - name: Sign bundle
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client-reattached.exe -out defguard-client-signed.exe
+        run: osslsigncode sign \
+          -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so \
+          -pkcs11cert ${{ secrets.CODESIGN_KEYID }} \
+          -key ${{ secrets.CODESIGN_KEYID }} \
+          -pass ${{ secrets.CODESIGN_PIN }} \
+          -h sha256 \
+          -t http://time.certum.pl/ \
+          -in defguard-client_${{ env.VERSION }}_x64_en-US.msi \
+          -out defguard-client-signed.msi
       - name: Upload installer asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client-signed.exe
-          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
+          asset_path: defguard-client-signed.msi
+          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
           asset_content_type: application/octet-stream
-  apt-sign:
-    needs: #Add needs: -ubuntu-22-04-build (on merge dev -> main) 
-      - build-linux
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    strategy:
-      fail-fast: false
-    steps:
-      - name: Sign APT repository
-        run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_APT }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY_APT }}
-          export AWS_REGION=eu-north-1
-          sudo apt update -y
-          sudo apt install -y awscli curl jq
 
-          for DIST in trixie bookworm; do
-            aws s3 cp s3://apt.defguard.net/dists/${DIST}/Release .
-            
-            curl -X POST "${{ secrets.DEFGUARD_SIGNING_URL }}?signature_type=both" \
-              -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
-              -F "file=@Release" \
-              -o response.json
-            
-            cat response.json | jq -r '.files["Release.gpg"].content' | base64 --decode > Release.gpg
-            cat response.json | jq -r '.files.Release.content' | base64 --decode > InRelease
-            
-            aws s3 cp Release.gpg s3://apt.defguard.net/dists/${DIST}/ --acl public-read
-            aws s3 cp InRelease s3://apt.defguard.net/dists/${DIST}/ --acl public-read
+  # apt-sign:
+  #   needs: #Add needs: -ubuntu-22-04-build (on merge dev -> main) 
+  #     - build-linux
+  #   runs-on:
+  #     - self-hosted
+  #     - Linux
+  #     - X64
+  #   strategy:
+  #     fail-fast: false
+  #   steps:
+  #     - name: Sign APT repository
+  #       run: |
+  #         export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_APT }}
+  #         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY_APT }}
+  #         export AWS_REGION=eu-north-1
+  #         sudo apt update -y
+  #         sudo apt install -y awscli curl jq
 
-            aws s3 ls s3://apt.defguard.net/dists/ --recursive | awk '{print "<a href=\""$4"\">"$4"</a><br>"}' > index.html
-            aws s3 cp index.html s3://apt.defguard.net/ --acl public-read
-          done
+  #         for DIST in trixie bookworm; do
+  #           aws s3 cp s3://apt.defguard.net/dists/${DIST}/Release .
+            
+  #           curl -X POST "${{ secrets.DEFGUARD_SIGNING_URL }}?signature_type=both" \
+  #             -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
+  #             -F "file=@Release" \
+  #             -o response.json
+            
+  #           cat response.json | jq -r '.files["Release.gpg"].content' | base64 --decode > Release.gpg
+  #           cat response.json | jq -r '.files.Release.content' | base64 --decode > InRelease
+            
+  #           aws s3 cp Release.gpg s3://apt.defguard.net/dists/${DIST}/ --acl public-read
+  #           aws s3 cp InRelease s3://apt.defguard.net/dists/${DIST}/ --acl public-read
+
+  #           aws s3 ls s3://apt.defguard.net/dists/ --recursive | awk '{print "<a href=\""$4"\">"$4"</a><br>"}' > index.html
+  #           aws s3 cp index.html s3://apt.defguard.net/ --acl public-read
+  #         done
