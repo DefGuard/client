@@ -139,17 +139,14 @@ impl DesktopDaemonService for DaemonService {
             .entry(ifname.clone())
             .or_insert(setup_wgapi(ifname)?);
 
-        #[cfg(not(windows))]
-        {
-            // create new interface
-            debug!("Creating new interface {ifname}");
-            wgapi.create_interface().map_err(|err| {
-                let msg = format!("Failed to create WireGuard interface {ifname}: {err}");
-                error!("{msg}");
-                Status::new(Code::Internal, msg)
-            })?;
-            debug!("Done creating a new interface {ifname}");
-        }
+        // create new interface
+        debug!("Creating new interface {ifname}");
+        wgapi.create_interface().map_err(|err| {
+            let msg = format!("Failed to create WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+        info!("Done creating a new interface {ifname}");
 
         // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
         // be used as DNS servers and search domains respectively.
@@ -171,10 +168,7 @@ impl DesktopDaemonService for DaemonService {
             {search_domains:?}"
         );
 
-        #[cfg(not(windows))]
         let configure_interface_result = wgapi.configure_interface(&config);
-        #[cfg(windows)]
-        let configure_interface_result = wgapi.configure_interface(&config, &dns, &search_domains);
 
         configure_interface_result.map_err(|err| {
             let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
@@ -191,24 +185,23 @@ impl DesktopDaemonService for DaemonService {
                 error!("{msg}");
                 Status::new(Code::Internal, msg)
             })?;
-
-            if dns.is_empty() {
-                debug!(
-                    "No DNS configuration provided for interface {ifname}, skipping DNS \
-                    configuration"
-                );
-            } else {
-                debug!(
-                    "The following DNS servers will be set: {dns:?}, search domains: \
-                    {search_domains:?}"
-                );
-                wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
-                    let msg =
-                        format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
-                    error!("{msg}");
-                    Status::new(Code::Internal, msg)
-                })?;
-            }
+        }
+        if dns.is_empty() {
+            debug!(
+                "No DNS configuration provided for interface {ifname}, skipping DNS \
+                configuration"
+            );
+        } else {
+            debug!(
+                "The following DNS servers will be set: {dns:?}, search domains: \
+                {search_domains:?}"
+            );
+            wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
+                let msg =
+                    format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
+                error!("{msg}");
+                Status::new(Code::Internal, msg)
+            })?;
         }
 
         debug!("Finished creating a new interface {ifname}");
