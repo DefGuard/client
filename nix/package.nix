@@ -8,7 +8,7 @@
   makeDesktopItem,
 }: let
   pname = "defguard-client";
-  version = "1.5.2"; # TODO: Get this from Cargo.toml or git
+  version = "1.6.0"; # TODO: Get this from Cargo.toml or git
 
   desktopItem = makeDesktopItem {
     name = pname;
