@@ -235,13 +235,15 @@ export const ClientPage = () => {
   }, [navigate, listChecked, instances, tunnels]);
 
   return (
-    <DeepLinkProvider>
-      <MfaModalProvider>
-        <Outlet />
-      </MfaModalProvider>
-      <DeadConDroppedModal />
-      <ClientSideBar />
-      <AutoProvisioningManager />
-    </DeepLinkProvider>
+    <AutoProvisioningManager>
+      <DeepLinkProvider>
+        <MfaModalProvider>
+          <Outlet />
+        </MfaModalProvider>
+        <DeadConDroppedModal />
+        <ClientSideBar />
+        <AutoProvisioningManager />
+      </DeepLinkProvider>
+    </AutoProvisioningManager>
   );
 };

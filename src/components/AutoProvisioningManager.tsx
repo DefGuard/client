@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
-import { useEffect } from 'react';
+import { type PropsWithChildren, useEffect } from 'react';
 import { clientApi } from '../pages/client/clientAPI/clientApi';
 import type { ProvisioningConfig } from '../pages/client/clientAPI/types';
 import { clientQueryKeys } from '../pages/client/query';
@@ -9,7 +9,7 @@ import useAddInstance from '../shared/hooks/useAddInstance';
 
 const { getProvisioningConfig } = clientApi;
 
-export default function AutoProvisioningManager() {
+export default function AutoProvisioningManager({ children }: PropsWithChildren) {
   const toaster = useToaster();
   const { handleAddInstance } = useAddInstance();
   const { data: provisioningConfig } = useQuery({
@@ -42,5 +42,5 @@ export default function AutoProvisioningManager() {
     }
   }, [provisioningConfig]);
 
-  return null;
+  return <>{children}</>;
 }
