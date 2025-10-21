@@ -72,7 +72,7 @@ Built packages are available after in `src-tauri/target/release/bundle`.
 
 For windows development you'll need:
 
-1. The `stable-x86_64-pc-windows-gnu` rust toolchain. Use rustup to change the toolchain:
+1. The `stable-x86_64-pc-windows-gnu` Rust toolchain. Use `rustup` to change the toolchain:
 
 ```
 rustup install stable-x86_64-pc-windows-gnu
