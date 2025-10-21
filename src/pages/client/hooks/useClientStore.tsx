@@ -5,10 +5,10 @@ import { createWithEqualityFn } from 'zustand/traditional';
 import { clientApi } from '../clientAPI/clientApi';
 import type { AppConfig, ClientView } from '../clientAPI/types';
 import {
+  ClientConnectionType,
   type CommonWireguardFields,
   type DefguardInstance,
   type SelectedInstance,
-  ClientConnectionType,
 } from '../types';
 
 const { getInstances, setAppConfig } = clientApi;

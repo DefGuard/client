@@ -1,6 +1,6 @@
 import type { ThemeKey } from '../../../shared/defguard-ui/hooks/theme/types';
 import type { CreateDeviceResponse } from '../../../shared/hooks/api/types';
-import type { DefguardInstance, DefguardLocation, ClientConnectionType } from '../types';
+import type { ClientConnectionType, DefguardInstance, DefguardLocation } from '../types';
 
 export type GetLocationsRequest = {
   instanceId: number;
@@ -82,6 +82,11 @@ export type AppConfig = {
   peer_alive_period: number;
 };
 
+export type ProvisioningConfig = {
+  enrollment_token: string;
+  enrollment_url: string;
+};
+
 export type LocationDetails = {
   location_id: number;
   name: string;
@@ -142,4 +147,5 @@ export type TauriCommandKey =
   | 'start_global_logwatcher'
   | 'stop_global_logwatcher'
   | 'command_get_app_config'
-  | 'command_set_app_config';
+  | 'command_set_app_config'
+  | 'get_provisioning_config';

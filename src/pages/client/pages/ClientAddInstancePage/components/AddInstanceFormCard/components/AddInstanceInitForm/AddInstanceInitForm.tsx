@@ -27,7 +27,7 @@ import { routes } from '../../../../../../../../shared/routes';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { type SelectedInstance, ClientConnectionType } from '../../../../../../types';
+import { ClientConnectionType, type SelectedInstance } from '../../../../../../types';
 import { AddInstanceFormStep } from '../../../../hooks/types';
 import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 

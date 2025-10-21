@@ -29,7 +29,9 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::{periodic::config::poll_instance, service_locations},
+    enterprise::{
+        periodic::config::poll_instance, provisioning::ProvisioningConfig, service_locations,
+    },
     error::Error,
     events::EventKey,
     log_watcher::{
@@ -1324,5 +1326,22 @@ pub async fn command_set_app_config(
             }
         }
     }
+    Ok(res)
+}
+
+#[tauri::command]
+pub fn get_provisioning_config(
+    app_state: State<'_, AppState>,
+) -> Result<Option<ProvisioningConfig>, Error> {
+    debug!("Running command get_provisioning_config.");
+    let res = app_state
+        .provisioning_config
+        .lock()
+        .map_err(|_err| {
+            error!("Failed to acquire lock on client provisioning config");
+            Error::StateLockFail
+        })?
+        .clone();
+    trace!("Returning config: {res:?}");
     Ok(res)
 }
