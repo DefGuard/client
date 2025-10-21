@@ -411,7 +411,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-bundle
-          path: src-tauri/target/release/bundle/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
   # sign-burn-engine:
   #   needs:
   #     - build-windows
