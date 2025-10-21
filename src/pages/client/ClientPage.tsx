@@ -2,17 +2,15 @@ import './style.scss';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
-import { error } from '@tauri-apps/plugin-log';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
+import AutoProvisioningManager from '../../components/AutoProvisioningManager';
 import { useI18nContext } from '../../i18n/i18n-react';
 import { DeepLinkProvider } from '../../shared/components/providers/DeepLinkProvider';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
-import useAddInstance from '../../shared/hooks/useAddInstance';
 import { routes } from '../../shared/routes';
 import { clientApi } from './clientAPI/clientApi';
-import type { ProvisioningConfig } from './clientAPI/types';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
 import { MfaModalProvider } from './components/MfaModalProvider';
 import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/DeadConDroppedModal';
@@ -28,7 +26,7 @@ import {
   TauriEventKey,
 } from './types';
 
-const { getInstances, getTunnels, getAppConfig, getProvisioningConfig } = clientApi;
+const { getInstances, getTunnels, getAppConfig } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
@@ -47,7 +45,6 @@ export const ClientPage = () => {
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
   const openMFAModal = useMFAModal((state) => state.open);
   const { LL } = useI18nContext();
-  const { handleAddInstance } = useAddInstance();
 
   const { data: instances } = useQuery({
     queryFn: getInstances,
@@ -69,29 +66,6 @@ export const ClientPage = () => {
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
-
-  const { data: provisioningConfig } = useQuery({
-    queryFn: getProvisioningConfig,
-    queryKey: [clientQueryKeys.getProvisioningConfig],
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const handleProvisioning = async (config: ProvisioningConfig) => {
-    try {
-      await handleAddInstance({
-        url: config.enrollment_url,
-        token: config.enrollment_token,
-      });
-    } catch (e) {
-      error(
-        `Failed to handle automatic client provisioning with ${JSON.stringify(config)}.\n Error: ${JSON.stringify(e)}`,
-      );
-      toaster.error(
-        'Automatic client provisioning failed, please contact your administrator.',
-      );
-    }
-  };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
   useEffect(() => {
@@ -260,13 +234,6 @@ export const ClientPage = () => {
     }
   }, [navigate, listChecked, instances, tunnels]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: migration, checkMeLater
-  useEffect(() => {
-    if (provisioningConfig) {
-      handleProvisioning(provisioningConfig);
-    }
-  }, [provisioningConfig]);
-
   return (
     <DeepLinkProvider>
       <MfaModalProvider>
@@ -274,6 +241,7 @@ export const ClientPage = () => {
       </MfaModalProvider>
       <DeadConDroppedModal />
       <ClientSideBar />
+      <AutoProvisioningManager />
     </DeepLinkProvider>
   );
 };
