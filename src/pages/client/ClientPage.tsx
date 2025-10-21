@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
-
+import AutoProvisioningManager from '../../components/AutoProvisioningManager';
 import { useI18nContext } from '../../i18n/i18n-react';
 import { DeepLinkProvider } from '../../shared/components/providers/DeepLinkProvider';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
@@ -20,10 +20,10 @@ import { useClientStore } from './hooks/useClientStore';
 import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
 import {
+  ClientConnectionType,
   type CommonWireguardFields,
   type DeadConDroppedPayload,
   TauriEventKey,
-  ClientConnectionType,
 } from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
@@ -235,12 +235,15 @@ export const ClientPage = () => {
   }, [navigate, listChecked, instances, tunnels]);
 
   return (
-    <DeepLinkProvider>
-      <MfaModalProvider>
-        <Outlet />
-      </MfaModalProvider>
-      <DeadConDroppedModal />
-      <ClientSideBar />
-    </DeepLinkProvider>
+    <AutoProvisioningManager>
+      <DeepLinkProvider>
+        <MfaModalProvider>
+          <Outlet />
+        </MfaModalProvider>
+        <DeadConDroppedModal />
+        <ClientSideBar />
+        <AutoProvisioningManager />
+      </DeepLinkProvider>
+    </AutoProvisioningManager>
   );
 };

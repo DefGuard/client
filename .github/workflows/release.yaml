@@ -27,6 +27,8 @@ jobs:
   build-linux:
     needs:
       - create-release
+    outputs:
+      deb_sha256_amd64: ${{ steps.calculate-sha256.outputs.deb_sha256_amd64 }}
     runs-on:
       - self-hosted
       - Linux
@@ -82,6 +84,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: "--bundles deb,rpm"
+      - name: Calculate DEB SHA256
+        id: calculate-sha256
+        if: matrix.deb_arch == 'amd64'
+        run: |
+          DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
+          DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
+          echo "DEB SHA256: $DEB_SHA256"
+          echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
+          echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
       - name: Upload RPM
         uses: actions/upload-release-asset@v1
         env:
@@ -100,6 +111,17 @@ jobs:
           asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_content_type: application/octet-stream
+      - name: Install ruby with deb-s3
+        if: matrix.build != 'freebsd'
+        run: |
+          sudo apt-get install -y ruby
+          gem install deb-s3
+          echo "$(ruby -r rubygems -e 'puts Gem.user_dir')/bin" >> $GITHUB_PATH
+      - name: Upload DEB to APT repository #Add this to ubuntu 22.04 job (on merge dev -> main) with --codename=bookworm 
+        run: |
+          COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
+
+          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=trixie --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
       - name: Rename client binary
         run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
       - name: Tar client binary
@@ -184,6 +206,73 @@ jobs:
           asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
           asset_content_type: application/octet-stream
 
+  update-aur:
+    needs:
+      - create-release
+      - build-linux
+    if: "!contains(github.ref_name, '-')"
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.architecture }}
+    container: archlinux:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [X64]
+        include:
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git openssh base-devel
+      - name: Create non-root user
+        run: |
+          useradd -m -G wheel -s /bin/bash builduser
+          echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
+      - name: Checkout AUR repository
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
+          rm -rf aur-repo
+          git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
+          chown -R builduser:builduser aur-repo
+      - name: Update PKGBUILD version
+        run: |
+          cd aur-repo
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+
+          echo "Updating to version: $VERSION"
+          sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
+          
+          AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
+          
+          echo "AMD64 DEB SHA256: $AMD64_SHA"
+          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
+      - name: Update .SRCINFO
+        run: |
+          cd aur-repo
+          sudo -u builduser makepkg --printsrcinfo > .SRCINFO
+      - name: Commit and push changes
+        run: |
+          cd aur-repo
+          chown -R builduser:builduser .
+          sudo -u builduser git config user.name "Defguard Build System"
+          sudo -u builduser git config user.email "community@defguard.net"
+          sudo -u builduser git add PKGBUILD .SRCINFO
+          sudo -u builduser git commit -m "Updated to $VERSION"
+          sudo -u builduser git push
+          cat PKGBUILD
+          cat .SRCINFO
   build-macos:
     needs:
       - create-release
@@ -399,3 +488,38 @@ jobs:
           asset_path: defguard-client-signed.exe
           asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
           asset_content_type: application/octet-stream
+  apt-sign:
+    needs: #Add needs: -ubuntu-22-04-build (on merge dev -> main) 
+      - build-linux
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Sign APT repository
+        run: |
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_APT }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY_APT }}
+          export AWS_REGION=eu-north-1
+          sudo apt update -y
+          sudo apt install -y awscli curl jq
+
+          for DIST in trixie bookworm; do
+            aws s3 cp s3://apt.defguard.net/dists/${DIST}/Release .
+            
+            curl -X POST "${{ secrets.DEFGUARD_SIGNING_URL }}?signature_type=both" \
+              -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
+              -F "file=@Release" \
+              -o response.json
+            
+            cat response.json | jq -r '.files["Release.gpg"].content' | base64 --decode > Release.gpg
+            cat response.json | jq -r '.files.Release.content' | base64 --decode > InRelease
+            
+            aws s3 cp Release.gpg s3://apt.defguard.net/dists/${DIST}/ --acl public-read
+            aws s3 cp InRelease s3://apt.defguard.net/dists/${DIST}/ --acl public-read
+
+            aws s3 ls s3://apt.defguard.net/dists/ --recursive | awk '{print "<a href=\""$4"\">"$4"</a><br>"}' > index.html
+            aws s3 cp index.html s3://apt.defguard.net/ --acl public-read
+          done

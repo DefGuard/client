@@ -18,6 +18,7 @@ use defguard_client::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
+    enterprise::provisioning::handle_client_initialization,
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
@@ -137,7 +138,8 @@ fn main() {
             start_global_logwatcher,
             stop_global_logwatcher,
             command_get_app_config,
-            command_set_app_config
+            command_set_app_config,
+            get_provisioning_config
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -244,7 +246,12 @@ fn main() {
                     .build(),
             )?;
 
-            let state = AppState::new(config);
+            // Check if client needs to be initialized
+            // and try to load provisioning config if necessary
+            let provisioning_config =
+                tauri::async_runtime::block_on(handle_client_initialization(app_handle));
+
+            let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
             info!("App setup completed, log level: {log_level}");
@@ -271,9 +278,11 @@ fn main() {
 
             // Ensure directories have appropriate permissions (dg25-28).
             #[cfg(unix)]
-            set_perms(&data_dir);
-            #[cfg(unix)]
-            set_perms(&log_dir);
+            {
+                set_perms(&data_dir);
+                set_perms(&log_dir);
+            }
+
             info!(
                 "Application data (database file) will be stored in: {data_dir:?} and application \
                 logs in: {log_dir:?}. Logs of the background Defguard service responsible for \
@@ -293,6 +302,15 @@ fn main() {
                 app_handle_clone.exit(0);
             });
             debug!("Ctrl-C handler has been set up successfully");
+
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                // Wait for frontend to be ready
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+
+                // Handle client initialization if necessary
+                handle_client_initialization(&app_handle_clone).await;
+            });
         }
         RunEvent::ExitRequested { code, api, .. } => {
             debug!("Received exit request");

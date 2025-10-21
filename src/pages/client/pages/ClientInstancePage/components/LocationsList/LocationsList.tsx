@@ -9,9 +9,9 @@ import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/us
 import { routes } from '../../../../../../shared/routes';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import {
+  ClientConnectionType,
   type CommonWireguardFields,
   type DefguardInstance,
-  ClientConnectionType,
 } from '../../../../types';
 import { LocationsDetailView } from './components/LocationsDetailView/LocationsDetailView';
 import { LocationsGridView } from './components/LocationsGridView/LocationsGridView';

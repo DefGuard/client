@@ -17,6 +17,7 @@ import type {
   GetLocationsRequest,
   LocationDetails,
   LocationDetailsRequest,
+  ProvisioningConfig,
   RoutingRequest,
   SaveConfigRequest,
   SaveDeviceConfigResponse,
@@ -129,6 +130,9 @@ const stopGlobalLogWatcher = async (): Promise<void> =>
 const getAppConfig = async (): Promise<AppConfig> =>
   invokeWrapper('command_get_app_config');
 
+const getProvisioningConfig = async (): Promise<ProvisioningConfig | null> =>
+  invokeWrapper('get_provisioning_config');
+
 const setAppConfig = async (
   appConfig: Partial<AppConfig>,
   emitEvent: boolean,
@@ -164,4 +168,5 @@ export const clientApi = {
   getLatestAppVersion,
   startGlobalLogWatcher,
   stopGlobalLogWatcher,
+  getProvisioningConfig,
 };
