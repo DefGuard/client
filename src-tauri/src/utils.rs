@@ -73,13 +73,13 @@ pub(crate) async fn setup_interface(
         .await?;
     // tunnel_config.port = port;
 
-    swift!(fn start_tunnel(prvkey: &SRString));
+    swift!(fn start_tunnel(json: &SRString) -> bool);
     unsafe {
-        let prvkey: SRString = serde_json::to_string(&tunnel_config)
+        let json: SRString = serde_json::to_string(&tunnel_config)
             .unwrap()
             .as_str()
             .into();
-        let result = start_tunnel(&prvkey);
+        let result = start_tunnel(&json);
         error!("start_tunnel() returned {result:?}");
     }
     Ok(())
@@ -261,10 +261,10 @@ pub fn load_log_targets() -> Vec<String> {
 // helper function to get log file directory for the defguard-service daemon
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     let path = "/Logs/defguard-service";
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     let path = "/var/log/defguard-service";
 
     Path::new(path)
@@ -644,30 +644,40 @@ pub(crate) async fn disconnect_interface(
                 );
                 return Err(Error::NotFound);
             };
-            let request = RemoveInterfaceRequest {
-                interface_name,
-                endpoint: location.endpoint.clone(),
-            };
-            debug!(
-                "Sending request to the background service to remove interface {} for location \
-                {}...",
-                active_connection.interface_name, location.name
-            );
-            if let Err(error) = client.remove_interface(request).await {
-                let msg = if error.code() == Code::Unavailable {
-                    format!(
-                        "Couldn't remove interface {}. Background service is unavailable. \
-                        Please make sure the service is running. Error: {error}.",
-                        active_connection.interface_name
-                    )
-                } else {
-                    format!(
-                        "Failed to send a request to the background service to remove interface \
-                        {}. Error: {error}.",
-                        active_connection.interface_name
-                    )
-                };
-                error!("{msg}");
+
+            let mut result = false;
+            swift!(fn stop_tunnel(name: &SRString) -> bool);
+            unsafe {
+                let name: SRString = location.name.as_str().into();
+                result = stop_tunnel(&name);
+                error!("stop_tunnel() returned {result:?}");
+            }
+            if !result {
+                let msg = String::from("Error from Swift");
+                // let request = RemoveInterfaceRequest {
+                //     interface_name,
+                //     endpoint: location.endpoint.clone(),
+                // };
+                // debug!(
+                //     "Sending request to the background service to remove interface {} for location \
+                //     {}...",
+                //     active_connection.interface_name, location.name
+                // );
+                // if let Err(error) = client.remove_interface(request).await {
+                //     let msg = if error.code() == Code::Unavailable {
+                //         format!(
+                //             "Couldn't remove interface {}. Background service is unavailable. \
+                //             Please make sure the service is running. Error: {error}.",
+                //             active_connection.interface_name
+                //         )
+                //     } else {
+                //         format!(
+                //             "Failed to send a request to the background service to remove interface \
+                //             {}. Error: {error}.",
+                //             active_connection.interface_name
+                //         )
+                //     };
+                //     error!("{msg}");
                 return Err(Error::InternalError(msg));
             }
             let connection: Connection = active_connection.into();

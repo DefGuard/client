@@ -40,7 +40,7 @@
       "exceptionDomain": "",
       "files": {
         "embedded.provisionprofile": "Adam_Apollo_Defguard.provisionprofile",
-        "PlugIns": "/Users/adam/Library/Developer/Xcode/DerivedData/NetExt-bpogxtiuhfulrpbbfnqblorodxcp/Build/Products/Release/NetExt.app/Contents/PlugIns"
+        "PlugIns/VPNExtension.appex": "../swift/extension/build/Debug/VPNExtension.appex"
       },
       "frameworks": [],
       "minimumSystemVersion": "13.5",

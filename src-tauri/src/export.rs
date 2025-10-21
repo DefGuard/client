@@ -27,26 +27,6 @@ pub(crate) struct TunnelConfiguration {
     dns_search: Vec<String>,
 }
 
-// impl TunnelConfiguration {
-//     #[must_use]
-//     pub(crate) fn new(
-//         interface_configuration: InterfaceConfiguration,
-//         dns: Vec<IpAddr>,
-//         dns_search: Vec<String>,
-//     ) -> Self {
-//         Self {
-//             name: interface_configuration.name,
-//             private_key: interface_configuration.prvkey,
-//             addresses: interface_configuration.addresses,
-//             listen_port: Some(interface_configuration.port),
-//             peers: interface_configuration.peers,
-//             mtu: interface_configuration.mtu,
-//             dns,
-//             dns_search,
-//         }
-//     }
-// }
-
 impl Location<Id> {
     pub(crate) async fn tunnel_configurarion<'e, E>(
         &self,

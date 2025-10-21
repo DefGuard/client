@@ -1,3 +1,4 @@
+import Foundation
 import Network
 
 struct Endpoint: Codable, CustomStringConvertible {

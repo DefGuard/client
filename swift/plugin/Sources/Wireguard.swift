@@ -4,7 +4,7 @@ import NetworkExtension
 import SwiftRs
 import os
 
-let appId = Bundle.main.bundleIdentifier ?? "net.defguard"
+let appId = Bundle.main.bundleIdentifier ?? "net.defguard.client"
 let pluginAppId = "\(appId).VPNExtension"
 let plugin = WireguardPlugin()
 let logger = Logger(subsystem: appId, category: "WireguardPlugin")
@@ -29,21 +29,30 @@ public func startTunnel(json: SRString) -> Bool {
         return false
     }
 
-    logger.log("Saving tunnel with config: \(String(describing: config))")
-//    plugin.startTunnel(config: config) { result in
-//        if result == nil {
-//            logger.info("Tunnel started successfully")
-//        } else {
-//            logger.error("Tunnel failed to start with \(result)")
-//        }
-//    }
+    logger.info("Saving tunnel with config: \(String(describing: config))")
     saveConfig(config)
 
     return true
 }
 
+@_cdecl("stop_tunnel")
+public func stopTunnel(name: SRString) -> Bool {
+    managerForName(name.toString()) { manager in
+        if let providerManager = manager {
+            // TEST
+            do {
+                try providerManager.connection.stopVPNTunnel()
+                logger.info("VPN stopped")
+            } catch {
+                logger.error("Failed to stop VPN")
+            }
+        }
+    }
+    return true
+}
+
 func saveConfig(_ config: TunnelConfiguration) {
-    managerForConfig(config) { manager in
+    managerForName(config.name) { manager in
         let providerManager = manager ?? NETunnelProviderManager()
         let tunnelProtocol = NETunnelProviderProtocol()
         tunnelProtocol.providerBundleIdentifier = pluginAppId
@@ -74,11 +83,21 @@ func saveConfig(_ config: TunnelConfiguration) {
                 logger.info("Config saved")
             }
         }
+
+        // TEST
+        do {
+            try providerManager.connection.startVPNTunnel()
+            logger.info("VPN started")
+        } catch {
+            logger.error("Failed to start VPN")
+        }
     }
 }
 
-func managerForConfig(_ config: TunnelConfiguration,
-                      completion: @escaping (NETunnelProviderManager?) -> Void) {
+func managerForName(
+    _ name: String,
+    completion: @escaping (NETunnelProviderManager?) -> Void
+) {
     var providerManager: NETunnelProviderManager?
     NETunnelProviderManager.loadAllFromPreferences { managers, error in
         guard let managers = managers else {
@@ -98,10 +117,11 @@ func managerForConfig(_ config: TunnelConfiguration,
         providerManager = nil
         for manager in managers {
             // Obtain named configuration.
-            if manager.localizedDescription != config.name {
+            if manager.localizedDescription != name {
                 continue
             }
-            guard let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol else {
+            guard let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol
+            else {
                 continue
             }
             // Sometimes all managers from all apps come through, so filter by bundle ID.
@@ -112,8 +132,7 @@ func managerForConfig(_ config: TunnelConfiguration,
         }
         if providerManager == nil {
             logger.log("No VPN manager found")
-        }
-        else {
+        } else {
             logger.log(
                 "Loaded provider manager: \(String(describing: providerManager!.localizedDescription), privacy: .public)"
             )

@@ -1,0 +1,70 @@
+import NetworkExtension
+import os
+
+enum WireGuardTunnelError: Error {
+    case invalidTunnelConfiguration
+}
+
+class PacketTunnelProvider: NEPacketTunnelProvider {
+    /// Logging
+    private var logger = Logger(subsystem: Bundle.main.bundleIdentifier!, category: "PacketTunnelProvider")
+
+    private lazy var adapter: Adapter = {
+        return Adapter(with: self)
+    }()
+
+    override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
+        logger.debug("\(#function)")
+        if let options = options {
+            logger.log("Options: \(options)")
+        }
+
+        guard let protocolConfig = self.protocolConfiguration as? NETunnelProviderProtocol,
+        let providerConfig = protocolConfig.providerConfiguration,
+        let tunnelConfig = try? TunnelConfiguration.from(dictionary: providerConfig) else {
+            completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
+            return
+        }
+
+        let networkSettings = tunnelConfig.asNetworkSettings()
+        self.setTunnelNetworkSettings(networkSettings) { error in
+            self.logger.log("Set tunnel network settings returned \(error)")
+            completionHandler(error)
+            return
+        }
+
+        do {
+            try adapter.start(tunnelConfiguration: tunnelConfig)
+        } catch {
+            logger.error("Failed to start tunnel")
+            completionHandler(error)
+        }
+
+        completionHandler(nil)
+    }
+
+    override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        logger.debug("\(#function)")
+        adapter.stop()
+        completionHandler()
+    }
+
+    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+        logger.debug("\(#function)")
+        // Add code here to handle the message.
+        if let handler = completionHandler {
+            handler(messageData)
+        }
+    }
+
+    override func sleep(completionHandler: @escaping () -> Void) {
+        logger.debug("\(#function)")
+        // Add code here to get ready to sleep.
+        completionHandler()
+    }
+
+    override func wake() {
+        logger.debug("\(#function)")
+        // Add code here to wake up.
+    }
+}

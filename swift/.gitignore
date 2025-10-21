@@ -1,7 +1,8 @@
 .DS_Store
 */.build
+build
+Boringtun
 /Packages
-/*.xcodeproj
 xcuserdata/
 DerivedData/
 .swiftpm/config/registries.json
