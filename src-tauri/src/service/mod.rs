@@ -226,11 +226,9 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
-        #[cfg(not(windows))]
-        let wgapi;
-        #[cfg(windows)]
-        let mut wgapi;
-        wgapi = {
+        // `WGApi::remove_interface`` takes `&mut self` under Windows.
+        #[allow(unused_mut)]
+        let mut wgapi = {
             let Ok(mut wgapis_map) = self.wgapis.write() else {
                 error!("Failed to acquire read-write lock for WGApis");
                 return Err(Status::new(Code::Internal, "read-write lock error"));
