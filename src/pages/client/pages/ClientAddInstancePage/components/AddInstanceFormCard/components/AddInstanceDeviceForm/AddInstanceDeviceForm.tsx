@@ -26,7 +26,7 @@ import { routes } from '../../../../../../../../shared/routes';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
-import { type SelectedInstance, ClientConnectionType } from '../../../../../../types';
+import { ClientConnectionType, type SelectedInstance } from '../../../../../../types';
 import { useAddInstanceStore } from '../../../../hooks/useAddInstanceStore';
 import type { AddInstanceInitResponse } from '../../types';
 

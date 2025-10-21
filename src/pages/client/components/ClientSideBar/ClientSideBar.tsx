@@ -60,8 +60,9 @@ export const ClientSideBar = () => {
         </div>
         {instances.map((instance) => (
           <ClientBarItem
-            key={`${instance.id
-              }-${ClientConnectionType.LOCATION.valueOf().toLowerCase()}`}
+            key={`${
+              instance.id
+            }-${ClientConnectionType.LOCATION.valueOf().toLowerCase()}`}
             label={instance.name}
             itemId={instance.id}
             itemType={ClientConnectionType.LOCATION}

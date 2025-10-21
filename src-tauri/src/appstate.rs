@@ -10,6 +10,7 @@ use crate::{
         models::{connection::ActiveConnection, Id},
         DB_POOL,
     },
+    enterprise::provisioning::ProvisioningConfig,
     utils::stats_handler,
     ConnectionType,
 };
@@ -18,15 +19,17 @@ pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
+    pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new(config: AppConfig) -> Self {
+    pub fn new(config: AppConfig, provisioning_config: Option<ProvisioningConfig>) -> Self {
         AppState {
             log_watchers: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
             stat_threads: Mutex::new(HashMap::new()),
+            provisioning_config: Mutex::new(provisioning_config),
         }
     }
 

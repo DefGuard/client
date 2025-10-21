@@ -12,7 +12,7 @@ import { routes } from '../../../../shared/routes';
 import { clientApi } from '../../clientAPI/clientApi';
 import { useClientStore } from '../../hooks/useClientStore';
 import { clientQueryKeys } from '../../query';
-import { type DefguardInstance, ClientConnectionType } from '../../types';
+import { ClientConnectionType, type DefguardInstance } from '../../types';
 import { LocationsList } from './components/LocationsList/LocationsList';
 import { StatsFilterSelect } from './components/StatsFilterSelect/StatsFilterSelect';
 import { StatsLayoutSelect } from './components/StatsLayoutSelect/StatsLayoutSelect';
@@ -72,8 +72,7 @@ export const ClientInstancePage = () => {
   });
 
   useEffect(() => {
-    const isDefguardInstance =
-      selectedInstanceType === ClientConnectionType.LOCATION;
+    const isDefguardInstance = selectedInstanceType === ClientConnectionType.LOCATION;
     const isTunnelInstance = selectedInstanceType === ClientConnectionType.TUNNEL;
 
     if (isDefguardInstance && !selectedInstance) {
