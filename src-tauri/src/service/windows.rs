@@ -1,7 +1,21 @@
-use std::{ffi::OsString, sync::mpsc, time::Duration};
+use std::{
+    ffi::OsString,
+    fs::OpenOptions,
+    net::IpAddr,
+    result::Result,
+    str::FromStr,
+    sync::{mpsc, LazyLock, RwLock},
+    time::Duration,
+};
 
+use chrono::Utc;
 use clap::Parser;
-use log::error;
+use common::{find_free_tcp_port, get_interface_name};
+use defguard_wireguard_rs::{
+    host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WireguardInterfaceApi,
+};
+use error;
+use std::io::Write;
 use tokio::runtime::Runtime;
 use windows_service::{
     define_windows_service,
@@ -10,15 +24,33 @@ use windows_service::{
         ServiceType,
     },
     service_control_handler::{register, ServiceControlHandlerResult},
-    service_dispatcher, Result,
+    service_dispatcher,
 };
 
-use crate::service::{run_server, utils::logging_setup, Config};
+use crate::{
+    enterprise::service_locations::{windows::watch_for_login_logoff, ServiceLocationApi},
+    error::Error,
+    service::{
+        proto::{ServiceLocation, ServiceLocationMode},
+        run_server, setup_wgapi,
+        utils::logging_setup,
+        Config, DaemonError,
+    },
+    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
+};
+use windows::{
+    core::PSTR,
+    Win32::System::RemoteDesktop::{
+        WTSQuerySessionInformationA, WTSWaitSystemEvent, WTS_CURRENT_SERVER_HANDLE,
+        WTS_EVENT_LOGOFF, WTS_EVENT_LOGON, WTS_SESSION_INFOA,
+    },
+};
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: u64 = 10;
 
-pub fn run() -> Result<()> {
+pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
     // this thread until the service is stopped.
     service_dispatcher::start(SERVICE_NAME, ffi_service_main)
@@ -33,7 +65,7 @@ pub fn service_main(_arguments: Vec<OsString>) {
     }
 }
 
-fn run_service() -> Result<()> {
+fn run_service() -> Result<(), DaemonError> {
     // Create a channel to be able to poll a stop event from the service worker loop.
     let (shutdown_tx, shutdown_rx) = mpsc::channel::<u32>();
     let shutdown_tx_server = shutdown_tx.clone();
@@ -80,6 +112,61 @@ fn run_service() -> Result<()> {
             default_panic(info);
             std::process::exit(1);
         }));
+
+        
+        runtime.spawn(async move {
+            info!("Starting service location management task");
+            
+            match ServiceLocationApi::init() {
+                Ok(_) => {
+                    info!("Service locations storage initialized successfully");
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to initialize service locations storage: {}. Shutting down service location thread",
+                        e
+                    );
+                    return;
+                }
+            }
+            
+            // Attempt to connect to service locations
+            info!("Attempting to auto-connect to service locations");
+            match ServiceLocationApi::connect_to_service_locations() {
+                Ok(_) => {
+                    info!("Auto-connect to service locations completed successfully");
+                }
+                Err(e) => {
+                    warn!(
+                        "Error while trying to auto-connect to service locations: {}. \
+                        Will continue monitoring for login/logoff events.",
+                        e
+                    );
+                }
+            }
+            
+            // Start watching for login/logoff events with error recovery
+            info!("Starting login/logoff event monitoring");
+            loop {
+                match watch_for_login_logoff().await {
+                    Ok(_) => {
+                        warn!("Login/logoff event monitoring ended unexpectedly");
+                        break;
+                    }
+                    Err(e) => {
+                        error!(
+                            "Error in login/logoff event monitoring: {}. Restarting in {} seconds...",
+                            e, LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS
+                        );
+                        tokio::time::sleep(Duration::from_secs(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS)).await;
+                        info!("Restarting login/logoff event monitoring");
+                    }
+                }
+            }
+            
+            warn!("Service location management task terminated");
+        });
+
 
         runtime.spawn(async move {
             let server_result = run_server(config).await;

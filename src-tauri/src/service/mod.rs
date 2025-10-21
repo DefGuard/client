@@ -48,6 +48,14 @@ use tonic::{
 };
 use tracing::{debug, error, info, info_span, Instrument};
 
+use crate::enterprise::service_locations::ServiceLocationError;
+#[cfg(not(windows))]
+use crate::service::proto::DeleteServiceLocationsRequest;
+#[cfg(windows)]
+use crate::service::proto::{
+    DeleteServiceLocationsRequest, RestartServiceLocationRequest, SaveServiceLocationsRequest,
+};
+
 use self::config::Config;
 use super::VERSION;
 
@@ -72,6 +80,10 @@ pub enum DaemonError {
     Unexpected(String),
     #[error(transparent)]
     TransportError(#[from] tonic::transport::Error),
+    #[error(transparent)]
+    ServiceLocationError(#[from] ServiceLocationError),
+    #[error(transparent)]
+    WindowsServiceError(#[from] windows_service::Error),
 }
 
 type IfName = String;
@@ -101,7 +113,7 @@ impl DaemonService {
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
+pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
     let wgapi = WG::new(ifname).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
@@ -114,6 +126,111 @@ fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
+
+    #[cfg(not(windows))]
+    async fn save_service_locations(
+        &self,
+        request: tonic::Request<SaveServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Saved service location request received, this is currently not supported on Unix systems");
+        Ok(Response::new(()))
+    }
+
+    #[cfg(not(windows))]
+    async fn delete_service_locations(
+        &self,
+        request: tonic::Request<DeleteServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Saved service location request received, this is currently not supported on Unix systems");
+        Ok(Response::new(()))
+    }
+
+    #[cfg(not(windows))]
+    async fn reset_service_location(
+        &self,
+        request: tonic::Request<RestartServiceLocationRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Restart service location request received, this is currently not supported on Unix systems");
+        Ok(Response::new(()))
+    }
+
+    #[cfg(windows)]
+    async fn save_service_locations(
+        &self,
+        request: tonic::Request<SaveServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        use crate::enterprise::service_locations::ServiceLocationApi;
+
+        debug!("Received a request to save service location");
+        let service_location = request.into_inner();
+
+        match ServiceLocationApi::save_service_locations(
+            service_location.service_locations.as_slice(),
+            &service_location.instance_id,
+            &service_location.private_key,
+        ) {
+            Ok(()) => {
+                debug!("Service location saved successfully");
+                Ok(Response::new(()))
+            }
+            Err(e) => {
+                error!("Failed to save service location: {}", e);
+                Err(Status::internal(format!(
+                    "Failed to save service location: {}",
+                    e
+                )))
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    async fn delete_service_locations(
+        &self,
+        request: tonic::Request<DeleteServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        use crate::enterprise::service_locations::ServiceLocationApi;
+
+        debug!("Received a request to delete service location");
+        let instance_id = request.into_inner().instance_id;
+
+        ServiceLocationApi::disconnect_service_locations_by_instance(&instance_id).map_err(
+            |e| {
+                error!("Failed to disconnect service location: {}", e);
+                Status::internal(format!("Failed to disconnect service location: {}", e))
+            },
+        )?;
+
+        match ServiceLocationApi::delete_all_service_locations_for_instance(&instance_id) {
+            Ok(()) => {
+                debug!("Service location deleted successfully");
+                Ok(Response::new(()))
+            }
+            Err(e) => {
+                error!("Failed to delete service location: {}", e);
+                Err(Status::internal(format!(
+                    "Failed to delete service location: {}",
+                    e
+                )))
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    async fn reset_service_location(
+        &self,
+        request: tonic::Request<RestartServiceLocationRequest>,
+    ) -> Result<Response<()>, Status> {
+        use crate::enterprise::service_locations::ServiceLocationApi;
+
+        let request = request.into_inner();
+        ServiceLocationApi::reset_service_location_state(&request.instance_id, &request.pubkey)
+            .await
+            .map_err(|e| {
+                error!("Failed to restart service location: {}", e);
+                Status::internal(format!("Failed to restart service location: {}", e))
+            })?;
+        Ok(Response::new(()))
+    }
 
     async fn create_interface(
         &self,

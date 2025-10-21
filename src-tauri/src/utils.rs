@@ -943,6 +943,11 @@ async fn check_connection(
 pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
     let all_locations = Location::all(&*DB_POOL).await?;
+    // filter out service locations as they are managed through the Windows Service
+    let all_locations: Vec<Location<Id>> = all_locations
+        .into_iter()
+        .filter(|loc| !loc.is_service_location())
+        .collect();
     let service_manager =
         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(
             |err| {

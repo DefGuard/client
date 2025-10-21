@@ -2,6 +2,8 @@ use std::net::AddrParseError;
 
 use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
 
+use crate::enterprise::service_locations::ServiceLocationError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
@@ -44,6 +46,10 @@ pub enum Error {
     StateLockFail,
     #[error("Failed to acquire lock on mutex. {0}")]
     PoisonError(String),
+    #[error("Failed to convert value. {0}")]
+    ConversionError(String),
+    #[error("JSON error: {0}")]
+    JsonError(#[from] serde_json::Error),
 }
 
 // we must manually implement serde::Serialize
