@@ -477,15 +477,7 @@ jobs:
         with:
           name: unsigned-bundle
       - name: Sign bundle
-        run: osslsigncode sign \
-          -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so \
-          -pkcs11cert ${{ secrets.CODESIGN_KEYID }} \
-          -key ${{ secrets.CODESIGN_KEYID }} \
-          -pass ${{ secrets.CODESIGN_PIN }} \
-          -h sha256 \
-          -t http://time.certum.pl/ \
-          -in defguard-client_${{ env.VERSION }}_x64_en-US.msi \
-          -out defguard-client-signed.msi
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}_x64_en-US.msi -out defguard-client-signed.msi
       - name: Upload installer asset
         uses: actions/upload-release-asset@v1
         env:
