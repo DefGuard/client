@@ -226,7 +226,6 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
-
         #[cfg(not(windows))]
         let wgapi;
         #[cfg(windows)]

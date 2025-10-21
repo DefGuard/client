@@ -250,9 +250,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
             .expect("Failed to configure routing for WireGuard interface");
     }
     if dns.is_empty() {
-        debug!(
-            "No DNS configuration provided for interface {ifname}, skipping DNS configuration"
-        );
+        debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
     } else {
         debug!(
             "The following DNS servers will be set: {dns:?}, search domains: \
