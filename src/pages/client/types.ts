@@ -92,6 +92,11 @@ export type DeadConDroppedPayload = {
   peer_alive_period: number;
 };
 
+export type AddInstancePayload = {
+  token: string;
+  url: string;
+};
+
 export enum TauriEventKey {
   CONNECTION_CHANGED = 'connection-changed',
   INSTANCE_UPDATE = 'instance-update',

@@ -7,8 +7,8 @@ import { Card } from '../../../../../../../../../../shared/defguard-ui/component
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
 import type {
-  DefguardLocation,
   ClientConnectionType,
+  DefguardLocation,
 } from '../../../../../../../../types';
 import { LocationCardNeverConnected } from '../../../LocationCardNeverConnected/LocationCardNeverConnected';
 import { LocationHistoryTable } from './LocationHistoryTable/LocationHistoryTable';

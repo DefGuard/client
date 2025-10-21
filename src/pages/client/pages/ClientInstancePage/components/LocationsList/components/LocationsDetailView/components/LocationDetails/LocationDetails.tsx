@@ -11,8 +11,8 @@ import { Label } from '../../../../../../../../../../shared/defguard-ui/componen
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import { clientQueryKeys } from '../../../../../../../../query';
 import type {
-  DefguardLocation,
   ClientConnectionType,
+  DefguardLocation,
 } from '../../../../../../../../types';
 import { LocationLogs } from '../LocationLogs/LocationLogs';
 
