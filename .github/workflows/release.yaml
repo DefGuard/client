@@ -453,7 +453,7 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - name: Download unsigned bundle & signed burn-engine
+      - name: Download unsigned bundle
         uses: actions/download-artifact@v4
         with:
           name: unsigned-bundle
