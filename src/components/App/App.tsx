@@ -4,7 +4,7 @@ import '../../shared/scss/index.scss';
 
 import { QueryClient } from '@tanstack/query-core';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { debug } from '@tauri-apps/plugin-log';
+import { debug, info } from '@tauri-apps/plugin-log';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
@@ -38,6 +38,7 @@ import { useTheme } from '../../shared/defguard-ui/hooks/theme/useTheme';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
+import { exit } from '@tauri-apps/plugin-process';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -184,6 +185,19 @@ export const App = () => {
     return () => {
       document.removeEventListener('click', handler);
     };
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'q') {
+        info("Ctrl-Q pressed, exiting.");
+        e.preventDefault();
+        exit(0);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   if (!appLoaded) return null;
