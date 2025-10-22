@@ -39,6 +39,7 @@ import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvide
 import { routes } from '../../shared/routes';
 import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
 import { exit } from '@tauri-apps/plugin-process';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -187,18 +188,11 @@ export const App = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 'q') {
-        info("Ctrl-Q pressed, exiting.");
-        e.preventDefault();
-        exit(0);
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+  // register ctrl+q keyboard shortcut
+  useHotkeys('ctrl+q', () => {
+      info("Ctrl-Q pressed, exiting.");
+      exit(0);
+  });
 
   if (!appLoaded) return null;
 
