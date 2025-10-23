@@ -713,8 +713,6 @@ pub(crate) async fn do_update_instance(
             private_key: private_key.clone(),
         };
 
-        debug!("Prepared save request: {save_request:#?}");
-
         debug!(
             "Sending request to daemon to save {} service location(s) for instance {}({})",
             save_request.service_locations.len(),
