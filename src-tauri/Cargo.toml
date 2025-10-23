@@ -110,6 +110,10 @@ x25519-dalek = { version = "2", features = [
     "serde",
     "static_secrets",
 ] }
+async-stream = "0.3.6"
+futures-core = "0.3.31"
+tower = "0.5"
+hyper-util = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 hyper-util = "0.1"

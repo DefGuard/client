@@ -414,18 +414,22 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
 #[cfg(windows)]
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
+    use crate::named_pipe::get_named_pipe_server_stream;
+
     debug!("Starting Defguard interface management daemon");
 
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
+    // let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
+    let stream = get_named_pipe_server_stream();
     let daemon_service = DaemonService::new(&config);
 
-    info!("Defguard daemon version {VERSION} started, listening on {addr}",);
+    // info!("Defguard daemon version {VERSION} started, listening on {addr}",);
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        .serve(addr)
+        // .serve(addr)
+        .serve_with_incoming(stream)
         .await?;
 
     Ok(())

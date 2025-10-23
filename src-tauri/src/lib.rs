@@ -29,6 +29,8 @@ pub mod service;
 pub mod tray;
 pub mod utils;
 pub mod wg_config;
+#[cfg(windows)]
+pub mod named_pipe;
 
 pub mod proto {
     use crate::database::models::{
