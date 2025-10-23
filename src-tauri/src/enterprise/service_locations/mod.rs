@@ -48,6 +48,7 @@ pub(crate) struct ServiceLocationManager {
     connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 pub(crate) struct ServiceLocationData {
     pub service_locations: Vec<ServiceLocation>,
