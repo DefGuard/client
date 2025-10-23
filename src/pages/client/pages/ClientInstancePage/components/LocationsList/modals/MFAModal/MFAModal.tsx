@@ -88,10 +88,16 @@ export const MFAModal = () => {
     setStartResponse(undefined);
   };
 
-  const resetAuthState = () => {
+  const resetAuthState = useCallback(() => {
     setScreen('start');
     setStartResponse(undefined);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (location) {
+      resetAuthState();
+    }
+  }, [location, resetAuthState]);
 
   // selectedMethod: 0 = authenticator app, 1 = email, 2 = OpenID, 3 = MobileApprove
   const startMFA = useCallback(
