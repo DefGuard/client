@@ -302,36 +302,24 @@ $joinType = $joinStatus.JoinType
 Write-Host "Join Type = '$joinType'" -ForegroundColor Magenta
 
 if ($joinType -eq "OnPremisesAD") {
-        Write-Host "Connected to on-premises Active Directory: $($joinStatus.Domain)" -ForegroundColor Green
-        $currentUser = $env:USERNAME
-        Get-OnPremisesADProvisioningConfig -Username $currentUser -ADAttribute $ADAttribute
-        exit 0
-    
-    
+    Write-Host "Connected to on-premises Active Directory: $($joinStatus.Domain)" -ForegroundColor Green
+    $currentUser = $env:USERNAME
+    Get-OnPremisesADProvisioningConfig -Username $currentUser -ADAttribute $ADAttribute
 } elseif ($joinType -eq "Hybrid") {
-        Write-Host "Hybrid join detected (both on-premises AD and Entra ID): $($joinStatus.Domain)" -ForegroundColor Green
-        Write-Host "Querying on-premises Active Directory..." -ForegroundColor Gray
-        $currentUser = $env:USERNAME
-        Get-OnPremisesADProvisioningConfig -Username $currentUser -ADAttribute $ADAttribute
-        exit 0
-    
-    
+    Write-Host "Hybrid join detected (both on-premises AD and Entra ID): $($joinStatus.Domain)" -ForegroundColor Green
+    Write-Host "Querying on-premises Active Directory..." -ForegroundColor Gray
+    $currentUser = $env:USERNAME
+    Get-OnPremisesADProvisioningConfig -Username $currentUser -ADAttribute $ADAttribute
 } elseif ($joinType -eq "EntraID") {
-        Write-Host "Connected to Entra ID (Azure AD)" -ForegroundColor Green
-        if ($joinStatus.Domain) {
-            Write-Host "  Tenant: $($joinStatus.Domain)" -ForegroundColor Gray
-        }
-        Get-EntraIDProvisioningConfig
-        exit 0
-    
-    
+    Write-Host "Connected to Entra ID (Azure AD)" -ForegroundColor Green
+    if ($joinStatus.Domain) {
+        Write-Host "  Tenant: $($joinStatus.Domain)" -ForegroundColor Gray
+    }
+    Get-EntraIDProvisioningConfig
 } elseif ($joinType -eq "Workgroup") {
-        Write-Host "This computer is not connected to a domain (Workgroup). Exiting." -ForegroundColor Yellow
-        exit 0
-    
-    
+    Write-Host "This computer is not connected to a domain (Workgroup). Exiting." -ForegroundColor Yellow
 } else {
-        Write-Host "Unable to determine domain connection status. Exiting." -ForegroundColor Yellow
-        exit 0
-    
+    Write-Host "Unable to determine domain connection status. Exiting." -ForegroundColor Yellow
 }
+
+Stop-Transcript
