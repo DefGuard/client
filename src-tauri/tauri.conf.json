@@ -27,6 +27,7 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "wix": {
+        "upgradeCode": "923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43",
         "fragmentPaths": [
           "./resources-windows/fragments/service.wxs",
           "./resources-windows/fragments/provisioning.wxs"
