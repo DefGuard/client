@@ -1,21 +1,12 @@
 use std::{
     ffi::OsString,
-    fs::OpenOptions,
-    net::IpAddr,
     result::Result,
-    str::FromStr,
-    sync::{mpsc, LazyLock, RwLock},
+    sync::{mpsc, Arc, RwLock},
     time::Duration,
 };
 
-use chrono::Utc;
 use clap::Parser;
-use common::{find_free_tcp_port, get_interface_name};
-use defguard_wireguard_rs::{
-    host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WireguardInterfaceApi,
-};
 use error;
-use std::io::Write;
 use tokio::runtime::Runtime;
 use windows_service::{
     define_windows_service,
@@ -28,23 +19,14 @@ use windows_service::{
 };
 
 use crate::{
-    enterprise::service_locations::{windows::watch_for_login_logoff, ServiceLocationApi},
-    error::Error,
+    enterprise::service_locations::{windows::watch_for_login_logoff, ServiceLocationManager, ServiceLocationError},
     service::{
-        proto::{ServiceLocation, ServiceLocationMode},
-        run_server, setup_wgapi,
+        run_server, 
         utils::logging_setup,
         Config, DaemonError,
     },
-    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
 };
-use windows::{
-    core::PSTR,
-    Win32::System::RemoteDesktop::{
-        WTSQuerySessionInformationA, WTSWaitSystemEvent, WTS_CURRENT_SERVER_HANDLE,
-        WTS_EVENT_LOGOFF, WTS_EVENT_LOGON, WTS_SESSION_INFOA,
-    },
-};
+
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -113,26 +95,32 @@ fn run_service() -> Result<(), DaemonError> {
             std::process::exit(1);
         }));
 
-        
+                
+        let service_location_manager = match ServiceLocationManager::init() {
+            Ok(api) => {
+                info!("Service locations storage initialized successfully");
+                Ok(api)
+            }
+            Err(e) => {
+                error!(
+                    "Failed to initialize service locations storage: {}. Shutting down service location thread",
+                    e
+                );
+                Err(ServiceLocationError::InitError(e.to_string()))
+            }
+        }?;
+
+        let service_location_manager = Arc::new(RwLock::new(service_location_manager));
+
+        let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
             info!("Starting service location management task");
-            
-            match ServiceLocationApi::init() {
-                Ok(_) => {
-                    info!("Service locations storage initialized successfully");
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to initialize service locations storage: {}. Shutting down service location thread",
-                        e
-                    );
-                    return;
-                }
-            }
-            
+
+            let manager = service_location_manager_clone;
+
             // Attempt to connect to service locations
             info!("Attempting to auto-connect to service locations");
-            match ServiceLocationApi::connect_to_service_locations() {
+            match manager.write().unwrap().connect_to_service_locations() {
                 Ok(_) => {
                     info!("Auto-connect to service locations completed successfully");
                 }
@@ -148,7 +136,9 @@ fn run_service() -> Result<(), DaemonError> {
             // Start watching for login/logoff events with error recovery
             info!("Starting login/logoff event monitoring");
             loop {
-                match watch_for_login_logoff().await {
+                match watch_for_login_logoff(
+                    manager.clone(),
+                ).await {
                     Ok(_) => {
                         warn!("Login/logoff event monitoring ended unexpectedly");
                         break;
@@ -168,8 +158,11 @@ fn run_service() -> Result<(), DaemonError> {
         });
 
 
+        let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
-            let server_result = run_server(config).await;
+            let server_result = run_server(config, 
+                service_location_manager_clone
+            ).await;
 
             if server_result.is_err() {
                 let _ = shutdown_tx_server.send(2);

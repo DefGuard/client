@@ -21,7 +21,7 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
             instance::{Instance, InstanceInfo},
-            location::{Location, LocationMfaMode, ServiceLocationMode},
+            location::{Location, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -29,9 +29,7 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::{
-        periodic::config::poll_instance, provisioning::ProvisioningConfig, service_locations,
-    },
+    enterprise::{periodic::config::poll_instance, provisioning::ProvisioningConfig},
     error::Error,
     events::EventKey,
     log_watcher::{
@@ -41,7 +39,7 @@ use crate::{
     proto::DeviceConfigResponse,
     service::{
         proto::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, RestartServiceLocationRequest,
+            DeleteServiceLocationsRequest, RemoveInterfaceRequest, ResetServiceLocationRequest,
             SaveServiceLocationsRequest, ServiceLocation,
         },
         utils::DAEMON_CLIENT,
@@ -296,7 +294,6 @@ pub async fn save_device_config(
     trace!("Created following locations: {locations:#?}");
 
     let mut service_locations = Vec::<ServiceLocation>::new();
-    let mut service_locations_to_restart = Vec::<(String, String)>::new();
 
     for saved_location in &locations {
         if saved_location.is_service_location() {
@@ -342,7 +339,7 @@ pub async fn save_device_config(
             .collect::<HashSet<String>>();
 
         for location_pubkey in locations_pubkeys {
-            let restart_request = RestartServiceLocationRequest {
+            let restart_request = ResetServiceLocationRequest {
                 instance_id: instance.uuid.clone(),
                 pubkey: location_pubkey.clone(),
             };
@@ -626,7 +623,6 @@ pub(crate) async fn do_update_instance(
     );
 
     let mut service_locations = Vec::<ServiceLocation>::new();
-    let mut service_locations_to_reset = Vec::<(String, String)>::new();
 
     // check if locations have changed
     if locations_changed {
@@ -760,7 +756,7 @@ pub(crate) async fn do_update_instance(
 
             DAEMON_CLIENT
                 .clone()
-                .reset_service_location(RestartServiceLocationRequest {
+                .reset_service_location(ResetServiceLocationRequest {
                     instance_id: instance_id.clone(),
                     pubkey: pubkey.clone(),
                 })

@@ -1,12 +1,14 @@
-use defguard_wireguard_rs::error::WireguardInterfaceError;
+use std::collections::HashMap;
+
+use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     database::models::{
-        location::{Location, LocationMfaMode, ServiceLocationMode},
+        location::{Location, ServiceLocationMode},
         Id,
     },
-    service::proto::{ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode},
+    service::proto::ServiceLocation,
 };
 
 #[cfg(target_os = "windows")]
@@ -14,6 +16,8 @@ pub mod windows;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceLocationError {
+    #[error("Error occurred while initializing service location API: {0}")]
+    InitError(String),
     #[error("Failed to load service location storage: {0}")]
     LoadError(String),
     #[error(transparent)]
@@ -35,7 +39,13 @@ pub enum ServiceLocationError {
     WindowsServiceError(#[from] windows_service::Error),
 }
 
-pub(crate) struct ServiceLocationApi;
+#[derive(Default)]
+pub(crate) struct ServiceLocationManager {
+    // Interface name: WireGuard API instance
+    wgapis: HashMap<String, WGApi>,
+    // Instance ID: Service locations connected under that instance
+    connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
+}
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct ServiceLocationData {
@@ -44,10 +54,26 @@ pub(crate) struct ServiceLocationData {
     pub private_key: String,
 }
 
+pub(crate) struct SingleServiceLocationData {
+    pub service_location: ServiceLocation,
+    pub instance_id: String,
+    pub private_key: String,
+}
+
 impl std::fmt::Debug for ServiceLocationData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ServiceLocationData")
             .field("service_locations", &self.service_locations)
+            .field("instance_id", &self.instance_id)
+            .field("private_key", &"***")
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for SingleServiceLocationData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SingleServiceLocationData")
+            .field("service_locations", &self.service_location)
             .field("instance_id", &self.instance_id)
             .field("private_key", &"***")
             .finish()

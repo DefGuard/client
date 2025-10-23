@@ -2,8 +2,6 @@ use std::net::AddrParseError;
 
 use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
 
-use crate::enterprise::service_locations::ServiceLocationError;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]

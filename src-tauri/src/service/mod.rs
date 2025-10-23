@@ -48,16 +48,18 @@ use tonic::{
 };
 use tracing::{debug, error, info, info_span, Instrument};
 
+use self::config::Config;
+use super::VERSION;
 use crate::enterprise::service_locations::ServiceLocationError;
 #[cfg(not(windows))]
 use crate::service::proto::DeleteServiceLocationsRequest;
 #[cfg(windows)]
-use crate::service::proto::{
-    DeleteServiceLocationsRequest, RestartServiceLocationRequest, SaveServiceLocationsRequest,
+use crate::{
+    enterprise::service_locations::ServiceLocationManager,
+    service::proto::{
+        DeleteServiceLocationsRequest, ResetServiceLocationRequest, SaveServiceLocationsRequest,
+    },
 };
-
-use self::config::Config;
-use super::VERSION;
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
@@ -98,15 +100,22 @@ pub(crate) struct DaemonService {
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
+    #[cfg(windows)]
+    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 }
 
 impl DaemonService {
     #[must_use]
-    pub fn new(config: &Config) -> Self {
+    pub fn new(
+        config: &Config,
+        #[cfg(windows)] service_location_manager: Arc<RwLock<ServiceLocationManager>>,
+    ) -> Self {
         Self {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(windows)]
+            service_location_manager,
         }
     }
 }
@@ -148,7 +157,7 @@ impl DesktopDaemonService for DaemonService {
     #[cfg(not(windows))]
     async fn reset_service_location(
         &self,
-        request: tonic::Request<RestartServiceLocationRequest>,
+        request: tonic::Request<ResetServiceLocationRequest>,
     ) -> Result<Response<()>, Status> {
         debug!("Restart service location request received, this is currently not supported on Unix systems");
         Ok(Response::new(()))
@@ -159,12 +168,12 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        use crate::enterprise::service_locations::ServiceLocationApi;
+        use crate::enterprise::service_locations::ServiceLocationManager;
 
         debug!("Received a request to save service location");
         let service_location = request.into_inner();
 
-        match ServiceLocationApi::save_service_locations(
+        match ServiceLocationManager::save_service_locations(
             service_location.service_locations.as_slice(),
             &service_location.instance_id,
             &service_location.private_key,
@@ -188,19 +197,26 @@ impl DesktopDaemonService for DaemonService {
         &self,
         request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        use crate::enterprise::service_locations::ServiceLocationApi;
-
         debug!("Received a request to delete service location");
         let instance_id = request.into_inner().instance_id;
 
-        ServiceLocationApi::disconnect_service_locations_by_instance(&instance_id).map_err(
-            |e| {
+        self.service_location_manager
+            .clone()
+            .write()
+            .unwrap()
+            .disconnect_service_locations_by_instance(&instance_id)
+            .map_err(|e| {
                 error!("Failed to disconnect service location: {}", e);
                 Status::internal(format!("Failed to disconnect service location: {}", e))
-            },
-        )?;
+            })?;
 
-        match ServiceLocationApi::delete_all_service_locations_for_instance(&instance_id) {
+        match self
+            .service_location_manager
+            .clone()
+            .read()
+            .unwrap()
+            .delete_all_service_locations_for_instance(&instance_id)
+        {
             Ok(()) => {
                 debug!("Service location deleted successfully");
                 Ok(Response::new(()))
@@ -218,13 +234,14 @@ impl DesktopDaemonService for DaemonService {
     #[cfg(windows)]
     async fn reset_service_location(
         &self,
-        request: tonic::Request<RestartServiceLocationRequest>,
+        request: tonic::Request<ResetServiceLocationRequest>,
     ) -> Result<Response<()>, Status> {
-        use crate::enterprise::service_locations::ServiceLocationApi;
-
         let request = request.into_inner();
-        ServiceLocationApi::reset_service_location_state(&request.instance_id, &request.pubkey)
-            .await
+        self.service_location_manager
+            .clone()
+            .write()
+            .unwrap()
+            .reset_service_location_state(&request.instance_id, &request.pubkey)
             .map_err(|e| {
                 error!("Failed to restart service location: {}", e);
                 Status::internal(format!("Failed to restart service location: {}", e))
@@ -530,11 +547,14 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 }
 
 #[cfg(windows)]
-pub async fn run_server(config: Config) -> anyhow::Result<()> {
+pub(crate) async fn run_server(
+    config: Config,
+    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
+) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
-    let daemon_service = DaemonService::new(&config);
+    let daemon_service = DaemonService::new(&config, service_location_manager);
 
     info!("Defguard daemon version {VERSION} started, listening on {addr}",);
     debug!("Defguard daemon configuration: {config:?}");
