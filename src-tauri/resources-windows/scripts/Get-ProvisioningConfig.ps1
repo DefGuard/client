@@ -70,9 +70,7 @@ function Get-DomainJoinStatus {
 function Save-DefguardEnrollmentData {
     param(
         [string]$EnrollmentUrl,
-        [string]$EnrollmentToken,
-        [string]$UserPrincipalName,
-        [string]$DisplayName
+        [string]$EnrollmentToken
     )
     
     # Create Defguard directory in AppData\Roaming
@@ -87,11 +85,8 @@ function Save-DefguardEnrollmentData {
         }
         
         $jsonData = @{
-            enrollmentUrl = $EnrollmentUrl
-            enrollmentToken = $EnrollmentToken
-            userPrincipalName = $UserPrincipalName
-            displayName = $DisplayName
-            retrievedAt = (Get-Date).ToString("o")
+            enrollment_url = $EnrollmentUrl
+            enrollment_token = $EnrollmentToken
         }
         
         $jsonData | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonOutputPath -Encoding UTF8 -Force
@@ -162,9 +157,7 @@ function Get-OnPremisesADProvisioningConfig {
                 # Save enrollment data to JSON file only if both URL and token exist
                 if ($enrollmentUrl -and $enrollmentToken) {
                     Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
-                                                 -EnrollmentToken $enrollmentToken `
-                                                 -UserPrincipalName $adUser.UserPrincipalName `
-                                                 -DisplayName $adUser.DisplayName
+                                                 -EnrollmentToken $enrollmentToken
                 } else {
                     Write-Host "`nWarning: Incomplete Defguard enrollment data in JSON. Both URL and token are required." -ForegroundColor Yellow
                 }
@@ -263,9 +256,7 @@ function Get-EntraIDProvisioningConfig {
                     # Save enrollment data to JSON file only if both URL and token exist
                     if ($enrollmentUrl -and $enrollmentToken) {
                         Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
-                                                     -EnrollmentToken $enrollmentToken `
-                                                     -UserPrincipalName $mgUser.UserPrincipalName `
-                                                     -DisplayName $mgUser.DisplayName
+                                                     -EnrollmentToken $enrollmentToken
                     } else {
                         Write-Host "`nWarning: Incomplete Defguard enrollment data. Both URL and token are required." -ForegroundColor Yellow
                     }
