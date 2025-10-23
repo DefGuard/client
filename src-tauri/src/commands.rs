@@ -853,6 +853,10 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
+    let app_state: State<AppState> = handle.state();
+    let theme = { app_state.app_config.lock().unwrap().tray_theme };
+    configure_tray_icon(&handle, theme).await?;
+
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
