@@ -39,8 +39,8 @@ use crate::{
     proto::DeviceConfigResponse,
     service::{
         proto::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, ResetServiceLocationRequest,
-            SaveServiceLocationsRequest, ServiceLocation,
+            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+            ServiceLocation,
         },
         utils::DAEMON_CLIENT,
     },
@@ -290,7 +290,7 @@ pub async fn save_device_config(
     transaction.commit().await?;
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
-    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
     let mut service_locations = Vec::<ServiceLocation>::new();
@@ -332,36 +332,6 @@ pub async fn save_device_config(
             "Saved service locations to the daemon for instance {}({}).",
             instance.name, instance.id,
         );
-
-        let locations_pubkeys = service_locations
-            .iter()
-            .map(|loc| loc.pubkey.clone())
-            .collect::<HashSet<String>>();
-
-        for location_pubkey in locations_pubkeys {
-            let restart_request = ResetServiceLocationRequest {
-                instance_id: instance.uuid.clone(),
-                pubkey: location_pubkey.clone(),
-            };
-            debug!(
-                "Restarting service location with pubkey {} on instance {}.",
-                restart_request.pubkey, restart_request.instance_id,
-            );
-            DAEMON_CLIENT.clone()
-                .reset_service_location(restart_request)
-                .await
-                .map_err(|err| {
-                    error!(
-                        "Error while restarting service location with pubkey {} on instance {}: {err}",
-                        location_pubkey, instance.uuid,
-                    );
-                    Error::InternalError(err.to_string())
-                })?;
-            debug!(
-                "Restarted service location with pubkey {} on instance {}.",
-                location_pubkey, instance.uuid
-            );
-        }
     }
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
@@ -386,7 +356,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     let mut instance_info = Vec::new();
     let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
-        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
+        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
         let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
         let connected = connection_ids
             .iter()
@@ -460,7 +430,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
         "Getting information about all locations for instance {}.",
         instance.name
     );
-    let locations = Location::find_by_instance_id(&*DB_POOL, instance_id).await?;
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance_id, false).await?;
     trace!(
         "Found {} locations for instance {instance} to return information about.",
         locations.len()
@@ -468,16 +438,6 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
     let active_locations_ids = get_connection_id_by_type(ConnectionType::Location).await;
     let mut location_info = Vec::new();
     for location in locations {
-        // Skip service locations, those shouldn't be shown in the UI.
-        if location.is_service_location() {
-            debug!(
-                "Skipping service location {}({}) for instance {}({}) when returning \
-                locations to the frontend.",
-                location.name, location.id, instance.name, instance.id,
-            );
-            continue;
-        }
-
         let info = LocationInfo {
             id: location.id,
             instance_id: location.instance_id,
@@ -560,7 +520,7 @@ pub(crate) async fn locations_changed(
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
     let db_locations: HashSet<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id)
+        Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
             .await?
             .into_iter()
             .map(|location| {
@@ -633,14 +593,13 @@ pub(crate) async fn do_update_instance(
         );
         // fetch existing locations for given instance
         let mut current_locations =
-            Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
+            Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
         for dev_config in response.configs {
             // parse device config
             let new_location = dev_config.into_location(instance.id);
-            let saved_location: Location<Id>;
 
             // check if location is already present in current locations
-            if let Some(position) = current_locations
+            let saved_location = if let Some(position) = current_locations
                 .iter()
                 .position(|loc| loc.network_id == new_location.network_id)
             {
@@ -662,14 +621,14 @@ pub(crate) async fn do_update_instance(
                 current_location.service_location_mode = new_location.service_location_mode;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
-                saved_location = current_location;
+                current_location
             } else {
                 // create new location
                 debug!("Creating new location {new_location} for instance instance {instance}");
                 let new_location = new_location.save(transaction.as_mut()).await?;
                 info!("New location {new_location} created for instance {instance}");
-                saved_location = new_location;
-            }
+                new_location
+            };
 
             if saved_location.is_service_location() {
                 debug!(
@@ -699,7 +658,12 @@ pub(crate) async fn do_update_instance(
         .ok_or(Error::NotFound)?
         .prvkey;
 
-    if !service_locations.is_empty() {
+    if service_locations.is_empty() {
+        debug!(
+            "No service locations to process for instance {}({})",
+            instance.name, instance.id
+        );
+    } else {
         debug!(
             "Processing {} service location(s) for instance {}({})",
             service_locations.len(),
@@ -739,47 +703,8 @@ pub(crate) async fn do_update_instance(
             instance.id
         );
 
-        let service_locations_pubkeys = service_locations
-            .iter()
-            .map(|loc| loc.pubkey.clone())
-            .collect::<HashSet<String>>();
-
-        let instance_id = instance.uuid.clone();
-
-        for pubkey in service_locations_pubkeys {
-            debug!(
-                "Sending state reset request for service location with pubkey {} on instance {}",
-                pubkey, instance_id
-            );
-
-            DAEMON_CLIENT
-                .clone()
-                .reset_service_location(ResetServiceLocationRequest {
-                    instance_id: instance_id.clone(),
-                    pubkey: pubkey.clone(),
-                })
-                .await
-                .map_err(|err| {
-                    error!(
-                        "Error while restarting service location with pubkey {} on instance {}: {err}",
-                        pubkey, instance_id,
-                    );
-                    Error::InternalError(err.to_string())
-                })?;
-
-            info!(
-                "Successfully reset the state of service location with pubkey {} on instance {}",
-                pubkey, instance_id
-            );
-        }
-
         debug!(
             "Completed processing all service locations for instance {}({})",
-            instance.name, instance.id
-        );
-    } else {
-        debug!(
-            "No service locations to process for instance {}({})",
             instance.name, instance.id
         );
     }
@@ -1007,7 +932,8 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     };
     debug!("The instance that is being deleted has been identified as {instance}");
 
-    let instance_locations = Location::find_by_instance_id(&mut *transaction, instance_id).await?;
+    let instance_locations =
+        Location::find_by_instance_id(&mut *transaction, instance_id, false).await?;
     if !instance_locations.is_empty() {
         debug!(
             "Found locations associated with the instance {instance}, closing their connections."

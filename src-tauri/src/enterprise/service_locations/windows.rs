@@ -700,12 +700,11 @@ impl ServiceLocationManager {
                             location.name
                         );
                         continue;
-                    } else {
-                        debug!(
+                    }
+                    debug!(
                             "Proceeding to connect pre-logon service location '{}' because no user is logged in",
                             location.name
                         );
-                    }
                 }
 
                 if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
@@ -748,6 +747,7 @@ impl ServiceLocationManager {
     }
 
     pub fn save_service_locations(
+        &self,
         service_locations: &[ServiceLocation],
         instance_id: &str,
         private_key: &str,

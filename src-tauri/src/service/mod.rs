@@ -53,10 +53,7 @@ use super::VERSION;
 use crate::enterprise::service_locations::ServiceLocationError;
 #[cfg(windows)]
 use crate::enterprise::service_locations::ServiceLocationManager;
-#[cfg(not(windows))]
-use crate::service::proto::{
-    DeleteServiceLocationsRequest, ResetServiceLocationRequest, SaveServiceLocationsRequest,
-};
+use crate::service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest};
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
@@ -152,40 +149,58 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[cfg(not(windows))]
-    async fn reset_service_location(
-        &self,
-        _request: tonic::Request<ResetServiceLocationRequest>,
-    ) -> Result<Response<()>, Status> {
-        debug!("Restart service location request received, this is currently not supported on Unix systems");
-        Ok(Response::new(()))
-    }
-
     #[cfg(windows)]
     async fn save_service_locations(
         &self,
         request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        use crate::enterprise::service_locations::ServiceLocationManager;
-
         debug!("Received a request to save service location");
         let service_location = request.into_inner();
 
-        match ServiceLocationManager::save_service_locations(
-            service_location.service_locations.as_slice(),
-            &service_location.instance_id,
-            &service_location.private_key,
-        ) {
+        match self
+            .service_location_manager
+            .clone()
+            .read()
+            .unwrap()
+            .save_service_locations(
+                service_location.service_locations.as_slice(),
+                &service_location.instance_id,
+                &service_location.private_key,
+            ) {
             Ok(()) => {
                 debug!("Service location saved successfully");
-                Ok(Response::new(()))
             }
             Err(e) => {
                 let msg = format!("Failed to save service location: {e}");
                 error!(msg);
-                Err(Status::internal(msg))
+                return Err(Status::internal(msg));
             }
         }
+
+        for saved_location in service_location.service_locations {
+            match self
+                .service_location_manager
+                .clone()
+                .write()
+                .unwrap()
+                .reset_service_location_state(&service_location.instance_id, &saved_location.pubkey)
+            {
+                Ok(()) => {
+                    debug!(
+                        "Service location '{}' state reset successfully",
+                        saved_location.name
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to reset state for service location '{}': {e}",
+                        saved_location.name
+                    );
+                }
+            }
+        }
+
+        Ok(Response::new(()))
     }
 
     #[cfg(windows)]
@@ -226,24 +241,6 @@ impl DesktopDaemonService for DaemonService {
                 )))
             }
         }
-    }
-
-    #[cfg(windows)]
-    async fn reset_service_location(
-        &self,
-        request: tonic::Request<ResetServiceLocationRequest>,
-    ) -> Result<Response<()>, Status> {
-        let request = request.into_inner();
-        self.service_location_manager
-            .clone()
-            .write()
-            .unwrap()
-            .reset_service_location_state(&request.instance_id, &request.pubkey)
-            .map_err(|e| {
-                error!("Failed to restart service location: {}", e);
-                Status::internal(format!("Failed to restart service location: {}", e))
-            })?;
-        Ok(Response::new(()))
     }
 
     async fn create_interface(

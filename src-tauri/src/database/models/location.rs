@@ -84,17 +84,24 @@ impl fmt::Display for Location<NoId> {
 }
 
 impl Location<Id> {
+    /// Ignores service locations
     #[cfg(windows)]
-    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    pub(crate) async fn all<'e, E>(
+        executor: E,
+        include_service_locations: bool,
+    ) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
+        let max_mode = if include_service_locations { 2 } else { 0 }; // 0 to exclude service locations, 2 to include them
         query_as!(
           Self,
-          "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
-          route_all_traffic, keepalive_interval, \
-          location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
-          FROM location ORDER BY name ASC;"
+            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
+            route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            FROM location WHERE service_location_mode <= $1 \
+            ORDER BY name ASC;",
+            max_mode
       )
         .fetch_all(executor)
         .await
@@ -151,16 +158,20 @@ impl Location<Id> {
     pub(crate) async fn find_by_instance_id<'e, E>(
         executor: E,
         instance_id: Id,
+        include_service_locations: bool,
     ) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
+        let max_mode = if include_service_locations { 2 } else { 0 }; // 0 to exclude service locations, 2 to include them
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
             network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
-            FROM location WHERE instance_id = $1 ORDER BY name ASC",
-            instance_id
+            FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
+            ORDER BY name ASC",
+            instance_id,
+            max_mode
         )
         .fetch_all(executor)
         .await
