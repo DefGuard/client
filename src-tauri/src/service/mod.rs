@@ -181,11 +181,9 @@ impl DesktopDaemonService for DaemonService {
                 Ok(Response::new(()))
             }
             Err(e) => {
-                error!("Failed to save service location: {}", e);
-                Err(Status::internal(format!(
-                    "Failed to save service location: {}",
-                    e
-                )))
+                let msg = format!("Failed to save service location: {e}");
+                error!(msg);
+                Err(Status::internal(msg))
             }
         }
     }
@@ -204,8 +202,9 @@ impl DesktopDaemonService for DaemonService {
             .unwrap()
             .disconnect_service_locations_by_instance(&instance_id)
             .map_err(|e| {
-                error!("Failed to disconnect service location: {}", e);
-                Status::internal(format!("Failed to disconnect service location: {}", e))
+                let msg = format!("Failed to disconnect service location: {e}");
+                error!(msg);
+                Status::internal(msg)
             })?;
 
         match self

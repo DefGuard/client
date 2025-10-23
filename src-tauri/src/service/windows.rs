@@ -27,7 +27,7 @@ use crate::{
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
-const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: u64 = 10;
+const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
@@ -121,9 +121,8 @@ fn run_service() -> Result<(), DaemonError> {
                 }
                 Err(e) => {
                     warn!(
-                        "Error while trying to auto-connect to service locations: {}. \
+                        "Error while trying to auto-connect to service locations: {e}. \
                         Will continue monitoring for login/logoff events.",
-                        e
                     );
                 }
             }
@@ -139,10 +138,9 @@ fn run_service() -> Result<(), DaemonError> {
                     }
                     Err(e) => {
                         error!(
-                            "Error in login/logoff event monitoring: {}. Restarting in {} seconds...",
-                            e, LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS
+                            "Error in login/logoff event monitoring: {e}. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS} seconds...",
                         );
-                        tokio::time::sleep(Duration::from_secs(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS)).await;
+                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                         info!("Restarting login/logoff event monitoring");
                     }
                 }
