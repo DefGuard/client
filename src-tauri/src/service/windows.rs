@@ -19,14 +19,11 @@ use windows_service::{
 };
 
 use crate::{
-    enterprise::service_locations::{windows::watch_for_login_logoff, ServiceLocationManager, ServiceLocationError},
-    service::{
-        run_server, 
-        utils::logging_setup,
-        Config, DaemonError,
+    enterprise::service_locations::{
+        windows::watch_for_login_logoff, ServiceLocationError, ServiceLocationManager,
     },
+    service::{run_server, utils::logging_setup, Config, DaemonError},
 };
-
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -95,7 +92,6 @@ fn run_service() -> Result<(), DaemonError> {
             std::process::exit(1);
         }));
 
-                
         let service_location_manager = match ServiceLocationManager::init() {
             Ok(api) => {
                 info!("Service locations storage initialized successfully");
@@ -118,7 +114,6 @@ fn run_service() -> Result<(), DaemonError> {
 
             let manager = service_location_manager_clone;
 
-            // Attempt to connect to service locations
             info!("Attempting to auto-connect to service locations");
             match manager.write().unwrap().connect_to_service_locations() {
                 Ok(_) => {
@@ -132,8 +127,7 @@ fn run_service() -> Result<(), DaemonError> {
                     );
                 }
             }
-            
-            // Start watching for login/logoff events with error recovery
+
             info!("Starting login/logoff event monitoring");
             loop {
                 match watch_for_login_logoff(
@@ -153,16 +147,13 @@ fn run_service() -> Result<(), DaemonError> {
                     }
                 }
             }
-            
+
             warn!("Service location management task terminated");
         });
 
-
         let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
-            let server_result = run_server(config, 
-                service_location_manager_clone
-            ).await;
+            let server_result = run_server(config, service_location_manager_clone).await;
 
             if server_result.is_err() {
                 let _ = shutdown_tx_server.send(2);

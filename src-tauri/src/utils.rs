@@ -14,6 +14,8 @@ use windows_service::{
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
+#[cfg(target_os = "windows")]
+use crate::active_connections::find_connection;
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -37,9 +39,6 @@ use crate::{
     },
     ConnectionType,
 };
-
-#[cfg(target_os = "windows")]
-use crate::active_connections::find_connection;
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";

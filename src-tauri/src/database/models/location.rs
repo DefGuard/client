@@ -5,8 +5,10 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, Sql
 
 use super::{Id, NoId};
 use crate::{
-    error::Error, proto::LocationMfaMode as ProtoLocationMfaMode,
-    proto::ServiceLocationMode as ProtoServiceLocationMode,
+    error::Error,
+    proto::{
+        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
