@@ -288,6 +288,11 @@ function Get-EntraIDProvisioningConfig {
     }
 }
 
+# Log all script output to file
+$defguardDir = Join-Path $env:APPDATA "net.defguard"
+$logFilePath = Join-Path $defguardDir "provisioning_log.txt"
+Start-Transcript -Path $logFilePath
+
 # Main script execution
 Write-Host "Detecting domain join status..." -ForegroundColor Gray
 
