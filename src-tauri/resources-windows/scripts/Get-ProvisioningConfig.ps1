@@ -12,15 +12,11 @@
     - Workgroup: Exits gracefully
     The retrieved enrollment data is saved to a JSON file for the Defguard client to use.
 
-.PARAMETER Silent
-    Suppresses interactive authentication prompts for Entra ID (will fail if not already authenticated)
-
 .PARAMETER ADAttribute
     Specifies which Active Directory attribute to read from (default: extensionAttribute1)
 #>
 
 param(
-    [switch]$Silent,
     [string]$ADAttribute = "extensionAttribute1"
 )
 
@@ -193,8 +189,6 @@ function Get-OnPremisesADProvisioningConfig {
 
 # Get Defguard client provisioning config from Entra ID
 function Get-EntraIDProvisioningConfig {
-    param([bool]$SilentMode)
-    
     # Check if Microsoft.Graph module is available
     if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Users)) {
         Write-Host "Microsoft.Graph.Users module is not installed." -ForegroundColor Yellow
@@ -215,11 +209,6 @@ function Get-EntraIDProvisioningConfig {
         $context = Get-MgContext -ErrorAction SilentlyContinue
         
         if (-not $context) {
-            if ($SilentMode) {
-                Write-Host "Not authenticated to Microsoft Graph and silent mode is enabled. Cannot proceed." -ForegroundColor Yellow
-                return
-            }
-            
             Write-Host "Connecting to Microsoft Graph (authentication required)..." -ForegroundColor Yellow
             Write-Host "Note: Requesting additional permissions for custom security attributes..." -ForegroundColor Gray
             Connect-MgGraph -Scopes "User.Read", "CustomSecAttributeAssignment.Read.All" -ErrorAction Stop
@@ -327,7 +316,7 @@ if ($joinType -eq "OnPremisesAD") {
         if ($joinStatus.Domain) {
             Write-Host "  Tenant: $($joinStatus.Domain)" -ForegroundColor Gray
         }
-        Get-EntraIDProvisioningConfig -SilentMode $Silent
+        Get-EntraIDProvisioningConfig
         exit 0
     
     
