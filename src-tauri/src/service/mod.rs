@@ -51,14 +51,11 @@ use tracing::{debug, error, info, info_span, Instrument};
 use self::config::Config;
 use super::VERSION;
 use crate::enterprise::service_locations::ServiceLocationError;
-#[cfg(not(windows))]
-use crate::service::proto::DeleteServiceLocationsRequest;
 #[cfg(windows)]
-use crate::{
-    enterprise::service_locations::ServiceLocationManager,
-    service::proto::{
-        DeleteServiceLocationsRequest, ResetServiceLocationRequest, SaveServiceLocationsRequest,
-    },
+use crate::enterprise::service_locations::ServiceLocationManager;
+#[cfg(not(windows))]
+use crate::service::proto::{
+    DeleteServiceLocationsRequest, ResetServiceLocationRequest, SaveServiceLocationsRequest,
 };
 
 #[cfg(windows)]
@@ -84,6 +81,7 @@ pub enum DaemonError {
     TransportError(#[from] tonic::transport::Error),
     #[error(transparent)]
     ServiceLocationError(#[from] ServiceLocationError),
+    #[cfg(windows)]
     #[error(transparent)]
     WindowsServiceError(#[from] windows_service::Error),
 }
@@ -139,7 +137,7 @@ impl DesktopDaemonService for DaemonService {
     #[cfg(not(windows))]
     async fn save_service_locations(
         &self,
-        request: tonic::Request<SaveServiceLocationsRequest>,
+        _request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
         debug!("Saved service location request received, this is currently not supported on Unix systems");
         Ok(Response::new(()))
@@ -148,7 +146,7 @@ impl DesktopDaemonService for DaemonService {
     #[cfg(not(windows))]
     async fn delete_service_locations(
         &self,
-        request: tonic::Request<DeleteServiceLocationsRequest>,
+        _request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
         debug!("Saved service location request received, this is currently not supported on Unix systems");
         Ok(Response::new(()))
@@ -157,7 +155,7 @@ impl DesktopDaemonService for DaemonService {
     #[cfg(not(windows))]
     async fn reset_service_location(
         &self,
-        request: tonic::Request<ResetServiceLocationRequest>,
+        _request: tonic::Request<ResetServiceLocationRequest>,
     ) -> Result<Response<()>, Status> {
         debug!("Restart service location request received, this is currently not supported on Unix systems");
         Ok(Response::new(()))

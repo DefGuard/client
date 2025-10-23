@@ -34,11 +34,12 @@ pub enum ServiceLocationError {
     JsonError(#[from] serde_json::Error),
     #[error(transparent)]
     ProtoEnumError(#[from] prost::UnknownEnumValue),
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     #[error(transparent)]
     WindowsServiceError(#[from] windows_service::Error),
 }
 
+#[allow(dead_code)]
 #[derive(Default)]
 pub(crate) struct ServiceLocationManager {
     // Interface name: WireGuard API instance
@@ -54,6 +55,7 @@ pub(crate) struct ServiceLocationData {
     pub private_key: String,
 }
 
+#[allow(dead_code)]
 pub(crate) struct SingleServiceLocationData {
     pub service_location: ServiceLocation,
     pub instance_id: String,
@@ -115,7 +117,7 @@ impl Location<Id> {
             allowed_ips: self.allowed_ips.clone(),
             dns: self.dns.clone().unwrap_or_default(),
             keepalive_interval: self.keepalive_interval.try_into().unwrap_or(0),
-            mode: mode,
+            mode,
         })
     }
 }
