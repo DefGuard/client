@@ -6,15 +6,15 @@ use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
 use tonic::Code;
 use tracing::Level;
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use windows_service::{
     service::{ServiceAccess, ServiceState},
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use crate::active_connections::find_connection;
 use crate::{
     appstate::AppState,

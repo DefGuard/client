@@ -11,7 +11,7 @@ use crate::{
     service::proto::ServiceLocation,
 };
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub mod windows;
 
 #[derive(Debug, thiserror::Error)]
