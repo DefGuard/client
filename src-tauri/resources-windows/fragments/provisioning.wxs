@@ -1,17 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <!-- Component to include the PowerShell script -->
-    <ComponentGroup Id="ProvisioningScripts">
-      <Component Id="ProvisioningScriptFragment" Directory="INSTALLDIR">
-        <File Id="GetProvisioningConfigScript" Source="src-tauri\resources-windows\scripts\Get-ProvisioningConfig.ps1" KeyPath="yes"/>
-      </Component>
-    </ComponentGroup>
-  </Fragment>
-  
-  <Fragment>
+    <Component Id="ProvisioningScriptFragment" Directory="INSTALLDIR" Guid="*">
+      <File Id="GetProvisioningConfigScript" Source="..\..\resources-windows\scripts\Get-ProvisioningConfig.ps1" KeyPath="yes"/>
+    </Component>
+
     <!-- Define public properties that can be passed to the MSI -->
-    <!-- Uppercase names make them public and settable from command line -->
     <Property Id="PROVISIONING" Secure="yes"/>
     <Property Id="ADATTRIBUTE" Value="extensionAttribute1"/>
     
@@ -21,7 +16,7 @@
                   Execute="deferred"
                   Impersonate="yes"
                   Return="check"
-                  ExeCommand="powershell.exe -ExecutionPolicy Bypass -File &quot;[#GetProvisioningConfigScript]&quot; -Silent -ADAttribute &quot;[ADATTRIBUTE]&quot;"/>
+                  ExeCommand="powershell.exe -ExecutionPolicy Bypass -File &quot;[INSTALLDIR]Get-ProvisioningConfig.ps1&quot; -ADAttribute &quot;[ADATTRIBUTE]&quot;"/>
     
     <!-- Schedule the custom action to run only if PROVISIONING property is set -->
     <InstallExecuteSequence>

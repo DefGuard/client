@@ -5,7 +5,6 @@
     ],
     "resources": [
       "resources-windows/binaries/*",
-      "resources-windows/scripts/*",
       "resources/icons/*"
     ]
   }
