@@ -85,10 +85,7 @@ impl std::fmt::Debug for SingleServiceLocationData {
 impl Location<Id> {
     pub fn to_service_location(&self) -> Result<ServiceLocation, crate::error::Error> {
         if !self.is_service_location() {
-            warn!(
-                "Location {} is not a service location, so it can't be converted to one.",
-                self
-            );
+            warn!("Location {self} is not a service location, so it can't be converted to one.");
             return Err(crate::error::Error::ConversionError(format!(
                 "Failed to convert location {} to a service location as it's either not marked as one or has MFA enabled.",
                 self

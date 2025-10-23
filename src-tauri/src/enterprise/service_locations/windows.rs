@@ -43,45 +43,42 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 pub(crate) async fn watch_for_login_logoff(
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) -> Result<(), ServiceLocationError> {
-    unsafe {
-        loop {
-            let mut event_mask: u32 = 0;
-            let success = WTSWaitSystemEvent(
+    loop {
+        let mut event_flags = 0;
+        let success = unsafe {
+            WTSWaitSystemEvent(
                 Some(WTS_CURRENT_SERVER_HANDLE),
                 WTS_EVENT_LOGON | WTS_EVENT_LOGOFF,
-                &mut event_mask,
-            );
+                &mut event_flags,
+            )
+        };
 
-            match success {
-                Ok(_) => {
-                    debug!("Waiting for system event returned with event_mask: 0x{event_mask:x}");
-                }
-                Err(err) => {
-                    error!("Failed waiting for login/logoff event: {err:?}");
-                    tokio::time::sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS))
-                        .await;
-                    continue;
-                }
-            };
+        match success {
+            Ok(_) => {
+                debug!("Waiting for system event returned with event_flags: 0x{event_flags:x}");
+            }
+            Err(err) => {
+                error!("Failed waiting for login/logoff event: {err:?}");
+                tokio::time::sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS)).await;
+                continue;
+            }
+        };
 
-            if event_mask & WTS_EVENT_LOGON != 0 {
-                debug!(
-                    "Detected user logon, attempting to auto-disconnect from service locations."
-                );
-                service_location_manager
-                    .clone()
-                    .write()
-                    .unwrap()
-                    .disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
-            }
-            if event_mask & WTS_EVENT_LOGOFF != 0 {
-                debug!("Detected user logoff, attempting to auto-connect to service locations.");
-                service_location_manager
-                    .clone()
-                    .write()
-                    .unwrap()
-                    .connect_to_service_locations()?;
-            }
+        if event_flags & WTS_EVENT_LOGON != 0 {
+            debug!("Detected user logon, attempting to auto-disconnect from service locations.");
+            service_location_manager
+                .clone()
+                .write()
+                .unwrap()
+                .disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
+        }
+        if event_flags & WTS_EVENT_LOGOFF != 0 {
+            debug!("Detected user logoff, attempting to auto-connect to service locations.");
+            service_location_manager
+                .clone()
+                .write()
+                .unwrap()
+                .connect_to_service_locations()?;
         }
     }
 }
@@ -265,7 +262,7 @@ impl ServiceLocationManager {
         debug!("Initializing ServiceLocationApi");
         let path = get_shared_directory()?;
 
-        debug!("Creating directory: {:?}", path);
+        debug!("Creating directory: {path:?}");
         create_dir_all(&path)?;
 
         if let Some(path_str) = path.to_str() {
@@ -694,7 +691,7 @@ impl ServiceLocationManager {
                 instance_data.service_locations.len()
             );
             for location in instance_data.service_locations {
-                debug!("Service Location: {:?}", location);
+                debug!("Service Location: {location:?}");
 
                 if location.mode == ServiceLocationMode::PreLogon as i32 {
                     if is_user_logged_in() {
@@ -760,7 +757,7 @@ impl ServiceLocationManager {
             service_locations.len(),
         );
 
-        debug!("Service locations to save: {:?}", service_locations);
+        debug!("Service locations to save: {service_locations:?}");
 
         create_dir_all(get_shared_directory()?)?;
 
@@ -774,10 +771,7 @@ impl ServiceLocationManager {
 
         let json = serde_json::to_string_pretty(&service_location_data)?;
 
-        debug!(
-            "Writing service location data to file: {:?}",
-            instance_file_path
-        );
+        debug!("Writing service location data to file: {instance_file_path:?}");
 
         fs::write(&instance_file_path, &json)?;
 
