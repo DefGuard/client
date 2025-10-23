@@ -77,7 +77,7 @@ function Save-DefguardEnrollmentData {
     
     # Create Defguard directory in AppData\Roaming
     $defguardDir = Join-Path $env:APPDATA "net.defguard"
-    $jsonOutputPath = Join-Path $defguardDir "enrollment.json"
+    $jsonOutputPath = Join-Path $defguardDir "provisioning.json"
     
     try {
         # Create directory if it doesn't exist

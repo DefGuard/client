@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::database::{models::instance::Instance, DB_POOL};
 
-const CONFIG_FILE_NAME: &str = "enrollment.json";
+const CONFIG_FILE_NAME: &str = "provisioning.json";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProvisioningConfig {
