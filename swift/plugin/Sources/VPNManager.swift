@@ -33,8 +33,10 @@ public class VPNManager: VPNManagement {
         providerManager?.connection.status
     }
 
-    func managerForConfig(_ config: TunnelConfiguration,
-                          completion: @escaping (NETunnelProviderManager?) -> Void) {
+    func managerForConfig(
+        _ config: TunnelConfiguration,
+        completion: @escaping (NETunnelProviderManager?) -> Void
+    ) {
         NETunnelProviderManager.loadAllFromPreferences { managers, error in
             guard let managers = managers else {
                 self.logger.info("No tunnel managers in user's settings")
@@ -55,19 +57,20 @@ public class VPNManager: VPNManagement {
                 if manager.localizedDescription != config.name {
                     continue
                 }
-                guard let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol else {
+                guard
+                    let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol
+                else {
                     continue
                 }
                 // Sometimes all managers from all apps come through, so filter by bundle ID.
-                if tunnelProtocol.providerBundleIdentifier == "\(appId).VPNExtension" {
+                if tunnelProtocol.providerBundleIdentifier == pluginAppId {
                     self.providerManager = manager
                     break
                 }
             }
             if self.providerManager == nil {
                 self.logger.log("No VPN manager found")
-            }
-            else {
+            } else {
                 self.logger.log(
                     "Loaded provider manager: \(String(describing: self.providerManager!.localizedDescription), privacy: .public)"
                 )
@@ -101,19 +104,20 @@ public class VPNManager: VPNManagement {
                 if manager.localizedDescription != name {
                     continue
                 }
-                guard let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol else {
+                guard
+                    let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol
+                else {
                     continue
                 }
                 // Sometimes all managers from all apps come through, so filter by bundle ID.
-                if tunnelProtocol.providerBundleIdentifier == "\(appId).VPNExtension" {
+                if tunnelProtocol.providerBundleIdentifier == pluginAppId {
                     self.providerManager = manager
                     break
                 }
             }
             if self.providerManager == nil {
                 self.logger.log("No VPN manager found")
-            }
-            else {
+            } else {
                 self.logger.log(
                     "Loaded provider manager: \(String(describing: self.providerManager!.localizedDescription), privacy: .public)"
                 )
@@ -140,13 +144,13 @@ public class VPNManager: VPNManagement {
 
     public func handleVPNConfigurationChange() {
         logger.log("VPN configuration changed, updating provider manager")
-//        loadProviderManager { providerManager in
-//            guard let providerManager = providerManager else {
-//                self.logger.log("No VPN manager found after configuration change")
-//                return
-//            }
-//            self.providerManager = providerManager
-//        }
+        //        loadProviderManager { providerManager in
+        //            guard let providerManager = providerManager else {
+        //                self.logger.log("No VPN manager found after configuration change")
+        //                return
+        //            }
+        //            self.providerManager = providerManager
+        //        }
     }
 
     public func startTunnel() throws {

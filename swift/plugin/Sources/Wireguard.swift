@@ -4,8 +4,8 @@ import NetworkExtension
 import SwiftRs
 import os
 
-let appId = Bundle.main.bundleIdentifier ?? "net.defguard.client"
-let pluginAppId = "\(appId).VPNExtension"
+let appId = Bundle.main.bundleIdentifier ?? "net.defguard"
+let pluginAppId = "\(appId).client.VPNExtension"
 let plugin = WireguardPlugin()
 let logger = Logger(subsystem: appId, category: "WireguardPlugin")
 
@@ -39,16 +39,33 @@ public func startTunnel(json: SRString) -> Bool {
 public func stopTunnel(name: SRString) -> Bool {
     managerForName(name.toString()) { manager in
         if let providerManager = manager {
-            // TEST
-            do {
-                try providerManager.connection.stopVPNTunnel()
-                logger.info("VPN stopped")
-            } catch {
-                logger.error("Failed to stop VPN")
-            }
+            providerManager.connection.stopVPNTunnel()
+            logger.info("VPN stopped")
         }
     }
     return true
+}
+
+@_cdecl("tunnel_stats")
+public func tunnelStats(name: SRString) {
+    managerForName(name.toString()) { manager in
+        if let providerManager = manager as NETunnelProviderManager? {
+            let session = providerManager.connection as! NETunnelProviderSession
+            do {
+                let data = Data(count: 8)
+                try session.sendProviderMessage(data) { response in
+                    if response != nil {
+                        logger.info("Tunnel extension sent some data")
+                    } else {
+                        logger.info("Tunnel extension sent nothing")
+                    }
+                }
+                logger.info("Send message to tunnel extension")
+            } catch {
+                logger.error("Failed to send message to tunnel extension \(error)")
+            }
+        }
+    }
 }
 
 func saveConfig(_ config: TunnelConfiguration) {
@@ -125,7 +142,7 @@ func managerForName(
                 continue
             }
             // Sometimes all managers from all apps come through, so filter by bundle ID.
-            if tunnelProtocol.providerBundleIdentifier == "\(appId).VPNExtension" {
+            if tunnelProtocol.providerBundleIdentifier == pluginAppId {
                 providerManager = manager
                 break
             }

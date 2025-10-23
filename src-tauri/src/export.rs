@@ -5,6 +5,11 @@ use std::{net::IpAddr, str::FromStr};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use serde::Serialize;
 use sqlx::SqliteExecutor;
+use swift_rs::{swift, SRString};
+
+swift!(pub(crate) fn start_tunnel(json: &SRString) -> bool);
+swift!(pub(crate) fn stop_tunnel(name: &SRString) -> bool);
+swift!(pub(crate) fn tunnel_stats(name: &SRString));
 
 use crate::{
     database::models::{location::Location, wireguard_keys::WireguardKeys, Id},

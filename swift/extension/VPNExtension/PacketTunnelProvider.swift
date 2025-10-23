@@ -28,7 +28,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
         let networkSettings = tunnelConfig.asNetworkSettings()
         self.setTunnelNetworkSettings(networkSettings) { error in
-            self.logger.log("Set tunnel network settings returned \(error)")
+            if error != nil {
+                self.logger.error("Set tunnel network settings returned \(error)")
+            }
             completionHandler(error)
             return
         }

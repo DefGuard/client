@@ -4,7 +4,7 @@ use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
 #[cfg(target_os = "macos")]
-use swift_rs::{swift, SRString};
+use swift_rs::SRString;
 use tauri::{AppHandle, Emitter, Manager};
 use tonic::Code;
 use tracing::Level;
@@ -16,6 +16,10 @@ use windows_service::{
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
+#[cfg(target_os = "windows")]
+use crate::active_connections::find_connection;
+#[cfg(target_os = "macos")]
+use crate::export::{start_tunnel, stop_tunnel, tunnel_stats};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -39,9 +43,6 @@ use crate::{
     },
     ConnectionType,
 };
-
-#[cfg(target_os = "windows")]
-use crate::active_connections::find_connection;
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
@@ -73,7 +74,6 @@ pub(crate) async fn setup_interface(
         .await?;
     // tunnel_config.port = port;
 
-    swift!(fn start_tunnel(json: &SRString) -> bool);
     unsafe {
         let json: SRString = serde_json::to_string(&tunnel_config)
             .unwrap()
@@ -120,6 +120,21 @@ pub(crate) async fn setup_interface(
     // }
 }
 
+#[cfg(target_os = "macos")]
+pub(crate) async fn stats_handler(pool: DbPool, ifname: String, connection_type: ConnectionType) {
+    const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+    let mut interval = tokio::time::interval(CHECK_INTERVAL);
+
+    loop {
+        interval.tick().await;
+        info!("stats_handler :)");
+        unsafe {
+            tunnel_stats(&"Szczecin".into());
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
 pub(crate) async fn stats_handler(
     pool: DbPool,
     interface_name: String,
@@ -361,7 +376,7 @@ pub async fn setup_interface_tunnel(
         name: interface_name,
         prvkey: tunnel.prvkey.clone(),
         addresses,
-        port: port.into(),
+        port,
         peers: vec![peer.clone()],
         mtu: None,
     };
@@ -645,13 +660,11 @@ pub(crate) async fn disconnect_interface(
                 return Err(Error::NotFound);
             };
 
-            let mut result = false;
-            swift!(fn stop_tunnel(name: &SRString) -> bool);
-            unsafe {
+            let result = unsafe {
                 let name: SRString = location.name.as_str().into();
-                result = stop_tunnel(&name);
-                error!("stop_tunnel() returned {result:?}");
-            }
+                stop_tunnel(&name)
+            };
+            error!("stop_tunnel() returned {result:?}");
             if !result {
                 let msg = String::from("Error from Swift");
                 // let request = RemoveInterfaceRequest {

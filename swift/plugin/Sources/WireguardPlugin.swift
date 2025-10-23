@@ -47,21 +47,21 @@ public class WireguardPlugin: NSObject {
 
     /// Loads the possibly already existing VPN manager and sets up observers for VPN connection status changes if its present.
     /// This is to ensure that the VPN status is observed and updated correctly when the app starts.
-//    private func setupVPNManager(
-//        completion: @escaping () -> Void
-//    ) {
-//        vpnManager.loadProviderManager { manager in
-//            if manager == nil {
-//                self.logger.log(
-//                    "No provider manager found, the VPN status won't be observed until the VPN is started."
-//                )
-//            } else {
-//                self.logger.log(
-//                    "VPN manager loaded successfully, the VPN status will be observed and updated.")
-//            }
-//            completion()
-//        }
-//    }
+    //    private func setupVPNManager(
+    //        completion: @escaping () -> Void
+    //    ) {
+    //        vpnManager.loadProviderManager { manager in
+    //            if manager == nil {
+    //                self.logger.log(
+    //                    "No provider manager found, the VPN status won't be observed until the VPN is started."
+    //                )
+    //            } else {
+    //                self.logger.log(
+    //                    "VPN manager loaded successfully, the VPN status will be observed and updated.")
+    //            }
+    //            completion()
+    //        }
+    //    }
 
     /// Sets up observers for VPN connection status changes.
     private func setupVPNObservers() {
@@ -229,21 +229,21 @@ public class WireguardPlugin: NSObject {
         defaults?.removeObject(forKey: "lastTunnelError")
     }
 
-//    private func saveConfig(config: TunnelConfiguration, result: @escaping (VPNError?) -> Void) {
-//        logger.info("Saving tunnel config: \(String(describing: config))")
-//
-//        vpnManager.saveProviderManager(providerManager) { saveError in
-//            if let saveError = saveError {
-//                self.logger.log("Failed to save preferences: \(saveError, privacy: .public)")
-//                result(
-//                    VPNError.saveError(
-//                        saveError
-//                    )
-//                )
-//                return
-//            }
-//        }
-//    }
+    //    private func saveConfig(config: TunnelConfiguration, result: @escaping (VPNError?) -> Void) {
+    //        logger.info("Saving tunnel config: \(String(describing: config))")
+    //
+    //        vpnManager.saveProviderManager(providerManager) { saveError in
+    //            if let saveError = saveError {
+    //                self.logger.log("Failed to save preferences: \(saveError, privacy: .public)")
+    //                result(
+    //                    VPNError.saveError(
+    //                        saveError
+    //                    )
+    //                )
+    //                return
+    //            }
+    //        }
+    //    }
 
     func startTunnel(
         config: TunnelConfiguration,
@@ -258,7 +258,7 @@ public class WireguardPlugin: NSObject {
         vpnManager.loadProviderManager(name: config.name) { manager in
             let providerManager = manager ?? NETunnelProviderManager()
             let tunnelProtocol = NETunnelProviderProtocol()
-            tunnelProtocol.providerBundleIdentifier = "\(appId).VPNExtension"
+            tunnelProtocol.providerBundleIdentifier = pluginAppId
             // `serverAddress` must have a non-nil string value for the protocol configuration to be valid.
             if let endpoint = config.peers[0].endpoint {
                 tunnelProtocol.serverAddress = endpoint.toString()
