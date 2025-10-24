@@ -25,7 +25,10 @@ impl ProvisioningConfig {
             }
         };
 
-        match serde_json::from_str::<Self>(&file_content) {
+        // strip Windows BOM manually
+        let file_content = file_content.trim_start_matches('\u{FEFF}');
+
+        match serde_json::from_str::<Self>(file_content) {
             Ok(config) => Some(config),
             Err(err) => {
                 warn!("Failed to parse provisioning configuration file at {path:?}. Error details: {err}");
@@ -59,8 +62,7 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
                     .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
                 match try_get_provisioning_config(&data_dir) {
                     Some(config) => {
-                        info!("Provisioning config found in {data_dir:?}.");
-                        debug!("Provisioning config: {config:?}");
+                        info!("Provisioning config found in {data_dir:?}: {config:?}");
                         return Some(config);
                     }
                     None => {
