@@ -165,7 +165,7 @@ fn run_service() -> Result<(), DaemonError> {
                     result.map_err(|e| format!("Server error: {e}"))
                 }
             };
-            
+
             let signal = if result.is_err() {
                 error!("Task ended with error: {:?}", result.err());
                 2
@@ -173,7 +173,7 @@ fn run_service() -> Result<(), DaemonError> {
                 info!("Task ended without an error.");
                 1
             };
-            
+
             let _ = shutdown_tx_server.send(signal);
         });
 
