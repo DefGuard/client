@@ -1444,7 +1444,6 @@ dependencies = [
  "vergen-git2",
  "webbrowser",
  "winapi",
- "windows 0.61.3",
  "windows-service",
  "x25519-dalek",
 ]
