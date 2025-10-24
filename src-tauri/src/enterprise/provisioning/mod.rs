@@ -1,4 +1,4 @@
-use std::{fs::OpenOptions, path::Path};
+use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -16,14 +16,16 @@ pub struct ProvisioningConfig {
 impl ProvisioningConfig {
     /// Load configuration from a file at `path`.
     fn load(path: &Path) -> Option<Self> {
-        let file = match OpenOptions::new().read(true).open(path) {
-            Ok(file) => file,
+        // read content to string first to handle Windows encoding issues
+        let file_content = match fs::read_to_string(path) {
+            Ok(content) => content,
             Err(err) => {
                 warn!("Failed to open provisioning configuration file at {path:?}. Error details: {err}");
                 return None;
             }
         };
-        match serde_json::from_reader::<_, Self>(file) {
+
+        match serde_json::from_str::<Self>(&file_content) {
             Ok(config) => Some(config),
             Err(err) => {
                 warn!("Failed to parse provisioning configuration file at {path:?}. Error details: {err}");
