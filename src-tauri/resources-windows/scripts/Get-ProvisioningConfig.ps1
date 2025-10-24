@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Retrieves Defguard client provisioning configuration for the currently logged-in user from AD or Entra ID.
+    Retrieves Defguard client provisioning configuration for the currently logged-in user from Active Directory or Entra ID.
 
 .DESCRIPTION
     This script detects whether the computer is joined to on-premises Active Directory 
