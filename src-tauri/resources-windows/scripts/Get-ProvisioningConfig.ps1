@@ -7,17 +7,17 @@
 .DESCRIPTION
     This script detects whether the computer is joined to on-premises Active Directory 
     or Entra ID (Azure AD), then fetches Defguard provisioning data (URL and enrollment token) from the appropriate source.
-    - On-premises AD: Reads from extensionAttribute1 and extensionAttribute2
+    - On-premises AD: Reads from specified attribute (default: defguardProvisioningConfig)
     - Entra ID: Reads from custom security attributes under the 'Defguard' set
     - Workgroup: Exits gracefully
     The retrieved enrollment data is saved to a JSON file for the Defguard client to use.
 
 .PARAMETER ADAttribute
-    Specifies which Active Directory attribute to read from (default: extensionAttribute1)
+    Specifies which Active Directory attribute to read from (default: defguardProvisioningConfig)
 #>
 
 param(
-    [string]$ADAttribute = "extensionAttribute1"
+    [string]$ADAttribute = "defguardProvisioningConfig"
 )
 
 # Check device join status

@@ -8,7 +8,7 @@
 
     <!-- Define public properties that can be passed to the MSI -->
     <Property Id="PROVISIONING" Secure="yes"/>
-    <Property Id="ADATTRIBUTE" Value="extensionAttribute1"/>
+    <Property Id="ADATTRIBUTE" Value="defguardProvisioningConfig"/>
     
     <!-- Custom action to run the PowerShell script -->
     <CustomAction Id="RunProvisioningScript"
