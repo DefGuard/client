@@ -27,11 +27,16 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "wix": {
+        "upgradeCode": "923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43",
+        "bannerPath": "./resources-windows/msi/top_banner.png",
+        "dialogImagePath": "./resources-windows/msi/side_banner.png",
         "fragmentPaths": [
-          "./resources-windows/service-fragment.wxs"
+          "./resources-windows/fragments/service.wxs",
+          "./resources-windows/fragments/provisioning.wxs"
         ],
         "componentRefs": [
-          "DefGuardServiceFragment"
+          "DefguardServiceFragment",
+          "ProvisioningScriptFragment"
         ]
       }
     },
