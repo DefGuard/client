@@ -37,7 +37,13 @@ use crate::{
         service_log_watcher::stop_log_watcher_task,
     },
     proto::DeviceConfigResponse,
-    service::{proto::RemoveInterfaceRequest, utils::DAEMON_CLIENT},
+    service::{
+        proto::{
+            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+            ServiceLocation,
+        },
+        utils::DAEMON_CLIENT,
+    },
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         disconnect_interface, execute_command, get_location_interface_details,
@@ -284,14 +290,57 @@ pub async fn save_device_config(
     transaction.commit().await?;
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
-    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
+
+    let mut service_locations = Vec::<ServiceLocation>::new();
+
+    for saved_location in &locations {
+        if saved_location.is_service_location() {
+            debug!(
+                "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
+                saved_location.name, saved_location.id, instance.name, instance.id,
+            );
+            service_locations.push(saved_location.to_service_location()?);
+        }
+    }
+
+    if !service_locations.is_empty() {
+        let save_request = SaveServiceLocationsRequest {
+            service_locations: service_locations.clone(),
+            instance_id: instance.uuid.clone(),
+            private_key: keys.prvkey.clone(),
+        };
+        debug!(
+            "Saving {} service locations to the daemon for instance {}({}).",
+            save_request.service_locations.len(),
+            instance.name,
+            instance.id,
+        );
+        DAEMON_CLIENT
+            .clone()
+            .save_service_locations(save_request)
+            .await
+            .map_err(|err| {
+                error!(
+                    "Error while saving service locations to the daemon for instance {}({}): {err}",
+                    instance.name, instance.id,
+                );
+                Error::InternalError(err.to_string())
+            })?;
+        debug!(
+            "Saved service locations to the daemon for instance {}({}).",
+            instance.name, instance.id,
+        );
+    }
+
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
     };
     reload_tray_menu(&handle).await;
+
     Ok(res)
 }
 
@@ -307,7 +356,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     let mut instance_info = Vec::new();
     let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
-        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
+        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
         let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
         let connected = connection_ids
             .iter()
@@ -381,7 +430,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
         "Getting information about all locations for instance {}.",
         instance.name
     );
-    let locations = Location::find_by_instance_id(&*DB_POOL, instance_id).await?;
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance_id, false).await?;
     trace!(
         "Found {} locations for instance {instance} to return information about.",
         locations.len()
@@ -471,7 +520,7 @@ pub(crate) async fn locations_changed(
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
     let db_locations: HashSet<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id)
+        Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
             .await?
             .into_iter()
             .map(|location| {
@@ -533,6 +582,8 @@ pub(crate) async fn do_update_instance(
         "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
+    let mut service_locations = Vec::<ServiceLocation>::new();
+
     // check if locations have changed
     if locations_changed {
         // process locations received in response
@@ -542,13 +593,13 @@ pub(crate) async fn do_update_instance(
         );
         // fetch existing locations for given instance
         let mut current_locations =
-            Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
+            Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
         for dev_config in response.configs {
             // parse device config
             let new_location = dev_config.into_location(instance.id);
 
             // check if location is already present in current locations
-            if let Some(position) = current_locations
+            let saved_location = if let Some(position) = current_locations
                 .iter()
                 .position(|loc| loc.network_id == new_location.network_id)
             {
@@ -567,13 +618,24 @@ pub(crate) async fn do_update_instance(
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
+                current_location.service_location_mode = new_location.service_location_mode;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
+                current_location
             } else {
                 // create new location
                 debug!("Creating new location {new_location} for instance instance {instance}");
                 let new_location = new_location.save(transaction.as_mut()).await?;
                 info!("New location {new_location} created for instance {instance}");
+                new_location
+            };
+
+            if saved_location.is_service_location() {
+                debug!(
+                    "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
+                    saved_location.name, saved_location.id, instance.name, instance.id,
+                );
+                service_locations.push(saved_location.to_service_location()?);
             }
         }
 
@@ -590,6 +652,63 @@ pub(crate) async fn do_update_instance(
     } else {
         info!("Locations for instance {instance} didn't change. Not updating them.");
     }
+
+    let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
+        .await?
+        .ok_or(Error::NotFound)?
+        .prvkey;
+
+    if service_locations.is_empty() {
+        debug!(
+            "No service locations to process for instance {}({})",
+            instance.name, instance.id
+        );
+    } else {
+        debug!(
+            "Processing {} service location(s) for instance {}({})",
+            service_locations.len(),
+            instance.name,
+            instance.id
+        );
+
+        let save_request = SaveServiceLocationsRequest {
+            service_locations: service_locations.clone(),
+            instance_id: instance.uuid.clone(),
+            private_key: private_key.clone(),
+        };
+
+        debug!(
+            "Sending request to daemon to save {} service location(s) for instance {}({})",
+            save_request.service_locations.len(),
+            instance.name,
+            instance.id
+        );
+
+        DAEMON_CLIENT
+            .clone()
+            .save_service_locations(save_request)
+            .await
+            .map_err(|err| {
+                error!(
+                    "Error while saving service locations to the daemon for instance {}({}): {err}",
+                    instance.name, instance.id,
+                );
+                Error::InternalError(err.to_string())
+            })?;
+
+        info!(
+            "Successfully saved {} service location(s) to daemon for instance {}({})",
+            service_locations.len(),
+            instance.name,
+            instance.id
+        );
+
+        debug!(
+            "Completed processing all service locations for instance {}({})",
+            instance.name, instance.id
+        );
+    }
+
     Ok(())
 }
 
@@ -813,7 +932,8 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     };
     debug!("The instance that is being deleted has been identified as {instance}");
 
-    let instance_locations = Location::find_by_instance_id(&mut *transaction, instance_id).await?;
+    let instance_locations =
+        Location::find_by_instance_id(&mut *transaction, instance_id, false).await?;
     if !instance_locations.is_empty() {
         debug!(
             "Found locations associated with the instance {instance}, closing their connections."
@@ -850,6 +970,14 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    DAEMON_CLIENT
+        .clone()
+        .delete_service_locations(DeleteServiceLocationsRequest {
+            instance_id: instance.uuid.clone(),
+        })
+        .await
+        .unwrap();
 
     reload_tray_menu(&handle).await;
 
