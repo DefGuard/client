@@ -61,7 +61,10 @@
           "../control/postinst": "../resources-linux/postinst",
           "../control/prerm": "../resources-linux/prerm",
           "../control/postrm": "../resources-linux/postrm"
-        }
+        },
+        "depends": [
+          "desktop-file-utils"
+        ]
       },
       "rpm": {
         "files": {
