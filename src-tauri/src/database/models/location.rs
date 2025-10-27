@@ -1,4 +1,4 @@
-use std::{fmt, i32};
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
