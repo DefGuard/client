@@ -49,32 +49,6 @@ pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface for `Instance`.
-#[cfg(target_os = "macos")]
-pub(crate) async fn setup_interface(
-    location: &Location<Id>,
-    name: &str,
-    preshared_key: Option<String>,
-    pool: &DbPool,
-) -> Result<String, Error> {
-    debug!("Setting up interface for location: {location}");
-    let interface_name = get_interface_name(name);
-
-    let (dns, dns_search) = location.dns();
-    let tunnel_config = location
-        .tunnel_configurarion(pool, preshared_key, dns, dns_search)
-        .await?;
-
-    unsafe {
-        let json: SRString = serde_json::to_string(&tunnel_config)
-            .unwrap()
-            .as_str()
-            .into();
-        let result = start_tunnel(&json);
-        error!("start_tunnel() returned {result:?}");
-    }
-    Ok(interface_name)
-}
-
 #[cfg(not(target_os = "macos"))]
 pub(crate) async fn setup_interface(
     location: &Location<Id>,
@@ -98,11 +72,10 @@ pub(crate) async fn setup_interface(
     debug!("Found free port: {port} for interface {interface_name}.");
 
     let (dns, dns_search) = location.dns();
-    let tunnel_config = location
-        .tunnel_configurarion(pool, preshared_key, dns, dns_search)
-        .await?;
-    tunnel_config.port = port;
 
+    let interface_config = location
+        .interface_configurarion(&*DB_POOL, interface_name.clone(), preshared_key)
+        .await?;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
@@ -140,7 +113,33 @@ pub(crate) async fn setup_interface(
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) async fn stats_handler(pool: DbPool, name: String, connection_type: ConnectionType) {
+pub(crate) async fn setup_interface(
+    location: &Location<Id>,
+    name: &str,
+    preshared_key: Option<String>,
+    pool: &DbPool,
+) -> Result<String, Error> {
+    debug!("Setting up interface for location: {location}");
+    let interface_name = get_interface_name(name);
+
+    let (dns, dns_search) = location.dns();
+    let tunnel_config = location
+        .tunnel_configurarion(pool, preshared_key, dns, dns_search)
+        .await?;
+
+    unsafe {
+        let json: SRString = serde_json::to_string(&tunnel_config)
+            .unwrap()
+            .as_str()
+            .into();
+        let result = start_tunnel(&json);
+        error!("start_tunnel() returned {result:?}");
+    }
+    Ok(interface_name)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) async fn stats_handler(_pool: DbPool, name: String, _connection_type: ConnectionType) {
     const CHECK_INTERVAL: Duration = Duration::from_secs(5);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 

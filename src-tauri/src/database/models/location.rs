@@ -215,6 +215,7 @@ impl Location<Id> {
         (dns, dns_search)
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub(crate) async fn interface_configurarion<'e, E>(
         &self,
         executor: E,
