@@ -316,7 +316,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
 
         let handle = CreateNamedPipeW(
             name_wide.as_ptr(),
-            PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
             PIPE_TYPE_BYTE,
             2,
             65536,
