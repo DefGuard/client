@@ -977,7 +977,13 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             instance_id: instance.uuid.clone(),
         })
         .await
-        .unwrap();
+        .map_err(|err| {
+            error!(
+                "Error while deleting service locations from the daemon for instance {}({}): {err}",
+                instance.name, instance.id,
+            );
+            Error::InternalError(err.to_string())
+        })?;
 
     reload_tray_menu(&handle).await;
 

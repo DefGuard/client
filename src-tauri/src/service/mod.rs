@@ -50,10 +50,12 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use super::VERSION;
-use crate::enterprise::service_locations::ServiceLocationError;
 #[cfg(windows)]
 use crate::enterprise::service_locations::ServiceLocationManager;
-use crate::service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest};
+use crate::{
+    enterprise::service_locations::ServiceLocationError,
+    service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
+};
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;

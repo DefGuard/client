@@ -93,7 +93,8 @@ impl Location<Id> {
     where
         E: SqliteExecutor<'e>,
     {
-        let max_mode = if include_service_locations { 2 } else { 0 }; // 0 to exclude service locations, 2 to include them
+        let max_service_location_mode =
+            Self::get_service_location_mode_filter(include_service_locations);
         query_as!(
           Self,
             "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
@@ -101,7 +102,7 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC;",
-            max_mode
+            max_service_location_mode
       )
         .fetch_all(executor)
         .await
@@ -163,7 +164,8 @@ impl Location<Id> {
     where
         E: SqliteExecutor<'e>,
     {
-        let max_mode = if include_service_locations { 2 } else { 0 }; // 0 to exclude service locations, 2 to include them
+        let max_service_location_mode =
+            Self::get_service_location_mode_filter(include_service_locations);
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
@@ -171,7 +173,7 @@ impl Location<Id> {
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
-            max_mode
+            max_service_location_mode
         )
         .fetch_all(executor)
         .await
@@ -226,6 +228,16 @@ impl Location<Id> {
         match self.location_mfa_mode {
             LocationMfaMode::Disabled => false,
             LocationMfaMode::Internal | LocationMfaMode::External => true,
+        }
+    }
+
+    /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?` when querying locations
+    /// to exclude (<= 1) or include service locations (all service locations modes).
+    fn get_service_location_mode_filter(include_service_locations: bool) -> i32 {
+        if include_service_locations {
+            i32::MAX
+        } else {
+            ServiceLocationMode::Disabled as i32
         }
     }
 }
