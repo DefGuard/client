@@ -41,6 +41,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             logger.error("Failed to start tunnel")
             completionHandler(error)
         }
+        logger.info("Tunnel started")
 
         completionHandler(nil)
     }
@@ -48,14 +49,20 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         logger.debug("\(#function)")
         adapter.stop()
+        logger.info("Tunnel stopped")
         completionHandler()
     }
 
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
         logger.debug("\(#function)")
-        // Add code here to handle the message.
+        // TODO: messageData should contain a valid message.
         if let handler = completionHandler {
-            handler(messageData)
+            if let stats = adapter.stats() {
+                let data = try? JSONEncoder().encode(stats)
+                handler(data)
+            } else {
+                handler(nil)
+            }
         }
     }
 

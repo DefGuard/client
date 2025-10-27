@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use swift_rs::SwiftLinker;
 use vergen_git2::{Emitter, Git2Builder};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tauri_build::build();
 
     #[cfg(target_os = "macos")]
-    SwiftLinker::new("13")
+    swift_rs::SwiftLinker::new("13")
         .with_ios("15")
         .with_package("defguard-vpn-plugin", "../swift/plugin")
         .link();

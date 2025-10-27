@@ -1,4 +1,4 @@
-use std::{env, path::Path, process::Command, str::FromStr};
+use std::{env, path::Path, process::Command, str::FromStr, time::Duration};
 
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
@@ -6,6 +6,7 @@ use sqlx::query;
 #[cfg(target_os = "macos")]
 use swift_rs::SRString;
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(not(target_os = "macos"))]
 use tonic::Code;
 use tracing::Level;
 #[cfg(target_os = "windows")]
@@ -48,31 +49,20 @@ pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 
 /// Setup client interface for `Instance`.
+#[cfg(target_os = "macos")]
 pub(crate) async fn setup_interface(
     location: &Location<Id>,
-    interface_name: String,
+    name: &str,
     preshared_key: Option<String>,
     pool: &DbPool,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
-
-    // request interface configuration
-    // debug!("Looking for a free port for interface {interface_name}.");
-    // let Some(port) = find_free_tcp_port() else {
-    //     let msg = format!(
-    //         "Couldn't find free port during interface {interface_name} setup for location \
-    //         {location}"
-    //     );
-    //     error!("{msg}");
-    //     return Err(Error::InternalError(msg));
-    // };
-    // debug!("Found free port: {port} for interface {interface_name}.");
+    let interface_name = get_interface_name(name);
 
     let (dns, dns_search) = location.dns();
     let tunnel_config = location
         .tunnel_configurarion(pool, preshared_key, dns, dns_search)
         .await?;
-    // tunnel_config.port = port;
 
     unsafe {
         let json: SRString = serde_json::to_string(&tunnel_config)
@@ -82,54 +72,83 @@ pub(crate) async fn setup_interface(
         let result = start_tunnel(&json);
         error!("start_tunnel() returned {result:?}");
     }
-    Ok(())
+    Ok(interface_name)
+}
 
-    // debug!("Creating interface for location {location} with configuration {interface_config:?}");
-    // let request = CreateInterfaceRequest {
-    //     config: Some(interface_config.clone().into()),
-    //     dns: location.dns.clone(),
-    // };
-    // if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-    //     if error.code() == Code::Unavailable {
-    //         error!(
-    //             "Failed to set up connection for location {location}; background service is \
-    //             unavailable. Make sure the service is running. Error: {error}, Interface \
-    //             configuration: {interface_config:?}"
-    //         );
-    //         Err(Error::InternalError(
-    //             "Background service is unavailable. Make sure the service is running.".into(),
-    //         ))
-    //     } else {
-    //         error!(
-    //             "Failed to send a request to the background service to create an interface for \
-    //             location {location} with the following configuration: {interface_config:?}. \
-    //             Error: {error}"
-    //         );
-    //         Err(Error::InternalError(format!(
-    //             "Failed to send a request to the background service to create an interface for \
-    //             location {location}. Error: {error}. Check logs for details."
-    //         )))
-    //     }
-    // } else {
-    //     info!(
-    //         "The interface for location {location} has been created successfully, interface \
-    //         name: {}.",
-    //         interface_config.name
-    //     );
-    //     Ok(())
-    // }
+#[cfg(not(target_os = "macos"))]
+pub(crate) async fn setup_interface(
+    location: &Location<Id>,
+    name: &str,
+    preshared_key: Option<String>,
+    pool: &DbPool,
+) -> Result<String, Error> {
+    debug!("Setting up interface for location: {location}");
+    let interface_name = get_interface_name(name);
+
+    // request interface configuration
+    debug!("Looking for a free port for interface {interface_name}.");
+    let Some(port) = find_free_tcp_port() else {
+        let msg = format!(
+            "Couldn't find free port during interface {interface_name} setup for location \
+            {location}"
+        );
+        error!("{msg}");
+        return Err(Error::InternalError(msg));
+    };
+    debug!("Found free port: {port} for interface {interface_name}.");
+
+    let (dns, dns_search) = location.dns();
+    let tunnel_config = location
+        .tunnel_configurarion(pool, preshared_key, dns, dns_search)
+        .await?;
+    tunnel_config.port = port;
+
+    debug!("Creating interface for location {location} with configuration {interface_config:?}");
+    let request = CreateInterfaceRequest {
+        config: Some(interface_config.clone().into()),
+        dns: location.dns.clone(),
+    };
+    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+        if error.code() == Code::Unavailable {
+            error!(
+                "Failed to set up connection for location {location}; background service is \
+                unavailable. Make sure the service is running. Error: {error}, Interface \
+                configuration: {interface_config:?}"
+            );
+            Err(Error::InternalError(
+                "Background service is unavailable. Make sure the service is running.".into(),
+            ))
+        } else {
+            error!(
+                "Failed to send a request to the background service to create an interface for \
+                location {location} with the following configuration: {interface_config:?}. \
+                Error: {error}"
+            );
+            Err(Error::InternalError(format!(
+                "Failed to send a request to the background service to create an interface for \
+                location {location}. Error: {error}. Check logs for details."
+            )))
+        }
+    } else {
+        info!(
+            "The interface for location {location} has been created successfully, interface \
+            name: {}.",
+            interface_config.name
+        );
+        Ok(interface_name)
+    }
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) async fn stats_handler(pool: DbPool, ifname: String, connection_type: ConnectionType) {
-    const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+pub(crate) async fn stats_handler(pool: DbPool, name: String, connection_type: ConnectionType) {
+    const CHECK_INTERVAL: Duration = Duration::from_secs(5);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 
     loop {
         interval.tick().await;
-        info!("stats_handler :)");
-        unsafe {
-            tunnel_stats(&"Szczecin".into());
+        // TODO: check all known localtions/tunnels, not just `name`.
+        if let Some(stats) = unsafe { tunnel_stats(&name.as_str().into()) } {
+            info!("Tunnel stats: {} {}", stats.tx_bytes, stats.rx_bytes);
         }
     }
 }
@@ -286,11 +305,9 @@ pub fn get_service_log_dir() -> &'static Path {
 }
 
 /// Setup client interface
-pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel<Id>,
-    interface_name: String,
-) -> Result<(), Error> {
+pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<String, Error> {
     debug!("Setting up interface for tunnel {tunnel}");
+    let interface_name = get_interface_name(name);
     // prepare peer config
     debug!(
         "Decoding tunnel {tunnel} public key: {}.",
@@ -373,7 +390,7 @@ pub async fn setup_interface_tunnel(
             Error::InternalError(msg)
         })?;
     let interface_config = InterfaceConfiguration {
-        name: interface_name,
+        name: interface_name.clone(),
         prvkey: tunnel.prvkey.clone(),
         addresses,
         port,
@@ -431,7 +448,7 @@ pub async fn setup_interface_tunnel(
             "Created interface {} with config: {interface_config:?}",
             interface_config.name
         );
-        Ok(())
+        Ok(interface_name)
     }
 }
 
@@ -557,8 +574,7 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    let interface_name = get_interface_name(&location.name);
-    setup_interface(location, interface_name.clone(), preshared_key, &DB_POOL).await?;
+    let interface_name = setup_interface(location, &location.name, preshared_key, &DB_POOL).await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
@@ -589,8 +605,7 @@ pub(crate) async fn handle_connection_for_tunnel(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
-    let interface_name = get_interface_name(&tunnel.name);
-    setup_interface_tunnel(tunnel, interface_name.clone()).await?;
+    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
@@ -660,39 +675,47 @@ pub(crate) async fn disconnect_interface(
                 return Err(Error::NotFound);
             };
 
-            let result = unsafe {
-                let name: SRString = location.name.as_str().into();
-                stop_tunnel(&name)
-            };
-            error!("stop_tunnel() returned {result:?}");
-            if !result {
-                let msg = String::from("Error from Swift");
-                // let request = RemoveInterfaceRequest {
-                //     interface_name,
-                //     endpoint: location.endpoint.clone(),
-                // };
-                // debug!(
-                //     "Sending request to the background service to remove interface {} for location \
-                //     {}...",
-                //     active_connection.interface_name, location.name
-                // );
-                // if let Err(error) = client.remove_interface(request).await {
-                //     let msg = if error.code() == Code::Unavailable {
-                //         format!(
-                //             "Couldn't remove interface {}. Background service is unavailable. \
-                //             Please make sure the service is running. Error: {error}.",
-                //             active_connection.interface_name
-                //         )
-                //     } else {
-                //         format!(
-                //             "Failed to send a request to the background service to remove interface \
-                //             {}. Error: {error}.",
-                //             active_connection.interface_name
-                //         )
-                //     };
-                //     error!("{msg}");
-                return Err(Error::InternalError(msg));
+            #[cfg(target_os = "macos")]
+            {
+                let result = unsafe {
+                    let name: SRString = location.name.as_str().into();
+                    stop_tunnel(&name)
+                };
+                error!("stop_tunnel() returned {result:?}");
+                if !result {
+                    return Err(Error::InternalError("Error from Swift".into()));
+                }
             }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: location.endpoint.clone(),
+                };
+                debug!(
+                    "Sending request to the background service to remove interface {} for location \
+                    {}...",
+                    active_connection.interface_name, location.name
+                );
+                if let Err(error) = client.remove_interface(request).await {
+                    let msg = if error.code() == Code::Unavailable {
+                        format!(
+                            "Couldn't remove interface {}. Background service is unavailable. \
+                            Please make sure the service is running. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    } else {
+                        format!(
+                            "Failed to send a request to the background service to remove interface \
+                            {}. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    };
+                    error!("{msg}");
+                }
+            }
+
             let connection: Connection = active_connection.into();
             let connection = connection.save(&*DB_POOL).await?;
             debug!(

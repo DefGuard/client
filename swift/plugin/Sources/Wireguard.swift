@@ -5,7 +5,7 @@ import SwiftRs
 import os
 
 let appId = Bundle.main.bundleIdentifier ?? "net.defguard"
-let pluginAppId = "\(appId).client.VPNExtension"
+let pluginAppId = "\(appId).VPNExtension"
 let plugin = WireguardPlugin()
 let logger = Logger(subsystem: appId, category: "WireguardPlugin")
 
@@ -47,25 +47,34 @@ public func stopTunnel(name: SRString) -> Bool {
 }
 
 @_cdecl("tunnel_stats")
-public func tunnelStats(name: SRString) {
+public func tunnelStats(name: SRString) -> Stats? {
+    // Blocking
+    let semaphore = DispatchSemaphore(value: 0)
+    var result: Stats? = nil
+
     managerForName(name.toString()) { manager in
         if let providerManager = manager as NETunnelProviderManager? {
             let session = providerManager.connection as! NETunnelProviderSession
             do {
-                let data = Data(count: 8)
+                // TODO: data should contain a valid message.
+                let data = Data()
                 try session.sendProviderMessage(data) { response in
-                    if response != nil {
-                        logger.info("Tunnel extension sent some data")
-                    } else {
-                        logger.info("Tunnel extension sent nothing")
+                    if let data = response {
+                        let decoder = JSONDecoder()
+                        result = try? decoder.decode(Stats.self, from: data)
                     }
+                    semaphore.signal()
                 }
-                logger.info("Send message to tunnel extension")
             } catch {
                 logger.error("Failed to send message to tunnel extension \(error)")
+                semaphore.signal()
             }
         }
     }
+
+    semaphore.wait()
+    logger.info("Tunnel stats done")
+    return result
 }
 
 func saveConfig(_ config: TunnelConfiguration) {
@@ -102,6 +111,8 @@ func saveConfig(_ config: TunnelConfiguration) {
         }
 
         // TEST
+        // MFA is not that fast to propagate pre-shared key, so wait a moment here.
+        Thread.sleep(forTimeInterval: 1)
         do {
             try providerManager.connection.startVPNTunnel()
             logger.info("VPN started")

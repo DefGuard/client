@@ -39,13 +39,11 @@
       "entitlements": "./Client.entitlements",
       "exceptionDomain": "",
       "files": {
-        "embedded.provisionprofile": "Adam_Apollo_Defguard.provisionprofile",
-        "PlugIns/VPNExtension.appex": "../swift/extension/build/Debug/VPNExtension.appex"
+        "embedded.provisionprofile": "Adam_Apollo_Desktop.provisionprofile",
+        "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
       },
       "frameworks": [],
-      "minimumSystemVersion": "13.5",
-      "providerShortName": null,
-      "signingIdentity": "692SQ9VLU5"
+      "minimumSystemVersion": "13.5"
     },
     "resources": [
       "resources/icons/*"

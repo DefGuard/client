@@ -55,14 +55,14 @@
     "@tanstack/query-core": "^5.90.5",
     "@tanstack/react-virtual": "3.13.12",
     "@tauri-apps/api": "^2.9.0",
-    "@tauri-apps/plugin-clipboard-manager": "^2.3.0",
-    "@tauri-apps/plugin-deep-link": "^2.4.3",
-    "@tauri-apps/plugin-dialog": "^2.4.0",
-    "@tauri-apps/plugin-fs": "^2.4.2",
-    "@tauri-apps/plugin-http": "^2.5.2",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.1",
+    "@tauri-apps/plugin-deep-link": "^2.4.4",
+    "@tauri-apps/plugin-dialog": "^2.4.1",
+    "@tauri-apps/plugin-fs": "^2.4.3",
+    "@tauri-apps/plugin-http": "^2.5.3",
     "@tauri-apps/plugin-log": "^2.7.0",
-    "@tauri-apps/plugin-notification": "^2.3.1",
-    "@tauri-apps/plugin-opener": "^2.5.0",
+    "@tauri-apps/plugin-notification": "^2.3.2",
+    "@tauri-apps/plugin-opener": "^2.5.1",
     "@tauri-apps/plugin-os": "^2.3.1",
     "@tauri-apps/plugin-window-state": "^2.4.0",
     "@types/byte-size": "^8.1.2",
@@ -106,7 +106,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.7",
+    "@biomejs/biome": "^2.3.1",
     "@hookform/devtools": "^4.4.0",
     "@svgr/cli": "^8.1.0",
     "@tanstack/react-query": "^5.90.5",
@@ -117,8 +117,8 @@
     "@types/node": "^24.9.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@vitejs/plugin-react": "^5.0.4",
-    "@vitejs/plugin-react-swc": "^4.1.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "@vitejs/plugin-react-swc": "^4.2.0",
     "autoprefixer": "^10.4.21",
     "npm-run-all": "^4.1.5",
     "postcss": "^8.5.6",
@@ -127,7 +127,7 @@
     "typedoc": "^0.28.14",
     "typesafe-i18n": "^5.26.2",
     "typescript": "^5.9.3",
-    "vite": "^7.1.11"
+    "vite": "^7.1.12"
   },
   "volta": {
     "node": "20.5.1"

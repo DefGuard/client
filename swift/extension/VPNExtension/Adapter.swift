@@ -33,7 +33,6 @@ enum State {
 
     private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
 
-
     /// Designated initializer.
     /// - Parameter packetTunnelProvider: an instance of `NEPacketTunnelProvider`. Internally stored
     init(with packetTunnelProvider: NEPacketTunnelProvider) {
@@ -51,7 +50,7 @@ enum State {
             return
         }
 
-        if let _ = tunnel {
+        if tunnel != nil {
             logger.info("Cleaning exiting Tunnel")
             tunnel = nil
             connection = nil
@@ -87,8 +86,8 @@ enum State {
         state = .running
 
         // Test notifications
-        let notificationName = CFNotificationName("net.defguard.NetExt.start" as CFString)
-        CFNotificationCenterPostNotification(notificationCenter, notificationName, nil, nil, false)
+        //        let notificationName = CFNotificationName("net.defguard.client.start" as CFString)
+        //        CFNotificationCenterPostNotification(notificationCenter, notificationName, nil, nil, false)
     }
 
     func stop() {
@@ -106,42 +105,52 @@ enum State {
         logger.info("Tunnel stopped")
 
         // Test notifications
-        let notificationName = CFNotificationName("net.defguard.NetExt.stop" as CFString)
-        CFNotificationCenterPostNotification(notificationCenter, notificationName, nil, nil, false)
+        //        let notificationName = CFNotificationName("net.defguard.client.stop" as CFString)
+        //        CFNotificationCenterPostNotification(notificationCenter, notificationName, nil, nil, false)
+    }
+
+    // Obtain tunnel statistics.
+    func stats() -> Stats? {
+        if let stats = tunnel?.stats() {
+            return Stats(txBytes: stats.txBytes, rxBytes: stats.rxBytes)
+        }
+        return nil
     }
 
     private func handleTunnelResult(_ result: TunnelResult) {
         switch result {
-            case .done:
-                // Nothing to do.
-                break
-            case .err(let error):
-                logger.error("Tunnel error \(error, privacy: .public)")
-                switch error {
-                    case .InvalidAeadTag:
-                        logger.error("Invalid pre-shared key; stopping tunnel")
-                        // The correct way is to call the packet tunnel provider, if there is one.
-                        if let provider = packetTunnelProvider {
-                            provider.cancelTunnelWithError(error)
-                        } else {
-                            stop()
-                        }
-                    case .ConnectionExpired:
-                        logger.error("Connecion has expired; re-connecting")
-                        packetTunnelProvider?.reasserting = true
-                        initEndpoint()
-                        packetTunnelProvider?.reasserting = false
-                    default:
-                        break
+        case .done:
+            // Nothing to do.
+            break
+        case .err(let error):
+            logger.error("Tunnel error \(error, privacy: .public)")
+            switch error {
+            case .InvalidAeadTag:
+                logger.error("Invalid pre-shared key; stopping tunnel")
+                // The correct way is to call the packet tunnel provider, if there is one.
+                if let provider = packetTunnelProvider {
+                    provider.cancelTunnelWithError(error)
+                } else {
+                    stop()
                 }
-            case .writeToNetwork(let data):
-                sendToEndpoint(data: data)
-            case .writeToTunnelV4(let data):
-                packetTunnelProvider?.packetFlow.writePacketObjects([
-                    NEPacket(data: data,protocolFamily: sa_family_t(AF_INET))])
-            case .writeToTunnelV6(let data):
-                packetTunnelProvider?.packetFlow.writePacketObjects([
-                    NEPacket(data: data, protocolFamily: sa_family_t(AF_INET6))])
+            case .ConnectionExpired:
+                logger.error("Connecion has expired; re-connecting")
+                packetTunnelProvider?.reasserting = true
+                initEndpoint()
+                packetTunnelProvider?.reasserting = false
+            default:
+                break
+            }
+        case .writeToNetwork(let data):
+            sendToEndpoint(data: data)
+        case .writeToTunnelV4(let data):
+            packetTunnelProvider?.packetFlow.writePacketObjects([
+                NEPacket(data: data, protocolFamily: sa_family_t(AF_INET))
+            ])
+        case .writeToTunnelV6(let data):
+            packetTunnelProvider?.packetFlow.writePacketObjects([
+                NEPacket(data: data, protocolFamily: sa_family_t(AF_INET6))
+            ])
         }
     }
 
@@ -174,7 +183,9 @@ enum State {
             handleTunnelResult(tunnel.forceHandshake())
         }
         logger.info("Receiving UDP from endpoint")
-        logger.debug("NWConnection path \(String(describing: self.connection?.currentPath), privacy: .public)")
+        logger.debug(
+            "NWConnection path \(String(describing: self.connection?.currentPath), privacy: .public)"
+        )
         receive()
 
         // Use Timer to send keep-alive packets.
@@ -192,11 +203,13 @@ enum State {
     private func sendToEndpoint(data: Data) {
         guard let connection = connection else { return }
         if connection.state == .ready {
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error = error {
-                    self.logger.error("UDP connection send error: \(error, privacy: .public)")
-                }
-            })
+            connection.send(
+                content: data,
+                completion: .contentProcessed { error in
+                    if let error = error {
+                        self.logger.error("UDP connection send error: \(error, privacy: .public)")
+                    }
+                })
         } else {
             logger.warning("UDP connection not ready to send")
         }
@@ -224,7 +237,7 @@ enum State {
 
         // Packets received to the tunnel's virtual interface.
         packetTunnelProvider?.packetFlow.readPacketObjects { packets in
-            for packet in packets  {
+            for packet in packets {
                 self.handleTunnelResult(tunnel.write(src: packet.data))
             }
             // continue reading
@@ -236,32 +249,33 @@ enum State {
     private func endpointStateChange(state: NWConnection.State) {
         logger.debug("UDP connection state: \(String(describing: state), privacy: .public)")
         switch state {
-            case .ready:
-                setupEndpoint()
-                //case .waiting(let error):
-                //    switch error {
-                //        case .posix(_):
-                //            connection?.restart()
-                //        default:
-                //            self.stop()
-                //    }
-            case .failed(let error):
-                logger.error("Failed to establish endpoint connection: \(error)")
-                // The correct way is to call the packet tunnel provider, if there is one.
-                if let provider = packetTunnelProvider {
-                    provider.cancelTunnelWithError(error)
-                } else {
-                    stop()
-                }
-            default:
-                break
+        case .ready:
+            setupEndpoint()
+        //case .waiting(let error):
+        //    switch error {
+        //        case .posix(_):
+        //            connection?.restart()
+        //        default:
+        //            self.stop()
+        //    }
+        case .failed(let error):
+            logger.error("Failed to establish endpoint connection: \(error)")
+            // The correct way is to call the packet tunnel provider, if there is one.
+            if let provider = packetTunnelProvider {
+                provider.cancelTunnelWithError(error)
+            } else {
+                stop()
+            }
+        default:
+            break
         }
     }
 
     /// Handle network path updates.
     private func networkPathUpdate(path: Network.NWPath) {
         logger
-            .debug("Network path status \(String(describing: path.status), privacy: .public); interfaces \(path.availableInterfaces, privacy: .public)"
+            .debug(
+                "Network path status \(String(describing: path.status), privacy: .public); interfaces \(path.availableInterfaces, privacy: .public)"
             )
         if path.status == .unsatisfied {
             if state == .running {

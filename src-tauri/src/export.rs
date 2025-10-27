@@ -5,11 +5,18 @@ use std::{net::IpAddr, str::FromStr};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use serde::Serialize;
 use sqlx::SqliteExecutor;
-use swift_rs::{swift, SRString};
+use swift_rs::{swift, SRObject, SRString};
+
+#[repr(C)]
+// Should match the declaration in Swift.
+pub(crate) struct Stats {
+    pub(crate) tx_bytes: u64,
+    pub(crate) rx_bytes: u64,
+}
 
 swift!(pub(crate) fn start_tunnel(json: &SRString) -> bool);
 swift!(pub(crate) fn stop_tunnel(name: &SRString) -> bool);
-swift!(pub(crate) fn tunnel_stats(name: &SRString));
+swift!(pub(crate) fn tunnel_stats(name: &SRString) -> Option<SRObject<Stats>>);
 
 use crate::{
     database::models::{location::Location, wireguard_keys::WireguardKeys, Id},
