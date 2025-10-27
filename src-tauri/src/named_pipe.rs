@@ -5,13 +5,11 @@ use windows_sys::Win32::{
         GetLastError, LocalFree, ERROR_INSUFFICIENT_BUFFER, HANDLE, INVALID_HANDLE_VALUE
     },
     Security::{
-        PSID,
         Authorization::{
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
-        },
-        LookupAccountNameW, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES
+        }, LookupAccountNameW, PSECURITY_DESCRIPTOR, PSID, SECURITY_ATTRIBUTES
     },
-    Storage::FileSystem::PIPE_ACCESS_DUPLEX, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE}
+    Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX}, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE}
 };
 // use winapi::{shared::{sddl::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1}, winerror::ERROR_INSUFFICIENT_BUFFER},
 //     um::{
@@ -319,7 +317,8 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
         let handle = CreateNamedPipeW(
             name_wide.as_ptr(),
             // PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
-            PIPE_ACCESS_DUPLEX,
+            // PIPE_ACCESS_DUPLEX,
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             // PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             PIPE_TYPE_BYTE,
             1,
