@@ -437,8 +437,8 @@ jobs:
           Set-Content -Path ".\src-tauri\Cargo.toml" -Value (get-content -Path ".\src-tauri\Cargo.toml" | Select-String -Pattern 'default-run =' -NotMatch)
       - name: Debug
         run: |
-          pwd
-          ls -la
+          Get-Location
+          Get-ChildItem
       - name: Build packages
         uses: tauri-apps/tauri-action@v0
         env:
