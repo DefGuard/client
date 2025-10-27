@@ -93,7 +93,11 @@ impl Location<Id> {
     where
         E: SqliteExecutor<'e>,
     {
-        let max_mode = if include_service_locations { 2 } else { 0 }; // 0 to exclude service locations, 2 to include them
+        let max_mode = if include_service_locations {
+            ServiceLocationMode::AlwaysOn as i32
+        } else {
+            ServiceLocationMode::Disabled as i32
+        };
         query_as!(
           Self,
             "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
@@ -163,7 +167,11 @@ impl Location<Id> {
     where
         E: SqliteExecutor<'e>,
     {
-        let max_mode = if include_service_locations { 2 } else { 0 }; // 0 to exclude service locations, 2 to include them
+        let max_mode = if include_service_locations {
+            ServiceLocationMode::AlwaysOn as i32
+        } else {
+            ServiceLocationMode::Disabled as i32
+        };
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
