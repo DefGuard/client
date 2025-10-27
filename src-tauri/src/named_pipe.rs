@@ -9,7 +9,7 @@ use windows_sys::Win32::{
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
         }, LookupAccountNameW, PSECURITY_DESCRIPTOR, PSID, SECURITY_ATTRIBUTES
     },
-    Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX}, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE}
+    Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX}, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT}
 };
 // use winapi::{shared::{sddl::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1}, winerror::ERROR_INSUFFICIENT_BUFFER},
 //     um::{
@@ -320,8 +320,8 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             // PIPE_ACCESS_DUPLEX,
             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             // PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-            PIPE_TYPE_BYTE,
-            1,
+            PIPE_TYPE_BYTE | PIPE_WAIT,
+            PIPE_UNLIMITED_INSTANCES,
             65536,
             65536,
             0,
