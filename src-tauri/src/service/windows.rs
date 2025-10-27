@@ -7,7 +7,7 @@ use std::{
 
 use clap::Parser;
 use error;
-use tokio::{runtime::Runtime, select};
+use tokio::runtime::Runtime;
 use windows_service::{
     define_windows_service,
     service::{
@@ -108,69 +108,57 @@ fn run_service() -> Result<(), DaemonError> {
 
         let service_location_manager = Arc::new(RwLock::new(service_location_manager));
 
+        // Spawn service location management task
         let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
-            let manager = service_location_manager_clone.clone();
+            let manager = service_location_manager_clone;
 
-            let service_location_task = async move {
-                info!("Starting service location management task");
+            info!("Starting service location management task");
 
-                info!("Attempting to auto-connect to service locations");
-                match manager.write().unwrap().connect_to_service_locations() {
+            info!("Attempting to auto-connect to service locations");
+            match manager.write().unwrap().connect_to_service_locations() {
+                Ok(_) => {
+                    info!("Auto-connect to service locations completed successfully");
+                }
+                Err(e) => {
+                    warn!(
+                        "Error while trying to auto-connect to service locations: {e}. \
+                        Will continue monitoring for login/logoff events.",
+                    );
+                }
+            }
+
+            info!("Starting login/logoff event monitoring");
+            loop {
+                match watch_for_login_logoff(
+                    manager.clone(),
+                ).await {
                     Ok(_) => {
-                        info!("Auto-connect to service locations completed successfully");
+                        warn!("Login/logoff event monitoring ended unexpectedly. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...");
+                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                     }
                     Err(e) => {
-                        warn!(
-                            "Error while trying to auto-connect to service locations: {e}. \
-                            Will continue monitoring for login/logoff events.",
+                        error!(
+                            "Error in login/logoff event monitoring: {e}. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
                         );
+                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                        info!("Restarting login/logoff event monitoring");
                     }
                 }
+            }
 
-                info!("Starting login/logoff event monitoring");
-                loop {
-                    match watch_for_login_logoff(
-                        manager.clone(),
-                    ).await {
-                        Ok(_) => {
-                            warn!("Login/logoff event monitoring ended unexpectedly");
-                            break;
-                        }
-                        Err(e) => {
-                            error!(
-                                "Error in login/logoff event monitoring: {e}. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?} seconds...",
-                            );
-                            tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
-                            info!("Restarting login/logoff event monitoring");
-                        }
-                    }
-                }
+        });
 
-                warn!("Service location management task terminated");
-                Ok::<(), ServiceLocationError>(())
-            };
-
-            let server_task = async move {
-                run_server(config, service_location_manager_clone).await
-            };
-
-            let result = select! {
-                result = service_location_task => {
-                    warn!("Service location task completed");
-                    result.map_err(|e| format!("Service location error: {e}"))
-                }
-                result = server_task => {
-                    warn!("Server task completed");
-                    result.map_err(|e| format!("Server error: {e}"))
-                }
-            };
+        // Spawn the main gRPC server task
+        let service_location_manager_clone = service_location_manager.clone();
+        runtime.spawn(async move {
+            let result = run_server(config, service_location_manager_clone).await;
 
             let signal = if result.is_err() {
-                error!("Task ended with error: {:?}", result.err());
+                error!("Server task ended with error: {:?}", result.err());
                 2
             } else {
-                info!("Task ended without an error.");
+                warn!("Server task ended without an error.");
                 1
             };
 
