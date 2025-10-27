@@ -249,6 +249,7 @@ fn account_name_to_sid_string(account: &str) -> Result<String, std::io::Error> {
             &mut sid_string_ptr as *mut *mut u16,
         ) == 0
         {
+            error!("ConvertSidToStringSidW");
             return Err(std::io::Error::last_os_error());
         }
 
@@ -276,31 +277,33 @@ fn create_secure_pipe() -> Result<winapi::um::winnt::HANDLE, std::io::Error> {
 
         // Compose SDDL: SYSTEM & Administrators full, and group RW.
         let sddl = format!("D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;{})", sid_str);
-        let sddl_w = str_to_wide_null_terminated(&sddl);
+        let sddl_wide = str_to_wide_null_terminated(&sddl);
 
-        let mut p_sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+        let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+        warn!("DESCRIPTOR BEFORE: {descriptor:?}");
 
         if ConvertStringSecurityDescriptorToSecurityDescriptorW(
-            sddl_w.as_ptr(),
+            sddl_wide.as_ptr(),
             SDDL_REVISION_1 as u32,
-            &mut p_sd as *mut PSECURITY_DESCRIPTOR as *mut *mut _,
+            &mut descriptor as *mut PSECURITY_DESCRIPTOR as *mut *mut _,
             std::ptr::null_mut(),
         ) == 0
         {
             return Err(std::io::Error::last_os_error());
         }
+        warn!("DESCRIPTOR AFTER: {descriptor:?}");
 
         // Build SECURITY_ATTRIBUTES pointing to the security descriptor
-        let mut sa = SECURITY_ATTRIBUTES {
+        let mut attributes = SECURITY_ATTRIBUTES {
             nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
-            lpSecurityDescriptor: p_sd as *mut _,
+            lpSecurityDescriptor: descriptor as *mut _,
             bInheritHandle: 0,
         };
 
-        let name_w = str_to_wide_null_terminated(r"\\.\pipe\defguard_daemon");
+        let name_wide = str_to_wide_null_terminated(r"\\.\pipe\defguard_daemon");
 
         let handle = CreateNamedPipeW(
-            name_w.as_ptr(),
+            name_wide.as_ptr(),
             // PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
             PIPE_ACCESS_DUPLEX,
             // PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
@@ -309,12 +312,12 @@ fn create_secure_pipe() -> Result<winapi::um::winnt::HANDLE, std::io::Error> {
             65536,
             65536,
             0,
-            // &mut sa,
-            std::ptr::null_mut(),
+            &mut attributes,
+            // std::ptr::null_mut(),
         );
 
         // Free the security descriptor memory returned by ConvertStringSecurityDescriptorToSecurityDescriptorW
-        LocalFree(p_sd as *mut _);
+        LocalFree(descriptor as *mut _);
 
         if handle == INVALID_HANDLE_VALUE || handle.is_null() {
             return Err(std::io::Error::last_os_error());
