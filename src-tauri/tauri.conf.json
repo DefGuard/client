@@ -71,6 +71,9 @@
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
         },
+        "depends": [
+          "desktop-file-utils"
+        ],
         "postInstallScript": "../resources-linux/postinst",
         "preRemoveScript": "../resources-linux/prerm",
         "postRemoveScript": "../resources-linux/postrm"
