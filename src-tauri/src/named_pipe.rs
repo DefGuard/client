@@ -9,7 +9,7 @@ use windows_sys::Win32::{
             ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
         }, LookupAccountNameW, PSECURITY_DESCRIPTOR, PSID, SECURITY_ATTRIBUTES
     },
-    Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX}, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT}
+    Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX}, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_WAIT}
 };
 // use winapi::{shared::{sddl::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1}, winerror::ERROR_INSUFFICIENT_BUFFER},
 //     um::{
@@ -316,17 +316,13 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
 
         let handle = CreateNamedPipeW(
             name_wide.as_ptr(),
-            // PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
-            // PIPE_ACCESS_DUPLEX,
-            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-            // PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-            PIPE_TYPE_BYTE | PIPE_WAIT,
-            PIPE_UNLIMITED_INSTANCES,
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_TYPE_BYTE,
+            2,
             65536,
             65536,
             0,
             &mut attributes,
-            // std::ptr::null_mut(),
         );
 
         // Free the security descriptor memory returned by ConvertStringSecurityDescriptorToSecurityDescriptorW
