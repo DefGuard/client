@@ -1,9 +1,22 @@
 use async_stream::stream;
 use futures_core::stream::Stream;
-use winapi::{shared::{sddl::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1}, winerror::ERROR_INSUFFICIENT_BUFFER},
-    um::{
-        errhandlingapi::GetLastError, handleapi::INVALID_HANDLE_VALUE, minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreateNamedPipeW, winbase::{LocalFree, LookupAccountNameW, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_READMODE_BYTE, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT}, winnt::{LPCWSTR, PCWSTR, PSECURITY_DESCRIPTOR, PSID}
-    }};
+use windows_sys::Win32::{
+    Foundation::{
+        GetLastError, LocalFree, ERROR_INSUFFICIENT_BUFFER, HANDLE, INVALID_HANDLE_VALUE
+    },
+    Security::{
+        PSID,
+        Authorization::{
+            ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+        },
+        LookupAccountNameW, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES
+    },
+    Storage::FileSystem::PIPE_ACCESS_DUPLEX, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE}
+};
+// use winapi::{shared::{sddl::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1}, winerror::ERROR_INSUFFICIENT_BUFFER},
+//     um::{
+//         errhandlingapi::GetLastError, handleapi::INVALID_HANDLE_VALUE, minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreateNamedPipeW, winbase::{LocalFree, LookupAccountNameW, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_READMODE_BYTE, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT}, winnt::{LPCWSTR, PCWSTR, PSECURITY_DESCRIPTOR, PSID}
+//     }};
 use std::{os::windows::io::{AsRawHandle, RawHandle}, pin::Pin};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite},
@@ -196,15 +209,16 @@ fn str_to_wide_null_terminated(s: &str) -> Vec<u16> {
 /// Resolve account name (e.g. "defguard") -> SID string like "S-1-5-21-...".
 fn account_name_to_sid_string(account: &str) -> Result<String, std::io::Error> {
     unsafe {
-        let name_w = str_to_wide_null_terminated(account);
+        let name_wide = str_to_wide_null_terminated(account);
         // First call to get buffer sizes
         let mut sid_size: u32 = 0;
         let mut domain_size: u32 = 0;
-        let mut pe_use = 0u32;
+        let mut pe_use = 0i32;
+        // let mut pe_use: *mut u32 = std::ptr::null_mut();
 
         let ok = LookupAccountNameW(
             std::ptr::null(),                         // local system
-            name_w.as_ptr(),
+            name_wide.as_ptr(),
             std::ptr::null_mut(),                     // PSID buffer
             &mut sid_size,
             std::ptr::null_mut(),                     // domain buffer
@@ -230,7 +244,7 @@ fn account_name_to_sid_string(account: &str) -> Result<String, std::io::Error> {
 
         let ok2 = LookupAccountNameW(
             std::ptr::null(),
-            name_w.as_ptr(),
+            name_wide.as_ptr(),
             sid_buf.as_mut_ptr() as PSID,
             &mut sid_size,
             domain_buf.as_mut_ptr(),
@@ -268,7 +282,7 @@ fn account_name_to_sid_string(account: &str) -> Result<String, std::io::Error> {
     }
 }
 
-fn create_secure_pipe() -> Result<winapi::um::winnt::HANDLE, std::io::Error> {
+fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     unsafe {
         // Resolve group name "defguard" to SID string
         let group = "defguard";

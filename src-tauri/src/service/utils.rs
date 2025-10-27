@@ -54,7 +54,6 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
             use std::time::Duration;
             use tokio::net::windows::named_pipe::ClientOptions;
             use tower::service_fn;
-            use winapi::shared::winerror::ERROR_PIPE_BUSY;
             use crate::named_pipe::PIPE_NAME;
 
             // channel = endpoint.connect_lazy();
@@ -64,6 +63,8 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
             info!("DBG: lazy connection");
 
                 let client = loop {
+                    use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
+
                     info!("DBG: LOOP");
                     match ClientOptions::new().open(PIPE_NAME) {
                         Ok(client) => break client,

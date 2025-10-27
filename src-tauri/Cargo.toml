@@ -114,6 +114,7 @@ async-stream = "0.3.6"
 futures-core = "0.3.31"
 tower = "0.5"
 hyper-util = "0.1"
+windows-sys = "0.61.2"
 
 [target.'cfg(unix)'.dependencies]
 hyper-util = "0.1"
@@ -122,8 +123,23 @@ tokio-stream = "0.1"
 tower = "0.5"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winsvc", "winerror", "namedpipeapi", "sddl", "handleapi", "winnt", "errhandlingapi"] }
+# winapi = { version = "0.3", features = ["winsvc", "winerror", "namedpipeapi", "sddl", "handleapi", "winnt", "errhandlingapi"] }
 windows-service = "0.7"
+windows-sys = { version = "0.61.2", features = [
+    # Core Win32 types
+    "Win32_Foundation",
+
+    # Security descriptors, ACLs, SDDL
+    "Win32_Security",
+    "Win32_Security_Authorization",
+
+    # Named pipes (CreateNamedPipeW)
+    "Win32_System_Pipes",
+
+    # HANDLE & file functions
+    "Win32_System_IO",
+    "Win32_System_Threading",
+] }
 # windows = { version = "0.61.3", features = [
 #     # Core Win32 types
 #     "Win32_Foundation",

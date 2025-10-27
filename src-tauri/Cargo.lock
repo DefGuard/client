@@ -1443,8 +1443,8 @@ dependencies = [
  "tracing-subscriber",
  "vergen-git2",
  "webbrowser",
- "winapi",
  "windows-service",
+ "windows-sys 0.61.2",
  "x25519-dalek",
 ]
 
