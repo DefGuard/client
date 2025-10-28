@@ -548,7 +548,7 @@ pub(crate) async fn run_server(
 ) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
-    let stream = get_named_pipe_server_stream();
+    let stream = get_named_pipe_server_stream()?;
     let daemon_service = DaemonService::new(&config, service_location_manager);
 
     info!("Defguard daemon version {VERSION} started");

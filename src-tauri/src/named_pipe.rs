@@ -7,7 +7,7 @@ use tokio::{
 };
 use tonic::transport::server::Connected;
 use windows_sys::Win32::{
-    Foundation::{GetLastError, LocalFree, HANDLE, INVALID_HANDLE_VALUE},
+    Foundation::{LocalFree, HANDLE, INVALID_HANDLE_VALUE},
     Security::{
         Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1},
         PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
@@ -147,7 +147,8 @@ fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
 /// 1. Creates a fresh listening instance.
 /// 2. Awaits a client connection (`connect().await`).
 /// 3. Yields the connected `TonicNamedPipeServer`.
-pub fn get_named_pipe_server_stream() -> Result<impl Stream<Item = io::Result<TonicNamedPipeServer>>, std::io::Error> {
+pub fn get_named_pipe_server_stream(
+) -> Result<impl Stream<Item = io::Result<TonicNamedPipeServer>>, std::io::Error> {
     Ok(stream! {
         let mut server = create_tokio_secure_pipe()?;
 
