@@ -543,7 +543,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 }
 
 #[cfg(windows)]
-pub async fn run_server(
+pub(crate) async fn run_server(
     config: Config,
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) -> anyhow::Result<()> {
@@ -554,6 +554,7 @@ pub async fn run_server(
     let stream = get_named_pipe_server_stream();
     let daemon_service = DaemonService::new(&config, service_location_manager);
 
+    info!("Defguard daemon version {VERSION} started");
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
