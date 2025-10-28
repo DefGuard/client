@@ -39,12 +39,20 @@ name = "defguard-client"
 description = "Defguard desktop client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
+autobins = false
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
+
+[[bin]]
+name = "defguard-client"
+
+[[bin]]
+name = "defguard-service"
+required-features = ["service"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -133,6 +141,7 @@ windows-service = "0.7"
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+service = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

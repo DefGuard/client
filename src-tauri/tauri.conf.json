@@ -37,12 +37,10 @@
     },
     "macOS": {
       "entitlements": "./Client.entitlements",
-      "exceptionDomain": "",
       "files": {
-        "embedded.provisionprofile": "Adam_Apollo_Desktop.provisionprofile",
+        "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
         "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
       },
-      "frameworks": [],
       "minimumSystemVersion": "13.5"
     },
     "resources": [
