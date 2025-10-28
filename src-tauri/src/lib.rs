@@ -24,13 +24,13 @@ pub mod enterprise;
 pub mod error;
 pub mod events;
 pub mod log_watcher;
+#[cfg(windows)]
+pub mod named_pipe;
 pub mod periodic;
 pub mod service;
 pub mod tray;
 pub mod utils;
 pub mod wg_config;
-#[cfg(windows)]
-pub mod named_pipe;
 
 pub mod proto {
     use crate::database::models::{

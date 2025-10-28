@@ -545,7 +545,8 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 #[cfg(windows)]
 pub async fn run_server(
     config: Config,
-    service_location_manager: Arc<RwLock<ServiceLocationManager>>) -> anyhow::Result<()> {
+    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
+) -> anyhow::Result<()> {
     use crate::named_pipe::get_named_pipe_server_stream;
 
     debug!("Starting Defguard interface management daemon");

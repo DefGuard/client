@@ -2,20 +2,28 @@ use async_stream::stream;
 use futures_core::stream::Stream;
 use windows_sys::Win32::{
     Foundation::{
-        GetLastError, LocalFree, ERROR_INSUFFICIENT_BUFFER, HANDLE, INVALID_HANDLE_VALUE
+        GetLastError, LocalFree, ERROR_INSUFFICIENT_BUFFER, HANDLE, INVALID_HANDLE_VALUE,
     },
     Security::{
         Authorization::{
-            ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
-        }, LookupAccountNameW, PSECURITY_DESCRIPTOR, PSID, SECURITY_ATTRIBUTES
+            ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
+            SDDL_REVISION_1,
+        },
+        LookupAccountNameW, PSECURITY_DESCRIPTOR, PSID, SECURITY_ATTRIBUTES,
     },
-    Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX}, System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_WAIT}
+    Storage::FileSystem::{
+        FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
+    },
+    System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_WAIT},
 };
 // use winapi::{shared::{sddl::{ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1}, winerror::ERROR_INSUFFICIENT_BUFFER},
 //     um::{
 //         errhandlingapi::GetLastError, handleapi::INVALID_HANDLE_VALUE, minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreateNamedPipeW, winbase::{LocalFree, LookupAccountNameW, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_READMODE_BYTE, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT}, winnt::{LPCWSTR, PCWSTR, PSECURITY_DESCRIPTOR, PSID}
 //     }};
-use std::{os::windows::io::{AsRawHandle, RawHandle}, pin::Pin};
+use std::{
+    os::windows::io::{AsRawHandle, RawHandle},
+    pin::Pin,
+};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite},
     net::windows::named_pipe::{NamedPipeServer, ServerOptions},
@@ -215,11 +223,11 @@ fn account_name_to_sid_string(account: &str) -> Result<String, std::io::Error> {
         // let mut pe_use: *mut u32 = std::ptr::null_mut();
 
         let ok = LookupAccountNameW(
-            std::ptr::null(),                         // local system
+            std::ptr::null(), // local system
             name_wide.as_ptr(),
-            std::ptr::null_mut(),                     // PSID buffer
+            std::ptr::null_mut(), // PSID buffer
             &mut sid_size,
-            std::ptr::null_mut(),                     // domain buffer
+            std::ptr::null_mut(), // domain buffer
             &mut domain_size,
             &mut pe_use,
         );
@@ -284,8 +292,9 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     unsafe {
         // Resolve group name "defguard" to SID string
         let group = "defguard";
-        let sid_str = account_name_to_sid_string(group)
-            .map_err(|e| std::io::Error::new(e.kind(), format!("Failed resolve group SID: {}", e)))?;
+        let sid_str = account_name_to_sid_string(group).map_err(|e| {
+            std::io::Error::new(e.kind(), format!("Failed resolve group SID: {}", e))
+        })?;
 
         // Compose SDDL: SYSTEM & Administrators full, and group RW.
         let sddl = format!("D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;{})", sid_str);
