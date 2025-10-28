@@ -290,14 +290,8 @@ fn account_name_to_sid_string(account: &str) -> Result<String, std::io::Error> {
 
 fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     unsafe {
-        // Resolve group name "defguard" to SID string
-        let group = "defguard";
-        let sid_str = account_name_to_sid_string(group).map_err(|e| {
-            std::io::Error::new(e.kind(), format!("Failed resolve group SID: {}", e))
-        })?;
-
-        // Compose SDDL: SYSTEM & Administrators full, and group RW.
-        let sddl = format!("D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;{})", sid_str);
+        // Compose SDDL: SYSTEM & Administrators full, users RW.
+        let sddl = format!("D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)");
         let sddl_wide = str_to_wide_null_terminated(&sddl);
 
         let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
@@ -325,7 +319,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
 
         let handle = CreateNamedPipeW(
             name_wide.as_ptr(),
-            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             PIPE_TYPE_BYTE,
             2,
             65536,
