@@ -1,30 +1,20 @@
 use async_stream::stream;
 use futures_core::stream::Stream;
-use windows_sys::Win32::{
-    Foundation::{
-        GetLastError, LocalFree, HANDLE, INVALID_HANDLE_VALUE,
-    },
-    Security::{
-        Authorization::{
-            ConvertStringSecurityDescriptorToSecurityDescriptorW,
-            SDDL_REVISION_1,
-        },
-        PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
-    },
-    Storage::FileSystem::{
-        FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
-    },
-    System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE},
-};
-use std::{
-    os::windows::io::RawHandle,
-    pin::Pin,
-};
+use std::{os::windows::io::RawHandle, pin::Pin};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite},
     net::windows::named_pipe::NamedPipeServer,
 };
 use tonic::transport::server::Connected;
+use windows_sys::Win32::{
+    Foundation::{GetLastError, LocalFree, HANDLE, INVALID_HANDLE_VALUE},
+    Security::{
+        Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1},
+        PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
+    },
+    Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX},
+    System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE},
+};
 
 pub static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 
@@ -41,8 +31,7 @@ impl TonicNamedPipeServer {
 impl Connected for TonicNamedPipeServer {
     type ConnectInfo = ();
 
-    fn connect_info(&self) -> Self::ConnectInfo {
-    }
+    fn connect_info(&self) -> Self::ConnectInfo {}
 }
 
 impl AsyncRead for TonicNamedPipeServer {

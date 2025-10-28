@@ -49,7 +49,9 @@ use tracing::{debug, error, info, info_span, Instrument};
 use self::config::Config;
 use super::VERSION;
 #[cfg(windows)]
-use crate::{named_pipe::get_named_pipe_server_stream, enterprise::service_locations::ServiceLocationManager};
+use crate::{
+    enterprise::service_locations::ServiceLocationManager, named_pipe::get_named_pipe_server_stream,
+};
 
 use crate::{
     enterprise::service_locations::ServiceLocationError,

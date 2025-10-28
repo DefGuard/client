@@ -1,6 +1,10 @@
 use std::{io::stdout, sync::LazyLock};
 
 use hyper_util::rt::TokioIo;
+#[cfg(windows)]
+use std::time::Duration;
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::ClientOptions;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 use tonic::transport::channel::{Channel, Endpoint};
@@ -8,18 +12,14 @@ use tonic::transport::channel::{Channel, Endpoint};
 use tonic::transport::Uri;
 #[cfg(unix)]
 use tower::service_fn;
+#[cfg(windows)]
+use tower::service_fn;
 use tracing::{debug, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
-#[cfg(windows)]
-use std::time::Duration;
-#[cfg(windows)]
-use tokio::net::windows::named_pipe::ClientOptions;
-#[cfg(windows)]
-use tower::service_fn;
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
@@ -60,7 +60,6 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
         #[cfg(windows)]
         {
             channel = endpoint.connect_with_connector_lazy(service_fn(|_| async {
-
                 let client = loop {
                     match ClientOptions::new().open(PIPE_NAME) {
                         Ok(client) => break client,
