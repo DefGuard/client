@@ -50,7 +50,8 @@ use self::config::Config;
 use super::VERSION;
 #[cfg(windows)]
 use crate::{
-    enterprise::service_locations::ServiceLocationManager, named_pipe::get_named_pipe_server_stream,
+    enterprise::service_locations::ServiceLocationManager,
+    named_pipe::get_named_pipe_server_stream, named_pipe::PIPE_NAME,
 };
 
 use crate::{
@@ -551,7 +552,7 @@ pub(crate) async fn run_server(
     let stream = get_named_pipe_server_stream()?;
     let daemon_service = DaemonService::new(&config, service_location_manager);
 
-    info!("Defguard daemon version {VERSION} started");
+    info!("Defguard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()

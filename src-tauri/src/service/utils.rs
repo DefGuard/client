@@ -2,17 +2,12 @@ use std::{io::stdout, sync::LazyLock};
 
 use hyper_util::rt::TokioIo;
 #[cfg(windows)]
-use std::time::Duration;
-#[cfg(windows)]
 use tokio::net::windows::named_pipe::ClientOptions;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 use tonic::transport::channel::{Channel, Endpoint};
 #[cfg(unix)]
 use tonic::transport::Uri;
-#[cfg(unix)]
-use tower::service_fn;
-#[cfg(windows)]
 use tower::service_fn;
 use tracing::{debug, Level};
 use tracing_appender::non_blocking::WorkerGuard;
@@ -66,7 +61,6 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
                         Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
                         Err(e) => return Err(e),
                     }
-                    tokio::time::sleep(Duration::from_millis(50)).await;
                 };
                 Ok::<_, std::io::Error>(TokioIo::new(client))
             }));
