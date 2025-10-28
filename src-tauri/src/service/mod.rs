@@ -6,8 +6,6 @@ pub mod utils;
 #[cfg(windows)]
 pub mod windows;
 
-#[cfg(windows)]
-use std::net::{Ipv4Addr, SocketAddr};
 use std::{
     collections::HashMap,
     net::IpAddr,
@@ -57,8 +55,6 @@ use crate::{
     service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
 };
 
-#[cfg(windows)]
-const DAEMON_HTTP_PORT: u16 = 54127;
 pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
 #[cfg(unix)]
