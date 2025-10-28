@@ -20,7 +20,10 @@ impl ProvisioningConfig {
         let file_content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(err) => {
-                warn!("Failed to open provisioning configuration file at {path:?}. Error details: {err}");
+                warn!(
+                    "Failed to open provisioning configuration file at {path:?}. Error details: \
+                    {err}"
+                );
                 return None;
             }
         };
@@ -31,7 +34,10 @@ impl ProvisioningConfig {
         match serde_json::from_str::<Self>(file_content) {
             Ok(config) => Some(config),
             Err(err) => {
-                warn!("Failed to parse provisioning configuration file at {path:?}. Error details: {err}");
+                warn!(
+                    "Failed to parse provisioning configuration file at {path:?}. Error details: \
+                    {err}"
+                );
                 None
             }
         }
@@ -66,13 +72,16 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
                         return Some(config);
                     }
                     None => {
-                        debug!("Provisioning config not found in {data_dir:?}. Proceeding with normal startup.")
+                        debug!(
+                            "Provisioning config not found in {data_dir:?}. Proceeding with normal \
+                            startup."
+                        );
                     }
                 }
             }
         }
         Err(err) => {
-            error!("Failed to verify if the client has already been initialized: {err}")
+            error!("Failed to verify if the client has already been initialized: {err}");
         }
     }
 
