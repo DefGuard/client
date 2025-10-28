@@ -111,7 +111,7 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
-          echo "VERSION=$1.5.2" >> ${GITHUB_ENV}
+          echo "VERSION=1.5.2" >> ${GITHUB_ENV}
       - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
