@@ -49,7 +49,8 @@ use tracing::{debug, error, info, info_span, Instrument};
 use self::config::Config;
 use super::VERSION;
 #[cfg(windows)]
-use crate::enterprise::service_locations::ServiceLocationManager;
+use crate::{named_pipe::get_named_pipe_server_stream, enterprise::service_locations::ServiceLocationManager};
+
 use crate::{
     enterprise::service_locations::ServiceLocationError,
     service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
@@ -543,8 +544,6 @@ pub(crate) async fn run_server(
     config: Config,
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) -> anyhow::Result<()> {
-    use crate::named_pipe::get_named_pipe_server_stream;
-
     debug!("Starting Defguard interface management daemon");
 
     let stream = get_named_pipe_server_stream();

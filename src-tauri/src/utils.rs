@@ -11,6 +11,8 @@ use windows_service::{
     service::{ServiceAccess, ServiceState},
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
 #[cfg(windows)]
 use crate::active_connections::find_connection;
@@ -860,8 +862,6 @@ async fn check_connection(
     connection_type: ConnectionType,
     app_handle: &AppHandle,
 ) -> Result<(), Error> {
-    use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
-
     let appstate = app_handle.state::<AppState>();
     let interface_name = get_interface_name(name);
     let service_name = format!("WireGuardTunnel${interface_name}");

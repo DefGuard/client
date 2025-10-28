@@ -1,6 +1,5 @@
 use std::{io::stdout, sync::LazyLock};
 
-#[cfg(unix)]
 use hyper_util::rt::TokioIo;
 #[cfg(unix)]
 use tokio::net::UnixStream;
@@ -15,7 +14,17 @@ use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
+#[cfg(windows)]
+use std::time::Duration;
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::ClientOptions;
+#[cfg(windows)]
+use tower::service_fn;
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
+#[cfg(windows)]
+use crate::named_pipe::PIPE_NAME;
 use crate::service::{
     proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
 };
@@ -50,30 +59,16 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
         };
         #[cfg(windows)]
         {
-            use crate::named_pipe::PIPE_NAME;
-            use hyper_util::rt::TokioIo;
-            use std::time::Duration;
-            use tokio::net::windows::named_pipe::ClientOptions;
-            use tower::service_fn;
-
-            // channel = endpoint.connect_lazy();
-            info!("DBG: Connecting pipe");
             channel = endpoint.connect_with_connector_lazy(service_fn(|_| async {
-                info!("DBG: lazy connection");
 
                 let client = loop {
-                    use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
-
-                    info!("DBG: LOOP");
                     match ClientOptions::new().open(PIPE_NAME) {
                         Ok(client) => break client,
                         Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
                         Err(e) => return Err(e),
                     }
-
                     tokio::time::sleep(Duration::from_millis(50)).await;
                 };
-
                 Ok::<_, std::io::Error>(TokioIo::new(client))
             }));
         }

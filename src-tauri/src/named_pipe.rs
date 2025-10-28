@@ -109,12 +109,13 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             bInheritHandle: 0,
         };
 
-        let name_wide = str_to_wide_null_terminated(r"\\.\pipe\defguard_daemon");
+        let name_wide = str_to_wide_null_terminated(PIPE_NAME);
 
         let handle = CreateNamedPipeW(
             name_wide.as_ptr(),
             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             PIPE_TYPE_BYTE,
+            // need instances for client and server
             2,
             65536,
             65536,
