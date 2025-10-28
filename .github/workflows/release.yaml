@@ -435,12 +435,8 @@ jobs:
       - name: Remove "default-run" line from Cargo.toml
         run: |
           Set-Content -Path ".\src-tauri\Cargo.toml" -Value (get-content -Path ".\src-tauri\Cargo.toml" | Select-String -Pattern 'default-run =' -NotMatch)
-      - name: Debug
-        run: |
-          Get-Location
-          Get-ChildItem
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.5.23
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # - name: Upload unsigned bundle
