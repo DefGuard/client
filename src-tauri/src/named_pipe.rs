@@ -16,8 +16,10 @@ use windows_sys::Win32::{
     System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE},
 };
 
+// Named-pipe name used for IPC between defguard client and windows service.
 pub static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 
+/// Tonic-compatible wrapper around a Windows named pipe server handle.
 pub struct TonicNamedPipeServer {
     inner: NamedPipeServer,
 }
@@ -45,6 +47,7 @@ impl AsyncRead for TonicNamedPipeServer {
 }
 
 impl AsyncWrite for TonicNamedPipeServer {
+    /// Delegate async write to the underlying pipe.
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -53,6 +56,7 @@ impl AsyncWrite for TonicNamedPipeServer {
         Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
+    /// Delegate flush to the underlying pipe.
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -60,6 +64,7 @@ impl AsyncWrite for TonicNamedPipeServer {
         Pin::new(&mut self.inner).poll_flush(cx)
     }
 
+    /// Delegate shutdown to the underlying pipe.
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -68,14 +73,21 @@ impl AsyncWrite for TonicNamedPipeServer {
     }
 }
 
-/// Converts an str to wide (u16), null-terminated
+/// Convert a Rust `&str` to a null-terminated UTF-16 buffer suitable for Win32 APIs.
 fn str_to_wide_null_terminated(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(Some(0)).collect()
 }
 
+/// Create a secure Windows named pipe handle with ACLs:
+/// - `SY` (LocalSystem) - full control
+/// - `BA` (Administrators) - full control
+/// - `BU` (Built-in Users) - read/write
+///
+/// Uses `FILE_FLAG_OVERLAPPED` for Tokio compatibility and sets `nMaxInstances = 2`
+/// (one client + one service instance).
 fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     unsafe {
-        // Compose SDDL: SYSTEM & Administrators full, users RW.
+        // Compose SDDL: SYSTEM & Administrators full access, users read-write.
         let sddl = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
         let sddl_wide = str_to_wide_null_terminated(sddl);
 
@@ -104,7 +116,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             name_wide.as_ptr(),
             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             PIPE_TYPE_BYTE,
-            // need instances for client and server
+            // 1 client + 1 service
             2,
             65536,
             65536,
@@ -112,7 +124,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             &attributes,
         );
 
-        // Free the security descriptor memory returned by ConvertStringSecurityDescriptorToSecurityDescriptorW
+        // Free memory allocated by ConvertStringSecurityDescriptorToSecurityDescriptorW.
         LocalFree(descriptor as *mut _);
 
         if handle == INVALID_HANDLE_VALUE || handle.is_null() {
@@ -123,29 +135,26 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     }
 }
 
-fn create_tokio_secure_pipe() -> NamedPipeServer {
-    let raw = create_secure_pipe().unwrap();
-    unsafe {
-        let result = NamedPipeServer::from_raw_handle(raw as RawHandle);
-        match result {
-            Ok(server) => server,
-            Err(err) => {
-                let error = GetLastError();
-                error!("Windows error: {error:}");
-                panic!("Other error: {err:?}");
-            }
-        }
-    }
+/// Wrap a raw pipe `HANDLE` into a Tokio `NamedPipeServer`.
+fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
+    let raw = create_secure_pipe()?;
+    unsafe { NamedPipeServer::from_raw_handle(raw as RawHandle) }
 }
 
-pub fn get_named_pipe_server_stream() -> impl Stream<Item = io::Result<TonicNamedPipeServer>> {
-    stream! {
-        let mut server = create_tokio_secure_pipe();
+/// Produce a `Stream` of connected pipe servers for `tonic::transport::Server::serve_with_incoming`.
+///
+/// Each loop:
+/// 1. Creates a fresh listening instance.
+/// 2. Awaits a client connection (`connect().await`).
+/// 3. Yields the connected `TonicNamedPipeServer`.
+pub fn get_named_pipe_server_stream() -> Result<impl Stream<Item = io::Result<TonicNamedPipeServer>>, std::io::Error> {
+    Ok(stream! {
+        let mut server = create_tokio_secure_pipe()?;
 
         loop {
             server.connect().await?;
             yield Ok(TonicNamedPipeServer::new(server));
-            server = create_tokio_secure_pipe();
+            server = create_tokio_secure_pipe()?;
         }
-    }
+    })
 }
