@@ -9,9 +9,9 @@ use tauri::{AppHandle, Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
 use tracing::Level;
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use windows_service::{
     service::{ServiceAccess, ServiceState},
     service_manager::{ServiceManager, ServiceManagerAccess},
@@ -910,7 +910,7 @@ async fn check_connection(
 #[cfg(target_os = "windows")]
 pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
-    let all_locations = Location::all(&*DB_POOL).await?;
+    let all_locations = Location::all(&*DB_POOL, false).await?;
     let service_manager =
         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(
             |err| {

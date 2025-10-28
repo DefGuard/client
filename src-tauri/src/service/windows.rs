@@ -1,7 +1,12 @@
-use std::{ffi::OsString, sync::mpsc, time::Duration};
+use std::{
+    ffi::OsString,
+    result::Result,
+    sync::{mpsc, Arc, RwLock},
+    time::Duration,
+};
 
 use clap::Parser;
-use log::error;
+use error;
 use tokio::runtime::Runtime;
 use windows_service::{
     define_windows_service,
@@ -10,15 +15,21 @@ use windows_service::{
         ServiceType,
     },
     service_control_handler::{register, ServiceControlHandlerResult},
-    service_dispatcher, Result,
+    service_dispatcher,
 };
 
-use crate::service::{run_server, utils::logging_setup, Config};
+use crate::{
+    enterprise::service_locations::{
+        windows::watch_for_login_logoff, ServiceLocationError, ServiceLocationManager,
+    },
+    service::{run_server, utils::logging_setup, Config, DaemonError},
+};
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 
-pub fn run() -> Result<()> {
+pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
     // this thread until the service is stopped.
     service_dispatcher::start(SERVICE_NAME, ffi_service_main)
@@ -33,7 +44,7 @@ pub fn service_main(_arguments: Vec<OsString>) {
     }
 }
 
-fn run_service() -> Result<()> {
+fn run_service() -> Result<(), DaemonError> {
     // Create a channel to be able to poll a stop event from the service worker loop.
     let (shutdown_tx, shutdown_rx) = mpsc::channel::<u32>();
     let shutdown_tx_server = shutdown_tx.clone();
@@ -81,12 +92,77 @@ fn run_service() -> Result<()> {
             std::process::exit(1);
         }));
 
-        runtime.spawn(async move {
-            let server_result = run_server(config).await;
-
-            if server_result.is_err() {
-                let _ = shutdown_tx_server.send(2);
+        let service_location_manager = match ServiceLocationManager::init() {
+            Ok(api) => {
+                info!("Service locations storage initialized successfully");
+                Ok(api)
             }
+            Err(e) => {
+                error!(
+                    "Failed to initialize service locations storage: {}. Shutting down service location thread",
+                    e
+                );
+                Err(ServiceLocationError::InitError(e.to_string()))
+            }
+        }?;
+
+        let service_location_manager = Arc::new(RwLock::new(service_location_manager));
+
+        // Spawn service location management task
+        let service_location_manager_clone = service_location_manager.clone();
+        runtime.spawn(async move {
+            let manager = service_location_manager_clone;
+
+            info!("Starting service location management task");
+
+            info!("Attempting to auto-connect to service locations");
+            match manager.write().unwrap().connect_to_service_locations() {
+                Ok(_) => {
+                    info!("Auto-connect to service locations completed successfully");
+                }
+                Err(e) => {
+                    warn!(
+                        "Error while trying to auto-connect to service locations: {e}. \
+                        Will continue monitoring for login/logoff events.",
+                    );
+                }
+            }
+
+            info!("Starting login/logoff event monitoring");
+            loop {
+                match watch_for_login_logoff(
+                    manager.clone(),
+                ).await {
+                    Ok(_) => {
+                        warn!("Login/logoff event monitoring ended unexpectedly. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...");
+                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                    }
+                    Err(e) => {
+                        error!(
+                            "Error in login/logoff event monitoring: {e}. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
+                        );
+                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                        info!("Restarting login/logoff event monitoring");
+                    }
+                }
+            }
+
+        });
+
+        // Spawn the main gRPC server task
+        let service_location_manager_clone = service_location_manager.clone();
+        runtime.spawn(async move {
+            let result = run_server(config, service_location_manager_clone).await;
+
+            let signal = if result.is_err() {
+                error!("Server task ended with error: {:?}", result.err());
+                2
+            } else {
+                warn!("Server task ended without an error.");
+                1
+            };
+
+            let _ = shutdown_tx_server.send(signal);
         });
 
         loop {

@@ -42,6 +42,10 @@ pub enum Error {
     NoToken,
     #[error("Failed to lock app state member.")]
     StateLockFail,
+    #[error("Failed to convert value. {0}")]
+    ConversionError(String),
+    #[error("JSON error: {0}")]
+    JsonError(#[from] serde_json::Error),
 }
 
 // we must manually implement serde::Serialize

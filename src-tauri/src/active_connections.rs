@@ -82,7 +82,7 @@ pub(crate) async fn find_connection(
 pub(crate) async fn active_connections(
     instance: &Instance<Id>,
 ) -> Result<Vec<ActiveConnection>, Error> {
-    let locations: HashSet<Id> = Location::find_by_instance_id(&*DB_POOL, instance.id)
+    let locations: HashSet<Id> = Location::find_by_instance_id(&*DB_POOL, instance.id, false)
         .await?
         .iter()
         .map(|location| location.id)
