@@ -34,7 +34,7 @@ pub mod named_pipe;
 
 pub mod proto {
     use crate::database::models::{
-        location::{Location, LocationMfaMode as MfaMode},
+        location::{Location, LocationMfaMode as MfaMode, ServiceLocationMode as SLocationMode},
         Id, NoId,
     };
 
@@ -57,6 +57,11 @@ pub mod proto {
                 }
             };
 
+            let service_location_mode = match self.service_location_mode {
+                Some(_service_location_mode) => self.service_location_mode().into(),
+                None => SLocationMode::Disabled, // Default to disabled if not set
+            };
+
             Location {
                 id: NoId,
                 instance_id,
@@ -70,6 +75,7 @@ pub mod proto {
                 route_all_traffic: false,
                 keepalive_interval: self.keepalive_interval.into(),
                 location_mfa_mode,
+                service_location_mode,
             }
         }
     }

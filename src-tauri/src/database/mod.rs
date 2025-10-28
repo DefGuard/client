@@ -93,3 +93,13 @@ fn prepare_db_url() -> Result<String, Error> {
         ))
     }
 }
+
+pub async fn handle_db_migrations() {
+    debug!("Running database migrations, if there are any.");
+    sqlx::migrate!()
+        .run(&*DB_POOL)
+        .await
+        .expect("Failed to apply database migrations.");
+    debug!("Applied all database migrations that were pending. If any.");
+    debug!("Database setup has been completed successfully.");
+}

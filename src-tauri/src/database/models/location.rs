@@ -4,7 +4,12 @@ use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{Id, NoId};
-use crate::{error::Error, proto::LocationMfaMode as ProtoLocationMfaMode};
+use crate::{
+    error::Error,
+    proto::{
+        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+    },
+};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
@@ -27,6 +32,27 @@ impl From<ProtoLocationMfaMode> for LocationMfaMode {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[repr(u32)]
+#[serde(rename_all = "lowercase")]
+pub enum ServiceLocationMode {
+    Disabled = 1,
+    PreLogon = 2,
+    AlwaysOn = 3,
+}
+
+impl From<ProtoServiceLocationMode> for ServiceLocationMode {
+    fn from(value: ProtoServiceLocationMode) -> Self {
+        match value {
+            ProtoServiceLocationMode::Unspecified | ProtoServiceLocationMode::Disabled => {
+                ServiceLocationMode::Disabled
+            }
+            ProtoServiceLocationMode::Prelogon => ServiceLocationMode::PreLogon,
+            ProtoServiceLocationMode::Alwayson => ServiceLocationMode::AlwaysOn,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Location<I = NoId> {
     pub id: I,
@@ -42,6 +68,7 @@ pub struct Location<I = NoId> {
     pub route_all_traffic: bool,
     pub keepalive_interval: i64,
     pub location_mfa_mode: LocationMfaMode,
+    pub service_location_mode: ServiceLocationMode,
 }
 
 impl fmt::Display for Location<Id> {
@@ -57,17 +84,25 @@ impl fmt::Display for Location<NoId> {
 }
 
 impl Location<Id> {
+    /// Ignores service locations
     #[cfg(windows)]
-    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    pub(crate) async fn all<'e, E>(
+        executor: E,
+        include_service_locations: bool,
+    ) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
+        let max_service_location_mode =
+            Self::get_service_location_mode_filter(include_service_locations);
         query_as!(
           Self,
-          "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
-          route_all_traffic, keepalive_interval, \
-          location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
-          FROM location ORDER BY name ASC;"
+            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
+            route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            FROM location WHERE service_location_mode <= $1 \
+            ORDER BY name ASC;",
+            max_service_location_mode
       )
         .fetch_all(executor)
         .await
@@ -81,7 +116,7 @@ impl Location<Id> {
         query!(
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
-            keepalive_interval = $10, location_mfa_mode = $11 WHERE id = $12",
+            keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12 WHERE id = $13",
             self.instance_id,
             self.name,
             self.address,
@@ -93,6 +128,7 @@ impl Location<Id> {
             self.route_all_traffic,
             self.keepalive_interval,
             self.location_mfa_mode,
+            self.service_location_mode,
             self.id,
         )
         .execute(executor)
@@ -112,7 +148,7 @@ impl Location<Id> {
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
             network_id, route_all_traffic,  keepalive_interval, \
-            location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
             FROM location WHERE id = $1",
             location_id
         )
@@ -123,16 +159,21 @@ impl Location<Id> {
     pub(crate) async fn find_by_instance_id<'e, E>(
         executor: E,
         instance_id: Id,
+        include_service_locations: bool,
     ) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
+        let max_service_location_mode =
+            Self::get_service_location_mode_filter(include_service_locations);
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
-            FROM location WHERE instance_id = $1 ORDER BY name ASC",
-            instance_id
+            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
+            ORDER BY name ASC",
+            instance_id,
+            max_service_location_mode
         )
         .fetch_all(executor)
         .await
@@ -148,7 +189,7 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\" \
+            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
             FROM location WHERE pubkey = $1;",
             pubkey
         )
@@ -189,6 +230,16 @@ impl Location<Id> {
             LocationMfaMode::Internal | LocationMfaMode::External => true,
         }
     }
+
+    /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?` when querying locations
+    /// to exclude (<= 1) or include service locations (all service locations modes).
+    fn get_service_location_mode_filter(include_service_locations: bool) -> i32 {
+        if include_service_locations {
+            i32::MAX
+        } else {
+            ServiceLocationMode::Disabled as i32
+        }
+    }
 }
 
 impl Location<NoId> {
@@ -199,8 +250,8 @@ impl Location<NoId> {
         // Insert a new record when there is no ID
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
-            dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
+            dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, service_location_mode) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -212,7 +263,8 @@ impl Location<NoId> {
             self.network_id,
             self.route_all_traffic,
             self.keepalive_interval,
-            self.location_mfa_mode
+            self.location_mfa_mode,
+            self.service_location_mode,
         )
         .fetch_one(executor)
         .await?;
@@ -230,7 +282,15 @@ impl Location<NoId> {
             route_all_traffic: self.route_all_traffic,
             keepalive_interval: self.keepalive_interval,
             location_mfa_mode: self.location_mfa_mode,
+            service_location_mode: self.service_location_mode,
         })
+    }
+}
+
+impl<I> Location<I> {
+    pub fn is_service_location(&self) -> bool {
+        self.service_location_mode != ServiceLocationMode::Disabled
+            && self.location_mfa_mode == LocationMfaMode::Disabled
     }
 }
 
@@ -249,6 +309,7 @@ impl From<Location<Id>> for Location {
             route_all_traffic: location.route_all_traffic,
             keepalive_interval: location.keepalive_interval,
             location_mfa_mode: location.location_mfa_mode,
+            service_location_mode: location.service_location_mode,
         }
     }
 }

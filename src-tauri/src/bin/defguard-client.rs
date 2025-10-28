@@ -15,6 +15,7 @@ use defguard_client::{
     appstate::AppState,
     commands::*,
     database::{
+        handle_db_migrations,
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
@@ -39,14 +40,6 @@ const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "
 static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
 async fn startup(app_handle: &AppHandle) {
-    debug!("Running database migrations, if there are any.");
-    sqlx::migrate!()
-        .run(&*DB_POOL)
-        .await
-        .expect("Failed to apply database migrations.");
-    debug!("Applied all database migrations that were pending. If any.");
-    debug!("Database setup has been completed successfully.");
-
     debug!("Purging old stats from the database.");
     if let Err(err) = LocationStats::purge(&*DB_POOL).await {
         error!("Failed to purge location stats: {err}");
@@ -245,6 +238,9 @@ fn main() {
                     })
                     .build(),
             )?;
+
+            // run DB migrations
+            tauri::async_runtime::block_on(handle_db_migrations());
 
             // Check if client needs to be initialized
             // and try to load provisioning config if necessary

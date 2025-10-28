@@ -2,7 +2,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Fragment>
     <DirectoryRef Id="INSTALLDIR">
-      <Component Id="DefGuardServiceFragment">
+      <Component Id="DefguardServiceFragment">
         <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\defguard-service.exe" />
         <ServiceInstall
           Account="LocalSystem"

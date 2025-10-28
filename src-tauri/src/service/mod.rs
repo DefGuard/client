@@ -50,6 +50,12 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use self::config::Config;
 use super::VERSION;
+#[cfg(windows)]
+use crate::enterprise::service_locations::ServiceLocationManager;
+use crate::{
+    enterprise::service_locations::ServiceLocationError,
+    service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
+};
 
 #[cfg(windows)]
 const DAEMON_HTTP_PORT: u16 = 54127;
@@ -72,6 +78,11 @@ pub enum DaemonError {
     Unexpected(String),
     #[error(transparent)]
     TransportError(#[from] tonic::transport::Error),
+    #[error(transparent)]
+    ServiceLocationError(#[from] ServiceLocationError),
+    #[cfg(windows)]
+    #[error(transparent)]
+    WindowsServiceError(#[from] windows_service::Error),
 }
 
 type IfName = String;
@@ -86,22 +97,29 @@ pub(crate) struct DaemonService {
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
+    #[cfg(windows)]
+    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 }
 
 impl DaemonService {
     #[must_use]
-    pub fn new(config: &Config) -> Self {
+    pub fn new(
+        config: &Config,
+        #[cfg(windows)] service_location_manager: Arc<RwLock<ServiceLocationManager>>,
+    ) -> Self {
         Self {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(windows)]
+            service_location_manager,
         }
     }
 }
 
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
-fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
+pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
     let wgapi = WG::new(ifname).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
@@ -114,6 +132,118 @@ fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
+
+    #[cfg(not(windows))]
+    async fn save_service_locations(
+        &self,
+        _request: tonic::Request<SaveServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Saved service location request received, this is currently not supported on Unix systems");
+        Ok(Response::new(()))
+    }
+
+    #[cfg(not(windows))]
+    async fn delete_service_locations(
+        &self,
+        _request: tonic::Request<DeleteServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Saved service location request received, this is currently not supported on Unix systems");
+        Ok(Response::new(()))
+    }
+
+    #[cfg(windows)]
+    async fn save_service_locations(
+        &self,
+        request: tonic::Request<SaveServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Received a request to save service location");
+        let service_location = request.into_inner();
+
+        match self
+            .service_location_manager
+            .clone()
+            .read()
+            .unwrap()
+            .save_service_locations(
+                service_location.service_locations.as_slice(),
+                &service_location.instance_id,
+                &service_location.private_key,
+            ) {
+            Ok(()) => {
+                debug!("Service location saved successfully");
+            }
+            Err(e) => {
+                let msg = format!("Failed to save service location: {e}");
+                error!(msg);
+                return Err(Status::internal(msg));
+            }
+        }
+
+        for saved_location in service_location.service_locations {
+            match self
+                .service_location_manager
+                .clone()
+                .write()
+                .unwrap()
+                .reset_service_location_state(&service_location.instance_id, &saved_location.pubkey)
+            {
+                Ok(()) => {
+                    debug!(
+                        "Service location '{}' state reset successfully",
+                        saved_location.name
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to reset state for service location '{}': {e}",
+                        saved_location.name
+                    );
+                }
+            }
+        }
+
+        Ok(Response::new(()))
+    }
+
+    #[cfg(windows)]
+    async fn delete_service_locations(
+        &self,
+        request: tonic::Request<DeleteServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Received a request to delete service location");
+        let instance_id = request.into_inner().instance_id;
+
+        self.service_location_manager
+            .clone()
+            .write()
+            .unwrap()
+            .disconnect_service_locations_by_instance(&instance_id)
+            .map_err(|e| {
+                let msg = format!("Failed to disconnect service location: {e}");
+                error!(msg);
+                Status::internal(msg)
+            })?;
+
+        match self
+            .service_location_manager
+            .clone()
+            .read()
+            .unwrap()
+            .delete_all_service_locations_for_instance(&instance_id)
+        {
+            Ok(()) => {
+                debug!("Service location deleted successfully");
+                Ok(Response::new(()))
+            }
+            Err(e) => {
+                error!("Failed to delete service location: {}", e);
+                Err(Status::internal(format!(
+                    "Failed to delete service location: {}",
+                    e
+                )))
+            }
+        }
+    }
 
     async fn create_interface(
         &self,
@@ -413,22 +543,21 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 }
 
 #[cfg(windows)]
-pub async fn run_server(config: Config) -> anyhow::Result<()> {
+pub async fn run_server(
+    config: Config,
+    service_location_manager: Arc<RwLock<ServiceLocationManager>>) -> anyhow::Result<()> {
     use crate::named_pipe::get_named_pipe_server_stream;
 
     debug!("Starting Defguard interface management daemon");
 
-    // let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
     let stream = get_named_pipe_server_stream();
-    let daemon_service = DaemonService::new(&config);
+    let daemon_service = DaemonService::new(&config, service_location_manager);
 
-    // info!("Defguard daemon version {VERSION} started, listening on {addr}",);
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        // .serve(addr)
         .serve_with_incoming(stream)
         .await?;
 
