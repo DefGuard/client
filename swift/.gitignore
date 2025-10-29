@@ -1,7 +1,6 @@
 .DS_Store
 */.build
 build
-Boringtun
 /Packages
 xcuserdata/
 DerivedData/
@@ -9,3 +8,4 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 Package.resolved
+extension/BoringTun

@@ -1,0 +1,72 @@
+name: Build macOS app
+on:
+  workflow_call:
+
+jobs:
+  build-macos:
+    runs-on:
+      - self-hosted
+      - macOS
+    env:
+      APPLE_SIGNING_IDENTITY_APPLICATION: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_ID: "kamil@defguard.net"
+      APPLE_TEAM_ID: "82GZ7KN29J"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Unlock keychain
+        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+      - name: Build app
+        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ env.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+      - name: Build installation package
+        run: |
+          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+          xcrun productbuild --sign "${APPLE_SIGNING_IDENTITY_INSTALLER}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
+          xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+          xcrun stapler staple defguard-client.pkg
+      - name: Upload installation package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: defguard-client.pkg
+          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
+          asset_content_type: application/octet-stream

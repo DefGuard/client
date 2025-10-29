@@ -120,7 +120,6 @@ jobs:
       - name: Upload DEB to APT repository #Add this to ubuntu 22.04 job (on merge dev -> main) with --codename=bookworm
         run: |
           COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
-
           deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=trixie --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
       - name: Rename client binary
         run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
@@ -226,15 +225,15 @@ jobs:
 
           for DIST in trixie bookworm; do
             aws s3 cp s3://apt.defguard.net/dists/${DIST}/Release .
-            
+
             curl -X POST "${{ secrets.DEFGUARD_SIGNING_URL }}?signature_type=both" \
               -H "Authorization: Bearer ${{ secrets.DEFGUARD_SIGNING_API_KEY }}" \
               -F "file=@Release" \
               -o response.json
-            
+
             cat response.json | jq -r '.files["Release.gpg"].content' | base64 --decode > Release.gpg
             cat response.json | jq -r '.files.Release.content' | base64 --decode > InRelease
-            
+
             aws s3 cp Release.gpg s3://apt.defguard.net/dists/${DIST}/ --acl public-read
             aws s3 cp InRelease s3://apt.defguard.net/dists/${DIST}/ --acl public-read
 
@@ -313,79 +312,7 @@ jobs:
   build-macos:
     needs:
       - create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [aarch64-apple-darwin, x86_64-apple-darwin]
-    runs-on:
-      - self-hosted
-      - macOS
-    env:
-      APPLE_SIGNING_IDENTITY_APPLICATION: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_SIGNING_IDENTITY_INSTALLER: "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_ID: "kamil@defguard.net"
-      APPLE_TEAM_ID: "82GZ7KN29J"
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: "recursive"
-      - name: Write release version
-        run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-          run_install: false
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install protobuf compiler
-        run: brew install protobuf
-      - name: Install ARM target
-        run: rustup target add aarch64-apple-darwin
-      - name: Unlock keychain
-        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" /Users/admin/Library/Keychains/login.keychain
-      - name: Build app
-        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ env.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
-        with:
-          args: --target ${{ matrix.target }} -v
-      - name: Build installation package
-        run: |
-          bash build-macos-package.sh src-tauri/target/${{ matrix.target }} src-tauri/resources-macos/scripts '${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}' /Users/admin/Library/Keychains/login.keychain
-          xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-          xcrun stapler staple src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-      - name: Upload installation package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/${{ matrix.target }}/product-signed/defguard.pkg
-          asset_name: defguard-${{ matrix.target }}-${{ env.VERSION }}.pkg
-          asset_content_type: application/octet-stream
+    uses: ./.github/workflows/build-macos.yml
 
   # Builds Windows MSI and uploads it as artifact
   build-windows:
