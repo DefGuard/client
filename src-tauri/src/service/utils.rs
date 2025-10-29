@@ -3,7 +3,7 @@ use std::{io::stdout, sync::LazyLock};
 #[cfg(windows)]
 use crate::service::{
     named_pipe::PIPE_NAME,
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
+    proto::desktop_daemon_service_client::DesktopDaemonServiceClient,
 };
 use hyper_util::rt::TokioIo;
 #[cfg(windows)]
@@ -26,7 +26,8 @@ use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {
         debug!("Setting up gRPC client");
-        let endpoint = Endpoint::from_static(DAEMON_BASE_URL); // Should not panic.
+        // URL is ignored since we provide our own connectors for unix socket and windows named pipes.
+        let endpoint = Endpoint::from_static("http://localhost");
         let channel;
         #[cfg(unix)]
         {
