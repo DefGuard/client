@@ -1,5 +1,8 @@
 name: Build macOS app
 on:
+  push:
+    branches:
+      - swift_plugin
   workflow_call:
 
 jobs:

@@ -212,8 +212,6 @@ jobs:
       - self-hosted
       - Linux
       - X64
-    strategy:
-      fail-fast: false
     steps:
       - name: Sign APT repository
         run: |
