@@ -5,6 +5,8 @@ pub mod proto {
 pub mod utils;
 #[cfg(windows)]
 pub mod windows;
+#[cfg(windows)]
+pub mod named_pipe;
 
 use std::{
     collections::HashMap,
@@ -51,8 +53,9 @@ use super::VERSION;
 #[cfg(windows)]
 use crate::{
     enterprise::service_locations::ServiceLocationManager,
-    named_pipe::get_named_pipe_server_stream, named_pipe::PIPE_NAME,
 };
+#[cfg(windows)]
+use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
 
 use crate::{
     enterprise::service_locations::ServiceLocationError,

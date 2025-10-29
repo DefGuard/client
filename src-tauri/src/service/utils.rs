@@ -1,8 +1,8 @@
 use std::{io::stdout, sync::LazyLock};
 
 #[cfg(windows)]
-use crate::named_pipe::PIPE_NAME;
 use crate::service::{
+    named_pipe::PIPE_NAME,
     proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
 };
 use hyper_util::rt::TokioIo;
