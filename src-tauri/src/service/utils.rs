@@ -1,5 +1,10 @@
 use std::{io::stdout, sync::LazyLock};
 
+#[cfg(windows)]
+use crate::named_pipe::PIPE_NAME;
+use crate::service::{
+    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
+};
 use hyper_util::rt::TokioIo;
 #[cfg(windows)]
 use tokio::net::windows::named_pipe::ClientOptions;
@@ -17,11 +22,6 @@ use tracing_subscriber::{
 };
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
-#[cfg(windows)]
-use crate::named_pipe::PIPE_NAME;
-use crate::service::{
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
-};
 
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {
