@@ -4,6 +4,3 @@
 [submodule "src-tauri/proto"]
 	path = src-tauri/proto
 	url = ../proto.git
-[submodule "swift/boringtun"]
-	path = swift/boringtun
-	url = ../boringtun.git

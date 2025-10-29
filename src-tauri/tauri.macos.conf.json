@@ -1,0 +1,8 @@
+{
+  "build": {
+    "beforeBundleCommand": {
+      "cwd": "../swift",
+      "script": "./build.sh"
+    }
+  }
+}
