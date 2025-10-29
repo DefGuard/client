@@ -19,6 +19,12 @@ use windows_sys::Win32::{
 // Named-pipe name used for IPC between defguard client and windows service.
 pub static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 
+// SDDL defining named pipe ACL:
+/// - `SY` (LocalSystem) - full control
+/// - `BA` (Administrators) - full control
+/// - `BU` (Built-in Users) - read/write
+pub static SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
+
 /// Tonic-compatible wrapper around a Windows named pipe server handle.
 pub struct TonicNamedPipeServer {
     inner: NamedPipeServer,
@@ -78,41 +84,41 @@ fn str_to_wide_null_terminated(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(Some(0)).collect()
 }
 
-/// Create a secure Windows named pipe handle with ACLs:
-/// - `SY` (LocalSystem) - full control
-/// - `BA` (Administrators) - full control
-/// - `BU` (Built-in Users) - read/write
-///
+/// Create a secure Windows named pipe handle with appropriate ACL.
 /// Uses `FILE_FLAG_OVERLAPPED` for Tokio compatibility and sets `nMaxInstances = 2`
 /// (one client + one service instance).
 fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
-    unsafe {
-        // Compose SDDL: SYSTEM & Administrators full access, users read-write.
-        let sddl = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
-        let sddl_wide = str_to_wide_null_terminated(sddl);
+    debug!("Creating secure named pipe {PIPE_NAME}");
 
-        let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+    // Compose SDDL: SYSTEM & Administrators full access, users read-write.
+    let sddl_wide = str_to_wide_null_terminated(SDDL);
 
-        if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+    let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+
+    let result = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
             sddl_wide.as_ptr(),
             SDDL_REVISION_1,
             &mut descriptor as *mut PSECURITY_DESCRIPTOR,
             std::ptr::null_mut(),
-        ) == 0
-        {
-            return Err(std::io::Error::last_os_error());
-        }
+        )
+    };
+    if result == 0 {
+        error!("Error calling ConvertStringSecurityDescriptorToSecurityDescriptorW");
+        return Err(std::io::Error::last_os_error());
+    }
 
-        // Build SECURITY_ATTRIBUTES pointing to the security descriptor
-        let attributes = SECURITY_ATTRIBUTES {
-            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
-            lpSecurityDescriptor: descriptor as *mut _,
-            bInheritHandle: 0,
-        };
+    // Build SECURITY_ATTRIBUTES pointing to the security descriptor
+    let attributes = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: descriptor as *mut _,
+        bInheritHandle: 0,
+    };
 
-        let name_wide = str_to_wide_null_terminated(PIPE_NAME);
+    let name_wide = str_to_wide_null_terminated(PIPE_NAME);
 
-        let handle = CreateNamedPipeW(
+    let handle = unsafe {
+        CreateNamedPipeW(
             name_wide.as_ptr(),
             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             PIPE_TYPE_BYTE,
@@ -122,23 +128,30 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             65536,
             0,
             &attributes,
-        );
-
+        )
+    };
+    unsafe {
         // Free memory allocated by ConvertStringSecurityDescriptorToSecurityDescriptorW.
-        LocalFree(descriptor as *mut _);
-
-        if handle == INVALID_HANDLE_VALUE || handle.is_null() {
-            return Err(std::io::Error::last_os_error());
-        }
-
-        Ok(handle)
+        LocalFree(descriptor);
     }
+
+    if handle == INVALID_HANDLE_VALUE || handle.is_null() {
+        error!("CreateNamedPipeW returned invalid handle: {handle:?}");
+        return Err(std::io::Error::last_os_error());
+    }
+
+    info!("Created secure named pipe {PIPE_NAME}");
+    Ok(handle)
 }
 
 /// Wrap a raw pipe `HANDLE` into a Tokio `NamedPipeServer`.
 fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
+    debug!("Creating tokio secure pipe");
     let raw = create_secure_pipe()?;
-    unsafe { NamedPipeServer::from_raw_handle(raw as RawHandle) }
+    let pipe = unsafe { NamedPipeServer::from_raw_handle(raw as RawHandle)? };
+
+    info!("Created tokio secure pipe");
+    Ok(pipe)
 }
 
 /// Produce a `Stream` of connected pipe servers for `tonic::transport::Server::serve_with_incoming`.
@@ -149,7 +162,8 @@ fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
 /// 3. Yields the connected `TonicNamedPipeServer`.
 pub fn get_named_pipe_server_stream(
 ) -> Result<impl Stream<Item = io::Result<TonicNamedPipeServer>>, std::io::Error> {
-    Ok(stream! {
+    debug!("Creating named pipe server stream");
+    let stream = stream! {
         let mut server = create_tokio_secure_pipe()?;
 
         loop {
@@ -157,5 +171,7 @@ pub fn get_named_pipe_server_stream(
             yield Ok(TonicNamedPipeServer::new(server));
             server = create_tokio_secure_pipe()?;
         }
-    })
+    };
+    info!("Created named pipe server stream");
+    Ok(stream)
 }

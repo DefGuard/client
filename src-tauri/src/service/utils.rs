@@ -17,7 +17,6 @@ use tracing_subscriber::{
 };
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
-
 #[cfg(windows)]
 use crate::named_pipe::PIPE_NAME;
 use crate::service::{
@@ -58,8 +57,11 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
                 let client = loop {
                     match ClientOptions::new().open(PIPE_NAME) {
                         Ok(client) => break client,
-                        Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
-                        Err(e) => return Err(e),
+                        Err(err) if err.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
+                        Err(err) => {
+                            error!("Problem connecting to named pipe: {err}");
+                            return Err(err);
+                        }
                     }
                 };
                 Ok::<_, std::io::Error>(TokioIo::new(client))
