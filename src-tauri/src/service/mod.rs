@@ -2,11 +2,11 @@ pub mod config;
 pub mod proto {
     tonic::include_proto!("client");
 }
+#[cfg(windows)]
+pub mod named_pipe;
 pub mod utils;
 #[cfg(windows)]
 pub mod windows;
-#[cfg(windows)]
-pub mod named_pipe;
 
 use std::{
     collections::HashMap,
@@ -51,9 +51,7 @@ use tracing::{debug, error, info, info_span, Instrument};
 use self::config::Config;
 use super::VERSION;
 #[cfg(windows)]
-use crate::{
-    enterprise::service_locations::ServiceLocationManager,
-};
+use crate::enterprise::service_locations::ServiceLocationManager;
 #[cfg(windows)]
 use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
 

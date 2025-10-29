@@ -2,8 +2,7 @@ use std::{io::stdout, sync::LazyLock};
 
 #[cfg(windows)]
 use crate::service::{
-    named_pipe::PIPE_NAME,
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient,
+    named_pipe::PIPE_NAME, proto::desktop_daemon_service_client::DesktopDaemonServiceClient,
 };
 use hyper_util::rt::TokioIo;
 #[cfg(windows)]
