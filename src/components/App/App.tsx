@@ -4,7 +4,7 @@ import '../../shared/scss/index.scss';
 
 import { QueryClient } from '@tanstack/query-core';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { debug } from '@tauri-apps/plugin-log';
+import { debug, info } from '@tauri-apps/plugin-log';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
@@ -38,6 +38,8 @@ import { useTheme } from '../../shared/defguard-ui/hooks/theme/useTheme';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
+import { exit } from '@tauri-apps/plugin-process';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -185,6 +187,12 @@ export const App = () => {
       document.removeEventListener('click', handler);
     };
   }, []);
+
+  // register ctrl+q keyboard shortcut
+  useHotkeys('ctrl+q', () => {
+      info("Ctrl-Q pressed, exiting.");
+      exit(0);
+  });
 
   if (!appLoaded) return null;
 

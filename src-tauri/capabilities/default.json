@@ -48,6 +48,7 @@
     "os:allow-hostname",
     "dialog:default",
     "clipboard-manager:allow-write-text",
+    "process:allow-exit",
     {
       "identifier": "http:default",
       "allow": [
