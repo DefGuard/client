@@ -303,7 +303,7 @@ impl ServiceLocationManager {
     ) -> Result<(), ServiceLocationError> {
         self.connected_service_locations
             .entry(instance_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(location.clone());
 
         debug!(
@@ -407,7 +407,7 @@ impl ServiceLocationManager {
 
         if let Some(locations) = self.connected_service_locations.get(instance_id) {
             // Collect locations to disconnect to avoid borrowing issues
-            let locations_to_disconnect: Vec<_> = locations.iter().cloned().collect();
+            let locations_to_disconnect = locations.to_vec();
 
             for location in locations_to_disconnect {
                 let ifname = get_interface_name(&location.name);
@@ -456,7 +456,7 @@ impl ServiceLocationManager {
         if let Some(locations) = self.connected_service_locations.get_mut(instance_id) {
             if let Some(pos) = locations
                 .iter()
-                .position(|loc| &loc.pubkey == location_pubkey)
+                .position(|loc| loc.pubkey == location_pubkey)
             {
                 let location = locations.remove(pos);
                 let ifname = get_interface_name(&location.name);

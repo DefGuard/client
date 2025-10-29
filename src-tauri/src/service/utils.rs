@@ -1,13 +1,13 @@
 use std::{io::stdout, sync::LazyLock};
 
-#[cfg(unix)]
 use hyper_util::rt::TokioIo;
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::ClientOptions;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 use tonic::transport::channel::{Channel, Endpoint};
 #[cfg(unix)]
 use tonic::transport::Uri;
-#[cfg(unix)]
 use tower::service_fn;
 use tracing::{debug, Level};
 use tracing_appender::non_blocking::WorkerGuard;
@@ -15,15 +15,18 @@ use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
-use crate::service::{
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
-};
+#[cfg(windows)]
+use crate::service::named_pipe::PIPE_NAME;
+use crate::service::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
 
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {
         debug!("Setting up gRPC client");
-        let endpoint = Endpoint::from_static(DAEMON_BASE_URL); // Should not panic.
+        // URL is ignored since we provide our own connectors for unix socket and windows named pipes.
+        let endpoint = Endpoint::from_static("http://localhost");
         let channel;
         #[cfg(unix)]
         {
@@ -45,12 +48,26 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
                         return Err(err);
                     }
                 };
+                info!("Created unix gRPC client");
                 Ok::<_, std::io::Error>(TokioIo::new(stream))
             }));
         };
         #[cfg(windows)]
         {
-            channel = endpoint.connect_lazy();
+            channel = endpoint.connect_with_connector_lazy(service_fn(|_| async {
+                let client = loop {
+                    match ClientOptions::new().open(PIPE_NAME) {
+                        Ok(client) => break client,
+                        Err(err) if err.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
+                        Err(err) => {
+                            error!("Problem connecting to named pipe: {err}");
+                            return Err(err);
+                        }
+                    }
+                };
+                info!("Created windows gRPC client");
+                Ok::<_, std::io::Error>(TokioIo::new(client))
+            }));
         }
         DesktopDaemonServiceClient::new(channel)
     });

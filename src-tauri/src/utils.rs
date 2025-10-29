@@ -7,12 +7,12 @@ use tauri::{AppHandle, Emitter, Manager};
 use tonic::Code;
 use tracing::Level;
 #[cfg(windows)]
-use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
-#[cfg(windows)]
 use windows_service::{
     service::{ServiceAccess, ServiceState},
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
 #[cfg(windows)]
 use crate::active_connections::find_connection;
