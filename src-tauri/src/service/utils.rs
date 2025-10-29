@@ -49,6 +49,7 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
                         return Err(err);
                     }
                 };
+                info!("Created unix gRPC client");
                 Ok::<_, std::io::Error>(TokioIo::new(stream))
             }));
         };
@@ -65,6 +66,7 @@ pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
                         }
                     }
                 };
+                info!("Created windows gRPC client");
                 Ok::<_, std::io::Error>(TokioIo::new(client))
             }));
         }
