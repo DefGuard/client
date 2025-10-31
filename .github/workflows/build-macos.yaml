@@ -1,8 +1,5 @@
 name: Build macOS app
 on:
-  push:
-    branches:
-      - swift_plugin
   workflow_call:
 
 jobs:
@@ -70,15 +67,15 @@ jobs:
           security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
           xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
           xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
-          xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
-          xcrun stapler staple defguard-client.pkg
+          # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+          # xcrun stapler staple defguard-client.pkg
 
-      - name: Upload installation package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client.pkg
-          asset_name: defguard-client-universal-${{ env.VERSION }}.pkg
-          asset_content_type: application/octet-stream
+      # - name: Upload installation package
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ needs.create-release.outputs.upload_url }}
+      #     asset_path: defguard-client.pkg
+      #     asset_name: defguard-client-universal-${{ env.VERSION }}.pkg
+      #     asset_content_type: application/octet-stream
