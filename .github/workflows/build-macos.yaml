@@ -52,8 +52,8 @@ jobs:
 
       - name: Set build number
         run: |
-          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}" src-tauri/tauri.conf.json
-          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}" swift/extension/VPNExtension.xcodeproj/project.pbxproj
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
 
       - name: Build app
         uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
