@@ -160,6 +160,7 @@ fn main() {
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Register for linux and dev windows builds
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]

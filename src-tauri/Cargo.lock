@@ -438,6 +438,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-stream"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.108",
+]
+
+[[package]]
 name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1371,6 +1393,7 @@ name = "defguard-client"
 version = "1.6.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "base64 0.22.1",
  "chrono",
  "clap",
@@ -1378,6 +1401,7 @@ dependencies = [
  "dark-light",
  "defguard_wireguard_rs",
  "dirs-next",
+ "futures-core",
  "hyper-util",
  "known-folders",
  "log",
@@ -1405,6 +1429,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-opener",
  "tauri-plugin-os",
+ "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
  "thiserror 2.0.17",
@@ -1421,10 +1446,10 @@ dependencies = [
  "tracing-subscriber",
  "vergen-git2",
  "webbrowser",
- "winapi",
  "windows 0.62.2",
  "windows-acl",
  "windows-service",
+ "windows-sys 0.61.2",
  "x25519-dalek",
 ]
 
@@ -6609,6 +6634,16 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "tauri-plugin-process"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d55511a7bf6cd70c8767b02c97bf8134fa434daf3926cfc1be0a0f94132d165a"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]

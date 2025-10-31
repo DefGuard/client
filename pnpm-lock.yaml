@@ -30,37 +30,40 @@ importers:
         specifier: 3.13.12
         version: 3.13.12(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@tauri-apps/api':
-        specifier: ^2.9.0
+        specifier: ^2.8.0
         version: 2.9.0
       '@tauri-apps/plugin-clipboard-manager':
-        specifier: ^2.3.2
+        specifier: ^2.3.0
         version: 2.3.2
       '@tauri-apps/plugin-deep-link':
-        specifier: ^2.4.5
+        specifier: ^2.4.3
         version: 2.4.5
       '@tauri-apps/plugin-dialog':
-        specifier: ^2.4.2
+        specifier: ^2.4.0
         version: 2.4.2
       '@tauri-apps/plugin-fs':
-        specifier: ^2.4.4
+        specifier: ^2.4.2
         version: 2.4.4
       '@tauri-apps/plugin-http':
-        specifier: ^2.5.4
+        specifier: ^2.5.2
         version: 2.5.4
       '@tauri-apps/plugin-log':
-        specifier: ^2.7.1
+        specifier: ^2.7.0
         version: 2.7.1
       '@tauri-apps/plugin-notification':
-        specifier: ^2.3.3
+        specifier: ^2.3.1
         version: 2.3.3
       '@tauri-apps/plugin-opener':
-        specifier: ^2.5.2
+        specifier: ^2.5.0
         version: 2.5.2
       '@tauri-apps/plugin-os':
-        specifier: ^2.3.2
+        specifier: ^2.3.1
         version: 2.3.2
+      '@tauri-apps/plugin-process':
+        specifier: ^2.3.0
+        version: 2.3.1
       '@tauri-apps/plugin-window-state':
-        specifier: ^2.4.1
+        specifier: ^2.4.0
         version: 2.4.1
       '@types/byte-size':
         specifier: ^8.1.2
@@ -141,8 +144,11 @@ importers:
         specifier: ^19.2.0
         version: 19.2.0(react@19.2.0)
       react-hook-form:
-        specifier: ^7.65.0
+        specifier: ^7.63.0
         version: 7.65.0(react@19.2.0)
+      react-hotkeys-hook:
+        specifier: ^5.2.1
+        version: 5.2.1(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       react-loading-skeleton:
         specifier: ^3.5.0
         version: 3.5.0(react@19.2.0)
@@ -1206,6 +1212,9 @@ packages:
 
   '@tauri-apps/plugin-os@2.3.2':
     resolution: {integrity: sha512-n+nXWeuSeF9wcEsSPmRnBEGrRgOy6jjkSU+UVCOV8YUGKb2erhDOxis7IqRXiRVHhY8XMKks00BJ0OAdkpf6+A==}
+
+  '@tauri-apps/plugin-process@2.3.1':
+    resolution: {integrity: sha512-nCa4fGVaDL/B9ai03VyPOjfAHRHSBz5v6F/ObsB73r/dA3MHHhZtldaDMIc0V/pnUw9ehzr2iEG+XkSEyC0JJA==}
 
   '@tauri-apps/plugin-window-state@2.4.1':
     resolution: {integrity: sha512-OuvdrzyY8Q5Dbzpj+GcrnV1iCeoZbcFdzMjanZMMcAEUNy/6PH5pxZPXpaZLOR7whlzXiuzx0L9EKZbH7zpdRw==}
@@ -2461,6 +2470,12 @@ packages:
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
+
+  react-hotkeys-hook@5.2.1:
+    resolution: {integrity: sha512-xbKh6zJxd/vJHT4Bw4+0pBD662Fk20V+VFhLqciCg+manTVO4qlqRqiwFOYelfHN9dBvWj9vxaPkSS26ZSIJGg==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -3846,6 +3861,10 @@ snapshots:
       '@tauri-apps/api': 2.9.0
 
   '@tauri-apps/plugin-os@2.3.2':
+    dependencies:
+      '@tauri-apps/api': 2.9.0
+
+  '@tauri-apps/plugin-process@2.3.1':
     dependencies:
       '@tauri-apps/api': 2.9.0
 
@@ -5291,6 +5310,11 @@ snapshots:
   react-hook-form@7.65.0(react@19.2.0):
     dependencies:
       react: 19.2.0
+
+  react-hotkeys-hook@5.2.1(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
+    dependencies:
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
 
   react-is@16.13.1: {}
 

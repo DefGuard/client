@@ -2,12 +2,12 @@ pub mod config;
 pub mod proto {
     tonic::include_proto!("client");
 }
+#[cfg(windows)]
+pub mod named_pipe;
 pub mod utils;
 #[cfg(windows)]
 pub mod windows;
 
-#[cfg(windows)]
-use std::net::{Ipv4Addr, SocketAddr};
 use std::{
     collections::HashMap,
     net::IpAddr,
@@ -52,14 +52,13 @@ use self::config::Config;
 use super::VERSION;
 #[cfg(windows)]
 use crate::enterprise::service_locations::ServiceLocationManager;
+#[cfg(windows)]
+use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
+
 use crate::{
     enterprise::service_locations::ServiceLocationError,
     service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
 };
-
-#[cfg(windows)]
-const DAEMON_HTTP_PORT: u16 = 54127;
-pub(super) const DAEMON_BASE_URL: &str = "http://localhost:54127";
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -549,16 +548,16 @@ pub(crate) async fn run_server(
 ) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), DAEMON_HTTP_PORT);
+    let stream = get_named_pipe_server_stream()?;
     let daemon_service = DaemonService::new(&config, service_location_manager);
 
-    info!("Defguard daemon version {VERSION} started, listening on {addr}",);
+    info!("Defguard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        .serve(addr)
+        .serve_with_incoming(stream)
         .await?;
 
     Ok(())

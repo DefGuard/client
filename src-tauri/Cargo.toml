@@ -67,6 +67,7 @@ common = { path = "common" }
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
+hyper-util = "0.1"
 log = { version = "0.4", features = ["serde"] }
 prost.workspace = true
 regex = "1.11"
@@ -101,6 +102,7 @@ tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
+tauri-plugin-process = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
 thiserror.workspace = true
@@ -109,6 +111,7 @@ tokio.workspace = true
 tokio-util = "0.7"
 tonic.workspace = true
 tonic-prost.workspace = true
+tower = "0.5"
 tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber.workspace = true
@@ -126,14 +129,12 @@ swift-rs = "1.0"
 swift-rs = { version = "1.0", features = ["build"] }
 
 [target.'cfg(unix)'.dependencies]
-hyper-util = "0.1"
 nix = { version = "0.30.1", features = ["user", "fs"] }
 tokio-stream = "0.1"
-tower = "0.5"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winsvc", "winerror"] }
-windows-service = "0.7"
+async-stream = "0.3"
+futures-core = "0.3"
 known-folders = "1.3"
 windows = { version = "0.62", features = [
     "Win32",
@@ -141,6 +142,22 @@ windows = { version = "0.62", features = [
     "Win32_System_RemoteDesktop",
 ] }
 windows-acl = "0.3"
+windows-service = "0.7"
+windows-sys = { version = "0.61", features = [
+    # Core Win32 types
+    "Win32_Foundation",
+
+    # Security descriptors, ACLs, SDDL
+    "Win32_Security",
+    "Win32_Security_Authorization",
+
+    # Named pipes (CreateNamedPipeW)
+    "Win32_System_Pipes",
+
+    # HANDLE & file functions
+    "Win32_System_IO",
+    "Win32_System_Threading",
+] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
