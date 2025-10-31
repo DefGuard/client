@@ -56,7 +56,8 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
 
       - name: Build app
-        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        # Switch back to tauri-action when this gets merged https://github.com/tauri-apps/tauri/pull/14379
+        # uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
@@ -65,6 +66,7 @@ jobs:
           APPLE_ID: ${{ env.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+        run: cd src-tauri && cargo tauri build
 
       - name: Build installation package
         run: |
