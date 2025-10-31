@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
+DST="${PWD}/extension/BoringTun"
 CARGO="${HOME}/.cargo/bin/cargo"
 RUSTUP="${HOME}/.cargo/bin/rustup"
+
 export MACOSX_DEPLOYMENT_TARGET=13.5
 
 # Build BoringTun.
@@ -30,16 +32,14 @@ ${CARGO} run --release --bin uniffi-bindgen -- \
 
 # Install BoringTun framework.
 
-DST="${PWD}/extension"
-
-mkdir -p ${DST}/BoringTun
-cp -c target/uniffi/boringtun.swift ${DST}/BoringTun/
-rm -f -r ${DST}/BoringTun/boringtun.xcframework
+mkdir -p "${DST}"
+cp -c target/uniffi/boringtun.swift "${DST}/"
+rm -f -r "${DST}/boringtun.xcframework"
 xcodebuild -create-xcframework \
     -library target/universal/release/libboringtun.a \
     -headers target/uniffi \
     -output ${DST}/BoringTun/boringtun.xcframework
-cp -c target/uniffi/boringtunFFI.h ${DST}/BoringTun/
+cp -c target/uniffi/boringtunFFI.h "${DST}/"
 
 popd
 

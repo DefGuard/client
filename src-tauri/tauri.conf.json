@@ -41,7 +41,7 @@
       }
     },
     "macOS": {
-      "bundleVersion": "1",
+      "bundleVersion": "@BUILD_NUMBER@",
       "entitlements": "./Client.entitlements",
       "files": {
         "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
