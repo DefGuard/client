@@ -1,4 +1,6 @@
-use std::{fmt, net::IpAddr, str::FromStr};
+#[cfg(target_os = "macos")]
+use std::net::IpAddr;
+use std::{fmt, str::FromStr};
 
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
@@ -235,6 +237,7 @@ impl Location<Id> {
     }
 
     /// Split DNS settings into resolver IP addresses and search domains.
+    #[cfg(target_os = "macos")]
     pub(crate) fn dns(&self) -> (Vec<IpAddr>, Vec<String>) {
         let mut dns = Vec::new();
         let mut dns_search = Vec::new();

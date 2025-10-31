@@ -1,4 +1,6 @@
-use std::{env, path::Path, process::Command, str::FromStr, time::Duration};
+#[cfg(target_os = "macos")]
+use std::time::Duration;
+use std::{env, path::Path, process::Command, str::FromStr};
 
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
@@ -71,10 +73,8 @@ pub(crate) async fn setup_interface(
     };
     debug!("Found free port: {port} for interface {interface_name}.");
 
-    let (dns, dns_search) = location.dns();
-
     let interface_config = location
-        .interface_configurarion(&*DB_POOL, interface_name.clone(), preshared_key)
+        .interface_configurarion(pool, interface_name.clone(), preshared_key)
         .await?;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
