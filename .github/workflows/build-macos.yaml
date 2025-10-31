@@ -11,8 +11,9 @@ jobs:
       - self-hosted
       - macOS
     env:
-      APPLE_SIGNING_IDENTITY_APPLICATION: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
       APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_PROVIDER_SHORT_NAME: "82GZ7KN29J"
       APPLE_ID: "kamil@defguard.net"
       APPLE_TEAM_ID: "82GZ7KN29J"
     steps:
@@ -60,18 +61,14 @@ jobs:
         # uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY_APPLICATION }}
-          APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
-          APPLE_INSTALLER_IDENTITY: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
-          APPLE_PROVIDER_SHORT_NAME: 82GZ7KN29J
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: cd src-tauri && cargo tauri build
 
       - name: Build installation package
         run: |
           security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-          xcrun productbuild --sign "${APPLE_SIGNING_IDENTITY_INSTALLER}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
+          xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
           xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
           xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
           xcrun stapler staple defguard-client.pkg
