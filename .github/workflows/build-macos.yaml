@@ -63,7 +63,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: cd src-tauri && cargo tauri build
+        run: cd src-tauri && cargo tauri build --bundles app --target universal-apple-darwin
 
       - name: Build installation package
         run: |
@@ -80,5 +80,5 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: defguard-client.pkg
-          asset_name: defguard-client-${{ env.VERSION }}.pkg
+          asset_name: defguard-client-universal-${{ env.VERSION }}.pkg
           asset_content_type: application/octet-stream
