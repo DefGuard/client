@@ -38,7 +38,7 @@ rm -f -r "${DST}/boringtun.xcframework"
 xcodebuild -create-xcframework \
     -library target/universal/release/libboringtun.a \
     -headers target/uniffi \
-    -output ${DST}/BoringTun/boringtun.xcframework
+    -output ${DST}/boringtun.xcframework
 cp -c target/uniffi/boringtunFFI.h "${DST}/"
 
 popd
