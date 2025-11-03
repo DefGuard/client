@@ -533,7 +533,7 @@ impl ServiceLocationManager {
             name: location.name.clone(),
             prvkey: private_key.to_string(),
             addresses,
-            port: find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT) as u32,
+            port: find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
             peers: vec![peer.clone()],
             mtu: None,
         };
