@@ -41,11 +41,13 @@
       }
     },
     "macOS": {
-      "entitlements": null,
-      "exceptionDomain": "",
-      "frameworks": [],
-      "providerShortName": null,
-      "signingIdentity": null
+      "bundleVersion": "@BUILD_NUMBER@",
+      "entitlements": "./Client.entitlements",
+      "files": {
+        "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
+        "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
+      },
+      "minimumSystemVersion": "13.5"
     },
     "resources": [
       "resources/icons/*"

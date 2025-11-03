@@ -42,8 +42,6 @@ pub enum Error {
     NoToken,
     #[error("Failed to lock app state member.")]
     StateLockFail,
-    #[error("Failed to acquire lock on mutex. {0}")]
-    PoisonError(String),
     #[error("Failed to convert value. {0}")]
     ConversionError(String),
     #[error("JSON error: {0}")]

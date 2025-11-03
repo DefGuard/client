@@ -54,7 +54,7 @@ use crate::{
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 
-// Create new WireGuard interface
+/// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
     location_id: Id,
@@ -1009,7 +1009,7 @@ pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
 
 #[tauri::command(async)]
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
-    debug!("Received tunnel configuration to update: {tunnel:?}");
+    debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
     handle.emit(EventKey::LocationUpdate.into(), ())?;
@@ -1018,7 +1018,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
 
 #[tauri::command(async)]
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
-    debug!("Received tunnel configuration to save: {tunnel:?}");
+    debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
     handle.emit(EventKey::LocationUpdate.into(), ())?;
@@ -1042,7 +1042,6 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
 
     let tunnels = Tunnel::all(&*DB_POOL).await?;
     trace!("Found ({}) tunnels to get information about", tunnels.len());
-    trace!("Tunnels found: {tunnels:#?}");
     let mut tunnel_info = Vec::new();
     let active_tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
 
