@@ -1,8 +1,8 @@
 use clap::Parser;
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub const DEFAULT_LOG_DIR: &str = "/Logs/defguard-service";
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 pub const DEFAULT_LOG_DIR: &str = "/var/log/defguard-service";
 
 #[derive(Debug, Parser, Clone)]

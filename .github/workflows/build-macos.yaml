@@ -1,6 +1,15 @@
 name: Build macOS app
 on:
-  workflow_call:
+  push:
+    branches:
+      - main
+      - dev
+      - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+    tags:
+      - v*.*.*
 
 jobs:
   build-macos:

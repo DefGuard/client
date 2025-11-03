@@ -57,7 +57,7 @@ async fn startup(app_handle: &AppHandle) {
     // and they are still running after the restart. We sync them here to
     // reflect the real system's state.
     // TODO: Find a way to intercept the shutdown event and close all connections
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     {
         match sync_connections(app_handle).await {
             Ok(_) => {

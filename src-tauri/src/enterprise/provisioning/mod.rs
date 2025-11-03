@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fmt, fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -7,10 +7,24 @@ use crate::database::{models::instance::Instance, DB_POOL};
 
 const CONFIG_FILE_NAME: &str = "provisioning.json";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ProvisioningConfig {
     pub enrollment_url: String,
     pub enrollment_token: String,
+}
+
+impl fmt::Debug for ProvisioningConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            enrollment_url,
+            enrollment_token: _,
+        } = self;
+
+        f.debug_struct("ProvisioningConfig")
+            .field("enrollment_url", enrollment_url)
+            .field("enrollment_token", &"***")
+            .finish()
+    }
 }
 
 impl ProvisioningConfig {

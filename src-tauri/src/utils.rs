@@ -19,7 +19,7 @@ use windows_service::{
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
 use crate::export::{start_tunnel, stop_tunnel, tunnel_stats};
@@ -823,7 +823,7 @@ pub async fn get_tunnel_or_location_name(id: Id, connection_type: ConnectionType
 // Check if location/tunnel is connected and WireGuard Windows service is running.
 // `id`: location or tunnel Id
 // `name`: location or tunnel name
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 async fn check_connection(
     service_manager: &ServiceManager,
     id: Id,
@@ -907,7 +907,7 @@ async fn check_connection(
 // TODO: Move the connection handling to a seperate, common function,
 // so `handle_connection_for_location` and `handle_connection_for_tunnel` are not
 // partially duplicated here.
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
     let all_locations = Location::all(&*DB_POOL, false).await?;
