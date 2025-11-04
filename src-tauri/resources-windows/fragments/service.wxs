@@ -3,6 +3,7 @@
   <Fragment>
     <DirectoryRef Id="INSTALLDIR">
       <Component Id="DefguardServiceFragment">
+        <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\defguard-service.exe" />
         <ServiceInstall
           Account="LocalSystem"
           Id="DefguardService"
