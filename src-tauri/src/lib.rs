@@ -34,8 +34,8 @@ pub mod utils;
 pub mod wg_config;
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
-pub const MIN_CORE_VERSION: Version = Version::new(1, 5, 0);
-pub const MIN_PROXY_VERSION: Version = Version::new(1, 5, 0);
+pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
+pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
 pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
 pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
