@@ -9,7 +9,7 @@ export MACOSX_DEPLOYMENT_TARGET=13.5
 
 # Build BoringTun.
 
-pushd boringtun
+pushd ../../boringtun
 
 for TARGET in aarch64-apple-darwin x86_64-apple-darwin
 do
@@ -45,9 +45,9 @@ popd
 
 # Build VPNExtension.
 
-# if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
+if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
     CONFIG=Release
-# else
-#     CONFIG=Debug
-# fi
+else
+     CONFIG=Debug
+fi
 xcodebuild -project extension/VPNExtension.xcodeproj -target VPNExtension -configuration ${CONFIG} build

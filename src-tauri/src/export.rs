@@ -12,6 +12,7 @@ use swift_rs::{swift, SRObject, SRString};
 pub(crate) struct Stats {
     pub(crate) tx_bytes: u64,
     pub(crate) rx_bytes: u64,
+    pub(crate) last_handshake: u64,
 }
 
 swift!(pub(crate) fn start_tunnel(json: &SRString) -> bool);

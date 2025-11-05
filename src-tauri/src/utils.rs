@@ -147,7 +147,7 @@ pub(crate) async fn stats_handler(_pool: DbPool, name: String, _connection_type:
         interval.tick().await;
         // TODO: check all known localtions/tunnels, not just `name`.
         if let Some(stats) = unsafe { tunnel_stats(&name.as_str().into()) } {
-            info!("Tunnel stats: {} {}", stats.tx_bytes, stats.rx_bytes);
+            info!("Tunnel stats: {} {} {}", stats.last_handshake, stats.tx_bytes, stats.rx_bytes);
         }
     }
 }

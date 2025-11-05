@@ -1,5 +1,4 @@
-use core::fmt;
-use std::time::SystemTime;
+use std::{fmt, time::SystemTime};
 
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;

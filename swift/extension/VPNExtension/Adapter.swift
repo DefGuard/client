@@ -112,7 +112,7 @@ enum State {
     // Obtain tunnel statistics.
     func stats() -> Stats? {
         if let stats = tunnel?.stats() {
-            return Stats(txBytes: stats.txBytes, rxBytes: stats.rxBytes)
+            return Stats(txBytes: stats.txBytes, rxBytes: stats.rxBytes, lastHandshake: stats.lastHandshake)
         }
         return nil
     }
