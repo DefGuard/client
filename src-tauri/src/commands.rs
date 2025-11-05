@@ -46,9 +46,9 @@ use crate::{
     },
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        disconnect_interface, execute_command, get_location_interface_details,
-        get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
-        handle_connection_for_tunnel,
+        construct_platform_header, disconnect_interface, execute_command,
+        get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
+        handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
@@ -1273,4 +1273,10 @@ pub fn get_provisioning_config(
         .clone();
     trace!("Returning config: {res:?}");
     Ok(res)
+}
+
+#[tauri::command]
+#[must_use]
+pub fn get_platform_header() -> String {
+    construct_platform_header()
 }

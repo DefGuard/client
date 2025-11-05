@@ -11,7 +11,6 @@ import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import {
@@ -81,6 +80,7 @@ export const MFAModal = () => {
       return instances.find((i) => i.id === instanceId);
     }
   }, [location, instances]);
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   const resetState = () => {
     reset();
@@ -121,6 +121,8 @@ export const MFAModal = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          CLIENT_VERSION_HEADER: platformInfo.client_version,
+          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
         },
         body: JSON.stringify(data),
       });
@@ -176,6 +178,7 @@ export const MFAModal = () => {
       location,
       selectedInstance,
       toaster.error,
+      platformInfo,
     ],
   );
 
@@ -433,6 +436,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
   const location = useMFAModal((state) => state.instance);
   const closeModal = useMFAModal((state) => state.close);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   useEffect(() => {
     const TIMEOUT_DURATION = 5 * 1000 * 60; // 5 minutes timeout
@@ -450,6 +454,8 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          CLIENT_VERSION_HEADER: platformInfo.client_version,
+          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
         },
         body: JSON.stringify(body_token),
       });
@@ -503,7 +509,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       clearInterval(interval);
       clearTimeout(timeoutId);
     };
-  }, [proxyUrl, token, location, closeModal, localLL.errors, toaster]);
+  }, [proxyUrl, token, location, closeModal, localLL.errors, toaster, platformInfo]);
 
   return (
     <div className="mfa-modal-content">
@@ -552,6 +558,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
   const [mfaError, setMFAError] = useState('');
 
   const localLL = LL.modals.mfa.authentication;
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   const schema = useMemo(
     () =>
@@ -570,6 +577,8 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       },
       body: JSON.stringify(data),
     });

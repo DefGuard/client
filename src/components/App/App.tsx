@@ -4,8 +4,10 @@ import '../../shared/scss/index.scss';
 
 import { QueryClient } from '@tanstack/query-core';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { getVersion } from '@tauri-apps/api/app';
 import { debug, info } from '@tauri-apps/plugin-log';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { exit } from '@tauri-apps/plugin-process';
 import dayjs from 'dayjs';
 import customParseData from 'dayjs/plugin/customParseFormat';
 import duration from 'dayjs/plugin/duration';
@@ -15,6 +17,7 @@ import timezone from 'dayjs/plugin/timezone';
 import updateLocale from 'dayjs/plugin/updateLocale';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { localStorageDetector } from 'typesafe-i18n/detectors';
 import TypesafeI18n from '../../i18n/i18n-react';
@@ -22,6 +25,7 @@ import { detectLocale } from '../../i18n/i18n-util';
 import { loadLocaleAsync } from '../../i18n/i18n-util.async';
 import { ClientPage } from '../../pages/client/ClientPage';
 import { clientApi } from '../../pages/client/clientAPI/clientApi';
+import type { PlatformInfo } from '../../pages/client/clientAPI/types';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { CarouselPage } from '../../pages/client/pages/CarouselPage/CarouselPage';
 import { ClientAddedPage } from '../../pages/client/pages/ClientAddedPage/ClientAddedPage';
@@ -38,8 +42,6 @@ import { useTheme } from '../../shared/defguard-ui/hooks/theme/useTheme';
 import { ThemeProvider } from '../../shared/providers/ThemeProvider/ThemeProvider';
 import { routes } from '../../shared/routes';
 import { ApplicationUpdateManager } from '../ApplicationUpdateManager/ApplicationUpdateManager';
-import { exit } from '@tauri-apps/plugin-process';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 dayjs.extend(duration);
 dayjs.extend(utc);
@@ -127,12 +129,13 @@ export const App = () => {
   const localeLoadRef = useRef(false);
   const [localeLoaded, setWasLoaded] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [platformInfoLoaded, setPlatformInfoLoaded] = useState(false);
   const setClientState = useClientStore((state) => state.setState);
   const { changeTheme } = useTheme();
 
   const appLoaded = useMemo(
-    () => localeLoaded && settingsLoaded,
-    [localeLoaded, settingsLoaded],
+    () => localeLoaded && settingsLoaded && platformInfoLoaded,
+    [localeLoaded, settingsLoaded, platformInfoLoaded],
   );
 
   // load locales
@@ -190,9 +193,25 @@ export const App = () => {
 
   // register ctrl+q keyboard shortcut
   useHotkeys('ctrl+q', () => {
-      info("Ctrl-Q pressed, exiting.");
-      exit(0);
+    info('Ctrl-Q pressed, exiting.');
+    exit(0);
   });
+
+  useEffect(() => {
+    const loadPlatformInfo = async () => {
+      debug('Loading platform info from Tauri');
+      const version = await getVersion().catch(() => 'unknown');
+      const platformHeader = await clientApi.getPlatformHeader();
+      const platformInfo: PlatformInfo = {
+        client_version: `${version}`,
+        platform_info: platformHeader,
+      };
+      setClientState({ platformInfo });
+      debug('Platform info loaded from Tauri');
+      setPlatformInfoLoaded(true);
+    };
+    void loadPlatformInfo();
+  }, [setClientState]);
 
   if (!appLoaded) return null;
 

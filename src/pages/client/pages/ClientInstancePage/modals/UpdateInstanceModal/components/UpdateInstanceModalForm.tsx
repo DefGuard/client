@@ -5,7 +5,6 @@ import { useMemo } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
-
 import { useI18nContext } from '../../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -42,6 +41,7 @@ export const UpdateInstanceModalForm = () => {
   const toaster = useToaster();
   const queryClient = useQueryClient();
   const setClientState = useClientStore((s) => s.setState, shallow);
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   const defaultValues = useMemo(
     (): FormFields => ({
@@ -85,9 +85,10 @@ export const UpdateInstanceModalForm = () => {
     };
 
     const endpointUrl = url();
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      CLIENT_VERSION_HEADER: platformInfo.client_version,
+      CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
     };
 
     const data = {

@@ -958,3 +958,35 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
 
     Ok(())
 }
+
+/// Get generic OS name (linux, windows, macos, etc.)
+#[must_use]
+const fn get_os_family() -> &'static str {
+    #[cfg(target_os = "linux")]
+    return "linux";
+
+    #[cfg(target_os = "windows")]
+    return "windows";
+
+    #[cfg(target_os = "macos")]
+    return "macos";
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    return "unknown";
+}
+
+#[must_use]
+pub(crate) fn construct_platform_header() -> String {
+    let os = os_info::get();
+    format!(
+        "os_family={}; os_type={}; version={}; edition={}; codename={}; bitness={}; architecture={}",
+        get_os_family(),
+        // OS type may be more specific, e.g. "Ubuntu", "Debian" but also may not: "Windows", "Mac OS"
+        os.os_type(),
+        os.version(),
+        os.edition().unwrap_or(""),
+        os.codename().unwrap_or(""),
+        os.bitness(),
+        os.architecture().unwrap_or("")
+    )
+}

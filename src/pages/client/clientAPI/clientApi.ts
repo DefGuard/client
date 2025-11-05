@@ -133,6 +133,9 @@ const getAppConfig = async (): Promise<AppConfig> =>
 const getProvisioningConfig = async (): Promise<ProvisioningConfig | null> =>
   invokeWrapper('get_provisioning_config');
 
+const getPlatformHeader = async (): Promise<string> =>
+  invokeWrapper('get_platform_header');
+
 const setAppConfig = async (
   appConfig: Partial<AppConfig>,
   emitEvent: boolean,
@@ -169,4 +172,5 @@ export const clientApi = {
   startGlobalLogWatcher,
   stopGlobalLogWatcher,
   getProvisioningConfig,
+  getPlatformHeader,
 };

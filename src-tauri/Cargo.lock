@@ -1406,6 +1406,7 @@ dependencies = [
  "known-folders",
  "log",
  "nix",
+ "os_info",
  "prost",
  "regex",
  "reqwest",

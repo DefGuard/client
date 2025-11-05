@@ -82,6 +82,11 @@ export type AppConfig = {
   peer_alive_period: number;
 };
 
+export type PlatformInfo = {
+  client_version: string;
+  platform_info: string;
+};
+
 export type ProvisioningConfig = {
   enrollment_token: string;
   enrollment_url: string;
@@ -148,4 +153,5 @@ export type TauriCommandKey =
   | 'stop_global_logwatcher'
   | 'command_get_app_config'
   | 'command_set_app_config'
-  | 'get_provisioning_config';
+  | 'get_provisioning_config'
+  | 'get_platform_header';
