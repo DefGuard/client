@@ -153,9 +153,6 @@
                 {{/each~}}
                 {{/each~}}
             </Component>
-            <Component Id="defguard_client" Guid="AD28904E-F21D-47F8-9AA5-4D0C18CF30F8" Win64="$(var.Win64)">
-                <File Id="Bin_defguard_client" Source="..\..\defguard-client.exe" KeyPath="yes"/>
-            </Component>
             {{#if enable_elevated_update_task}}
             <Component Id="UpdateTask" Guid="C492327D-9720-4CD5-8DB8-F09082AF44BE" Win64="$(var.Win64)">
                 <File Id="UpdateTask" Source="update.xml" KeyPath="yes" Checksum="yes"/>
@@ -251,7 +248,6 @@
                 Level="1"
                 Absent="allow">
             <ComponentRef Id="Path"/>
-            <ComponentRef Id="defguard_client"/>
             </Feature>
         </Feature>
 
