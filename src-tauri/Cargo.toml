@@ -38,12 +38,20 @@ name = "defguard-client"
 description = "Defguard desktop client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
+autobins = false
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
+
+[[bin]]
+name = "defguard-client"
+
+[[bin]]
+name = "defguard-service"
+required-features = ["service"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
