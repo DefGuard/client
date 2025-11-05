@@ -121,7 +121,7 @@ x25519-dalek = { version = "2", features = [
     "serde",
     "static_secrets",
 ] }
-os_info = "3.12.0"
+os_info = "3.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 swift-rs = "1.0"
