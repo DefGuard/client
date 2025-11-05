@@ -1,4 +1,9 @@
 {
+  "build": {
+    "features": [
+      "service"
+    ]
+  },
   "bundle": {
     "targets": [
       "msi"
