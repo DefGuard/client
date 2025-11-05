@@ -3,7 +3,7 @@
 //! This binary is meant to run as a daemon with root privileges
 //! and communicate with the desktop client over HTTP.
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     use clap::Parser;
@@ -17,6 +17,10 @@ async fn main() -> anyhow::Result<()> {
     run_server(config).await?;
 
     Ok(())
+}
+#[cfg(target_os = "macos")]
+fn main() {
+    println!("defguard-service is not supported on macOS");
 }
 
 #[cfg(windows)]
