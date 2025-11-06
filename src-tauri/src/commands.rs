@@ -13,6 +13,14 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(not(target_os = "macos"))]
+use crate::service::{
+    proto::{
+        DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        ServiceLocation,
+    },
+    utils::DAEMON_CLIENT,
+};
 use crate::{
     active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
@@ -37,13 +45,6 @@ use crate::{
         service_log_watcher::stop_log_watcher_task,
     },
     proto::DeviceConfigResponse,
-    service::{
-        proto::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-            ServiceLocation,
-        },
-        utils::DAEMON_CLIENT,
-    },
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         disconnect_interface, execute_command, get_location_interface_details,
@@ -246,13 +247,13 @@ pub async fn save_device_config(
     let mut instance: Instance = instance_info.into();
     if response.token.is_some() {
         debug!(
-            "The newly saved device config has a polling token, automatic configuration \
-            polling will be possible if the core has an enterprise license."
+            "The newly saved device config has a polling token, automatic configuration polling \
+            will be possible if the core has an enterprise license."
         );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an \
-            update, configuration polling won't work",
+            "Missing polling token for instance {}, core and/or proxy services may need an update, \
+            configuration polling won't work",
             instance.name,
         );
     }
@@ -290,10 +291,30 @@ pub async fn save_device_config(
     transaction.commit().await?;
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
+
+    push_service_locations(&instance).await;
+
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
+        locations,
+        instance,
+    };
+    reload_tray_menu(&handle).await;
+
+    Ok(res)
+}
+
+#[cfg(target_os = "macos")]
+async fn push_service_locations(instance: &Instance<Id>) {
+    // Nothing here... yet
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn push_service_locations(instance: &Instance) {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
-    let mut service_locations = Vec::<ServiceLocation>::new();
+    let mut service_locations = Vec::new();
 
     for saved_location in &locations {
         if saved_location.is_service_location() {
@@ -333,15 +354,6 @@ pub async fn save_device_config(
             instance.name, instance.id,
         );
     }
-
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
-    let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
-        locations,
-        instance,
-    };
-    reload_tray_menu(&handle).await;
-
-    Ok(res)
 }
 
 #[tauri::command(async)]
@@ -582,7 +594,7 @@ pub(crate) async fn do_update_instance(
         "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
-    let mut service_locations = Vec::<ServiceLocation>::new();
+    let mut service_locations = Vec::new();
 
     // check if locations have changed
     if locations_changed {
@@ -591,7 +603,7 @@ pub(crate) async fn do_update_instance(
             "Updating locations for instance {}({}).",
             instance.name, instance.id
         );
-        // fetch existing locations for given instance
+        // Fetch existing locations for a given instance.
         let mut current_locations =
             Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
         for dev_config in response.configs {

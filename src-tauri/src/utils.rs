@@ -23,6 +23,11 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
 use crate::export::{start_tunnel, stop_tunnel, tunnel_stats};
+#[cfg(not(target_os = "macos"))]
+use crate::service::{
+    proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
+    utils::DAEMON_CLIENT,
+};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -40,10 +45,6 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    service::{
-        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
-        utils::DAEMON_CLIENT,
-    },
     ConnectionType,
 };
 
@@ -145,9 +146,12 @@ pub(crate) async fn stats_handler(_pool: DbPool, name: String, _connection_type:
 
     loop {
         interval.tick().await;
-        // TODO: check all known localtions/tunnels, not just `name`.
+        // TODO: check all known locations/tunnels, not just `name`.
         if let Some(stats) = unsafe { tunnel_stats(&name.as_str().into()) } {
-            info!("Tunnel stats: {} {} {}", stats.last_handshake, stats.tx_bytes, stats.rx_bytes);
+            info!(
+                "Tunnel stats: {} {} {}",
+                stats.last_handshake, stats.tx_bytes, stats.rx_bytes
+            );
         }
     }
 }
@@ -414,41 +418,46 @@ pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<S
             interface_config.name
         );
     }
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-        error!(
-            "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
-            interface_config.name
-        );
-        Err(Error::InternalError(format!(
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+            error!(
+                "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
+                interface_config.name
+            );
+            return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
             interface_config.name,
             error.message()
-        )))
-    } else {
-        info!(
-            "Network interface {} for tunnel {tunnel} created successfully.",
-            interface_config.name
-        );
-        if let Some(post_up) = &tunnel.post_up {
-            debug!(
-                "Executing defined PostUp command after setting up the interface {} for the \
-                tunnel {tunnel}: {post_up}",
+        )));
+        } else {
+            info!(
+                "Network interface {} for tunnel {tunnel} created successfully.",
                 interface_config.name
             );
-            let _ = execute_command(post_up);
-            info!(
-                "Executed defined PostUp command after setting up the interface {} for the \
+            if let Some(post_up) = &tunnel.post_up {
+                debug!(
+                    "Executing defined PostUp command after setting up the interface {} for the \
                 tunnel {tunnel}: {post_up}",
+                    interface_config.name
+                );
+                let _ = execute_command(post_up);
+                info!(
+                    "Executed defined PostUp command after setting up the interface {} for the \
+                tunnel {tunnel}: {post_up}",
+                    interface_config.name
+                );
+            }
+            debug!(
+                "Created interface {} with config: {interface_config:?}",
                 interface_config.name
             );
         }
-        debug!(
-            "Created interface {} with config: {interface_config:?}",
-            interface_config.name
-        );
-        Ok(interface_name)
     }
+
+    Ok(interface_name)
 }
 
 pub async fn get_tunnel_interface_details(

@@ -37,7 +37,8 @@
         "componentRefs": [
           "DefguardServiceFragment",
           "ProvisioningScriptFragment"
-        ]
+        ],
+        "template": "./resources-windows/msi/main.wxs"
       }
     },
     "macOS": {

@@ -1,4 +1,6 @@
-use std::{io::stdout, sync::LazyLock};
+use std::io::stdout;
+#[cfg(not(target_os = "macos"))]
+use std::sync::LazyLock;
 
 use hyper_util::rt::TokioIo;
 #[cfg(windows)]
@@ -22,6 +24,7 @@ use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 use crate::service::named_pipe::PIPE_NAME;
 use crate::service::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
 
+#[cfg(not(target_os = "macos"))]
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {
         debug!("Setting up gRPC client");
