@@ -660,7 +660,25 @@ pub(crate) async fn do_update_instance(
 
     if service_locations.is_empty() {
         debug!(
-            "No service locations to process for instance {}({})",
+            "No service locations for instance {}({}), removing all existing service locations connections if there are any.",
+            instance.name, instance.id
+        );
+        let delete_request = DeleteServiceLocationsRequest {
+            instance_id: instance.uuid.clone(),
+        };
+        DAEMON_CLIENT
+            .clone()
+            .delete_service_locations(delete_request)
+            .await
+            .map_err(|err| {
+                error!(
+                    "Error while deleting service locations from the daemon for instance {}({}): {err}",
+                    instance.name, instance.id,
+                );
+                Error::InternalError(err.to_string())
+            })?;
+        debug!(
+            "Successfully removed all service locations from daemon for instance {}({})",
             instance.name, instance.id
         );
     } else {
