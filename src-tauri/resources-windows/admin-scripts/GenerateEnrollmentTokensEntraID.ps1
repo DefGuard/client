@@ -44,37 +44,74 @@ function Invoke-AuthenticatedRestMethod {
 }
 
 
-# Function to find user in Entra ID by username using Microsoft.Graph module
+# Function to find user in Entra ID by email address using Microsoft.Graph module
 function Get-EntraIDUser {
     param(
-        [string]$Username
+        [string]$Email
     )
     
-    # Try different user properties to find the user
-    try {
-        # Try by UserPrincipalName first
-        $user = Get-MgUser -Filter "userPrincipalName eq '$Username'" -ErrorAction Stop
-        if ($user) { return $user }
-    } catch { }
+    Write-Host "    Searching for user with email: $Email" -ForegroundColor Cyan
     
+    # Try to find user by mail (primary email)
     try {
-        # Try by mail
-        $user = Get-MgUser -Filter "mail eq '$Username'" -ErrorAction Stop
-        if ($user) { return $user }
-    } catch { }
+        Write-Host "      Trying search by 'mail' property..." -ForegroundColor Gray
+        $user = Get-MgUser -Filter "mail eq '$Email'" -ErrorAction Stop
+        if ($user) { 
+            Write-Host "    Found user by mail: $($user.UserPrincipalName)" -ForegroundColor Green
+            return $user 
+        }
+    } 
+    catch { 
+        Write-Host "      Error searching by mail: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "      Full error details:" -ForegroundColor Red
+        Write-Host "        Exception Type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+        Write-Host "        Inner Exception: $($_.Exception.InnerException.Message)" -ForegroundColor Red
+    }
     
+    # Try to find user by userPrincipalName (often matches email)
     try {
-        # Try by display name
-        $user = Get-MgUser -Filter "displayName eq '$Username'" -ErrorAction Stop
-        if ($user) { return $user }
-    } catch { }
+        Write-Host "      Trying search by 'userPrincipalName' property..." -ForegroundColor Gray
+        $user = Get-MgUser -Filter "userPrincipalName eq '$Email'" -ErrorAction Stop
+        if ($user) { 
+            Write-Host "    Found user by userPrincipalName: $($user.UserPrincipalName)" -ForegroundColor Green
+            return $user 
+        }
+    } 
+    catch { 
+        Write-Host "      Error searching by userPrincipalName: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "      Full error details:" -ForegroundColor Red
+        Write-Host "        Exception Type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+        Write-Host "        Inner Exception: $($_.Exception.InnerException.Message)" -ForegroundColor Red
+    }
     
+    # Try other mail properties if the above don't work
     try {
-        # Try starts with userPrincipalName
-        $user = Get-MgUser -Filter "startswith(userPrincipalName,'$Username@')" -ErrorAction Stop
-        if ($user) { return $user }
-    } catch { }
+        Write-Host "      Trying search by 'otherMails' property..." -ForegroundColor Gray
+        $user = Get-MgUser -Filter "otherMails/any(m:m eq '$Email')" -ErrorAction Stop
+        if ($user) { 
+            Write-Host "    Found user by otherMails: $($user.UserPrincipalName)" -ForegroundColor Green
+            return $user 
+        }
+    } 
+    catch { 
+        Write-Host "      Error searching by otherMails: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "      Full error details:" -ForegroundColor Red
+        Write-Host "        Exception Type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+        Write-Host "        Inner Exception: $($_.Exception.InnerException.Message)" -ForegroundColor Red
+    }
     
+    # Try a broader search to see if we can find any users at all
+    try {
+        Write-Host "      Testing basic user query..." -ForegroundColor Gray
+        $testUser = Get-MgUser -Top 1 -ErrorAction Stop
+        Write-Host "      Basic user query successful - permissions appear valid" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "      Basic user query failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "      This suggests a permissions issue with User.ReadWrite.All" -ForegroundColor Red
+    }
+    
+    Write-Host "    User not found in Entra ID for email: $Email" -ForegroundColor Yellow
     return $null
 }
 
@@ -92,8 +129,8 @@ function Set-EntraIDUserEnrollmentToken {
         $attributes = @{
             "$AttributeSetName" = @{
                 "@odata.type" = "#microsoft.graph.customSecurityAttributeValue"
-                "enrollmentToken" = $EnrollmentToken
-                "enrollmentUrl" = $EnrollmentUrl
+                "EnrollmentToken" = $EnrollmentToken
+                "EnrollmentUrl" = $EnrollmentUrl
             }
         }
         
@@ -107,12 +144,6 @@ function Set-EntraIDUserEnrollmentToken {
         Write-Host "  Failed to update Entra ID custom security attributes for user ID: $UserId" -ForegroundColor Red
         Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
         
-        # Check if it's a permissions error
-        if ($_.Exception.Message -like "*403*" -or $_.Exception.Message -like "*Forbidden*") {
-            Write-Host "  This is likely a permissions issue. Ensure the current user has:" -ForegroundColor Yellow
-            Write-Host "  - CustomSecurityAttributes.ReadWrite.All permission" -ForegroundColor Yellow
-            Write-Host "  - User.ReadWrite.All permission" -ForegroundColor Yellow
-        }
         return $false
     }
 }
@@ -121,33 +152,35 @@ function Set-EntraIDUserEnrollmentToken {
 Write-Host "Starting enrollment token generation for Entra ID users in group: $GroupName" -ForegroundColor Green
 
 # Check for Microsoft.Graph module and install/import if needed
+Write-Host "Setting up Microsoft.Graph modules..." -ForegroundColor Yellow
+
+# Install only the specific modules we need to avoid function capacity issues
 $requiredModules = @(
     "Microsoft.Graph.Authentication",
-    "Microsoft.Graph.Users",
-    "Microsoft.Graph.Users.Actions"
+    "Microsoft.Graph.Users"
 )
 
 foreach ($module in $requiredModules) {
-    if (-not (Get-Module -ListAvailable -Name $module)) {
-        Write-Host "$module module is required but not installed. Attempting to install..." -ForegroundColor Yellow
-        try {
+    try {
+        # Check if module is installed
+        if (-not (Get-Module -ListAvailable -Name $module)) {
+            Write-Host "$module module is required but not installed. Attempting to install..." -ForegroundColor Yellow
             Install-Module $module -Scope CurrentUser -Force -ErrorAction Stop
             Write-Host "$module module installed successfully" -ForegroundColor Green
+        } else {
+            # Update to latest version to avoid dependency issues
+            Write-Host "Updating $module module to latest version..." -ForegroundColor Yellow
+            Update-Module $module -Force -ErrorAction SilentlyContinue
+            Write-Host "$module module is up to date" -ForegroundColor Green
         }
-        catch {
-            Write-Error "Failed to install $module module: $($_.Exception.Message)"
-            Write-Host "Please install it manually using: Install-Module $module -Scope CurrentUser" -ForegroundColor Red
-            exit 1
-        }
-    }
-    
-    # Import the module
-    try {
+        
+        # Import the module
         Import-Module $module -Force -ErrorAction Stop
         Write-Host "$module module imported successfully" -ForegroundColor Green
     }
     catch {
-        Write-Error "Failed to import $module module: $($_.Exception.Message)"
+        Write-Error "Failed to setup $module module: $($_.Exception.Message)"
+        Write-Host "Please try installing manually: Install-Module $module -Scope CurrentUser -Force" -ForegroundColor Red
         exit 1
     }
 }
@@ -167,17 +200,17 @@ try {
         # Try authentication methods in order of preference                                                                                 
         Write-Host "Attempting authentication methods..." -ForegroundColor Cyan                                                             
                                                                                                                                             
-        # Method 1: Try integrated Windows authentication (best for domain-joined)                                                          
+        # Method 1: Try interactive browser authentication                                                                                    
         try {                                                                                                                               
-            Write-Host "Trying Integrated Windows Authentication..." -ForegroundColor Yellow                                                
-            Connect-MgGraph -Scopes @('CustomSecAttributeAssignment.ReadWrite.All', 'User.ReadWrite.All') -UseDeviceCode -ErrorAction Stop      
-            Write-Host "Successfully connected using device code flow" -ForegroundColor Green                                               
-        }                                                                                                                                   
-        catch {                                                                                                                             
-            # Method 2: Fall back to interactive browser                                                                                    
-            Write-Host "Device code flow failed, trying interactive browser..." -ForegroundColor Yellow                                     
+            Write-Host "Trying interactive browser authentication" -ForegroundColor Yellow                                     
             Connect-MgGraph -Scopes @('CustomSecAttributeAssignment.ReadWrite.All', 'User.ReadWrite.All') -ErrorAction Stop                     
             Write-Host "Successfully connected using interactive authentication" -ForegroundColor Green                                     
+        }                                                                                                                                   
+        catch {                                                                                                                             
+            # Method 2: Fall back to device code authentication                                                                                    
+            Write-Host "Interactive browser authentication failed, trying device code flow..." -ForegroundColor Yellow                                     
+            Connect-MgGraph -Scopes @('CustomSecAttributeAssignment.ReadWrite.All', 'User.ReadWrite.All') -UseDeviceCode -ErrorAction Stop      
+            Write-Host "Successfully connected using device code flow" -ForegroundColor Green                                               
         }                                                                                                                                   
     }                                                                                                                                       
 }                                                                                                                                           
@@ -216,11 +249,32 @@ Write-Host "Found $($usernames.Count) members in the group" -ForegroundColor Gre
 $enrollmentTokens = @()
 $entraUpdateResults = @()
 
-# Loop through each user and generate enrollment token, then update Entra ID
+# Loop through each username, fetch user details to get email, then generate enrollment token and update Entra ID
 foreach ($username in $usernames) {
     Write-Host "Processing user: $username" -ForegroundColor Cyan
     
-    # Generate enrollment token from Defguard
+    # Get user details from Defguard to fetch email
+    $userDetailsEndpoint = "api/v1/user/$username"
+    $userDetailsResponse = Invoke-AuthenticatedRestMethod -Method "GET" -Endpoint $userDetailsEndpoint
+    
+    if (-not $userDetailsResponse -or -not $userDetailsResponse.user -or -not $userDetailsResponse.user.email) {
+        Write-Host "  Failed to fetch user details or email not found for user: $username" -ForegroundColor Red
+        $entraUpdateResults += @{
+            username = $username
+            email = $null
+            entra_id = $null
+            user_principal_name = $null
+            success = $false
+            enrollment_token = $null
+            enrollment_url = $null
+        }
+        continue
+    }
+    
+    $userEmail = $userDetailsResponse.user.email
+    Write-Host "  Found email: $userEmail" -ForegroundColor Green
+    
+    # Generate enrollment token from Defguard using username
     $enrollmentEndpoint = "api/v1/user/$username/start_enrollment"
     $requestBody = @{
         email = $null
@@ -232,9 +286,9 @@ foreach ($username in $usernames) {
     if ($enrollmentResponse) {
         Write-Host "  Enrollment token generated for $username" -ForegroundColor Green
         
-        # Find user in Entra ID
-        Write-Host "  Searching for user in Entra ID..." -ForegroundColor Yellow
-        $entraUser = Get-EntraIDUser -Username $username
+        # Find user in Entra ID by email
+        Write-Host "  Searching for user in Entra ID by email..." -ForegroundColor Yellow
+        $entraUser = Get-EntraIDUser -Email $userEmail
         
         if ($entraUser) {
             Write-Host "  Found user in Entra ID: $($entraUser.UserPrincipalName) (ID: $($entraUser.Id))" -ForegroundColor Green
@@ -244,6 +298,7 @@ foreach ($username in $usernames) {
             
             $entraUpdateResults += @{
                 username = $username
+                email = $userEmail
                 entra_id = $entraUser.Id
                 user_principal_name = $entraUser.UserPrincipalName
                 success = $updateResult
@@ -252,9 +307,10 @@ foreach ($username in $usernames) {
             }
         }
         else {
-            Write-Host "  User $username not found in Entra ID" -ForegroundColor Red
+            Write-Host "  User with email $userEmail not found in Entra ID" -ForegroundColor Red
             $entraUpdateResults += @{
                 username = $username
+                email = $userEmail
                 entra_id = $null
                 user_principal_name = $null
                 success = $false
@@ -267,6 +323,7 @@ foreach ($username in $usernames) {
         Write-Host "  Failed to generate enrollment token for $username" -ForegroundColor Red
         $entraUpdateResults += @{
             username = $username
+            email = $userEmail
             entra_id = $null
             user_principal_name = $null
             success = $false
