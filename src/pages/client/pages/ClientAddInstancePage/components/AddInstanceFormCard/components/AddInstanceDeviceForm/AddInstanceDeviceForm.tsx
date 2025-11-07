@@ -41,6 +41,7 @@ export const AddInstanceDeviceForm = () => {
   const localLL = LL.pages.client.pages.addInstancePage.forms.device;
   const toaster = useToaster();
   const setClientStore = useClientStore((state) => state.setState);
+  const platformInfo = useClientStore((state) => state.platformInfo);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const response = useAddInstanceStore((s) => s.response as AddInstanceInitResponse);
@@ -91,9 +92,12 @@ export const AddInstanceDeviceForm = () => {
       name: values.name,
       pubkey: publicKey,
     };
+
     const headers = {
       'Content-Type': 'application/json',
       Cookie: cookie,
+      CLIENT_VERSION_HEADER: platformInfo.client_version,
+      CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
     };
     try {
       await fetch(`${proxyUrl}/enrollment/create_device`, {

@@ -2,8 +2,10 @@
 use std::time::Duration;
 use std::{env, path::Path, process::Command, str::FromStr};
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
+use prost::Message;
 use sqlx::query;
 #[cfg(target_os = "macos")]
 use swift_rs::SRString;
@@ -40,6 +42,7 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
+    proto::ClientPlatformInfo,
     service::{
         proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
         utils::DAEMON_CLIENT,
@@ -957,4 +960,25 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Active connections synchronized with the system state");
 
     Ok(())
+}
+
+#[must_use]
+pub(crate) fn construct_platform_header() -> String {
+    let os = os_info::get();
+
+    let platform_info = ClientPlatformInfo {
+        os_family: std::env::consts::OS.to_string(),
+        os_type: os.os_type().to_string(),
+        version: os.version().to_string(),
+        edition: os.edition().map(str::to_string),
+        codename: os.codename().map(str::to_string),
+        bitness: Some(os.bitness().to_string()),
+        architecture: os.architecture().map(str::to_string),
+    };
+
+    debug!("Constructed platform info header: {platform_info:?}");
+
+    let buffer = platform_info.encode_to_vec();
+
+    BASE64_STANDARD.encode(buffer)
 }
