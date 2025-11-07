@@ -295,7 +295,7 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
-// helper function to get log file directory for the defguard-service daemon
+/// Helper function to get log file directory for `defguard-service` daemon.
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
     #[cfg(windows)]
@@ -400,27 +400,27 @@ pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<S
         peers: vec![peer.clone()],
         mtu: None,
     };
-    debug!("Creating interface {interface_config:?}");
-    let request = CreateInterfaceRequest {
-        config: Some(interface_config.clone().into()),
-        dns: tunnel.dns.clone(),
-    };
-    if let Some(pre_up) = &tunnel.pre_up {
-        debug!(
-            "Executing defined PreUp command before setting up the interface {} for the \
-            tunnel {tunnel}: {pre_up}",
-            interface_config.name
-        );
-        let _ = execute_command(pre_up);
-        info!(
-            "Executed defined PreUp command before setting up the interface {} for the \
-            tunnel {tunnel}: {pre_up}",
-            interface_config.name
-        );
-    }
 
     #[cfg(not(target_os = "macos"))]
     {
+        debug!("Creating interface {interface_config:?}");
+        let request = CreateInterfaceRequest {
+            config: Some(interface_config.clone().into()),
+            dns: tunnel.dns.clone(),
+        };
+        if let Some(pre_up) = &tunnel.pre_up {
+            debug!(
+                "Executing defined PreUp command before setting up the interface {} for the \
+            tunnel {tunnel}: {pre_up}",
+                interface_config.name
+            );
+            let _ = execute_command(pre_up);
+            info!(
+                "Executed defined PreUp command before setting up the interface {} for the \
+            tunnel {tunnel}: {pre_up}",
+                interface_config.name
+            );
+        }
         if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
             error!(
                 "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
@@ -669,7 +669,6 @@ pub(crate) async fn disconnect_interface(
         "Disconnecting interface {}.",
         active_connection.interface_name
     );
-    let mut client = DAEMON_CLIENT.clone();
     let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
@@ -689,7 +688,7 @@ pub(crate) async fn disconnect_interface(
                     let name: SRString = location.name.as_str().into();
                     stop_tunnel(&name)
                 };
-                error!("stop_tunnel() returned {result:?}");
+                error!("stop_tunnel() for location returned {result:?}");
                 if !result {
                     return Err(Error::InternalError("Error from Swift".into()));
                 }
@@ -697,6 +696,7 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(not(target_os = "macos"))]
             {
+                let mut client = DAEMON_CLIENT.clone();
                 let request = RemoveInterfaceRequest {
                     interface_name,
                     endpoint: location.endpoint.clone(),
@@ -758,19 +758,35 @@ pub(crate) async fn disconnect_interface(
                     active_connection.interface_name
                 );
             }
-            let request = RemoveInterfaceRequest {
-                interface_name,
-                endpoint: tunnel.endpoint.clone(),
-            };
-            if let Err(error) = client.remove_interface(request).await {
-                error!(
-                    "Error while removing interface {}, error details: {error:?}",
-                    active_connection.interface_name
-                );
-                return Err(Error::InternalError(format!(
-                    "Failed to remove interface, error message: {}",
-                    error.message()
-                )));
+
+            #[cfg(target_os = "macos")]
+            {
+                let result = unsafe {
+                    let name: SRString = tunnel.name.as_str().into();
+                    stop_tunnel(&name)
+                };
+                error!("stop_tunnel() for tunnel returned {result:?}");
+                if !result {
+                    return Err(Error::InternalError("Error from Swift".into()));
+                }
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: tunnel.endpoint.clone(),
+                };
+                if let Err(error) = client.remove_interface(request).await {
+                    error!(
+                        "Error while removing interface {}, error details: {error:?}",
+                        active_connection.interface_name
+                    );
+                    return Err(Error::InternalError(format!(
+                        "Failed to remove interface, error message: {}",
+                        error.message()
+                    )));
+                }
             }
             if let Some(post_down) = &tunnel.post_down {
                 debug!(

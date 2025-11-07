@@ -58,7 +58,7 @@ impl From<ProtoServiceLocationMode> for ServiceLocationMode {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Location<I = NoId> {
     pub id: I,
     pub instance_id: Id,
@@ -74,39 +74,6 @@ pub struct Location<I = NoId> {
     pub keepalive_interval: i64,
     pub location_mfa_mode: LocationMfaMode,
     pub service_location_mode: ServiceLocationMode,
-}
-
-impl PartialEq for Location {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id &&
-        self.instance_id == other.instance_id &&
-        self.name == other.name &&
-        self.address == other.address &&
-        self.pubkey == other.pubkey &&
-        self.endpoint == other.endpoint &&
-        self.allowed_ips == other.allowed_ips &&
-        self.dns == other.dns &&
-        // Ignore `route_all_traffic` flag as Defguard Core does not have it.
-        self.keepalive_interval == other.keepalive_interval &&
-        self.location_mfa_mode == other.location_mfa_mode &&
-        self.service_location_mode == other.service_location_mode
-    }
-}
-
-impl PartialEq<Location<NoId>> for Location {
-    fn eq(&self, other: &Self) -> bool {
-        self.instance_id == other.instance_id &&
-        self.name == other.name &&
-        self.address == other.address &&
-        self.pubkey == other.pubkey &&
-        self.endpoint == other.endpoint &&
-        self.allowed_ips == other.allowed_ips &&
-        self.dns == other.dns &&
-        // Ignore `route_all_traffic` flag as Defguard Core does not have it.
-        self.keepalive_interval == other.keepalive_interval &&
-        self.location_mfa_mode == other.location_mfa_mode &&
-        self.service_location_mode == other.service_location_mode
-    }
 }
 
 impl fmt::Display for Location<Id> {

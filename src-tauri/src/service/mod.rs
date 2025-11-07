@@ -137,7 +137,7 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Saved service location request received, this is currently not supported on Unix systems");
+        debug!("Save service location request received, this is currently not supported on Unix systems");
         Ok(Response::new(()))
     }
 
@@ -146,7 +146,7 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Saved service location request received, this is currently not supported on Unix systems");
+        debug!("Delete service location request received, this is currently not supported on Unix systems");
         Ok(Response::new(()))
     }
 

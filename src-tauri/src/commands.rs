@@ -9,10 +9,14 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
+#[cfg(target_os = "macos")]
+use swift_rs::SRString;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(target_os = "macos")]
+use crate::export::stop_tunnel;
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
     proto::{
@@ -292,7 +296,7 @@ pub async fn save_device_config(
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
-    push_service_locations(&instance).await;
+    let locations = push_service_locations(&instance).await?;
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
@@ -305,12 +309,14 @@ pub async fn save_device_config(
 }
 
 #[cfg(target_os = "macos")]
-async fn push_service_locations(instance: &Instance<Id>) {
+async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     // Nothing here... yet
+
+    Ok(Vec::new())
 }
 
 #[cfg(not(target_os = "macos"))]
-async fn push_service_locations(instance: &Instance) {
+async fn push_service_locations(instance: &Instance) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
@@ -354,6 +360,8 @@ async fn push_service_locations(instance: &Instance) {
             instance.name, instance.id,
         );
     }
+
+    Ok(locations)
 }
 
 #[tauri::command(async)]
@@ -670,55 +678,58 @@ pub(crate) async fn do_update_instance(
         .ok_or(Error::NotFound)?
         .prvkey;
 
-    if service_locations.is_empty() {
-        debug!(
-            "No service locations to process for instance {}({})",
-            instance.name, instance.id
-        );
-    } else {
-        debug!(
-            "Processing {} service location(s) for instance {}({})",
-            service_locations.len(),
-            instance.name,
-            instance.id
-        );
+    #[cfg(windows)]
+    {
+        if service_locations.is_empty() {
+            debug!(
+                "No service locations to process for instance {}({})",
+                instance.name, instance.id
+            );
+        } else {
+            debug!(
+                "Processing {} service location(s) for instance {}({})",
+                service_locations.len(),
+                instance.name,
+                instance.id
+            );
 
-        let save_request = SaveServiceLocationsRequest {
-            service_locations: service_locations.clone(),
-            instance_id: instance.uuid.clone(),
-            private_key: private_key.clone(),
-        };
+            let save_request = SaveServiceLocationsRequest {
+                service_locations: service_locations.clone(),
+                instance_id: instance.uuid.clone(),
+                private_key: private_key.clone(),
+            };
 
-        debug!(
-            "Sending request to daemon to save {} service location(s) for instance {}({})",
-            save_request.service_locations.len(),
-            instance.name,
-            instance.id
-        );
+            debug!(
+                "Sending request to daemon to save {} service location(s) for instance {}({})",
+                save_request.service_locations.len(),
+                instance.name,
+                instance.id
+            );
 
-        DAEMON_CLIENT
-            .clone()
-            .save_service_locations(save_request)
-            .await
-            .map_err(|err| {
-                error!(
+            DAEMON_CLIENT
+                .clone()
+                .save_service_locations(save_request)
+                .await
+                .map_err(|err| {
+                    error!(
                     "Error while saving service locations to the daemon for instance {}({}): {err}",
                     instance.name, instance.id,
                 );
-                Error::InternalError(err.to_string())
-            })?;
+                    Error::InternalError(err.to_string())
+                })?;
 
-        info!(
-            "Successfully saved {} service location(s) to daemon for instance {}({})",
-            service_locations.len(),
-            instance.name,
-            instance.id
-        );
+            info!(
+                "Successfully saved {} service location(s) to daemon for instance {}({})",
+                service_locations.len(),
+                instance.name,
+                instance.id
+            );
 
-        debug!(
-            "Completed processing all service locations for instance {}({})",
-            instance.name, instance.id
-        );
+            debug!(
+                "Completed processing all service locations for instance {}({})",
+                instance.name, instance.id
+            );
+        }
     }
 
     Ok(())
@@ -931,6 +942,56 @@ pub async fn update_location_routing(
     }
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command(async)]
+pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
+    let app_state = handle.state::<AppState>();
+    let mut transaction = DB_POOL.begin().await?;
+
+    let Some(instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
+        error!("Couldn't delete instance: instance with ID {instance_id} could not be found.");
+        return Err(Error::NotFound);
+    };
+    debug!("The instance that is being deleted has been identified as {instance}");
+
+    let instance_locations =
+        Location::find_by_instance_id(&mut *transaction, instance_id, false).await?;
+    if !instance_locations.is_empty() {
+        debug!(
+            "Found locations associated with the instance {instance}, closing their connections."
+        );
+    }
+    for location in instance_locations {
+        if let Some(connection) = app_state
+            .remove_connection(location.id, ConnectionType::Location)
+            .await
+        {
+            let result = unsafe {
+                let name: SRString = location.name.as_str().into();
+                stop_tunnel(&name)
+            };
+            error!("stop_tunnel() for location returned {result:?}");
+            if !result {
+                return Err(Error::InternalError("Error from Swift".into()));
+            }
+        }
+    }
+
+    instance.delete(&mut *transaction).await?;
+
+    transaction.commit().await?;
+
+    reload_tray_menu(&handle).await;
+
+    let theme = { app_state.app_config.lock().unwrap().tray_theme };
+    configure_tray_icon(&handle, theme).await?;
+
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    info!("Successfully deleted instance {instance}.");
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance with ID {instance_id}");
@@ -983,8 +1044,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     transaction.commit().await?;
 
-    DAEMON_CLIENT
-        .clone()
+    client
         .delete_service_locations(DeleteServiceLocationsRequest {
             instance_id: instance.uuid.clone(),
         })
@@ -999,7 +1059,6 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
-    let app_state: State<AppState> = handle.state();
     let theme = { app_state.app_config.lock().unwrap().tray_theme };
     configure_tray_icon(&handle, theme).await?;
 
@@ -1089,6 +1148,14 @@ pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
     }
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command(async)]
+pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
+    // TODO: implementation
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting tunnel with ID {tunnel_id}");
