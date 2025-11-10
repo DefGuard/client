@@ -34,22 +34,24 @@ jobs:
       - name: Create SBOM with Trivy
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: 'fs'
-          format: 'spdx-json'
+          scan-type: "fs"
+          format: "spdx-json"
           output: "defguard-client-${{ steps.vars.outputs.VERSION }}.sbom.json"
-          scan-ref: '.'
+          scan-ref: "."
           severity: "CRITICAL,HIGH,MEDIUM,LOW"
           scanners: "vuln"
+          trivyignores: ".trivyignore.yaml"
 
       - name: Create security advisory file with Trivy
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: 'fs'
-          format: 'json'
+          scan-type: "fs"
+          format: "json"
           output: "defguard-client-${{ steps.vars.outputs.VERSION }}.advisories.json"
-          scan-ref: '.'
+          scan-ref: "."
           severity: "CRITICAL,HIGH,MEDIUM,LOW"
           scanners: "vuln"
+          trivyignores: ".trivyignore.yaml"
 
       - name: Upload SBOMs and advisories
         uses: shogo82148/actions-upload-release-asset@v1
