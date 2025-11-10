@@ -35,7 +35,7 @@ jobs:
         uses: aquasecurity/trivy-action@0.33.1
         env:
           TRIVY_SHOW_SUPPRESED: 1
-          TRIVY_IGNOREFILE: ".trivyignore.yaml"
+          TRIVY_IGNOREFILE: "./.trivyignore.yaml"
         with:
           scan-type: "fs"
           format: "spdx-json"
@@ -48,7 +48,7 @@ jobs:
         uses: aquasecurity/trivy-action@0.33.1
         env:
           TRIVY_SHOW_SUPPRESED: 1
-          TRIVY_IGNOREFILE: ".trivyignore.yaml"
+          TRIVY_IGNOREFILE: "./.trivyignore.yaml"
         with:
           scan-type: "fs"
           format: "json"

@@ -5,18 +5,18 @@ on:
     branches:
       - main
       - dev
-      - 'release/**'
+      - "release/**"
     paths-ignore:
-      - '*.md'
-      - 'LICENSE'
+      - "*.md"
+      - "LICENSE"
   pull_request:
     branches:
       - main
       - dev
-      - 'release/**'
+      - "release/**"
     paths-ignore:
-      - '*.md'
-      - 'LICENSE'
+      - "*.md"
+      - "LICENSE"
 
 env:
   CARGO_TERM_COLOR: always
@@ -41,9 +41,12 @@ jobs:
           submodules: recursive
       - name: Scan code with Trivy
         uses: aquasecurity/trivy-action@0.33.1
+        env:
+          TRIVY_SHOW_SUPPRESED: 1
+          TRIVY_IGNOREFILE: "./.trivyignore.yaml"
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
+          scan-type: "fs"
+          scan-ref: "."
           exit-code: "1"
           ignore-unfixed: true
           severity: "CRITICAL,HIGH,MEDIUM"
