@@ -135,6 +135,74 @@ public func tunnelStats(name: SRString) -> Stats? {
     return result
 }
 
+@_cdecl("all_tunnel_stats")
+public func allTunnelStats() -> SRObjectArray {
+    // Blocking
+    let semaphore = DispatchSemaphore(value: 0)
+    var stats: [Stats] = []
+
+    // Get all tunnel provider managers.
+    NETunnelProviderManager.loadAllFromPreferences { managers, error in
+        guard let managers = managers else {
+            logger.info("No tunnel managers in user's settings")
+            return
+        }
+        guard error == nil else {
+            logger.warning(
+                "Error loading tunnel managers: \(error, privacy: .public)")
+            semaphore.signal()
+            return
+        }
+        logger.info("Loaded \(managers.count, privacy: .public) tunnel managers.")
+
+        // `NETunnelProviderSession.sendProviderMessage()` is asynchronous, so use `DispatchGroup`.
+        let dispatchGroup = DispatchGroup()
+
+        for manager in managers {
+            guard let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol
+            else {
+                continue
+            }
+            // Sometimes all managers from all apps come through, so filter by bundle ID.
+            if tunnelProtocol.providerBundleIdentifier != pluginAppId {
+                continue
+            }
+            if let providerManager = manager as NETunnelProviderManager? {
+                let session = providerManager.connection as! NETunnelProviderSession
+                do {
+                    // TODO: data should contain a valid message.
+                    let data = Data()
+                    dispatchGroup.enter()
+                    logger.info("Pre send provider message")
+                    try session.sendProviderMessage(data) { response in
+                        logger.info("Post send provider message")
+                        if let data = response {
+                            let decoder = JSONDecoder()
+                            if let result = try? decoder.decode(Stats.self, from: data) {
+                                stats.append(result)
+                            }
+                        }
+                        dispatchGroup.leave()
+                    }
+                } catch {
+                    logger.error("Failed to send message to tunnel extension \(error)")
+                    dispatchGroup.leave()
+                }
+            }
+        }
+
+        // NOTE: `dispatchGroup.wait()` will cause a dead-lock, because it uses the same thread as
+        // `NETunnelProviderSession.sendProviderMessage()`. Use this pattern instead:
+        dispatchGroup.notify(queue: DispatchQueue.global()) {
+            semaphore.signal()
+        }
+    }
+
+    semaphore.wait()
+    logger.info("Collected \(stats.count) stats")
+    return SRObjectArray(stats)
+}
+
 /// Save `TunnelConfiguration` to preferences.
 func saveConfig(_ config: TunnelConfiguration) {
     // Blocking
@@ -180,7 +248,6 @@ func saveConfig(_ config: TunnelConfiguration) {
 
     semaphore.wait()
 }
-
 
 /// Start VPN tunnel for a given `name`.
 func startVPN(name: String) {

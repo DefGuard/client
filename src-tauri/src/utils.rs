@@ -22,7 +22,7 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::export::{start_tunnel, stop_tunnel, tunnel_stats};
+use crate::export::{start_tunnel, stop_tunnel, all_tunnel_stats};
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
     proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
@@ -140,16 +140,17 @@ pub(crate) async fn setup_interface(
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) async fn stats_handler(_pool: DbPool, name: String, _connection_type: ConnectionType) {
+pub(crate) async fn stats_handler(_pool: DbPool, _interface_name: String, _connection_type: ConnectionType) {
     const CHECK_INTERVAL: Duration = Duration::from_secs(5);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 
     loop {
+        info!("Stats loop");
         interval.tick().await;
-        // TODO: check all known locations/tunnels, not just `name`.
-        if let Some(stats) = unsafe { tunnel_stats(&name.as_str().into()) } {
+        let all_stats = unsafe { all_tunnel_stats() };
+        for stats in all_stats.as_slice() {
             info!(
-                "Tunnel stats: {} {} {}",
+                "==> Stats: {} {} {}",
                 stats.last_handshake, stats.tx_bytes, stats.rx_bytes
             );
         }
