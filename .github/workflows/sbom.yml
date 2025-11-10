@@ -33,6 +33,9 @@ jobs:
 
       - name: Create SBOM with Trivy
         uses: aquasecurity/trivy-action@0.33.1
+        env:
+          TRIVY_SHOW_SUPPRESED: 1
+          TRIVY_IGNOREFILE: ".trivyignore.yaml"
         with:
           scan-type: "fs"
           format: "spdx-json"
@@ -40,10 +43,12 @@ jobs:
           scan-ref: "."
           severity: "CRITICAL,HIGH,MEDIUM,LOW"
           scanners: "vuln"
-          trivyignores: ".trivyignore.yaml"
 
       - name: Create security advisory file with Trivy
         uses: aquasecurity/trivy-action@0.33.1
+        env:
+          TRIVY_SHOW_SUPPRESED: 1
+          TRIVY_IGNOREFILE: ".trivyignore.yaml"
         with:
           scan-type: "fs"
           format: "json"
@@ -51,7 +56,6 @@ jobs:
           scan-ref: "."
           severity: "CRITICAL,HIGH,MEDIUM,LOW"
           scanners: "vuln"
-          trivyignores: ".trivyignore.yaml"
 
       - name: Upload SBOMs and advisories
         uses: shogo82148/actions-upload-release-asset@v1
