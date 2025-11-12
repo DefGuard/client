@@ -80,7 +80,7 @@ export type AppConfig = {
   tray_theme: TrayIconTheme;
   check_for_updates: boolean;
   peer_alive_period: number;
-  mtu: number;
+  mtu?: number;
 };
 
 export type PlatformInfo = {
