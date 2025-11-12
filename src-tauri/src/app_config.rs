@@ -71,6 +71,7 @@ pub struct AppConfig {
     pub log_level: LevelFilter,
     /// In seconds. How much time after last network activity the connection is automatically dropped.
     pub peer_alive_period: u32,
+    pub mtu: Option<u32>,
 }
 
 // Important: keep in sync with client store default in frontend
@@ -82,6 +83,7 @@ impl Default for AppConfig {
             tray_theme: AppTrayTheme::Color,
             log_level: LevelFilter::Info,
             peer_alive_period: 300,
+            mtu: None,
         }
     }
 }

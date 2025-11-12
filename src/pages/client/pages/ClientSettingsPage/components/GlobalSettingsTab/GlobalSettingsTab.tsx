@@ -81,6 +81,44 @@ export const GlobalSettingsTab = () => {
             required_error: LL.form.errors.required(),
           })
           .gte(120, LL.form.errors.minValue({ min: 120 })),
+        // TODO nullable number
+        mtu: z.coerce.number(),
+        // mtu: z
+        //   .coerce
+        //   .number()
+        //   .lte(65535, LL.form.errors.maxValue({ max: 65535 }))
+        //   .transform((val) => val === 0 ? null : val)
+        //   .optional(),
+        // mtu: z.preprocess(
+        //   (val) =>
+        //     val == null || (typeof val === 'string' && val.trim() === '')
+        //       ? null
+        //       : Number(val),
+        //   z.nullable(
+        //     z.number().lte(65535, LL.form.errors.maxValue({ max: 65535 })),
+        //   ),
+        // ),
+        // mtu: z
+        //   .union([
+        //     z.coerce.number().lte(65535, LL.form.errors.maxValue({ max: 65535 })),
+        //     z.null(),
+        //   ])
+        //   .transform((val) => (val === 0 ? null : val))
+        //   .optional()
+        // mtu: z.union([
+        //   z.literal(""), // 1. Explicitly allow an empty string
+        //   z.coerce // 2. Or, allow a number...
+        //     .number()
+        //     .lte(65535, LL.form.errors.maxValue({ max: 65535 })),
+        // ])
+        //   .optional() // 3. Still allow the field to be undefined
+        //   .transform((val) => (val === "" ? null : val))
+        // mtu: z.union([
+        //   z.string().optional(),
+        //   z.coerce.number().lte(65535, LL.form.errors.maxValue({ max: 65535 }))
+        // ])
+        //   .transform((val) => (val === 0 || val === null ? null : val))
+        //   .optional()
       }),
     [LL.form.errors],
   );
@@ -138,6 +176,15 @@ export const GlobalSettingsTab = () => {
           </Helper>
         </header>
         <FormInput controller={{ control, name: 'peer_alive_period' }} type="number" />
+      </section>
+      <section>
+        <header>
+          <h2>{localLL.mtu.title()}</h2>
+          <Helper initialPlacement="right">
+            <p>{localLL.mtu.helper()}</p>
+          </Helper>
+        </header>
+        <FormInput controller={{ control, name: 'mtu' }} type="number" />
       </section>
     </form>
   );

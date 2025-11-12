@@ -376,6 +376,16 @@ type RootTranslation = {
 								 */
 								helper: string
 							}
+							mtu: {
+								/**
+								 * M​a​x​i​m​u​m​ ​T​r​a​n​s​m​i​s​s​i​o​n​ ​U​n​i​t​ ​(​M​T​U​)
+								 */
+								title: string
+								/**
+								 * M​T​U​ ​s​e​t​s​ ​t​h​e​ ​l​a​r​g​e​s​t​ ​p​a​c​k​e​t​ ​s​i​z​e​ ​s​e​n​t​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​n​e​t​w​o​r​k​.​ ​L​o​w​e​r​i​n​g​ ​i​t​ ​c​a​n​ ​i​m​p​r​o​v​e​ ​c​o​n​n​e​c​t​i​o​n​ ​s​t​a​b​i​l​i​t​y​ ​i​n​ ​r​e​s​t​r​i​c​t​i​v​e​ ​o​r​ ​u​n​r​e​l​i​a​b​l​e​ ​I​S​P​ ​n​e​t​w​o​r​k​s​.​ ​T​h​e​ ​d​e​f​a​u​l​t​ ​v​a​l​u​e​ ​o​n​ ​m​o​s​t​ ​s​y​s​t​e​m​s​ ​i​s​ ​1​5​0​0​.​ ​T​r​y​ ​l​o​w​e​r​i​n​g​ ​i​t​ ​t​o​ ​1​3​0​0​-​1​4​0​0​ ​i​f​ ​y​o​u​ ​e​n​c​o​u​n​t​e​r​ ​I​S​P​-​r​e​l​a​t​e​d​ ​i​s​s​u​e​s​.
+								 */
+								helper: string
+							}
 							tray: {
 								/**
 								 * S​y​s​t​e​m​ ​t​r​a​y
@@ -2063,6 +2073,16 @@ export type TranslationFunctions = {
 								title: () => LocalizedString
 								/**
 								 * If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.
+								 */
+								helper: () => LocalizedString
+							}
+							mtu: {
+								/**
+								 * Maximum Transmission Unit (MTU)
+								 */
+								title: () => LocalizedString
+								/**
+								 * MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues.
 								 */
 								helper: () => LocalizedString
 							}
