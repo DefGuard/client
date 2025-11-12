@@ -15,7 +15,10 @@ param(
     [string]$ADUsername,
     
     [Parameter(Mandatory=$false)]
-    [string]$DomainController
+    [string]$DomainController,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$EnrollmentTokenExpirationTime
 )
 
 # Function to make authenticated API calls to Defguard
@@ -191,6 +194,11 @@ foreach ($username in $usernames) {
     $requestBody = @{
         email = $null
         send_enrollment_notification = $false
+    }
+    
+    # Add token expiration time if provided
+    if ($EnrollmentTokenExpirationTime) {
+        $requestBody["token_expiration_time"] = $EnrollmentTokenExpirationTime
     }
     
     $enrollmentResponse = Invoke-AuthenticatedRestMethod -Method "POST" -Endpoint $enrollmentEndpoint -Body $requestBody
