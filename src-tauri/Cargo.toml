@@ -124,7 +124,10 @@ x25519-dalek = { version = "2", features = [
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-swift-rs = "1.0"
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-network-extension = "0.3"
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
 swift-rs = { version = "1.0", features = ["build"] }

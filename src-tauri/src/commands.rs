@@ -9,14 +9,12 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
-#[cfg(target_os = "macos")]
-use swift_rs::SRString;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 #[cfg(target_os = "macos")]
-use crate::export::stop_tunnel;
+use crate::apple::stop_tunnel;
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
     proto::{
@@ -966,13 +964,10 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             .remove_connection(location.id, ConnectionType::Location)
             .await
         {
-            let result = unsafe {
-                let name: SRString = location.name.as_str().into();
-                stop_tunnel(&name)
-            };
+            let result = stop_tunnel(&location.name);
             error!("stop_tunnel() for location returned {result:?}");
             if !result {
-                return Err(Error::InternalError("Error from Swift".into()));
+                return Err(Error::InternalError("Error from tunnel".into()));
             }
         }
     }

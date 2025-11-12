@@ -6,7 +6,6 @@ import os
 
 let appId = Bundle.main.bundleIdentifier ?? "net.defguard"
 let pluginAppId = "\(appId).VPNExtension"
-let plugin = WireguardPlugin()
 let logger = Logger(subsystem: appId, category: "WireguardPlugin")
 
 /// From preferences load `NETunnelProviderManager` with a given `name.
@@ -173,9 +172,7 @@ public func allTunnelStats() -> SRObjectArray {
                     // TODO: data should contain a valid message.
                     let data = Data()
                     dispatchGroup.enter()
-                    logger.info("Pre send provider message")
                     try session.sendProviderMessage(data) { response in
-                        logger.info("Post send provider message")
                         if let data = response {
                             let decoder = JSONDecoder()
                             if let result = try? decoder.decode(Stats.self, from: data) {
@@ -199,7 +196,6 @@ public func allTunnelStats() -> SRObjectArray {
     }
 
     semaphore.wait()
-    logger.info("Collected \(stats.count) stats")
     return SRObjectArray(stats)
 }
 

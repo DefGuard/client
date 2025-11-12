@@ -5,8 +5,6 @@ use std::{env, path::Path, process::Command, str::FromStr};
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use sqlx::query;
-#[cfg(target_os = "macos")]
-use swift_rs::SRString;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
@@ -22,7 +20,7 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::export::{start_tunnel, stop_tunnel, all_tunnel_stats};
+use crate::apple::{all_tunnel_stats, start_tunnel, stop_tunnel};
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
     proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
@@ -50,6 +48,8 @@ use crate::{
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
+// Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
+static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
 /// Setup client interface for `Instance`.
 #[cfg(not(target_os = "macos"))]
@@ -128,32 +128,84 @@ pub(crate) async fn setup_interface(
         .tunnel_configurarion(pool, preshared_key, dns, dns_search)
         .await?;
 
-    unsafe {
-        let json: SRString = serde_json::to_string(&tunnel_config)
-            .unwrap()
-            .as_str()
-            .into();
-        let result = start_tunnel(&json);
-        error!("start_tunnel() returned {result:?}");
-    }
+    tunnel_config.save();
+    tokio::time::sleep(TUNNEL_START_DELAY).await;
+    start_tunnel(&location.name);
+
     Ok(interface_name)
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) async fn stats_handler(_pool: DbPool, _interface_name: String, _connection_type: ConnectionType) {
+pub(crate) async fn stats_handler(
+    pool: DbPool,
+    _interface_name: String,
+    _connection_type: ConnectionType,
+) {
     const CHECK_INTERVAL: Duration = Duration::from_secs(5);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 
     loop {
         info!("Stats loop");
         interval.tick().await;
-        let all_stats = unsafe { all_tunnel_stats() };
-        for stats in all_stats.as_slice() {
+
+        let all_stats = all_tunnel_stats();
+        if all_stats.len() == 0 {
+            continue;
+        }
+        // Let `all_stats` be `Send`.
+        let all_stats = all_stats.as_slice().to_owned();
+
+        // let mut transaction = match pool.begin().await {
+        //     Ok(transactions) => transactions,
+        //     Err(err) => {
+        //         error!(
+        //             "Failed to begin database transaction for saving location/tunnel stats: {err}",
+        //         );
+        //         continue;
+        //     }
+        // };
+
+        for stats in all_stats {
             info!(
                 "==> Stats: {} {} {}",
                 stats.last_handshake, stats.tx_bytes, stats.rx_bytes
             );
+
+            if let Some(location_id) = stats.location_id {
+                //let location_stats = LocationStats {
+                //};
+                /*match location_stats.save(&mut *transaction).await {
+                    Ok(_) => {
+                        debug!("Saved network usage stats for location ID {location_id}");
+                    }
+                    Err(err) => {
+                        error!(
+                            "Failed to save network usage stats for location ID {location_id}: \
+                            {err}"
+                        );
+                    }
+                }*/
+            }
+            if let Some(tunnel_id) = stats.tunnel_id {
+                //let tunnel_stats = TunnelStats {
+                //};
+                /*match tunnel_stats.save(&mut *transaction).await {
+                    Ok(_) => {
+                        debug!("Saved network usage stats for tunnel ID {tunnel_id}");
+                    }
+                    Err(err) => {
+                        error!(
+                            "Failed to save network usage stats for tunnel ID {tunnel_id}: \
+                            {err}"
+                        );
+                    }
+                }*/
+            }
         }
+
+        // if let Err(err) = transaction.commit().await {
+        //     error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        // }
     }
 }
 
@@ -685,13 +737,10 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = unsafe {
-                    let name: SRString = location.name.as_str().into();
-                    stop_tunnel(&name)
-                };
+                let result = stop_tunnel(&location.name);
                 error!("stop_tunnel() for location returned {result:?}");
                 if !result {
-                    return Err(Error::InternalError("Error from Swift".into()));
+                    return Err(Error::InternalError("Error from tunnel".into()));
                 }
             }
 
@@ -762,13 +811,10 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = unsafe {
-                    let name: SRString = tunnel.name.as_str().into();
-                    stop_tunnel(&name)
-                };
-                error!("stop_tunnel() for tunnel returned {result:?}");
+                let result = stop_tunnel(&tunnel.name);
+                error!("stop_tunnel() for location returned {result:?}");
                 if !result {
-                    return Err(Error::InternalError("Error from Swift".into()));
+                    return Err(Error::InternalError("Error from tunnel".into()));
                 }
             }
 
