@@ -122,6 +122,7 @@ pub(crate) async fn setup_interface(
     location: &Location<Id>,
     name: &str,
     preshared_key: Option<String>,
+    _mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
