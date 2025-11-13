@@ -78,7 +78,7 @@ pub(crate) async fn setup_interface(
     debug!("Found free port: {port} for interface {interface_name}.");
 
     let mut interface_config = location
-        .interface_configurarion(pool, interface_name.clone(), preshared_key)
+        .interface_configuration(pool, interface_name.clone(), preshared_key)
         .await?;
     interface_config.mtu = mtu;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");

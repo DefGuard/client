@@ -257,7 +257,7 @@ impl Location<Id> {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub(crate) async fn interface_configurarion<'e, E>(
+    pub(crate) async fn interface_configuration<'e, E>(
         &self,
         executor: E,
         interface_name: String,
