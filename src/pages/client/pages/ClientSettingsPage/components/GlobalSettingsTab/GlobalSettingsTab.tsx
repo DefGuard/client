@@ -81,7 +81,8 @@ export const GlobalSettingsTab = () => {
             required_error: LL.form.errors.required(),
           })
           .gte(120, LL.form.errors.minValue({ min: 120 })),
-        mtu: z.number({
+        mtu: z
+          .number({
             invalid_type_error: LL.form.errors.required(),
             required_error: LL.form.errors.required(),
           })
