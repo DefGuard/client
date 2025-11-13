@@ -575,6 +575,7 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
                 .join(","),
             port: u32::from(config.port),
             peers: config.peers.into_iter().map(Into::into).collect(),
+            mtu: config.mtu,
         }
     }
 }
@@ -592,7 +593,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             addresses,
             port: config.port as u16,
             peers: config.peers.into_iter().map(Into::into).collect(),
-            mtu: None,
+            mtu: config.mtu,
         }
     }
 }

@@ -35,6 +35,7 @@ const defaultValues: StoreValues = {
     tray_theme: 'color',
     check_for_updates: true,
     peer_alive_period: 300,
+    mtu: 0,
   },
   platformInfo: {
     client_version: '',

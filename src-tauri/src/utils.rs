@@ -59,6 +59,7 @@ pub(crate) async fn setup_interface(
     location: &Location<Id>,
     name: &str,
     preshared_key: Option<String>,
+    mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
@@ -76,9 +77,10 @@ pub(crate) async fn setup_interface(
     };
     debug!("Found free port: {port} for interface {interface_name}.");
 
-    let interface_config = location
-        .interface_configurarion(pool, interface_name.clone(), preshared_key)
+    let mut interface_config = location
+        .interface_configuration(pool, interface_name.clone(), preshared_key)
         .await?;
+    interface_config.mtu = mtu;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
@@ -120,6 +122,7 @@ pub(crate) async fn setup_interface(
     location: &Location<Id>,
     name: &str,
     preshared_key: Option<String>,
+    _mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
@@ -307,7 +310,11 @@ pub fn get_service_log_dir() -> &'static Path {
 }
 
 /// Setup client interface
-pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<String, Error> {
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel<Id>,
+    name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
     debug!("Setting up interface for tunnel {tunnel}");
     let interface_name = get_interface_name(name);
     // prepare peer config
@@ -397,7 +404,7 @@ pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<S
         addresses,
         port,
         peers: vec![peer.clone()],
-        mtu: None,
+        mtu,
     };
     debug!("Creating interface {interface_config:?}");
     let request = CreateInterfaceRequest {
@@ -576,7 +583,9 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    let interface_name = setup_interface(location, &location.name, preshared_key, &DB_POOL).await?;
+    let mtu = state.app_config.lock().unwrap().get_mtu();
+    let interface_name =
+        setup_interface(location, &location.name, preshared_key, mtu, &DB_POOL).await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
@@ -607,7 +616,8 @@ pub(crate) async fn handle_connection_for_tunnel(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
-    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name).await?;
+    let mtu = state.app_config.lock().unwrap().get_mtu();
+    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name, mtu).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
