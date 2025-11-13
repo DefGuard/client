@@ -162,9 +162,9 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                   'If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.',
               },
               mtu: {
-                title: 'Maximum Transmission Unit (MTU)',
+                title: 'MTU (Maximum Transmission Unit)',
                 helper:
-                  'MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues.',
+                  'MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues. 0 = default.',
               },
               tray: {
                 title: 'System tray',
