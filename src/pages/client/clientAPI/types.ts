@@ -80,6 +80,12 @@ export type AppConfig = {
   tray_theme: TrayIconTheme;
   check_for_updates: boolean;
   peer_alive_period: number;
+  mtu: number;
+};
+
+export type PlatformInfo = {
+  client_version: string;
+  platform_info: string;
 };
 
 export type ProvisioningConfig = {
@@ -148,4 +154,5 @@ export type TauriCommandKey =
   | 'stop_global_logwatcher'
   | 'command_get_app_config'
   | 'command_set_app_config'
-  | 'get_provisioning_config';
+  | 'get_provisioning_config'
+  | 'get_platform_header';

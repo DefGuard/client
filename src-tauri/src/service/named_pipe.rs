@@ -1,6 +1,7 @@
+use std::{os::windows::io::RawHandle, pin::Pin};
+
 use async_stream::stream;
 use futures_core::stream::Stream;
-use std::{os::windows::io::RawHandle, pin::Pin};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite},
     net::windows::named_pipe::NamedPipeServer,

@@ -132,7 +132,8 @@ fn main() {
             stop_global_logwatcher,
             command_get_app_config,
             command_set_app_config,
-            get_provisioning_config
+            get_provisioning_config,
+            get_platform_header
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

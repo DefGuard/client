@@ -54,7 +54,6 @@ use super::VERSION;
 use crate::enterprise::service_locations::ServiceLocationManager;
 #[cfg(windows)]
 use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-
 use crate::{
     enterprise::service_locations::ServiceLocationError,
     service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
@@ -576,6 +575,7 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
                 .join(","),
             port: u32::from(config.port),
             peers: config.peers.into_iter().map(Into::into).collect(),
+            mtu: config.mtu,
         }
     }
 }
@@ -593,7 +593,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             addresses,
             port: config.port as u16,
             peers: config.peers.into_iter().map(Into::into).collect(),
-            mtu: None,
+            mtu: config.mtu,
         }
     }
 }

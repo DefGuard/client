@@ -81,6 +81,12 @@ export const GlobalSettingsTab = () => {
             required_error: LL.form.errors.required(),
           })
           .gte(120, LL.form.errors.minValue({ min: 120 })),
+        mtu: z
+          .number({
+            invalid_type_error: LL.form.errors.required(),
+            required_error: LL.form.errors.required(),
+          })
+          .lte(65535, LL.form.errors.maxValue({ max: 65535 })),
       }),
     [LL.form.errors],
   );
@@ -138,6 +144,15 @@ export const GlobalSettingsTab = () => {
           </Helper>
         </header>
         <FormInput controller={{ control, name: 'peer_alive_period' }} type="number" />
+      </section>
+      <section>
+        <header>
+          <h2>{localLL.mtu.title()}</h2>
+          <Helper initialPlacement="right">
+            <p>{localLL.mtu.helper()}</p>
+          </Helper>
+        </header>
+        <FormInput controller={{ control, name: 'mtu' }} type="number" />
       </section>
     </form>
   );

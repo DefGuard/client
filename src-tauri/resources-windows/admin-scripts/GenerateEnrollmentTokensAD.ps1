@@ -15,10 +15,13 @@ param(
     [string]$ADUsername,
     
     [Parameter(Mandatory=$false)]
-    [string]$DomainController
+    [string]$DomainController,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$EnrollmentTokenExpirationTime
 )
 
-# Function to make authenticated API calls
+# Function to make authenticated API calls to Defguard
 function Invoke-AuthenticatedRestMethod {
     param(
         [string]$Method,
@@ -44,7 +47,7 @@ function Invoke-AuthenticatedRestMethod {
         return $response
     }
     catch {
-        Write-Error "API call failed: $($_.Exception.Message)"
+        Write-Error "Defguard API call failed: $($_.Exception.Message)"
         return $null
     }
 }
@@ -130,6 +133,7 @@ if ($ADUsername) {
 }
 
 # Get group members
+Write-Host "Fetching group members from Defguard..." -ForegroundColor Yellow
 $groupEndpoint = "api/v1/group/$GroupName"
 $groupResponse = Invoke-AuthenticatedRestMethod -Method "GET" -Endpoint $groupEndpoint
 
@@ -190,6 +194,11 @@ foreach ($username in $usernames) {
     $requestBody = @{
         email = $null
         send_enrollment_notification = $false
+    }
+    
+    # Add token expiration time if provided
+    if ($EnrollmentTokenExpirationTime) {
+        $requestBody["token_expiration_time"] = $EnrollmentTokenExpirationTime
     }
     
     $enrollmentResponse = Invoke-AuthenticatedRestMethod -Method "POST" -Endpoint $enrollmentEndpoint -Body $requestBody

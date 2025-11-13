@@ -71,6 +71,8 @@ pub struct AppConfig {
     pub log_level: LevelFilter,
     /// In seconds. How much time after last network activity the connection is automatically dropped.
     pub peer_alive_period: u32,
+    /// Maximal transmission unit. 0 means default value.
+    pub mtu: u32,
 }
 
 // Important: keep in sync with client store default in frontend
@@ -82,6 +84,7 @@ impl Default for AppConfig {
             tray_theme: AppTrayTheme::Color,
             log_level: LevelFilter::Info,
             peer_alive_period: 300,
+            mtu: 0,
         }
     }
 }
@@ -128,6 +131,16 @@ impl AppConfig {
                     "Application configuration file couldn't be saved. Failed to serialize: {err}",
                 );
             }
+        }
+    }
+
+    /// Wraps MTU in an Option. We don't store Option directly in AppConfig to avoid struct-patch
+    /// ambiguity when applying updates coming from the frontend. An incoming MTU value of 0 is
+    /// interpreted as a request to fall back to the default.
+    pub fn get_mtu(&self) -> Option<u32> {
+        match self.mtu {
+            0 => None,
+            v => Some(v),
         }
     }
 }

@@ -2,8 +2,10 @@
 use std::time::Duration;
 use std::{env, path::Path, process::Command, str::FromStr};
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
+use prost::Message;
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
@@ -43,6 +45,7 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
+    proto::ClientPlatformInfo,
     ConnectionType,
 };
 
@@ -57,6 +60,7 @@ pub(crate) async fn setup_interface(
     location: &Location<Id>,
     name: &str,
     preshared_key: Option<String>,
+    mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
@@ -74,9 +78,10 @@ pub(crate) async fn setup_interface(
     };
     debug!("Found free port: {port} for interface {interface_name}.");
 
-    let interface_config = location
-        .interface_configurarion(pool, interface_name.clone(), preshared_key)
+    let mut interface_config = location
+        .interface_configuration(pool, interface_name.clone(), preshared_key)
         .await?;
+    interface_config.mtu = mtu;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
@@ -118,6 +123,7 @@ pub(crate) async fn setup_interface(
     location: &Location<Id>,
     name: &str,
     preshared_key: Option<String>,
+    _mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
@@ -361,7 +367,11 @@ pub fn get_service_log_dir() -> &'static Path {
 }
 
 /// Setup client interface
-pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<String, Error> {
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel<Id>,
+    name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
     debug!("Setting up interface for tunnel {tunnel}");
     let interface_name = get_interface_name(name);
     // prepare peer config
@@ -451,7 +461,7 @@ pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str) -> Result<S
         addresses,
         port,
         peers: vec![peer.clone()],
-        mtu: None,
+        mtu,
     };
 
     #[cfg(not(target_os = "macos"))]
@@ -635,7 +645,9 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    let interface_name = setup_interface(location, &location.name, preshared_key, &DB_POOL).await?;
+    let mtu = state.app_config.lock().unwrap().get_mtu();
+    let interface_name =
+        setup_interface(location, &location.name, preshared_key, mtu, &DB_POOL).await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
@@ -666,7 +678,8 @@ pub(crate) async fn handle_connection_for_tunnel(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
-    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name).await?;
+    let mtu = state.app_config.lock().unwrap().get_mtu();
+    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name, mtu).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
@@ -738,7 +751,10 @@ pub(crate) async fn disconnect_interface(
             #[cfg(target_os = "macos")]
             {
                 let result = stop_tunnel(&location.name);
-                error!("stop_tunnel() for location {} returned {result:?}", location.name);
+                error!(
+                    "stop_tunnel() for location {} returned {result:?}",
+                    location.name
+                );
                 if !result {
                     return Err(Error::InternalError("Error from tunnel".into()));
                 }
@@ -812,7 +828,10 @@ pub(crate) async fn disconnect_interface(
             #[cfg(target_os = "macos")]
             {
                 let result = stop_tunnel(&tunnel.name);
-                error!("stop_tunnel() for tunnel {} returned {result:?}", tunnel.name);
+                error!(
+                    "stop_tunnel() for tunnel {} returned {result:?}",
+                    tunnel.name
+                );
                 if !result {
                     return Err(Error::InternalError("Error from tunnel".into()));
                 }
@@ -1029,4 +1048,25 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Active connections synchronized with the system state");
 
     Ok(())
+}
+
+#[must_use]
+pub(crate) fn construct_platform_header() -> String {
+    let os = os_info::get();
+
+    let platform_info = ClientPlatformInfo {
+        os_family: std::env::consts::OS.to_string(),
+        os_type: os.os_type().to_string(),
+        version: os.version().to_string(),
+        edition: os.edition().map(str::to_string),
+        codename: os.codename().map(str::to_string),
+        bitness: Some(os.bitness().to_string()),
+        architecture: os.architecture().map(str::to_string),
+    };
+
+    debug!("Constructed platform info header: {platform_info:?}");
+
+    let buffer = platform_info.encode_to_vec();
+
+    BASE64_STANDARD.encode(buffer)
 }
