@@ -309,7 +309,11 @@ pub fn get_service_log_dir() -> &'static Path {
 }
 
 /// Setup client interface
-pub async fn setup_interface_tunnel(tunnel: &Tunnel<Id>, name: &str, mtu: Option<u32>) -> Result<String, Error> {
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel<Id>,
+    name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
     debug!("Setting up interface for tunnel {tunnel}");
     let interface_name = get_interface_name(name);
     // prepare peer config
