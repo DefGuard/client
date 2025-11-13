@@ -48,6 +48,6 @@ popd
 if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
     CONFIG=Release
 else
-     CONFIG=Debug
+    CONFIG=Debug
 fi
 xcodebuild -project extension/VPNExtension.xcodeproj -target VPNExtension -configuration ${CONFIG} build

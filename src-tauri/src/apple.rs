@@ -49,7 +49,6 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
 
     let handler = RcBlock::new(
         move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
-            error!("ADAM is here");
             if !error_ptr.is_null() {
                 error!("Failed to load tunnel provider managers.");
                 return;
@@ -242,15 +241,6 @@ impl TunnelConfiguration {
             let provider_manager =
                 manager_for_name(&self.name).unwrap_or_else(|| NETunnelProviderManager::new());
 
-            if let Some(vpn_protocol) = provider_manager.protocolConfiguration() {
-                if let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>() {
-                    info!("CURRENT CONFIG {tunnel_protocol:?}");
-                    // if let Some(config) = tunnel_protocol.providerConfiguration() {
-                    //     info!("CURRENT CONFIG {config:?}");
-                    // }
-                }
-            }
-
             let tunnel_protocol = NETunnelProviderProtocol::new();
             let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
             tunnel_protocol.setProviderBundleIdentifier(Some(&plugin_bundle_id));
@@ -285,15 +275,6 @@ impl TunnelConfiguration {
             provider_manager.saveToPreferencesWithCompletionHandler(Some(&*handler));
             while !spinlock.load(Ordering::Acquire) {
                 spin_loop();
-            }
-
-            // Sanity check
-            let descr = provider_manager.localizedDescription();
-            info!("SANITY DESCR {descr:?}");
-            if let Some(vpn_protocol) = provider_manager.protocolConfiguration() {
-                if let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>() {
-                    info!("SAVED CONFIG {tunnel_protocol:?}");
-                }
             }
         }
     }

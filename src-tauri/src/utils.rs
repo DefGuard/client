@@ -738,7 +738,7 @@ pub(crate) async fn disconnect_interface(
             #[cfg(target_os = "macos")]
             {
                 let result = stop_tunnel(&location.name);
-                error!("stop_tunnel() for location returned {result:?}");
+                error!("stop_tunnel() for location {} returned {result:?}", location.name);
                 if !result {
                     return Err(Error::InternalError("Error from tunnel".into()));
                 }
@@ -812,7 +812,7 @@ pub(crate) async fn disconnect_interface(
             #[cfg(target_os = "macos")]
             {
                 let result = stop_tunnel(&tunnel.name);
-                error!("stop_tunnel() for location returned {result:?}");
+                error!("stop_tunnel() for tunnel {} returned {result:?}", tunnel.name);
                 if !result {
                     return Err(Error::InternalError("Error from tunnel".into()));
                 }
