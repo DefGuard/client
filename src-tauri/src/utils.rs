@@ -52,6 +52,7 @@ use crate::{
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
+#[cfg(target_os = "macos")]
 static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
 /// Setup client interface for `Instance`.
@@ -762,7 +763,6 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(not(target_os = "macos"))]
             {
-                let mut client = DAEMON_CLIENT.clone();
                 let request = RemoveInterfaceRequest {
                     interface_name,
                     endpoint: location.endpoint.clone(),
@@ -772,7 +772,7 @@ pub(crate) async fn disconnect_interface(
                     {}...",
                     active_connection.interface_name, location.name
                 );
-                if let Err(error) = client.remove_interface(request).await {
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
                     let msg = if error.code() == Code::Unavailable {
                         format!(
                             "Couldn't remove interface {}. Background service is unavailable. \
@@ -843,7 +843,7 @@ pub(crate) async fn disconnect_interface(
                     interface_name,
                     endpoint: tunnel.endpoint.clone(),
                 };
-                if let Err(error) = client.remove_interface(request).await {
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
                     error!(
                         "Error while removing interface {}, error details: {error:?}",
                         active_connection.interface_name

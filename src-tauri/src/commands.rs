@@ -17,10 +17,7 @@ const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 use crate::apple::stop_tunnel;
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
-    proto::{
-        DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-        ServiceLocation,
-    },
+    proto::{DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest},
     utils::DAEMON_CLIENT,
 };
 use crate::{
@@ -294,7 +291,7 @@ pub async fn save_device_config(
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
-    let locations = push_service_locations(&instance).await?;
+    let locations = push_service_locations(&instance, keys).await?;
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
@@ -307,14 +304,20 @@ pub async fn save_device_config(
 }
 
 #[cfg(target_os = "macos")]
-async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
+async fn push_service_locations(
+    instance: &Instance<Id>,
+    keys: WireguardKeys<Id>,
+) -> Result<Vec<Location<Id>>, Error> {
     // Nothing here... yet
 
     Ok(Vec::new())
 }
 
 #[cfg(not(target_os = "macos"))]
-async fn push_service_locations(instance: &Instance) -> Result<Vec<Location<Id>>, Error> {
+async fn push_service_locations(
+    instance: &Instance<Id>,
+    keys: WireguardKeys<Id>,
+) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
@@ -334,7 +337,7 @@ async fn push_service_locations(instance: &Instance) -> Result<Vec<Location<Id>>
         let save_request = SaveServiceLocationsRequest {
             service_locations: service_locations.clone(),
             instance_id: instance.uuid.clone(),
-            private_key: keys.prvkey.clone(),
+            private_key: keys.prvkey,
         };
         debug!(
             "Saving {} service locations to the daemon for instance {}({}).",
