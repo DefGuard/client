@@ -770,6 +770,8 @@ If you want to disengage your VPN connection, simply press "deactivate".
           mfaNotConfigured: 'Selected method has not been configured.',
           mfaStartGeneric:
             'Could not start MFA process. Please try again or contact administrator.',
+          mfaFinishGeneric:
+            'Could not finish MFA process. Please try again or contact administrator.',
           instanceNotFound: 'Could not find instance.',
           locationNotSpecified: 'Location is not specified.',
           invalidCode:
