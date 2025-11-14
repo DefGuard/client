@@ -575,52 +575,56 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
   );
 
   const finishMFA = async (code: string) => {
-    if (!location) return toaster.error(localLL.errors.mfaStartGeneric());
+    if (!location) return toaster.error(localLL.errors.mfaFinishGeneric());
 
     const data = { token, code: code };
 
-    const response = await fetch(`${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        CLIENT_VERSION_HEADER: platformInfo.client_version,
-        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
-      },
-      body: JSON.stringify(data),
-    });
-
-    console.log('response: ', response);
-
-    if (response.ok) {
-      closeModal();
-      const data = (await response.json()) as MFAFinishResponse;
-      await connect({
-        locationId: location?.id,
-        connectionType: location.connection_type,
-        presharedKey: data.preshared_key,
+    try {
+      const response = await fetch(`${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          CLIENT_VERSION_HEADER: platformInfo.client_version,
+          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
+        },
+        body: JSON.stringify(data),
       });
-    } else {
-      const data = (await response.json()) as unknown as MFAError;
-      const { error: errorMessage } = data;
-      let message = '';
 
-      if (errorMessage === 'Unauthorized') {
-        message = localLL.errors.invalidCode();
-      } else if (
-        errorMessage === 'invalid token' ||
-        errorMessage === 'login session not found'
-      ) {
-        console.error(data);
-        toaster.error(localLL.errors.tokenExpired());
-        resetState();
+      if (response.ok) {
+        closeModal();
+        const data = (await response.json()) as MFAFinishResponse;
+        await connect({
+          locationId: location?.id,
+          connectionType: location.connection_type,
+          presharedKey: data.preshared_key,
+        });
+      } else {
+        const data = (await response.json()) as unknown as MFAError;
+        const { error: errorMessage } = data;
+        let message = '';
+
+        if (errorMessage === 'Unauthorized') {
+          message = localLL.errors.invalidCode();
+        } else if (
+          errorMessage === 'invalid token' ||
+          errorMessage === 'login session not found'
+        ) {
+          console.error(data);
+          toaster.error(localLL.errors.tokenExpired());
+          resetState();
+          error(JSON.stringify(data));
+          return;
+        } else {
+          toaster.error(localLL.errors.mfaFinishGeneric());
+        }
+
+        setMFAError(message);
         error(JSON.stringify(data));
         return;
-      } else {
-        toaster.error(localLL.errors.mfaStartGeneric());
       }
-
-      setMFAError(message);
-      error(JSON.stringify(data));
+    } catch (rej) {
+      error(`Failed to execute proxy request: ${rej}`);
+      toaster.error(localLL.errors.mfaFinishGeneric());
       return;
     }
   };

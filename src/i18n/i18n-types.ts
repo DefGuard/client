@@ -1703,6 +1703,10 @@ type RootTranslation = {
 					 */
 					mfaStartGeneric: string
 					/**
+					 * C​o​u​l​d​ ​n​o​t​ ​f​i​n​i​s​h​ ​M​F​A​ ​p​r​o​c​e​s​s​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​ ​o​r​ ​c​o​n​t​a​c​t​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					mfaFinishGeneric: string
+					/**
 					 * C​o​u​l​d​ ​n​o​t​ ​f​i​n​d​ ​i​n​s​t​a​n​c​e​.
 					 */
 					instanceNotFound: string
@@ -3391,6 +3395,10 @@ export type TranslationFunctions = {
 					 * Could not start MFA process. Please try again or contact administrator.
 					 */
 					mfaStartGeneric: () => LocalizedString
+					/**
+					 * Could not finish MFA process. Please try again or contact administrator.
+					 */
+					mfaFinishGeneric: () => LocalizedString
 					/**
 					 * Could not find instance.
 					 */
