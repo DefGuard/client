@@ -9,7 +9,7 @@ export MACOSX_DEPLOYMENT_TARGET=13.5
 
 # Build BoringTun.
 
-pushd ../../boringtun
+pushd boringtun
 
 for TARGET in aarch64-apple-darwin x86_64-apple-darwin
 do
