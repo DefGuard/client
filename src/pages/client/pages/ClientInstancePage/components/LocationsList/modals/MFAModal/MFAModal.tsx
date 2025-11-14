@@ -117,56 +117,62 @@ export const MFAModal = () => {
         location_id: location.network_id,
       };
 
-      const response = await fetch(mfaStartUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          CLIENT_VERSION_HEADER: platformInfo.client_version,
-          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
-        },
-        body: JSON.stringify(data),
-      });
+      try {
+        const response = await fetch(mfaStartUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            CLIENT_VERSION_HEADER: platformInfo.client_version,
+            CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
+          },
+          body: JSON.stringify(data),
+        });
 
-      if (response.ok) {
-        const data = (await response.json()) as MFAStartResponse;
+        if (response.ok) {
+          const data = (await response.json()) as MFAStartResponse;
 
-        switch (method) {
-          case 0:
-            setScreen('authenticator_app');
-            break;
-          case 1:
-            setScreen('email');
-            break;
-          case 2:
-            setScreen('openid_login');
-            break;
-          case 4:
-            // just to be safe
-            if (!isPresent(data.challenge)) {
-              toaster.error('Unsupported response from proxy');
-            }
-            setScreen('mobile_approve');
-            break;
-          default:
-            toaster.error(localLL.errors.mfaStartGeneric());
+          switch (method) {
+            case 0:
+              setScreen('authenticator_app');
+              break;
+            case 1:
+              setScreen('email');
+              break;
+            case 2:
+              setScreen('openid_login');
+              break;
+            case 4:
+              // just to be safe
+              if (!isPresent(data.challenge)) {
+                toaster.error('Unsupported response from proxy');
+              }
+              setScreen('mobile_approve');
+              break;
+            default:
+              toaster.error(localLL.errors.mfaStartGeneric());
+              return;
+          }
+          setStartResponse(data);
+          return data;
+        } else {
+          const errorData = ((await response.json()) as unknown as MFAError).error;
+          error(`MFA failed to start with the following error: ${errorData}`);
+          if (method === 2) {
+            setScreen('openid_unavailable');
             return;
-        }
-        setStartResponse(data);
-        return data;
-      } else {
-        const errorData = ((await response.json()) as unknown as MFAError).error;
-        error(`MFA failed to start with the following error: ${errorData}`);
-        if (method === 2) {
-          setScreen('openid_unavailable');
+          }
+
+          if (errorData === 'selected MFA method not available') {
+            toaster.error(localLL.errors.mfaNotConfigured());
+          } else {
+            toaster.error(localLL.errors.mfaStartGeneric());
+          }
+
           return;
         }
-
-        if (errorData === 'selected MFA method not available') {
-          toaster.error(localLL.errors.mfaNotConfigured());
-        } else {
-          toaster.error(localLL.errors.mfaStartGeneric());
-        }
-
+      } catch (rej) {
+        error(`Failed to execute proxy request: ${rej}`);
+        toaster.error(localLL.errors.mfaStartGeneric());
         return;
       }
     },
@@ -582,6 +588,8 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
       },
       body: JSON.stringify(data),
     });
+
+    console.log('response: ', response);
 
     if (response.ok) {
       closeModal();
