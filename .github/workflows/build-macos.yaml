@@ -5,7 +5,6 @@ on:
       - main
       - dev
       - "release/**"
-      - tauri_action
     paths-ignore:
       - "*.md"
       - "LICENSE"
