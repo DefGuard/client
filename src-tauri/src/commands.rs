@@ -394,6 +394,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             active: connected,
             pubkey: keys.pubkey,
             disable_all_traffic: instance.disable_all_traffic,
+            force_all_traffic: instance.force_all_traffic,
             enterprise_enabled: instance.enterprise_enabled,
             openid_display_name: instance.openid_display_name,
         });

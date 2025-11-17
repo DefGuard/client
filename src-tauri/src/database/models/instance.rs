@@ -16,6 +16,7 @@ pub struct Instance<I = NoId> {
     pub username: String,
     pub token: Option<String>,
     pub disable_all_traffic: bool,
+    pub force_all_traffic: bool,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,
 }
@@ -37,6 +38,7 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
             username: instance_info.username,
             token: None,
             disable_all_traffic: instance_info.disable_all_traffic,
+            force_all_traffic: instance_info.force_all_traffic.unwrap_or_else(|| false),
             enterprise_enabled: instance_info.enterprise_enabled,
             openid_display_name: instance_info.openid_display_name,
         }
@@ -74,7 +76,8 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance ORDER BY name ASC;"
+            disable_all_traffic, force_all_traffic, enterprise_enabled, openid_display_name \
+            FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
@@ -88,7 +91,8 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance WHERE id = $1;",
+            disable_all_traffic, force_all_traffic, enterprise_enabled, openid_display_name \
+            FROM instance WHERE id = $1;",
             id
         )
         .fetch_optional(executor)
@@ -122,7 +126,8 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
-            disable_all_traffic, enterprise_enabled, openid_display_name FROM instance
+            disable_all_traffic, force_all_traffic, enterprise_enabled, openid_display_name \
+            FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -176,6 +181,7 @@ impl Instance<NoId> {
             username: self.username,
             token: self.token,
             disable_all_traffic: self.disable_all_traffic,
+            force_all_traffic: self.force_all_traffic,
             enterprise_enabled: self.enterprise_enabled,
             openid_display_name: self.openid_display_name,
         })
@@ -192,6 +198,7 @@ pub struct InstanceInfo<I = NoId> {
     pub active: bool,
     pub pubkey: String,
     pub disable_all_traffic: bool,
+    pub force_all_traffic: bool,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,
 }
