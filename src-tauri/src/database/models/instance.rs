@@ -52,13 +52,16 @@ impl Instance<Id> {
     {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
-            disable_all_traffic = $6, enterprise_enabled = $7, token = $8, openid_display_name = $9 WHERE id = $10;",
+            disable_all_traffic = $6, force_all_traffic = $7, enterprise_enabled = $8, token = $9, \
+            openid_display_name = $10 \
+            WHERE id = $11;",
             self.name,
             self.uuid,
             self.url,
             self.proxy_url,
             self.username,
             self.disable_all_traffic,
+            self.force_all_traffic,
             self.enterprise_enabled,
             self.token,
             self.openid_display_name,
@@ -159,8 +162,8 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            disable_all_traffic, enterprise_enabled) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+            disable_all_traffic, force_all_traffic, enterprise_enabled) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -168,6 +171,7 @@ impl Instance<NoId> {
             self.username,
             self.token,
             self.disable_all_traffic,
+            self.force_all_traffic,
             self.enterprise_enabled
         )
         .fetch_one(executor)
