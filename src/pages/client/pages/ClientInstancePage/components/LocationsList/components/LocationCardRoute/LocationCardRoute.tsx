@@ -37,6 +37,7 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.predefinedTraffic(),
         value: 0,
+        disabled: selectedDefguardInstance?.force_all_traffic,
       },
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),

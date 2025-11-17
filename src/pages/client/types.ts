@@ -8,6 +8,7 @@ export type DefguardInstance = {
   active: boolean;
   pubkey: string;
   disable_all_traffic: boolean;
+  force_all_traffic: boolean;
   openid_display_name?: string;
 };
 
