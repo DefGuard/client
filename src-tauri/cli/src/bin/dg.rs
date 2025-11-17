@@ -159,8 +159,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
     let mut wgapi =
         WGApi::<Kernel>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
     #[cfg(target_os = "macos")]
-    let mut wgapi =
-        WGApi::<Userspace>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
+    let mut wgapi = WGApi::<Userspace>::new(ifname.clone()).expect("Failed to setup WireGuard API");
 
     // Create new interface.
     debug!("Creating new interface {ifname}");
@@ -617,7 +616,7 @@ async fn main() {
         let token = submatches
             .get_one::<String>("token")
             .expect("No enrollment token was provided or it's invalid")
-            .to_string();
+            .clone();
         let url = submatches
             .get_one::<Url>("url")
             .expect("No enrollment URL was provided or it's invalid");

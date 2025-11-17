@@ -80,7 +80,7 @@ pub(crate) async fn setup_interface(
     debug!("Found free port: {port} for interface {interface_name}.");
 
     let mut interface_config = location
-        .interface_configuration(pool, interface_name.clone(), preshared_key)
+        .interface_configuration(pool, interface_name.clone(), preshared_key, mtu)
         .await?;
     interface_config.mtu = mtu;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
@@ -124,7 +124,7 @@ pub(crate) async fn setup_interface(
     location: &Location<Id>,
     name: &str,
     preshared_key: Option<String>,
-    _mtu: Option<u32>,
+    mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
@@ -132,7 +132,7 @@ pub(crate) async fn setup_interface(
 
     let (dns, dns_search) = location.dns();
     let tunnel_config = location
-        .tunnel_configurarion(pool, preshared_key, dns, dns_search)
+        .tunnel_configurarion(pool, preshared_key, dns, dns_search, mtu)
         .await?;
 
     tunnel_config.save();
@@ -156,7 +156,7 @@ pub(crate) async fn stats_handler(
         interval.tick().await;
 
         let all_stats = all_tunnel_stats();
-        if all_stats.len() == 0 {
+        if all_stats.is_empty() {
             continue;
         }
         // Let `all_stats` be `Send`.
@@ -565,7 +565,7 @@ pub async fn get_tunnel_interface_details(
             address: tunnel.address,
             dns: tunnel.dns,
             listen_port,
-            peer_pubkey: peer_pubkey.to_string(),
+            peer_pubkey: peer_pubkey.clone(),
             peer_endpoint: tunnel.endpoint,
             allowed_ips: tunnel.allowed_ips.unwrap_or_default(),
             persistent_keepalive_interval,

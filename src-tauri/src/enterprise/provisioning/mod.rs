@@ -58,6 +58,7 @@ impl ProvisioningConfig {
     }
 }
 
+#[must_use]
 pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningConfig> {
     debug!("Trying to find provisioning config in {app_data_dir:?}");
 
