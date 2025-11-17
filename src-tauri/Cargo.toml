@@ -72,8 +72,7 @@ log = { version = "0.4", features = ["serde"] }
 prost.workspace = true
 regex = "1.11"
 reqwest.workspace = true
-# 0.21.2 causes config parsing errors
-rust-ini = "=0.21.1"
+rust-ini = "0.21"
 semver = "1.0"
 serde.workspace = true
 serde_json.workspace = true

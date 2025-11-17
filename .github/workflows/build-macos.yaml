@@ -5,6 +5,7 @@ on:
       - main
       - dev
       - "release/**"
+      - tauri_action
     paths-ignore:
       - "*.md"
       - "LICENSE"
@@ -62,14 +63,13 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
 
-      - name: Build app
-        # Switch back to tauri-action when this gets merged https://github.com/tauri-apps/tauri/pull/14379
-        # uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+      - uses: tauri-apps/tauri-action@v0.5.25
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: cd src-tauri && cargo tauri build --bundles app --target universal-apple-darwin
+        with:
+          args: --target universal-apple-darwin
 
       - name: Build installation package
         run: |
