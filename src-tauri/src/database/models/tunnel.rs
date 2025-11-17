@@ -1,5 +1,4 @@
-use core::fmt;
-use std::time::SystemTime;
+use std::{fmt, time::SystemTime};
 
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
@@ -256,7 +255,7 @@ impl Tunnel<NoId> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelStats<I = NoId> {
     id: I,
-    pub tunnel_id: Id,
+    pub(crate) tunnel_id: Id,
     upload: i64,
     download: i64,
     pub(crate) last_handshake: i64,

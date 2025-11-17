@@ -13,6 +13,13 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(target_os = "macos")]
+use crate::apple::stop_tunnel;
+#[cfg(not(target_os = "macos"))]
+use crate::service::{
+    proto::{DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest},
+    utils::DAEMON_CLIENT,
+};
 use crate::{
     active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
@@ -37,13 +44,6 @@ use crate::{
         service_log_watcher::stop_log_watcher_task,
     },
     proto::DeviceConfigResponse,
-    service::{
-        proto::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-            ServiceLocation,
-        },
-        utils::DAEMON_CLIENT,
-    },
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         construct_platform_header, disconnect_interface, execute_command,
@@ -246,13 +246,13 @@ pub async fn save_device_config(
     let mut instance: Instance = instance_info.into();
     if response.token.is_some() {
         debug!(
-            "The newly saved device config has a polling token, automatic configuration \
-            polling will be possible if the core has an enterprise license."
+            "The newly saved device config has a polling token, automatic configuration polling \
+            will be possible if the core has an enterprise license."
         );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an \
-            update, configuration polling won't work",
+            "Missing polling token for instance {}, core and/or proxy services may need an update, \
+            configuration polling won't work",
             instance.name,
         );
     }
@@ -290,10 +290,38 @@ pub async fn save_device_config(
     transaction.commit().await?;
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
+
+    let locations = push_service_locations(&instance, keys).await?;
+
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
+        locations,
+        instance,
+    };
+    reload_tray_menu(&handle).await;
+
+    Ok(res)
+}
+
+#[cfg(target_os = "macos")]
+async fn push_service_locations(
+    instance: &Instance<Id>,
+    keys: WireguardKeys<Id>,
+) -> Result<Vec<Location<Id>>, Error> {
+    // Nothing here... yet
+
+    Ok(Vec::new())
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn push_service_locations(
+    instance: &Instance<Id>,
+    keys: WireguardKeys<Id>,
+) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
-    let mut service_locations = Vec::<ServiceLocation>::new();
+    let mut service_locations = Vec::new();
 
     for saved_location in &locations {
         if saved_location.is_service_location() {
@@ -309,7 +337,7 @@ pub async fn save_device_config(
         let save_request = SaveServiceLocationsRequest {
             service_locations: service_locations.clone(),
             instance_id: instance.uuid.clone(),
-            private_key: keys.prvkey.clone(),
+            private_key: keys.prvkey,
         };
         debug!(
             "Saving {} service locations to the daemon for instance {}({}).",
@@ -334,14 +362,7 @@ pub async fn save_device_config(
         );
     }
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
-    let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
-        locations,
-        instance,
-    };
-    reload_tray_menu(&handle).await;
-
-    Ok(res)
+    Ok(locations)
 }
 
 #[tauri::command(async)]
@@ -582,7 +603,7 @@ pub(crate) async fn do_update_instance(
         "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
-    let mut service_locations = Vec::<ServiceLocation>::new();
+    let mut service_locations = Vec::new();
 
     // check if locations have changed
     if locations_changed {
@@ -591,7 +612,7 @@ pub(crate) async fn do_update_instance(
             "Updating locations for instance {}({}).",
             instance.name, instance.id
         );
-        // fetch existing locations for given instance
+        // Fetch existing locations for a given instance.
         let mut current_locations =
             Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
         for dev_config in response.configs {
@@ -663,10 +684,13 @@ pub(crate) async fn do_update_instance(
             "No service locations for instance {}({}), removing all existing service locations connections if there are any.",
             instance.name, instance.id
         );
-        let delete_request = DeleteServiceLocationsRequest {
-            instance_id: instance.uuid.clone(),
-        };
-        DAEMON_CLIENT
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let delete_request = DeleteServiceLocationsRequest {
+                instance_id: instance.uuid.clone(),
+            };
+            DAEMON_CLIENT
             .clone()
             .delete_service_locations(delete_request)
             .await
@@ -677,10 +701,11 @@ pub(crate) async fn do_update_instance(
                 );
                 Error::InternalError(err.to_string())
             })?;
-        debug!(
-            "Successfully removed all service locations from daemon for instance {}({})",
-            instance.name, instance.id
-        );
+            debug!(
+                "Successfully removed all service locations from daemon for instance {}({})",
+                instance.name, instance.id
+            );
+        }
     } else {
         debug!(
             "Processing {} service location(s) for instance {}({})",
@@ -689,42 +714,45 @@ pub(crate) async fn do_update_instance(
             instance.id
         );
 
-        let save_request = SaveServiceLocationsRequest {
-            service_locations: service_locations.clone(),
-            instance_id: instance.uuid.clone(),
-            private_key: private_key.clone(),
-        };
+        #[cfg(not(target_os = "macos"))]
+        {
+            let save_request = SaveServiceLocationsRequest {
+                service_locations: service_locations.clone(),
+                instance_id: instance.uuid.clone(),
+                private_key: private_key.clone(),
+            };
 
-        debug!(
-            "Sending request to daemon to save {} service location(s) for instance {}({})",
-            save_request.service_locations.len(),
-            instance.name,
-            instance.id
-        );
+            debug!(
+                "Sending request to daemon to save {} service location(s) for instance {}({})",
+                save_request.service_locations.len(),
+                instance.name,
+                instance.id
+            );
 
-        DAEMON_CLIENT
-            .clone()
-            .save_service_locations(save_request)
-            .await
-            .map_err(|err| {
-                error!(
+            DAEMON_CLIENT
+                .clone()
+                .save_service_locations(save_request)
+                .await
+                .map_err(|err| {
+                    error!(
                     "Error while saving service locations to the daemon for instance {}({}): {err}",
                     instance.name, instance.id,
                 );
-                Error::InternalError(err.to_string())
-            })?;
+                    Error::InternalError(err.to_string())
+                })?;
 
-        info!(
-            "Successfully saved {} service location(s) to daemon for instance {}({})",
-            service_locations.len(),
-            instance.name,
-            instance.id
-        );
+            info!(
+                "Successfully saved {} service location(s) to daemon for instance {}({})",
+                service_locations.len(),
+                instance.name,
+                instance.id
+            );
 
-        debug!(
-            "Completed processing all service locations for instance {}({})",
-            instance.name, instance.id
-        );
+            debug!(
+                "Completed processing all service locations for instance {}({})",
+                instance.name, instance.id
+            );
+        }
     }
 
     Ok(())
@@ -937,6 +965,53 @@ pub async fn update_location_routing(
     }
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command(async)]
+pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
+    let app_state = handle.state::<AppState>();
+    let mut transaction = DB_POOL.begin().await?;
+
+    let Some(instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
+        error!("Couldn't delete instance: instance with ID {instance_id} could not be found.");
+        return Err(Error::NotFound);
+    };
+    debug!("The instance that is being deleted has been identified as {instance}");
+
+    let instance_locations =
+        Location::find_by_instance_id(&mut *transaction, instance_id, false).await?;
+    if !instance_locations.is_empty() {
+        debug!(
+            "Found locations associated with the instance {instance}, closing their connections."
+        );
+    }
+    for location in instance_locations {
+        if let Some(connection) = app_state
+            .remove_connection(location.id, ConnectionType::Location)
+            .await
+        {
+            let result = stop_tunnel(&location.name);
+            error!("stop_tunnel() for location returned {result:?}");
+            if !result {
+                return Err(Error::InternalError("Error from tunnel".into()));
+            }
+        }
+    }
+
+    instance.delete(&mut *transaction).await?;
+
+    transaction.commit().await?;
+
+    reload_tray_menu(&handle).await;
+
+    let theme = { app_state.app_config.lock().unwrap().tray_theme };
+    configure_tray_icon(&handle, theme).await?;
+
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    info!("Successfully deleted instance {instance}.");
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance with ID {instance_id}");
@@ -989,8 +1064,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     transaction.commit().await?;
 
-    DAEMON_CLIENT
-        .clone()
+    client
         .delete_service_locations(DeleteServiceLocationsRequest {
             instance_id: instance.uuid.clone(),
         })
@@ -1005,7 +1079,6 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
-    let app_state: State<AppState> = handle.state();
     let theme = { app_state.app_config.lock().unwrap().tray_theme };
     configure_tray_icon(&handle, theme).await?;
 
@@ -1095,6 +1168,14 @@ pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
     }
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command(async)]
+pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
+    // TODO: implementation
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting tunnel with ID {tunnel_id}");

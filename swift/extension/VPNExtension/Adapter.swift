@@ -31,6 +31,10 @@ enum State {
     /// Adapter state.
     private var state: State = .stopped
 
+    /// For statistics returned to Rust code.
+    var locationId: UInt64?
+    var tunnelId: UInt64?
+
     private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
 
     /// Designated initializer.
@@ -71,6 +75,8 @@ enum State {
             keepAlive: tunnelConfiguration.peers[0].persistentKeepAlive,
             index: 0
         )
+        locationId = tunnelConfiguration.locationId
+        tunnelId = tunnelConfiguration.tunnelId
 
         logger.info("Connecting to endpoint")
         guard let endpoint = tunnelConfiguration.peers[0].endpoint else {
@@ -84,10 +90,6 @@ enum State {
         readPackets()
 
         state = .running
-
-        // Test notifications
-        //        let notificationName = CFNotificationName("net.defguard.client.start" as CFString)
-        //        CFNotificationCenterPostNotification(notificationCenter, notificationName, nil, nil, false)
     }
 
     func stop() {
@@ -103,16 +105,18 @@ enum State {
 
         state = .stopped
         logger.info("Tunnel stopped")
-
-        // Test notifications
-        //        let notificationName = CFNotificationName("net.defguard.client.stop" as CFString)
-        //        CFNotificationCenterPostNotification(notificationCenter, notificationName, nil, nil, false)
     }
 
     // Obtain tunnel statistics.
     func stats() -> Stats? {
         if let stats = tunnel?.stats() {
-            return Stats(txBytes: stats.txBytes, rxBytes: stats.rxBytes)
+            return Stats(
+                txBytes: stats.txBytes,
+                rxBytes: stats.rxBytes,
+                lastHandshake: stats.lastHandshake,
+                locationId: locationId,
+                tunnelId: tunnelId
+            )
         }
         return nil
     }

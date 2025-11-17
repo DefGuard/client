@@ -2,6 +2,10 @@ import Foundation
 import NetworkExtension
 
 final class TunnelConfiguration: Codable {
+    // One or the other.
+    var locationId: UInt64?
+    var tunnelId: UInt64?
+
     var name: String
     var privateKey: String
     var addresses: [IpAddrMask] = []
@@ -78,8 +82,9 @@ final class TunnelConfiguration: Codable {
         // Routes to interface addresses.
         for addr_mask in addresses {
             if addr_mask.address is IPv4Address {
-                let route = NEIPv4Route(destinationAddress: "\(addr_mask.address)",
-                                        subnetMask: "\(addr_mask.mask())")
+                let route = NEIPv4Route(
+                    destinationAddress: "\(addr_mask.address)",
+                    subnetMask: "\(addr_mask.mask())")
                 route.gatewayAddress = "\(addr_mask.address)"
                 ipv4IncludedRoutes.append(route)
             } else if addr_mask.address is IPv6Address {
@@ -97,12 +102,14 @@ final class TunnelConfiguration: Codable {
             for addr_mask in peer.allowedIPs {
                 if addr_mask.address is IPv4Address {
                     ipv4IncludedRoutes.append(
-                        NEIPv4Route(destinationAddress: "\(addr_mask.address)",
-                                    subnetMask: "\(addr_mask.mask())"))
+                        NEIPv4Route(
+                            destinationAddress: "\(addr_mask.address)",
+                            subnetMask: "\(addr_mask.mask())"))
                 } else if addr_mask.address is IPv6Address {
                     ipv6IncludedRoutes.append(
-                        NEIPv6Route(destinationAddress: "\(addr_mask.address)",
-                                    networkPrefixLength: NSNumber(value: addr_mask.cidr)))
+                        NEIPv6Route(
+                            destinationAddress: "\(addr_mask.address)",
+                            networkPrefixLength: NSNumber(value: addr_mask.cidr)))
                 }
             }
         }

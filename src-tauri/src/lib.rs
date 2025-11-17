@@ -17,14 +17,14 @@ use self::database::models::{Id, NoId};
 
 pub mod active_connections;
 pub mod app_config;
+#[cfg(target_os = "macos")]
+mod apple;
 pub mod appstate;
 pub mod commands;
 pub mod database;
 pub mod enterprise;
 pub mod error;
 pub mod events;
-#[cfg(target_os = "macos")]
-mod export;
 pub mod log_watcher;
 pub mod periodic;
 pub mod proto;

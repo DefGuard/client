@@ -7,8 +7,6 @@ use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use prost::Message;
 use sqlx::query;
-#[cfg(target_os = "macos")]
-use swift_rs::SRString;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
@@ -24,7 +22,12 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::export::{start_tunnel, stop_tunnel, tunnel_stats};
+use crate::apple::{all_tunnel_stats, start_tunnel, stop_tunnel};
+#[cfg(not(target_os = "macos"))]
+use crate::service::{
+    proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
+    utils::DAEMON_CLIENT,
+};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -43,15 +46,14 @@ use crate::{
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     proto::ClientPlatformInfo,
-    service::{
-        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
-        utils::DAEMON_CLIENT,
-    },
     ConnectionType,
 };
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
+// Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
+#[cfg(target_os = "macos")]
+static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
 /// Setup client interface for `Instance`.
 #[cfg(not(target_os = "macos"))]
@@ -133,28 +135,84 @@ pub(crate) async fn setup_interface(
         .tunnel_configurarion(pool, preshared_key, dns, dns_search)
         .await?;
 
-    unsafe {
-        let json: SRString = serde_json::to_string(&tunnel_config)
-            .unwrap()
-            .as_str()
-            .into();
-        let result = start_tunnel(&json);
-        error!("start_tunnel() returned {result:?}");
-    }
+    tunnel_config.save();
+    tokio::time::sleep(TUNNEL_START_DELAY).await;
+    start_tunnel(&location.name);
+
     Ok(interface_name)
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) async fn stats_handler(_pool: DbPool, name: String, _connection_type: ConnectionType) {
+pub(crate) async fn stats_handler(
+    pool: DbPool,
+    _interface_name: String,
+    _connection_type: ConnectionType,
+) {
     const CHECK_INTERVAL: Duration = Duration::from_secs(5);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 
     loop {
+        info!("Stats loop");
         interval.tick().await;
-        // TODO: check all known localtions/tunnels, not just `name`.
-        if let Some(stats) = unsafe { tunnel_stats(&name.as_str().into()) } {
-            info!("Tunnel stats: {} {}", stats.tx_bytes, stats.rx_bytes);
+
+        let all_stats = all_tunnel_stats();
+        if all_stats.len() == 0 {
+            continue;
         }
+        // Let `all_stats` be `Send`.
+        let all_stats = all_stats.as_slice().to_owned();
+
+        // let mut transaction = match pool.begin().await {
+        //     Ok(transactions) => transactions,
+        //     Err(err) => {
+        //         error!(
+        //             "Failed to begin database transaction for saving location/tunnel stats: {err}",
+        //         );
+        //         continue;
+        //     }
+        // };
+
+        for stats in all_stats {
+            info!(
+                "==> Stats: {} {} {}",
+                stats.last_handshake, stats.tx_bytes, stats.rx_bytes
+            );
+
+            if let Some(location_id) = stats.location_id {
+                //let location_stats = LocationStats {
+                //};
+                /*match location_stats.save(&mut *transaction).await {
+                    Ok(_) => {
+                        debug!("Saved network usage stats for location ID {location_id}");
+                    }
+                    Err(err) => {
+                        error!(
+                            "Failed to save network usage stats for location ID {location_id}: \
+                            {err}"
+                        );
+                    }
+                }*/
+            }
+            if let Some(tunnel_id) = stats.tunnel_id {
+                //let tunnel_stats = TunnelStats {
+                //};
+                /*match tunnel_stats.save(&mut *transaction).await {
+                    Ok(_) => {
+                        debug!("Saved network usage stats for tunnel ID {tunnel_id}");
+                    }
+                    Err(err) => {
+                        error!(
+                            "Failed to save network usage stats for tunnel ID {tunnel_id}: \
+                            {err}"
+                        );
+                    }
+                }*/
+            }
+        }
+
+        // if let Err(err) = transaction.commit().await {
+        //     error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        // }
     }
 }
 
@@ -297,7 +355,7 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
-// helper function to get log file directory for the defguard-service daemon
+/// Helper function to get log file directory for `defguard-service` daemon.
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
     #[cfg(windows)]
@@ -406,59 +464,64 @@ pub async fn setup_interface_tunnel(
         peers: vec![peer.clone()],
         mtu,
     };
-    debug!("Creating interface {interface_config:?}");
-    let request = CreateInterfaceRequest {
-        config: Some(interface_config.clone().into()),
-        dns: tunnel.dns.clone(),
-    };
-    if let Some(pre_up) = &tunnel.pre_up {
-        debug!(
-            "Executing defined PreUp command before setting up the interface {} for the \
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        debug!("Creating interface {interface_config:?}");
+        let request = CreateInterfaceRequest {
+            config: Some(interface_config.clone().into()),
+            dns: tunnel.dns.clone(),
+        };
+        if let Some(pre_up) = &tunnel.pre_up {
+            debug!(
+                "Executing defined PreUp command before setting up the interface {} for the \
             tunnel {tunnel}: {pre_up}",
-            interface_config.name
-        );
-        let _ = execute_command(pre_up);
-        info!(
-            "Executed defined PreUp command before setting up the interface {} for the \
+                interface_config.name
+            );
+            let _ = execute_command(pre_up);
+            info!(
+                "Executed defined PreUp command before setting up the interface {} for the \
             tunnel {tunnel}: {pre_up}",
-            interface_config.name
-        );
-    }
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-        error!(
-            "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
-            interface_config.name
-        );
-        Err(Error::InternalError(format!(
+                interface_config.name
+            );
+        }
+        if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+            error!(
+                "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
+                interface_config.name
+            );
+            return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
             interface_config.name,
             error.message()
-        )))
-    } else {
-        info!(
-            "Network interface {} for tunnel {tunnel} created successfully.",
-            interface_config.name
-        );
-        if let Some(post_up) = &tunnel.post_up {
-            debug!(
-                "Executing defined PostUp command after setting up the interface {} for the \
-                tunnel {tunnel}: {post_up}",
+        )));
+        } else {
+            info!(
+                "Network interface {} for tunnel {tunnel} created successfully.",
                 interface_config.name
             );
-            let _ = execute_command(post_up);
-            info!(
-                "Executed defined PostUp command after setting up the interface {} for the \
+            if let Some(post_up) = &tunnel.post_up {
+                debug!(
+                    "Executing defined PostUp command after setting up the interface {} for the \
                 tunnel {tunnel}: {post_up}",
+                    interface_config.name
+                );
+                let _ = execute_command(post_up);
+                info!(
+                    "Executed defined PostUp command after setting up the interface {} for the \
+                tunnel {tunnel}: {post_up}",
+                    interface_config.name
+                );
+            }
+            debug!(
+                "Created interface {} with config: {interface_config:?}",
                 interface_config.name
             );
         }
-        debug!(
-            "Created interface {} with config: {interface_config:?}",
-            interface_config.name
-        );
-        Ok(interface_name)
     }
+
+    Ok(interface_name)
 }
 
 pub async fn get_tunnel_interface_details(
@@ -673,7 +736,6 @@ pub(crate) async fn disconnect_interface(
         "Disconnecting interface {}.",
         active_connection.interface_name
     );
-    let mut client = DAEMON_CLIENT.clone();
     let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
@@ -689,13 +751,13 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = unsafe {
-                    let name: SRString = location.name.as_str().into();
-                    stop_tunnel(&name)
-                };
-                error!("stop_tunnel() returned {result:?}");
+                let result = stop_tunnel(&location.name);
+                error!(
+                    "stop_tunnel() for location {} returned {result:?}",
+                    location.name
+                );
                 if !result {
-                    return Err(Error::InternalError("Error from Swift".into()));
+                    return Err(Error::InternalError("Error from tunnel".into()));
                 }
             }
 
@@ -710,7 +772,7 @@ pub(crate) async fn disconnect_interface(
                     {}...",
                     active_connection.interface_name, location.name
                 );
-                if let Err(error) = client.remove_interface(request).await {
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
                     let msg = if error.code() == Code::Unavailable {
                         format!(
                             "Couldn't remove interface {}. Background service is unavailable. \
@@ -762,19 +824,35 @@ pub(crate) async fn disconnect_interface(
                     active_connection.interface_name
                 );
             }
-            let request = RemoveInterfaceRequest {
-                interface_name,
-                endpoint: tunnel.endpoint.clone(),
-            };
-            if let Err(error) = client.remove_interface(request).await {
+
+            #[cfg(target_os = "macos")]
+            {
+                let result = stop_tunnel(&tunnel.name);
                 error!(
-                    "Error while removing interface {}, error details: {error:?}",
-                    active_connection.interface_name
+                    "stop_tunnel() for tunnel {} returned {result:?}",
+                    tunnel.name
                 );
-                return Err(Error::InternalError(format!(
-                    "Failed to remove interface, error message: {}",
-                    error.message()
-                )));
+                if !result {
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: tunnel.endpoint.clone(),
+                };
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    error!(
+                        "Error while removing interface {}, error details: {error:?}",
+                        active_connection.interface_name
+                    );
+                    return Err(Error::InternalError(format!(
+                        "Failed to remove interface, error message: {}",
+                        error.message()
+                    )));
+                }
             }
             if let Some(post_down) = &tunnel.post_down {
                 debug!(

@@ -321,10 +321,23 @@ fn main() {
         // Handle shutdown.
         RunEvent::Exit => {
             debug!("Exiting the application's main event loop.");
-            tauri::async_runtime::block_on(async {
+            let handle = tauri::async_runtime::spawn(async {
                 let _ = close_all_connections().await;
                 // This will clean the database file, pruning write-ahead log.
                 DB_POOL.close().await;
+            });
+            // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
+            // create a temporary one.
+            #[cfg(target_os = "macos")]
+            {
+                use objc2_foundation::{NSDate, NSRunLoop};
+                let run_loop = NSRunLoop::currentRunLoop();
+                // Should be enough to quit.
+                let date = NSDate::dateWithTimeIntervalSinceNow(2.0);
+                run_loop.runUntilDate(&date);
+            }
+            tauri::async_runtime::block_on(async {
+                let _ = handle.await;
             });
         }
         _ => {
