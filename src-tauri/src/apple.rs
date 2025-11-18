@@ -7,7 +7,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::channel,
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -15,11 +15,13 @@ use block2::RcBlock;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNumber,
-    NSString,
+    ns_string, NSArray, NSData, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
+    NSNumber, NSString,
 };
-use objc2_network_extension::{NETunnelProviderManager, NETunnelProviderProtocol};
-use serde::Serialize;
+use objc2_network_extension::{
+    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession,
+};
+use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
 
 use crate::{
@@ -32,12 +34,18 @@ use crate::{
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 
 // Should match the declaration in Swift.
+#[derive(Deserialize)]
 #[repr(C)]
 pub(crate) struct Stats {
+    #[serde(rename = "locationId")]
     pub(crate) location_id: Option<Id>,
+    #[serde(rename = "tunnelId")]
     pub(crate) tunnel_id: Option<Id>,
+    #[serde(rename = "txBytes")]
     pub(crate) tx_bytes: u64,
+    #[serde(rename = "rxBytes")]
     pub(crate) rx_bytes: u64,
+    #[serde(rename = "lastHandshake")]
     pub(crate) last_handshake: u64,
 }
 
@@ -309,7 +317,78 @@ pub(crate) fn stop_tunnel(name: &str) -> bool {
 
 /// IMPORTANT: This is currently for testing. Assume the config has been saved.
 pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
-    Vec::<Stats>::new()
+    let all_stats = Arc::new(Mutex::new(Vec::new()));
+    let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
+
+    let all_stats_clone = Arc::clone(&all_stats);
+    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
+        let Some(data) = (unsafe { data_ptr.as_ref() }) else {
+            error!("No data");
+            return;
+        };
+        info!("Received message from tunnel of size {}", data.len());
+        if let Ok(stats) = serde_json::from_slice::<Stats>(data.to_vec().as_slice()) {
+            all_stats_clone.lock().unwrap().push(stats)
+        } else {
+            warn!("Failed to deserialize tunnel stats");
+        }
+    });
+
+    let handler = RcBlock::new(
+        move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
+            if !error_ptr.is_null() {
+                error!("Failed to load tunnel provider managers.");
+                return;
+            }
+
+            let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
+                error!("No managers");
+                return;
+            };
+
+            for manager in managers {
+                let Some(vpn_protocol) = (unsafe { manager.protocolConfiguration() }) else {
+                    continue;
+                };
+                let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>()
+                else {
+                    error!("Failed to downcast to NETunnelProviderProtocol");
+                    continue;
+                };
+                // Sometimes all managers from all apps come through, so filter by bundle ID.
+                if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
+                    if bundle_id != plugin_bundle_id {
+                        continue;
+                    }
+                }
+
+                let Ok(session) =
+                    unsafe { manager.connection() }.downcast::<NETunnelProviderSession>()
+                else {
+                    error!("Failed to downcast to NETunnelProviderSession");
+                    continue;
+                };
+
+                let message_data = NSData::new();
+                if unsafe {
+                    session.sendProviderMessage_returnError_responseHandler(
+                        &message_data,
+                        None,
+                        Some(&response_handler),
+                    )
+                } {
+                    info!("Message sent to NETunnelProviderSession");
+                } else {
+                    error!("Failed to send to NETunnelProviderSession");
+                }
+            }
+        },
+    );
+    unsafe {
+        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
+    }
+
+    Arc::into_inner(all_stats).unwrap().into_inner().unwrap()
 }
 
 impl Location<Id> {
