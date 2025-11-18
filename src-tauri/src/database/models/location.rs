@@ -262,6 +262,7 @@ impl Location<Id> {
         executor: E,
         interface_name: String,
         preshared_key: Option<String>,
+        mtu: Option<u32>,
     ) -> Result<InterfaceConfiguration, Error>
     where
         E: SqliteExecutor<'e>,
@@ -341,7 +342,7 @@ impl Location<Id> {
             addresses,
             port: 0,
             peers: vec![peer],
-            mtu: None,
+            mtu,
         };
 
         Ok(interface_config)

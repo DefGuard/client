@@ -269,7 +269,7 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
     let token = instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
 
     Ok(InstanceInfoRequest {
-        token: (*token).to_string(),
+        token: (*token).clone(),
     })
 }
 

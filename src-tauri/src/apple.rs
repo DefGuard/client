@@ -15,8 +15,8 @@ use block2::RcBlock;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNull,
-    NSNumber, NSString,
+    ns_string, NSArray, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNumber,
+    NSString,
 };
 use objc2_network_extension::{NETunnelProviderManager, NETunnelProviderProtocol};
 use serde::Serialize;
@@ -43,7 +43,7 @@ pub(crate) struct Stats {
 
 /// Find `NETunnelProviderManager` in system preferences.
 fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
-    let name_string = NSString::from_str(&name);
+    let name_string = NSString::from_str(name);
     let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
     let (tx, rx) = channel();
 
@@ -87,7 +87,7 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
         },
     );
     unsafe {
-        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&*handler);
+        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
     }
 
     rx.recv().unwrap()
@@ -228,7 +228,7 @@ impl TunnelConfiguration {
 
         let dns_search = NSMutableArray::<NSString>::new();
         for entry in &self.dns_search {
-            dns_search.addObject(NSString::from_str(&entry).as_ref());
+            dns_search.addObject(NSString::from_str(entry).as_ref());
         }
         dict.insert(ns_string!("dnsSearch"), dns_search.as_ref());
 
@@ -244,7 +244,7 @@ impl TunnelConfiguration {
             let tunnel_protocol = NETunnelProviderProtocol::new();
             let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
             tunnel_protocol.setProviderBundleIdentifier(Some(&plugin_bundle_id));
-            let server_address = self.peers.get(0).map_or(String::new(), |peer| {
+            let server_address = self.peers.first().map_or(String::new(), |peer| {
                 peer.endpoint.map_or(String::new(), |sa| sa.to_string())
             });
             let server_address = NSString::from_str(&server_address);
@@ -319,6 +319,7 @@ impl Location<Id> {
         preshared_key: Option<String>,
         dns: Vec<IpAddr>,
         dns_search: Vec<String>,
+        mtu: Option<u32>,
     ) -> Result<TunnelConfiguration, Error>
     where
         E: SqliteExecutor<'e>,
@@ -400,7 +401,7 @@ impl Location<Id> {
             addresses,
             listen_port: Some(0),
             peers: vec![peer],
-            mtu: None,
+            mtu,
             dns,
             dns_search,
         })
@@ -413,6 +414,7 @@ impl Tunnel<Id> {
         executor: E,
         dns: Vec<IpAddr>,
         dns_search: Vec<String>,
+        mtu: Option<u32>,
     ) -> Result<TunnelConfiguration, Error>
     where
         E: SqliteExecutor<'e>,
@@ -489,7 +491,7 @@ impl Tunnel<Id> {
             addresses,
             listen_port: Some(0),
             peers: vec![peer],
-            mtu: None,
+            mtu,
             dns,
             dns_search,
         })

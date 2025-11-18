@@ -137,6 +137,7 @@ impl AppConfig {
     /// Wraps MTU in an Option. We don't store Option directly in AppConfig to avoid struct-patch
     /// ambiguity when applying updates coming from the frontend. An incoming MTU value of 0 is
     /// interpreted as a request to fall back to the default.
+    #[must_use]
     pub fn get_mtu(&self) -> Option<u32> {
         match self.mtu {
             0 => None,
