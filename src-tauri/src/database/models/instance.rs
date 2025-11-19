@@ -1,7 +1,7 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::proto;
@@ -15,8 +15,9 @@ pub struct Instance<I = NoId> {
     pub proxy_url: String,
     pub username: String,
     pub token: Option<String>,
-    pub disable_all_traffic: bool,
-    pub force_all_traffic: bool,
+    pub client_traffic_policy: ClientTrafficPolicy,
+    // pub disable_all_traffic: bool,
+    // pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,
 }
@@ -29,6 +30,15 @@ impl fmt::Display for Instance<Id> {
 
 impl From<proto::InstanceInfo> for Instance<NoId> {
     fn from(instance_info: proto::InstanceInfo) -> Self {
+        // Ensure backwards compatibility
+        let client_traffic_policy = match (
+            instance_info.client_traffic_policy,
+            instance_info.disable_all_traffic,
+        ) {
+            (Some(policy), _) => ClientTrafficPolicy::from(policy),
+            (None, true) => ClientTrafficPolicy::DisableAllTraffic,
+            (None, false) => ClientTrafficPolicy::None,
+        };
         Self {
             id: NoId,
             name: instance_info.name,
@@ -37,10 +47,19 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
             proxy_url: instance_info.proxy_url,
             username: instance_info.username,
             token: None,
-            disable_all_traffic: instance_info.disable_all_traffic,
-            force_all_traffic: instance_info.force_all_traffic.unwrap_or_else(|| false),
+            client_traffic_policy,
             enterprise_enabled: instance_info.enterprise_enabled,
             openid_display_name: instance_info.openid_display_name,
+        }
+    }
+}
+
+impl From<i32> for ClientTrafficPolicy {
+    fn from(value: i32) -> Self {
+        match value {
+            1 => ClientTrafficPolicy::DisableAllTraffic,
+            2 => ClientTrafficPolicy::ForceAllTraffic,
+            _ => ClientTrafficPolicy::None,
         }
     }
 }
@@ -52,16 +71,15 @@ impl Instance<Id> {
     {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
-            disable_all_traffic = $6, force_all_traffic = $7, enterprise_enabled = $8, token = $9, \
-            openid_display_name = $10 \
+            client_traffic_policy = $6, enterprise_enabled = $7, token = $8, \
+            openid_display_name = $9 \
             WHERE id = $11;",
             self.name,
             self.uuid,
             self.url,
             self.proxy_url,
             self.username,
-            self.disable_all_traffic,
-            self.force_all_traffic,
+            self.client_traffic_policy,
             self.enterprise_enabled,
             self.token,
             self.openid_display_name,
@@ -79,7 +97,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, force_all_traffic, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, openid_display_name \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -94,7 +112,7 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            disable_all_traffic, force_all_traffic, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, openid_display_name \
             FROM instance WHERE id = $1;",
             id
         )
@@ -129,7 +147,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
-            disable_all_traffic, force_all_traffic, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, openid_display_name \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -147,7 +165,7 @@ impl PartialEq<proto::InstanceInfo> for Instance<Id> {
             && self.url == other.url
             && self.proxy_url == other.proxy_url
             && self.username == other.username
-            && self.disable_all_traffic == other.disable_all_traffic
+            && self.client_traffic_policy == other.client_traffic_policy
             && self.enterprise_enabled == other.enterprise_enabled
             && self.openid_display_name == other.openid_display_name
     }
@@ -162,16 +180,17 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            disable_all_traffic, force_all_traffic, enterprise_enabled) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
+            client_traffic_policy , enterprise_enabled) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
             self.name,
             self.uuid,
             url,
             proxy_url,
             self.username,
             self.token,
-            self.disable_all_traffic,
-            self.force_all_traffic,
+            self.client_traffic_policy,
+            // self.disable_all_traffic,
+            // self.force_all_traffic,
             self.enterprise_enabled
         )
         .fetch_one(executor)
@@ -184,8 +203,9 @@ impl Instance<NoId> {
             proxy_url: self.proxy_url,
             username: self.username,
             token: self.token,
-            disable_all_traffic: self.disable_all_traffic,
-            force_all_traffic: self.force_all_traffic,
+            client_traffic_policy: self.client_traffic_policy,
+            // disable_all_traffic: self.disable_all_traffic,
+            // force_all_traffic: self.force_all_traffic,
             enterprise_enabled: self.enterprise_enabled,
             openid_display_name: self.openid_display_name,
         })
@@ -202,7 +222,7 @@ pub struct InstanceInfo<I = NoId> {
     pub active: bool,
     pub pubkey: String,
     pub disable_all_traffic: bool,
-    pub force_all_traffic: bool,
+    pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,
 }
@@ -212,3 +232,38 @@ impl fmt::Display for InstanceInfo<Id> {
         write!(f, "{}(ID: {})", self.name, self.id)
     }
 }
+
+/// Describes allowed traffic options for clients connecting to an instance.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[repr(u32)]
+#[serde(rename_all = "snake_case")]
+pub enum ClientTrafficPolicy {
+    /// No restrictions
+    None = 0,
+    /// Clients are not allowed to route all traffic through the VPN.
+    DisableAllTraffic = 1,
+    /// Clients are forced to route all traffic through the VPN.
+    ForceAllTraffic = 2,
+}
+
+impl From<i64> for ClientTrafficPolicy {
+    fn from(value: i64) -> Self {
+        match value {
+            1 => ClientTrafficPolicy::DisableAllTraffic,
+            2 => ClientTrafficPolicy::ForceAllTraffic,
+            _ => ClientTrafficPolicy::None,
+        }
+    }
+}
+
+// impl From<proto::ClientTrafficPolicy> for ClientTrafficPolicy {
+//     fn from(value: proto::ClientTrafficPolicy) -> Self {
+//         match value {
+//             ProtoLocationMfaMode::Unspecified | ProtoLocationMfaMode::Disabled => {
+//                 LocationMfaMode::Disabled
+//             }
+//             ProtoLocationMfaMode::Internal => LocationMfaMode::Internal,
+//             ProtoLocationMfaMode::External => LocationMfaMode::External,
+//         }
+//     }
+// }
