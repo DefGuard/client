@@ -1,3 +1,9 @@
+export enum ClientTrafficPolicy {
+  NONE = 'none',
+  DISABLE_ALL_TRAFFIC = 'disable_all_traffic',
+  FORCE_ALL_TRAFFIC = 'force_all_traffic',
+}
+
 export type DefguardInstance = {
   id: number;
   uuid: string;
@@ -7,8 +13,9 @@ export type DefguardInstance = {
   // connected
   active: boolean;
   pubkey: string;
-  disable_all_traffic: boolean;
-  force_all_traffic: boolean;
+  client_traffic_policy: ClientTrafficPolicy,
+  // disable_all_traffic: boolean;
+  // force_all_traffic: boolean;
   openid_display_name?: string;
 };
 

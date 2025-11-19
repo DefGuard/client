@@ -1,7 +1,7 @@
 use sqlx::SqliteExecutor;
 
 use crate::{
-    database::models::{instance::Instance, Id},
+    database::models::{instance::{ClientTrafficPolicy, Instance}, Id},
     error::Error,
 };
 
@@ -14,8 +14,7 @@ impl Instance<Id> {
             "Disabling enterprise features for instance {}({})",
             self.name, self.id
         );
-        self.enterprise_enabled = false;
-        self.disable_all_traffic = false;
+        self.client_traffic_policy = ClientTrafficPolicy::None;
         self.save(executor).await?;
         debug!(
             "Disabled enterprise features for instance {}({})",

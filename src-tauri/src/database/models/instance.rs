@@ -160,12 +160,17 @@ impl Instance<Id> {
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
 impl PartialEq<proto::InstanceInfo> for Instance<Id> {
     fn eq(&self, other: &proto::InstanceInfo) -> bool {
+        // TODO
+        let Some(other_policy) = other.client_traffic_policy else {
+            return false;
+        };
+        let other_policy = ClientTrafficPolicy::from(other_policy);
         self.name == other.name
             && self.uuid == other.id
             && self.url == other.url
             && self.proxy_url == other.proxy_url
             && self.username == other.username
-            && self.client_traffic_policy == other.client_traffic_policy
+            && self.client_traffic_policy == other_policy
             && self.enterprise_enabled == other.enterprise_enabled
             && self.openid_display_name == other.openid_display_name
     }
@@ -221,7 +226,7 @@ pub struct InstanceInfo<I = NoId> {
     pub proxy_url: String,
     pub active: bool,
     pub pubkey: String,
-    pub disable_all_traffic: bool,
+    // pub disable_all_traffic: bool,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,
@@ -249,9 +254,20 @@ pub enum ClientTrafficPolicy {
 impl From<i64> for ClientTrafficPolicy {
     fn from(value: i64) -> Self {
         match value {
-            1 => ClientTrafficPolicy::DisableAllTraffic,
-            2 => ClientTrafficPolicy::ForceAllTraffic,
-            _ => ClientTrafficPolicy::None,
+            1 => Self::DisableAllTraffic,
+            2 => Self::ForceAllTraffic,
+            _ => Self::None,
+        }
+    }
+}
+
+impl From<Option<i32>> for ClientTrafficPolicy {
+    fn from(value: Option<i32>) -> Self {
+        match value {
+            None => Self::None,
+            Some(1) => Self::DisableAllTraffic,
+            Some(2) => Self::ForceAllTraffic,
+            _ => Self::None,
         }
     }
 }

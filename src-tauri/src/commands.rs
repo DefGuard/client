@@ -27,7 +27,7 @@ use crate::{
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
-            instance::{Instance, InstanceInfo},
+            instance::{ClientTrafficPolicy, Instance, InstanceInfo},
             location::{Location, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
@@ -393,8 +393,9 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             proxy_url: instance.proxy_url,
             active: connected,
             pubkey: keys.pubkey,
-            disable_all_traffic: instance.disable_all_traffic,
-            force_all_traffic: instance.force_all_traffic,
+            // disable_all_traffic: instance.disable_all_traffic,
+            // force_all_traffic: instance.force_all_traffic,
+            client_traffic_policy: instance.client_traffic_policy,
             enterprise_enabled: instance.enterprise_enabled,
             openid_display_name: instance.openid_display_name,
         });
@@ -576,16 +577,16 @@ pub(crate) async fn do_update_instance(
     instance.url = instance_info.url;
     instance.proxy_url = instance_info.proxy_url;
     instance.username = instance_info.username;
-    // Make sure to update the locations too if we are disabling all traffic
-    if instance.disable_all_traffic != instance_info.disable_all_traffic
-        && instance_info.disable_all_traffic
-    {
-        debug!("Disabling all traffic for all locations of instance {instance}");
-        Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-        debug!("Disabled all traffic for all locations of instance {instance}");
-    }
-    instance.disable_all_traffic = instance_info.disable_all_traffic;
-    instance.enterprise_enabled = instance_info.enterprise_enabled;
+    // TODO
+    // // Make sure to update the locations too if we are disabling all traffic
+    // if instance.disable_all_traffic != instance_info.disable_all_traffic
+    //     && instance_info.disable_all_traffic
+    // {
+    //     debug!("Disabling all traffic for all locations of instance {instance}");
+    //     Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
+    //     debug!("Disabled all traffic for all locations of instance {instance}");
+    // }
+    instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
     instance.uuid = instance_info.id;
     // Token may be empty if it was not issued
@@ -928,7 +929,10 @@ pub async fn update_location_routing(
                 let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
                     .await?
                     .ok_or(Error::NotFound)?;
-                if instance.disable_all_traffic && route_all_traffic {
+                // TODO the same check for ForceAllTraffic
+                if (instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic)
+                    && route_all_traffic
+                {
                     error!(
                         "Couldn't update location routing: instance with id {} has \
                         route_all_traffic disabled.",
