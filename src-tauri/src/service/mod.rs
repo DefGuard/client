@@ -115,6 +115,75 @@ impl DaemonService {
     }
 }
 
+/// Helper function used to perform required configuration steps for a new interface.
+///
+/// This allows us to roll back interface creation if some configuration step fails.
+fn configure_new_interface(
+    ifname: &str,
+    request: &CreateInterfaceRequest,
+    wgapi: &mut WGApi,
+    interface_config: &InterfaceConfiguration,
+) -> Result<(), Status> {
+    // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
+    // be used as DNS servers and search domains respectively.
+    debug!("Preparing DNS configuration for interface {ifname}");
+    let dns_string = request.dns.clone().unwrap_or_default();
+    let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
+    // We assume that every entry that can't be parsed as an IP address is a domain name.
+    let mut dns = Vec::new();
+    let mut search_domains = Vec::new();
+    for entry in dns_entries {
+        if let Ok(ip) = entry.parse::<IpAddr>() {
+            dns.push(ip);
+        } else {
+            search_domains.push(entry);
+        }
+    }
+    debug!(
+        "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
+            {search_domains:?}"
+    );
+
+    let configure_interface_result = wgapi.configure_interface(interface_config);
+
+    configure_interface_result.map_err(|err| {
+        let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
+        error!("{msg}");
+        Status::new(Code::Internal, msg)
+    })?;
+
+    #[cfg(not(windows))]
+    {
+        debug!("Configuring interface {ifname} routing");
+        wgapi
+            .configure_peer_routing(&interface_config.peers)
+            .map_err(|err| {
+                let msg =
+                    format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
+                error!("{msg}");
+                Status::new(Code::Internal, msg)
+            })?;
+    }
+    if dns.is_empty() {
+        debug!(
+            "No DNS configuration provided for interface {ifname}, skipping DNS \
+                configuration"
+        );
+    } else {
+        debug!(
+            "The following DNS servers will be set: {dns:?}, search domains: \
+                {search_domains:?}"
+        );
+        wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
+            let msg = format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
+            error!("{msg}");
+            Status::new(Code::Internal, msg)
+        })?;
+    };
+
+    Ok(())
+}
+
 type InterfaceDataStream = Pin<Box<dyn Stream<Item = Result<InterfaceData, Status>> + Send>>;
 
 pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
@@ -251,6 +320,7 @@ impl DesktopDaemonService for DaemonService {
         let request = request.into_inner();
         let config: InterfaceConfiguration = request
             .config
+            .clone()
             .ok_or(Status::new(
                 Code::InvalidArgument,
                 "Missing interface config in request",
@@ -276,61 +346,23 @@ impl DesktopDaemonService for DaemonService {
         })?;
         info!("Done creating a new interface {ifname}");
 
-        // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
-        // be used as DNS servers and search domains respectively.
-        debug!("Preparing DNS configuration for interface {ifname}");
-        let dns_string = request.dns.unwrap_or_default();
-        let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
-        // We assume that every entry that can't be parsed as an IP address is a domain name.
-        let mut dns = Vec::new();
-        let mut search_domains = Vec::new();
-        for entry in dns_entries {
-            if let Ok(ip) = entry.parse::<IpAddr>() {
-                dns.push(ip);
-            } else {
-                search_domains.push(entry);
+        // attempt to configure new interface
+        // remove interface if configuration fails to avoid duplicate interfaces
+        match configure_new_interface(ifname, &request, wgapi, &config) {
+            Ok(_) => info!("Finished configuring new interface {ifname}"),
+            Err(err) => {
+                error!("Failed to configure interface {ifname}. Error: {err}");
+
+                debug!("Removing newly created interface {ifname} due to configuration failure");
+                wgapi.remove_interface().map_err(|err| {
+                    let msg = format!("Failed to remove WireGuard interface {ifname}: {err}");
+                    error!("{msg}");
+                    Status::new(Code::Internal, msg)
+                })?;
+
+                return Err(err);
             }
-        }
-        debug!(
-            "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
-            {search_domains:?}"
-        );
-
-        let configure_interface_result = wgapi.configure_interface(&config);
-
-        configure_interface_result.map_err(|err| {
-            let msg = format!("Failed to configure WireGuard interface {ifname}: {err}");
-            error!("{msg}");
-            Status::new(Code::Internal, msg)
-        })?;
-
-        #[cfg(not(windows))]
-        {
-            debug!("Configuring interface {ifname} routing");
-            wgapi.configure_peer_routing(&config.peers).map_err(|err| {
-                let msg =
-                    format!("Failed to configure routing for WireGuard interface {ifname}: {err}");
-                error!("{msg}");
-                Status::new(Code::Internal, msg)
-            })?;
-        }
-        if dns.is_empty() {
-            debug!(
-                "No DNS configuration provided for interface {ifname}, skipping DNS \
-                configuration"
-            );
-        } else {
-            debug!(
-                "The following DNS servers will be set: {dns:?}, search domains: \
-                {search_domains:?}"
-            );
-            wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
-                let msg =
-                    format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
-                error!("{msg}");
-                Status::new(Code::Internal, msg)
-            })?;
-        }
+        };
 
         debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
