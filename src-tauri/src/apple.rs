@@ -5,7 +5,7 @@ use std::{
     net::IpAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc::channel,
         Arc, Mutex,
     },
@@ -318,20 +318,26 @@ pub(crate) fn stop_tunnel(name: &str) -> bool {
 /// IMPORTANT: This is currently for testing. Assume the config has been saved.
 pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
     let all_stats = Arc::new(Mutex::new(Vec::new()));
+    // let all_stats_clone = Arc::clone(&all_stats);
     let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
+    let spinlock = Arc::new(AtomicUsize::new(1));
+    let spinlock_for_response = Arc::clone(&spinlock);
+    let spinlock_for_handler = Arc::clone(&spinlock);
 
-    let all_stats_clone = Arc::clone(&all_stats);
     let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
-        let Some(data) = (unsafe { data_ptr.as_ref() }) else {
-            error!("No data");
-            return;
-        };
-        info!("Received message from tunnel of size {}", data.len());
-        if let Ok(stats) = serde_json::from_slice::<Stats>(data.to_vec().as_slice()) {
-            all_stats_clone.lock().unwrap().push(stats)
+        if let Some(data) = (unsafe { data_ptr.as_ref() }) {
+            info!("Received message from tunnel of size {}", data.len());
+            if let Ok(stats) = serde_json::from_slice::<Stats>(data.to_vec().as_slice()) {
+                // if let Ok(mut all_stats_locked) = all_stats_clone.lock() {
+                //     all_stats_locked.push(stats);
+                // }
+            } else {
+                warn!("Failed to deserialize tunnel stats");
+            }
         } else {
-            warn!("Failed to deserialize tunnel stats");
+            warn!("No data");
         }
+        spinlock_for_response.fetch_sub(1, Ordering::Release);
     });
 
     let handler = RcBlock::new(
@@ -377,17 +383,25 @@ pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
                         Some(&response_handler),
                     )
                 } {
+                    spinlock_for_handler.fetch_add(1, Ordering::Release);
                     info!("Message sent to NETunnelProviderSession");
                 } else {
                     error!("Failed to send to NETunnelProviderSession");
                 }
             }
+            // Final release
+            spinlock_for_handler.fetch_sub(1, Ordering::Release);
         },
     );
     unsafe {
         NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
     }
 
+    // Wait for all handlers to complete.
+    while spinlock.load(Ordering::Acquire) != 0 {
+        spin_loop();
+    }
+    debug!("All stats aquired");
     Arc::into_inner(all_stats).unwrap().into_inner().unwrap()
 }
 
