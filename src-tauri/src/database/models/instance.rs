@@ -33,6 +33,7 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
         // Ensure backwards compatibility
         let client_traffic_policy = match (
             instance_info.client_traffic_policy,
+            #[allow(deprecated)]
             instance_info.disable_all_traffic,
         ) {
             (Some(policy), _) => ClientTrafficPolicy::from(policy),

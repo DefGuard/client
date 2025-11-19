@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO instance (name, uuid, url, proxy_url, username, token, client_traffic_policy , enterprise_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c4a6b8e1c94eefc619c768ff4aac9aa248baf9553cea4f47ca9b1f6499bedaa3"
+}
