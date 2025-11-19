@@ -37,21 +37,21 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.predefinedTraffic(),
         value: 0,
-        disabled: selectedDefguardInstance?.client_traffic_policy == ClientTrafficPolicy.FORCE_ALL_TRAFFIC,
+        disabled: selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.FORCE_ALL_TRAFFIC,
       },
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),
         value: 1,
-        disabled: selectedDefguardInstance?.client_traffic_policy == ClientTrafficPolicy.DISABLE_ALL_TRAFFIC,
+        disabled: selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.DISABLE_ALL_TRAFFIC,
       },
     ];
     return res;
   }, [LL.pages, selectedDefguardInstance?.client_traffic_policy]);
 
-  let selected;
-  if (selectedDefguardInstance?.client_traffic_policy == ClientTrafficPolicy.NONE) {
+  let selected: number;
+  if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.NONE) {
     selected = Number(location?.route_all_traffic);
-  } else if (selectedDefguardInstance?.client_traffic_policy == ClientTrafficPolicy.DISABLE_ALL_TRAFFIC) {
+  } else if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.DISABLE_ALL_TRAFFIC) {
     selected = 0;
   } else {
     selected = 1;
