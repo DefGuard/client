@@ -1,7 +1,10 @@
 use sqlx::SqliteExecutor;
 
 use crate::{
-    database::models::{instance::{ClientTrafficPolicy, Instance}, Id},
+    database::models::{
+        instance::{ClientTrafficPolicy, Instance},
+        Id,
+    },
     error::Error,
 };
 
