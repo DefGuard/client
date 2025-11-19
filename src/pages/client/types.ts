@@ -13,7 +13,7 @@ export type DefguardInstance = {
   // connected
   active: boolean;
   pubkey: string;
-  client_traffic_policy: ClientTrafficPolicy,
+  client_traffic_policy: ClientTrafficPolicy;
   openid_display_name?: string;
 };
 

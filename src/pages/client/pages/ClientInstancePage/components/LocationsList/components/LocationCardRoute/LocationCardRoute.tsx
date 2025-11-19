@@ -7,7 +7,11 @@ import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
 import type { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
-import { ClientTrafficPolicy, type CommonWireguardFields, type DefguardInstance } from '../../../../../../types';
+import {
+  ClientTrafficPolicy,
+  type CommonWireguardFields,
+  type DefguardInstance,
+} from '../../../../../../types';
 
 type Props = {
   location?: CommonWireguardFields;
@@ -37,12 +41,16 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.predefinedTraffic(),
         value: 0,
-        disabled: selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.FORCE_ALL_TRAFFIC,
+        disabled:
+          selectedDefguardInstance?.client_traffic_policy ===
+          ClientTrafficPolicy.FORCE_ALL_TRAFFIC,
       },
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),
         value: 1,
-        disabled: selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.DISABLE_ALL_TRAFFIC,
+        disabled:
+          selectedDefguardInstance?.client_traffic_policy ===
+          ClientTrafficPolicy.DISABLE_ALL_TRAFFIC,
       },
     ];
     return res;
@@ -51,7 +59,10 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
   let selected: number;
   if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.NONE) {
     selected = Number(location?.route_all_traffic);
-  } else if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.DISABLE_ALL_TRAFFIC) {
+  } else if (
+    selectedDefguardInstance?.client_traffic_policy ===
+    ClientTrafficPolicy.DISABLE_ALL_TRAFFIC
+  ) {
     selected = 0;
   } else {
     selected = 1;
