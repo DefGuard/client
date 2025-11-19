@@ -559,6 +559,11 @@ pub(crate) async fn locations_changed(
         .map(|config| config.clone().into_location(instance.id))
         .collect();
 
+    error!(
+        "Instance {} locations changed: {}",
+        instance.name,
+        db_locations != core_locations
+    );
     Ok(db_locations != core_locations)
 }
 
@@ -577,15 +582,22 @@ pub(crate) async fn do_update_instance(
     instance.url = instance_info.url;
     instance.proxy_url = instance_info.proxy_url;
     instance.username = instance_info.username;
-    // TODO
-    // // Make sure to update the locations too if we are disabling all traffic
-    // if instance.disable_all_traffic != instance_info.disable_all_traffic
-    //     && instance_info.disable_all_traffic
-    // {
-    //     debug!("Disabling all traffic for all locations of instance {instance}");
-    //     Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-    //     debug!("Disabled all traffic for all locations of instance {instance}");
-    // }
+    // Make sure to update the locations too if we are disabling all traffic
+    let policy = instance_info.client_traffic_policy.into();
+    if instance.client_traffic_policy != policy && policy == ClientTrafficPolicy::DisableAllTraffic
+    {
+        debug!("Disabling all traffic for all locations of instance {instance}");
+        Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
+        debug!("Disabled all traffic for all locations of instance {instance}");
+    }
+    error!(
+        "## Updating instance {}({:?}) : {:?} -> {:?}({:?})",
+        instance.name,
+        instance.client_traffic_policy,
+        instance.client_traffic_policy,
+        instance_info.client_traffic_policy,
+        ClientTrafficPolicy::from(instance_info.client_traffic_policy),
+    );
     instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
     instance.uuid = instance_info.id;

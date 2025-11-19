@@ -69,11 +69,12 @@ impl Instance<Id> {
     where
         E: SqliteExecutor<'e>,
     {
+        error!("### Executing query: {:?}", self.client_traffic_policy);
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, token = $8, \
             openid_display_name = $9 \
-            WHERE id = $11;",
+            WHERE id = $10;",
             self.name,
             self.uuid,
             self.url,
