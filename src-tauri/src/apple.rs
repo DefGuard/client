@@ -315,22 +315,20 @@ pub(crate) fn stop_tunnel(name: &str) -> bool {
     }
 }
 
-/// IMPORTANT: This is currently for testing. Assume the config has been saved.
-pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
-    let all_stats = Arc::new(Mutex::new(Vec::new()));
-    // let all_stats_clone = Arc::clone(&all_stats);
+pub(crate) fn tunnel_stats() -> Vec<Stats> {
+    let new_stats = Arc::new(Mutex::new(Vec::new()));
     let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
     let spinlock = Arc::new(AtomicUsize::new(1));
-    let spinlock_for_response = Arc::clone(&spinlock);
-    let spinlock_for_handler = Arc::clone(&spinlock);
 
+    let new_stats_clone = Arc::clone(&new_stats);
+    let spinlock_for_response = Arc::clone(&spinlock);
     let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
-        if let Some(data) = (unsafe { data_ptr.as_ref() }) {
+        if let Some(data) = unsafe { data_ptr.as_ref() } {
             info!("Received message from tunnel of size {}", data.len());
-            if let Ok(stats) = serde_json::from_slice::<Stats>(data.to_vec().as_slice()) {
-                // if let Ok(mut all_stats_locked) = all_stats_clone.lock() {
-                //     all_stats_locked.push(stats);
-                // }
+            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
+                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
+                    new_stats_locked.push(stats);
+                }
             } else {
                 warn!("Failed to deserialize tunnel stats");
             }
@@ -340,6 +338,7 @@ pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
         spinlock_for_response.fetch_sub(1, Ordering::Release);
     });
 
+    let spinlock_for_handler = Arc::clone(&spinlock);
     let handler = RcBlock::new(
         move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
             if !error_ptr.is_null() {
@@ -401,8 +400,9 @@ pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
     while spinlock.load(Ordering::Acquire) != 0 {
         spin_loop();
     }
-    debug!("All stats aquired");
-    Arc::into_inner(all_stats).unwrap().into_inner().unwrap()
+
+    let stats = new_stats.lock().unwrap().drain(..).collect();
+    stats
 }
 
 impl Location<Id> {
@@ -502,7 +502,7 @@ impl Location<Id> {
 }
 
 impl Tunnel<Id> {
-    pub(crate) async fn tunnel_configurarion<'e, E>(
+    pub(crate) fn tunnel_configurarion<'e, E>(
         &self,
         executor: E,
         dns: Vec<IpAddr>,

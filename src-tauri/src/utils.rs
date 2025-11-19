@@ -1,6 +1,9 @@
-#[cfg(target_os = "macos")]
-use std::time::Duration;
 use std::{env, path::Path, process::Command, str::FromStr};
+#[cfg(target_os = "macos")]
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use common::{find_free_tcp_port, get_interface_name};
@@ -22,7 +25,7 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::apple::{all_tunnel_stats, start_tunnel, stop_tunnel};
+use crate::apple::{start_tunnel, stop_tunnel, tunnel_stats};
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
     proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
@@ -148,40 +151,40 @@ pub(crate) async fn stats_handler(
     _interface_name: String,
     _connection_type: ConnectionType,
 ) {
-    const CHECK_INTERVAL: Duration = Duration::from_secs(5);
+    use crate::database::models::{location_stats::LocationStats, tunnel::TunnelStats};
+
+    const CHECK_INTERVAL: Duration = Duration::from_secs(10);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 
     loop {
-        info!("Stats loop");
         interval.tick().await;
 
-        let all_stats = all_tunnel_stats();
+        let mut all_stats = tunnel_stats();
         if all_stats.is_empty() {
             continue;
         }
-        // Let `all_stats` be `Send`.
-        let all_stats = all_stats.as_slice().to_owned();
 
-        // let mut transaction = match pool.begin().await {
-        //     Ok(transactions) => transactions,
-        //     Err(err) => {
-        //         error!(
-        //             "Failed to begin database transaction for saving location/tunnel stats: {err}",
-        //         );
-        //         continue;
-        //     }
-        // };
+        let mut transaction = match pool.begin().await {
+            Ok(transactions) => transactions,
+            Err(err) => {
+                error!(
+                    "Failed to begin database transaction for saving location/tunnel stats: {err}",
+                );
+                continue;
+            }
+        };
 
-        for stats in all_stats {
-            info!(
-                "==> Stats: {} {} {}",
-                stats.last_handshake, stats.tx_bytes, stats.rx_bytes
-            );
-
+        for stats in all_stats.drain(..) {
             if let Some(location_id) = stats.location_id {
-                //let location_stats = LocationStats {
-                //};
-                /*match location_stats.save(&mut *transaction).await {
+                let location_stats = LocationStats::new(
+                    location_id,
+                    stats.tx_bytes as i64,
+                    stats.rx_bytes as i64,
+                    stats.last_handshake as i64,
+                    0,
+                    None,
+                );
+                match location_stats.save(&mut *transaction).await {
                     Ok(_) => {
                         debug!("Saved network usage stats for location ID {location_id}");
                     }
@@ -191,12 +194,19 @@ pub(crate) async fn stats_handler(
                             {err}"
                         );
                     }
-                }*/
+                }
             }
             if let Some(tunnel_id) = stats.tunnel_id {
-                //let tunnel_stats = TunnelStats {
-                //};
-                /*match tunnel_stats.save(&mut *transaction).await {
+                let tunnel_stats = TunnelStats::new(
+                    tunnel_id,
+                    stats.tx_bytes as i64,
+                    stats.rx_bytes as i64,
+                    stats.last_handshake as i64,
+                    chrono::Utc::now().naive_utc(),
+                    0,
+                    0,
+                );
+                match tunnel_stats.save(&mut *transaction).await {
                     Ok(_) => {
                         debug!("Saved network usage stats for tunnel ID {tunnel_id}");
                     }
@@ -206,13 +216,13 @@ pub(crate) async fn stats_handler(
                             {err}"
                         );
                     }
-                }*/
+                }
             }
         }
 
-        // if let Err(err) = transaction.commit().await {
-        //     error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
-        // }
+        if let Err(err) = transaction.commit().await {
+            error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        }
     }
 }
 

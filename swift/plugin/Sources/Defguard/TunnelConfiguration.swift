@@ -29,6 +29,8 @@ final class TunnelConfiguration: Codable {
 
     /// Only encode these properties.
     enum CodingKeys: String, CodingKey {
+        case locationId
+        case tunnelId
         case name
         case privateKey
         case addresses
