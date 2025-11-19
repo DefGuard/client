@@ -69,7 +69,6 @@ impl Instance<Id> {
     where
         E: SqliteExecutor<'e>,
     {
-        error!("### Executing query: {:?}", self.client_traffic_policy);
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, token = $8, \
@@ -210,8 +209,6 @@ impl Instance<NoId> {
             username: self.username,
             token: self.token,
             client_traffic_policy: self.client_traffic_policy,
-            // disable_all_traffic: self.disable_all_traffic,
-            // force_all_traffic: self.force_all_traffic,
             enterprise_enabled: self.enterprise_enabled,
             openid_display_name: self.openid_display_name,
         })
@@ -227,7 +224,6 @@ pub struct InstanceInfo<I = NoId> {
     pub proxy_url: String,
     pub active: bool,
     pub pubkey: String,
-    // pub disable_all_traffic: bool,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,

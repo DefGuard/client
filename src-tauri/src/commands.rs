@@ -393,8 +393,6 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             proxy_url: instance.proxy_url,
             active: connected,
             pubkey: keys.pubkey,
-            // disable_all_traffic: instance.disable_all_traffic,
-            // force_all_traffic: instance.force_all_traffic,
             client_traffic_policy: instance.client_traffic_policy,
             enterprise_enabled: instance.enterprise_enabled,
             openid_display_name: instance.openid_display_name,
@@ -590,14 +588,6 @@ pub(crate) async fn do_update_instance(
         Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
         debug!("Disabled all traffic for all locations of instance {instance}");
     }
-    error!(
-        "## Updating instance {}({:?}) : {:?} -> {:?}({:?})",
-        instance.name,
-        instance.client_traffic_policy,
-        instance.client_traffic_policy,
-        instance_info.client_traffic_policy,
-        ClientTrafficPolicy::from(instance_info.client_traffic_policy),
-    );
     instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
     instance.uuid = instance_info.id;
