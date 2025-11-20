@@ -16,8 +16,6 @@ pub struct Instance<I = NoId> {
     pub username: String,
     pub token: Option<String>,
     pub client_traffic_policy: ClientTrafficPolicy,
-    // pub disable_all_traffic: bool,
-    // pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
     pub openid_display_name: Option<String>,
 }
@@ -51,16 +49,6 @@ impl From<proto::InstanceInfo> for Instance<NoId> {
             client_traffic_policy,
             enterprise_enabled: instance_info.enterprise_enabled,
             openid_display_name: instance_info.openid_display_name,
-        }
-    }
-}
-
-impl From<i32> for ClientTrafficPolicy {
-    fn from(value: i32) -> Self {
-        match value {
-            1 => ClientTrafficPolicy::DisableAllTraffic,
-            2 => ClientTrafficPolicy::ForceAllTraffic,
-            _ => ClientTrafficPolicy::None,
         }
     }
 }
@@ -195,8 +183,6 @@ impl Instance<NoId> {
             self.username,
             self.token,
             self.client_traffic_policy,
-            // self.disable_all_traffic,
-            // self.force_all_traffic,
             self.enterprise_enabled
         )
         .fetch_one(executor)
@@ -249,12 +235,12 @@ pub enum ClientTrafficPolicy {
     ForceAllTraffic = 2,
 }
 
-impl From<i64> for ClientTrafficPolicy {
-    fn from(value: i64) -> Self {
+impl From<i32> for ClientTrafficPolicy {
+    fn from(value: i32) -> Self {
         match value {
-            1 => Self::DisableAllTraffic,
-            2 => Self::ForceAllTraffic,
-            _ => Self::None,
+            1 => ClientTrafficPolicy::DisableAllTraffic,
+            2 => ClientTrafficPolicy::ForceAllTraffic,
+            _ => ClientTrafficPolicy::None,
         }
     }
 }
@@ -263,21 +249,13 @@ impl From<Option<i32>> for ClientTrafficPolicy {
     fn from(value: Option<i32>) -> Self {
         match value {
             None => Self::None,
-            Some(1) => Self::DisableAllTraffic,
-            Some(2) => Self::ForceAllTraffic,
-            _ => Self::None,
+            Some(v) => Self::from(v),
         }
     }
 }
 
-// impl From<proto::ClientTrafficPolicy> for ClientTrafficPolicy {
-//     fn from(value: proto::ClientTrafficPolicy) -> Self {
-//         match value {
-//             ProtoLocationMfaMode::Unspecified | ProtoLocationMfaMode::Disabled => {
-//                 LocationMfaMode::Disabled
-//             }
-//             ProtoLocationMfaMode::Internal => LocationMfaMode::Internal,
-//             ProtoLocationMfaMode::External => LocationMfaMode::External,
-//         }
-//     }
-// }
+impl From<i64> for ClientTrafficPolicy {
+    fn from(value: i64) -> Self {
+        Self::from(value as i32)
+    }
+}
