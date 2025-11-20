@@ -5,9 +5,9 @@ use std::{
     net::IpAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc::channel,
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -15,11 +15,13 @@ use block2::RcBlock;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNumber,
-    NSString,
+    ns_string, NSArray, NSData, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
+    NSNumber, NSString,
 };
-use objc2_network_extension::{NETunnelProviderManager, NETunnelProviderProtocol};
-use serde::Serialize;
+use objc2_network_extension::{
+    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession,
+};
+use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
 
 use crate::{
@@ -32,7 +34,9 @@ use crate::{
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 
 // Should match the declaration in Swift.
+#[derive(Deserialize)]
 #[repr(C)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Stats {
     pub(crate) location_id: Option<Id>,
     pub(crate) tunnel_id: Option<Id>,
@@ -75,7 +79,6 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
                     }
                 }
                 if let Some(descr) = unsafe { manager.localizedDescription() } {
-                    error!("Descripion {descr}");
                     if descr == name_string {
                         tx.send(Some(manager)).unwrap();
                         return;
@@ -94,21 +97,17 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct TunnelConfiguration {
-    #[serde(rename = "locationId")]
     location_id: Option<Id>,
-    #[serde(rename = "tunnelId")]
     tunnel_id: Option<Id>,
     name: String,
-    #[serde(rename = "privateKey")]
     private_key: String,
     addresses: Vec<IpAddrMask>,
-    #[serde(rename = "listenPort")]
     listen_port: Option<u16>,
     peers: Vec<Peer>,
     mtu: Option<u32>,
     dns: Vec<IpAddr>,
-    #[serde(rename = "dnsSearch")]
     dns_search: Vec<String>,
 }
 
@@ -307,9 +306,93 @@ pub(crate) fn stop_tunnel(name: &str) -> bool {
     }
 }
 
-/// IMPORTANT: This is currently for testing. Assume the config has been saved.
-pub(crate) fn all_tunnel_stats() -> Vec<Stats> {
-    Vec::<Stats>::new()
+pub(crate) fn tunnel_stats() -> Vec<Stats> {
+    let new_stats = Arc::new(Mutex::new(Vec::new()));
+    let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
+    let spinlock = Arc::new(AtomicUsize::new(1));
+
+    let new_stats_clone = Arc::clone(&new_stats);
+    let spinlock_for_response = Arc::clone(&spinlock);
+    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
+        if let Some(data) = unsafe { data_ptr.as_ref() } {
+            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
+                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
+                    new_stats_locked.push(stats);
+                }
+            } else {
+                warn!("Failed to deserialize tunnel stats");
+            }
+        } else {
+            warn!("No data");
+        }
+        spinlock_for_response.fetch_sub(1, Ordering::Release);
+    });
+
+    let spinlock_for_handler = Arc::clone(&spinlock);
+    let handler = RcBlock::new(
+        move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
+            if !error_ptr.is_null() {
+                error!("Failed to load tunnel provider managers.");
+                return;
+            }
+
+            let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
+                error!("No managers");
+                return;
+            };
+
+            for manager in managers {
+                let Some(vpn_protocol) = (unsafe { manager.protocolConfiguration() }) else {
+                    continue;
+                };
+                let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>()
+                else {
+                    error!("Failed to downcast to NETunnelProviderProtocol");
+                    continue;
+                };
+                // Sometimes all managers from all apps come through, so filter by bundle ID.
+                if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
+                    if bundle_id != plugin_bundle_id {
+                        continue;
+                    }
+                }
+
+                let Ok(session) =
+                    unsafe { manager.connection() }.downcast::<NETunnelProviderSession>()
+                else {
+                    error!("Failed to downcast to NETunnelProviderSession");
+                    continue;
+                };
+
+                let message_data = NSData::new();
+                if unsafe {
+                    session.sendProviderMessage_returnError_responseHandler(
+                        &message_data,
+                        None,
+                        Some(&response_handler),
+                    )
+                } {
+                    spinlock_for_handler.fetch_add(1, Ordering::Release);
+                    info!("Message sent to NETunnelProviderSession");
+                } else {
+                    error!("Failed to send to NETunnelProviderSession");
+                }
+            }
+            // Final release
+            spinlock_for_handler.fetch_sub(1, Ordering::Release);
+        },
+    );
+    unsafe {
+        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
+    }
+
+    // Wait for all handlers to complete.
+    while spinlock.load(Ordering::Acquire) != 0 {
+        spin_loop();
+    }
+
+    let stats = new_stats.lock().unwrap().drain(..).collect();
+    stats
 }
 
 impl Location<Id> {
@@ -409,16 +492,12 @@ impl Location<Id> {
 }
 
 impl Tunnel<Id> {
-    pub(crate) async fn tunnel_configurarion<'e, E>(
+    pub(crate) fn tunnel_configurarion(
         &self,
-        executor: E,
         dns: Vec<IpAddr>,
         dns_search: Vec<String>,
         mtu: Option<u32>,
-    ) -> Result<TunnelConfiguration, Error>
-    where
-        E: SqliteExecutor<'e>,
-    {
+    ) -> Result<TunnelConfiguration, Error> {
         // prepare peer config
         debug!("Decoding tunnel {self} public key: {}.", self.server_pubkey);
         let peer_key = Key::from_str(&self.server_pubkey)?;

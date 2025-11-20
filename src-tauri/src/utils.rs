@@ -1,6 +1,9 @@
-#[cfg(target_os = "macos")]
-use std::time::Duration;
 use std::{env, path::Path, process::Command, str::FromStr};
+#[cfg(target_os = "macos")]
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use common::{find_free_tcp_port, get_interface_name};
@@ -22,7 +25,7 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::apple::{all_tunnel_stats, start_tunnel, stop_tunnel};
+use crate::apple::{start_tunnel, stop_tunnel, tunnel_stats};
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
     proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
@@ -128,6 +131,7 @@ pub(crate) async fn setup_interface(
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
+    // FIXME: not really useful nor true.
     let interface_name = get_interface_name(name);
 
     let (dns, dns_search) = location.dns();
@@ -148,40 +152,40 @@ pub(crate) async fn stats_handler(
     _interface_name: String,
     _connection_type: ConnectionType,
 ) {
-    const CHECK_INTERVAL: Duration = Duration::from_secs(5);
+    use crate::database::models::{location_stats::LocationStats, tunnel::TunnelStats};
+
+    const CHECK_INTERVAL: Duration = Duration::from_secs(10);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
 
     loop {
-        info!("Stats loop");
         interval.tick().await;
 
-        let all_stats = all_tunnel_stats();
+        let mut all_stats = tunnel_stats();
         if all_stats.is_empty() {
             continue;
         }
-        // Let `all_stats` be `Send`.
-        let all_stats = all_stats.as_slice().to_owned();
 
-        // let mut transaction = match pool.begin().await {
-        //     Ok(transactions) => transactions,
-        //     Err(err) => {
-        //         error!(
-        //             "Failed to begin database transaction for saving location/tunnel stats: {err}",
-        //         );
-        //         continue;
-        //     }
-        // };
+        let mut transaction = match pool.begin().await {
+            Ok(transactions) => transactions,
+            Err(err) => {
+                error!(
+                    "Failed to begin database transaction for saving location/tunnel stats: {err}",
+                );
+                continue;
+            }
+        };
 
-        for stats in all_stats {
-            info!(
-                "==> Stats: {} {} {}",
-                stats.last_handshake, stats.tx_bytes, stats.rx_bytes
-            );
-
+        for stats in all_stats.drain(..) {
             if let Some(location_id) = stats.location_id {
-                //let location_stats = LocationStats {
-                //};
-                /*match location_stats.save(&mut *transaction).await {
+                let location_stats = LocationStats::new(
+                    location_id,
+                    stats.tx_bytes as i64,
+                    stats.rx_bytes as i64,
+                    stats.last_handshake as i64,
+                    0,
+                    None,
+                );
+                match location_stats.save(&mut *transaction).await {
                     Ok(_) => {
                         debug!("Saved network usage stats for location ID {location_id}");
                     }
@@ -191,12 +195,19 @@ pub(crate) async fn stats_handler(
                             {err}"
                         );
                     }
-                }*/
+                }
             }
             if let Some(tunnel_id) = stats.tunnel_id {
-                //let tunnel_stats = TunnelStats {
-                //};
-                /*match tunnel_stats.save(&mut *transaction).await {
+                let tunnel_stats = TunnelStats::new(
+                    tunnel_id,
+                    stats.tx_bytes as i64,
+                    stats.rx_bytes as i64,
+                    stats.last_handshake as i64,
+                    chrono::Utc::now().naive_utc(),
+                    0,
+                    0,
+                );
+                match tunnel_stats.save(&mut *transaction).await {
                     Ok(_) => {
                         debug!("Saved network usage stats for tunnel ID {tunnel_id}");
                     }
@@ -206,13 +217,13 @@ pub(crate) async fn stats_handler(
                             {err}"
                         );
                     }
-                }*/
+                }
             }
         }
 
-        // if let Err(err) = transaction.commit().await {
-        //     error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
-        // }
+        if let Err(err) = transaction.commit().await {
+            error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        }
     }
 }
 
@@ -368,6 +379,7 @@ pub fn get_service_log_dir() -> &'static Path {
 }
 
 /// Setup client interface
+#[cfg(not(target_os = "macos"))]
 pub async fn setup_interface_tunnel(
     tunnel: &Tunnel<Id>,
     name: &str,
@@ -465,61 +477,78 @@ pub async fn setup_interface_tunnel(
         mtu,
     };
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        debug!("Creating interface {interface_config:?}");
-        let request = CreateInterfaceRequest {
-            config: Some(interface_config.clone().into()),
-            dns: tunnel.dns.clone(),
-        };
-        if let Some(pre_up) = &tunnel.pre_up {
-            debug!(
-                "Executing defined PreUp command before setting up the interface {} for the \
+    debug!("Creating interface {interface_config:?}");
+    let request = CreateInterfaceRequest {
+        config: Some(interface_config.clone().into()),
+        dns: tunnel.dns.clone(),
+    };
+    if let Some(pre_up) = &tunnel.pre_up {
+        debug!(
+            "Executing defined PreUp command before setting up the interface {} for the \
             tunnel {tunnel}: {pre_up}",
-                interface_config.name
-            );
-            let _ = execute_command(pre_up);
-            info!(
-                "Executed defined PreUp command before setting up the interface {} for the \
+            interface_config.name
+        );
+        let _ = execute_command(pre_up);
+        info!(
+            "Executed defined PreUp command before setting up the interface {} for the \
             tunnel {tunnel}: {pre_up}",
-                interface_config.name
-            );
-        }
-        if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-            error!(
-                "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
-                interface_config.name
-            );
-            return Err(Error::InternalError(format!(
+            interface_config.name
+        );
+    }
+    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+        error!(
+            "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
+            interface_config.name
+        );
+        return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
             interface_config.name,
             error.message()
         )));
-        } else {
-            info!(
-                "Network interface {} for tunnel {tunnel} created successfully.",
+    } else {
+        info!(
+            "Network interface {} for tunnel {tunnel} created successfully.",
+            interface_config.name
+        );
+        if let Some(post_up) = &tunnel.post_up {
+            debug!(
+                "Executing defined PostUp command after setting up the interface {} for the \
+                tunnel {tunnel}: {post_up}",
                 interface_config.name
             );
-            if let Some(post_up) = &tunnel.post_up {
-                debug!(
-                    "Executing defined PostUp command after setting up the interface {} for the \
+            let _ = execute_command(post_up);
+            info!(
+                "Executed defined PostUp command after setting up the interface {} for the \
                 tunnel {tunnel}: {post_up}",
-                    interface_config.name
-                );
-                let _ = execute_command(post_up);
-                info!(
-                    "Executed defined PostUp command after setting up the interface {} for the \
-                tunnel {tunnel}: {post_up}",
-                    interface_config.name
-                );
-            }
-            debug!(
-                "Created interface {} with config: {interface_config:?}",
                 interface_config.name
             );
         }
+        debug!(
+            "Created interface {} with config: {interface_config:?}",
+            interface_config.name
+        );
     }
+
+    Ok(interface_name)
+}
+
+#[cfg(target_os = "macos")]
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel<Id>,
+    name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
+    debug!("Setting up interface for tunnel: {tunnel}");
+    // FIXME: not really useful nor true.
+    let interface_name = get_interface_name(name);
+
+    let (dns, dns_search) = tunnel.dns();
+    let tunnel_config = tunnel.tunnel_configurarion(dns, dns_search, mtu)?;
+
+    tunnel_config.save();
+    tokio::time::sleep(TUNNEL_START_DELAY).await;
+    start_tunnel(&tunnel.name);
 
     Ok(interface_name)
 }

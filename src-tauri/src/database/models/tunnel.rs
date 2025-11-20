@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+use std::net::IpAddr;
 use std::{fmt, time::SystemTime};
 
 use chrono::{NaiveDateTime, Utc};
@@ -249,6 +251,28 @@ impl Tunnel<NoId> {
             pre_down: self.pre_down,
             post_down: self.post_down,
         })
+    }
+}
+
+impl Tunnel<Id> {
+    /// Split DNS settings into resolver IP addresses and search domains.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn dns(&self) -> (Vec<IpAddr>, Vec<String>) {
+        let mut dns = Vec::new();
+        let mut dns_search = Vec::new();
+
+        if let Some(dns_string) = &self.dns {
+            for entry in dns_string.split(',').map(str::trim) {
+                // Assume that every entry that can't be parsed as an IP address is a domain name.
+                if let Ok(ip) = entry.parse::<IpAddr>() {
+                    dns.push(ip);
+                } else {
+                    dns_search.push(entry.into());
+                }
+            }
+        }
+
+        (dns, dns_search)
     }
 }
 

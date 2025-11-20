@@ -115,6 +115,7 @@ pub struct CommonLocationStats<I = NoId> {
     pub persistent_keepalive_interval: Option<u16>,
     pub connection_type: ConnectionType,
 }
+
 // Common fields for ConnectionInfo and TunnelConnectionInfo due to shared command
 #[derive(Debug, Serialize)]
 pub struct CommonConnectionInfo {

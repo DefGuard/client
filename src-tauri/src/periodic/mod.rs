@@ -22,7 +22,7 @@ pub async fn run_periodic_tasks(app_handle: &AppHandle) {
         () = poll_config(app_handle.clone()) => {
             error!("Config polling task has stopped unexpectedly");
         }
-        () = verify_active_connections(app_handle.clone()), if cfg!(not(target_os = "macos")) => {
+        () = verify_active_connections(app_handle.clone()) => {
             error!("Active connection verification task has stopped unexpectedly");
         }
         () = purge_stats() => {

@@ -15,11 +15,6 @@ const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 #[cfg(target_os = "macos")]
 use crate::apple::stop_tunnel;
-#[cfg(not(target_os = "macos"))]
-use crate::service::{
-    proto::{DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest},
-    utils::DAEMON_CLIENT,
-};
 use crate::{
     active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
@@ -46,12 +41,22 @@ use crate::{
     proto::DeviceConfigResponse,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        construct_platform_header, disconnect_interface, execute_command,
-        get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
-        handle_connection_for_location, handle_connection_for_tunnel,
+        construct_platform_header, disconnect_interface, get_location_interface_details,
+        get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
+        handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+};
+#[cfg(not(target_os = "macos"))]
+use crate::{
+    service::{
+        proto::{
+            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        },
+        utils::DAEMON_CLIENT,
+    },
+    utils::execute_command,
 };
 
 /// Open new WireGuard connection.
