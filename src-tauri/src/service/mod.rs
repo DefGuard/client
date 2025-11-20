@@ -118,6 +118,7 @@ impl DaemonService {
 /// Helper function used to perform required configuration steps for a new interface.
 ///
 /// This allows us to roll back interface creation if some configuration step fails.
+#[cfg(not(target_os = "macos"))]
 fn configure_new_interface(
     ifname: &str,
     request: &CreateInterfaceRequest,
@@ -196,6 +197,7 @@ pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
     Ok(wgapi)
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
@@ -531,7 +533,7 @@ impl DesktopDaemonService for DaemonService {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
