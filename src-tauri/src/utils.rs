@@ -131,6 +131,7 @@ pub(crate) async fn setup_interface(
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
+    // FIXME: not really useful nor true.
     let interface_name = get_interface_name(name);
 
     let (dns, dns_search) = location.dns();
@@ -378,6 +379,7 @@ pub fn get_service_log_dir() -> &'static Path {
 }
 
 /// Setup client interface
+#[cfg(not(target_os = "macos"))]
 pub async fn setup_interface_tunnel(
     tunnel: &Tunnel<Id>,
     name: &str,
@@ -475,61 +477,78 @@ pub async fn setup_interface_tunnel(
         mtu,
     };
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        debug!("Creating interface {interface_config:?}");
-        let request = CreateInterfaceRequest {
-            config: Some(interface_config.clone().into()),
-            dns: tunnel.dns.clone(),
-        };
-        if let Some(pre_up) = &tunnel.pre_up {
-            debug!(
-                "Executing defined PreUp command before setting up the interface {} for the \
+    debug!("Creating interface {interface_config:?}");
+    let request = CreateInterfaceRequest {
+        config: Some(interface_config.clone().into()),
+        dns: tunnel.dns.clone(),
+    };
+    if let Some(pre_up) = &tunnel.pre_up {
+        debug!(
+            "Executing defined PreUp command before setting up the interface {} for the \
             tunnel {tunnel}: {pre_up}",
-                interface_config.name
-            );
-            let _ = execute_command(pre_up);
-            info!(
-                "Executed defined PreUp command before setting up the interface {} for the \
+            interface_config.name
+        );
+        let _ = execute_command(pre_up);
+        info!(
+            "Executed defined PreUp command before setting up the interface {} for the \
             tunnel {tunnel}: {pre_up}",
-                interface_config.name
-            );
-        }
-        if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-            error!(
-                "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
-                interface_config.name
-            );
-            return Err(Error::InternalError(format!(
+            interface_config.name
+        );
+    }
+    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+        error!(
+            "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
+            interface_config.name
+        );
+        return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
             interface_config.name,
             error.message()
         )));
-        } else {
-            info!(
-                "Network interface {} for tunnel {tunnel} created successfully.",
+    } else {
+        info!(
+            "Network interface {} for tunnel {tunnel} created successfully.",
+            interface_config.name
+        );
+        if let Some(post_up) = &tunnel.post_up {
+            debug!(
+                "Executing defined PostUp command after setting up the interface {} for the \
+                tunnel {tunnel}: {post_up}",
                 interface_config.name
             );
-            if let Some(post_up) = &tunnel.post_up {
-                debug!(
-                    "Executing defined PostUp command after setting up the interface {} for the \
+            let _ = execute_command(post_up);
+            info!(
+                "Executed defined PostUp command after setting up the interface {} for the \
                 tunnel {tunnel}: {post_up}",
-                    interface_config.name
-                );
-                let _ = execute_command(post_up);
-                info!(
-                    "Executed defined PostUp command after setting up the interface {} for the \
-                tunnel {tunnel}: {post_up}",
-                    interface_config.name
-                );
-            }
-            debug!(
-                "Created interface {} with config: {interface_config:?}",
                 interface_config.name
             );
         }
+        debug!(
+            "Created interface {} with config: {interface_config:?}",
+            interface_config.name
+        );
     }
+
+    Ok(interface_name)
+}
+
+#[cfg(target_os = "macos")]
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel<Id>,
+    name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
+    debug!("Setting up interface for tunnel: {tunnel}");
+    // FIXME: not really useful nor true.
+    let interface_name = get_interface_name(name);
+
+    let (dns, dns_search) = tunnel.dns();
+    let tunnel_config = tunnel.tunnel_configurarion(dns, dns_search, mtu)?;
+
+    tunnel_config.save();
+    tokio::time::sleep(TUNNEL_START_DELAY).await;
+    start_tunnel(&tunnel.name);
 
     Ok(interface_name)
 }

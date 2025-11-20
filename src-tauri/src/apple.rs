@@ -102,21 +102,17 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct TunnelConfiguration {
-    #[serde(rename = "locationId")]
     location_id: Option<Id>,
-    #[serde(rename = "tunnelId")]
     tunnel_id: Option<Id>,
     name: String,
-    #[serde(rename = "privateKey")]
     private_key: String,
     addresses: Vec<IpAddrMask>,
-    #[serde(rename = "listenPort")]
     listen_port: Option<u16>,
     peers: Vec<Peer>,
     mtu: Option<u32>,
     dns: Vec<IpAddr>,
-    #[serde(rename = "dnsSearch")]
     dns_search: Vec<String>,
 }
 
@@ -502,16 +498,12 @@ impl Location<Id> {
 }
 
 impl Tunnel<Id> {
-    pub(crate) fn tunnel_configurarion<'e, E>(
+    pub(crate) fn tunnel_configurarion(
         &self,
-        executor: E,
         dns: Vec<IpAddr>,
         dns_search: Vec<String>,
         mtu: Option<u32>,
-    ) -> Result<TunnelConfiguration, Error>
-    where
-        E: SqliteExecutor<'e>,
-    {
+    ) -> Result<TunnelConfiguration, Error> {
         // prepare peer config
         debug!("Decoding tunnel {self} public key: {}.", self.server_pubkey);
         let peer_key = Key::from_str(&self.server_pubkey)?;
