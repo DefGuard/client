@@ -557,11 +557,6 @@ pub(crate) async fn locations_changed(
         .map(|config| config.clone().into_location(instance.id))
         .collect();
 
-    error!(
-        "Instance {} locations changed: {}",
-        instance.name,
-        db_locations != core_locations
-    );
     Ok(db_locations != core_locations)
 }
 
