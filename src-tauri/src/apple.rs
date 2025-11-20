@@ -30,7 +30,6 @@ use crate::{
     utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
 };
 
-// const BUNDLE_ID: &str = "net.defguard";
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 
 // Should match the declaration in Swift.
@@ -234,11 +233,77 @@ impl TunnelConfiguration {
         dict.into_super()
     }
 
+    /// Try to find `NETunnelProviderManager` for this configuration, based on location ID or
+    /// tunnel ID.
+    pub(crate) fn tunnel_provider_manager(&self) -> Option<Retained<NETunnelProviderManager>> {
+        let (key, desired_value) = match (self.location_id, self.tunnel_id) {
+            (Some(location_id), None) => (NSString::from_str("locationId"), location_id),
+            (None, Some(tunnel_id)) => (NSString::from_str("tunnelId"), tunnel_id),
+            _ => return None,
+        };
+
+        let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
+        let (tx, rx) = channel();
+
+        let handler = RcBlock::new(
+            move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
+                if !error_ptr.is_null() {
+                    error!("Failed to load tunnel provider managers.");
+                    return;
+                }
+
+                let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
+                    error!("No managers");
+                    return;
+                };
+
+                for manager in managers {
+                    let Some(vpn_protocol) = (unsafe { manager.protocolConfiguration() }) else {
+                        continue;
+                    };
+                    let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>()
+                    else {
+                        error!("Failed to downcast to NETunnelProviderProtocol");
+                        continue;
+                    };
+                    // Sometimes all managers from all apps come through, so filter by bundle ID.
+                    if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
+                        if bundle_id != plugin_bundle_id {
+                            continue;
+                        }
+                    }
+
+                    if let Some(config_dict) = unsafe { tunnel_protocol.providerConfiguration() } {
+                        if let Some(value) = config_dict.objectForKey(&key) {
+                            let Ok(id) = value.downcast::<NSNumber>() else {
+                                warn!("Failed to downcast ID to NSNumber");
+                                continue;
+                            };
+                            if id.as_i64() == desired_value {
+                                // This is the manager we were looking for.
+                                tx.send(Some(manager)).unwrap();
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                tx.send(None).unwrap();
+            },
+        );
+        unsafe {
+            NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
+        }
+
+        rx.recv().unwrap()
+    }
+
     /// Create or update system VPN settings with this configuration.
     pub(crate) fn save(&self) {
         unsafe {
-            let provider_manager =
-                manager_for_name(&self.name).unwrap_or_else(|| NETunnelProviderManager::new());
+            let provider_manager = self
+                .tunnel_provider_manager()
+                .unwrap_or_else(|| NETunnelProviderManager::new());
 
             let tunnel_protocol = NETunnelProviderProtocol::new();
             let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);

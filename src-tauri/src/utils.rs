@@ -1,9 +1,6 @@
-use std::{env, path::Path, process::Command, str::FromStr};
 #[cfg(target_os = "macos")]
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::time::Duration;
+use std::{env, path::Path, process::Command, str::FromStr};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use common::{find_free_tcp_port, get_interface_name};
@@ -28,8 +25,8 @@ use crate::active_connections::find_connection;
 use crate::apple::{start_tunnel, stop_tunnel, tunnel_stats};
 #[cfg(not(target_os = "macos"))]
 use crate::service::{
+    client::DAEMON_CLIENT,
     proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
-    utils::DAEMON_CLIENT,
 };
 use crate::{
     appstate::AppState,

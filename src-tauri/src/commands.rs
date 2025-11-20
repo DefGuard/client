@@ -51,10 +51,10 @@ use crate::{
 #[cfg(not(target_os = "macos"))]
 use crate::{
     service::{
+        client::DAEMON_CLIENT,
         proto::{
             DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
         },
-        utils::DAEMON_CLIENT,
     },
     utils::execute_command,
 };
