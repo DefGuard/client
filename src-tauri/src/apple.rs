@@ -36,16 +36,12 @@ const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 // Should match the declaration in Swift.
 #[derive(Deserialize)]
 #[repr(C)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Stats {
-    #[serde(rename = "locationId")]
     pub(crate) location_id: Option<Id>,
-    #[serde(rename = "tunnelId")]
     pub(crate) tunnel_id: Option<Id>,
-    #[serde(rename = "txBytes")]
     pub(crate) tx_bytes: u64,
-    #[serde(rename = "rxBytes")]
     pub(crate) rx_bytes: u64,
-    #[serde(rename = "lastHandshake")]
     pub(crate) last_handshake: u64,
 }
 
