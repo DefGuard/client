@@ -927,11 +927,10 @@ pub async fn update_location_routing(
     match connection_type {
         ConnectionType::Location => {
             if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-                // Check if the instance has route_all_traffic disabled
                 let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
                     .await?
                     .ok_or(Error::NotFound)?;
-                // TODO the same check for ForceAllTraffic
+                // Check if the instance has route_all_traffic disabled
                 if (instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic)
                     && route_all_traffic
                 {
@@ -942,6 +941,19 @@ pub async fn update_location_routing(
                     );
                     return Err(Error::InternalError(
                         "Instance has route_all_traffic disabled".into(),
+                    ));
+                }
+                // Check if the instance has route_all_traffic enforced
+                if (instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic)
+                    && !route_all_traffic
+                {
+                    error!(
+                        "Couldn't update location routing: instance with id {} has \
+                        route_all_traffic enforced.",
+                        instance.id
+                    );
+                    return Err(Error::InternalError(
+                        "Instance has route_all_traffic enforced".into(),
                     ));
                 }
 
