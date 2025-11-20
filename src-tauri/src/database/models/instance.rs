@@ -28,16 +28,7 @@ impl fmt::Display for Instance<Id> {
 
 impl From<proto::InstanceInfo> for Instance<NoId> {
     fn from(instance_info: proto::InstanceInfo) -> Self {
-        // Ensure backwards compatibility
-        let client_traffic_policy = match (
-            instance_info.client_traffic_policy,
-            #[allow(deprecated)]
-            instance_info.disable_all_traffic,
-        ) {
-            (Some(policy), _) => ClientTrafficPolicy::from(policy),
-            (None, true) => ClientTrafficPolicy::DisableAllTraffic,
-            (None, false) => ClientTrafficPolicy::None,
-        };
+        let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
         Self {
             id: NoId,
             name: instance_info.name,
@@ -149,11 +140,7 @@ impl Instance<Id> {
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
 impl PartialEq<proto::InstanceInfo> for Instance<Id> {
     fn eq(&self, other: &proto::InstanceInfo) -> bool {
-        // TODO
-        let Some(other_policy) = other.client_traffic_policy else {
-            return false;
-        };
-        let other_policy = ClientTrafficPolicy::from(other_policy);
+        let other_policy = ClientTrafficPolicy::from(other);
         self.name == other.name
             && self.uuid == other.id
             && self.url == other.url
@@ -233,6 +220,21 @@ pub enum ClientTrafficPolicy {
     DisableAllTraffic = 1,
     /// Clients are forced to route all traffic through the VPN.
     ForceAllTraffic = 2,
+}
+
+/// Retrieves `ClientTrafficPolicy` from `proto::InstanceInfo` while ensuring backwards compatibility
+impl From<&proto::InstanceInfo> for ClientTrafficPolicy {
+    fn from(instance: &proto::InstanceInfo) -> Self {
+        match (
+            instance.client_traffic_policy,
+            #[allow(deprecated)]
+            instance.disable_all_traffic,
+        ) {
+            (Some(policy), _) => ClientTrafficPolicy::from(policy),
+            (None, true) => ClientTrafficPolicy::DisableAllTraffic,
+            (None, false) => ClientTrafficPolicy::None,
+        }
+    }
 }
 
 impl From<i32> for ClientTrafficPolicy {
