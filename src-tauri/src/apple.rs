@@ -83,7 +83,6 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
                     }
                 }
                 if let Some(descr) = unsafe { manager.localizedDescription() } {
-                    error!("Descripion {descr}");
                     if descr == name_string {
                         tx.send(Some(manager)).unwrap();
                         return;
@@ -320,7 +319,6 @@ pub(crate) fn tunnel_stats() -> Vec<Stats> {
     let spinlock_for_response = Arc::clone(&spinlock);
     let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
         if let Some(data) = unsafe { data_ptr.as_ref() } {
-            info!("Received message from tunnel of size {}", data.len());
             if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
                 if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
                     new_stats_locked.push(stats);
