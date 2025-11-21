@@ -1,9 +1,13 @@
+#[cfg(not(target_os = "macos"))]
+use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
-use std::{env, path::Path, process::Command, str::FromStr};
+use std::{env, path::Path, process::Command};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
+#[cfg(not(target_os = "macos"))]
 use common::{find_free_tcp_port, get_interface_name};
+#[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use prost::Message;
 use sqlx::query;
@@ -22,12 +26,7 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::apple::{start_tunnel, stop_tunnel, tunnel_stats};
-#[cfg(not(target_os = "macos"))]
-use crate::service::{
-    client::DAEMON_CLIENT,
-    proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
-};
+use crate::apple::{stop_tunnel_for_location, stop_tunnel_for_tunnel, tunnel_stats};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -35,8 +34,7 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection},
             location::Location,
-            location_stats::peer_to_location_stats,
-            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection},
+            tunnel::{Tunnel, TunnelConnection},
             wireguard_keys::WireguardKeys,
             Id,
         },
@@ -47,6 +45,14 @@ use crate::{
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     proto::ClientPlatformInfo,
     ConnectionType,
+};
+#[cfg(not(target_os = "macos"))]
+use crate::{
+    database::models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
+    service::{
+        client::DAEMON_CLIENT,
+        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
+    },
 };
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
@@ -122,25 +128,23 @@ pub(crate) async fn setup_interface(
 #[cfg(target_os = "macos")]
 pub(crate) async fn setup_interface(
     location: &Location<Id>,
-    name: &str,
+    _name: &str,
     preshared_key: Option<String>,
     mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
-    // FIXME: not really useful nor true.
-    let interface_name = get_interface_name(name);
 
-    let (dns, dns_search) = location.dns();
     let tunnel_config = location
-        .tunnel_configurarion(pool, preshared_key, dns, dns_search, mtu)
+        .tunnel_configurarion(pool, preshared_key, mtu)
         .await?;
 
     tunnel_config.save();
     tokio::time::sleep(TUNNEL_START_DELAY).await;
-    start_tunnel(&location.name);
+    tunnel_config.start_tunnel();
 
-    Ok(interface_name)
+    // FIXME: not really useful nor true.
+    Ok(String::new())
 }
 
 #[cfg(target_os = "macos")]
@@ -533,21 +537,19 @@ pub async fn setup_interface_tunnel(
 #[cfg(target_os = "macos")]
 pub async fn setup_interface_tunnel(
     tunnel: &Tunnel<Id>,
-    name: &str,
+    _name: &str,
     mtu: Option<u32>,
 ) -> Result<String, Error> {
     debug!("Setting up interface for tunnel: {tunnel}");
-    // FIXME: not really useful nor true.
-    let interface_name = get_interface_name(name);
 
-    let (dns, dns_search) = tunnel.dns();
-    let tunnel_config = tunnel.tunnel_configurarion(dns, dns_search, mtu)?;
+    let tunnel_config = tunnel.tunnel_configurarion(mtu)?;
 
     tunnel_config.save();
     tokio::time::sleep(TUNNEL_START_DELAY).await;
-    start_tunnel(&tunnel.name);
+    tunnel_config.start_tunnel();
 
-    Ok(interface_name)
+    // FIXME: not really useful nor true.
+    Ok(String::new())
 }
 
 pub async fn get_tunnel_interface_details(
@@ -560,7 +562,15 @@ pub async fn get_tunnel_interface_details(
         let peer_pubkey = &tunnel.pubkey;
 
         // generate interface name
-        let interface_name = get_interface_name(&tunnel.name);
+        let interface_name;
+        #[cfg(not(target_os = "macos"))]
+        {
+            interface_name = get_interface_name(&tunnel.name);
+        }
+        #[cfg(target_os = "macos")]
+        {
+            interface_name = String::new();
+        };
 
         debug!("Fetching tunnel stats for tunnel ID {tunnel_id}");
         let result = query!(
@@ -619,8 +629,15 @@ pub async fn get_location_interface_details(
         );
         let peer_pubkey = keys.pubkey;
 
-        // generate interface name
-        let interface_name = get_interface_name(&location.name);
+        let interface_name;
+        #[cfg(not(target_os = "macos"))]
+        {
+            interface_name = get_interface_name(&location.name);
+        }
+        #[cfg(target_os = "macos")]
+        {
+            interface_name = String::new();
+        }
 
         debug!("Fetching location stats for location ID {location_id}");
         let result = query!(
@@ -777,7 +794,7 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = stop_tunnel(&location.name);
+                let result = stop_tunnel_for_location(&location);
                 error!(
                     "stop_tunnel() for location {} returned {result:?}",
                     location.name
@@ -853,7 +870,7 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = stop_tunnel(&tunnel.name);
+                let result = stop_tunnel_for_tunnel(&tunnel);
                 error!(
                     "stop_tunnel() for tunnel {} returned {result:?}",
                     tunnel.name

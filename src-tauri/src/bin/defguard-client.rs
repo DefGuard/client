@@ -76,6 +76,12 @@ async fn startup(app_handle: &AppHandle) {
             }
         };
     }
+    #[cfg(target_os = "macos")]
+    {
+        // TODO: create NSRunLoop.
+        // defguard_client::apple::purge_system_settings();
+        // defguard_client::apple::sync_locations_and_tunnels().await;
+    }
 
     // Run periodic tasks.
     let periodic_tasks_handle = app_handle.clone();

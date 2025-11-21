@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{location::Location, Id, NoId, PURGE_DURATION};
 use crate::{commands::DateTimeAggregation, error::Error, CommonLocationStats, ConnectionType};
@@ -59,7 +59,8 @@ where
 }
 
 impl LocationStats {
-    pub(crate) async fn get_name<'e, E>(&self, executor: E) -> Result<String, SqlxError>
+    #[cfg(not(target_os = "macos"))]
+    pub(crate) async fn get_name<'e, E>(&self, executor: E) -> Result<String, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
