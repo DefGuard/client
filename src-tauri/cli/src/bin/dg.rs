@@ -621,9 +621,13 @@ async fn main() {
             .get_one::<Url>("url")
             .expect("No enrollment URL was provided or it's invalid");
         debug!("Successfully parsed enrollment token and URL");
-        let config = enroll(url, token)
-            .await
-            .expect("The enrollment process has failed");
+        let config = match enroll(url, token).await {
+            Ok(cfg) => cfg,
+            Err(err) => {
+                error!("{}",err);
+                return;
+            }
+        };
         debug!("Successfully enrolled the device, saving the configuration.");
         if let Err(err) = config.save(&config_path) {
             error!("{err}");
