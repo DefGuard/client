@@ -16,7 +16,7 @@ use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
     ns_string, NSArray, NSData, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNumber, NSString,
+    NSNumber, NSString, NSDate, NSRunLoop,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession,
@@ -45,6 +45,12 @@ pub(crate) struct Stats {
     pub(crate) tx_bytes: u64,
     pub(crate) rx_bytes: u64,
     pub(crate) last_handshake: u64,
+}
+
+pub fn spawn_runloop_for(seconds: f64) {
+    let run_loop = NSRunLoop::currentRunLoop();
+    let date = NSDate::dateWithTimeIntervalSinceNow(seconds);
+    run_loop.runUntilDate(&date);
 }
 
 pub(crate) fn manager_for_key_and_value(

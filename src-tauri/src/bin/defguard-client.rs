@@ -3,7 +3,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, str::FromStr, sync::LazyLock};
+use std::{env, str::FromStr, sync::LazyLock, time::Duration};
 
 #[cfg(unix)]
 use defguard_client::set_perms;
@@ -36,6 +36,7 @@ extern crate log;
 // For tauri logging plugin:
 // if found in metadata target name it will ignore the log if it was below info level.
 const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
+const WAIT_FOR_FRONEND_DELAY: Duration = Duration::from_secs(15);
 
 static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
@@ -78,9 +79,15 @@ async fn startup(app_handle: &AppHandle) {
     }
     #[cfg(target_os = "macos")]
     {
-        // TODO: create NSRunLoop.
-        // defguard_client::apple::purge_system_settings();
-        // defguard_client::apple::sync_locations_and_tunnels().await;
+        // let handle = tauri::async_runtime::spawn(async {
+        //     defguard_client::apple::purge_system_settings();
+        //     defguard_client::apple::sync_locations_and_tunnels().await;
+        // });
+        // // Should be enough to save.
+        // defguard_client::apple::spawn_runloop_for(2.);
+        // tauri::async_runtime::block_on(async {
+        //     let _ = handle.await;
+        // });
     }
 
     // Run periodic tasks.
@@ -310,7 +317,7 @@ fn main() {
             let app_handle_clone = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 // Wait for frontend to be ready
-                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                tokio::time::sleep(WAIT_FOR_FRONEND_DELAY).await;
 
                 // Handle client initialization if necessary
                 handle_client_initialization(&app_handle_clone).await;
@@ -336,11 +343,8 @@ fn main() {
             // create a temporary one.
             #[cfg(target_os = "macos")]
             {
-                use objc2_foundation::{NSDate, NSRunLoop};
-                let run_loop = NSRunLoop::currentRunLoop();
                 // Should be enough to quit.
-                let date = NSDate::dateWithTimeIntervalSinceNow(2.0);
-                run_loop.runUntilDate(&date);
+                defguard_client::apple::spawn_runloop_for(2.);
             }
             tauri::async_runtime::block_on(async {
                 let _ = handle.await;
