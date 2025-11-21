@@ -624,7 +624,7 @@ async fn main() {
         let config = match enroll(url, token).await {
             Ok(cfg) => cfg,
             Err(err) => {
-                error!("{}", err);
+                error!("{err}");
                 return;
             }
         };
