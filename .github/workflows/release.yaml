@@ -330,7 +330,7 @@ jobs:
   #         aws s3 cp index.html s3://apt.defguard.net/ --acl public-read
 
   update-aur:
-    needs:
+    # needs:
       # - create-release
       # - build-linux
     # if: "!contains(github.ref_name, '-')"
