@@ -18,7 +18,7 @@ use self::database::models::{Id, NoId};
 pub mod active_connections;
 pub mod app_config;
 #[cfg(target_os = "macos")]
-mod apple;
+pub mod apple;
 pub mod appstate;
 pub mod commands;
 pub mod database;

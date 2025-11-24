@@ -1,4 +1,4 @@
-//! defguard interface management daemon
+//! Defguard interface management daemon
 //!
 //! This binary is meant to run as a daemon with root privileges
 //! and communicate with the desktop client over HTTP.
@@ -7,7 +7,7 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     use clap::Parser;
-    use defguard_client::service::{config::Config, run_server, utils::logging_setup};
+    use defguard_client::service::{config::Config, daemon::run_server, utils::logging_setup};
 
     // parse config
     let config: Config = Config::parse();

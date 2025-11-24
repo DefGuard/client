@@ -1,19 +1,24 @@
+use std::fmt;
 #[cfg(target_os = "macos")]
 use std::net::IpAddr;
-use std::{fmt, str::FromStr};
+#[cfg(not(target_os = "macos"))]
+use std::str::FromStr;
 
+#[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
+#[cfg(not(target_os = "macos"))]
+use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
+#[cfg(not(target_os = "macos"))]
+use crate::utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 use crate::{
-    database::models::wireguard_keys::WireguardKeys,
     error::Error,
     proto::{
         LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
     },
-    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
 };
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
@@ -90,7 +95,7 @@ impl fmt::Display for Location<NoId> {
 
 impl Location<Id> {
     /// Ignores service locations
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     pub(crate) async fn all<'e, E>(
         executor: E,
         include_service_locations: bool,

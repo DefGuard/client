@@ -15,8 +15,8 @@ use block2::RcBlock;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSData, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNumber, NSString,
+    ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
+    NSNumber, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession,
@@ -25,15 +25,17 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
 
 use crate::{
-    database::models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
+    database::{
+        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
+        DB_POOL,
+    },
     error::Error,
     utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
 };
 
-// const BUNDLE_ID: &str = "net.defguard";
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 
-// Should match the declaration in Swift.
+/// Tunnel statistics shared with VPNExtension (written in Swift).
 #[derive(Deserialize)]
 #[repr(C)]
 #[serde(rename_all = "camelCase")]
@@ -45,9 +47,25 @@ pub(crate) struct Stats {
     pub(crate) last_handshake: u64,
 }
 
-/// Find `NETunnelProviderManager` in system preferences.
-fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
-    let name_string = NSString::from_str(name);
+/// Run [`NSRunLoop`] until semaphore becomes `true`.
+pub fn spawn_runloop_and_wait_for(semaphore: Arc<AtomicBool>) {
+    const ONE_SECOND: f64 = 1.;
+    let run_loop = NSRunLoop::currentRunLoop();
+    let mut date = NSDate::dateWithTimeIntervalSinceNow(ONE_SECOND);
+    loop {
+        run_loop.runUntilDate(&date);
+        if semaphore.load(Ordering::Acquire) {
+            break;
+        }
+        date = date.dateByAddingTimeInterval(ONE_SECOND);
+    }
+}
+
+pub(crate) fn manager_for_key_and_value(
+    key: &str,
+    value: Id,
+) -> Option<Retained<NETunnelProviderManager>> {
+    let key_string = NSString::from_str(key);
     let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
     let (tx, rx) = channel();
 
@@ -78,24 +96,33 @@ fn manager_for_name(name: &str) -> Option<Retained<NETunnelProviderManager>> {
                         continue;
                     }
                 }
-                if let Some(descr) = unsafe { manager.localizedDescription() } {
-                    if descr == name_string {
-                        tx.send(Some(manager)).unwrap();
-                        return;
+
+                if let Some(config_dict) = unsafe { tunnel_protocol.providerConfiguration() } {
+                    if let Some(any_object) = config_dict.objectForKey(&key_string) {
+                        let Ok(id) = any_object.downcast::<NSNumber>() else {
+                            warn!("Failed to downcast ID to NSNumber");
+                            continue;
+                        };
+                        if id.as_i64() == value {
+                            // This is the manager we were looking for.
+                            tx.send(Some(manager)).expect("Sender is dead");
+                            return;
+                        }
                     }
                 }
             }
 
-            tx.send(None).unwrap();
+            tx.send(None).expect("Sender is dead");
         },
     );
     unsafe {
         NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
     }
 
-    rx.recv().unwrap()
+    rx.recv().expect("Receiver is dead")
 }
 
+/// Tunnel configuration shared with VPNExtension (written in Swift).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TunnelConfiguration {
@@ -234,14 +261,30 @@ impl TunnelConfiguration {
         dict.into_super()
     }
 
+    /// Try to find `NETunnelProviderManager` for this configuration, based on location ID or
+    /// tunnel ID.
+    pub(crate) fn tunnel_provider_manager(&self) -> Option<Retained<NETunnelProviderManager>> {
+        let (key, value) = match (self.location_id, self.tunnel_id) {
+            (Some(location_id), None) => ("locationId", location_id),
+            (None, Some(tunnel_id)) => ("tunnelId", tunnel_id),
+            _ => return None,
+        };
+
+        manager_for_key_and_value(key, value)
+    }
+
     /// Create or update system VPN settings with this configuration.
     pub(crate) fn save(&self) {
+        let spinlock = Arc::new(AtomicBool::new(false));
+        let spinlock_clone = Arc::clone(&spinlock);
+        let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
+
         unsafe {
-            let provider_manager =
-                manager_for_name(&self.name).unwrap_or_else(|| NETunnelProviderManager::new());
+            let provider_manager = self
+                .tunnel_provider_manager()
+                .unwrap_or_else(|| NETunnelProviderManager::new());
 
             let tunnel_protocol = NETunnelProviderProtocol::new();
-            let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
             tunnel_protocol.setProviderBundleIdentifier(Some(&plugin_bundle_id));
             let server_address = self.peers.first().map_or(String::new(), |peer| {
                 peer.endpoint.map_or(String::new(), |sa| sa.to_string())
@@ -259,10 +302,7 @@ impl TunnelConfiguration {
             provider_manager.setLocalizedDescription(Some(&name));
             provider_manager.setEnabled(true);
 
-            // Save to preferences.
-            let spinlock = Arc::new(AtomicBool::new(false));
-            let spinlock_clone = Arc::clone(&spinlock);
-            let name = self.name.clone();
+            // Save to system settings.
             let handler = RcBlock::new(move |error_ptr: *mut NSError| {
                 if error_ptr.is_null() {
                     info!("Saved tunnel configuration for {name}");
@@ -272,36 +312,90 @@ impl TunnelConfiguration {
                 spinlock_clone.store(true, Ordering::Release);
             });
             provider_manager.saveToPreferencesWithCompletionHandler(Some(&*handler));
-            while !spinlock.load(Ordering::Acquire) {
-                spin_loop();
+        }
+
+        while !spinlock.load(Ordering::Acquire) {
+            spin_loop();
+        }
+    }
+
+    /// Start tunnel for this configuration.
+    pub(crate) fn start_tunnel(&self) {
+        if let Some(provider_manager) = self.tunnel_provider_manager() {
+            if let Err(err) =
+                unsafe { provider_manager.connection().startVPNTunnelAndReturnError() }
+            {
+                error!("Failed to start VPN: {err}");
+            } else {
+                info!("VPN started");
             }
+        } else {
+            error!(
+                "Couldn't find configuration from system settings for {}",
+                self.name
+            );
         }
     }
 }
 
-/// IMPORTANT: This is currently for testing. Assume the config has been saved.
-pub(crate) fn start_tunnel(name: &str) {
-    if let Some(provider_manager) = manager_for_name(name) {
-        if let Err(err) = unsafe { provider_manager.connection().startVPNTunnelAndReturnError() } {
-            error!("Failed to start VPN: {err}");
-        } else {
-            info!("VPN started");
+/// Remove configuration from system settings for [`Location`].
+pub(crate) fn remove_config_for_location(location: &Location<Id>) {
+    if let Some(provider_manager) = manager_for_key_and_value("locationId", location.id) {
+        unsafe {
+            provider_manager.removeFromPreferencesWithCompletionHandler(None);
         }
     } else {
-        error!("Couldn't find configuration from preferences for {name}");
+        error!(
+            "Couldn't find configuration in system settings for location {}",
+            location.name
+        );
     }
 }
 
-/// IMPORTANT: This is currently for testing. Assume the config has been saved.
-pub(crate) fn stop_tunnel(name: &str) -> bool {
-    if let Some(provider_manager) = manager_for_name(name) {
+/// Remove configuration from system settings for [`Tunnel`].
+pub(crate) fn remove_config_for_tunnel(tunnel: &Tunnel<Id>) {
+    if let Some(provider_manager) = manager_for_key_and_value("locationId", tunnel.id) {
+        unsafe {
+            provider_manager.removeFromPreferencesWithCompletionHandler(None);
+        }
+    } else {
+        error!(
+            "Couldn't find configuration in system settings for tunnel {}",
+            tunnel.name
+        );
+    }
+}
+
+/// Stop tunnel for [`Location`].
+pub(crate) fn stop_tunnel_for_location(location: &Location<Id>) -> bool {
+    if let Some(provider_manager) = manager_for_key_and_value("locationId", location.id) {
         unsafe {
             provider_manager.connection().stopVPNTunnel();
         }
         info!("VPN stopped");
         true
     } else {
-        error!("Couldn't find configuration from preferences for {name}");
+        error!(
+            "Couldn't find configuration in system settings for location {}",
+            location.name
+        );
+        false
+    }
+}
+
+/// Stop tunnel for [`Tunnel`].
+pub(crate) fn stop_tunnel_for_tunnel(tunnel: &Tunnel<Id>) -> bool {
+    if let Some(provider_manager) = manager_for_key_and_value("tunnelId", tunnel.id) {
+        unsafe {
+            provider_manager.connection().stopVPNTunnel();
+        }
+        info!("VPN stopped");
+        true
+    } else {
+        error!(
+            "Couldn't find configuration in system settings for location {}",
+            tunnel.name
+        );
         false
     }
 }
@@ -391,17 +485,92 @@ pub(crate) fn tunnel_stats() -> Vec<Stats> {
         spin_loop();
     }
 
-    let stats = new_stats.lock().unwrap().drain(..).collect();
+    let stats = new_stats
+        .lock()
+        .expect("Failed to acquire lock")
+        .drain(..)
+        .collect();
     stats
 }
 
+/// Remove all locations and tunnels from system settings.
+pub fn purge_system_settings() {
+    let spinlock = Arc::new(AtomicBool::new(false));
+    let spinlock_clone = Arc::clone(&spinlock);
+    let handler = RcBlock::new(
+        move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
+            if !error_ptr.is_null() {
+                error!("Failed to load tunnel provider managers.");
+                return;
+            }
+
+            let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
+                error!("No managers");
+                return;
+            };
+
+            for manager in managers {
+                unsafe { manager.removeFromPreferencesWithCompletionHandler(None) };
+            }
+
+            spinlock_clone.store(true, Ordering::Release);
+        },
+    );
+    unsafe {
+        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
+    }
+
+    while !spinlock.load(Ordering::Acquire) {
+        spin_loop();
+    }
+
+    debug!("Removed all configurations from system settings.");
+}
+
+/// Synchronize locations with system settings.
+pub async fn sync_locations_and_tunnels() {
+    if let Ok(all_locations) = Location::all(&*DB_POOL, false).await {
+        for location in all_locations {
+            // For syncing, set `preshred_key` and `mtu` to `None`.
+            let Ok(tunnel_config) = location.tunnel_configurarion(&*DB_POOL, None, None).await
+            else {
+                error!(
+                    "Failed to convert location {} to tunnel configuration.",
+                    location.name
+                );
+                continue;
+            };
+            tunnel_config.save();
+        }
+    } else {
+        error!("Failed to fetch all location from the database");
+    }
+
+    if let Ok(all_tunnels) = Tunnel::all(&*DB_POOL).await {
+        for tunnel in all_tunnels {
+            // For syncing, set `mtu` to `None`.
+            let Ok(tunnel_config) = tunnel.tunnel_configurarion(None) else {
+                error!(
+                    "Failed to convert tunnel {} to tunnel configuration.",
+                    tunnel.name
+                );
+                continue;
+            };
+            tunnel_config.save();
+        }
+    } else {
+        error!("Failed to fetch all location from the database");
+    }
+
+    debug!("Saved all configurations with system settings.");
+}
+
 impl Location<Id> {
+    /// Build [`TunnelConfiguration`] from [`Location`].
     pub(crate) async fn tunnel_configurarion<'e, E>(
         &self,
         executor: E,
         preshared_key: Option<String>,
-        dns: Vec<IpAddr>,
-        dns_search: Vec<String>,
         mtu: Option<u32>,
     ) -> Result<TunnelConfiguration, Error>
     where
@@ -476,6 +645,7 @@ impl Location<Id> {
                 error!("{msg}");
                 Error::InternalError(msg)
             })?;
+        let (dns, dns_search) = self.dns();
         Ok(TunnelConfiguration {
             location_id: Some(self.id),
             tunnel_id: None,
@@ -492,10 +662,9 @@ impl Location<Id> {
 }
 
 impl Tunnel<Id> {
+    /// Build [`TunnelConfiguration`] from [`Tunnel`].
     pub(crate) fn tunnel_configurarion(
         &self,
-        dns: Vec<IpAddr>,
-        dns_search: Vec<String>,
         mtu: Option<u32>,
     ) -> Result<TunnelConfiguration, Error> {
         // prepare peer config
@@ -562,6 +731,7 @@ impl Tunnel<Id> {
                 error!("{msg}");
                 Error::InternalError(msg)
             })?;
+        let (dns, dns_search) = self.dns();
         Ok(TunnelConfiguration {
             location_id: None,
             tunnel_id: Some(self.id),

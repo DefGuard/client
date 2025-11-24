@@ -14,7 +14,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 #[cfg(target_os = "macos")]
-use crate::apple::stop_tunnel;
+use crate::apple::{
+    remove_config_for_location, remove_config_for_tunnel, stop_tunnel_for_location,
+};
 use crate::{
     active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
@@ -51,10 +53,10 @@ use crate::{
 #[cfg(not(target_os = "macos"))]
 use crate::{
     service::{
+        client::DAEMON_CLIENT,
         proto::{
             DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
         },
-        utils::DAEMON_CLIENT,
     },
     utils::execute_command,
 };
@@ -213,7 +215,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Device {
     pub id: Id,
     pub name: String,
@@ -222,7 +224,7 @@ pub struct Device {
     pub created_at: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct InstanceResponse {
     // uuid
     pub id: String,
@@ -230,7 +232,7 @@ pub struct InstanceResponse {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location<Id>>,
     instance: Instance<Id>,
@@ -678,11 +680,6 @@ pub(crate) async fn do_update_instance(
         info!("Locations for instance {instance} didn't change. Not updating them.");
     }
 
-    let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
-        .await?
-        .ok_or(Error::NotFound)?
-        .prvkey;
-
     if service_locations.is_empty() {
         debug!(
             "No service locations for instance {}({}), removing all existing service locations connections if there are any.",
@@ -720,10 +717,15 @@ pub(crate) async fn do_update_instance(
 
         #[cfg(not(target_os = "macos"))]
         {
+            let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
+                .await?
+                .ok_or(Error::NotFound)?
+                .prvkey;
+
             let save_request = SaveServiceLocationsRequest {
                 service_locations: service_locations.clone(),
                 instance_id: instance.uuid.clone(),
-                private_key: private_key.clone(),
+                private_key,
             };
 
             debug!(
@@ -1004,15 +1006,16 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
         );
     }
     for location in instance_locations {
-        if let Some(connection) = app_state
+        if let Some(_connection) = app_state
             .remove_connection(location.id, ConnectionType::Location)
             .await
         {
-            let result = stop_tunnel(&location.name);
+            let result = stop_tunnel_for_location(&location);
             error!("stop_tunnel() for location returned {result:?}");
             if !result {
                 return Err(Error::InternalError("Error from tunnel".into()));
             }
+            remove_config_for_location(&location);
         }
     }
 
@@ -1187,19 +1190,10 @@ pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
     }
 }
 
-#[cfg(target_os = "macos")]
-#[tauri::command(async)]
-pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
-    // TODO: implementation
-    Ok(())
-}
-
-#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting tunnel with ID {tunnel_id}");
     let app_state = handle.state::<AppState>();
-    let mut client = DAEMON_CLIENT.clone();
     let mut transaction = DB_POOL.begin().await?;
 
     let Some(tunnel) = Tunnel::find_by_id(&mut *transaction, tunnel_id).await? else {
@@ -1219,53 +1213,66 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
             "Found active connection for tunnel {tunnel} which is being deleted, closing the \
             connection."
         );
-        if let Some(pre_down) = &tunnel.pre_down {
-            debug!(
-                "Executing defined PreDown command before removing the interface {} for the \
-                tunnel {tunnel}: {pre_down}",
-                connection.interface_name
-            );
-            let _ = execute_command(pre_down);
-            info!(
-                "Executed defined PreDown command before removing the interface {} for the \
-                tunnel {tunnel}: {pre_down}",
-                connection.interface_name
-            );
+
+        #[cfg(target_os = "macos")]
+        {
+            remove_config_for_tunnel(&tunnel);
         }
-        let request = RemoveInterfaceRequest {
-            interface_name: connection.interface_name.clone(),
-            endpoint: tunnel.endpoint.clone(),
-        };
-        client.remove_interface(request).await.map_err(|status| {
-            error!(
-                "An error occurred while removing interface {} for tunnel {tunnel}, status: \
-                {status}",
-                connection.interface_name
-            );
-            Error::InternalError(format!(
-                "An error occurred while removing interface {} for tunnel {tunnel}, error \
-                message: {}. Check logs for more details.",
-                connection.interface_name,
-                status.message()
-            ))
-        })?;
-        info!(
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            if let Some(pre_down) = &tunnel.pre_down {
+                debug!(
+                    "Executing defined PreDown command before removing the interface {} for the \
+                    tunnel {tunnel}: {pre_down}",
+                    connection.interface_name
+                );
+                let _ = execute_command(pre_down);
+                info!(
+                    "Executed defined PreDown command before removing the interface {} for the \
+                    tunnel {tunnel}: {pre_down}",
+                    connection.interface_name
+                );
+            }
+            let request = RemoveInterfaceRequest {
+                interface_name: connection.interface_name.clone(),
+                endpoint: tunnel.endpoint.clone(),
+            };
+            DAEMON_CLIENT
+                .clone()
+                .remove_interface(request)
+                .await
+                .map_err(|status| {
+                    error!(
+                        "An error occurred while removing interface {} for tunnel {tunnel}, \
+                        status: {status}",
+                        connection.interface_name
+                    );
+                    Error::InternalError(format!(
+                        "An error occurred while removing interface {} for tunnel {tunnel}, error \
+                        message: {}. Check logs for more details.",
+                        connection.interface_name,
+                        status.message()
+                    ))
+                })?;
+            info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
             connection.interface_name
         );
-        if let Some(post_down) = &tunnel.post_down {
-            debug!(
-                "Executing defined PostDown command after removing the interface {} for the \
+            if let Some(post_down) = &tunnel.post_down {
+                debug!(
+                    "Executing defined PostDown command after removing the interface {} for the \
                 tunnel {tunnel}: {post_down}",
-                connection.interface_name
-            );
-            let _ = execute_command(post_down);
-            info!(
-                "Executed defined PostDown command after removing the interface {} for the \
+                    connection.interface_name
+                );
+                let _ = execute_command(post_down);
+                info!(
+                    "Executed defined PostDown command after removing the interface {} for the \
                 tunnel {tunnel}: {post_down}",
-                connection.interface_name
-            );
+                    connection.interface_name
+                );
+            }
         }
     }
     tunnel.delete(&mut *transaction).await?;

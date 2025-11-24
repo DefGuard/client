@@ -3,6 +3,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(target_os = "macos")]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::{env, str::FromStr, sync::LazyLock};
 
 #[cfg(unix)]
@@ -75,6 +80,19 @@ async fn startup(app_handle: &AppHandle) {
                 )
             }
         };
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+
+        let handle = tauri::async_runtime::spawn(async move {
+            defguard_client::apple::purge_system_settings();
+            defguard_client::apple::sync_locations_and_tunnels().await;
+            semaphore_clone.store(true, Ordering::Release);
+        });
+        defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+        let _ = handle.await;
     }
 
     // Run periodic tasks.
@@ -300,15 +318,6 @@ fn main() {
                 app_handle_clone.exit(0);
             });
             debug!("Ctrl-C handler has been set up successfully");
-
-            let app_handle_clone = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                // Wait for frontend to be ready
-                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
-
-                // Handle client initialization if necessary
-                handle_client_initialization(&app_handle_clone).await;
-            });
         }
         RunEvent::ExitRequested { code, api, .. } => {
             debug!("Received exit request");
@@ -321,24 +330,32 @@ fn main() {
         // Handle shutdown.
         RunEvent::Exit => {
             debug!("Exiting the application's main event loop.");
-            let handle = tauri::async_runtime::spawn(async {
-                let _ = close_all_connections().await;
-                // This will clean the database file, pruning write-ahead log.
-                DB_POOL.close().await;
-            });
-            // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
-            // create a temporary one.
             #[cfg(target_os = "macos")]
             {
-                use objc2_foundation::{NSDate, NSRunLoop};
-                let run_loop = NSRunLoop::currentRunLoop();
-                // Should be enough to quit.
-                let date = NSDate::dateWithTimeIntervalSinceNow(2.0);
-                run_loop.runUntilDate(&date);
+                let semaphore = Arc::new(AtomicBool::new(false));
+                let semaphore_clone = Arc::clone(&semaphore);
+
+                let handle = tauri::async_runtime::spawn(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                    semaphore_clone.store(true, Ordering::Release);
+                });
+                // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
+                // create a temporary one.
+                defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+                tauri::async_runtime::block_on(async move {
+                    let _ = handle.await;
+                });
             }
-            tauri::async_runtime::block_on(async {
-                let _ = handle.await;
-            });
+            #[cfg(not(target_os = "macos"))]
+            {
+                tauri::async_runtime::block_on(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                });
+            }
         }
         _ => {
             trace!("Received event: {event:?}");
