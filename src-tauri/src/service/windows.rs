@@ -22,7 +22,11 @@ use crate::{
     enterprise::service_locations::{
         windows::watch_for_login_logoff, ServiceLocationError, ServiceLocationManager,
     },
-    service::{run_server, utils::logging_setup, Config, DaemonError},
+    service::{
+        config::Config,
+        daemon::{run_server, DaemonError},
+        utils::logging_setup,
+    },
 };
 
 static SERVICE_NAME: &str = "DefguardService";
