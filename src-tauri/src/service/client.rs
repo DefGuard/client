@@ -1,16 +1,22 @@
 use std::sync::LazyLock;
 
 use hyper_util::rt::TokioIo;
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::ClientOptions;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 use tonic::transport::channel::{Channel, Endpoint};
 #[cfg(unix)]
 use tonic::transport::Uri;
 use tower::service_fn;
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
-use super::{
-    daemon::DAEMON_SOCKET_PATH, proto::desktop_daemon_service_client::DesktopDaemonServiceClient,
-};
+#[cfg(unix)]
+use super::daemon::DAEMON_SOCKET_PATH;
+#[cfg(windows)]
+use super::named_pipe::PIPE_NAME;
+use super::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
 
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {

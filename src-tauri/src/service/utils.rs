@@ -1,18 +1,11 @@
 use std::io::stdout;
 
-#[cfg(windows)]
-use tokio::net::windows::named_pipe::ClientOptions;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
-#[cfg(windows)]
-use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
-
-#[cfg(windows)]
-use crate::service::named_pipe::PIPE_NAME;
 
 pub fn logging_setup(log_dir: &str, log_level: &str) -> WorkerGuard {
     // prepare log file appender

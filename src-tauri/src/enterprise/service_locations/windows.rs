@@ -30,8 +30,8 @@ use crate::{
         SingleServiceLocationData,
     },
     service::{
+        daemon::setup_wgapi,
         proto::{ServiceLocation, ServiceLocationMode},
-        setup_wgapi,
     },
 };
 
