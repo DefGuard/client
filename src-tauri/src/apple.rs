@@ -15,8 +15,8 @@ use block2::RcBlock;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSData, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNumber, NSString, NSDate, NSRunLoop,
+    ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
+    NSNumber, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession,
@@ -47,10 +47,18 @@ pub(crate) struct Stats {
     pub(crate) last_handshake: u64,
 }
 
-pub fn spawn_runloop_for(seconds: f64) {
+/// Run [`NSRunLoop`] until semaphore becomes `true`.
+pub fn spawn_runloop_and_wait_for(semaphore: Arc<AtomicBool>) {
+    const ONE_SECOND: f64 = 1.;
     let run_loop = NSRunLoop::currentRunLoop();
-    let date = NSDate::dateWithTimeIntervalSinceNow(seconds);
-    run_loop.runUntilDate(&date);
+    let mut date = NSDate::dateWithTimeIntervalSinceNow(ONE_SECOND);
+    loop {
+        run_loop.runUntilDate(&date);
+        if semaphore.load(Ordering::Acquire) {
+            break;
+        }
+        date = date.dateByAddingTimeInterval(ONE_SECOND);
+    }
 }
 
 pub(crate) fn manager_for_key_and_value(

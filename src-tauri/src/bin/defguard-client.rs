@@ -3,6 +3,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(target_os = "macos")]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::{env, str::FromStr, sync::LazyLock, time::Duration};
 
 #[cfg(unix)]
@@ -79,15 +84,16 @@ async fn startup(app_handle: &AppHandle) {
     }
     #[cfg(target_os = "macos")]
     {
-        // let handle = tauri::async_runtime::spawn(async {
-        //     defguard_client::apple::purge_system_settings();
-        //     defguard_client::apple::sync_locations_and_tunnels().await;
-        // });
-        // // Should be enough to save.
-        // defguard_client::apple::spawn_runloop_for(2.);
-        // tauri::async_runtime::block_on(async {
-        //     let _ = handle.await;
-        // });
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+
+        let handle = tauri::async_runtime::spawn(async move {
+            defguard_client::apple::purge_system_settings();
+            defguard_client::apple::sync_locations_and_tunnels().await;
+            semaphore_clone.store(true, Ordering::Release);
+        });
+        defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+        let _ = handle.await;
     }
 
     // Run periodic tasks.
@@ -334,21 +340,32 @@ fn main() {
         // Handle shutdown.
         RunEvent::Exit => {
             debug!("Exiting the application's main event loop.");
-            let handle = tauri::async_runtime::spawn(async {
-                let _ = close_all_connections().await;
-                // This will clean the database file, pruning write-ahead log.
-                DB_POOL.close().await;
-            });
-            // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
-            // create a temporary one.
             #[cfg(target_os = "macos")]
             {
-                // Should be enough to quit.
-                defguard_client::apple::spawn_runloop_for(2.);
+                let semaphore = Arc::new(AtomicBool::new(false));
+                let semaphore_clone = Arc::clone(&semaphore);
+
+                let handle = tauri::async_runtime::spawn(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                    semaphore_clone.store(true, Ordering::Release);
+                });
+                // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
+                // create a temporary one.
+                defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+                tauri::async_runtime::block_on(async move {
+                    let _ = handle.await;
+                });
             }
-            tauri::async_runtime::block_on(async {
-                let _ = handle.await;
-            });
+            #[cfg(not(target_os = "macos"))]
+            {
+                tauri::async_runtime::block_on(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                });
+            }
         }
         _ => {
             trace!("Received event: {event:?}");
