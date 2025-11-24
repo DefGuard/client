@@ -8,7 +8,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use std::{env, str::FromStr, sync::LazyLock, time::Duration};
+use std::{env, str::FromStr, sync::LazyLock};
 
 #[cfg(unix)]
 use defguard_client::set_perms;
@@ -41,7 +41,6 @@ extern crate log;
 // For tauri logging plugin:
 // if found in metadata target name it will ignore the log if it was below info level.
 const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
-const WAIT_FOR_FRONEND_DELAY: Duration = Duration::from_secs(15);
 
 static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
@@ -319,15 +318,6 @@ fn main() {
                 app_handle_clone.exit(0);
             });
             debug!("Ctrl-C handler has been set up successfully");
-
-            let app_handle_clone = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                // Wait for frontend to be ready
-                tokio::time::sleep(WAIT_FOR_FRONEND_DELAY).await;
-
-                // Handle client initialization if necessary
-                handle_client_initialization(&app_handle_clone).await;
-            });
         }
         RunEvent::ExitRequested { code, api, .. } => {
             debug!("Received exit request");
