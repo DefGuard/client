@@ -105,21 +105,21 @@ pub(crate) fn manager_for_key_and_value(
                         };
                         if id.as_i64() == value {
                             // This is the manager we were looking for.
-                            tx.send(Some(manager)).unwrap();
+                            tx.send(Some(manager)).expect("Sender is dead");
                             return;
                         }
                     }
                 }
             }
 
-            tx.send(None).unwrap();
+            tx.send(None).expect("Sender is dead");
         },
     );
     unsafe {
         NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
     }
 
-    rx.recv().unwrap()
+    rx.recv().expect("Receiver is dead")
 }
 
 /// Tunnel configuration shared with VPNExtension (written in Swift).
@@ -485,7 +485,11 @@ pub(crate) fn tunnel_stats() -> Vec<Stats> {
         spin_loop();
     }
 
-    let stats = new_stats.lock().unwrap().drain(..).collect();
+    let stats = new_stats
+        .lock()
+        .expect("Failed to acquire lock")
+        .drain(..)
+        .collect();
     stats
 }
 
