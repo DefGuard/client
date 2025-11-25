@@ -1343,9 +1343,8 @@ dependencies = [
 
 [[package]]
 name = "defguard_wireguard_rs"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27cfd58a0c9e3338235404b81cebdd9c709b33bbfe9451d602fe0d8747601db9"
+version = "0.7.7"
+source = "git+https://github.com/DefGuard/wireguard-rs?rev=2d3d3af2c9239ec047d2a51acbc27d62d4ab950c#2d3d3af2c9239ec047d2a51acbc27d62d4ab950c"
 dependencies = [
  "base64 0.22.1",
  "libc",
@@ -1357,6 +1356,7 @@ dependencies = [
  "netlink-packet-wireguard",
  "netlink-sys",
  "nix",
+ "regex",
  "serde",
  "thiserror 2.0.16",
  "x25519-dalek",
@@ -4826,9 +4826,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.11.3"
+version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b5288124840bee7b386bc413c487869b360b2b4ec421ea56425128692f2a82c"
+checksum = "843bc0191f75f3e22651ae5f1e72939ab2f72a4bc30fa80a066bd66edefc24d4"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -4838,9 +4838,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.11"
+version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "833eb9ce86d40ef33cb1306d8accf7bc8ec2bfea4355cbdebb3df68b40925cad"
+checksum = "5276caf25ac86c8d810222b3dbb938e512c55c6831a10f3e6ed1c93b84041f1c"
 dependencies = [
  "aho-corasick",
  "memchr",

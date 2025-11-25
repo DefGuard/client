@@ -4,7 +4,7 @@ default-members = [".", "cli"]
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = "0.7.7"
+defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs", rev = "2d3d3af2c9239ec047d2a51acbc27d62d4ab950c" }
 dirs-next = "2.0"
 prost = "0.14"
 reqwest = { version = "0.12", features = ["cookies", "json"] }
@@ -61,7 +61,7 @@ defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 log = { version = "0.4", features = ["serde"] }
 prost.workspace = true
-regex = "1.11"
+regex = "1.12"
 reqwest.workspace = true
 # 0.21.2 causes config parsing errors
 rust-ini = "=0.21.1"
