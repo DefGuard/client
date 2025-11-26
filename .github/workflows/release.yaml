@@ -395,7 +395,7 @@ jobs:
           cat PKGBUILD
           cat .SRCINFO
 
-  Builds Windows MSI and uploads it as artifact
+  # Builds Windows MSI and uploads it as artifact
   build-windows:
     needs:
       - create-release
