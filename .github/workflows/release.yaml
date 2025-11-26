@@ -356,10 +356,18 @@ jobs:
         run: |
           useradd -m -G wheel -s /bin/bash builduser
           echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
+      - name: Set up SSH for AUR
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # AUR host key
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+
+          eval $(ssh-agent)
+          ssh-add ~/.ssh/id_rsa
+
       - name: Checkout AUR repository
         run: |
           mkdir -p ~/.ssh
