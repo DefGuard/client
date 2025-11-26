@@ -350,48 +350,48 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm git openssh base-devel
-      - name: Create non-root user
-        run: |
-          useradd -m -G wheel -s /bin/bash builduser
-          echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.AUR_SSH_KEY }}
-      - name: Checkout AUR repository
+      - name: Setup SSH for AUR
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
-          rm -rf aur-repo
-          git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
-          chown -R builduser:builduser aur-repo
-      - name: Update PKGBUILD version
+          echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          # Create SSH config file
+          cat > ~/.ssh/config << EOF
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/id_rsa
+            User aur
+            StrictHostKeyChecking accept-new
+          EOF
+          chmod 600 ~/.ssh/config
+      - name: Update AUR Package
         run: |
-          cd aur-repo
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
 
+          git config --global user.name "Defguard Build System"
+          git config --global user.email "community@defguard.net"
+          git config --global --add safe.directory '*'
+
+          rm -rf aur-repo || true
+          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" \
+            git clone "ssh://aur@aur.archlinux.org/defguard-client.git" aur-repo
+          cd aur-repo
+          git config --global --add safe.directory "$(pwd)"
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo "Updating to version: $VERSION"
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
 
           AMD64_SHA="${{ needs.build-linux.outputs.deb_sha256_amd64 }}"
-
           echo "AMD64 DEB SHA256: $AMD64_SHA"
           sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
-      - name: Update .SRCINFO
-        run: |
-          cd aur-repo
-          sudo -u builduser makepkg --printsrcinfo > .SRCINFO
-      - name: Commit and push changes
-        run: |
-          cd aur-repo
+
+          useradd -m builduser
           chown -R builduser:builduser .
-          sudo -u builduser git config user.name "Defguard Build System"
-          sudo -u builduser git config user.email "community@defguard.net"
-          sudo -u builduser git add PKGBUILD .SRCINFO
-          sudo -u builduser git commit -m "Updated to $VERSION"
-          sudo -u builduser git push
+
+          su builduser -c "makepkg --printsrcinfo" > .SRCINFO
+          git add PKGBUILD .SRCINFO
+          git commit -m "Updated to $VERSION"
+          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" git push
           cat PKGBUILD
           cat .SRCINFO
 
