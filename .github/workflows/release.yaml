@@ -361,13 +361,21 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          echo "Host aur.archlinux.org" > ~/.ssh/config
-          echo "    StrictHostKeyChecking no" >> ~/.ssh/config
+          # Create SSH config file
+          cat > ~/.ssh/config << EOF
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/id_rsa
+            User aur
+            StrictHostKeyChecking accept-new
+          EOF
+          chmod 600 ~/.ssh/config
           
+
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          rm -rf aur-repo
-          git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
+          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" \
+            git clone "ssh://aur@aur.archlinux.org/defguard-client.git" aur-repo
+
           chown -R builduser:builduser aur-repo
       - name: Update PKGBUILD version
         run: |
