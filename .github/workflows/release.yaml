@@ -356,7 +356,7 @@ jobs:
         run: |
           useradd -m -G wheel -s /bin/bash builduser
           echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-      - name: Checkout AUR repository
+      - name: Update AUR Package
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
@@ -377,8 +377,7 @@ jobs:
             git clone "ssh://aur@aur.archlinux.org/defguard-client.git" aur-repo
 
           chown -R builduser:builduser aur-repo
-      - name: Update PKGBUILD version
-        run: |
+
           cd aur-repo
           # VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           VERSION="1.5.2"
@@ -391,12 +390,8 @@ jobs:
 
           echo "AMD64 DEB SHA256: $AMD64_SHA"
           sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
-      - name: Update .SRCINFO
-        run: |
           cd aur-repo
           sudo -u builduser makepkg --printsrcinfo > .SRCINFO
-      - name: Commit and push changes
-        run: |
           cd aur-repo
           chown -R builduser:builduser .
           sudo -u builduser git config user.name "Defguard Build System"
