@@ -396,7 +396,7 @@ jobs:
           sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
 
           useradd -m builduser
-          chown -R builder:builder .
+          chown -R builduser:builduser .
 
           sh builduser -c "makepkg --printsrcinfo" > .SRCINFO
           chown -R builduser:builduser .
