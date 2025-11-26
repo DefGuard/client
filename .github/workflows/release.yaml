@@ -361,17 +361,12 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
-          # AUR host key
           ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-
           eval $(ssh-agent)
           ssh-add ~/.ssh/id_rsa
 
       - name: Checkout AUR repository
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
           rm -rf aur-repo
