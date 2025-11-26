@@ -399,7 +399,6 @@ jobs:
           chown -R builduser:builduser .
 
           sh builduser -c "makepkg --printsrcinfo" > .SRCINFO
-          chown -R builduser:builduser .
 
           git add PKGBUILD .SRCINFO
           git commit -m "Updated to $VERSION"
