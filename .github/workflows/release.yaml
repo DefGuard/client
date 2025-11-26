@@ -356,19 +356,16 @@ jobs:
         run: |
           useradd -m -G wheel -s /bin/bash builduser
           echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-      - name: Set up SSH for AUR
+      - name: Checkout AUR repository
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-          eval $(ssh-agent)
-          ssh-add ~/.ssh/id_rsa
-
-      - name: Checkout AUR repository
-        run: |
+          echo "Host aur.archlinux.org" > ~/.ssh/config
+          echo "    StrictHostKeyChecking no" >> ~/.ssh/config
+          
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
           rm -rf aur-repo
           git clone ssh://aur@aur.archlinux.org/defguard-client.git aur-repo
           chown -R builduser:builduser aur-repo
