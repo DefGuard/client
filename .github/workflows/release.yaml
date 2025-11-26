@@ -373,6 +373,7 @@ jobs:
 
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+          rm -rf aur-repo || true
           GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" \
             git clone "ssh://aur@aur.archlinux.org/defguard-client.git" aur-repo
 
