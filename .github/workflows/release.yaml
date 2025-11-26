@@ -487,33 +487,3 @@ jobs:
   #         asset_path: defguard-client-signed.msi
   #         asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
   #         asset_content_type: application/octet-stream
-client-reattached.exe
-  sign-bundle:
-    needs:
-      - create-release
-      - reattach-burn-engine
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    steps:
-      - name: Write release version
-        run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo Version: $VERSION
-          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-      - name: Download unsigned bundle & signed burn-engine
-        uses: actions/download-artifact@v4
-        with:
-          name: unsigned-bundle-with-reattached-signed-burn-engine
-      - name: Sign bundle
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client-reattached.exe -out defguard-client-signed.exe
-      - name: Upload installer asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client-signed.exe
-          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.exe
-          asset_content_type: application/octet-stream
