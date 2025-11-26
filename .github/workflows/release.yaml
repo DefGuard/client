@@ -390,9 +390,7 @@ jobs:
 
           echo "AMD64 DEB SHA256: $AMD64_SHA"
           sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
-          cd aur-repo
           sudo -u builduser makepkg --printsrcinfo > .SRCINFO
-          cd aur-repo
           chown -R builduser:builduser .
           sudo -u builduser git config user.name "Defguard Build System"
           sudo -u builduser git config user.email "community@defguard.net"
