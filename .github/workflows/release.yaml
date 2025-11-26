@@ -399,10 +399,9 @@ jobs:
           chown -R builduser:builduser .
 
           su builduser -c "makepkg --printsrcinfo" > .SRCINFO
-          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new"
           git add PKGBUILD .SRCINFO
           git commit -m "Updated to $VERSION"
-          git push
+          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" git push
           cat PKGBUILD
           cat .SRCINFO
 
