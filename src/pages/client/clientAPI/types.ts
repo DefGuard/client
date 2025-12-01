@@ -52,7 +52,7 @@ export type LogLevel = 'ERROR' | 'INFO' | 'DEBUG' | 'TRACE' | 'WARN';
 export const availableLogLevels: LogLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
 
 export type GlobalLogLevel = 'ERROR' | 'INFO' | 'DEBUG';
-export type LogSource = 'Client' | 'Service' | 'All';
+export type LogSource = 'Client' | 'VPN' | 'All';
 
 export type ClientView = 'grid' | 'detail';
 

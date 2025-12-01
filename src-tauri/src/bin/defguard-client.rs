@@ -83,8 +83,14 @@ async fn startup(app_handle: &AppHandle) {
     }
     #[cfg(target_os = "macos")]
     {
+        use defguard_client::{
+            apple::get_managers_for_tunnels_and_locations, utils::get_all_tunnels_locations,
+        };
+
         let semaphore = Arc::new(AtomicBool::new(false));
         let semaphore_clone = Arc::clone(&semaphore);
+
+        let app_handle_clone = app_handle.clone();
 
         let handle = tauri::async_runtime::spawn(async move {
             defguard_client::apple::purge_system_settings();
@@ -93,6 +99,25 @@ async fn startup(app_handle: &AppHandle) {
         });
         defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
         let _ = handle.await;
+
+        let (tunnels, locations) = get_all_tunnels_locations().await;
+        let handle = app_handle.clone();
+        // Observer thread is blocking, so its better not to mess with the tauri runtime,
+        // hence std::thread::spawn.
+        std::thread::spawn(move || {
+            defguard_client::apple::observer_thread(get_managers_for_tunnels_and_locations(
+                &tunnels, &locations,
+            ));
+            error!("VPN observer thread has exited unexpectedly, quitting the app.");
+            handle.exit(0);
+        });
+
+        let handle = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            defguard_client::apple::connection_state_update_thread(&handle).await;
+            error!("Connection state update thread has exited unexpectedly, quitting the app.");
+            handle.exit(0);
+        });
     }
 
     // Run periodic tasks.

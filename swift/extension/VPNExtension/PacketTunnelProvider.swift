@@ -1,36 +1,40 @@
 import NetworkExtension
-import os
 
 enum WireGuardTunnelError: Error {
     case invalidTunnelConfiguration
 }
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
-    /// Logging
-    private var logger = Logger(subsystem: Bundle.main.bundleIdentifier!, category: "PacketTunnelProvider")
+    /// Unified logger (writes to both system log and file)
+    private let log = Log(category: "PacketTunnelProvider")
 
     private lazy var adapter: Adapter = {
         return Adapter(with: self)
     }()
 
-    override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        logger.debug("\(#function)")
+    override func startTunnel(
+        options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void
+    ) {
+        log.info("\(#function) called")
         if let options = options {
-            logger.log("Options: \(options)")
+            log.debug("Options: \(options)")
         }
 
         guard let protocolConfig = self.protocolConfiguration as? NETunnelProviderProtocol,
-        let providerConfig = protocolConfig.providerConfiguration,
-        let tunnelConfig = try? TunnelConfiguration.from(dictionary: providerConfig) else {
-            self.logger.error("Failed to parse tunnel configuration")
+            let providerConfig = protocolConfig.providerConfiguration,
+            let tunnelConfig = try? TunnelConfiguration.from(dictionary: providerConfig)
+        else {
+            log.error("Failed to parse tunnel configuration")
             completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
             return
         }
 
+        log.info("Tunnel configuration parsed successfully")
+
         let networkSettings = tunnelConfig.asNetworkSettings()
         self.setTunnelNetworkSettings(networkSettings) { error in
             if error != nil {
-                self.logger.error("Set tunnel network settings returned \(error)")
+                self.log.error("Set tunnel network settings error: \(String(describing: error))")
             }
             completionHandler(error)
             return
@@ -39,23 +43,25 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         do {
             try adapter.start(tunnelConfiguration: tunnelConfig)
         } catch {
-            logger.error("Failed to start tunnel")
+            log.error("Failed to start tunnel: \(error)")
             completionHandler(error)
         }
-        logger.info("Tunnel started")
+        log.info("Tunnel started successfully")
 
         completionHandler(nil)
     }
 
-    override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        logger.debug("\(#function)")
+    override func stopTunnel(
+        with reason: NEProviderStopReason, completionHandler: @escaping () -> Void
+    ) {
+        log.info("\(#function) called with reason: \(reason)")
         adapter.stop()
-        logger.info("Tunnel stopped")
+        log.info("Tunnel stopped")
         completionHandler()
     }
 
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
-        logger.debug("\(#function)")
+        log.debug("\(#function) called")
         // TODO: messageData should contain a valid message.
         if let handler = completionHandler {
             if let stats = adapter.stats() {
@@ -68,13 +74,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override func sleep(completionHandler: @escaping () -> Void) {
-        logger.debug("\(#function)")
+        log.info("System going to sleep")
         // Add code here to get ready to sleep.
         completionHandler()
     }
 
     override func wake() {
-        logger.debug("\(#function)")
+        log.info("System waking up")
         // Add code here to wake up.
     }
 }

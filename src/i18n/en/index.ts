@@ -189,11 +189,11 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               globalLogs: {
                 logSources: {
                   client: 'Client',
-                  service: 'Service',
+                  vpn: 'VPN',
                   all: 'All',
                 },
                 logSourceHelper:
-                  'The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.',
+                  'The source of the logs. Logs can come from the Defguard client or the VPN service/extension that manages VPN connections at the network level.',
               },
               theme: {
                 title: 'Theme',

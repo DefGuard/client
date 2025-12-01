@@ -449,16 +449,16 @@ type RootTranslation = {
 									 */
 									client: string
 									/**
-									 * S​e​r​v​i​c​e
+									 * V​P​N
 									 */
-									service: string
+									vpn: string
 									/**
 									 * A​l​l
 									 */
 									all: string
 								}
 								/**
-								 * T​h​e​ ​s​o​u​r​c​e​ ​o​f​ ​t​h​e​ ​l​o​g​s​.​ ​L​o​g​s​ ​c​a​n​ ​c​o​m​e​ ​f​r​o​m​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​c​l​i​e​n​t​ ​o​r​ ​t​h​e​ ​b​a​c​k​g​r​o​u​n​d​ ​D​e​f​g​u​a​r​d​ ​s​e​r​v​i​c​e​ ​t​h​a​t​ ​m​a​n​a​g​e​s​ ​V​P​N​ ​c​o​n​n​c​e​t​i​o​n​s​ ​a​t​ ​t​h​e​ ​n​e​t​w​o​r​k​ ​l​e​v​e​l​.
+								 * T​h​e​ ​s​o​u​r​c​e​ ​o​f​ ​t​h​e​ ​l​o​g​s​.​ ​L​o​g​s​ ​c​a​n​ ​c​o​m​e​ ​f​r​o​m​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​c​l​i​e​n​t​ ​o​r​ ​t​h​e​ ​V​P​N​ ​s​e​r​v​i​c​e​/​e​x​t​e​n​s​i​o​n​ ​t​h​a​t​ ​m​a​n​a​g​e​s​ ​V​P​N​ ​c​o​n​n​e​c​t​i​o​n​s​ ​a​t​ ​t​h​e​ ​n​e​t​w​o​r​k​ ​l​e​v​e​l​.
 								 */
 								logSourceHelper: string
 							}
@@ -2153,16 +2153,16 @@ export type TranslationFunctions = {
 									 */
 									client: () => LocalizedString
 									/**
-									 * Service
+									 * VPN
 									 */
-									service: () => LocalizedString
+									vpn: () => LocalizedString
 									/**
 									 * All
 									 */
 									all: () => LocalizedString
 								}
 								/**
-								 * The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.
+								 * The source of the logs. Logs can come from the Defguard client or the VPN service/extension that manages VPN connections at the network level.
 								 */
 								logSourceHelper: () => LocalizedString
 							}

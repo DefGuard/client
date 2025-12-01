@@ -312,8 +312,8 @@ pub async fn save_device_config(
 
 #[cfg(target_os = "macos")]
 async fn push_service_locations(
-    instance: &Instance<Id>,
-    keys: WireguardKeys<Id>,
+    _instance: &Instance<Id>,
+    _keys: WireguardKeys<Id>,
 ) -> Result<Vec<Location<Id>>, Error> {
     // Nothing here... yet
 
@@ -1205,9 +1205,10 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
         with deletion."
     );
 
-    if let Some(connection) = app_state
+    if app_state
         .remove_connection(tunnel_id, ConnectionType::Tunnel)
         .await
+        .is_some()
     {
         debug!(
             "Found active connection for tunnel {tunnel} which is being deleted, closing the \
