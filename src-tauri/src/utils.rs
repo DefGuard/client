@@ -217,11 +217,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) async fn stats_handler(
-    pool: DbPool,
-    interface_name: String,
-    connection_type: ConnectionType,
-) {
+pub(crate) async fn stats_handler(interface_name: String, connection_type: ConnectionType) {
+    let pool = DB_POOL.clone();
     let request = ReadInterfaceDataRequest {
         interface_name: interface_name.clone(),
     };
@@ -1104,6 +1101,7 @@ pub(crate) fn construct_platform_header() -> String {
 
 #[must_use]
 /// Utility function to get all tunnels and locations from the database.
+#[cfg(target_os = "macos")]
 pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
     let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
     let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();

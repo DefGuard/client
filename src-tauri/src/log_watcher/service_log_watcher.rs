@@ -16,13 +16,18 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
+#[cfg(target_os = "macos")]
+use chrono::{NaiveDateTime, TimeZone};
+#[cfg(target_os = "macos")]
 use regex::Regex;
 use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
-use super::{LogLine, LogLineFields, LogWatcherError};
+#[cfg(target_os = "macos")]
+use super::LogLineFields;
+use super::{LogLine, LogWatcherError};
 #[cfg(not(target_os = "macos"))]
 use crate::utils::get_service_log_dir;
 use crate::{

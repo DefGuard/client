@@ -1205,10 +1205,9 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
         with deletion."
     );
 
-    if app_state
+    if let Some(connection) = app_state
         .remove_connection(tunnel_id, ConnectionType::Tunnel)
         .await
-        .is_some()
     {
         debug!(
             "Found active connection for tunnel {tunnel} which is being deleted, closing the \
