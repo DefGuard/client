@@ -45,7 +45,10 @@ impl AppState {
         drop(connections);
 
         debug!("Spawning thread for network statistics for location ID {location_id}");
+        #[cfg(target_os = "macos")]
         let handle = spawn(stats_handler(location_id, connection_type));
+        #[cfg(not(target_os = "macos"))]
+        let handle = spawn(stats_handler(ifname, connection_type));
         let Some(old_handle) = self
             .stat_threads
             .lock()
