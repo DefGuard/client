@@ -3,6 +3,9 @@
 //! This is meant to handle passing relevant logs from `defguard-service` daemon to the client GUI.
 //! The watcher monitors a given directory for any changes. Whenever a change is detected
 //! it parses the log files and sends logs relevant to a specified interface to the fronted.
+//!
+//! On macOS, this module also provides a VPN extension log watcher that reads from the
+//! App Group shared container where the Swift network extension writes its logs.
 
 use std::{
     fs::{read_dir, File},
@@ -14,18 +17,20 @@ use std::{
 };
 
 use chrono::{DateTime, NaiveDate, Utc};
+#[cfg(target_os = "macos")]
+use chrono::{NaiveDateTime, TimeZone};
 use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
+#[cfg(target_os = "macos")]
+use super::LogLineFields;
 use super::{LogLine, LogWatcherError};
+#[cfg(not(target_os = "macos"))]
+use crate::utils::get_service_log_dir;
 use crate::{
-    appstate::AppState,
-    database::models::Id,
-    error::Error,
-    log_watcher::extract_timestamp,
-    utils::{get_service_log_dir, get_tunnel_or_location_name},
-    ConnectionType,
+    appstate::AppState, database::models::Id, error::Error, log_watcher::extract_timestamp,
+    utils::get_tunnel_or_location_name, ConnectionType,
 };
 
 const DELAY: Duration = Duration::from_secs(2);
@@ -206,12 +211,195 @@ impl<'a> ServiceLogWatcher<'a> {
     }
 }
 
+/// macOS-specific log watcher for VPN extension logs
+///
+/// On macOS, the VPN functionality is handled by a Network Extension which writes
+/// its logs to an App Group shared container. This watcher reads those logs.
+#[cfg(target_os = "macos")]
+#[derive(Debug)]
+pub struct VpnExtensionLogWatcher {
+    log_level: Level,
+    from: Option<DateTime<Utc>>,
+    log_file: PathBuf,
+    handle: AppHandle,
+    cancellation_token: CancellationToken,
+    event_topic: String,
+}
+
+#[cfg(target_os = "macos")]
+impl VpnExtensionLogWatcher {
+    #[must_use]
+    pub fn new(
+        handle: AppHandle,
+        cancellation_token: CancellationToken,
+        event_topic: String,
+        log_level: Level,
+        from: Option<DateTime<Utc>>,
+        log_file: PathBuf,
+    ) -> Self {
+        Self {
+            log_level,
+            from,
+            log_file,
+            handle,
+            cancellation_token,
+            event_topic,
+        }
+    }
+
+    /// Run the VPN extension log watcher
+    pub fn run(&mut self) -> Result<(), LogWatcherError> {
+        debug!(
+            "Starting VPN extension log watcher, reading from: {}",
+            self.log_file.display()
+        );
+
+        // Wait for the log file to exist
+        while !self.log_file.exists() {
+            if self.cancellation_token.is_cancelled() {
+                return Ok(());
+            }
+            debug!(
+                "VPN extension log file not found at {}, waiting...",
+                self.log_file.display()
+            );
+            sleep(DELAY);
+        }
+
+        let file = File::open(&self.log_file)?;
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+        let mut parsed_lines = Vec::new();
+
+        loop {
+            if self.cancellation_token.is_cancelled() {
+                info!("VPN extension log watcher is being stopped.");
+                break;
+            }
+
+            let size = reader.read_line(&mut line)?;
+            if size == 0 {
+                // EOF reached, emit collected logs and wait
+                if !parsed_lines.is_empty() {
+                    trace!(
+                        "Emitting {} VPN extension log lines for the frontend",
+                        parsed_lines.len()
+                    );
+                    self.handle.emit(&self.event_topic, &parsed_lines)?;
+                    parsed_lines.clear();
+                }
+                sleep(DELAY);
+            } else {
+                match self.parse_log_line(&line) {
+                    Ok(Some(parsed_line)) => {
+                        parsed_lines.push(parsed_line);
+                    }
+                    Ok(None) => {
+                        // Line was filtered out
+                    }
+                    Err(e) => {
+                        trace!("Failed to parse VPN extension log line: {e}");
+                    }
+                }
+                line.clear();
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Parse a VPN extension log line
+    ///
+    /// Log format: `2024-01-15 14:32:45.123 [INFO] [Adapter] Message here`
+    fn parse_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
+        use crate::log_watcher::LOG_LINE_REGEX;
+
+        let trimmed = line.trim();
+
+        // Skip empty lines and separator/header lines
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            return Ok(None);
+        }
+
+        let captures = LOG_LINE_REGEX
+            .captures(trimmed)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?;
+
+        let timestamp_str = captures
+            .get(1)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        // Parse timestamp as UTC (Swift FileLogger is configured to use UTC timezone)
+        let timestamp = Utc.from_utc_datetime(
+            &NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%d %H:%M:%S%.3f").map_err(
+                |err| {
+                    LogWatcherError::LogParseError(format!(
+                        "Failed to parse VPN extension timestamp {timestamp_str} with error: {err}"
+                    ))
+                },
+            )?,
+        );
+
+        let level_str = captures
+            .get(2)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        let level = match level_str.to_uppercase().as_str() {
+            "DEBUG" => Level::DEBUG,
+            "WARN" => Level::WARN,
+            "ERROR" => Level::ERROR,
+            _ => Level::INFO,
+        };
+
+        let category = captures
+            .get(3)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        let message = captures
+            .get(4)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        // Filter by log level
+        if level > self.log_level {
+            return Ok(None);
+        }
+
+        // Filter by timestamp
+        if let Some(from) = self.from {
+            if timestamp < from {
+                return Ok(None);
+            }
+        }
+
+        let fields = LogLineFields {
+            message: message.to_string(),
+        };
+
+        Ok(Some(LogLine {
+            timestamp,
+            level,
+            target: format!("VPNExtension::{category}"),
+            fields,
+            span: None,
+            source: None,
+        }))
+    }
+}
+
 /// Starts a log watcher in a separate thread
 ///
 /// The watcher parses `defguard-service` log files and extracts logs relevant
 /// to the WireGuard interface for a given location.
 /// Logs are then transmitted to the frontend by using `tauri` `Events`.
 /// Returned value is the name of an event topic to monitor.
+///
+/// On macOS, this uses the VPN extension log watcher instead, reading from
+/// the App Group shared container where the Swift network extension writes logs.
+#[cfg(not(target_os = "macos"))]
 pub async fn spawn_log_watcher_task(
     handle: AppHandle,
     location_id: Id,
@@ -281,6 +469,86 @@ pub async fn spawn_log_watcher_task(
     let name = get_tunnel_or_location_name(location_id, connection_type).await;
     info!(
         "A background task has been spawned to watch the defguard service log file for \
+        {connection_type} {name} (interface {interface_name}), location's specific collected logs \
+        will be displayed in the {connection_type}'s detailed view."
+    );
+    Ok(event_topic)
+}
+
+/// macOS version: Starts a VPN extension log watcher in a separate thread
+///
+/// On macOS, the VPN functionality is handled by a Network Extension which writes
+/// its logs to an App Group shared container. This function spawns a watcher for those logs.
+///
+/// TODO: Currently the "service log watcher" should watch only given interface, this is not yet implemented for VPN extension logs.
+#[cfg(target_os = "macos")]
+pub async fn spawn_log_watcher_task(
+    handle: AppHandle,
+    location_id: Id,
+    interface_name: String,
+    connection_type: ConnectionType,
+    log_level: Level,
+    from: Option<String>,
+) -> Result<String, Error> {
+    use crate::log_watcher::get_vpn_extension_log_path;
+
+    debug!(
+        "Spawning VPN extension log watcher task for location ID {location_id}, interface {interface_name}"
+    );
+    let app_state = handle.state::<AppState>();
+
+    let from = from.and_then(|from| DateTime::<Utc>::from_str(&from).ok());
+
+    let connection_type_str = if connection_type.eq(&ConnectionType::Tunnel) {
+        "Tunnel"
+    } else {
+        "Location"
+    };
+    let event_topic = format!("log-update-{connection_type_str}-{location_id}");
+    debug!("Using the following event topic for the VPN extension log watcher: {event_topic}");
+
+    let log_file = get_vpn_extension_log_path().map_err(|e| Error::InternalError(e.to_string()))?;
+    debug!("VPN extension log file path: {}", log_file.display());
+
+    let topic_clone = event_topic.clone();
+    let handle_clone = handle.clone();
+
+    let token = CancellationToken::new();
+    let token_clone = token.clone();
+
+    let mut log_watcher = VpnExtensionLogWatcher::new(
+        handle_clone,
+        token_clone,
+        topic_clone,
+        log_level,
+        from,
+        log_file,
+    );
+
+    // spawn task
+    let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
+        tauri::async_runtime::spawn(async move {
+            log_watcher.run()?;
+            Ok(())
+        });
+
+    // store `CancellationToken` to manually stop watcher thread
+    // keep this in a block as we .await later, which should not be done while holding a lock like this
+    {
+        let mut log_watchers = app_state
+            .log_watchers
+            .lock()
+            .expect("Failed to lock log watchers mutex");
+        if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
+            // cancel previous log watcher for this interface
+            debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
+            old_token.cancel();
+        }
+    }
+
+    let name = get_tunnel_or_location_name(location_id, connection_type).await;
+    info!(
+        "A background task has been spawned to watch the VPN extension log file for \
         {connection_type} {name} (interface {interface_name}), location's specific collected logs \
         will be displayed in the {connection_type}'s detailed view."
     );

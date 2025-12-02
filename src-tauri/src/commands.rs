@@ -312,8 +312,8 @@ pub async fn save_device_config(
 
 #[cfg(target_os = "macos")]
 async fn push_service_locations(
-    instance: &Instance<Id>,
-    keys: WireguardKeys<Id>,
+    _instance: &Instance<Id>,
+    _keys: WireguardKeys<Id>,
 ) -> Result<Vec<Location<Id>>, Error> {
     // Nothing here... yet
 

@@ -133,8 +133,6 @@ pub(crate) async fn setup_interface(
     mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
-    debug!("Setting up interface for location: {location}");
-
     let tunnel_config = location
         .tunnel_configurarion(pool, preshared_key, mtu)
         .await?;
@@ -148,23 +146,22 @@ pub(crate) async fn setup_interface(
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) async fn stats_handler(
-    pool: DbPool,
-    _interface_name: String,
-    _connection_type: ConnectionType,
-) {
+pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
+    debug!("Starting stats handler for ID {id} and connection type {connection_type:?}");
     use crate::database::models::{location_stats::LocationStats, tunnel::TunnelStats};
 
     const CHECK_INTERVAL: Duration = Duration::from_secs(10);
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
+    let pool = DB_POOL.clone();
 
     loop {
+        debug!("Waiting for the next stats collection interval for ID {id} and connection type {connection_type:?}");
         interval.tick().await;
 
-        let mut all_stats = tunnel_stats();
-        if all_stats.is_empty() {
+        let stats = tunnel_stats(id, &connection_type);
+        let Some(stats) = stats else {
             continue;
-        }
+        };
 
         let mut transaction = match pool.begin().await {
             Ok(transactions) => transactions,
@@ -176,48 +173,39 @@ pub(crate) async fn stats_handler(
             }
         };
 
-        for stats in all_stats.drain(..) {
-            if let Some(location_id) = stats.location_id {
-                let location_stats = LocationStats::new(
-                    location_id,
-                    stats.tx_bytes as i64,
-                    stats.rx_bytes as i64,
-                    stats.last_handshake as i64,
-                    0,
-                    None,
-                );
-                match location_stats.save(&mut *transaction).await {
-                    Ok(_) => {
-                        debug!("Saved network usage stats for location ID {location_id}");
-                    }
-                    Err(err) => {
-                        error!(
-                            "Failed to save network usage stats for location ID {location_id}: \
-                            {err}"
-                        );
-                    }
+        if connection_type == ConnectionType::Location {
+            let location_stats = LocationStats::new(
+                id,
+                stats.tx_bytes as i64,
+                stats.rx_bytes as i64,
+                stats.last_handshake as i64,
+                0,
+                None,
+            );
+            match location_stats.save(&mut *transaction).await {
+                Ok(_) => {
+                    debug!("Saved network usage stats for location ID {id}");
+                }
+                Err(err) => {
+                    error!("Failed to save network usage stats for location ID {id}: {err}");
                 }
             }
-            if let Some(tunnel_id) = stats.tunnel_id {
-                let tunnel_stats = TunnelStats::new(
-                    tunnel_id,
-                    stats.tx_bytes as i64,
-                    stats.rx_bytes as i64,
-                    stats.last_handshake as i64,
-                    chrono::Utc::now().naive_utc(),
-                    0,
-                    0,
-                );
-                match tunnel_stats.save(&mut *transaction).await {
-                    Ok(_) => {
-                        debug!("Saved network usage stats for tunnel ID {tunnel_id}");
-                    }
-                    Err(err) => {
-                        error!(
-                            "Failed to save network usage stats for tunnel ID {tunnel_id}: \
-                            {err}"
-                        );
-                    }
+        } else {
+            let tunnel_stats = TunnelStats::new(
+                id,
+                stats.tx_bytes as i64,
+                stats.rx_bytes as i64,
+                stats.last_handshake as i64,
+                chrono::Utc::now().naive_utc(),
+                0,
+                0,
+            );
+            match tunnel_stats.save(&mut *transaction).await {
+                Ok(_) => {
+                    debug!("Saved network usage stats for tunnel ID {id}");
+                }
+                Err(err) => {
+                    error!("Failed to save network usage stats for tunnel ID {id}: {err}");
                 }
             }
         }
@@ -229,11 +217,8 @@ pub(crate) async fn stats_handler(
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) async fn stats_handler(
-    pool: DbPool,
-    interface_name: String,
-    connection_type: ConnectionType,
-) {
+pub(crate) async fn stats_handler(interface_name: String, connection_type: ConnectionType) {
+    let pool = DB_POOL.clone();
     let request = ReadInterfaceDataRequest {
         interface_name: interface_name.clone(),
     };
@@ -1112,4 +1097,13 @@ pub(crate) fn construct_platform_header() -> String {
     let buffer = platform_info.encode_to_vec();
 
     BASE64_STANDARD.encode(buffer)
+}
+
+#[must_use]
+/// Utility function to get all tunnels and locations from the database.
+#[cfg(target_os = "macos")]
+pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
+    let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
+    let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
+    (tunnels, locations)
 }

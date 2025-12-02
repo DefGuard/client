@@ -1,7 +1,6 @@
 import Foundation
 import Network
 import NetworkExtension
-import os
 
 /// State of Adapter.
 enum State {
@@ -26,8 +25,8 @@ enum State {
     private var networkMonitor: NWPathMonitor?
     /// Keep alive timer
     private var keepAliveTimer: Timer?
-    /// Logging
-    private lazy var logger = Logger(subsystem: Bundle.main.bundleIdentifier!, category: "Adapter")
+    /// Unified logger (writes to both system log and file)
+    private let log = Log(category: "Adapter")
     /// Adapter state.
     private var state: State = .stopped
 
@@ -49,13 +48,13 @@ enum State {
 
     func start(tunnelConfiguration: TunnelConfiguration) throws {
         guard case .stopped = self.state else {
-            logger.error("Invalid state")
+            log.error("Invalid state - cannot start tunnel")
             // TODO: throw invalid state
             return
         }
 
         if tunnel != nil {
-            logger.info("Cleaning exiting Tunnel")
+            log.info("Cleaning existing Tunnel")
             tunnel = nil
             connection = nil
         }
@@ -67,7 +66,7 @@ enum State {
         networkMonitor.start(queue: .main)
         self.networkMonitor = networkMonitor
 
-        logger.info("Initializing Tunnel")
+        log.info("Initializing Tunnel")
         tunnel = try Tunnel.init(
             privateKey: tunnelConfiguration.privateKey,
             serverPublicKey: tunnelConfiguration.peers[0].publicKey,
@@ -78,22 +77,25 @@ enum State {
         locationId = tunnelConfiguration.locationId
         tunnelId = tunnelConfiguration.tunnelId
 
-        logger.info("Connecting to endpoint")
+        log.info(
+            "Connecting to endpoint (locationId: \(tunnelConfiguration.locationId ?? 0), tunnelId: \(tunnelConfiguration.tunnelId ?? 0))"
+        )
         guard let endpoint = tunnelConfiguration.peers[0].endpoint else {
-            logger.error("Endpoint is nil")
+            log.error("Endpoint is nil, cannot connect")
             return
         }
         self.endpoint = endpoint.asNWEndpoint()
         initEndpoint()
 
-        logger.info("Sniffing packets")
+        log.info("Starting to sniff packets")
         readPackets()
 
         state = .running
+        log.info("Tunnel started successfully")
     }
 
     func stop() {
-        logger.info("Stopping Adapter")
+        log.info("Stopping Adapter")
         connection?.cancel()
         connection = nil
         tunnel = nil
@@ -104,7 +106,8 @@ enum State {
         networkMonitor = nil
 
         state = .stopped
-        logger.info("Tunnel stopped")
+        log.info("Tunnel stopped")
+        log.flush()
     }
 
     // Obtain tunnel statistics.
@@ -127,10 +130,10 @@ enum State {
             // Nothing to do.
             break
         case .err(let error):
-            logger.error("Tunnel error \(error, privacy: .public)")
+            log.error("Tunnel error: \(error)")
             switch error {
             case .InvalidAeadTag:
-                logger.error("Invalid pre-shared key; stopping tunnel")
+                log.error("Invalid pre-shared key; stopping tunnel")
                 // The correct way is to call the packet tunnel provider, if there is one.
                 if let provider = packetTunnelProvider {
                     provider.cancelTunnelWithError(error)
@@ -138,7 +141,7 @@ enum State {
                     stop()
                 }
             case .ConnectionExpired:
-                logger.error("Connecion has expired; re-connecting")
+                log.warning("Connection has expired; re-connecting")
                 packetTunnelProvider?.reasserting = true
                 initEndpoint()
                 packetTunnelProvider?.reasserting = false
@@ -162,7 +165,7 @@ enum State {
     private func initEndpoint() {
         guard let endpoint = endpoint else { return }
 
-        logger.info("Init Endpoint")
+        log.info("Initializing endpoint connection to: \(endpoint)")
         // Cancel previous connection
         connection?.cancel()
         connection = nil
@@ -180,21 +183,20 @@ enum State {
 
     /// Setup UDP connection to endpoint. This method should be called when UDP connection is ready to send and receive.
     private func setupEndpoint() {
-        logger.info("Setup endpoint")
+        log.info("Setting up endpoint")
 
         // Send initial handshake packet
         if let tunnel = self.tunnel {
+            log.info("Sending initial handshake")
             handleTunnelResult(tunnel.forceHandshake())
         }
-        logger.info("Receiving UDP from endpoint")
-        logger.debug(
-            "NWConnection path \(String(describing: self.connection?.currentPath), privacy: .public)"
-        )
+        log.info("Starting UDP receive loop")
+        log.debug("NWConnection path: \(String(describing: self.connection?.currentPath))")
         receive()
 
         // Use Timer to send keep-alive packets.
         keepAliveTimer?.invalidate()
-        logger.info("Creating keep-alive timer")
+        log.info("Creating keep-alive timer")
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] timer in
             guard let self = self, let tunnel = self.tunnel else { return }
             self.handleTunnelResult(tunnel.tick())
@@ -209,13 +211,13 @@ enum State {
         if connection.state == .ready {
             connection.send(
                 content: data,
-                completion: .contentProcessed { error in
+                completion: .contentProcessed { [weak self] error in
                     if let error = error {
-                        self.logger.error("UDP connection send error: \(error, privacy: .public)")
+                        self?.log.error("UDP connection send error: \(error)")
                     }
                 })
         } else {
-            logger.warning("UDP connection not ready to send")
+            log.warning("UDP connection not ready to send")
         }
     }
 
@@ -230,7 +232,7 @@ enum State {
                 // continue receiving
                 self.receive()
             } else {
-                logger.error("receive() error: \(error)")
+                self.log.error("receive() error: \(String(describing: error))")
             }
         }
     }
@@ -251,7 +253,7 @@ enum State {
 
     /// Handle UDP connection state changes.
     private func endpointStateChange(state: NWConnection.State) {
-        logger.debug("UDP connection state: \(String(describing: state), privacy: .public)")
+        log.debug("UDP connection state changed: \(state)")
         switch state {
         case .ready:
             setupEndpoint()
@@ -263,7 +265,7 @@ enum State {
         //            self.stop()
         //    }
         case .failed(let error):
-            logger.error("Failed to establish endpoint connection: \(error)")
+            log.error("Failed to establish endpoint connection: \(error)")
             // The correct way is to call the packet tunnel provider, if there is one.
             if let provider = packetTunnelProvider {
                 provider.cancelTunnelWithError(error)
@@ -277,20 +279,18 @@ enum State {
 
     /// Handle network path updates.
     private func networkPathUpdate(path: Network.NWPath) {
-        logger
-            .debug(
-                "Network path status \(String(describing: path.status), privacy: .public); interfaces \(path.availableInterfaces, privacy: .public)"
-            )
+        log.debug(
+            "Network path update - status: \(path.status), interfaces: \(path.availableInterfaces)")
         if path.status == .unsatisfied {
             if state == .running {
-                logger.warning("Unsatisfied network path: going dormant")
+                log.warning("Unsatisfied network path: going dormant")
                 connection?.cancel()
                 connection = nil
                 state = .dormant
             }
         } else {
             if state == .dormant {
-                logger.warning("Satisfied network path: going running")
+                log.warning("Satisfied network path: going running")
                 initEndpoint()
                 state = .running
             }

@@ -1,39 +1,324 @@
 //! Structures used for interchangeability with the Swift code.
 
 use std::{
+    collections::HashMap,
     hint::spin_loop,
     net::IpAddr,
+    ptr::NonNull,
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        mpsc::channel,
-        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, channel, Receiver, RecvTimeoutError, Sender},
+        Arc, LazyLock, Mutex,
     },
+    time::Duration,
 };
 
 use block2::RcBlock;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
-use objc2::{rc::Retained, runtime::AnyObject};
+use objc2::{
+    rc::Retained,
+    runtime::{AnyObject, ProtocolObject},
+};
 use objc2_foundation::{
     ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNumber, NSRunLoop, NSString,
+    NSNotification, NSNotificationCenter, NSNotificationName, NSNumber, NSObjectProtocol,
+    NSOperationQueue, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
-    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession,
+    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNStatus,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
+    active_connections::find_connection,
+    appstate::AppState,
     database::{
         models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
         DB_POOL,
     },
     error::Error,
+    events::EventKey,
     utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
+    ConnectionType,
 };
 
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
+static OBSERVER_COMMS: LazyLock<(
+    Mutex<Sender<(String, Id)>>,
+    Mutex<Option<Receiver<(String, Id)>>>,
+)> = LazyLock::new(|| {
+    let (tx, rx) = mpsc::channel();
+    (Mutex::new(tx), Mutex::new(Some(rx)))
+});
+
+static VPN_STATE_UPDATE_COMMS: LazyLock<(
+    Mutex<tokio::sync::mpsc::Sender<()>>,
+    Mutex<Option<tokio::sync::mpsc::Receiver<()>>>,
+)> = LazyLock::new(|| {
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
+    (Mutex::new(tx), Mutex::new(Some(rx)))
+});
+
+/// Thread responsible for handling VPN status update requests.
+/// This is an async function.
+/// It has access to the `AppHandle` to be able to emit events.
+pub async fn connection_state_update_thread(app_handle: &AppHandle) {
+    let mut receiver = {
+        let mut rx_opt = VPN_STATE_UPDATE_COMMS
+            .1
+            .lock()
+            .expect("Failed to lock state update receiver");
+        rx_opt.take().expect("Receiver already taken")
+    };
+
+    while receiver.recv().await.is_some() {
+        debug!("Waiting for status update message from channel...");
+
+        debug!("Status update message received, synchronizing state...");
+        sync_connections_with_system(app_handle).await;
+
+        debug!("Processed status update message.");
+    }
+}
+
+/// Synchronize the app's connection state with the system's VPN state.
+/// This checks all locations and tunnels and updates the app state to match
+/// what's actually running in the system.
+pub async fn sync_connections_with_system(app_handle: &AppHandle) {
+    let pool = DB_POOL.clone();
+    let app_state = app_handle.state::<AppState>();
+    let locations = Location::all(&pool, false).await.unwrap_or_default();
+    let tunnels = Tunnel::all(&pool).await.unwrap_or_default();
+
+    for location in locations {
+        debug!(
+            "Synchronizing VPN status for location with system status: {}. Querying status...",
+            location.name
+        );
+        let status = get_location_status(&location);
+        debug!(
+            "Location {} (ID {}) status: {status:?}",
+            location.name, location.id
+        );
+
+        match status {
+            Some(NEVPNStatus::Connected) => {
+                debug!("Location {} is connected", location.name);
+                if find_connection(location.id, crate::ConnectionType::Location)
+                    .await
+                    .is_some()
+                {
+                    debug!(
+                        "Location {} has already a connected state, skipping synchronization",
+                        location.name
+                    );
+                } else {
+                    debug!("Adding connection for location {}", location.name);
+
+                    app_state
+                        .add_connection(
+                            location.id,
+                            &location.name,
+                            crate::ConnectionType::Location,
+                        )
+                        .await;
+                    app_handle
+                        .emit(EventKey::ConnectionChanged.into(), ())
+                        .unwrap();
+                }
+            }
+            Some(NEVPNStatus::Disconnected) => {
+                debug!("Location {} is disconnected", location.name);
+                if find_connection(location.id, crate::ConnectionType::Location)
+                    .await
+                    .is_some()
+                {
+                    debug!("Removing connection for location {}", location.name);
+                    app_state
+                        .remove_connection(location.id, crate::ConnectionType::Location)
+                        .await;
+                    app_handle
+                        .emit(EventKey::ConnectionChanged.into(), ())
+                        .unwrap();
+                } else {
+                    debug!(
+                        "Location {} has no active connection, skipping removal",
+                        location.name
+                    );
+                }
+            }
+            Some(unknown_status) => {
+                debug!(
+                    "Location {} has unknown status {unknown_status:?}, skipping synchronization",
+                    location.name
+                );
+            }
+            None => {
+                debug!(
+                    "Couldn't find configuration for tunnel {}, skipping synchronization",
+                    location.name
+                );
+            }
+        }
+    }
+
+    for tunnel in tunnels {
+        debug!(
+            "Synchronizing VPN status for tunnel with system status: {}. Querying status...",
+            tunnel.name
+        );
+        let status = get_tunnel_status(&tunnel);
+        debug!(
+            "Location {} (ID {}) status: {status:?}",
+            tunnel.name, tunnel.id
+        );
+
+        match status {
+            Some(NEVPNStatus::Connected) => {
+                debug!("Location {} is connected", tunnel.name);
+                if find_connection(tunnel.id, crate::ConnectionType::Tunnel)
+                    .await
+                    .is_some()
+                {
+                    debug!(
+                        "Location {} has already a connected state, skipping synchronization",
+                        tunnel.name
+                    );
+                } else {
+                    debug!("Adding connection for location {}", tunnel.name);
+
+                    app_state
+                        .add_connection(tunnel.id, &tunnel.name, crate::ConnectionType::Tunnel)
+                        .await;
+
+                    app_handle
+                        .emit(EventKey::ConnectionChanged.into(), ())
+                        .unwrap();
+                }
+            }
+            Some(NEVPNStatus::Disconnected) => {
+                debug!("Location {} is disconnected", tunnel.name);
+                if find_connection(tunnel.id, crate::ConnectionType::Tunnel)
+                    .await
+                    .is_some()
+                {
+                    debug!("Removing connection for location {}", tunnel.name);
+                    app_state
+                        .remove_connection(tunnel.id, crate::ConnectionType::Tunnel)
+                        .await;
+                    app_handle
+                        .emit(EventKey::ConnectionChanged.into(), ())
+                        .unwrap();
+                } else {
+                    debug!(
+                        "Location {} has no active connection, skipping removal",
+                        tunnel.name
+                    );
+                }
+            }
+            Some(unknown_status) => {
+                debug!(
+                    "Location {} has unknown status {:?}, skipping synchronization",
+                    tunnel.name, unknown_status
+                );
+            }
+            None => {
+                debug!(
+                    "Couldn't find configuration for tunnel {}, skipping synchronization",
+                    tunnel.name
+                );
+            }
+        }
+    }
+}
+
+const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Thread responsible for observing VPN status changes.
+/// This is intentionally a blocking function, as it uses the objective-c objects which are not thread safe.
+pub fn observer_thread(initial_managers: HashMap<(String, Id), Retained<NETunnelProviderManager>>) {
+    debug!("Starting VPN connection observer thread");
+    let receiver = {
+        let mut rx_opt = OBSERVER_COMMS
+            .1
+            .lock()
+            .expect("Failed to lock observer receiver");
+        rx_opt.take().expect("Receiver already taken")
+    };
+
+    let mut observers = HashMap::new();
+
+    // spawn initial observers for existing managers
+    for ((key, value), manager) in initial_managers {
+        debug!("Spawning initial observer for manager with key: {key}, value: {value}");
+        let connection = unsafe { manager.connection() };
+
+        let observer = create_observer(
+            &NSNotificationCenter::defaultCenter(),
+            unsafe { objc2_network_extension::NEVPNStatusDidChangeNotification },
+            vpn_status_change_handler,
+            Some(connection.as_ref()),
+        );
+        debug!("Registered initial observer for manager with key: {key}, value: {value}");
+        observers.insert((key, value), observer);
+    }
+
+    loop {
+        match receiver.recv_timeout(OBSERVER_CLEANUP_INTERVAL) {
+            Ok(message) => {
+                debug!("Received message to observe the following connection: {message:?}");
+
+                let (key, value) = message;
+
+                if observers.contains_key(&(key.clone(), value)) {
+                    debug!("Observer for manager with key: {key}, value: {value} already exists, skipping",);
+                    continue;
+                }
+
+                let manager = manager_for_key_and_value(&key, value).unwrap();
+                let connection = unsafe { manager.connection() };
+                let observer = create_observer(
+                    &NSNotificationCenter::defaultCenter(),
+                    unsafe { objc2_network_extension::NEVPNStatusDidChangeNotification },
+                    vpn_status_change_handler,
+                    Some(connection.as_ref()),
+                );
+
+                observers.insert((key.clone(), value), observer);
+                debug!("Registered observer for manager with key: {key}, value: {value}");
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                debug!("Performing periodic cleanup of dead observers");
+                let mut dead_keys = Vec::new();
+
+                for (key, value) in observers.keys() {
+                    if manager_for_key_and_value(key, *value).is_none() {
+                        debug!("Manager for key: {key}, value: {value} no longer exists, marking for removal");
+                        dead_keys.push((key.clone(), *value));
+                    }
+                }
+
+                for dead_key in dead_keys {
+                    if let Some(_observer) = observers.remove(&dead_key) {
+                        debug!(
+                            "Removed dead VPN connection observer for key: {}, value: {}",
+                            dead_key.0, dead_key.1
+                        );
+                    }
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                error!("Observer receiver channel disconnected, exiting observer thread");
+                break;
+            }
+        }
+    }
+
+    debug!("Exiting VPN connection observer thread");
+}
 
 /// Tunnel statistics shared with VPNExtension (written in Swift).
 #[derive(Deserialize)]
@@ -59,6 +344,55 @@ pub fn spawn_runloop_and_wait_for(semaphore: Arc<AtomicBool>) {
         }
         date = date.dateByAddingTimeInterval(ONE_SECOND);
     }
+}
+
+fn vpn_status_change_handler(notification: &NSNotification) {
+    let name = notification.name();
+    debug!("Received VPN status change notification: {name:?}");
+    VPN_STATE_UPDATE_COMMS
+        .0
+        .lock()
+        .expect("Failed to lock state update sender")
+        .blocking_send(())
+        .expect("Failed to send to state update channel");
+    debug!("Sent status update request to channel");
+}
+
+pub fn create_observer(
+    center: &NSNotificationCenter,
+    name: &NSNotificationName,
+    handler: impl Fn(&NSNotification) + 'static,
+    object: Option<&AnyObject>,
+) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
+    let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
+        handler(unsafe { notification.as_ref() });
+    });
+    let queue = NSOperationQueue::mainQueue();
+    unsafe {
+        center.addObserverForName_object_queue_usingBlock(Some(name), object, Some(&queue), &block)
+    }
+}
+
+#[must_use]
+pub fn get_managers_for_tunnels_and_locations(
+    tunnels: &[Tunnel<Id>],
+    locations: &[Location<Id>],
+) -> HashMap<(String, Id), Retained<NETunnelProviderManager>> {
+    let mut managers = HashMap::new();
+
+    for location in locations {
+        if let Some(manager) = manager_for_key_and_value("locationId", location.id) {
+            managers.insert(("locationId".to_string(), location.id), manager);
+        }
+    }
+
+    for tunnel in tunnels {
+        if let Some(manager) = manager_for_key_and_value("tunnelId", tunnel.id) {
+            managers.insert(("tunnelId".to_string(), tunnel.id), manager);
+        }
+    }
+
+    managers
 }
 
 pub(crate) fn manager_for_key_and_value(
@@ -279,11 +613,11 @@ impl TunnelConfiguration {
         let spinlock_clone = Arc::clone(&spinlock);
         let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
 
-        unsafe {
-            let provider_manager = self
-                .tunnel_provider_manager()
-                .unwrap_or_else(|| NETunnelProviderManager::new());
+        let provider_manager = self
+            .tunnel_provider_manager()
+            .unwrap_or_else(|| unsafe { NETunnelProviderManager::new() });
 
+        unsafe {
             let tunnel_protocol = NETunnelProviderProtocol::new();
             tunnel_protocol.setProviderBundleIdentifier(Some(&plugin_bundle_id));
             let server_address = self.peers.first().map_or(String::new(), |peer| {
@@ -305,9 +639,9 @@ impl TunnelConfiguration {
             // Save to system settings.
             let handler = RcBlock::new(move |error_ptr: *mut NSError| {
                 if error_ptr.is_null() {
-                    info!("Saved tunnel configuration for {name}");
+                    debug!("Saved tunnel configuration for {name} to system settings");
                 } else {
-                    error!("Failed to save tunnel configuration for: {name}");
+                    error!("Failed to save tunnel configuration for: {name} to system settings");
                 }
                 spinlock_clone.store(true, Ordering::Release);
             });
@@ -327,6 +661,18 @@ impl TunnelConfiguration {
             {
                 error!("Failed to start VPN: {err}");
             } else {
+                OBSERVER_COMMS
+                    .0
+                    .lock()
+                    .expect("Failed to lock observer sender")
+                    .send((
+                        self.location_id.map_or_else(
+                            || "tunnelId".to_string(),
+                            |_location_id| "locationId".to_string(),
+                        ),
+                        self.location_id.or(self.tunnel_id).unwrap(),
+                    ))
+                    .expect("Failed to send to observer channel");
                 info!("VPN started");
             }
         } else {
@@ -354,7 +700,7 @@ pub(crate) fn remove_config_for_location(location: &Location<Id>) {
 
 /// Remove configuration from system settings for [`Tunnel`].
 pub(crate) fn remove_config_for_tunnel(tunnel: &Tunnel<Id>) {
-    if let Some(provider_manager) = manager_for_key_and_value("locationId", tunnel.id) {
+    if let Some(provider_manager) = manager_for_key_and_value("tunnelId", tunnel.id) {
         unsafe {
             provider_manager.removeFromPreferencesWithCompletionHandler(None);
         }
@@ -368,128 +714,150 @@ pub(crate) fn remove_config_for_tunnel(tunnel: &Tunnel<Id>) {
 
 /// Stop tunnel for [`Location`].
 pub(crate) fn stop_tunnel_for_location(location: &Location<Id>) -> bool {
-    if let Some(provider_manager) = manager_for_key_and_value("locationId", location.id) {
-        unsafe {
-            provider_manager.connection().stopVPNTunnel();
-        }
-        info!("VPN stopped");
-        true
-    } else {
-        error!(
-            "Couldn't find configuration in system settings for location {}",
-            location.name
-        );
-        false
-    }
+    manager_for_key_and_value("locationId", location.id).map_or_else(
+        || {
+            error!(
+                "Couldn't find configuration in system settings for location {}",
+                location.name
+            );
+            false
+        },
+        |provider_manager| {
+            unsafe {
+                provider_manager.connection().stopVPNTunnel();
+            }
+            info!("VPN stopped");
+            true
+        },
+    )
 }
 
 /// Stop tunnel for [`Tunnel`].
 pub(crate) fn stop_tunnel_for_tunnel(tunnel: &Tunnel<Id>) -> bool {
-    if let Some(provider_manager) = manager_for_key_and_value("tunnelId", tunnel.id) {
-        unsafe {
-            provider_manager.connection().stopVPNTunnel();
-        }
-        info!("VPN stopped");
-        true
-    } else {
-        error!(
-            "Couldn't find configuration in system settings for location {}",
-            tunnel.name
-        );
-        false
-    }
+    manager_for_key_and_value("tunnelId", tunnel.id).map_or_else(
+        || {
+            error!(
+                "Couldn't find configuration in system settings for location {}",
+                tunnel.name
+            );
+            false
+        },
+        |provider_manager| {
+            unsafe {
+                provider_manager.connection().stopVPNTunnel();
+            }
+            info!("VPN stopped");
+            true
+        },
+    )
 }
 
-pub(crate) fn tunnel_stats() -> Vec<Stats> {
-    let new_stats = Arc::new(Mutex::new(Vec::new()));
+/// Check whether tunnel is running for [`Location`].
+pub(crate) fn get_location_status(location: &Location<Id>) -> Option<NEVPNStatus> {
+    manager_for_key_and_value("locationId", location.id).map_or_else(
+        || {
+            error!(
+                "Couldn't find configuration in system settings for location {}",
+                location.name
+            );
+            None
+        },
+        |provider_manager| {
+            let connection = unsafe { provider_manager.connection() };
+            Some(unsafe { connection.status() })
+        },
+    )
+}
+
+/// Check whether tunnel is running for [`Tunnel`].
+pub(crate) fn get_tunnel_status(tunnel: &Tunnel<Id>) -> Option<NEVPNStatus> {
+    manager_for_key_and_value("tunnelId", tunnel.id).map_or_else(
+        || {
+            error!(
+                "Couldn't find configuration in system settings for tunnel {}",
+                tunnel.name
+            );
+            None
+        },
+        |provider_manager| {
+            let connection = unsafe { provider_manager.connection() };
+            Some(unsafe { connection.status() })
+        },
+    )
+}
+
+pub(crate) fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
+    let new_stats = Arc::new(Mutex::new(None));
     let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
-    let spinlock = Arc::new(AtomicUsize::new(1));
 
     let new_stats_clone = Arc::clone(&new_stats);
-    let spinlock_for_response = Arc::clone(&spinlock);
+
+    let finished = Arc::new(AtomicBool::new(false));
+    let finished_clone = Arc::clone(&finished);
+
     let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
         if let Some(data) = unsafe { data_ptr.as_ref() } {
             if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
                 if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
-                    new_stats_locked.push(stats);
+                    *new_stats_locked = Some(stats);
                 }
             } else {
                 warn!("Failed to deserialize tunnel stats");
             }
         } else {
-            warn!("No data");
+            debug!("No data received in tunnel stats response, skipping");
         }
-        spinlock_for_response.fetch_sub(1, Ordering::Release);
+        finished_clone.store(true, Ordering::Release);
     });
 
-    let spinlock_for_handler = Arc::clone(&spinlock);
-    let handler = RcBlock::new(
-        move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
-            if !error_ptr.is_null() {
-                error!("Failed to load tunnel provider managers.");
-                return;
-            }
-
-            let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
-                error!("No managers");
-                return;
-            };
-
-            for manager in managers {
-                let Some(vpn_protocol) = (unsafe { manager.protocolConfiguration() }) else {
-                    continue;
-                };
-                let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>()
-                else {
-                    error!("Failed to downcast to NETunnelProviderProtocol");
-                    continue;
-                };
-                // Sometimes all managers from all apps come through, so filter by bundle ID.
-                if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
-                    if bundle_id != plugin_bundle_id {
-                        continue;
-                    }
-                }
-
-                let Ok(session) =
-                    unsafe { manager.connection() }.downcast::<NETunnelProviderSession>()
-                else {
-                    error!("Failed to downcast to NETunnelProviderSession");
-                    continue;
-                };
-
-                let message_data = NSData::new();
-                if unsafe {
-                    session.sendProviderMessage_returnError_responseHandler(
-                        &message_data,
-                        None,
-                        Some(&response_handler),
-                    )
-                } {
-                    spinlock_for_handler.fetch_add(1, Ordering::Release);
-                    info!("Message sent to NETunnelProviderSession");
-                } else {
-                    error!("Failed to send to NETunnelProviderSession");
-                }
-            }
-            // Final release
-            spinlock_for_handler.fetch_sub(1, Ordering::Release);
+    let manager = manager_for_key_and_value(
+        match connection_type {
+            ConnectionType::Location => "locationId",
+            ConnectionType::Tunnel => "tunnelId",
         },
-    );
-    unsafe {
-        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
+        id,
+    )?;
+
+    let vpn_protocol = (unsafe { manager.protocolConfiguration() })?;
+    let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>() else {
+        error!("Failed to downcast to NETunnelProviderProtocol");
+        return None;
+    };
+
+    // Sometimes all managers from all apps come through, so filter by bundle ID.
+    if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
+        if bundle_id != plugin_bundle_id {
+            return None;
+        }
+    }
+
+    let Ok(session) = unsafe { manager.connection() }.downcast::<NETunnelProviderSession>() else {
+        error!("Failed to downcast to NETunnelProviderSession");
+        return None;
+    };
+
+    let message_data = NSData::new();
+    if unsafe {
+        session.sendProviderMessage_returnError_responseHandler(
+            &message_data,
+            None,
+            Some(&response_handler),
+        )
+    } {
+        debug!("Message sent to NETunnelProviderSession");
+    } else {
+        error!("Failed to send to NETunnelProviderSession while requesting stats");
     }
 
     // Wait for all handlers to complete.
-    while spinlock.load(Ordering::Acquire) != 0 {
+    while !finished.load(Ordering::Acquire) {
         spin_loop();
     }
 
     let stats = new_stats
         .lock()
-        .expect("Failed to acquire lock")
-        .drain(..)
-        .collect();
+        .map_or(None, |mut new_stats_locked| new_stats_locked.take());
+
     stats
 }
 
@@ -694,12 +1062,10 @@ impl Tunnel<Id> {
             debug!("Using all traffic routing for tunnel {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
         } else {
-            let msg = match &self.allowed_ips {
-                Some(ips) => {
-                    format!("Using predefined location traffic for tunnel {self}: {ips}")
-                }
-                None => "No allowed IP addresses found in tunnel {self} configuration".to_string(),
-            };
+            let msg = self.allowed_ips.as_ref().map_or_else(
+                || "No allowed IP addresses found in tunnel {self} configuration".to_string(),
+                |ips| format!("Using predefined location traffic for tunnel {self}: {ips}"),
+            );
             debug!("{msg}");
             self.allowed_ips
                 .as_ref()

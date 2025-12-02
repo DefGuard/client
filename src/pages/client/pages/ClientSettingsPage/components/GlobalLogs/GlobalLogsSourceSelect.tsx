@@ -33,8 +33,8 @@ export const GlobalLogsSourceSelect = ({ initSelected, onChange }: Props) => {
       },
       {
         key: 2,
-        label: localLL.service(),
-        value: 'Service',
+        label: localLL.vpn(),
+        value: 'VPN',
       },
     ];
   }, [localLL]);

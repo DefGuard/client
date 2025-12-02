@@ -2,36 +2,50 @@
 //!
 // FIXME: Some of the code here overlaps with the `log_watcher` module and could be refactored to avoid duplication.
 
+#[cfg(not(target_os = "macos"))]
+use std::fs::read_dir;
 use std::{
-    fs::{read_dir, File},
+    fs::File,
     io::{BufRead, BufReader},
     path::PathBuf,
     str::FromStr,
-    thread::sleep,
     time::Duration,
 };
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+#[cfg(not(target_os = "macos"))]
+use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
 use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
+#[cfg(target_os = "macos")]
+use crate::log_watcher::get_vpn_extension_log_path;
 use crate::{
     appstate::AppState,
     error::Error,
-    log_watcher::{extract_timestamp, LogLine, LogLineFields, LogSource, LogWatcherError},
-    utils::get_service_log_dir,
+    log_watcher::{LogLine, LogLineFields, LogSource, LogWatcherError},
 };
+#[cfg(not(target_os = "macos"))]
+use crate::{log_watcher::extract_timestamp, utils::get_service_log_dir};
+
+#[cfg(target_os = "macos")]
+const VPN_EXTENSION_LOG_FILENAME: &str = "vpn-extension.log";
 
 /// Helper struct to handle log directory logic
 #[derive(Debug)]
 pub struct LogDirs {
     // Service
+    #[cfg(not(target_os = "macos"))]
     service_log_dir: PathBuf,
+    #[cfg(not(target_os = "macos"))]
     current_service_log_file: Option<PathBuf>,
     // Client
     client_log_dir: PathBuf,
+    // VPN Extension (macOS only)
+    #[cfg(target_os = "macos")]
+    vpn_extension_log_dir: PathBuf,
 }
 
 const DELAY: Duration = Duration::from_secs(2);
@@ -39,19 +53,37 @@ const DELAY: Duration = Duration::from_secs(2);
 impl LogDirs {
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
         debug!("Getting log directories for service and client to watch.");
+        #[cfg(not(target_os = "macos"))]
         let service_log_dir = get_service_log_dir().to_path_buf();
         let client_log_dir = handle.path().app_log_dir().map_err(|_| {
             LogWatcherError::LogPathError("Path to client logs directory is empty.".to_string())
         })?;
+
+        #[cfg(target_os = "macos")]
+        let vpn_extension_log_dir = get_vpn_extension_log_path()?;
+
+        #[cfg(not(target_os = "macos"))]
         debug!(
-            "Log directories of service and client have been identified by the global log watcher: \
-            {} and {}", service_log_dir.display(), client_log_dir.display()
+            "Log directories identified by global log watcher: service={}, client={}",
+            service_log_dir.display(),
+            client_log_dir.display()
+        );
+
+        #[cfg(target_os = "macos")]
+        debug!(
+            "Log directories identified by global log watcher: client={}, vpn_extension={}",
+            client_log_dir.display(),
+            vpn_extension_log_dir.display()
         );
 
         Ok(Self {
+            #[cfg(not(target_os = "macos"))]
             service_log_dir,
+            #[cfg(not(target_os = "macos"))]
             current_service_log_file: None,
             client_log_dir,
+            #[cfg(target_os = "macos")]
+            vpn_extension_log_dir,
         })
     }
 
@@ -59,12 +91,14 @@ impl LogDirs {
     ///
     /// Log files are rotated daily and have a known naming format,
     /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
+    #[cfg(not(target_os = "macos"))]
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
-        trace!(
+        debug!(
             "Getting latest log file from directory: {}",
             self.service_log_dir.display()
         );
         let entries = read_dir(&self.service_log_dir)?;
+        debug!("Read entries from service log directory");
 
         let mut latest_log = None;
         let mut latest_time = NaiveDate::MIN;
@@ -81,9 +115,15 @@ impl LogDirs {
             }
         }
 
+        debug!(
+            "Latest log file determined: {:?}",
+            latest_log.as_ref().map(|p| p.display())
+        );
+
         Ok(latest_log)
     }
 
+    #[cfg(not(target_os = "macos"))]
     fn get_current_service_file(&self) -> Result<File, LogWatcherError> {
         trace!(
             "Opening service log file: {:?}",
@@ -123,6 +163,17 @@ impl LogDirs {
         trace!("Client log file at {path:?} opened successfully");
         Ok(file)
     }
+
+    /// Get the VPN extension log file (macOS only)
+    /// The VPN extension writes logs to the App Group shared container
+    #[cfg(target_os = "macos")]
+    fn get_vpn_extension_file(&self) -> Result<File, LogWatcherError> {
+        let path = self.vpn_extension_log_dir.join(VPN_EXTENSION_LOG_FILENAME);
+        trace!("Opening VPN extension log file: {}", path.display());
+        let file = File::open(&path)?;
+        trace!("VPN extension log file opened successfully");
+        Ok(file)
+    }
 }
 
 #[derive(Debug)]
@@ -154,8 +205,9 @@ impl GlobalLogWatcher {
     }
 
     /// Start log watching, calls the [`parse_log_dirs`] function.
-    pub fn run(&mut self) -> Result<(), LogWatcherError> {
-        self.parse_log_dirs()
+    pub async fn run(&mut self) -> Result<(), LogWatcherError> {
+        debug!("Starting global log watcher run loop.");
+        self.parse_log_dirs().await
     }
 
     /// Parse the log files
@@ -163,10 +215,11 @@ impl GlobalLogWatcher {
     /// This function will open the log files and read them line by line, parsing each line
     /// into a [`LogLine`] struct and emitting it to the frontend. It can be stopped by cancelling
     /// the token by calling [`stop_global_log_watcher_task()`]
-    fn parse_log_dirs(&mut self) -> Result<(), LogWatcherError> {
-        trace!("Processing log directories for service and client.");
+    #[cfg(not(target_os = "macos"))]
+    async fn parse_log_dirs(&mut self) -> Result<(), LogWatcherError> {
+        debug!("Processing log directories for service and client.");
         self.log_dirs.current_service_log_file = self.log_dirs.get_latest_log_file()?;
-        trace!(
+        debug!(
             "Latest service log file found: {:?}",
             self.log_dirs.current_service_log_file
         );
@@ -182,7 +235,7 @@ impl GlobalLogWatcher {
             None
         };
 
-        trace!("Checking if log files are available");
+        debug!("Checking if log files are available");
         if service_reader.is_none() && client_reader.is_none() {
             warn!(
                 "Couldn't read files at {:?} and {}, there will be no logs reported in the client.",
@@ -190,10 +243,10 @@ impl GlobalLogWatcher {
                 self.log_dirs.client_log_dir.display()
             );
             // Wait for logs to appear.
-            sleep(DELAY);
+            tokio::time::sleep(DELAY).await;
             return Ok(());
         }
-        trace!("Log files are available, starting to read lines.");
+        debug!("Log files are available, starting to read lines.");
 
         let mut service_line = String::new();
         let mut client_line = String::new();
@@ -282,7 +335,122 @@ impl GlobalLogWatcher {
                 parsed_lines.clear();
             }
             trace!("Sleeping for {DELAY:?} seconds before reading again");
-            sleep(DELAY);
+            tokio::time::sleep(DELAY).await;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    async fn parse_log_dirs(&self) -> Result<(), LogWatcherError> {
+        debug!("Processing log directories for client and VPN extension.");
+        let mut client_reader = self
+            .log_dirs
+            .get_client_file()
+            .map_or_else(|_| None, |file| Some(BufReader::new(file)));
+
+        let mut vpn_extension_reader = self.log_dirs.get_vpn_extension_file().map_or_else(
+            |_| {
+                debug!("VPN extension log file not available yet");
+                None
+            },
+            |file| {
+                debug!("VPN extension log file opened successfully");
+                Some(BufReader::new(file))
+            },
+        );
+
+        debug!("Checking if log files are available");
+        if client_reader.is_none() && vpn_extension_reader.is_none() {
+            warn!(
+                "Couldn't read client logs at {} or VPN extension logs at {}, there will be no logs reported.",
+                self.log_dirs.client_log_dir.display(),
+                self.log_dirs.vpn_extension_log_dir.display()
+            );
+            // Wait for logs to appear.
+            tokio::time::sleep(DELAY).await;
+            return Ok(());
+        }
+        debug!("Log files are available, starting to read lines.");
+
+        let mut client_line = String::new();
+        let mut vpn_extension_line = String::new();
+        let mut parsed_lines = Vec::new();
+
+        // Track the amount of bytes read from the log lines
+        let mut client_line_read;
+        let mut vpn_extension_line_read;
+
+        debug!("Global log watcher is starting the loop for reading client and VPN extension log files");
+        loop {
+            if self.cancellation_token.is_cancelled() {
+                debug!("Received cancellation request. Stopping global log watcher");
+                break;
+            }
+
+            // Client logs
+            // If the reader is present, read the log file to the end.
+            // Parse every line.
+            // Warning: don't use anything other than a trace log level in this loop for logs that would appear on every iteration (or very often)
+            // This could result in the reader constantly producing and consuming logs without any progress.
+            if let Some(reader) = &mut client_reader {
+                loop {
+                    client_line_read = reader.read_line(&mut client_line)?;
+                    if client_line_read > 0 {
+                        if let Ok(Some(parsed_line)) = self.parse_client_log_line(&client_line) {
+                            parsed_lines.push(parsed_line);
+                        } else {
+                            // Don't log it, as it will cause an endless loop
+                        }
+                        client_line.clear();
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                // Try to open the client log file if it wasn't available before
+                if let Ok(file) = self.log_dirs.get_client_file() {
+                    debug!("Client log file is now available, opening reader");
+                    client_reader = Some(BufReader::new(file));
+                }
+            }
+
+            // VPN Extension logs
+            // Read the VPN extension log file written by the Swift network extension
+            if let Some(reader) = &mut vpn_extension_reader {
+                loop {
+                    vpn_extension_line_read = reader.read_line(&mut vpn_extension_line)?;
+                    if vpn_extension_line_read > 0 {
+                        if let Ok(Some(parsed_line)) =
+                            self.parse_vpn_extension_log_line(&vpn_extension_line)
+                        {
+                            parsed_lines.push(parsed_line);
+                        } else {
+                            // Don't log it, as it will cause an endless loop
+                        }
+                        vpn_extension_line.clear();
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                // Try to open the VPN extension log file if it wasn't available before
+                if let Ok(file) = self.log_dirs.get_vpn_extension_file() {
+                    debug!("VPN extension log file is now available, opening reader");
+                    vpn_extension_reader = Some(BufReader::new(file));
+                }
+            }
+
+            trace!("Reached EOF in all log files.");
+            if !parsed_lines.is_empty() {
+                parsed_lines.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+                trace!("Emitting parsed lines for the frontend");
+                self.handle.emit(&self.event_topic, &parsed_lines)?;
+                trace!("Emitted {} lines to the frontend", parsed_lines.len());
+                parsed_lines.clear();
+            }
+            trace!("Sleeping for {DELAY:?} seconds before reading again");
+            tokio::time::sleep(DELAY).await;
         }
 
         Ok(())
@@ -292,6 +460,7 @@ impl GlobalLogWatcher {
     ///
     /// Deserializes the log line into a known struct.
     /// Also performs filtering by log level and optional timestamp.
+    #[cfg(not(target_os = "macos"))]
     fn parse_service_log_line(&self, line: &str) -> Option<LogLine> {
         let Ok(mut log_line) = serde_json::from_str::<LogLine>(line) else {
             warn!("Failed to parse service log line: {line}");
@@ -388,6 +557,91 @@ impl GlobalLogWatcher {
 
         Ok(Some(log_line))
     }
+
+    /// Parse a VPN extension log line into a known struct using regex.
+    #[cfg(target_os = "macos")]
+    fn parse_vpn_extension_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
+        use crate::log_watcher::LOG_LINE_REGEX;
+
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            return Ok(None);
+        }
+
+        // Example log:
+        // 2024-01-15 14:32:45.123 [INFO] [Adapter] Tunnel started successfully
+        // Format: YYYY-MM-DD HH:mm:ss.SSS [LEVEL] [Category] Message
+
+        let captures = LOG_LINE_REGEX
+            .captures(trimmed)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?;
+
+        let timestamp_str = captures
+            .get(1)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        // Parse timestamp as UTC (Swift FileLogger is configured to use UTC timezone)
+        let timestamp = Utc.from_utc_datetime(
+            &NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%d %H:%M:%S%.3f").map_err(
+                |err| {
+                    LogWatcherError::LogParseError(format!(
+                        "Failed to parse VPN extension timestamp {timestamp_str} with error: {err}"
+                    ))
+                },
+            )?,
+        );
+
+        let level_str = captures
+            .get(2)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        // Map VPN extension log levels to tracing levels
+        // VPN extension uses: DEBUG, INFO, WARN, ERROR
+        let level = match level_str.to_uppercase().as_str() {
+            "DEBUG" => Level::DEBUG,
+            "WARN" => Level::WARN,
+            "ERROR" => Level::ERROR,
+            _ => Level::INFO, // Default to INFO for unknown (and INFO) levels
+        };
+
+        let category = captures
+            .get(3)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        let message = captures
+            .get(4)
+            .ok_or(LogWatcherError::LogParseError(line.to_string()))?
+            .as_str();
+
+        let fields = LogLineFields {
+            message: message.to_string(),
+        };
+
+        let log_line = LogLine {
+            timestamp,
+            level,
+            target: format!("VPNExtension::{category}"),
+            fields,
+            span: None,
+            source: Some(LogSource::VpnExtension),
+        };
+
+        if log_line.level > self.log_level {
+            return Ok(None);
+        }
+
+        if let Some(from) = self.from {
+            if log_line.timestamp < from {
+                return Ok(None);
+            }
+        }
+
+        Ok(Some(log_line))
+    }
 }
 
 /// Starts a global log watcher in a separate thread
@@ -415,7 +669,8 @@ pub async fn spawn_global_log_watcher_task(
     let _join_handle: JoinHandle<Result<(), LogWatcherError>> =
         tauri::async_runtime::spawn(async move {
             GlobalLogWatcher::new(handle_clone, token_clone, topic_clone, log_level, from)?
-                .run()?;
+                .run()
+                .await?;
             Ok(())
         });
 
@@ -444,14 +699,17 @@ pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
         .lock()
         .expect("Failed to lock log watchers mutex");
 
-    if let Some(token) = log_watchers.remove("GLOBAL") {
-        debug!("Using cancellation token for global log watcher");
-        token.cancel();
-        debug!("Global log watcher cancelled");
-        Ok(())
-    } else {
-        // Silently ignore if global log watcher is not found, as there is nothing to cancel
-        debug!("Global log watcher not found, nothing to cancel");
-        Ok(())
-    }
+    log_watchers.remove("GLOBAL").map_or_else(
+        || {
+            // Silently ignore if global log watcher is not found, as there is nothing to cancel
+            debug!("Global log watcher not found, nothing to cancel");
+            Ok(())
+        },
+        |token| {
+            debug!("Using cancellation token for global log watcher");
+            token.cancel();
+            debug!("Global log watcher cancelled");
+            Ok(())
+        },
+    )
 }
