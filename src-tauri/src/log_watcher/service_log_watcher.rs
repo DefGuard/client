@@ -19,8 +19,6 @@ use std::{
 use chrono::{DateTime, NaiveDate, Utc};
 #[cfg(target_os = "macos")]
 use chrono::{NaiveDateTime, TimeZone};
-#[cfg(target_os = "macos")]
-use regex::Regex;
 use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
 use tracing::Level;

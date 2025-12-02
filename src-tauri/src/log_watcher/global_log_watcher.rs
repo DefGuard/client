@@ -9,7 +9,6 @@ use std::{
     io::{BufRead, BufReader},
     path::PathBuf,
     str::FromStr,
-    sync::LazyLock,
     time::Duration,
 };
 

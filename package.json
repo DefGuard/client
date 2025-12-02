@@ -44,7 +44,10 @@
     "onlyBuiltDependencies": [
       "@swc/core",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "mdast-util-to-hast": "13.2.1"
+    }
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",

@@ -1,7 +1,9 @@
 #[cfg(target_os = "macos")]
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::LazyLock};
 
 use chrono::{DateTime, NaiveDate, Utc};
+#[cfg(target_os = "macos")]
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use thiserror::Error;
