@@ -9,6 +9,7 @@ use std::{
     io::{BufRead, BufReader},
     path::PathBuf,
     str::FromStr,
+    sync::LazyLock,
     time::Duration,
 };
 
@@ -175,6 +176,10 @@ impl LogDirs {
         Ok(file)
     }
 }
+
+static LOG_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \[(\w+)\] \[(\w+)\] (.*)$").unwrap()
+});
 
 #[derive(Debug)]
 pub struct GlobalLogWatcher {
@@ -570,9 +575,8 @@ impl GlobalLogWatcher {
         // Example log:
         // 2024-01-15 14:32:45.123 [INFO] [Adapter] Tunnel started successfully
         // Format: YYYY-MM-DD HH:mm:ss.SSS [LEVEL] [Category] Message
-        let regex =
-            Regex::new(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \[(\w+)\] \[(\w+)\] (.*)$")?;
-        let captures = regex
+
+        let captures = LOG_LINE_REGEX
             .captures(trimmed)
             .ok_or(LogWatcherError::LogParseError(line.to_string()))?;
 

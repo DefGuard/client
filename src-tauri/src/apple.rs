@@ -98,10 +98,10 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
             "Synchronizing VPN status for location with system status: {}. Querying status...",
             location.name
         );
-        let status = crate::apple::get_location_status(&location);
+        let status = get_location_status(&location);
         debug!(
-            "Location {} (ID {}) status: {:?}",
-            location.name, location.id, status
+            "Location {} (ID {}) status: {status:?}",
+            location.name, location.id
         );
 
         match status {
@@ -152,8 +152,8 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
             }
             Some(unknown_status) => {
                 debug!(
-                    "Location {} has unknown status {:?}, skipping synchronization",
-                    location.name, unknown_status
+                    "Location {} has unknown status {unknown_status:?}, skipping synchronization",
+                    location.name
                 );
             }
             None => {
@@ -170,10 +170,10 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
             "Synchronizing VPN status for tunnel with system status: {}. Querying status...",
             tunnel.name
         );
-        let status = crate::apple::get_tunnel_status(&tunnel);
+        let status = get_tunnel_status(&tunnel);
         debug!(
-            "Location {} (ID {}) status: {:?}",
-            tunnel.name, tunnel.id, status
+            "Location {} (ID {}) status: {status:?}",
+            tunnel.name, tunnel.id
         );
 
         match status {
@@ -364,7 +364,7 @@ pub fn create_observer(
     handler: impl Fn(&NSNotification) + 'static,
     object: Option<&AnyObject>,
 ) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
-    let block = block2::RcBlock::new(move |notification: NonNull<NSNotification>| {
+    let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
         handler(unsafe { notification.as_ref() });
     });
     let queue = NSOperationQueue::mainQueue();

@@ -29,7 +29,7 @@ final class Log {
     init(category: String) {
         self.category = category
         self.systemLogger = Logger(
-            subsystem: Bundle.main.bundleIdentifier ?? "net.defguard.vpnextension",
+            subsystem: Bundle.main.bundleIdentifier ?? "net.defguard.VPNExtension",
             category: category
         )
     }
@@ -81,10 +81,10 @@ final class FileLogger {
         return formatter
     }()
 
-    private let queue = DispatchQueue(label: "net.defguard.vpnextension.filelogger")
+    private let queue = DispatchQueue(label: "net.defguard.VPNExtension.filelogger")
 
     private let internalLogger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "net.defguard.vpnextension",
+        subsystem: Bundle.main.bundleIdentifier ?? "net.defguard.VPNExtension",
         category: "FileLogger")
 
     private init() {

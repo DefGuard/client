@@ -90,8 +90,6 @@ async fn startup(app_handle: &AppHandle) {
         let semaphore = Arc::new(AtomicBool::new(false));
         let semaphore_clone = Arc::clone(&semaphore);
 
-        let app_handle_clone = app_handle.clone();
-
         let handle = tauri::async_runtime::spawn(async move {
             defguard_client::apple::purge_system_settings();
             defguard_client::apple::sync_locations_and_tunnels().await;
