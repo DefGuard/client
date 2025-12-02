@@ -73,6 +73,11 @@ fn extract_timestamp(filename: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()
 }
 
+#[cfg(target_os = "macos")]
+static LOG_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \[(\w+)\] \[(\w+)\] (.*)$").unwrap()
+});
+
 /// Get the VPN extension log file path on macOS
 #[cfg(target_os = "macos")]
 fn get_vpn_extension_log_path() -> Result<PathBuf, LogWatcherError> {

@@ -177,10 +177,6 @@ impl LogDirs {
     }
 }
 
-static LOG_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \[(\w+)\] \[(\w+)\] (.*)$").unwrap()
-});
-
 #[derive(Debug)]
 pub struct GlobalLogWatcher {
     log_level: Level,
@@ -566,6 +562,8 @@ impl GlobalLogWatcher {
     /// Parse a VPN extension log line into a known struct using regex.
     #[cfg(target_os = "macos")]
     fn parse_vpn_extension_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
+        use crate::log_watcher::LOG_LINE_REGEX;
+
         let trimmed = line.trim();
 
         if trimmed.is_empty() || trimmed.starts_with('#') {

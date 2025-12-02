@@ -314,6 +314,8 @@ impl VpnExtensionLogWatcher {
     ///
     /// Log format: `2024-01-15 14:32:45.123 [INFO] [Adapter] Message here`
     fn parse_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
+        use crate::log_watcher::LOG_LINE_REGEX;
+
         let trimmed = line.trim();
 
         // Skip empty lines and separator/header lines
@@ -321,9 +323,7 @@ impl VpnExtensionLogWatcher {
             return Ok(None);
         }
 
-        let regex =
-            Regex::new(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \[(\w+)\] \[(\w+)\] (.*)$")?;
-        let captures = regex
+        let captures = LOG_LINE_REGEX
             .captures(trimmed)
             .ok_or(LogWatcherError::LogParseError(line.to_string()))?;
 
