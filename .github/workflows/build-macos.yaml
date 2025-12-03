@@ -96,6 +96,9 @@ jobs:
 
       - name: Build installation package for GitHub Release
         run: |
+          # Unlock keychain again before signing (it may have auto-locked)
+          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+          # security set-keychain-settings -t 3600 -u login.keychain
           xcrun productbuild --sign "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)" \
             --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications \
             defguard-client.pkg
