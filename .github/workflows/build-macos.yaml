@@ -5,6 +5,7 @@ on:
       - main
       - dev
       - "release/**"
+      - build-pkgs
     paths-ignore:
       - "*.md"
       - "LICENSE"
@@ -27,9 +28,15 @@ jobs:
         with:
           submodules: recursive
 
+      # - name: Write release version
+      #   run: |
+      #     VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+      #     echo Version: $VERSION
+      #     echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+
       - name: Write release version
         run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          VERSION=1.6.0
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
 
@@ -73,13 +80,30 @@ jobs:
         # with:
         #   args: --target universal-apple-darwin
 
-      - name: Build installation package
+      # - name: Build installation package
+      #   run: |
+      #     security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+      #     xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
+      #     xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
+      #     # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+      #     # xcrun stapler staple defguard-client.pkg
+
+      - name: Re-sign app for direct distribution
         run: |
-          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-          xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
-          xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
-          # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
-          # xcrun stapler staple defguard-client.pkg
+          # Re-sign the app with Developer ID for direct distribution
+          codesign --force --deep --sign "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)" \
+            "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
+
+      - name: Build installation package for GitHub Release
+        run: |
+          xcrun productbuild --sign "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)" \
+            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications \
+            defguard-client.pkg
+          # Notarize for Gatekeeper
+          xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} \
+            --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} \
+            --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+          xcrun stapler staple defguard-client.pkg
 
       # - name: Upload installation package
       #   uses: actions/upload-release-asset@v1
