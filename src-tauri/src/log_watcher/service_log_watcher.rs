@@ -566,15 +566,20 @@ pub fn stop_log_watcher_task(handle: &AppHandle, interface_name: &str) -> Result
         .lock()
         .expect("Failed to lock log watchers mutex");
 
-    if let Some(token) = log_watchers.remove(interface_name) {
-        debug!("Using cancellation token for service log watcher on interface {interface_name}");
-        token.cancel();
-        debug!("Service log watcher for interface {interface_name} stopped");
-        Ok(())
-    } else {
-        debug!(
-            "Service log watcher for interface {interface_name} couldn't be found, nothing to stop"
-        );
-        Err(Error::NotFound)
-    }
+    log_watchers.remove(interface_name).map_or_else(
+        || {
+            warn!(
+                "Service log watcher for interface {interface_name} couldn't be found, nothing to stop"
+            );
+            Ok(())
+        },
+        |token| {
+            debug!(
+                "Using cancellation token for service log watcher on interface {interface_name}"
+            );
+            token.cancel();
+            debug!("Service log watcher for interface {interface_name} stopped");
+            Ok(())
+        },
+    )
 }

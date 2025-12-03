@@ -31,6 +31,7 @@ use objc2_network_extension::{
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteExecutor;
 use tauri::{AppHandle, Emitter, Manager};
+use tracing::Level;
 
 use crate::{
     active_connections::find_connection,
@@ -41,6 +42,7 @@ use crate::{
     },
     error::Error,
     events::EventKey,
+    log_watcher::service_log_watcher::spawn_log_watcher_task,
     utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
     ConnectionType,
 };
@@ -62,6 +64,8 @@ static VPN_STATE_UPDATE_COMMS: LazyLock<(
     (Mutex::new(tx), Mutex::new(Some(rx)))
 });
 
+const SYSTEM_SYNC_DELAY_MS: u64 = 500;
+
 /// Thread responsible for handling VPN status update requests.
 /// This is an async function.
 /// It has access to the `AppHandle` to be able to emit events.
@@ -78,6 +82,7 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
         debug!("Waiting for status update message from channel...");
 
         debug!("Status update message received, synchronizing state...");
+        tokio::time::sleep(Duration::from_secs(SYSTEM_SYNC_DELAY_MS)).await;
         sync_connections_with_system(app_handle).await;
 
         debug!("Processed status update message.");
@@ -128,6 +133,26 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
                     app_handle
                         .emit(EventKey::ConnectionChanged.into(), ())
                         .unwrap();
+
+                    debug!(
+                        "Spawning log watcher for location {} (started from system settings)",
+                        location.name
+                    );
+                    if let Err(e) = spawn_log_watcher_task(
+                        app_handle.clone(),
+                        location.id,
+                        location.name.clone(),
+                        ConnectionType::Location,
+                        Level::DEBUG,
+                        None,
+                    )
+                    .await
+                    {
+                        warn!(
+                            "Failed to spawn log watcher for location {}: {e}",
+                            location.name
+                        );
+                    }
                 }
             }
             Some(NEVPNStatus::Disconnected) => {
@@ -197,6 +222,27 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
                     app_handle
                         .emit(EventKey::ConnectionChanged.into(), ())
                         .unwrap();
+
+                    // Spawn log watcher for this tunnel (VPN was started from system settings)
+                    debug!(
+                        "Spawning log watcher for tunnel {} (started from system settings)",
+                        tunnel.name
+                    );
+                    if let Err(e) = spawn_log_watcher_task(
+                        app_handle.clone(),
+                        tunnel.id,
+                        tunnel.name.clone(),
+                        ConnectionType::Tunnel,
+                        Level::DEBUG,
+                        None,
+                    )
+                    .await
+                    {
+                        warn!(
+                            "Failed to spawn log watcher for tunnel {}: {e}",
+                            tunnel.name
+                        );
+                    }
                 }
             }
             Some(NEVPNStatus::Disconnected) => {
@@ -676,7 +722,7 @@ impl TunnelConfiguration {
                 info!("VPN started");
             }
         } else {
-            error!(
+            debug!(
                 "Couldn't find configuration from system settings for {}",
                 self.name
             );
@@ -691,7 +737,7 @@ pub(crate) fn remove_config_for_location(location: &Location<Id>) {
             provider_manager.removeFromPreferencesWithCompletionHandler(None);
         }
     } else {
-        error!(
+        debug!(
             "Couldn't find configuration in system settings for location {}",
             location.name
         );
@@ -705,7 +751,7 @@ pub(crate) fn remove_config_for_tunnel(tunnel: &Tunnel<Id>) {
             provider_manager.removeFromPreferencesWithCompletionHandler(None);
         }
     } else {
-        error!(
+        debug!(
             "Couldn't find configuration in system settings for tunnel {}",
             tunnel.name
         );
@@ -716,7 +762,7 @@ pub(crate) fn remove_config_for_tunnel(tunnel: &Tunnel<Id>) {
 pub(crate) fn stop_tunnel_for_location(location: &Location<Id>) -> bool {
     manager_for_key_and_value("locationId", location.id).map_or_else(
         || {
-            error!(
+            debug!(
                 "Couldn't find configuration in system settings for location {}",
                 location.name
             );
@@ -726,6 +772,7 @@ pub(crate) fn stop_tunnel_for_location(location: &Location<Id>) -> bool {
             unsafe {
                 provider_manager.connection().stopVPNTunnel();
             }
+
             info!("VPN stopped");
             true
         },
@@ -736,7 +783,7 @@ pub(crate) fn stop_tunnel_for_location(location: &Location<Id>) -> bool {
 pub(crate) fn stop_tunnel_for_tunnel(tunnel: &Tunnel<Id>) -> bool {
     manager_for_key_and_value("tunnelId", tunnel.id).map_or_else(
         || {
-            error!(
+            debug!(
                 "Couldn't find configuration in system settings for location {}",
                 tunnel.name
             );
@@ -746,6 +793,7 @@ pub(crate) fn stop_tunnel_for_tunnel(tunnel: &Tunnel<Id>) -> bool {
             unsafe {
                 provider_manager.connection().stopVPNTunnel();
             }
+
             info!("VPN stopped");
             true
         },
@@ -756,7 +804,7 @@ pub(crate) fn stop_tunnel_for_tunnel(tunnel: &Tunnel<Id>) -> bool {
 pub(crate) fn get_location_status(location: &Location<Id>) -> Option<NEVPNStatus> {
     manager_for_key_and_value("locationId", location.id).map_or_else(
         || {
-            error!(
+            debug!(
                 "Couldn't find configuration in system settings for location {}",
                 location.name
             );
@@ -773,7 +821,7 @@ pub(crate) fn get_location_status(location: &Location<Id>) -> Option<NEVPNStatus
 pub(crate) fn get_tunnel_status(tunnel: &Tunnel<Id>) -> Option<NEVPNStatus> {
     manager_for_key_and_value("tunnelId", tunnel.id).map_or_else(
         || {
-            error!(
+            debug!(
                 "Couldn't find configuration in system settings for tunnel {}",
                 tunnel.name
             );
