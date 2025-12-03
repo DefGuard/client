@@ -82,7 +82,7 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
         debug!("Waiting for status update message from channel...");
 
         debug!("Status update message received, synchronizing state...");
-        tokio::time::sleep(Duration::from_secs(SYSTEM_SYNC_DELAY_MS)).await;
+        tokio::time::sleep(Duration::from_millis(SYSTEM_SYNC_DELAY_MS)).await;
         sync_connections_with_system(app_handle).await;
 
         debug!("Processed status update message.");

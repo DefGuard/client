@@ -62,7 +62,11 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
                 logsContainerElement.current &&
                 filterLogByLevel(locationLogLevelRef.current, item.level)
               ) {
-                const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
+                const utcTimestamp = item.timestamp.endsWith('Z')
+                  ? item.timestamp
+                  : `${item.timestamp}Z`;
+                const dateTime = new Date(utcTimestamp).toLocaleString();
+                const messageString = `${dateTime} ${item.level} ${item.fields.message}`;
                 const element = createLogLineElement(messageString);
                 const scrollAfterAppend =
                   logsContainerElement.current.scrollHeight -

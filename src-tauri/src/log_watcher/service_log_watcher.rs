@@ -290,6 +290,7 @@ impl VpnExtensionLogWatcher {
                 }
                 sleep(DELAY);
             } else {
+                println!("Read VPN extension log line: {}", line.trim());
                 match self.parse_log_line(&line) {
                     Ok(Some(parsed_line)) => {
                         parsed_lines.push(parsed_line);
@@ -490,7 +491,9 @@ pub async fn spawn_log_watcher_task(
     log_level: Level,
     from: Option<String>,
 ) -> Result<String, Error> {
-    use crate::log_watcher::get_vpn_extension_log_path;
+    use crate::log_watcher::{
+        get_vpn_extension_log_dir_path, global_log_watcher::VPN_EXTENSION_LOG_FILENAME,
+    };
 
     debug!(
         "Spawning VPN extension log watcher task for location ID {location_id}, interface {interface_name}"
@@ -507,7 +510,9 @@ pub async fn spawn_log_watcher_task(
     let event_topic = format!("log-update-{connection_type_str}-{location_id}");
     debug!("Using the following event topic for the VPN extension log watcher: {event_topic}");
 
-    let log_file = get_vpn_extension_log_path().map_err(|e| Error::InternalError(e.to_string()))?;
+    let log_dir =
+        get_vpn_extension_log_dir_path().map_err(|e| Error::InternalError(e.to_string()))?;
+    let log_file = log_dir.join(VPN_EXTENSION_LOG_FILENAME);
     debug!("VPN extension log file path: {}", log_file.display());
 
     let topic_clone = event_topic.clone();

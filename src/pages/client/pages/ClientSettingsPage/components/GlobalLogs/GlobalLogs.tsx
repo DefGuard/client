@@ -30,20 +30,24 @@ export const GlobalLogs = () => {
   const { startGlobalLogWatcher, stopGlobalLogWatcher } = clientApi;
 
   const handleLogsDownload = async () => {
-    const path = await save({
-      filters: [
-        {
-          name: 'Logs',
-          extensions: ['txt', 'log'],
-        },
-      ],
-    });
+    try {
+      const path = await save({
+        filters: [
+          {
+            name: 'Logs',
+            extensions: ['txt', 'log'],
+          },
+        ],
+      });
 
-    if (path) {
-      const logs = getAllLogs();
-      await writeTextFile(path, logs);
-    } else {
-      error('Failed to save logs! Path was null');
+      if (path) {
+        const logs = getAllLogs();
+        await writeTextFile(path, logs);
+      } else {
+        throw new Error('No path selected');
+      }
+    } catch (e) {
+      error(`Failed to save logs: ${e}`);
     }
   };
 
@@ -72,7 +76,10 @@ export const GlobalLogs = () => {
                 filterLogByLevel(globalLogLevelRef.current, item.level) &&
                 filterLogBySource(logSourceRef.current, item.source)
               ) {
-                const dateTime = new Date(item.timestamp).toLocaleString();
+                const utcTimestamp = item.timestamp.endsWith('Z')
+                  ? item.timestamp
+                  : `${item.timestamp}Z`;
+                const dateTime = new Date(utcTimestamp).toLocaleString();
                 const messageString = `[${dateTime}][${item.level}][${item.source}] ${item.fields.message}`;
                 const element = createLogLineElement(messageString);
                 const scrollAfterAppend =

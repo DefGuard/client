@@ -82,7 +82,7 @@ static LOG_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Get the VPN extension log file path on macOS
 #[cfg(target_os = "macos")]
-fn get_vpn_extension_log_path() -> Result<PathBuf, LogWatcherError> {
+fn get_vpn_extension_log_dir_path() -> Result<PathBuf, LogWatcherError> {
     use objc2_foundation::{ns_string, NSFileManager};
 
     let manager = NSFileManager::defaultManager();
