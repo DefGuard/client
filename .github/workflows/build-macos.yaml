@@ -94,8 +94,8 @@ jobs:
           SIGN_ID: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
           CLIENT_PROFILE: src-tauri/Defguard_Client_Mac_DeveloperID.provisionprofile
           EXTENSION_PROFILE: src-tauri/Defguard_VPNExtension_Mac_DeveloperID.provisionprofile
-          CLIENT_ENTITLEMENTS: src-tauri/Client.entitlements
-          EXTENSION_ENTITLEMENTS: swift/extension/VPNExtension/VPNExtension.entitlements
+          CLIENT_ENTITLEMENTS: src-tauri/Client.developerid.entitlements
+          EXTENSION_ENTITLEMENTS: swift/extension/VPNExtension/VPNExtension.developerid.entitlements
         run: |
           # Replace App Store provisioning profiles with Developer ID profiles
           cp "$CLIENT_PROFILE" "$APP_PATH/Contents/embedded.provisionprofile"
