@@ -290,7 +290,6 @@ impl VpnExtensionLogWatcher {
                 }
                 sleep(DELAY);
             } else {
-                println!("Read VPN extension log line: {}", line.trim());
                 match self.parse_log_line(&line) {
                     Ok(Some(parsed_line)) => {
                         parsed_lines.push(parsed_line);
