@@ -490,7 +490,9 @@ pub async fn spawn_log_watcher_task(
     log_level: Level,
     from: Option<String>,
 ) -> Result<String, Error> {
-    use crate::log_watcher::get_vpn_extension_log_path;
+    use crate::log_watcher::{
+        get_vpn_extension_log_dir_path, global_log_watcher::VPN_EXTENSION_LOG_FILENAME,
+    };
 
     debug!(
         "Spawning VPN extension log watcher task for location ID {location_id}, interface {interface_name}"
@@ -507,7 +509,9 @@ pub async fn spawn_log_watcher_task(
     let event_topic = format!("log-update-{connection_type_str}-{location_id}");
     debug!("Using the following event topic for the VPN extension log watcher: {event_topic}");
 
-    let log_file = get_vpn_extension_log_path().map_err(|e| Error::InternalError(e.to_string()))?;
+    let log_dir =
+        get_vpn_extension_log_dir_path().map_err(|e| Error::InternalError(e.to_string()))?;
+    let log_file = log_dir.join(VPN_EXTENSION_LOG_FILENAME);
     debug!("VPN extension log file path: {}", log_file.display());
 
     let topic_clone = event_topic.clone();
@@ -566,15 +570,20 @@ pub fn stop_log_watcher_task(handle: &AppHandle, interface_name: &str) -> Result
         .lock()
         .expect("Failed to lock log watchers mutex");
 
-    if let Some(token) = log_watchers.remove(interface_name) {
-        debug!("Using cancellation token for service log watcher on interface {interface_name}");
-        token.cancel();
-        debug!("Service log watcher for interface {interface_name} stopped");
-        Ok(())
-    } else {
-        debug!(
-            "Service log watcher for interface {interface_name} couldn't be found, nothing to stop"
-        );
-        Err(Error::NotFound)
-    }
+    log_watchers.remove(interface_name).map_or_else(
+        || {
+            warn!(
+                "Service log watcher for interface {interface_name} couldn't be found, nothing to stop"
+            );
+            Ok(())
+        },
+        |token| {
+            debug!(
+                "Using cancellation token for service log watcher on interface {interface_name}"
+            );
+            token.cancel();
+            debug!("Service log watcher for interface {interface_name} stopped");
+            Ok(())
+        },
+    )
 }

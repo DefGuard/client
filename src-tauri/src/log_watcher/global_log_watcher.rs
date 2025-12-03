@@ -21,7 +21,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
 #[cfg(target_os = "macos")]
-use crate::log_watcher::get_vpn_extension_log_path;
+use crate::log_watcher::get_vpn_extension_log_dir_path;
 use crate::{
     appstate::AppState,
     error::Error,
@@ -31,7 +31,7 @@ use crate::{
 use crate::{log_watcher::extract_timestamp, utils::get_service_log_dir};
 
 #[cfg(target_os = "macos")]
-const VPN_EXTENSION_LOG_FILENAME: &str = "vpn-extension.log";
+pub(crate) const VPN_EXTENSION_LOG_FILENAME: &str = "vpn-extension.log";
 
 /// Helper struct to handle log directory logic
 #[derive(Debug)]
@@ -60,7 +60,7 @@ impl LogDirs {
         })?;
 
         #[cfg(target_os = "macos")]
-        let vpn_extension_log_dir = get_vpn_extension_log_path()?;
+        let vpn_extension_log_dir = get_vpn_extension_log_dir_path()?;
 
         #[cfg(not(target_os = "macos"))]
         debug!(
