@@ -90,9 +90,22 @@ jobs:
 
       - name: Re-sign app for direct distribution
         run: |
-          # Re-sign the app with Developer ID for direct distribution
-          codesign --force --deep --sign "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)" \
-            "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
+          SIGN_ID="Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
+
+          # First sign the VPN extension with hardened runtime
+          codesign --force --options runtime --timestamp \
+            --sign "$SIGN_ID" \
+            --entitlements "swift/extension/VPNExtension/VPNExtension.entitlements" \
+            "$APP_PATH/Contents/PlugIns/VPNExtension.appex"
+
+          # Then sign the main app with hardened runtime
+          codesign --force --options runtime --timestamp \
+            --sign "$SIGN_ID" \
+            --entitlements "src-tauri/Client.entitlements" \
+            "$APP_PATH"
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
       - name: Build installation package for GitHub Release
         run: |
