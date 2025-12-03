@@ -105,7 +105,18 @@ jobs:
           # Notarize for Gatekeeper
           xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} \
             --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} \
-            --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+            --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg \
+            --output-format json > notarization-result.json
+
+          # Get the submission ID and fetch the log regardless of success/failure
+          SUBMISSION_ID=$(cat notarization-result.json | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          if [ -n "$SUBMISSION_ID" ]; then
+            echo "Fetching notarization log for submission: $SUBMISSION_ID"
+            xcrun notarytool log "$SUBMISSION_ID" --apple-id ${{ env.APPLE_ID }} \
+              --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} \
+              --team-id ${{ env.APPLE_TEAM_ID }} notarization-log.json || true
+          fi
+
           xcrun stapler staple defguard-client.pkg
 
       # - name: Upload installation package
