@@ -93,29 +93,32 @@ jobs:
           APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
           SIGN_ID="Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
 
+          # Remove provisioning profiles (not needed for Developer ID distribution)
+          rm -f "$APP_PATH/Contents/embedded.provisionprofile"
+          rm -f "$APP_PATH/Contents/PlugIns/VPNExtension.appex/Contents/embedded.provisionprofile"
 
           # Sign the VPN extension executable
           codesign --force --options runtime --timestamp \
             --sign "$SIGN_ID" \
-            --entitlements "swift/extension/VPNExtension/VPNExtension.entitlements" \
+            --entitlements "swift/extension/VPNExtension/VPNExtension.developerid.entitlements" \
             "$APP_PATH/Contents/PlugIns/VPNExtension.appex/Contents/MacOS/VPNExtension"
 
           # Sign the VPN extension bundle
           codesign --force --options runtime --timestamp \
             --sign "$SIGN_ID" \
-            --entitlements "swift/extension/VPNExtension/VPNExtension.entitlements" \
+            --entitlements "swift/extension/VPNExtension/VPNExtension.developerid.entitlements" \
             "$APP_PATH/Contents/PlugIns/VPNExtension.appex"
 
           # Sign the main executable
           codesign --force --options runtime --timestamp \
             --sign "$SIGN_ID" \
-            --entitlements "src-tauri/Client.entitlements" \
+            --entitlements "src-tauri/Client.developerid.entitlements" \
             "$APP_PATH/Contents/MacOS/defguard-client"
 
           # Sign the main app bundle
           codesign --force --options runtime --timestamp \
             --sign "$SIGN_ID" \
-            --entitlements "src-tauri/Client.entitlements" \
+            --entitlements "src-tauri/Client.developerid.entitlements" \
             "$APP_PATH"
 
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
