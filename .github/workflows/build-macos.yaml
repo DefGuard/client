@@ -90,13 +90,24 @@ jobs:
           xcrun productbuild --sign "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)" \
             --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications \
             defguard-client.pkg
+
           xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} \
             --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} \
-            --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+            --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg > notarization-submit.log 2>&1 || true
 
-          xcrun stapler staple defguard-client.pkg
+          SUBMISSION_ID=$(grep "id:" notarization-submit.log | head -1 | awk '{print $2}')
+          if [ -n "$SUBMISSION_ID" ]; then
+            xcrun notarytool log "$SUBMISSION_ID" --apple-id ${{ env.APPLE_ID }} \
+              --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} \
+              --team-id ${{ env.APPLE_TEAM_ID }} notarization-log.json || true
+          fi
 
-      # now upload the artifact so i can download it from action
+          if grep -q "status: Accepted" notarization-submit.log; then
+            xcrun stapler staple defguard-client.pkg
+          else
+            exit 1
+          fi
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
