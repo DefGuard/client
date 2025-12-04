@@ -43,6 +43,7 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
+    tray::show_main_window,
     utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
     ConnectionType,
 };
@@ -121,6 +122,19 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
                         location.name
                     );
                 } else {
+                    // Check if location requires MFA - if so, we need to cancel this connection
+                    // and trigger MFA flow through the app
+                    if location.mfa_enabled() {
+                        info!(
+                            "Location {} requires MFA but was started from system settings, canceling system connection and triggering MFA flow",
+                            location.name
+                        );
+                        stop_tunnel_for_location(&location);
+                        show_main_window(app_handle);
+                        let _ = app_handle.emit(EventKey::MfaTrigger.into(), &location);
+                        continue;
+                    }
+
                     debug!("Adding connection for location {}", location.name);
 
                     app_state
