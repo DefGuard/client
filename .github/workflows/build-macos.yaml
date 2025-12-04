@@ -77,6 +77,35 @@ jobs:
           cd src-tauri && cargo tauri build --bundles app --target universal-apple-darwin \
             --config tauri.developerid.conf.json
 
+      - name: Re-sign app with Developer ID (proper codesigning)
+        run: |
+          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
+          IDENTITY="Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
+
+          # Sign the VPNExtension first (nested code must be signed before parent)
+          codesign --force --options runtime --timestamp \
+            --entitlements swift/extension/VPNExtension/VPNExtension.developerid.entitlements \
+            --sign "$IDENTITY" \
+            "$APP_PATH/Contents/PlugIns/VPNExtension.appex"
+
+          # Sign any other binaries/frameworks
+          find "$APP_PATH/Contents/Frameworks" -type f -perm +111 -exec \
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" {} \; 2>/dev/null || true
+
+          # Sign the main binary
+          codesign --force --options runtime --timestamp \
+            --entitlements src-tauri/Client.developerid.entitlements \
+            --sign "$IDENTITY" \
+            "$APP_PATH/Contents/MacOS/defguard-client"
+
+          # Sign the app bundle itself
+          codesign --force --options runtime --timestamp \
+            --entitlements src-tauri/Client.developerid.entitlements \
+            --sign "$IDENTITY" \
+            "$APP_PATH"
+
       - name: Verify code signature
         run: |
           APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
