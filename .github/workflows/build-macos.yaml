@@ -69,57 +69,20 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
 
-      - name: Build app
-        # Switch back to tauri-action when this gets merged https://github.com/tauri-apps/tauri/pull/14379
-        # uses: tauri-apps/tauri-action@v0 # 0.5.24 seems to be broken, TODO: update when fixed
+      - name: Build app for Developer ID distribution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: cd src-tauri && cargo tauri build --bundles app --target universal-apple-darwin
-        # with:
-        #   args: --target universal-apple-darwin
-
-      # - name: Build installation package
-      #   run: |
-      #     security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-      #     xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app" /Applications defguard-client.pkg
-      #     xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
-      #     # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
-      #     # xcrun stapler staple defguard-client.pkg
-
-      - name: Re-sign app for direct distribution
-        env:
-          APP_PATH: src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app
-          SIGN_ID: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
-          CLIENT_PROFILE: src-tauri/Defguard_Client_Mac_DeveloperID.provisionprofile
-          EXTENSION_PROFILE: src-tauri/Defguard_VPNExtension_Mac_DeveloperID.provisionprofile
-          CLIENT_ENTITLEMENTS: src-tauri/Client.developerid.entitlements
-          EXTENSION_ENTITLEMENTS: swift/extension/VPNExtension/VPNExtension.developerid.entitlements
+          DEVELOPER_ID_BUILD: "true"
         run: |
-          # Replace App Store provisioning profiles with Developer ID profiles
-          cp "$CLIENT_PROFILE" "$APP_PATH/Contents/embedded.provisionprofile"
-          cp "$EXTENSION_PROFILE" "$APP_PATH/Contents/PlugIns/VPNExtension.appex/Contents/embedded.provisionprofile"
+          cd src-tauri && cargo tauri build --bundles app --target universal-apple-darwin \
+            --config tauri.developerid.conf.json
 
-          # Sign inside-out: extension first, then main app
-          codesign --force --options runtime --timestamp \
-            --sign "$SIGN_ID" --entitlements "$EXTENSION_ENTITLEMENTS" \
-            "$APP_PATH/Contents/PlugIns/VPNExtension.appex/Contents/MacOS/VPNExtension"
-
-          codesign --force --options runtime --timestamp \
-            --sign "$SIGN_ID" --entitlements "$EXTENSION_ENTITLEMENTS" \
-            "$APP_PATH/Contents/PlugIns/VPNExtension.appex"
-
-          codesign --force --options runtime --timestamp \
-            --sign "$SIGN_ID" --entitlements "$CLIENT_ENTITLEMENTS" \
-            "$APP_PATH/Contents/MacOS/defguard-client"
-
-          codesign --force --options runtime --timestamp \
-            --sign "$SIGN_ID" --entitlements "$CLIENT_ENTITLEMENTS" \
-            "$APP_PATH"
-
-          # Verify
+      - name: Verify code signature
+        run: |
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/defguard-client.app"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign -dvv "$APP_PATH"
+          codesign -dvv "$APP_PATH/Contents/PlugIns/VPNExtension.appex"
 
       - name: Build installation package for GitHub Release
         run: |

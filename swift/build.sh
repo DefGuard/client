@@ -45,9 +45,22 @@ popd
 
 # Build VPNExtension.
 
-# if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
+if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
     CONFIG=Release
-# else
-#     CONFIG=Debug
-# fi
-xcodebuild -project extension/VPNExtension.xcodeproj -target VPNExtension -configuration ${CONFIG} build
+else
+    CONFIG=Debug
+fi
+
+# Check if building for Developer ID distribution
+if [ "${DEVELOPER_ID_BUILD}" = 'true' ]; then
+    echo "Building VPNExtension for Developer ID distribution..."
+    xcodebuild -project extension/VPNExtension.xcodeproj -target VPNExtension -configuration ${CONFIG} \
+        CODE_SIGN_IDENTITY="Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)" \
+        CODE_SIGN_STYLE=Manual \
+        CODE_SIGN_ENTITLEMENTS="VPNExtension/VPNExtension.developerid.entitlements" \
+        PROVISIONING_PROFILE_SPECIFIER="Defguard VPNExtension Mac DeveloperID" \
+        OTHER_CODE_SIGN_FLAGS="--options runtime --timestamp" \
+        build
+else
+    xcodebuild -project extension/VPNExtension.xcodeproj -target VPNExtension -configuration ${CONFIG} build
+fi

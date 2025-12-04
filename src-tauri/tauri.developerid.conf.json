@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "macOS": {
+      "entitlements": "./Client.developerid.entitlements",
+      "files": {
+        "embedded.provisionprofile": "Defguard_Client_Mac_DeveloperID.provisionprofile",
+        "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
+      },
+      "signingIdentity": "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
+    }
+  }
+}
