@@ -45,11 +45,14 @@ popd
 
 # Build VPNExtension.
 
-if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
-    CONFIG=Release
-else
+# For release builds, TAURI_ENV_DEBUG is unset or 'false'
+if [ "${TAURI_ENV_DEBUG}" = 'true' ]; then
     CONFIG=Debug
+else
+    CONFIG=Release
 fi
+
+echo "Building VPNExtension with configuration: ${CONFIG}"
 
 # Check if building for Developer ID distribution
 if [ "${DEVELOPER_ID_BUILD}" = 'true' ]; then
