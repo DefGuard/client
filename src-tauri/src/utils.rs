@@ -147,10 +147,12 @@ pub(crate) async fn setup_interface(
 
 #[cfg(target_os = "macos")]
 pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
-    debug!("Starting stats handler for ID {id} and connection type {connection_type:?}");
     use crate::database::models::{location_stats::LocationStats, tunnel::TunnelStats};
 
     const CHECK_INTERVAL: Duration = Duration::from_secs(10);
+
+    debug!("Starting stats handler for ID {id} and connection type {connection_type:?}");
+
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     let pool = DB_POOL.clone();
 

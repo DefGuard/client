@@ -83,7 +83,7 @@
       }
     }
   },
-  "productName": "defguard-client",
+  "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
   "version": "1.6.0",

@@ -204,7 +204,47 @@ fn main() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            // Register for linux and dev windows builds
+            // Create Help menu on macOS.
+            // https://github.com/tauri-apps/tauri/issues/9371
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_opener::OpenerExt;
+
+                const DOC_ITEM_ID: &str = "doc";
+                const REPORT_ITEM_ID: &str = "issue";
+                const DOC_URL: &str = "https://docs.defguard.net/using-defguard-for-end-users/desktop-client";
+                const REPORT_URL: &str = "https://github.com/DefGuard/client/issues/new?labels=bug&template=bug_report.md";
+                if let Some(menu) = app.menu() {
+                    if let Some(help_submenu) = menu.get(tauri::menu::HELP_SUBMENU_ID) {
+                        let report_item = tauri::menu::MenuItem::with_id(
+                            app,
+                            REPORT_ITEM_ID,
+                            "Report an issue",
+                            true,
+                            None::<&str>,
+                        )?;
+                        let _ = help_submenu.as_submenu_unchecked().append(&report_item);
+                        let doc_item = tauri::menu::MenuItem::with_id(
+                            app,
+                            DOC_ITEM_ID,
+                            "Defguard Desktop Client Help",
+                            true,
+                            None::<&str>,
+                        )?;
+                        let _ = help_submenu.as_submenu_unchecked().append(&doc_item);
+                    }
+                }
+                app.on_menu_event(move |app, event| {
+                    let id = event.id();
+                    if id == DOC_ITEM_ID {
+                        let _ = app.opener().open_url(DOC_URL, None::<&str>);
+                    } else if id == REPORT_ITEM_ID {
+                        let _ = app.opener().open_url(REPORT_URL, None::<&str>);
+                    }
+                });
+            }
+
+            // Register for Linux and debug Windows builds.
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
