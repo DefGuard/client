@@ -667,31 +667,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "boringtun"
-version = "0.6.0"
-source = "git+https://github.com/DefGuard/wireguard-rs?rev=93f174deced6ba9577c24812b16e2f756da22b01#93f174deced6ba9577c24812b16e2f756da22b01"
-dependencies = [
- "aead",
- "base64 0.22.1",
- "blake2",
- "chacha20poly1305",
- "hex",
- "hmac",
- "ip_network",
- "ip_network_table",
- "libc",
- "nix",
- "parking_lot",
- "ring",
- "socket2",
- "thiserror 2.0.17",
- "tracing",
- "uniffi",
- "untrusted",
- "x25519-dalek",
-]
-
-[[package]]
 name = "borsh"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1481,12 +1456,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard_boringtun"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "491589622056dd3c47b7aa3bc4727633ebf5d38462486209b7f04bef6c50075f"
+dependencies = [
+ "aead",
+ "base64 0.22.1",
+ "blake2",
+ "chacha20poly1305",
+ "hex",
+ "hmac",
+ "ip_network",
+ "ip_network_table",
+ "libc",
+ "nix",
+ "parking_lot",
+ "ring",
+ "socket2",
+ "thiserror 2.0.17",
+ "tracing",
+ "uniffi",
+ "untrusted",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "defguard_wireguard_rs"
-version = "0.9.0"
-source = "git+https://github.com/DefGuard/wireguard-rs?rev=93f174deced6ba9577c24812b16e2f756da22b01#93f174deced6ba9577c24812b16e2f756da22b01"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf853e6ffe9d6ab91aa1f706cbbf84a446c002cdf469ae0eb085fbcca07648e4"
 dependencies = [
  "base64 0.22.1",
- "boringtun",
+ "defguard_boringtun",
  "ipnet",
  "libc",
  "log",
