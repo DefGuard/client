@@ -41,6 +41,9 @@ jobs:
           submodules: recursive
       - name: Scan code with Trivy
         uses: aquasecurity/trivy-action@0.33.1
+        env:
+          TRIVY_SHOW_SUPPRESSED: 1
+          TRIVY_IGNOREFILE: "./.trivyignore.yaml"
         with:
           scan-type: "fs"
           scan-ref: "."

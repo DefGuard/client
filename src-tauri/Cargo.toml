@@ -70,7 +70,7 @@ dirs-next.workspace = true
 hyper-util = "0.1"
 log = { version = "0.4", features = ["serde"] }
 prost.workspace = true
-regex = "1.11"
+regex = "1.12"
 reqwest.workspace = true
 rust-ini = "0.21"
 semver = "1.0"
