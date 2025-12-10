@@ -1,5 +1,5 @@
 import { fromUint8Array } from 'js-base64';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import QrCode from 'react-qr-code';
 import useWebSocket from 'react-use-websocket';
 import z from 'zod';
@@ -48,7 +48,8 @@ export const MfaMobileApprove = ({
     [proxyUrl],
   );
 
-  const { lastMessage } = useWebSocket(wsUrl, {
+  var manuallyCancelled = false;
+  const { getWebSocket, lastMessage } = useWebSocket(wsUrl, {
     queryParams: {
       token,
     },
@@ -56,12 +57,14 @@ export const MfaMobileApprove = ({
       debug('WebSocket connection to proxy for mobile app MFA closed.');
     },
     onError: () => {
-      toaster.error('Unexpected error in WebSocket connection to proxy');
-      error(
-        'MFA auth using mobile app failed. Unexpected error in WebSocket connection to proxy.',
-      );
-      // go back to previous step
-      onCancel();
+      if (!manuallyCancelled) {
+        toaster.error('Unexpected error in WebSocket connection to proxy');
+        error(
+          'MFA auth using mobile app failed. Unexpected error in WebSocket connection to proxy.',
+        );
+        // go back to previous step
+        onCancel();
+      }
     },
   });
 
@@ -102,19 +105,26 @@ export const MfaMobileApprove = ({
     }
   }, [lastMessage]);
 
+  const cancel = () => {
+    manuallyCancelled = true;
+    const socket = getWebSocket();
+    socket?.close();
+    onCancel();
+  }
+
   return (
     <div id="mobile-approve-mfa">
-      <MessageBox message="Scan this QR with the defguard mobile app from the same instance screen.">
+      <MessageBox message="Scan this QR with Defguard mobile app from the same instance screen.">
         <p>
           <span>
             {'Go to the mobile app, select this instance and click the Biometry button'}
           </span>
           <ExampleButton />
-          <span>{'in the botom right corner.'}</span>
+          <span>{'in the bottom right corner.'}</span>
         </p>
       </MessageBox>
       <QrCode value={qrString} />
-      <Button text="Cancel" onClick={onCancel} />
+      <Button text="Cancel" onClick={cancel} />
     </div>
   );
 };
