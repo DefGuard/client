@@ -56,14 +56,11 @@ static OBSERVER_COMMS: LazyLock<(
     let (tx, rx) = mpsc::channel();
     (Mutex::new(tx), Mutex::new(Some(rx)))
 });
-
-static VPN_STATE_UPDATE_COMMS: LazyLock<(
-    Mutex<tokio::sync::mpsc::Sender<()>>,
-    Mutex<Option<tokio::sync::mpsc::Receiver<()>>>,
-)> = LazyLock::new(|| {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
-    (Mutex::new(tx), Mutex::new(Some(rx)))
-});
+static VPN_STATE_UPDATE_COMMS: LazyLock<(Mutex<Sender<()>>, Mutex<Option<Receiver<()>>>)> =
+    LazyLock::new(|| {
+        let (tx, rx) = mpsc::channel();
+        (Mutex::new(tx), Mutex::new(Some(rx)))
+    });
 
 const SYSTEM_SYNC_DELAY_MS: u64 = 500;
 
@@ -71,7 +68,7 @@ const SYSTEM_SYNC_DELAY_MS: u64 = 500;
 /// This is an async function.
 /// It has access to the `AppHandle` to be able to emit events.
 pub async fn connection_state_update_thread(app_handle: &AppHandle) {
-    let mut receiver = {
+    let receiver = {
         let mut rx_opt = VPN_STATE_UPDATE_COMMS
             .1
             .lock()
@@ -79,13 +76,11 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
         rx_opt.take().expect("Receiver already taken")
     };
 
-    while receiver.recv().await.is_some() {
-        debug!("Waiting for status update message from channel...");
-
+    debug!("Waiting for status update message from channel...");
+    while receiver.recv().is_ok() {
         debug!("Status update message received, synchronizing state...");
         tokio::time::sleep(Duration::from_millis(SYSTEM_SYNC_DELAY_MS)).await;
         sync_connections_with_system(app_handle).await;
-
         debug!("Processed status update message.");
     }
 }
@@ -96,200 +91,203 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
 pub async fn sync_connections_with_system(app_handle: &AppHandle) {
     let pool = DB_POOL.clone();
     let app_state = app_handle.state::<AppState>();
-    let locations = Location::all(&pool, false).await.unwrap_or_default();
-    let tunnels = Tunnel::all(&pool).await.unwrap_or_default();
 
-    for location in locations {
-        debug!(
-            "Synchronizing VPN status for location with system status: {}. Querying status...",
-            location.name
-        );
-        let status = get_location_status(&location);
-        debug!(
-            "Location {} (ID {}) status: {status:?}",
-            location.name, location.id
-        );
+    if let Ok(locations) = Location::all(&pool, false).await {
+        for location in locations {
+            debug!(
+                "Synchronizing VPN status for location with system status: {}. Querying status...",
+                location.name
+            );
+            let status = get_location_status(&location);
+            debug!(
+                "Location {} (ID {}) status: {status:?}",
+                location.name, location.id
+            );
 
-        match status {
-            Some(NEVPNStatus::Connected) => {
-                debug!("Location {} is connected", location.name);
-                if find_connection(location.id, crate::ConnectionType::Location)
-                    .await
-                    .is_some()
-                {
-                    debug!(
-                        "Location {} has already a connected state, skipping synchronization",
-                        location.name
-                    );
-                } else {
-                    // Check if location requires MFA - if so, we need to cancel this connection
-                    // and trigger MFA flow through the app
-                    if location.mfa_enabled() {
-                        info!(
-                            "Location {} requires MFA but was started from system settings, canceling system connection and triggering MFA flow",
-                            location.name
-                        );
-                        stop_tunnel_for_location(&location);
-                        show_main_window(app_handle);
-                        let _ = app_handle.emit(EventKey::MfaTrigger.into(), &location);
-                        continue;
-                    }
-
-                    debug!("Adding connection for location {}", location.name);
-
-                    app_state
-                        .add_connection(
-                            location.id,
-                            &location.name,
-                            crate::ConnectionType::Location,
-                        )
-                        .await;
-                    app_handle
-                        .emit(EventKey::ConnectionChanged.into(), ())
-                        .unwrap();
-
-                    debug!(
-                        "Spawning log watcher for location {} (started from system settings)",
-                        location.name
-                    );
-                    if let Err(e) = spawn_log_watcher_task(
-                        app_handle.clone(),
-                        location.id,
-                        location.name.clone(),
-                        ConnectionType::Location,
-                        Level::DEBUG,
-                        None,
-                    )
-                    .await
+            match status {
+                Some(NEVPNStatus::Connected) => {
+                    debug!("Location {} is connected", location.name);
+                    if find_connection(location.id, crate::ConnectionType::Location)
+                        .await
+                        .is_some()
                     {
-                        warn!(
-                            "Failed to spawn log watcher for location {}: {e}",
+                        debug!(
+                            "Location {} has already a connected state, skipping synchronization",
+                            location.name
+                        );
+                    } else {
+                        // Check if location requires MFA - if so, we need to cancel this connection
+                        // and trigger MFA flow through the app
+                        if location.mfa_enabled() {
+                            info!(
+                                "Location {} requires MFA but was started from system settings, \
+                                canceling system connection and triggering MFA flow",
+                                location.name
+                            );
+                            stop_tunnel_for_location(&location);
+                            show_main_window(app_handle);
+                            let _ = app_handle.emit(EventKey::MfaTrigger.into(), &location);
+                            continue;
+                        }
+
+                        debug!("Adding connection for location {}", location.name);
+
+                        app_state
+                            .add_connection(
+                                location.id,
+                                &location.name,
+                                crate::ConnectionType::Location,
+                            )
+                            .await;
+                        app_handle
+                            .emit(EventKey::ConnectionChanged.into(), ())
+                            .unwrap();
+
+                        debug!(
+                            "Spawning log watcher for location {} (started from system settings)",
+                            location.name
+                        );
+                        if let Err(e) = spawn_log_watcher_task(
+                            app_handle.clone(),
+                            location.id,
+                            location.name.clone(),
+                            ConnectionType::Location,
+                            Level::DEBUG,
+                            None,
+                        )
+                        .await
+                        {
+                            warn!(
+                                "Failed to spawn log watcher for location {}: {e}",
+                                location.name
+                            );
+                        }
+                    }
+                }
+                Some(NEVPNStatus::Disconnected) => {
+                    debug!("Location {} is disconnected", location.name);
+                    if find_connection(location.id, crate::ConnectionType::Location)
+                        .await
+                        .is_some()
+                    {
+                        debug!("Removing connection for location {}", location.name);
+                        app_state
+                            .remove_connection(location.id, crate::ConnectionType::Location)
+                            .await;
+                        app_handle
+                            .emit(EventKey::ConnectionChanged.into(), ())
+                            .unwrap();
+                    } else {
+                        debug!(
+                            "Location {} has no active connection, skipping removal",
                             location.name
                         );
                     }
                 }
-            }
-            Some(NEVPNStatus::Disconnected) => {
-                debug!("Location {} is disconnected", location.name);
-                if find_connection(location.id, crate::ConnectionType::Location)
-                    .await
-                    .is_some()
-                {
-                    debug!("Removing connection for location {}", location.name);
-                    app_state
-                        .remove_connection(location.id, crate::ConnectionType::Location)
-                        .await;
-                    app_handle
-                        .emit(EventKey::ConnectionChanged.into(), ())
-                        .unwrap();
-                } else {
+                Some(unknown_status) => {
                     debug!(
-                        "Location {} has no active connection, skipping removal",
-                        location.name
-                    );
-                }
-            }
-            Some(unknown_status) => {
-                debug!(
                     "Location {} has unknown status {unknown_status:?}, skipping synchronization",
                     location.name
                 );
-            }
-            None => {
-                debug!(
-                    "Couldn't find configuration for tunnel {}, skipping synchronization",
-                    location.name
-                );
+                }
+                None => {
+                    debug!(
+                        "Couldn't find configuration for tunnel {}, skipping synchronization",
+                        location.name
+                    );
+                }
             }
         }
     }
 
-    for tunnel in tunnels {
-        debug!(
-            "Synchronizing VPN status for tunnel with system status: {}. Querying status...",
-            tunnel.name
-        );
-        let status = get_tunnel_status(&tunnel);
-        debug!(
-            "Location {} (ID {}) status: {status:?}",
-            tunnel.name, tunnel.id
-        );
+    if let Ok(tunnels) = Tunnel::all(&pool).await {
+        for tunnel in tunnels {
+            debug!(
+                "Synchronizing VPN status for tunnel with system status: {}. Querying status...",
+                tunnel.name
+            );
+            let status = get_tunnel_status(&tunnel);
+            debug!(
+                "Location {} (ID {}) status: {status:?}",
+                tunnel.name, tunnel.id
+            );
 
-        match status {
-            Some(NEVPNStatus::Connected) => {
-                debug!("Location {} is connected", tunnel.name);
-                if find_connection(tunnel.id, crate::ConnectionType::Tunnel)
-                    .await
-                    .is_some()
-                {
-                    debug!(
-                        "Location {} has already a connected state, skipping synchronization",
-                        tunnel.name
-                    );
-                } else {
-                    debug!("Adding connection for location {}", tunnel.name);
-
-                    app_state
-                        .add_connection(tunnel.id, &tunnel.name, crate::ConnectionType::Tunnel)
-                        .await;
-
-                    app_handle
-                        .emit(EventKey::ConnectionChanged.into(), ())
-                        .unwrap();
-
-                    // Spawn log watcher for this tunnel (VPN was started from system settings)
-                    debug!(
-                        "Spawning log watcher for tunnel {} (started from system settings)",
-                        tunnel.name
-                    );
-                    if let Err(e) = spawn_log_watcher_task(
-                        app_handle.clone(),
-                        tunnel.id,
-                        tunnel.name.clone(),
-                        ConnectionType::Tunnel,
-                        Level::DEBUG,
-                        None,
-                    )
-                    .await
+            match status {
+                Some(NEVPNStatus::Connected) => {
+                    debug!("Location {} is connected", tunnel.name);
+                    if find_connection(tunnel.id, crate::ConnectionType::Tunnel)
+                        .await
+                        .is_some()
                     {
-                        warn!(
-                            "Failed to spawn log watcher for tunnel {}: {e}",
+                        debug!(
+                            "Location {} has already a connected state, skipping synchronization",
+                            tunnel.name
+                        );
+                    } else {
+                        debug!("Adding connection for location {}", tunnel.name);
+
+                        app_state
+                            .add_connection(tunnel.id, &tunnel.name, crate::ConnectionType::Tunnel)
+                            .await;
+
+                        app_handle
+                            .emit(EventKey::ConnectionChanged.into(), ())
+                            .unwrap();
+
+                        // Spawn log watcher for this tunnel (VPN was started from system settings)
+                        debug!(
+                            "Spawning log watcher for tunnel {} (started from system settings)",
+                            tunnel.name
+                        );
+                        if let Err(e) = spawn_log_watcher_task(
+                            app_handle.clone(),
+                            tunnel.id,
+                            tunnel.name.clone(),
+                            ConnectionType::Tunnel,
+                            Level::DEBUG,
+                            None,
+                        )
+                        .await
+                        {
+                            warn!(
+                                "Failed to spawn log watcher for tunnel {}: {e}",
+                                tunnel.name
+                            );
+                        }
+                    }
+                }
+                Some(NEVPNStatus::Disconnected) => {
+                    debug!("Location {} is disconnected", tunnel.name);
+                    if find_connection(tunnel.id, crate::ConnectionType::Tunnel)
+                        .await
+                        .is_some()
+                    {
+                        debug!("Removing connection for location {}", tunnel.name);
+                        app_state
+                            .remove_connection(tunnel.id, crate::ConnectionType::Tunnel)
+                            .await;
+                        app_handle
+                            .emit(EventKey::ConnectionChanged.into(), ())
+                            .unwrap();
+                    } else {
+                        debug!(
+                            "Location {} has no active connection, skipping removal",
                             tunnel.name
                         );
                     }
                 }
-            }
-            Some(NEVPNStatus::Disconnected) => {
-                debug!("Location {} is disconnected", tunnel.name);
-                if find_connection(tunnel.id, crate::ConnectionType::Tunnel)
-                    .await
-                    .is_some()
-                {
-                    debug!("Removing connection for location {}", tunnel.name);
-                    app_state
-                        .remove_connection(tunnel.id, crate::ConnectionType::Tunnel)
-                        .await;
-                    app_handle
-                        .emit(EventKey::ConnectionChanged.into(), ())
-                        .unwrap();
-                } else {
+                Some(unknown_status) => {
                     debug!(
-                        "Location {} has no active connection, skipping removal",
+                        "Location {} has unknown status {:?}, skipping synchronization",
+                        tunnel.name, unknown_status
+                    );
+                }
+                None => {
+                    debug!(
+                        "Couldn't find configuration for tunnel {}, skipping synchronization",
                         tunnel.name
                     );
                 }
-            }
-            Some(unknown_status) => {
-                debug!(
-                    "Location {} has unknown status {:?}, skipping synchronization",
-                    tunnel.name, unknown_status
-                );
-            }
-            None => {
-                debug!(
-                    "Couldn't find configuration for tunnel {}, skipping synchronization",
-                    tunnel.name
-                );
             }
         }
     }
@@ -413,7 +411,7 @@ fn vpn_status_change_handler(notification: &NSNotification) {
         .0
         .lock()
         .expect("Failed to lock state update sender")
-        .blocking_send(())
+        .send(())
         .expect("Failed to send to state update channel");
     debug!("Sent status update request to channel");
 }
@@ -824,9 +822,9 @@ pub(crate) fn get_location_status(location: &Location<Id>) -> Option<NEVPNStatus
             );
             None
         },
-        |provider_manager| {
-            let connection = unsafe { provider_manager.connection() };
-            Some(unsafe { connection.status() })
+        |provider_manager| unsafe {
+            let connection = provider_manager.connection();
+            Some(connection.status())
         },
     )
 }
@@ -841,9 +839,9 @@ pub(crate) fn get_tunnel_status(tunnel: &Tunnel<Id>) -> Option<NEVPNStatus> {
             );
             None
         },
-        |provider_manager| {
-            let connection = unsafe { provider_manager.connection() };
-            Some(unsafe { connection.status() })
+        |provider_manager| unsafe {
+            let connection = provider_manager.connection();
+            Some(connection.status())
         },
     )
 }
