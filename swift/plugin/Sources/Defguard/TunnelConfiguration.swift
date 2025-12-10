@@ -68,9 +68,12 @@ final class TunnelConfiguration: Codable {
         networkSettings.mtu = mtu as NSNumber?
         networkSettings.tunnelOverheadBytes = 80
 
-        let dnsServers = dns
-        let dnsSettings = NEDNSSettings(servers: dnsServers)
+        let dnsSettings = NEDNSSettings(servers: dns)
         dnsSettings.searchDomains = dnsSearch
+        if !dns.isEmpty {
+            // Make all DNS queries go through the tunnel.
+            dnsSettings.matchDomains = [""]
+        }
         networkSettings.dnsSettings = dnsSettings
 
         return networkSettings
