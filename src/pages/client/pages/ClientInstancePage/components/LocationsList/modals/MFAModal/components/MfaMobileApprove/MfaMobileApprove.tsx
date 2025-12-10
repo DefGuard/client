@@ -1,5 +1,5 @@
 import { fromUint8Array } from 'js-base64';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import QrCode from 'react-qr-code';
 import useWebSocket from 'react-use-websocket';
 import z from 'zod';
@@ -109,6 +109,7 @@ export const MfaMobileApprove = ({
     manuallyCancelled = true;
     const socket = getWebSocket();
     socket?.close();
+    // go back to previous step
     onCancel();
   }
 
