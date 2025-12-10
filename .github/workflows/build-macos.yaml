@@ -5,6 +5,7 @@ on:
       - main
       - dev
       - "release/**"
+      - release_1.6_merger
     paths-ignore:
       - "*.md"
       - "LICENSE"
