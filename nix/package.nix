@@ -68,9 +68,6 @@ in
 
     cargoDeps = rustPlatform.importCargoLock {
       lockFile = ../src-tauri/Cargo.lock;
-      outputHashes = {
-        "boringtun-0.6.0" = "sha256-UlgcnHAdrWm3S1v5T4W0froF4jJNqRAsfcVuI2EMSgk=";
-      };
     };
 
     # prefetch pnpm dependencies
