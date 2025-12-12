@@ -91,8 +91,9 @@ async fn startup(app_handle: &AppHandle) {
         let semaphore_clone = Arc::clone(&semaphore);
 
         let handle = tauri::async_runtime::spawn(async move {
-            defguard_client::apple::purge_system_settings();
-            defguard_client::apple::sync_locations_and_tunnels().await;
+            if let Err(err) = defguard_client::apple::sync_locations_and_tunnels().await {
+                error!("Failed to sync locations and tunnels: {err}");
+            }
             semaphore_clone.store(true, Ordering::Release);
         });
         defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
