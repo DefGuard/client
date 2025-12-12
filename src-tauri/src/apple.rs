@@ -943,7 +943,6 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     // Update tunnel settings.
     let all_tunnels = Tunnel::all(&*DB_POOL).await?;
     for tunnel in &all_tunnels {
-        // For syncing, set `mtu` to `None`.
         let Ok(tunnel_config) = tunnel.tunnel_configurarion(mtu) else {
             error!(
                 "Failed to convert tunnel {} to tunnel configuration.",
