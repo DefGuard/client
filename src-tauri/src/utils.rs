@@ -676,7 +676,11 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    let mtu = state.app_config.lock().unwrap().get_mtu();
+    let mtu = state
+        .app_config
+        .lock()
+        .expect("failed to lock app state")
+        .mtu();
     let interface_name =
         setup_interface(location, &location.name, preshared_key, mtu, &DB_POOL).await?;
     state
@@ -709,7 +713,11 @@ pub(crate) async fn handle_connection_for_tunnel(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
-    let mtu = state.app_config.lock().unwrap().get_mtu();
+    let mtu = state
+        .app_config
+        .lock()
+        .expect("failed to lock app state")
+        .mtu();
     let interface_name = setup_interface_tunnel(tunnel, &tunnel.name, mtu).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
