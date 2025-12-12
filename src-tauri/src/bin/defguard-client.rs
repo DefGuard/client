@@ -29,7 +29,7 @@ use defguard_client::{
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
     utils::load_log_targets,
-    VERSION,
+    LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
 use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
@@ -286,7 +286,7 @@ fn main() {
                     })
                     .targets([
                         Target::new(TargetKind::Stdout),
-                        Target::new(TargetKind::LogDir { file_name: None }),
+                        Target::new(TargetKind::LogDir { file_name: Some(LOG_FILENAME.to_string()) }),
                     ])
                     .level(log_level)
                     .filter(|metadata| {
@@ -364,9 +364,11 @@ fn main() {
             }
 
             info!(
-                "Application data (database file) will be stored in: {data_dir:?} and application \
-                logs in: {log_dir:?}. Logs of the background Defguard service responsible for \
-                managing VPN connections at the network level will be stored in: {}.",
+                "Application data (database file) will be stored in: {} and application logs in: \
+                {}. Logs of the background Defguard service responsible for managing VPN \
+                connections at the network level will be stored in: {}.",
+                data_dir.display(),
+                log_dir.display(),
                 service::config::DEFAULT_LOG_DIR
             );
             tauri::async_runtime::block_on(startup(app_handle));

@@ -83,13 +83,16 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
                     .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
                 match try_get_provisioning_config(&data_dir) {
                     Some(config) => {
-                        info!("Provisioning config found in {data_dir:?}: {config:?}");
+                        info!(
+                            "Provisioning config found in {}: {config:?}",
+                            data_dir.display()
+                        );
                         return Some(config);
                     }
                     None => {
                         debug!(
-                            "Provisioning config not found in {data_dir:?}. Proceeding with normal \
-                            startup."
+                            "Provisioning config not found in {}. Proceeding with normal startup.",
+                            data_dir.display()
                         );
                     }
                 }
