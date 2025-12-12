@@ -929,7 +929,7 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     // Update location settings.
     let all_locations = Location::all(&*DB_POOL, false).await?;
     for location in &all_locations {
-        // For syncing, set `preshred_key` and `mtu` to `None`.
+        // For syncing, set `preshred_key` to `None`.
         let Ok(tunnel_config) = location.tunnel_configurarion(&*DB_POOL, None, mtu).await else {
             error!(
                 "Failed to convert location {} to tunnel configuration.",
