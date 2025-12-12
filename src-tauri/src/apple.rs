@@ -1,4 +1,4 @@
-//! Structures used for interchangeability with the Swift code.
+//! Interchangeability and communication with VPNExtension (written in Swift).
 
 use std::{
     collections::HashMap,
@@ -28,7 +28,7 @@ use objc2_foundation::{
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNStatus,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::SqliteExecutor;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
@@ -332,7 +332,10 @@ pub fn observer_thread(initial_managers: HashMap<(String, Id), Retained<NETunnel
                 let (key, value) = message;
 
                 if observers.contains_key(&(key.clone(), value)) {
-                    debug!("Observer for manager with key: {key}, value: {value} already exists, skipping",);
+                    debug!(
+                        "Observer for manager with key: {key}, value: {value} already exists,
+                        skipping",
+                    );
                     continue;
                 }
 
@@ -354,7 +357,10 @@ pub fn observer_thread(initial_managers: HashMap<(String, Id), Retained<NETunnel
 
                 for (key, value) in observers.keys() {
                     if manager_for_key_and_value(key, *value).is_none() {
-                        debug!("Manager for key: {key}, value: {value} no longer exists, marking for removal");
+                        debug!(
+                            "Manager for key: {key}, value: {value} no longer exists, marking for
+                            removal"
+                        );
                         dead_keys.push((key.clone(), *value));
                     }
                 }
@@ -416,7 +422,7 @@ fn vpn_status_change_handler(notification: &NSNotification) {
     debug!("Sent status update request to channel");
 }
 
-pub fn create_observer(
+fn create_observer(
     center: &NSNotificationCenter,
     name: &NSNotificationName,
     handler: impl Fn(&NSNotification) + 'static,
@@ -453,10 +459,9 @@ pub fn get_managers_for_tunnels_and_locations(
     managers
 }
 
-pub(crate) fn manager_for_key_and_value(
-    key: &str,
-    value: Id,
-) -> Option<Retained<NETunnelProviderManager>> {
+/// Try to find [`NETunnelProviderManager`] in system settings that matches key and value.
+/// Key is usually `locationId` or `tunnelId`.
+fn manager_for_key_and_value(key: &str, value: Id) -> Option<Retained<NETunnelProviderManager>> {
     let key_string = NSString::from_str(key);
     let plugin_bundle_id = NSString::from_str(PLUGIN_BUNDLE_ID);
     let (tx, rx) = channel();
@@ -515,8 +520,6 @@ pub(crate) fn manager_for_key_and_value(
 }
 
 /// Tunnel configuration shared with VPNExtension (written in Swift).
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct TunnelConfiguration {
     location_id: Option<Id>,
     tunnel_id: Option<Id>,
@@ -531,7 +534,7 @@ pub(crate) struct TunnelConfiguration {
 }
 
 impl TunnelConfiguration {
-    /// Convert to `NSDictionary`.
+    /// Convert to [`NSDictionary`].
     fn as_nsdict(&self) -> Retained<NSDictionary<NSString, AnyObject>> {
         let dict = NSMutableDictionary::new();
 
@@ -581,13 +584,13 @@ impl TunnelConfiguration {
         for peer in &self.peers {
             let peer_dict = NSMutableDictionary::<NSString, AnyObject>::new();
             peer_dict.insert(
-                ns_string!("public_key"),
+                ns_string!("publicKey"),
                 NSString::from_str(&peer.public_key.to_string()).as_ref(),
             );
 
             if let Some(preshared_key) = &peer.preshared_key {
                 peer_dict.insert(
-                    ns_string!("preshared_key"),
+                    ns_string!("preSharedKey"),
                     NSString::from_str(&preshared_key.to_string()).as_ref(),
                 );
             }
@@ -599,20 +602,11 @@ impl TunnelConfiguration {
                 );
             }
 
-            // Skipping: last_handshake
-
-            peer_dict.insert(
-                ns_string!("tx_bytes"),
-                NSNumber::new_u64(peer.tx_bytes).as_ref(),
-            );
-            peer_dict.insert(
-                ns_string!("rx_bytes"),
-                NSNumber::new_u64(peer.rx_bytes).as_ref(),
-            );
+            // Skipping: lastHandshake, txBytes, rxBytes.
 
             if let Some(persistent_keep_alive) = peer.persistent_keepalive_interval {
                 peer_dict.insert(
-                    ns_string!("persistent_keepalive_interval"),
+                    ns_string!("persistentKeepAlive"),
                     NSNumber::new_u16(persistent_keep_alive).as_ref(),
                 );
             }
@@ -628,7 +622,7 @@ impl TunnelConfiguration {
                 addr_dict.insert(ns_string!("cidr"), NSNumber::new_u8(addr.cidr).as_ref());
                 allowed_ips.addObject(addr_dict.into_super().as_ref());
             }
-            peer_dict.insert(ns_string!("allowed_ips"), allowed_ips.as_ref());
+            peer_dict.insert(ns_string!("allowedIPs"), allowed_ips.as_ref());
 
             peers.addObject(peer_dict.into_super().as_ref());
         }
