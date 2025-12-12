@@ -90,8 +90,15 @@ async fn startup(app_handle: &AppHandle) {
         let semaphore = Arc::new(AtomicBool::new(false));
         let semaphore_clone = Arc::clone(&semaphore);
 
+        // Retrieve MTU from `AppConfig`.
+        let app_state = app_handle.state::<AppState>();
+        let mtu = app_state
+            .app_config
+            .lock()
+            .expect("failed to lock app state")
+            .mtu();
         let handle = tauri::async_runtime::spawn(async move {
-            if let Err(err) = defguard_client::apple::sync_locations_and_tunnels().await {
+            if let Err(err) = defguard_client::apple::sync_locations_and_tunnels(mtu).await {
                 error!("Failed to sync locations and tunnels: {err}");
             }
             semaphore_clone.store(true, Ordering::Release);

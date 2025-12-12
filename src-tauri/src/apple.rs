@@ -925,12 +925,12 @@ pub(crate) fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<S
 }
 
 /// Synchronize locations and tunnels with system settings.
-pub async fn sync_locations_and_tunnels() -> Result<(), sqlx::Error> {
+pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Error> {
     // Update location settings.
     let all_locations = Location::all(&*DB_POOL, false).await?;
     for location in &all_locations {
         // For syncing, set `preshred_key` and `mtu` to `None`.
-        let Ok(tunnel_config) = location.tunnel_configurarion(&*DB_POOL, None, None).await else {
+        let Ok(tunnel_config) = location.tunnel_configurarion(&*DB_POOL, None, mtu).await else {
             error!(
                 "Failed to convert location {} to tunnel configuration.",
                 location.name
@@ -944,7 +944,7 @@ pub async fn sync_locations_and_tunnels() -> Result<(), sqlx::Error> {
     let all_tunnels = Tunnel::all(&*DB_POOL).await?;
     for tunnel in &all_tunnels {
         // For syncing, set `mtu` to `None`.
-        let Ok(tunnel_config) = tunnel.tunnel_configurarion(None) else {
+        let Ok(tunnel_config) = tunnel.tunnel_configurarion(mtu) else {
             error!(
                 "Failed to convert tunnel {} to tunnel configuration.",
                 tunnel.name
