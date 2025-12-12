@@ -17,6 +17,7 @@ use chrono::NaiveDate;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
 use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
+use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
@@ -26,6 +27,7 @@ use crate::{
     appstate::AppState,
     error::Error,
     log_watcher::{LogLine, LogLineFields, LogSource, LogWatcherError},
+    LOG_FILENAME,
 };
 #[cfg(not(target_os = "macos"))]
 use crate::{log_watcher::extract_timestamp, utils::get_service_log_dir};
@@ -125,42 +127,24 @@ impl LogDirs {
 
     #[cfg(not(target_os = "macos"))]
     fn get_current_service_file(&self) -> Result<File, LogWatcherError> {
-        trace!(
-            "Opening service log file: {:?}",
-            self.current_service_log_file
-        );
         match &self.current_service_log_file {
             Some(path) => {
+                trace!("Opening service log file: {}", path.display());
                 let file = File::open(path)?;
-                trace!(
-                    "Successfully opened service log file at {:?}",
-                    self.current_service_log_file
-                );
+                trace!("Successfully opened service log file at {}", path.display());
                 Ok(file)
             }
-            None => Err(LogWatcherError::LogPathError(format!(
-                "Couldn't find service log file at: {:?}",
-                self.current_service_log_file
-            ))),
+            None => Err(LogWatcherError::LogPathError(
+                "Service log file not defined".to_string(),
+            )),
         }
     }
 
     fn get_client_file(&self) -> Result<File, LogWatcherError> {
-        trace!(
-            "Opening the log file for the client, using directory: {}",
-            self.client_log_dir.display()
-        );
-        let dir_str = self
-            .client_log_dir
-            .to_str()
-            .ok_or(LogWatcherError::LogPathError(format!(
-                "Couldn't convert the client log directory path ({}) to a string slice",
-                self.client_log_dir.display()
-            )))?;
-        let path = format!("{dir_str}/defguard-client.log");
-        trace!("Constructed client log file path: {path}");
+        let path = self.client_log_dir.join(format!("{LOG_FILENAME}.log"));
+        trace!("Constructed client log file path: {}", path.display());
         let file = File::open(&path)?;
-        trace!("Client log file at {path:?} opened successfully");
+        trace!("Client log file at {} opened successfully", path.display());
         Ok(file)
     }
 
@@ -243,7 +227,7 @@ impl GlobalLogWatcher {
                 self.log_dirs.client_log_dir.display()
             );
             // Wait for logs to appear.
-            tokio::time::sleep(DELAY).await;
+            sleep(DELAY).await;
             return Ok(());
         }
         debug!("Log files are available, starting to read lines.");
@@ -335,7 +319,7 @@ impl GlobalLogWatcher {
                 parsed_lines.clear();
             }
             trace!("Sleeping for {DELAY:?} seconds before reading again");
-            tokio::time::sleep(DELAY).await;
+            sleep(DELAY).await;
         }
 
         Ok(())
@@ -368,7 +352,7 @@ impl GlobalLogWatcher {
                 self.log_dirs.vpn_extension_log_dir.display()
             );
             // Wait for logs to appear.
-            tokio::time::sleep(DELAY).await;
+            sleep(DELAY).await;
             return Ok(());
         }
         debug!("Log files are available, starting to read lines.");
@@ -450,7 +434,7 @@ impl GlobalLogWatcher {
                 parsed_lines.clear();
             }
             trace!("Sleeping for {DELAY:?} seconds before reading again");
-            tokio::time::sleep(DELAY).await;
+            sleep(DELAY).await;
         }
 
         Ok(())
