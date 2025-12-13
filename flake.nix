@@ -4,8 +4,20 @@
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
 
-    # include git submodules
+    # let git manage submodules
     self.submodules = true;
+    proto = {
+      url = "path:src-tauri/proto";
+      flake = false;
+    };
+    defguard-ui = {
+      url = "path:src/shared/defguard-ui";
+      flake = false;
+    };
+    boringtun = {
+      url = "path:swift/boringtun";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -13,6 +25,7 @@
     nixpkgs,
     flake-utils,
     rust-overlay,
+    ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       # add rust overlay
