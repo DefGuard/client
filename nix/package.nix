@@ -88,14 +88,15 @@ in
     '';
 
     postInstall = ''
+      mkdir -p $out/bin
+
       # copy client binary
-      mkdir -p $out/bin
       cp src-tauri/target/release/${pname} $out/bin/
-      # copy service binary
-      mkdir -p $out/bin
+
+      # copy background service binary
       cp src-tauri/target/release/defguard-service $out/bin/
-      # copy cli binary
-      mkdir -p $out/bin
+
+      # copy CLI binary
       cp src-tauri/target/release/dg $out/bin/
 
       # add required library to client binary RPATH
