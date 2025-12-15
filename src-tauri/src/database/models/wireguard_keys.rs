@@ -5,7 +5,6 @@ use x25519_dalek::{PublicKey, StaticSecret};
 use super::{Id, NoId};
 
 // User key pair
-#[derive(Debug)]
 pub struct WireguardKeys<I = NoId> {
     pub id: I,
     pub instance_id: Id,

@@ -22,7 +22,9 @@ use crate::{
     error::Error,
     events::EventKey,
     proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
-    MIN_CORE_VERSION, MIN_PROXY_VERSION,
+    utils::construct_platform_header,
+    CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION,
+    PKG_VERSION,
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
@@ -137,6 +139,8 @@ pub async fn poll_instance(
     let response = Client::new()
         .post(url)
         .json(&request)
+        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
+        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
         .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await;
@@ -265,7 +269,7 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
     let token = instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
 
     Ok(InstanceInfoRequest {
-        token: (*token).to_string(),
+        token: (*token).clone(),
     })
 }
 

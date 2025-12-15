@@ -13,9 +13,9 @@ import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../../query';
 import type {
+  ClientConnectionType,
   CommonWireguardFields,
   DefguardInstance,
-  ClientConnectionType,
 } from '../../../../../../types';
 import { LocationUsageChart } from '../../../LocationUsageChart/LocationUsageChart';
 import { LocationUsageChartType } from '../../../LocationUsageChart/types';

@@ -1,7 +1,7 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { error } from '@tauri-apps/plugin-log';
 import { useEffect, useState } from 'react';
-
 import { clientApi } from '../../pages/client/clientAPI/clientApi.ts';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { TauriEventKey } from '../../pages/client/types';
@@ -71,16 +71,20 @@ export const ApplicationUpdateManager = () => {
     const getNewVersion = async (appVersion: string) => {
       if (!appVersion) return;
 
-      const response = await getLatestAppVersion();
+      try {
+        const response = await getLatestAppVersion();
 
-      setApplicationUpdateData({
-        currentVersion: appVersion,
-        latestVersion: response.version,
-        releaseDate: response.release_date,
-        releaseNotesUrl: response.release_notes_url,
-        updateUrl: response.update_url,
-        dismissed: false,
-      });
+        setApplicationUpdateData({
+          currentVersion: appVersion,
+          latestVersion: response.version,
+          releaseDate: response.release_date,
+          releaseNotesUrl: response.release_notes_url,
+          updateUrl: response.update_url,
+          dismissed: false,
+        });
+      } catch (e) {
+        error(`Failed to check latest app version: ${e}`);
+      }
     };
 
     getNewVersion(appVersion);

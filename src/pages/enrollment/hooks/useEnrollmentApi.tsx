@@ -2,12 +2,14 @@ import { fetch } from '@tauri-apps/plugin-http';
 
 import { useEnrollmentStore } from '../../../pages/enrollment/hooks/store/useEnrollmentStore';
 import type { UseApi } from '../../../shared/hooks/api/types';
+import { useClientStore } from '../../client/hooks/useClientStore';
 
 export const useEnrollmentApi = (): UseApi => {
   const [proxyUrl, cookie] = useEnrollmentStore((state) => [
     state.proxy_url,
     state.cookie,
   ]);
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   const networkInfo: UseApi['enrollment']['networkInfo'] = async (
     data,
@@ -19,6 +21,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: overrideCookie ?? cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
       body: JSON.stringify(data),
     });
@@ -33,6 +37,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
       body: JSON.stringify({
         method: method.valueOf(),
@@ -49,6 +55,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
       body: JSON.stringify(data),
     });
@@ -62,6 +70,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
       body: JSON.stringify({
         token: data.token,
@@ -76,6 +86,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
       body: JSON.stringify(data),
     });
@@ -89,6 +101,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
       body: JSON.stringify(data),
     });
@@ -102,6 +116,8 @@ export const useEnrollmentApi = (): UseApi => {
       headers: {
         'Content-Type': 'application/json',
         Cookie: cookie,
+        CLIENT_VERSION_HEADER: platformInfo.client_version,
+        CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
       } as Record<string, string>,
     });
 

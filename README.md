@@ -70,7 +70,33 @@ Built packages are available after in `src-tauri/target/release/bundle`.
 
 ### Windows
 
-Remove `default-run` line from `[package]` section in `Cargo.toml` to build the project.
+For windows development you'll need:
+
+1. The `stable-x86_64-pc-windows-gnu` Rust toolchain. Use `rustup` to change the toolchain:
+
+```
+rustup install stable-x86_64-pc-windows-gnu
+rustup default stable-x86_64-pc-windows-gnu
+```
+
+2. Install [MSYS2](https://www.msys2.org/)
+
+3. Then run this in the MSYS2 terminal:
+
+```
+pacman -S --needed base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm
+```
+
+4. Finally add msys to your PATH:
+
+```
+# cmd
+set PATH=C:\msys64\ucrt64\bin;%PATH%
+# power-shell
+$env:PATH = "C:\msys64\ucrt64\bin;" + $env:PATH
+```
+
+More info can be found [here](https://stackoverflow.com/a/79640980).
 
 # Legal
 

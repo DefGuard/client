@@ -8,4 +8,6 @@ export const clientQueryKeys = {
   getLocationDetails: 'GET_LOCATION_DETAILS',
   getTunnels: 'GET_TUNNELS',
   getApplicationConfig: 'GET_APPLICATION_CONFIG',
+  getProvisioningConfig: 'GET_PROVISIONING_CONFIG',
+  getPlatformHeader: 'GET_PLATFORM_HEADER',
 };

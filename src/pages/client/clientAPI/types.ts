@@ -1,6 +1,6 @@
 import type { ThemeKey } from '../../../shared/defguard-ui/hooks/theme/types';
 import type { CreateDeviceResponse } from '../../../shared/hooks/api/types';
-import type { DefguardInstance, DefguardLocation, ClientConnectionType } from '../types';
+import type { ClientConnectionType, DefguardInstance, DefguardLocation } from '../types';
 
 export type GetLocationsRequest = {
   instanceId: number;
@@ -52,7 +52,7 @@ export type LogLevel = 'ERROR' | 'INFO' | 'DEBUG' | 'TRACE' | 'WARN';
 export const availableLogLevels: LogLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
 
 export type GlobalLogLevel = 'ERROR' | 'INFO' | 'DEBUG';
-export type LogSource = 'Client' | 'Service' | 'All';
+export type LogSource = 'Client' | 'VPN' | 'All';
 
 export type ClientView = 'grid' | 'detail';
 
@@ -80,6 +80,17 @@ export type AppConfig = {
   tray_theme: TrayIconTheme;
   check_for_updates: boolean;
   peer_alive_period: number;
+  mtu: number;
+};
+
+export type PlatformInfo = {
+  client_version: string;
+  platform_info: string;
+};
+
+export type ProvisioningConfig = {
+  enrollment_token: string;
+  enrollment_url: string;
 };
 
 export type LocationDetails = {
@@ -142,4 +153,6 @@ export type TauriCommandKey =
   | 'start_global_logwatcher'
   | 'stop_global_logwatcher'
   | 'command_get_app_config'
-  | 'command_set_app_config';
+  | 'command_set_app_config'
+  | 'get_provisioning_config'
+  | 'get_platform_header';

@@ -1,5 +1,6 @@
-use core::fmt;
-use std::time::SystemTime;
+#[cfg(target_os = "macos")]
+use std::net::IpAddr;
+use std::{fmt, time::SystemTime};
 
 use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::host::Peer;
@@ -14,13 +15,13 @@ use crate::{
 };
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Tunnel<I = NoId> {
     pub id: I,
     pub name: String,
-    // user keys
-    pub pubkey: String,
-    pub prvkey: String,
+    // encryption keys
+    pub pubkey: String, // Remote
+    pub prvkey: String, // Local
     // server config
     pub address: String,
     pub server_pubkey: String,
@@ -32,7 +33,7 @@ pub struct Tunnel<I = NoId> {
     pub endpoint: String,
     #[serde_as(as = "NoneAsEmptyString")]
     pub dns: Option<String>,
-    pub persistent_keep_alive: i64, // New field
+    pub persistent_keep_alive: i64,
     pub route_all_traffic: bool,
     // additional commands
     #[serde_as(as = "NoneAsEmptyString")]
@@ -48,6 +49,12 @@ pub struct Tunnel<I = NoId> {
 impl fmt::Display for Tunnel<Id> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}(ID: {})", self.name, self.id)
+    }
+}
+
+impl fmt::Display for Tunnel<NoId> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 
@@ -247,10 +254,32 @@ impl Tunnel<NoId> {
     }
 }
 
+impl Tunnel<Id> {
+    /// Split DNS settings into resolver IP addresses and search domains.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn dns(&self) -> (Vec<IpAddr>, Vec<String>) {
+        let mut dns = Vec::new();
+        let mut dns_search = Vec::new();
+
+        if let Some(dns_string) = &self.dns {
+            for entry in dns_string.split(',').map(str::trim) {
+                // Assume that every entry that can't be parsed as an IP address is a domain name.
+                if let Ok(ip) = entry.parse::<IpAddr>() {
+                    dns.push(ip);
+                } else {
+                    dns_search.push(entry.into());
+                }
+            }
+        }
+
+        (dns, dns_search)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelStats<I = NoId> {
     id: I,
-    pub tunnel_id: Id,
+    pub(crate) tunnel_id: Id,
     upload: i64,
     download: i64,
     pub(crate) last_handshake: i64,

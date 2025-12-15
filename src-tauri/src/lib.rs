@@ -17,6 +17,8 @@ use self::database::models::{Id, NoId};
 
 pub mod active_connections;
 pub mod app_config;
+#[cfg(target_os = "macos")]
+pub mod apple;
 pub mod appstate;
 pub mod commands;
 pub mod database;
@@ -25,60 +27,23 @@ pub mod error;
 pub mod events;
 pub mod log_watcher;
 pub mod periodic;
+pub mod proto;
 pub mod service;
 pub mod tray;
 pub mod utils;
 pub mod wg_config;
 
-pub mod proto {
-    use crate::database::models::{
-        location::{Location, LocationMfaMode as MfaMode},
-        Id, NoId,
-    };
-
-    tonic::include_proto!("defguard.proxy");
-
-    impl DeviceConfig {
-        #[must_use]
-        pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
-            let location_mfa_mode = match self.location_mfa_mode {
-                Some(_location_mfa_mode) => self.location_mfa_mode().into(),
-                None => {
-                    // handle legacy core response
-                    // DEPRECATED(1.5): superseeded by location_mfa_mode
-                    #[allow(deprecated)]
-                    if self.mfa_enabled {
-                        MfaMode::Internal
-                    } else {
-                        MfaMode::Disabled
-                    }
-                }
-            };
-
-            Location {
-                id: NoId,
-                instance_id,
-                network_id: self.network_id,
-                name: self.network_name,
-                address: self.assigned_ip, // Transforming assigned_ip to address
-                pubkey: self.pubkey,
-                endpoint: self.endpoint,
-                allowed_ips: self.allowed_ips,
-                dns: self.dns,
-                route_all_traffic: false,
-                keepalive_interval: self.keepalive_interval.into(),
-                location_mfa_mode,
-            }
-        }
-    }
-}
-
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
-pub const MIN_CORE_VERSION: Version = Version::new(1, 5, 0);
-pub const MIN_PROXY_VERSION: Version = Version::new(1, 5, 0);
+pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
+pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
+pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
+pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
+pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+// Must be without ".log" suffix!
+pub const LOG_FILENAME: &str = "defguard-client";
 // This must match tauri.bundle.identifier from tauri.conf.json.
 const BUNDLE_IDENTIFIER: &str = "net.defguard";
-// Returns the path to the user’s data directory.
+// Returns the path to the user's data directory.
 #[must_use]
 pub fn app_data_dir() -> Option<PathBuf> {
     dirs_next::data_dir().map(|dir| dir.join(BUNDLE_IDENTIFIER))
@@ -91,7 +56,10 @@ pub fn app_data_dir() -> Option<PathBuf> {
 pub fn set_perms(path: &Path) {
     let perms = if path.is_dir() { 0o700 } else { 0o600 };
     if let Err(err) = set_permissions(path, Permissions::from_mode(perms)) {
-        warn!("Failed to set permissions on path {path:?}: {err}");
+        warn!(
+            "Failed to set permissions on path {}: {err}",
+            path.display()
+        );
     }
 }
 
@@ -152,6 +120,7 @@ pub struct CommonLocationStats<I = NoId> {
     pub persistent_keepalive_interval: Option<u16>,
     pub connection_type: ConnectionType,
 }
+
 // Common fields for ConnectionInfo and TunnelConnectionInfo due to shared command
 #[derive(Debug, Serialize)]
 pub struct CommonConnectionInfo {

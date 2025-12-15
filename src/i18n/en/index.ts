@@ -161,6 +161,11 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 helper:
                   'If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically.',
               },
+              mtu: {
+                title: 'MTU (Maximum Transmission Unit)',
+                helper:
+                  'MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues. 0 = default.',
+              },
               tray: {
                 title: 'System tray',
                 label: 'Tray icon theme',
@@ -184,11 +189,11 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               globalLogs: {
                 logSources: {
                   client: 'Client',
-                  service: 'Service',
+                  vpn: 'VPN',
                   all: 'All',
                 },
                 logSourceHelper:
-                  'The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.',
+                  'The source of the logs. Logs can come from the Defguard client or the VPN service/extension that manages VPN connections at the network level.',
               },
               theme: {
                 title: 'Theme',
@@ -765,6 +770,8 @@ If you want to disengage your VPN connection, simply press "deactivate".
           mfaNotConfigured: 'Selected method has not been configured.',
           mfaStartGeneric:
             'Could not start MFA process. Please try again or contact administrator.',
+          mfaFinishGeneric:
+            'Could not finish MFA process. Please try again or contact administrator.',
           instanceNotFound: 'Could not find instance.',
           locationNotSpecified: 'Location is not specified.',
           invalidCode:

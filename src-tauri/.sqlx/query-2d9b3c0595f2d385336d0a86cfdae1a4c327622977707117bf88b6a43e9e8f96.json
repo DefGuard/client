@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, openid_display_name FROM instance ORDER BY name ASC;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "uuid",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "url",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "proxy_url",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "username",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "token?",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "client_traffic_policy",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "enterprise_enabled",
+        "ordinal": 8,
+        "type_info": "Bool"
+      },
+      {
+        "name": "openid_display_name",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "2d9b3c0595f2d385336d0a86cfdae1a4c327622977707117bf88b6a43e9e8f96"
+}

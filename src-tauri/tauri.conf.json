@@ -10,7 +10,10 @@
     "active": true,
     "category": "Utility",
     "copyright": "Defguard",
-    "targets": ["deb", "app"],
+    "targets": [
+      "deb",
+      "app"
+    ],
     "externalBin": [],
     "icon": [
       "icons/32x32.png",
@@ -24,18 +27,32 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "wix": {
-        "fragmentPaths": ["./resources-windows/service-fragment.wxs"],
-        "componentRefs": ["DefGuardServiceFragment"]
+        "upgradeCode": "923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43",
+        "bannerPath": "./resources-windows/msi/top_banner.png",
+        "dialogImagePath": "./resources-windows/msi/side_banner.png",
+        "fragmentPaths": [
+          "./resources-windows/fragments/service.wxs",
+          "./resources-windows/fragments/provisioning.wxs"
+        ],
+        "componentRefs": [
+          "DefguardServiceFragment",
+          "ProvisioningScriptFragment"
+        ],
+        "template": "./resources-windows/msi/main.wxs"
       }
     },
     "macOS": {
-      "entitlements": null,
-      "exceptionDomain": "",
-      "frameworks": [],
-      "providerShortName": null,
-      "signingIdentity": null
+      "bundleVersion": "@BUILD_NUMBER@",
+      "entitlements": "./Client.entitlements",
+      "files": {
+        "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
+        "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
+      },
+      "minimumSystemVersion": "13.5"
     },
-    "resources": ["resources/icons/*"],
+    "resources": [
+      "resources/icons/*"
+    ],
     "shortDescription": "Defguard desktop client",
     "longDescription": "Defguard desktop client",
     "linux": {
@@ -47,26 +64,34 @@
           "../control/postinst": "../resources-linux/postinst",
           "../control/prerm": "../resources-linux/prerm",
           "../control/postrm": "../resources-linux/postrm"
-        }
+        },
+        "depends": [
+          "desktop-file-utils"
+        ]
       },
       "rpm": {
         "files": {
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
         },
+        "depends": [
+          "desktop-file-utils"
+        ],
         "postInstallScript": "../resources-linux/postinst",
         "preRemoveScript": "../resources-linux/prerm",
         "postRemoveScript": "../resources-linux/postrm"
       }
     }
   },
-  "productName": "defguard-client",
+  "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
-  "version": "1.5.3",
+  "version": "1.6.1",
   "app": {
     "security": {
-      "capabilities": ["main-capability"],
+      "capabilities": [
+        "main-capability"
+      ],
       "csp": null
     },
     "windows": [
@@ -90,7 +115,9 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["defguard"]
+        "schemes": [
+          "defguard"
+        ]
       }
     }
   }

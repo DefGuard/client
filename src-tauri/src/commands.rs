@@ -13,6 +13,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(target_os = "macos")]
+use crate::apple::{
+    remove_config_for_location, remove_config_for_tunnel, stop_tunnel_for_location,
+};
 use crate::{
     active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
@@ -20,7 +24,7 @@ use crate::{
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
-            instance::{Instance, InstanceInfo},
+            instance::{ClientTrafficPolicy, Instance, InstanceInfo},
             location::{Location, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
@@ -29,7 +33,7 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::periodic::config::poll_instance,
+    enterprise::{periodic::config::poll_instance, provisioning::ProvisioningConfig},
     error::Error,
     events::EventKey,
     log_watcher::{
@@ -37,18 +41,27 @@ use crate::{
         service_log_watcher::stop_log_watcher_task,
     },
     proto::DeviceConfigResponse,
-    service::{proto::RemoveInterfaceRequest, utils::DAEMON_CLIENT},
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        disconnect_interface, execute_command, get_location_interface_details,
+        construct_platform_header, disconnect_interface, get_location_interface_details,
         get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
         handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
+#[cfg(not(target_os = "macos"))]
+use crate::{
+    service::{
+        client::DAEMON_CLIENT,
+        proto::{
+            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        },
+    },
+    utils::execute_command,
+};
 
-// Create new WireGuard interface
+/// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
     location_id: Id,
@@ -202,7 +215,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Device {
     pub id: Id,
     pub name: String,
@@ -211,7 +224,7 @@ pub struct Device {
     pub created_at: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct InstanceResponse {
     // uuid
     pub id: String,
@@ -219,7 +232,7 @@ pub struct InstanceResponse {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location<Id>>,
     instance: Instance<Id>,
@@ -240,13 +253,13 @@ pub async fn save_device_config(
     let mut instance: Instance = instance_info.into();
     if response.token.is_some() {
         debug!(
-            "The newly saved device config has a polling token, automatic configuration \
-            polling will be possible if the core has an enterprise license."
+            "The newly saved device config has a polling token, automatic configuration polling \
+            will be possible if the core has an enterprise license."
         );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an \
-            update, configuration polling won't work",
+            "Missing polling token for instance {}, core and/or proxy services may need an update, \
+            configuration polling won't work",
             instance.name,
         );
     }
@@ -284,15 +297,79 @@ pub async fn save_device_config(
     transaction.commit().await?;
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
-    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
-    trace!("Created following locations: {locations:#?}");
+
+    let locations = push_service_locations(&instance, keys).await?;
+
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
         locations,
         instance,
     };
     reload_tray_menu(&handle).await;
+
     Ok(res)
+}
+
+#[cfg(target_os = "macos")]
+async fn push_service_locations(
+    _instance: &Instance<Id>,
+    _keys: WireguardKeys<Id>,
+) -> Result<Vec<Location<Id>>, Error> {
+    // Nothing here... yet
+
+    Ok(Vec::new())
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn push_service_locations(
+    instance: &Instance<Id>,
+    keys: WireguardKeys<Id>,
+) -> Result<Vec<Location<Id>>, Error> {
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
+    trace!("Created following locations: {locations:#?}");
+
+    let mut service_locations = Vec::new();
+
+    for saved_location in &locations {
+        if saved_location.is_service_location() {
+            debug!(
+                "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
+                saved_location.name, saved_location.id, instance.name, instance.id,
+            );
+            service_locations.push(saved_location.to_service_location()?);
+        }
+    }
+
+    if !service_locations.is_empty() {
+        let save_request = SaveServiceLocationsRequest {
+            service_locations: service_locations.clone(),
+            instance_id: instance.uuid.clone(),
+            private_key: keys.prvkey,
+        };
+        debug!(
+            "Saving {} service locations to the daemon for instance {}({}).",
+            save_request.service_locations.len(),
+            instance.name,
+            instance.id,
+        );
+        DAEMON_CLIENT
+            .clone()
+            .save_service_locations(save_request)
+            .await
+            .map_err(|err| {
+                error!(
+                    "Error while saving service locations to the daemon for instance {}({}): {err}",
+                    instance.name, instance.id,
+                );
+                Error::InternalError(err.to_string())
+            })?;
+        debug!(
+            "Saved service locations to the daemon for instance {}({}).",
+            instance.name, instance.id,
+        );
+    }
+
+    Ok(locations)
 }
 
 #[tauri::command(async)]
@@ -307,7 +384,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     let mut instance_info = Vec::new();
     let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
-        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id).await?;
+        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
         let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
         let connected = connection_ids
             .iter()
@@ -323,7 +400,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             proxy_url: instance.proxy_url,
             active: connected,
             pubkey: keys.pubkey,
-            disable_all_traffic: instance.disable_all_traffic,
+            client_traffic_policy: instance.client_traffic_policy,
             enterprise_enabled: instance.enterprise_enabled,
             openid_display_name: instance.openid_display_name,
         });
@@ -381,7 +458,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
         "Getting information about all locations for instance {}.",
         instance.name
     );
-    let locations = Location::find_by_instance_id(&*DB_POOL, instance_id).await?;
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance_id, false).await?;
     trace!(
         "Found {} locations for instance {instance} to return information about.",
         locations.len()
@@ -471,7 +548,7 @@ pub(crate) async fn locations_changed(
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
     let db_locations: HashSet<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id)
+        Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
             .await?
             .into_iter()
             .map(|location| {
@@ -506,15 +583,14 @@ pub(crate) async fn do_update_instance(
     instance.proxy_url = instance_info.proxy_url;
     instance.username = instance_info.username;
     // Make sure to update the locations too if we are disabling all traffic
-    if instance.disable_all_traffic != instance_info.disable_all_traffic
-        && instance_info.disable_all_traffic
+    let policy = instance_info.client_traffic_policy.into();
+    if instance.client_traffic_policy != policy && policy == ClientTrafficPolicy::DisableAllTraffic
     {
         debug!("Disabling all traffic for all locations of instance {instance}");
         Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
         debug!("Disabled all traffic for all locations of instance {instance}");
     }
-    instance.disable_all_traffic = instance_info.disable_all_traffic;
-    instance.enterprise_enabled = instance_info.enterprise_enabled;
+    instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
     instance.uuid = instance_info.id;
     // Token may be empty if it was not issued
@@ -533,6 +609,8 @@ pub(crate) async fn do_update_instance(
         "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
+    let mut service_locations = Vec::new();
+
     // check if locations have changed
     if locations_changed {
         // process locations received in response
@@ -540,15 +618,15 @@ pub(crate) async fn do_update_instance(
             "Updating locations for instance {}({}).",
             instance.name, instance.id
         );
-        // fetch existing locations for given instance
+        // Fetch existing locations for a given instance.
         let mut current_locations =
-            Location::find_by_instance_id(transaction.as_mut(), instance.id).await?;
+            Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
         for dev_config in response.configs {
             // parse device config
             let new_location = dev_config.into_location(instance.id);
 
             // check if location is already present in current locations
-            if let Some(position) = current_locations
+            let saved_location = if let Some(position) = current_locations
                 .iter()
                 .position(|loc| loc.network_id == new_location.network_id)
             {
@@ -567,13 +645,24 @@ pub(crate) async fn do_update_instance(
                 current_location.keepalive_interval = new_location.keepalive_interval;
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
+                current_location.service_location_mode = new_location.service_location_mode;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
+                current_location
             } else {
                 // create new location
                 debug!("Creating new location {new_location} for instance instance {instance}");
                 let new_location = new_location.save(transaction.as_mut()).await?;
                 info!("New location {new_location} created for instance {instance}");
+                new_location
+            };
+
+            if saved_location.is_service_location() {
+                debug!(
+                    "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
+                    saved_location.name, saved_location.id, instance.name, instance.id,
+                );
+                service_locations.push(saved_location.to_service_location()?);
             }
         }
 
@@ -590,6 +679,88 @@ pub(crate) async fn do_update_instance(
     } else {
         info!("Locations for instance {instance} didn't change. Not updating them.");
     }
+
+    if service_locations.is_empty() {
+        debug!(
+            "No service locations for instance {}({}), removing all existing service locations connections if there are any.",
+            instance.name, instance.id
+        );
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let delete_request = DeleteServiceLocationsRequest {
+                instance_id: instance.uuid.clone(),
+            };
+            DAEMON_CLIENT
+            .clone()
+            .delete_service_locations(delete_request)
+            .await
+            .map_err(|err| {
+                error!(
+                    "Error while deleting service locations from the daemon for instance {}({}): {err}",
+                    instance.name, instance.id,
+                );
+                Error::InternalError(err.to_string())
+            })?;
+            debug!(
+                "Successfully removed all service locations from daemon for instance {}({})",
+                instance.name, instance.id
+            );
+        }
+    } else {
+        debug!(
+            "Processing {} service location(s) for instance {}({})",
+            service_locations.len(),
+            instance.name,
+            instance.id
+        );
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
+                .await?
+                .ok_or(Error::NotFound)?
+                .prvkey;
+
+            let save_request = SaveServiceLocationsRequest {
+                service_locations: service_locations.clone(),
+                instance_id: instance.uuid.clone(),
+                private_key,
+            };
+
+            debug!(
+                "Sending request to daemon to save {} service location(s) for instance {}({})",
+                save_request.service_locations.len(),
+                instance.name,
+                instance.id
+            );
+
+            DAEMON_CLIENT
+                .clone()
+                .save_service_locations(save_request)
+                .await
+                .map_err(|err| {
+                    error!(
+                    "Error while saving service locations to the daemon for instance {}({}): {err}",
+                    instance.name, instance.id,
+                );
+                    Error::InternalError(err.to_string())
+                })?;
+
+            info!(
+                "Successfully saved {} service location(s) to daemon for instance {}({})",
+                service_locations.len(),
+                instance.name,
+                instance.id
+            );
+
+            debug!(
+                "Completed processing all service locations for instance {}({})",
+                instance.name, instance.id
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -758,11 +929,13 @@ pub async fn update_location_routing(
     match connection_type {
         ConnectionType::Location => {
             if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-                // Check if the instance has route_all_traffic disabled
                 let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
                     .await?
                     .ok_or(Error::NotFound)?;
-                if instance.disable_all_traffic && route_all_traffic {
+                // Check if the instance has route_all_traffic disabled
+                if (instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic)
+                    && route_all_traffic
+                {
                     error!(
                         "Couldn't update location routing: instance with id {} has \
                         route_all_traffic disabled.",
@@ -770,6 +943,19 @@ pub async fn update_location_routing(
                     );
                     return Err(Error::InternalError(
                         "Instance has route_all_traffic disabled".into(),
+                    ));
+                }
+                // Check if the instance has route_all_traffic enforced
+                if (instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic)
+                    && !route_all_traffic
+                {
+                    error!(
+                        "Couldn't update location routing: instance with id {} has \
+                        route_all_traffic enforced.",
+                        instance.id
+                    );
+                    return Err(Error::InternalError(
+                        "Instance has route_all_traffic enforced".into(),
                     ));
                 }
 
@@ -800,6 +986,54 @@ pub async fn update_location_routing(
     }
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command(async)]
+pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
+    let app_state = handle.state::<AppState>();
+    let mut transaction = DB_POOL.begin().await?;
+
+    let Some(instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
+        error!("Couldn't delete instance: instance with ID {instance_id} could not be found.");
+        return Err(Error::NotFound);
+    };
+    debug!("The instance that is being deleted has been identified as {instance}");
+
+    let instance_locations =
+        Location::find_by_instance_id(&mut *transaction, instance_id, false).await?;
+    if !instance_locations.is_empty() {
+        debug!(
+            "Found locations associated with the instance {instance}, closing their connections."
+        );
+    }
+    for location in instance_locations {
+        if let Some(_connection) = app_state
+            .remove_connection(location.id, ConnectionType::Location)
+            .await
+        {
+            let result = stop_tunnel_for_location(&location);
+            error!("stop_tunnel() for location returned {result:?}");
+            if !result {
+                return Err(Error::InternalError("Error from tunnel".into()));
+            }
+            remove_config_for_location(&location);
+        }
+    }
+
+    instance.delete(&mut *transaction).await?;
+
+    transaction.commit().await?;
+
+    reload_tray_menu(&handle).await;
+
+    let theme = { app_state.app_config.lock().unwrap().tray_theme };
+    configure_tray_icon(&handle, theme).await?;
+
+    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    info!("Successfully deleted instance {instance}.");
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting instance with ID {instance_id}");
@@ -813,7 +1047,8 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     };
     debug!("The instance that is being deleted has been identified as {instance}");
 
-    let instance_locations = Location::find_by_instance_id(&mut *transaction, instance_id).await?;
+    let instance_locations =
+        Location::find_by_instance_id(&mut *transaction, instance_id, false).await?;
     if !instance_locations.is_empty() {
         debug!(
             "Found locations associated with the instance {instance}, closing their connections."
@@ -851,7 +1086,23 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     transaction.commit().await?;
 
+    client
+        .delete_service_locations(DeleteServiceLocationsRequest {
+            instance_id: instance.uuid.clone(),
+        })
+        .await
+        .map_err(|err| {
+            error!(
+                "Error while deleting service locations from the daemon for instance {}({}): {err}",
+                instance.name, instance.id,
+            );
+            Error::InternalError(err.to_string())
+        })?;
+
     reload_tray_menu(&handle).await;
+
+    let theme = { app_state.app_config.lock().unwrap().tray_theme };
+    configure_tray_icon(&handle, theme).await?;
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     info!("Successfully deleted instance {instance}.");
@@ -871,7 +1122,7 @@ pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
 
 #[tauri::command(async)]
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
-    debug!("Received tunnel configuration to update: {tunnel:?}");
+    debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
     handle.emit(EventKey::LocationUpdate.into(), ())?;
@@ -880,7 +1131,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
 
 #[tauri::command(async)]
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
-    debug!("Received tunnel configuration to save: {tunnel:?}");
+    debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
     handle.emit(EventKey::LocationUpdate.into(), ())?;
@@ -904,7 +1155,6 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
 
     let tunnels = Tunnel::all(&*DB_POOL).await?;
     trace!("Found ({}) tunnels to get information about", tunnels.len());
-    trace!("Tunnels found: {tunnels:#?}");
     let mut tunnel_info = Vec::new();
     let active_tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
 
@@ -944,7 +1194,6 @@ pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
 pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Deleting tunnel with ID {tunnel_id}");
     let app_state = handle.state::<AppState>();
-    let mut client = DAEMON_CLIENT.clone();
     let mut transaction = DB_POOL.begin().await?;
 
     let Some(tunnel) = Tunnel::find_by_id(&mut *transaction, tunnel_id).await? else {
@@ -964,53 +1213,66 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
             "Found active connection for tunnel {tunnel} which is being deleted, closing the \
             connection."
         );
-        if let Some(pre_down) = &tunnel.pre_down {
-            debug!(
-                "Executing defined PreDown command before removing the interface {} for the \
-                tunnel {tunnel}: {pre_down}",
-                connection.interface_name
-            );
-            let _ = execute_command(pre_down);
-            info!(
-                "Executed defined PreDown command before removing the interface {} for the \
-                tunnel {tunnel}: {pre_down}",
-                connection.interface_name
-            );
+
+        #[cfg(target_os = "macos")]
+        {
+            remove_config_for_tunnel(&tunnel);
         }
-        let request = RemoveInterfaceRequest {
-            interface_name: connection.interface_name.clone(),
-            endpoint: tunnel.endpoint.clone(),
-        };
-        client.remove_interface(request).await.map_err(|status| {
-            error!(
-                "An error occurred while removing interface {} for tunnel {tunnel}, status: \
-                {status}",
-                connection.interface_name
-            );
-            Error::InternalError(format!(
-                "An error occurred while removing interface {} for tunnel {tunnel}, error \
-                message: {}. Check logs for more details.",
-                connection.interface_name,
-                status.message()
-            ))
-        })?;
-        info!(
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            if let Some(pre_down) = &tunnel.pre_down {
+                debug!(
+                    "Executing defined PreDown command before removing the interface {} for the \
+                    tunnel {tunnel}: {pre_down}",
+                    connection.interface_name
+                );
+                let _ = execute_command(pre_down);
+                info!(
+                    "Executed defined PreDown command before removing the interface {} for the \
+                    tunnel {tunnel}: {pre_down}",
+                    connection.interface_name
+                );
+            }
+            let request = RemoveInterfaceRequest {
+                interface_name: connection.interface_name.clone(),
+                endpoint: tunnel.endpoint.clone(),
+            };
+            DAEMON_CLIENT
+                .clone()
+                .remove_interface(request)
+                .await
+                .map_err(|status| {
+                    error!(
+                        "An error occurred while removing interface {} for tunnel {tunnel}, \
+                        status: {status}",
+                        connection.interface_name
+                    );
+                    Error::InternalError(format!(
+                        "An error occurred while removing interface {} for tunnel {tunnel}, error \
+                        message: {}. Check logs for more details.",
+                        connection.interface_name,
+                        status.message()
+                    ))
+                })?;
+            info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
             connection.interface_name
         );
-        if let Some(post_down) = &tunnel.post_down {
-            debug!(
-                "Executing defined PostDown command after removing the interface {} for the \
+            if let Some(post_down) = &tunnel.post_down {
+                debug!(
+                    "Executing defined PostDown command after removing the interface {} for the \
                 tunnel {tunnel}: {post_down}",
-                connection.interface_name
-            );
-            let _ = execute_command(post_down);
-            info!(
-                "Executed defined PostDown command after removing the interface {} for the \
+                    connection.interface_name
+                );
+                let _ = execute_command(post_down);
+                info!(
+                    "Executed defined PostDown command after removing the interface {} for the \
                 tunnel {tunnel}: {post_down}",
-                connection.interface_name
-            );
+                    connection.interface_name
+                );
+            }
         }
     }
     tunnel.delete(&mut *transaction).await?;
@@ -1119,4 +1381,27 @@ pub async fn command_set_app_config(
         }
     }
     Ok(res)
+}
+
+#[tauri::command]
+pub fn get_provisioning_config(
+    app_state: State<'_, AppState>,
+) -> Result<Option<ProvisioningConfig>, Error> {
+    debug!("Running command get_provisioning_config.");
+    let res = app_state
+        .provisioning_config
+        .lock()
+        .map_err(|_err| {
+            error!("Failed to acquire lock on client provisioning config");
+            Error::StateLockFail
+        })?
+        .clone();
+    trace!("Returning config: {res:?}");
+    Ok(res)
+}
+
+#[tauri::command]
+#[must_use]
+pub fn get_platform_header() -> String {
+    construct_platform_header()
 }

@@ -4,7 +4,7 @@ default-members = [".", "cli"]
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = { git = "https://github.com/DefGuard/wireguard-rs", rev = "2d3d3af2c9239ec047d2a51acbc27d62d4ab950c" }
+defguard_wireguard_rs = "0.8.0"
 dirs-next = "2.0"
 prost = "0.14"
 reqwest = { version = "0.12", features = ["cookies", "json"] }
@@ -30,20 +30,28 @@ authors = ["Defguard"]
 edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
-rust-version = "1.80"
-version = "1.5.3"
+rust-version = "1.85"
+version = "1.6.1"
 
 [package]
 name = "defguard-client"
 description = "Defguard desktop client"
 repository = "https://github.com/DefGuard/client"
 default-run = "defguard-client"
+autobins = false
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
+
+[[bin]]
+name = "defguard-client"
+
+[[bin]]
+name = "defguard-service"
+required-features = ["service"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -59,12 +67,12 @@ common = { path = "common" }
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
+hyper-util = "0.1"
 log = { version = "0.4", features = ["serde"] }
 prost.workspace = true
 regex = "1.12"
 reqwest.workspace = true
-# 0.21.2 causes config parsing errors
-rust-ini = "=0.21.1"
+rust-ini = "0.21"
 semver = "1.0"
 serde.workspace = true
 serde_json.workspace = true
@@ -91,8 +99,9 @@ tauri-plugin-fs = "2"
 tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-opener = "2.5.0"
-tauri-plugin-os = "2.3.1"
+tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
 thiserror.workspace = true
@@ -101,6 +110,7 @@ tokio.workspace = true
 tokio-util = "0.7"
 tonic.workspace = true
 tonic-prost.workspace = true
+tower = "0.5"
 tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber.workspace = true
@@ -110,23 +120,54 @@ x25519-dalek = { version = "2", features = [
     "serde",
     "static_secrets",
 ] }
-tauri-plugin-process = "2.3.0"
+os_info = "3.12"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-network-extension = "0.3"
+
+[target.'cfg(target_os = "macos")'.build-dependencies]
+swift-rs = { version = "1.0", features = ["build"] }
 
 [target.'cfg(unix)'.dependencies]
-hyper-util = "0.1"
 nix = { version = "0.30.1", features = ["user", "fs"] }
 tokio-stream = "0.1"
-tower = "0.5"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winsvc", "winerror"] }
+async-stream = "0.3"
+futures-core = "0.3"
+known-folders = "1.3"
+windows = { version = "0.62", features = [
+    "Win32",
+    "Win32_System",
+    "Win32_System_RemoteDesktop",
+] }
+windows-acl = "0.3"
 windows-service = "0.7"
+windows-sys = { version = "0.61", features = [
+    # Core Win32 types
+    "Win32_Foundation",
+
+    # Security descriptors, ACLs, SDDL
+    "Win32_Security",
+    "Win32_Security_Authorization",
+
+    # Named pipes (CreateNamedPipeW)
+    "Win32_System_Pipes",
+
+    # HANDLE & file functions
+    "Win32_System_IO",
+    "Win32_System_Threading",
+] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+service = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

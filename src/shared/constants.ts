@@ -12,3 +12,7 @@ export const mastodonUrl =
 export const githubUrl = 'https://github.com/Defguard/defguard';
 
 export const matrixUrl = 'https://matrix.to/#/#defguard:teonite.com';
+
+export const CLIENT_VERSION_HEADER = 'defguard-client-version';
+
+export const CLIENT_PLATFORM_HEADER = 'defguard-client-platform';

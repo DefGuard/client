@@ -1,3 +1,9 @@
+export enum ClientTrafficPolicy {
+  NONE = 'none',
+  DISABLE_ALL_TRAFFIC = 'disable_all_traffic',
+  FORCE_ALL_TRAFFIC = 'force_all_traffic',
+}
+
 export type DefguardInstance = {
   id: number;
   uuid: string;
@@ -7,7 +13,7 @@ export type DefguardInstance = {
   // connected
   active: boolean;
   pubkey: string;
-  disable_all_traffic: boolean;
+  client_traffic_policy: ClientTrafficPolicy;
   openid_display_name?: string;
 };
 
@@ -90,6 +96,11 @@ export type DeadConDroppedPayload = {
   name: string;
   con_type: ClientConnectionType;
   peer_alive_period: number;
+};
+
+export type AddInstancePayload = {
+  token: string;
+  url: string;
 };
 
 export enum TauriEventKey {

@@ -156,18 +156,16 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
     debug!("Connecting to network {network_name}.");
 
     #[cfg(not(target_os = "macos"))]
-    let wgapi = WGApi::<Kernel>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
+    let mut wgapi =
+        WGApi::<Kernel>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
     #[cfg(target_os = "macos")]
-    let wgapi = WGApi::<Userspace>::new(ifname.to_string()).expect("Failed to setup WireGuard API");
+    let mut wgapi = WGApi::<Userspace>::new(ifname.clone()).expect("Failed to setup WireGuard API");
 
-    #[cfg(not(windows))]
-    {
-        // Create new interface.
-        debug!("Creating new interface {ifname}");
-        wgapi
-            .create_interface()
-            .expect("Failed to create WireGuard interface");
-    }
+    // Create new interface.
+    debug!("Creating new interface {ifname}");
+    wgapi
+        .create_interface()
+        .expect("Failed to create WireGuard interface");
 
     debug!("Preparing DNS configuration for interface {ifname}");
     let dns_string = config.device_config.dns.clone().unwrap_or_default();
@@ -235,14 +233,11 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         name: config.instance_info.name.clone(),
         prvkey: config.private_key.to_string(),
         addresses,
-        port: u32::from(find_free_tcp_port().ok_or(CliError::FreeTCPPort)?),
+        port: find_free_tcp_port().ok_or(CliError::FreeTCPPort)?,
         peers: vec![peer.clone()],
         mtu: None,
     };
-    #[cfg(not(windows))]
     let configure_interface_result = wgapi.configure_interface(&config);
-    #[cfg(windows)]
-    let configure_interface_result = wgapi.configure_interface(&config, &dns, &search_domains);
 
     configure_interface_result.expect("Failed to configure WireGuard interface");
 
@@ -252,20 +247,17 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         wgapi
             .configure_peer_routing(&config.peers)
             .expect("Failed to configure routing for WireGuard interface");
-
-        if dns.is_empty() {
-            debug!(
-                "No DNS configuration provided for interface {ifname}, skipping DNS configuration"
-            );
-        } else {
-            debug!(
-                "The following DNS servers will be set: {dns:?}, search domains: \
-                {search_domains:?}"
-            );
-            wgapi
-                .configure_dns(&dns, &search_domains)
-                .expect("Failed to configure DNS for WireGuard interface");
-        }
+    }
+    if dns.is_empty() {
+        debug!("No DNS configuration provided for interface {ifname}, skipping DNS configuration");
+    } else {
+        debug!(
+            "The following DNS servers will be set: {dns:?}, search domains: \
+            {search_domains:?}"
+        );
+        wgapi
+            .configure_dns(&dns, &search_domains)
+            .expect("Failed to configure DNS for WireGuard interface");
     }
 
     debug!("Finished creating a new interface {ifname}");
@@ -624,14 +616,18 @@ async fn main() {
         let token = submatches
             .get_one::<String>("token")
             .expect("No enrollment token was provided or it's invalid")
-            .to_string();
+            .clone();
         let url = submatches
             .get_one::<Url>("url")
             .expect("No enrollment URL was provided or it's invalid");
         debug!("Successfully parsed enrollment token and URL");
-        let config = enroll(url, token)
-            .await
-            .expect("The enrollment process has failed");
+        let config = match enroll(url, token).await {
+            Ok(cfg) => cfg,
+            Err(err) => {
+                error!("Enrollment process failed with error: {err}");
+                return;
+            }
+        };
         debug!("Successfully enrolled the device, saving the configuration.");
         if let Err(err) = config.save(&config_path) {
             error!("{err}");

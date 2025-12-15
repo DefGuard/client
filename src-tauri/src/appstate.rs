@@ -6,10 +6,8 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     active_connections::ACTIVE_CONNECTIONS,
     app_config::AppConfig,
-    database::{
-        models::{connection::ActiveConnection, Id},
-        DB_POOL,
-    },
+    database::models::{connection::ActiveConnection, Id},
+    enterprise::provisioning::ProvisioningConfig,
     utils::stats_handler,
     ConnectionType,
 };
@@ -18,15 +16,17 @@ pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
+    pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new(config: AppConfig) -> Self {
-        AppState {
+    pub fn new(config: AppConfig, provisioning_config: Option<ProvisioningConfig>) -> Self {
+        Self {
             log_watchers: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
             stat_threads: Mutex::new(HashMap::new()),
+            provisioning_config: Mutex::new(provisioning_config),
         }
     }
 
@@ -45,13 +45,17 @@ impl AppState {
         drop(connections);
 
         debug!("Spawning thread for network statistics for location ID {location_id}");
-        let handle = spawn(stats_handler(DB_POOL.clone(), ifname, connection_type));
+        #[cfg(target_os = "macos")]
+        let handle = spawn(stats_handler(location_id, connection_type));
+        #[cfg(not(target_os = "macos"))]
+        let handle = spawn(stats_handler(ifname, connection_type));
         let Some(old_handle) = self
             .stat_threads
             .lock()
             .unwrap()
             .insert(location_id, handle)
         else {
+            debug!("Added new network statistics thread for location ID {location_id}");
             return;
         };
         warn!("Something went wrong: old network statistics thread still exists");

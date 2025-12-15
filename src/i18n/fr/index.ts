@@ -175,11 +175,11 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
               globalLogs: {
                 logSources: {
                   client: 'Client',
-                  service: 'Service',
+                  vpn: 'VPN',
                   all: 'Tous',
                 },
                 logSourceHelper:
-                  'La source des journaux. Les journaux peuvent provenir du client Defguard ou du service Defguard en arrière-plan qui gère les connexions VPN au niveau du réseau.',
+                  'La source des journaux. Les journaux peuvent provenir du client Defguard ou du service/extension VPN qui gère les connexions VPN au niveau du réseau.',
               },
               theme: {
                 title: 'Thème',

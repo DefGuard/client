@@ -1,59 +1,11 @@
-use std::{io::stdout, sync::LazyLock};
+use std::io::stdout;
 
-#[cfg(unix)]
-use hyper_util::rt::TokioIo;
-#[cfg(unix)]
-use tokio::net::UnixStream;
-use tonic::transport::channel::{Channel, Endpoint};
-#[cfg(unix)]
-use tonic::transport::Uri;
-#[cfg(unix)]
-use tower::service_fn;
-use tracing::{debug, Level};
+use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
-
-use crate::service::{
-    proto::desktop_daemon_service_client::DesktopDaemonServiceClient, DAEMON_BASE_URL,
-};
-
-pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
-    LazyLock::new(|| {
-        debug!("Setting up gRPC client");
-        let endpoint = Endpoint::from_static(DAEMON_BASE_URL); // Should not panic.
-        let channel;
-        #[cfg(unix)]
-        {
-            channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
-                // Connect to a Unix domain socket.
-                let stream = match UnixStream::connect(crate::service::DAEMON_SOCKET_PATH).await {
-                    Ok(stream) => stream,
-                    Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
-                        error!(
-                            "Permission denied for UNIX domain socket; please refer to \
-                            https://docs.defguard.net/support-1/troubleshooting#\
-                            unix-socket-permission-errors-when-desktop-client-attempts-to-connect-\
-                            to-vpn-on-linux-machines"
-                        );
-                        return Err(err);
-                    }
-                    Err(err) => {
-                        error!("Problem connecting to UNIX domain socket: {err}");
-                        return Err(err);
-                    }
-                };
-                Ok::<_, std::io::Error>(TokioIo::new(stream))
-            }));
-        };
-        #[cfg(windows)]
-        {
-            channel = endpoint.connect_lazy();
-        }
-        DesktopDaemonServiceClient::new(channel)
-    });
 
 pub fn logging_setup(log_dir: &str, log_level: &str) -> WorkerGuard {
     // prepare log file appender

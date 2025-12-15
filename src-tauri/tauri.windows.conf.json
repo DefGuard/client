@@ -1,8 +1,16 @@
 {
+  "build": {
+    "features": [
+      "service"
+    ]
+  },
   "bundle": {
-    "targets": ["msi"],
+    "targets": [
+      "msi"
+    ],
     "resources": [
       "resources-windows/binaries/*",
+      "resources-windows/scripts/*",
       "resources/icons/*"
     ]
   }

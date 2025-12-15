@@ -11,7 +11,6 @@ import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import {
@@ -81,6 +80,7 @@ export const MFAModal = () => {
       return instances.find((i) => i.id === instanceId);
     }
   }, [location, instances]);
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   const resetState = () => {
     reset();
@@ -88,10 +88,16 @@ export const MFAModal = () => {
     setStartResponse(undefined);
   };
 
-  const resetAuthState = () => {
+  const resetAuthState = useCallback(() => {
     setScreen('start');
     setStartResponse(undefined);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (location) {
+      resetAuthState();
+    }
+  }, [location, resetAuthState]);
 
   // selectedMethod: 0 = authenticator app, 1 = email, 2 = OpenID, 3 = MobileApprove
   const startMFA = useCallback(
@@ -111,54 +117,62 @@ export const MFAModal = () => {
         location_id: location.network_id,
       };
 
-      const response = await fetch(mfaStartUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      try {
+        const response = await fetch(mfaStartUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            CLIENT_VERSION_HEADER: platformInfo.client_version,
+            CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
+          },
+          body: JSON.stringify(data),
+        });
 
-      if (response.ok) {
-        const data = (await response.json()) as MFAStartResponse;
+        if (response.ok) {
+          const data = (await response.json()) as MFAStartResponse;
 
-        switch (method) {
-          case 0:
-            setScreen('authenticator_app');
-            break;
-          case 1:
-            setScreen('email');
-            break;
-          case 2:
-            setScreen('openid_login');
-            break;
-          case 4:
-            // just to be safe
-            if (!isPresent(data.challenge)) {
-              toaster.error('Unsupported response from proxy');
-            }
-            setScreen('mobile_approve');
-            break;
-          default:
-            toaster.error(localLL.errors.mfaStartGeneric());
+          switch (method) {
+            case 0:
+              setScreen('authenticator_app');
+              break;
+            case 1:
+              setScreen('email');
+              break;
+            case 2:
+              setScreen('openid_login');
+              break;
+            case 4:
+              // just to be safe
+              if (!isPresent(data.challenge)) {
+                toaster.error('Unsupported response from proxy');
+              }
+              setScreen('mobile_approve');
+              break;
+            default:
+              toaster.error(localLL.errors.mfaStartGeneric());
+              return;
+          }
+          setStartResponse(data);
+          return data;
+        } else {
+          const errorData = ((await response.json()) as unknown as MFAError).error;
+          error(`MFA failed to start with the following error: ${errorData}`);
+          if (method === 2) {
+            setScreen('openid_unavailable');
             return;
-        }
-        setStartResponse(data);
-        return data;
-      } else {
-        const errorData = ((await response.json()) as unknown as MFAError).error;
-        error(`MFA failed to start with the following error: ${errorData}`);
-        if (method === 2) {
-          setScreen('openid_unavailable');
+          }
+
+          if (errorData === 'selected MFA method not available') {
+            toaster.error(localLL.errors.mfaNotConfigured());
+          } else {
+            toaster.error(localLL.errors.mfaStartGeneric());
+          }
+
           return;
         }
-
-        if (errorData === 'selected MFA method not available') {
-          toaster.error(localLL.errors.mfaNotConfigured());
-        } else {
-          toaster.error(localLL.errors.mfaStartGeneric());
-        }
-
+      } catch (rej) {
+        error(`Failed to execute proxy request: ${rej}`);
+        toaster.error(localLL.errors.mfaStartGeneric());
         return;
       }
     },
@@ -170,6 +184,7 @@ export const MFAModal = () => {
       location,
       selectedInstance,
       toaster.error,
+      platformInfo,
     ],
   );
 
@@ -427,6 +442,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
   const location = useMFAModal((state) => state.instance);
   const closeModal = useMFAModal((state) => state.close);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   useEffect(() => {
     const TIMEOUT_DURATION = 5 * 1000 * 60; // 5 minutes timeout
@@ -444,6 +460,8 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          CLIENT_VERSION_HEADER: platformInfo.client_version,
+          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
         },
         body: JSON.stringify(body_token),
       });
@@ -497,7 +515,7 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       clearInterval(interval);
       clearTimeout(timeoutId);
     };
-  }, [proxyUrl, token, location, closeModal, localLL.errors, toaster]);
+  }, [proxyUrl, token, location, closeModal, localLL.errors, toaster, platformInfo]);
 
   return (
     <div className="mfa-modal-content">
@@ -546,6 +564,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
   const [mfaError, setMFAError] = useState('');
 
   const localLL = LL.modals.mfa.authentication;
+  const platformInfo = useClientStore((state) => state.platformInfo);
 
   const schema = useMemo(
     () =>
@@ -556,48 +575,56 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
   );
 
   const finishMFA = async (code: string) => {
-    if (!location) return toaster.error(localLL.errors.mfaStartGeneric());
+    if (!location) return toaster.error(localLL.errors.mfaFinishGeneric());
 
     const data = { token, code: code };
 
-    const response = await fetch(`${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (response.ok) {
-      closeModal();
-      const data = (await response.json()) as MFAFinishResponse;
-      await connect({
-        locationId: location?.id,
-        connectionType: location.connection_type,
-        presharedKey: data.preshared_key,
+    try {
+      const response = await fetch(`${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          CLIENT_VERSION_HEADER: platformInfo.client_version,
+          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
+        },
+        body: JSON.stringify(data),
       });
-    } else {
-      const data = (await response.json()) as unknown as MFAError;
-      const { error: errorMessage } = data;
-      let message = '';
 
-      if (errorMessage === 'Unauthorized') {
-        message = localLL.errors.invalidCode();
-      } else if (
-        errorMessage === 'invalid token' ||
-        errorMessage === 'login session not found'
-      ) {
-        console.error(data);
-        toaster.error(localLL.errors.tokenExpired());
-        resetState();
+      if (response.ok) {
+        closeModal();
+        const data = (await response.json()) as MFAFinishResponse;
+        await connect({
+          locationId: location?.id,
+          connectionType: location.connection_type,
+          presharedKey: data.preshared_key,
+        });
+      } else {
+        const data = (await response.json()) as unknown as MFAError;
+        const { error: errorMessage } = data;
+        let message = '';
+
+        if (errorMessage === 'Unauthorized') {
+          message = localLL.errors.invalidCode();
+        } else if (
+          errorMessage === 'invalid token' ||
+          errorMessage === 'login session not found'
+        ) {
+          console.error(data);
+          toaster.error(localLL.errors.tokenExpired());
+          resetState();
+          error(JSON.stringify(data));
+          return;
+        } else {
+          toaster.error(localLL.errors.mfaFinishGeneric());
+        }
+
+        setMFAError(message);
         error(JSON.stringify(data));
         return;
-      } else {
-        toaster.error(localLL.errors.mfaStartGeneric());
       }
-
-      setMFAError(message);
-      error(JSON.stringify(data));
+    } catch (rej) {
+      error(`Failed to execute proxy request: ${rej}`);
+      toaster.error(localLL.errors.mfaFinishGeneric());
       return;
     }
   };

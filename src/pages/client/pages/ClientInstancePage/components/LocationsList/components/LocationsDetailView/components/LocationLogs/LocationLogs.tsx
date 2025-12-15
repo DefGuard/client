@@ -13,8 +13,8 @@ import { Card } from '../../../../../../../../../../shared/defguard-ui/component
 import type { LogItem, LogLevel } from '../../../../../../../../clientAPI/types';
 import { useClientStore } from '../../../../../../../../hooks/useClientStore';
 import type {
-  DefguardLocation,
   ClientConnectionType,
+  DefguardLocation,
 } from '../../../../../../../../types';
 import { LocationLogsSelect } from './LocationLogsSelect';
 
@@ -62,11 +62,15 @@ export const LocationLogs = ({ locationId, connectionType }: Props) => {
                 logsContainerElement.current &&
                 filterLogByLevel(locationLogLevelRef.current, item.level)
               ) {
-                const messageString = `${item.timestamp} ${item.level} ${item.fields.message}`;
+                const utcTimestamp = item.timestamp.endsWith('Z')
+                  ? item.timestamp
+                  : `${item.timestamp}Z`;
+                const dateTime = new Date(utcTimestamp).toLocaleString();
+                const messageString = `${dateTime} ${item.level} ${item.fields.message}`;
                 const element = createLogLineElement(messageString);
                 const scrollAfterAppend =
                   logsContainerElement.current.scrollHeight -
-                  logsContainerElement.current.scrollTop ===
+                    logsContainerElement.current.scrollTop ===
                   logsContainerElement.current.clientHeight;
                 logsContainerElement.current.appendChild(element);
                 // auto scroll to bottom if user didn't scroll up

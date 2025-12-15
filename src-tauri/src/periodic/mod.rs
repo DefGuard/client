@@ -1,9 +1,9 @@
-use self::{
-    connection::verify_active_connections, purge_stats::purge_stats, version::poll_version,
-};
 use tauri::AppHandle;
 use tokio::select;
 
+use self::{
+    connection::verify_active_connections, purge_stats::purge_stats, version::poll_version,
+};
 use crate::enterprise::periodic::config::poll_config;
 
 pub mod connection;

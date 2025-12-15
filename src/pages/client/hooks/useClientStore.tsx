@@ -3,12 +3,12 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { createWithEqualityFn } from 'zustand/traditional';
 
 import { clientApi } from '../clientAPI/clientApi';
-import type { AppConfig, ClientView } from '../clientAPI/types';
+import type { AppConfig, ClientView, PlatformInfo } from '../clientAPI/types';
 import {
+  ClientConnectionType,
   type CommonWireguardFields,
   type DefguardInstance,
   type SelectedInstance,
-  ClientConnectionType,
 } from '../types';
 
 const { getInstances, setAppConfig } = clientApi;
@@ -35,6 +35,11 @@ const defaultValues: StoreValues = {
     tray_theme: 'color',
     check_for_updates: true,
     peer_alive_period: 300,
+    mtu: 0,
+  },
+  platformInfo: {
+    client_version: '',
+    platform_info: '',
   },
 };
 
@@ -110,6 +115,7 @@ type StoreValues = {
   listChecked: boolean;
   selectedView: ClientView;
   appConfig: AppConfig;
+  platformInfo: PlatformInfo;
 };
 
 type StoreMethods = {

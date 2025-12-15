@@ -3,10 +3,12 @@
   lib,
   stdenv,
   rustPlatform,
+  rustc,
+  cargo,
   makeDesktopItem,
 }: let
   pname = "defguard-client";
-  version = "1.5.3"; # TODO: Get this from Cargo.toml or git
+  version = "1.6.1"; # TODO: Get this from Cargo.toml or git
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -17,7 +19,7 @@
     categories = ["Network" "Security"];
   };
 
-  rustToolchain = pkgs.rust-bin.stable.latest.default;
+  pnpm = pkgs.pnpm_10;
 
   buildInputs = with pkgs; [
     at-spi2-atk
@@ -38,22 +40,21 @@
     desktop-file-utils
   ];
 
-  nativeBuildInputs = with pkgs; [
-    rustToolchain
-    pkg-config
-    gobject-introspection
-    cargo-tauri
-    nodejs_24
-    protobuf
+  nativeBuildInputs = [
+    rustc
+    cargo
+    pkgs.pkg-config
+    pkgs.gobject-introspection
+    pkgs.cargo-tauri
+    pkgs.nodejs_24
+    pkgs.protobuf
     pnpm
     # configures pnpm to use pre-fetched dependencies
     pnpm.configHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
-    # perl
-    wrapGAppsHook
     # helper to add dynamic library paths
-    makeWrapper
+    pkgs.makeWrapper
   ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
@@ -79,7 +80,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-GlgQuPpOibPrItt6X9EqV4QmCOyajZh5yy7gHh+O+ME=";
+      hash = "sha256-v47yaNnt7vLDPR7WVLSonmZBBOkYWnmTUqMiPZ/WCGo=";
     };
 
     buildPhase = ''
@@ -87,19 +88,20 @@ in
     '';
 
     postInstall = ''
+      mkdir -p $out/bin
+
       # copy client binary
-      mkdir -p $out/bin
       cp src-tauri/target/release/${pname} $out/bin/
-      # copy service binary
-      mkdir -p $out/bin
+
+      # copy background service binary
       cp src-tauri/target/release/defguard-service $out/bin/
-      # copy cli binary
-      mkdir -p $out/bin
+
+      # copy CLI binary
       cp src-tauri/target/release/dg $out/bin/
 
       # add required library to client binary RPATH
       wrapProgram $out/bin/${pname} \
-      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator]}
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator pkgs.desktop-file-utils]}
 
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/

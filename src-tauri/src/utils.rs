@@ -1,19 +1,32 @@
-use std::{env, path::Path, process::Command, str::FromStr};
+#[cfg(not(target_os = "macos"))]
+use std::str::FromStr;
+#[cfg(target_os = "macos")]
+use std::time::Duration;
+use std::{env, path::Path, process::Command};
 
+use base64::{prelude::BASE64_STANDARD, Engine};
+#[cfg(not(target_os = "macos"))]
 use common::{find_free_tcp_port, get_interface_name};
+#[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
+use prost::Message;
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
+#[cfg(not(target_os = "macos"))]
 use tonic::Code;
 use tracing::Level;
-#[cfg(target_os = "windows")]
-use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use windows_service::{
     service::{ServiceAccess, ServiceState},
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
+#[cfg(windows)]
+use crate::active_connections::find_connection;
+#[cfg(target_os = "macos")]
+use crate::apple::{stop_tunnel_for_location, stop_tunnel_for_tunnel, tunnel_stats};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -21,8 +34,7 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection},
             location::Location,
-            location_stats::peer_to_location_stats,
-            tunnel::{peer_to_tunnel_stats, Tunnel, TunnelConnection},
+            tunnel::{Tunnel, TunnelConnection},
             wireguard_keys::WireguardKeys,
             Id,
         },
@@ -31,103 +43,38 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    service::{
-        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
-        utils::DAEMON_CLIENT,
-    },
+    proto::ClientPlatformInfo,
     ConnectionType,
 };
-
-#[cfg(target_os = "windows")]
-use crate::active_connections::find_connection;
+#[cfg(not(target_os = "macos"))]
+use crate::{
+    database::models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
+    service::{
+        client::DAEMON_CLIENT,
+        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
+    },
+};
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
+// Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
+#[cfg(target_os = "macos")]
+static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
-/// Setup client interface
+/// Setup client interface for `Instance`.
+#[cfg(not(target_os = "macos"))]
 pub(crate) async fn setup_interface(
     location: &Location<Id>,
-    interface_name: String,
+    name: &str,
     preshared_key: Option<String>,
+    mtu: Option<u32>,
     pool: &DbPool,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
-
-    debug!("Looking for WireGuard keys for location {location} instance");
-    let Some(keys) = WireguardKeys::find_by_instance_id(pool, location.instance_id).await? else {
-        error!("No keys found for instance: {}", location.instance_id);
-        return Err(Error::InternalError(
-            "No keys found for instance".to_string(),
-        ));
-    };
-    debug!("WireGuard keys found for location {location} instance");
-
-    // prepare peer config
-    debug!(
-        "Decoding location {location} public key: {}.",
-        location.pubkey
-    );
-    let peer_key: Key = Key::from_str(&location.pubkey)?;
-    debug!("Location {location} public key decoded: {peer_key}");
-    let mut peer = Peer::new(peer_key);
-
-    debug!(
-        "Parsing location {location} endpoint: {}",
-        location.endpoint
-    );
-    peer.set_endpoint(&location.endpoint)?;
-    peer.persistent_keepalive_interval = Some(25);
-    debug!("Parsed location {location} endpoint: {}", location.endpoint);
-
-    if let Some(psk) = preshared_key {
-        debug!("Decoding location {location} preshared key.");
-        let peer_psk = Key::from_str(&psk)?;
-        info!("Location {location} preshared key decoded.");
-        peer.preshared_key = Some(peer_psk);
-    }
-
-    debug!(
-        "Parsing location {location} allowed IPs: {}",
-        location.allowed_ips
-    );
-    let allowed_ips = if location.route_all_traffic {
-        debug!(
-            "Using all traffic routing for location {location}: {DEFAULT_ROUTE_IPV4} \
-            {DEFAULT_ROUTE_IPV6}"
-        );
-        vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
-    } else {
-        debug!(
-            "Using predefined location {location} traffic: {}",
-            location.allowed_ips
-        );
-        location
-            .allowed_ips
-            .split(',')
-            .map(str::to_string)
-            .collect()
-    };
-    for allowed_ip in &allowed_ips {
-        match IpAddrMask::from_str(allowed_ip) {
-            Ok(addr) => {
-                peer.allowed_ips.push(addr);
-            }
-            Err(err) => {
-                // Handle the error from IpAddrMask::from_str, if needed
-                error!(
-                    "Error parsing IP address {allowed_ip} while setting up interface for \
-                    location {location}, error details: {err}"
-                );
-            }
-        }
-    }
-    debug!(
-        "Parsed allowed IPs for location {location}: {:?}",
-        peer.allowed_ips
-    );
+    let interface_name = get_interface_name(name);
 
     // request interface configuration
-    debug!("Looking for a free port for interface {interface_name}...");
+    debug!("Looking for a free port for interface {interface_name}.");
     let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port during interface {interface_name} setup for location \
@@ -137,29 +84,14 @@ pub(crate) async fn setup_interface(
         return Err(Error::InternalError(msg));
     };
     debug!("Found free port: {port} for interface {interface_name}.");
-    let addresses = location
-        .address
-        .split(',')
-        .map(str::trim)
-        .map(IpAddrMask::from_str)
-        .collect::<Result<_, _>>()
-        .map_err(|err| {
-            let msg = format!("Failed to parse IP addresses '{}': {err}", location.address);
-            error!("{msg}");
-            Error::InternalError(msg)
-        })?;
-    let interface_config = InterfaceConfiguration {
-        name: interface_name,
-        prvkey: keys.prvkey,
-        addresses,
-        port: port.into(),
-        peers: vec![peer.clone()],
-        mtu: None,
-    };
+
+    let mut interface_config = location
+        .interface_configuration(pool, interface_name.clone(), preshared_key, mtu)
+        .await?;
+    interface_config.mtu = mtu;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
-        allowed_ips,
         dns: location.dns.clone(),
     };
     if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
@@ -189,15 +121,106 @@ pub(crate) async fn setup_interface(
             name: {}.",
             interface_config.name
         );
-        Ok(())
+        Ok(interface_name)
     }
 }
 
-pub(crate) async fn stats_handler(
-    pool: DbPool,
-    interface_name: String,
-    connection_type: ConnectionType,
-) {
+#[cfg(target_os = "macos")]
+pub(crate) async fn setup_interface(
+    location: &Location<Id>,
+    _name: &str,
+    preshared_key: Option<String>,
+    mtu: Option<u32>,
+    pool: &DbPool,
+) -> Result<String, Error> {
+    let tunnel_config = location
+        .tunnel_configurarion(pool, preshared_key, mtu)
+        .await?;
+
+    tunnel_config.save();
+    tokio::time::sleep(TUNNEL_START_DELAY).await;
+    tunnel_config.start_tunnel();
+
+    // FIXME: not really useful nor true.
+    Ok(String::new())
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
+    use crate::database::models::{location_stats::LocationStats, tunnel::TunnelStats};
+
+    const CHECK_INTERVAL: Duration = Duration::from_secs(10);
+
+    debug!("Starting stats handler for ID {id} and connection type {connection_type:?}");
+
+    let mut interval = tokio::time::interval(CHECK_INTERVAL);
+    let pool = DB_POOL.clone();
+
+    loop {
+        debug!("Waiting for the next stats collection interval for ID {id} and connection type {connection_type:?}");
+        interval.tick().await;
+
+        let stats = tunnel_stats(id, &connection_type);
+        let Some(stats) = stats else {
+            continue;
+        };
+
+        let mut transaction = match pool.begin().await {
+            Ok(transactions) => transactions,
+            Err(err) => {
+                error!(
+                    "Failed to begin database transaction for saving location/tunnel stats: {err}",
+                );
+                continue;
+            }
+        };
+
+        if connection_type == ConnectionType::Location {
+            let location_stats = LocationStats::new(
+                id,
+                stats.tx_bytes as i64,
+                stats.rx_bytes as i64,
+                stats.last_handshake as i64,
+                0,
+                None,
+            );
+            match location_stats.save(&mut *transaction).await {
+                Ok(_) => {
+                    debug!("Saved network usage stats for location ID {id}");
+                }
+                Err(err) => {
+                    error!("Failed to save network usage stats for location ID {id}: {err}");
+                }
+            }
+        } else {
+            let tunnel_stats = TunnelStats::new(
+                id,
+                stats.tx_bytes as i64,
+                stats.rx_bytes as i64,
+                stats.last_handshake as i64,
+                chrono::Utc::now().naive_utc(),
+                0,
+                0,
+            );
+            match tunnel_stats.save(&mut *transaction).await {
+                Ok(_) => {
+                    debug!("Saved network usage stats for tunnel ID {id}");
+                }
+                Err(err) => {
+                    error!("Failed to save network usage stats for tunnel ID {id}: {err}");
+                }
+            }
+        }
+
+        if let Err(err) = transaction.commit().await {
+            error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) async fn stats_handler(interface_name: String, connection_type: ConnectionType) {
+    let pool = DB_POOL.clone();
     let request = ReadInterfaceDataRequest {
         interface_name: interface_name.clone(),
     };
@@ -331,24 +354,27 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
-// helper function to get log file directory for the defguard-service daemon
+/// Helper function to get log file directory for `defguard-service` daemon.
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     let path = "/Logs/defguard-service";
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     let path = "/var/log/defguard-service";
 
     Path::new(path)
 }
 
 /// Setup client interface
+#[cfg(not(target_os = "macos"))]
 pub async fn setup_interface_tunnel(
     tunnel: &Tunnel<Id>,
-    interface_name: String,
-) -> Result<(), Error> {
+    name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
     debug!("Setting up interface for tunnel {tunnel}");
+    let interface_name = get_interface_name(name);
     // prepare peer config
     debug!(
         "Decoding tunnel {tunnel} public key: {}.",
@@ -380,10 +406,7 @@ pub async fn setup_interface_tunnel(
         tunnel.allowed_ips
     );
     let allowed_ips = if tunnel.route_all_traffic {
-        debug!(
-            "Using all traffic routing for tunnel {tunnel}: {DEFAULT_ROUTE_IPV4} \
-            {DEFAULT_ROUTE_IPV6}"
-        );
+        debug!("Using all traffic routing for tunnel {tunnel}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         let msg = match &tunnel.allowed_ips {
@@ -412,7 +435,7 @@ pub async fn setup_interface_tunnel(
     debug!("Parsed tunnel {tunnel} allowed IPs: {:?}", peer.allowed_ips);
 
     // request interface configuration
-    debug!("Looking for a free port for interface {interface_name}...");
+    debug!("Looking for a free port for interface {interface_name}.");
     let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port for interface {interface_name} while setting up tunnel {tunnel}"
@@ -434,17 +457,17 @@ pub async fn setup_interface_tunnel(
             Error::InternalError(msg)
         })?;
     let interface_config = InterfaceConfiguration {
-        name: interface_name,
+        name: interface_name.clone(),
         prvkey: tunnel.prvkey.clone(),
         addresses,
-        port: port.into(),
+        port,
         peers: vec![peer.clone()],
-        mtu: None,
+        mtu,
     };
+
     debug!("Creating interface {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
-        allowed_ips,
         dns: tunnel.dns.clone(),
     };
     if let Some(pre_up) = &tunnel.pre_up {
@@ -465,12 +488,12 @@ pub async fn setup_interface_tunnel(
             "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
             interface_config.name
         );
-        Err(Error::InternalError(format!(
+        return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
             interface_config.name,
             error.message()
-        )))
+        )));
     } else {
         info!(
             "Network interface {} for tunnel {tunnel} created successfully.",
@@ -493,8 +516,27 @@ pub async fn setup_interface_tunnel(
             "Created interface {} with config: {interface_config:?}",
             interface_config.name
         );
-        Ok(())
     }
+
+    Ok(interface_name)
+}
+
+#[cfg(target_os = "macos")]
+pub async fn setup_interface_tunnel(
+    tunnel: &Tunnel<Id>,
+    _name: &str,
+    mtu: Option<u32>,
+) -> Result<String, Error> {
+    debug!("Setting up interface for tunnel: {tunnel}");
+
+    let tunnel_config = tunnel.tunnel_configurarion(mtu)?;
+
+    tunnel_config.save();
+    tokio::time::sleep(TUNNEL_START_DELAY).await;
+    tunnel_config.start_tunnel();
+
+    // FIXME: not really useful nor true.
+    Ok(String::new())
 }
 
 pub async fn get_tunnel_interface_details(
@@ -507,7 +549,15 @@ pub async fn get_tunnel_interface_details(
         let peer_pubkey = &tunnel.pubkey;
 
         // generate interface name
-        let interface_name = get_interface_name(&tunnel.name);
+        let interface_name;
+        #[cfg(not(target_os = "macos"))]
+        {
+            interface_name = get_interface_name(&tunnel.name);
+        }
+        #[cfg(target_os = "macos")]
+        {
+            interface_name = String::new();
+        };
 
         debug!("Fetching tunnel stats for tunnel ID {tunnel_id}");
         let result = query!(
@@ -538,7 +588,7 @@ pub async fn get_tunnel_interface_details(
             address: tunnel.address,
             dns: tunnel.dns,
             listen_port,
-            peer_pubkey: peer_pubkey.to_string(),
+            peer_pubkey: peer_pubkey.clone(),
             peer_endpoint: tunnel.endpoint,
             allowed_ips: tunnel.allowed_ips.unwrap_or_default(),
             persistent_keepalive_interval,
@@ -566,8 +616,15 @@ pub async fn get_location_interface_details(
         );
         let peer_pubkey = keys.pubkey;
 
-        // generate interface name
-        let interface_name = get_interface_name(&location.name);
+        let interface_name;
+        #[cfg(not(target_os = "macos"))]
+        {
+            interface_name = get_interface_name(&location.name);
+        }
+        #[cfg(target_os = "macos")]
+        {
+            interface_name = String::new();
+        }
 
         debug!("Fetching location stats for location ID {location_id}");
         let result = query!(
@@ -619,8 +676,13 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    let interface_name = get_interface_name(&location.name);
-    setup_interface(location, interface_name.clone(), preshared_key, &DB_POOL).await?;
+    let mtu = state
+        .app_config
+        .lock()
+        .expect("failed to lock app state")
+        .mtu();
+    let interface_name =
+        setup_interface(location, &location.name, preshared_key, mtu, &DB_POOL).await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
@@ -651,8 +713,12 @@ pub(crate) async fn handle_connection_for_tunnel(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
-    let interface_name = get_interface_name(&tunnel.name);
-    setup_interface_tunnel(tunnel, interface_name.clone()).await?;
+    let mtu = state
+        .app_config
+        .lock()
+        .expect("failed to lock app state")
+        .mtu();
+    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name, mtu).await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
@@ -708,7 +774,6 @@ pub(crate) async fn disconnect_interface(
         "Disconnecting interface {}.",
         active_connection.interface_name
     );
-    let mut client = DAEMON_CLIENT.clone();
     let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
@@ -721,32 +786,48 @@ pub(crate) async fn disconnect_interface(
                 );
                 return Err(Error::NotFound);
             };
-            let request = RemoveInterfaceRequest {
-                interface_name,
-                endpoint: location.endpoint.clone(),
-            };
-            debug!(
-                "Sending request to the background service to remove interface {} for location \
-                {}...",
-                active_connection.interface_name, location.name
-            );
-            if let Err(error) = client.remove_interface(request).await {
-                let msg = if error.code() == Code::Unavailable {
-                    format!(
-                        "Couldn't remove interface {}. Background service is unavailable. \
-                        Please make sure the service is running. Error: {error}.",
-                        active_connection.interface_name
-                    )
-                } else {
-                    format!(
-                        "Failed to send a request to the background service to remove interface \
-                        {}. Error: {error}.",
-                        active_connection.interface_name
-                    )
-                };
-                error!("{msg}");
-                return Err(Error::InternalError(msg));
+
+            #[cfg(target_os = "macos")]
+            {
+                let result = stop_tunnel_for_location(&location);
+                error!(
+                    "stop_tunnel() for location {} returned {result:?}",
+                    location.name
+                );
+                if !result {
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
             }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: location.endpoint.clone(),
+                };
+                debug!(
+                    "Sending request to the background service to remove interface {} for location \
+                    {}...",
+                    active_connection.interface_name, location.name
+                );
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    let msg = if error.code() == Code::Unavailable {
+                        format!(
+                            "Couldn't remove interface {}. Background service is unavailable. \
+                            Please make sure the service is running. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    } else {
+                        format!(
+                            "Failed to send a request to the background service to remove interface \
+                            {}. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    };
+                    error!("{msg}");
+                }
+            }
+
             let connection: Connection = active_connection.into();
             let connection = connection.save(&*DB_POOL).await?;
             debug!(
@@ -781,19 +862,35 @@ pub(crate) async fn disconnect_interface(
                     active_connection.interface_name
                 );
             }
-            let request = RemoveInterfaceRequest {
-                interface_name,
-                endpoint: tunnel.endpoint.clone(),
-            };
-            if let Err(error) = client.remove_interface(request).await {
+
+            #[cfg(target_os = "macos")]
+            {
+                let result = stop_tunnel_for_tunnel(&tunnel);
                 error!(
-                    "Error while removing interface {}, error details: {error:?}",
-                    active_connection.interface_name
+                    "stop_tunnel() for tunnel {} returned {result:?}",
+                    tunnel.name
                 );
-                return Err(Error::InternalError(format!(
-                    "Failed to remove interface, error message: {}",
-                    error.message()
-                )));
+                if !result {
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: tunnel.endpoint.clone(),
+                };
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    error!(
+                        "Error while removing interface {}, error details: {error:?}",
+                        active_connection.interface_name
+                    );
+                    return Err(Error::InternalError(format!(
+                        "Failed to remove interface, error message: {}",
+                        error.message()
+                    )));
+                }
             }
             if let Some(post_down) = &tunnel.post_down {
                 debug!(
@@ -855,7 +952,7 @@ pub async fn get_tunnel_or_location_name(id: Id, connection_type: ConnectionType
 // Check if location/tunnel is connected and WireGuard Windows service is running.
 // `id`: location or tunnel Id
 // `name`: location or tunnel name
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 async fn check_connection(
     service_manager: &ServiceManager,
     id: Id,
@@ -939,10 +1036,10 @@ async fn check_connection(
 // TODO: Move the connection handling to a seperate, common function,
 // so `handle_connection_for_location` and `handle_connection_for_tunnel` are not
 // partially duplicated here.
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Synchronizing active connections with the systems' state...");
-    let all_locations = Location::all(&*DB_POOL).await?;
+    let all_locations = Location::all(&*DB_POOL, false).await?;
     let service_manager =
         ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(
             |err| {
@@ -989,4 +1086,34 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Active connections synchronized with the system state");
 
     Ok(())
+}
+
+#[must_use]
+pub(crate) fn construct_platform_header() -> String {
+    let os = os_info::get();
+
+    let platform_info = ClientPlatformInfo {
+        os_family: std::env::consts::OS.to_string(),
+        os_type: os.os_type().to_string(),
+        version: os.version().to_string(),
+        edition: os.edition().map(str::to_string),
+        codename: os.codename().map(str::to_string),
+        bitness: Some(os.bitness().to_string()),
+        architecture: os.architecture().map(str::to_string),
+    };
+
+    debug!("Constructed platform info header: {platform_info:?}");
+
+    let buffer = platform_info.encode_to_vec();
+
+    BASE64_STANDARD.encode(buffer)
+}
+
+#[must_use]
+/// Utility function to get all tunnels and locations from the database.
+#[cfg(target_os = "macos")]
+pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
+    let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
+    let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
+    (tunnels, locations)
 }

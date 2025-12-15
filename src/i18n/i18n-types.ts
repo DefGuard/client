@@ -376,6 +376,16 @@ type RootTranslation = {
 								 */
 								helper: string
 							}
+							mtu: {
+								/**
+								 * M​T​U​ ​(​M​a​x​i​m​u​m​ ​T​r​a​n​s​m​i​s​s​i​o​n​ ​U​n​i​t​)
+								 */
+								title: string
+								/**
+								 * M​T​U​ ​s​e​t​s​ ​t​h​e​ ​l​a​r​g​e​s​t​ ​p​a​c​k​e​t​ ​s​i​z​e​ ​s​e​n​t​ ​t​h​r​o​u​g​h​ ​t​h​e​ ​n​e​t​w​o​r​k​.​ ​L​o​w​e​r​i​n​g​ ​i​t​ ​c​a​n​ ​i​m​p​r​o​v​e​ ​c​o​n​n​e​c​t​i​o​n​ ​s​t​a​b​i​l​i​t​y​ ​i​n​ ​r​e​s​t​r​i​c​t​i​v​e​ ​o​r​ ​u​n​r​e​l​i​a​b​l​e​ ​I​S​P​ ​n​e​t​w​o​r​k​s​.​ ​T​h​e​ ​d​e​f​a​u​l​t​ ​v​a​l​u​e​ ​o​n​ ​m​o​s​t​ ​s​y​s​t​e​m​s​ ​i​s​ ​1​5​0​0​.​ ​T​r​y​ ​l​o​w​e​r​i​n​g​ ​i​t​ ​t​o​ ​1​3​0​0​-​1​4​0​0​ ​i​f​ ​y​o​u​ ​e​n​c​o​u​n​t​e​r​ ​I​S​P​-​r​e​l​a​t​e​d​ ​i​s​s​u​e​s​.​ ​0​ ​=​ ​d​e​f​a​u​l​t​.
+								 */
+								helper: string
+							}
 							tray: {
 								/**
 								 * S​y​s​t​e​m​ ​t​r​a​y
@@ -439,16 +449,16 @@ type RootTranslation = {
 									 */
 									client: string
 									/**
-									 * S​e​r​v​i​c​e
+									 * V​P​N
 									 */
-									service: string
+									vpn: string
 									/**
 									 * A​l​l
 									 */
 									all: string
 								}
 								/**
-								 * T​h​e​ ​s​o​u​r​c​e​ ​o​f​ ​t​h​e​ ​l​o​g​s​.​ ​L​o​g​s​ ​c​a​n​ ​c​o​m​e​ ​f​r​o​m​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​c​l​i​e​n​t​ ​o​r​ ​t​h​e​ ​b​a​c​k​g​r​o​u​n​d​ ​D​e​f​g​u​a​r​d​ ​s​e​r​v​i​c​e​ ​t​h​a​t​ ​m​a​n​a​g​e​s​ ​V​P​N​ ​c​o​n​n​c​e​t​i​o​n​s​ ​a​t​ ​t​h​e​ ​n​e​t​w​o​r​k​ ​l​e​v​e​l​.
+								 * T​h​e​ ​s​o​u​r​c​e​ ​o​f​ ​t​h​e​ ​l​o​g​s​.​ ​L​o​g​s​ ​c​a​n​ ​c​o​m​e​ ​f​r​o​m​ ​t​h​e​ ​D​e​f​g​u​a​r​d​ ​c​l​i​e​n​t​ ​o​r​ ​t​h​e​ ​V​P​N​ ​s​e​r​v​i​c​e​/​e​x​t​e​n​s​i​o​n​ ​t​h​a​t​ ​m​a​n​a​g​e​s​ ​V​P​N​ ​c​o​n​n​e​c​t​i​o​n​s​ ​a​t​ ​t​h​e​ ​n​e​t​w​o​r​k​ ​l​e​v​e​l​.
 								 */
 								logSourceHelper: string
 							}
@@ -1693,6 +1703,10 @@ type RootTranslation = {
 					 */
 					mfaStartGeneric: string
 					/**
+					 * C​o​u​l​d​ ​n​o​t​ ​f​i​n​i​s​h​ ​M​F​A​ ​p​r​o​c​e​s​s​.​ ​P​l​e​a​s​e​ ​t​r​y​ ​a​g​a​i​n​ ​o​r​ ​c​o​n​t​a​c​t​ ​a​d​m​i​n​i​s​t​r​a​t​o​r​.
+					 */
+					mfaFinishGeneric: string
+					/**
 					 * C​o​u​l​d​ ​n​o​t​ ​f​i​n​d​ ​i​n​s​t​a​n​c​e​.
 					 */
 					instanceNotFound: string
@@ -2066,6 +2080,16 @@ export type TranslationFunctions = {
 								 */
 								helper: () => LocalizedString
 							}
+							mtu: {
+								/**
+								 * MTU (Maximum Transmission Unit)
+								 */
+								title: () => LocalizedString
+								/**
+								 * MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues. 0 = default.
+								 */
+								helper: () => LocalizedString
+							}
 							tray: {
 								/**
 								 * System tray
@@ -2129,16 +2153,16 @@ export type TranslationFunctions = {
 									 */
 									client: () => LocalizedString
 									/**
-									 * Service
+									 * VPN
 									 */
-									service: () => LocalizedString
+									vpn: () => LocalizedString
 									/**
 									 * All
 									 */
 									all: () => LocalizedString
 								}
 								/**
-								 * The source of the logs. Logs can come from the Defguard client or the background Defguard service that manages VPN conncetions at the network level.
+								 * The source of the logs. Logs can come from the Defguard client or the VPN service/extension that manages VPN connections at the network level.
 								 */
 								logSourceHelper: () => LocalizedString
 							}
@@ -3371,6 +3395,10 @@ export type TranslationFunctions = {
 					 * Could not start MFA process. Please try again or contact administrator.
 					 */
 					mfaStartGeneric: () => LocalizedString
+					/**
+					 * Could not finish MFA process. Please try again or contact administrator.
+					 */
+					mfaFinishGeneric: () => LocalizedString
 					/**
 					 * Could not find instance.
 					 */

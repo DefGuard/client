@@ -3,6 +3,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(target_os = "macos")]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::{env, str::FromStr, sync::LazyLock};
 
 #[cfg(unix)]
@@ -15,18 +20,18 @@ use defguard_client::{
     appstate::AppState,
     commands::*,
     database::{
+        handle_db_migrations,
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
+    enterprise::provisioning::handle_client_initialization,
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
     utils::load_log_targets,
-    VERSION,
+    LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
-#[cfg(target_os = "macos")]
-use tauri::{process, Env};
 use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -40,14 +45,6 @@ const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "
 static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
 async fn startup(app_handle: &AppHandle) {
-    debug!("Running database migrations, if there are any.");
-    sqlx::migrate!()
-        .run(&*DB_POOL)
-        .await
-        .expect("Failed to apply database migrations.");
-    debug!("Applied all database migrations that were pending. If any.");
-    debug!("Database setup has been completed successfully.");
-
     debug!("Purging old stats from the database.");
     if let Err(err) = LocationStats::purge(&*DB_POOL).await {
         error!("Failed to purge location stats: {err}");
@@ -65,7 +62,7 @@ async fn startup(app_handle: &AppHandle) {
     // and they are still running after the restart. We sync them here to
     // reflect the real system's state.
     // TODO: Find a way to intercept the shutdown event and close all connections
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     {
         match sync_connections(app_handle).await {
             Ok(_) => {
@@ -83,6 +80,50 @@ async fn startup(app_handle: &AppHandle) {
                 )
             }
         };
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use defguard_client::{
+            apple::get_managers_for_tunnels_and_locations, utils::get_all_tunnels_locations,
+        };
+
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+
+        // Retrieve MTU from `AppConfig`.
+        let app_state = app_handle.state::<AppState>();
+        let mtu = app_state
+            .app_config
+            .lock()
+            .expect("failed to lock app state")
+            .mtu();
+        let handle = tauri::async_runtime::spawn(async move {
+            if let Err(err) = defguard_client::apple::sync_locations_and_tunnels(mtu).await {
+                error!("Failed to sync locations and tunnels: {err}");
+            }
+            semaphore_clone.store(true, Ordering::Release);
+        });
+        defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+        let _ = handle.await;
+
+        let (tunnels, locations) = get_all_tunnels_locations().await;
+        let handle = app_handle.clone();
+        // Observer thread is blocking, so its better not to mess with the tauri runtime,
+        // hence std::thread::spawn.
+        std::thread::spawn(move || {
+            defguard_client::apple::observer_thread(get_managers_for_tunnels_and_locations(
+                &tunnels, &locations,
+            ));
+            error!("VPN observer thread has exited unexpectedly, quitting the app.");
+            handle.exit(0);
+        });
+
+        let handle = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            defguard_client::apple::connection_state_update_thread(&handle).await;
+            error!("Connection state update thread has exited unexpectedly, quitting the app.");
+            handle.exit(0);
+        });
     }
 
     // Run periodic tasks.
@@ -113,23 +154,6 @@ async fn startup(app_handle: &AppHandle) {
 }
 
 fn main() {
-    // add bundled `wireguard-go` binary to PATH
-    #[cfg(target_os = "macos")]
-    {
-        debug!("Adding bundled wireguard-go binary to PATH");
-        let current_bin_path =
-            process::current_binary(&Env::default()).expect("Failed to get current binary path");
-        let current_bin_dir = current_bin_path
-            .parent()
-            .expect("Failed to get current binary directory");
-        let current_path = env::var("PATH").expect("Failed to get current PATH variable");
-        env::set_var(
-            "PATH",
-            format!("{current_path}:{}", current_bin_dir.to_str().unwrap()),
-        );
-        debug!("Added binary dir {} to PATH", current_bin_dir.display());
-    }
-
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
@@ -156,7 +180,9 @@ fn main() {
             start_global_logwatcher,
             stop_global_logwatcher,
             command_get_app_config,
-            command_set_app_config
+            command_set_app_config,
+            get_provisioning_config,
+            get_platform_header
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -186,7 +212,47 @@ fn main() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            // Register for linux and dev windows builds
+            // Create Help menu on macOS.
+            // https://github.com/tauri-apps/tauri/issues/9371
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_opener::OpenerExt;
+
+                const DOC_ITEM_ID: &str = "doc";
+                const REPORT_ITEM_ID: &str = "issue";
+                const DOC_URL: &str = "https://docs.defguard.net/using-defguard-for-end-users/desktop-client";
+                const REPORT_URL: &str = "https://github.com/DefGuard/client/issues/new?labels=bug&template=bug_report.md";
+                if let Some(menu) = app.menu() {
+                    if let Some(help_submenu) = menu.get(tauri::menu::HELP_SUBMENU_ID) {
+                        let report_item = tauri::menu::MenuItem::with_id(
+                            app,
+                            REPORT_ITEM_ID,
+                            "Report an issue",
+                            true,
+                            None::<&str>,
+                        )?;
+                        let _ = help_submenu.as_submenu_unchecked().append(&report_item);
+                        let doc_item = tauri::menu::MenuItem::with_id(
+                            app,
+                            DOC_ITEM_ID,
+                            "Defguard Desktop Client Help",
+                            true,
+                            None::<&str>,
+                        )?;
+                        let _ = help_submenu.as_submenu_unchecked().append(&doc_item);
+                    }
+                }
+                app.on_menu_event(move |app, event| {
+                    let id = event.id();
+                    if id == DOC_ITEM_ID {
+                        let _ = app.opener().open_url(DOC_URL, None::<&str>);
+                    } else if id == REPORT_ITEM_ID {
+                        let _ = app.opener().open_url(REPORT_URL, None::<&str>);
+                    }
+                });
+            }
+
+            // Register for Linux and debug Windows builds.
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -227,7 +293,7 @@ fn main() {
                     })
                     .targets([
                         Target::new(TargetKind::Stdout),
-                        Target::new(TargetKind::LogDir { file_name: None }),
+                        Target::new(TargetKind::LogDir { file_name: Some(LOG_FILENAME.to_string()) }),
                     ])
                     .level(log_level)
                     .filter(|metadata| {
@@ -264,7 +330,15 @@ fn main() {
                     .build(),
             )?;
 
-            let state = AppState::new(config);
+            // run DB migrations
+            tauri::async_runtime::block_on(handle_db_migrations());
+
+            // Check if client needs to be initialized
+            // and try to load provisioning config if necessary
+            let provisioning_config =
+                tauri::async_runtime::block_on(handle_client_initialization(app_handle));
+
+            let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
             info!("App setup completed, log level: {log_level}");
@@ -291,13 +365,17 @@ fn main() {
 
             // Ensure directories have appropriate permissions (dg25-28).
             #[cfg(unix)]
-            set_perms(&data_dir);
-            #[cfg(unix)]
-            set_perms(&log_dir);
+            {
+                set_perms(&data_dir);
+                set_perms(&log_dir);
+            }
+
             info!(
-                "Application data (database file) will be stored in: {data_dir:?} and application \
-                logs in: {log_dir:?}. Logs of the background Defguard service responsible for \
-                managing VPN connections at the network level will be stored in: {}.",
+                "Application data (database file) will be stored in: {} and application logs in: \
+                {}. Logs of the background Defguard service responsible for managing VPN \
+                connections at the network level will be stored in: {}.",
+                data_dir.display(),
+                log_dir.display(),
                 service::config::DEFAULT_LOG_DIR
             );
             tauri::async_runtime::block_on(startup(app_handle));
@@ -325,11 +403,32 @@ fn main() {
         // Handle shutdown.
         RunEvent::Exit => {
             debug!("Exiting the application's main event loop.");
-            tauri::async_runtime::block_on(async {
-                let _ = close_all_connections().await;
-                // This will clean the database file, pruning write-ahead log.
-                DB_POOL.close().await;
-            });
+            #[cfg(target_os = "macos")]
+            {
+                let semaphore = Arc::new(AtomicBool::new(false));
+                let semaphore_clone = Arc::clone(&semaphore);
+
+                let handle = tauri::async_runtime::spawn(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                    semaphore_clone.store(true, Ordering::Release);
+                });
+                // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
+                // create a temporary one.
+                defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+                tauri::async_runtime::block_on(async move {
+                    let _ = handle.await;
+                });
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                tauri::async_runtime::block_on(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                });
+            }
         }
         _ => {
             trace!("Received event: {event:?}");
