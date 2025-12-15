@@ -10,7 +10,10 @@
     "active": true,
     "category": "Utility",
     "copyright": "Defguard",
-    "targets": ["deb", "app"],
+    "targets": [
+      "deb",
+      "app"
+    ],
     "externalBin": [],
     "icon": [
       "icons/32x32.png",
@@ -47,7 +50,9 @@
       },
       "minimumSystemVersion": "13.5"
     },
-    "resources": ["resources/icons/*"],
+    "resources": [
+      "resources/icons/*"
+    ],
     "shortDescription": "Defguard desktop client",
     "longDescription": "Defguard desktop client",
     "linux": {
@@ -81,10 +86,12 @@
   "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "app": {
     "security": {
-      "capabilities": ["main-capability"],
+      "capabilities": [
+        "main-capability"
+      ],
       "csp": null
     },
     "windows": [
@@ -108,7 +115,9 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["defguard"]
+        "schemes": [
+          "defguard"
+        ]
       }
     }
   }
