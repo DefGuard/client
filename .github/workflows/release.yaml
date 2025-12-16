@@ -444,7 +444,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-bundle
-          path: src-tauri/target/release/bundle/msi/defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          path: src-tauri/target/release/bundle/msi/Defguard_${{ env.VERSION }}_x64_en-US.msi
 
   # Signs the MSI and uploads it as release asset
   sign-bundle:
@@ -466,13 +466,13 @@ jobs:
         with:
           name: unsigned-bundle
       - name: Sign bundle
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in defguard-client_${{ env.VERSION }}_x64_en-US.msi -out defguard-client-signed.msi
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.71-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_x64_en-US.msi -out Defguard-signed.msi
       - name: Upload installer asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client-signed.msi
-          asset_name: defguard-client_${{ env.VERSION }}_x64_en-US.msi
+          asset_path: Defguard-signed.msi
+          asset_name: Defguard_${{ env.VERSION }}_x64_en-US.msi
           asset_content_type: application/octet-stream
