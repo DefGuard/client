@@ -1,4 +1,5 @@
 {
+  "productName": "defguard-client",
   "build": {
     "features": [
       "service"
