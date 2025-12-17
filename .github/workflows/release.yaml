@@ -100,8 +100,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_path: src-tauri/target/release/bundle/deb/Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: Defguard__${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
       - name: Rename dg binary
         run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
