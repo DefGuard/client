@@ -1,8 +1,8 @@
 name: 'Build app and create release'
 on:
   push:
-    tags:
-      - v*.*.*
+    # tags:
+    #   - v*.*.*
     branches:
       - ubuntu2204_dg_fix
 
