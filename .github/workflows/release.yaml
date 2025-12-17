@@ -72,7 +72,8 @@ jobs:
           echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
       - name: Write release version
         run: |
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          # VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          VERSION=1.6.0
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
       - uses: actions/cache@v4
@@ -101,7 +102,7 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: src-tauri/target/release/bundle/deb/Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: Defguard__${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_name: Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
       - name: Rename dg binary
         run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
