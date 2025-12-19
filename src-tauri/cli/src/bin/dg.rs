@@ -2,7 +2,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::{
     fmt,
-    fs::{create_dir, OpenOptions},
+    fs::{create_dir_all, OpenOptions},
     net::IpAddr,
     path::{Path, PathBuf},
     str::FromStr,
@@ -594,7 +594,7 @@ async fn main() {
             if let Some(mut path) = dirs_next::data_dir() {
                 path.push("net.defguard.cli");
                 if !path.exists() {
-                    if let Err(err) = create_dir(&path) {
+                    if let Err(err) = create_dir_all(&path) {
                         error!("Failed to create default configuration path: {err}");
                         return;
                     }
