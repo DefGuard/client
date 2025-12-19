@@ -316,7 +316,8 @@ jobs:
 
   apt-sign:
     needs:
-      - build-linux
+      # - build-linux
+      - ubuntu-22-04-build
     runs-on:
       - self-hosted
       - Linux
