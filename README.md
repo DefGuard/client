@@ -100,7 +100,18 @@ More info can be found [here](https://stackoverflow.com/a/79640980).
 
 # Legal
 
+## Trademarks
+
 WireGuard® is [registered trademarks](https://www.wireguard.com/trademark-policy/) of Jason A. Donenfeld.
+
+## Third-Party Licenses
+
+This product includes third-party software components.
+The licenses for these components are provided in the "licenses" directory
+included with this distribution.
+
+For details, see:
+  licenses/THIRD_PARTY_LICENSES.txt
 
 # Known issues
 
