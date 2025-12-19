@@ -1,4 +1,4 @@
-name: "Build app and create release"
+name: 'Build app and create release'
 on:
   push:
     tags:
@@ -56,14 +56,14 @@ jobs:
           git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
       - uses: pnpm/action-setup@v4
         with:
           version: 10.17
           run_install: false
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: '24'
       - name: Get pnpm store directory
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
@@ -90,15 +90,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--bundles deb"
+          args: '--bundles deb'
       - name: Upload DEB
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_path: src-tauri/target/release/bundle/deb/Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_content_type: application/octet-stream
+      - name: Rename dg binary
+        run: mv src-tauri/target/release/dg dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}
+      - name: Build dg deb
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: 'dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb'
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_name: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
       - name: Install ruby with deb-s3
         if: matrix.build != 'freebsd'
@@ -110,7 +126,8 @@ jobs:
         run: |
           COMPONENT=$([[ "${{ github.ref_name }}" == *"-"* ]] && echo "pre-release" || echo "release") # if tag contain "-" assume it's pre-release.
 
-          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=bookworm --component="$COMPONENT" src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=bookworm --component="$COMPONENT" src-tauri/target/release/bundle/deb/Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          deb-s3 upload -l --bucket=apt.defguard.net --access-key-id=${{ secrets.AWS_ACCESS_KEY_APT }} --secret-access-key=${{ secrets.AWS_SECRET_KEY_APT }} --s3-region=eu-north-1 --no-fail-if-exists --codename=bookworm --component="$COMPONENT" dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
 
   build-linux:
     needs:
@@ -135,7 +152,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
       - name: Write release version
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
@@ -143,7 +160,7 @@ jobs:
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: '24'
       - uses: pnpm/action-setup@v4
         with:
           version: 10.17
@@ -171,7 +188,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--bundles deb,rpm"
+          args: '--bundles deb,rpm'
       - name: Calculate DEB SHA256
         id: calculate-sha256
         if: matrix.deb_arch == 'amd64'
@@ -267,8 +284,8 @@ jobs:
       - name: Build dg deb
         uses: defGuard/fpm-action@main
         with:
-          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
+          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb'
       - name: Upload DEB
         uses: actions/upload-release-asset@v1.0.2
         env:
@@ -281,8 +298,8 @@ jobs:
       - name: Build dg rpm
         uses: defGuard/fpm-action@main
         with:
-          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
+          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm'
       - name: Upload RPM
         uses: actions/upload-release-asset@v1.0.2
         env:
@@ -294,8 +311,9 @@ jobs:
           asset_content_type: application/octet-stream
 
   apt-sign:
-    needs: #Add needs: -ubuntu-22-04-build (on merge dev -> main)
+    needs:
       - build-linux
+      - ubuntu-22-04-build
     runs-on:
       - self-hosted
       - Linux
@@ -403,7 +421,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
       - name: Write release version
         run: |
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
@@ -411,7 +429,7 @@ jobs:
           echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: '24'
       - uses: pnpm/action-setup@v4
         with:
           version: 10
