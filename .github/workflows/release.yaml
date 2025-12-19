@@ -105,36 +105,27 @@ jobs:
           asset_name: Defguard_${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
       - name: Rename dg binary
-        run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+        run: mv src-tauri/target/release/dg dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}
       - name: Tar dg binary
         uses: a7ul/tar-action@v1.2.0
         with:
           command: c
           files: |
-            dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-          outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}_ubuntu-22-04-lts.tar.gz
-      - name: Upload dg archive
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}_ubuntu-22-04-lts.tar.gz
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}_ubuntu-22-04-lts.tar.gz
-          asset_content_type: application/octet-stream
+            dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}
+          outPath: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.tar.gz
       - name: Build dg deb
         uses: defGuard/fpm-action@main
         with:
-          fpm_args: 'dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
-          fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}_ubuntu-22-04-lts.deb'
+          fpm_args: 'dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf'
+          fpm_opts: '--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb'
       - name: Upload DEB
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}_ubuntu-22-04-lts.deb
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}_ubuntu-22-04-lts.deb
+          asset_path: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_name: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
       # - name: Install ruby with deb-s3
       #   if: matrix.build != 'freebsd'
