@@ -1,0 +1,6 @@
+This product includes third-party components listed below.
+
+1. WireGuard-NT
+   Copyright: WireGuard LLC
+   License: Prebuilt Binaries License
+   File: licenses/WireGuard-NT.txt
