@@ -8,7 +8,8 @@
   makeDesktopItem,
 }: let
   pname = "defguard-client";
-  version = "1.6.2"; # TODO: Get this from Cargo.toml or git
+  # Automatically read version from Cargo.toml
+  version = (builtins.fromTOML (builtins.readFile ../src-tauri/Cargo.toml)).workspace.package.version;
 
   desktopItem = makeDesktopItem {
     name = pname;
