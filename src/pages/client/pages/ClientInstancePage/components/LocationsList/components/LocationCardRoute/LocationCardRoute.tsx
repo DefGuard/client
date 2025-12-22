@@ -8,6 +8,7 @@ import { Toggle } from '../../../../../../../../shared/defguard-ui/components/La
 import type { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import {
+  ClientConnectionType,
   ClientTrafficPolicy,
   type CommonWireguardFields,
   type DefguardInstance,
@@ -57,16 +58,23 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
   }, [LL.pages, selectedDefguardInstance?.client_traffic_policy]);
 
   let selected: number;
-  if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.NONE) {
-    selected = Number(location?.route_all_traffic);
-  } else if (
-    selectedDefguardInstance?.client_traffic_policy ===
-    ClientTrafficPolicy.DISABLE_ALL_TRAFFIC
-  ) {
-    selected = 0;
+  // check traffic policy for Defguard locations
+  if (location?.connection_type === ClientConnectionType.LOCATION) {
+    if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.NONE) {
+      selected = Number(location?.route_all_traffic);
+    } else if (
+      selectedDefguardInstance?.client_traffic_policy ===
+      ClientTrafficPolicy.DISABLE_ALL_TRAFFIC
+    ) {
+      selected = 0;
+    } else {
+      selected = 1;
+    }
   } else {
-    selected = 1;
+    // fall back to selected value for basic WireGuard tunnels
+    selected = Number(location?.route_all_traffic);
   }
+
   return (
     <Toggle
       className="location-traffic-toggle"
