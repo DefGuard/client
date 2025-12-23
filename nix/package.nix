@@ -30,6 +30,7 @@
     gdk-pixbuf
     glib
     glib-networking
+    gtk3
     gtk4
     harfbuzz
     librsvg
@@ -54,7 +55,7 @@
     pnpm.configHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
-    # helper to add dynamic library paths
+    # helper to add runtime binary deps paths
     pkgs.makeWrapper
   ];
 in
@@ -85,34 +86,50 @@ in
     };
 
     buildPhase = ''
-      pnpm tauri build
+      runHook preBuild
+
+      pnpm tauri build --verbose
+
+      runHook postBuild
     '';
 
-    postInstall = ''
+    installPhase = ''
+      runHook preInstall
+
       mkdir -p $out/bin
 
       # copy client binary
-      cp src-tauri/target/release/${pname} $out/bin/
+      install -Dm755 src-tauri/target/release/${pname} $out/bin/${pname}
 
       # copy background service binary
-      cp src-tauri/target/release/defguard-service $out/bin/
+      install -Dm755 src-tauri/target/release/defguard-service $out/bin/defguard-service
 
       # copy CLI binary
-      cp src-tauri/target/release/dg $out/bin/
+      install -Dm755 src-tauri/target/release/dg $out/bin/dg
 
-      # add required library to client binary RPATH
-      wrapProgram $out/bin/${pname} \
-      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator pkgs.desktop-file-utils]}
-
+      # install desktop entry
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
+
+      # install icon files
+      mkdir -p $out/share/icons/hicolor/{32x32,128x128}/apps
+      install -Dm644 src-tauri/icons/32x32.png $out/share/icons/hicolor/32x32/apps/${pname}.png
+      install -Dm644 src-tauri/icons/128x128.png $out/share/icons/hicolor/128x128/apps/${pname}.png
+
+      runHook postInstall
+    '';
+
+    postFixup = ''
+      # Add desktop-file-utils to PATH
+      wrapProgram $out/bin/${pname} \
+        --prefix PATH : ${lib.makeBinPath [pkgs.desktop-file-utils]}
     '';
 
     meta = with lib; {
       description = "Defguard VPN Client";
       homepage = "https://defguard.net";
       # license = licenses.gpl3Only;
-      maintainers = with maintainers; [];
+      maintainers = with maintainers; [wojcik91];
       platforms = platforms.linux;
     };
   })
