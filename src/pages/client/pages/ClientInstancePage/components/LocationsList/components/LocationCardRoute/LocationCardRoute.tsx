@@ -58,13 +58,15 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
   }, [LL.pages, selectedDefguardInstance?.client_traffic_policy]);
 
   const selected = useMemo((): boolean => {
-    if (!selectedDefguardInstance || !location) return false;
+    // handle undefined location
+    if (!location) return false;
 
     // tunnel
     if (location.connection_type === ClientConnectionType.TUNNEL)
       return location.route_all_traffic;
 
     // Defguard location
+    if (!selectedDefguardInstance) return false;
     switch (selectedDefguardInstance.client_traffic_policy) {
       case ClientTrafficPolicy.DISABLE_ALL_TRAFFIC:
         return false;
