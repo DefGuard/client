@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::IpAddr,
     pin::Pin,
     sync::{Arc, Mutex, RwLock},
     time::{Duration, SystemTime},
@@ -8,6 +7,7 @@ use std::{
 #[cfg(unix)]
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
+use common::dns_borrow;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, Kernel, WGApi, WireguardInterfaceApi,
 };
@@ -107,21 +107,10 @@ fn configure_new_interface(
     // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
     // be used as DNS servers and search domains respectively.
     debug!("Preparing DNS configuration for interface {ifname}");
-    let dns_string = request.dns.clone().unwrap_or_default();
-    let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
-    // We assume that every entry that can't be parsed as an IP address is a domain name.
-    let mut dns = Vec::new();
-    let mut search_domains = Vec::new();
-    for entry in dns_entries {
-        if let Ok(ip) = entry.parse::<IpAddr>() {
-            dns.push(ip);
-        } else {
-            search_domains.push(entry);
-        }
-    }
+    let (dns, search_domains) = dns_borrow(&request.dns);
     debug!(
         "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
-            {search_domains:?}"
+        {search_domains:?}"
     );
 
     let configure_interface_result = wgapi.configure_interface(interface_config);

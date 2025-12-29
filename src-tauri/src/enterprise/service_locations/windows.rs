@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     fs::{self, create_dir_all},
-    net::IpAddr,
     path::PathBuf,
     result::Result,
     str::FromStr,
@@ -9,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use common::{find_free_tcp_port, get_interface_name};
+use common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{
     host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WireguardInterfaceApi,
 };
@@ -351,7 +350,8 @@ impl ServiceLocationManager {
         location_pubkey: &str,
     ) -> Result<(), ServiceLocationError> {
         debug!(
-            "Reseting the state of service location for instance_id: {instance_id}, location_pubkey: {location_pubkey}"
+            "Reseting the state of service location for instance_id: {instance_id}, \
+            location_pubkey: {location_pubkey}"
         );
 
         let service_location_data = self
@@ -364,19 +364,22 @@ impl ServiceLocationManager {
             })?;
 
         debug!(
-            "Disconnecting service location for instance_id: {instance_id}, location_pubkey: {location_pubkey} ({})",
+            "Disconnecting service location for instance_id: {instance_id}, location_pubkey: \
+            {location_pubkey} ({})",
             service_location_data.service_location.name
         );
 
         self.disconnect_service_location(instance_id, location_pubkey)?;
 
         debug!(
-            "Disconnected service location for instance_id: {instance_id}, location_pubkey: {location_pubkey} ({})",
+            "Disconnected service location for instance_id: {instance_id}, \
+            location_pubkey: {location_pubkey} ({})",
             service_location_data.service_location.name
         );
 
         debug!(
-            "Reconnecting service location if needed for instance_id: {instance_id}, location_pubkey: {location_pubkey} ({})",
+            "Reconnecting service location if needed for instance_id: {instance_id}, \
+            location_pubkey: {location_pubkey} ({})",
             service_location_data.service_location.name
         );
 
@@ -388,7 +391,8 @@ impl ServiceLocationManager {
                 && !is_user_logged_in())
         {
             debug!(
-                "Reconnecting service location for instance_id: {instance_id}, location_pubkey: {location_pubkey} ({})",
+                "Reconnecting service location for instance_id: {instance_id}, location_pubkey: \
+                {location_pubkey} ({})",
                 service_location_data.service_location.name
             );
             self.connect_to_service_location(&service_location_data)?;
@@ -419,11 +423,13 @@ impl ServiceLocationManager {
                         debug!("Interface {ifname} removed successfully");
                     }
                     debug!(
-                    "Removing connected service location for instance_id: {instance_id}, location_pubkey: {}",
-                    location.pubkey
-                );
+                        "Removing connected service location for instance_id: {instance_id}, \
+                        location_pubkey: {}",
+                        location.pubkey
+                    );
                     debug!(
-                        "Disconnected service location for instance_id: {instance_id}, location_pubkey: {}",
+                        "Disconnected service location for instance_id: {instance_id}, \
+                        location_pubkey: {}",
                         location.pubkey
                     );
                 } else {
@@ -450,7 +456,8 @@ impl ServiceLocationManager {
         location_pubkey: &str,
     ) -> Result<(), ServiceLocationError> {
         debug!(
-            "Disconnecting service location for instance_id: {instance_id}, location_pubkey: {location_pubkey}"
+            "Disconnecting service location for instance_id: {instance_id}, location_pubkey: \
+            {location_pubkey}"
         );
 
         if let Some(locations) = self.connected_service_locations.get_mut(instance_id) {
@@ -472,19 +479,22 @@ impl ServiceLocationManager {
                 }
             } else {
                 debug!(
-                    "Service location with pubkey {location_pubkey} for instance {instance_id} is not connected, skipping disconnect"
+                    "Service location with pubkey {location_pubkey} for instance {instance_id} is \
+                    not connected, skipping disconnect"
                 );
                 return Ok(());
             }
         } else {
             debug!(
-                "No connected service locations found for instance_id: {instance_id}, skipping disconnect"
+                "No connected service locations found for instance_id: {instance_id}, skipping \
+                disconnect"
             );
             return Ok(());
         }
 
         debug!(
-            "Disconnected service location for instance_id: {instance_id}, location_pubkey: {location_pubkey}"
+            "Disconnected service location for instance_id: {instance_id}, location_pubkey: \
+            {location_pubkey}"
         );
 
         Ok(())
@@ -552,24 +562,13 @@ impl ServiceLocationManager {
         wgapi.create_interface()?;
 
         // Extract DNS configuration if available
-        let dns_string = location.dns.clone();
-        let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
-        // We assume that every entry that can't be parsed as an IP address is a domain name.
-        let mut dns = Vec::new();
-        let mut search_domains = Vec::new();
-        for entry in dns_entries {
-            if let Ok(ip) = entry.parse::<IpAddr>() {
-                dns.push(ip);
-            } else {
-                search_domains.push(entry);
-            }
-        }
-
+        let dns_config = Some(location.dns.clone());
+        let (dns, search_domains) = dns_borrow(&dns_config);
         debug!(
-            "Configuring interface {ifname} with DNS: {:?} and search domains: {:?}",
-            dns, search_domains
+            "Configuring interface {ifname} with DNS: {dns:?} and search domains: \
+            {search_domains:?}",
         );
-        debug!("Interface Configuration: {:?}", config);
+        debug!("Interface Configuration: {config:?}");
 
         wgapi.configure_interface(&config)?;
         wgapi.configure_dns(&dns, &search_domains)?;
@@ -587,13 +586,15 @@ impl ServiceLocationManager {
         let instance_id = &location_data.instance_id;
         let location_pubkey = &location_data.service_location.pubkey;
         debug!(
-            "Connecting to service location for instance_id: {instance_id}, location_pubkey: {location_pubkey}"
+            "Connecting to service location for instance_id: {instance_id}, location_pubkey: \
+            {location_pubkey}"
         );
 
         // Check if already connected to this service location
         if self.is_service_location_connected(instance_id, location_pubkey) {
             debug!(
-                "Service location with pubkey {location_pubkey} for instance {instance_id} is already connected, skipping"
+                "Service location with pubkey {location_pubkey} for instance {instance_id} is \
+                already connected, skipping"
             );
             return Ok(());
         }
@@ -602,8 +603,8 @@ impl ServiceLocationManager {
             .load_service_location(instance_id, location_pubkey)?
             .ok_or_else(|| {
                 ServiceLocationError::LoadError(format!(
-                    "Service location with pubkey {} for instance {} not found",
-                    location_pubkey, instance_id
+                    "Service location with pubkey {location_pubkey} for instance {instance_id} not \
+                    found",
                 ))
             })?;
 
@@ -630,14 +631,16 @@ impl ServiceLocationManager {
         for (instance, locations) in self.connected_service_locations.iter() {
             for location in locations {
                 debug!(
-                    "Found connected service location for instance_id: {instance}, location_pubkey: {}",
+                    "Found connected service location for instance_id: {instance}, \
+                    location_pubkey: {}",
                     location.pubkey
                 );
                 if let Some(m) = mode {
                     let location_mode: ServiceLocationMode = location.mode.try_into()?;
                     if location_mode != m {
                         debug!(
-                        "Skipping interface {} due to the service location mode doesn't match the requested mode (expected {m:?}, found {:?})",
+                        "Skipping interface {} due to the service location mode doesn't match the \
+                        requested mode (expected {m:?}, found {:?})",
                         location.name, location.mode
                     );
                         continue;
@@ -702,9 +705,10 @@ impl ServiceLocationManager {
                         continue;
                     }
                     debug!(
-                            "Proceeding to connect pre-logon service location '{}' because no user is logged in",
-                            location.name
-                        );
+                        "Proceeding to connect pre-logon service location '{}' because no user \
+                            is logged in",
+                        location.name
+                    );
                 }
 
                 if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
@@ -779,7 +783,8 @@ impl ServiceLocationManager {
             debug!("Setting ACLs on service location file: {file_path_str}");
             if let Err(e) = set_protected_acls(file_path_str) {
                 warn!(
-                    "Failed to set ACLs on service location file {file_path_str}: {e}. File saved but may have insecure permissions."
+                    "Failed to set ACLs on service location file {file_path_str}: {e}. File saved \
+                    but may have insecure permissions."
                 );
             } else {
                 debug!("Successfully set ACLs on service location file");
@@ -850,7 +855,8 @@ impl ServiceLocationManager {
             for location in service_location_data.service_locations {
                 if location.pubkey == location_pubkey {
                     debug!(
-                        "Successfully loaded service location for instance {instance_id} and pubkey {location_pubkey}"
+                        "Successfully loaded service location for instance {instance_id} and \
+                        pubkey {location_pubkey}"
                     );
                     return Ok(Some(SingleServiceLocationData {
                         service_location: location,

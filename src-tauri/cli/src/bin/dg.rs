@@ -3,7 +3,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::{
     fmt,
     fs::{create_dir_all, OpenOptions},
-    net::IpAddr,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -11,7 +10,7 @@ use std::{
 };
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
-use common::{find_free_tcp_port, get_interface_name};
+use common::{dns_borrow, find_free_tcp_port, get_interface_name};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -168,18 +167,8 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         .expect("Failed to create WireGuard interface");
 
     debug!("Preparing DNS configuration for interface {ifname}");
-    let dns_string = config.device_config.dns.clone().unwrap_or_default();
-    let dns_entries = dns_string.split(',').map(str::trim).collect::<Vec<&str>>();
     // We assume that every entry that can't be parsed as an IP address is a domain name.
-    let mut dns = Vec::new();
-    let mut search_domains = Vec::new();
-    for entry in dns_entries {
-        if let Ok(ip) = entry.parse::<IpAddr>() {
-            dns.push(ip);
-        } else {
-            search_domains.push(entry);
-        }
-    }
+    let (dns, search_domains) = dns_borrow(&config.device_config.dns);
     debug!(
         "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
         {search_domains:?}"
@@ -227,7 +216,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         .split(',')
         .filter_map(ip_addr_parser)
         .collect::<Vec<_>>();
-    debug!("Parsed assigned IPs: {:?}", addresses);
+    debug!("Parsed assigned IPs: {addresses:?}");
 
     let config = InterfaceConfiguration {
         name: config.instance_info.name.clone(),
