@@ -1,6 +1,4 @@
 use std::fmt;
-#[cfg(target_os = "macos")]
-use std::net::IpAddr;
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
 
@@ -239,26 +237,6 @@ impl Location<Id> {
             LocationMfaMode::Disabled => false,
             LocationMfaMode::Internal | LocationMfaMode::External => true,
         }
-    }
-
-    /// Split DNS settings into resolver IP addresses and search domains.
-    #[cfg(target_os = "macos")]
-    pub(crate) fn dns(&self) -> (Vec<IpAddr>, Vec<String>) {
-        let mut dns = Vec::new();
-        let mut dns_search = Vec::new();
-
-        if let Some(dns_string) = &self.dns {
-            for entry in dns_string.split(',').map(str::trim) {
-                // Assume that every entry that can't be parsed as an IP address is a domain name.
-                if let Ok(ip) = entry.parse::<IpAddr>() {
-                    dns.push(ip);
-                } else {
-                    dns_search.push(entry.into());
-                }
-            }
-        }
-
-        (dns, dns_search)
     }
 
     #[cfg(not(target_os = "macos"))]

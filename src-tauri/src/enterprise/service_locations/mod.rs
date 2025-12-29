@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 use serde::{Deserialize, Serialize};
@@ -63,8 +63,8 @@ pub(crate) struct SingleServiceLocationData {
     pub private_key: String,
 }
 
-impl std::fmt::Debug for ServiceLocationData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for ServiceLocationData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ServiceLocationData")
             .field("service_locations", &self.service_locations)
             .field("instance_id", &self.instance_id)
@@ -73,8 +73,8 @@ impl std::fmt::Debug for ServiceLocationData {
     }
 }
 
-impl std::fmt::Debug for SingleServiceLocationData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for SingleServiceLocationData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SingleServiceLocationData")
             .field("service_locations", &self.service_location)
             .field("instance_id", &self.instance_id)
@@ -88,18 +88,22 @@ impl Location<Id> {
         if !self.is_service_location() {
             warn!("Location {self} is not a service location, so it can't be converted to one.");
             return Err(crate::error::Error::ConversionError(format!(
-                "Failed to convert location {self} to a service location as it's either not marked as one or has MFA enabled."
+                "Failed to convert location {self} to a service location as it's either not marked \
+                as one or has MFA enabled."
             )));
         }
 
         let mode = match self.service_location_mode {
             ServiceLocationMode::Disabled => {
                 warn!(
-                "Location {self} has an invalid service location mode, so it can't be converted to one."
+                "Location {self} has an invalid service location mode, so it can't be converted to \
+                one."
             );
-                return Err(
-                    crate::error::Error::ConversionError(format!("Location {} has an invalid service location mode ({:?}), so it can't be converted to one.", self, self.service_location_mode))
-                );
+                return Err(crate::error::Error::ConversionError(format!(
+                    "Location {self} has an invalid service location mode ({:?}), so it can't be \
+                    converted to one.",
+                    self.service_location_mode
+                )));
             }
             ServiceLocationMode::PreLogon => 0,
             ServiceLocationMode::AlwaysOn => 1,

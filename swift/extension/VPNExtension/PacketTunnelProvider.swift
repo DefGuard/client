@@ -28,12 +28,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
 
-        log.info("Tunnel configuration parsed successfully")
-
         let networkSettings = tunnelConfig.asNetworkSettings()
         self.setTunnelNetworkSettings(networkSettings) { error in
             if error != nil {
-                self.log.error("Set tunnel network settings error: \(String(describing: error))")
+                self.log.error("Failed to set tunnel network settings: \(String(describing: error))")
             }
             completionHandler(error)
             return

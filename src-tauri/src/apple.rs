@@ -15,6 +15,7 @@ use std::{
 };
 
 use block2::RcBlock;
+use common::dns_owned;
 use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask};
 use objc2::{
     rc::Retained,
@@ -399,7 +400,7 @@ pub(crate) struct Stats {
 }
 
 /// Run [`NSRunLoop`] until semaphore becomes `true`.
-pub fn spawn_runloop_and_wait_for(semaphore: Arc<AtomicBool>) {
+pub fn spawn_runloop_and_wait_for(semaphore: &Arc<AtomicBool>) {
     const ONE_SECOND: f64 = 1.;
     let run_loop = NSRunLoop::currentRunLoop();
     let mut date = NSDate::dateWithTimeIntervalSinceNow(ONE_SECOND);
@@ -937,6 +938,7 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
             );
             continue;
         };
+        eprintln!("=======> {:?}", tunnel_config.dns_search);
         tunnel_config.save();
     }
 
@@ -1096,7 +1098,7 @@ impl Location<Id> {
                 error!("{msg}");
                 Error::InternalError(msg)
             })?;
-        let (dns, dns_search) = self.dns();
+        let (dns, dns_search) = dns_owned(&self.dns);
         Ok(TunnelConfiguration {
             location_id: Some(self.id),
             tunnel_id: None,
@@ -1180,7 +1182,7 @@ impl Tunnel<Id> {
                 error!("{msg}");
                 Error::InternalError(msg)
             })?;
-        let (dns, dns_search) = self.dns();
+        let (dns, dns_search) = dns_owned(&self.dns);
         Ok(TunnelConfiguration {
             location_id: None,
             tunnel_id: Some(self.id),

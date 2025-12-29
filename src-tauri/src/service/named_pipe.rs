@@ -18,13 +18,13 @@ use windows_sys::Win32::{
 };
 
 // Named-pipe name used for IPC between defguard client and windows service.
-pub static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
+pub(super) static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 
-// SDDL defining named pipe ACL:
+/// SDDL defining named pipe ACL:
 /// - `SY` (LocalSystem) - full control
 /// - `BA` (Administrators) - full control
 /// - `BU` (Built-in Users) - read/write
-pub static SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
+static SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
 
 /// Tonic-compatible wrapper around a Windows named pipe server handle.
 pub struct TonicNamedPipeServer {
