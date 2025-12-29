@@ -1,4 +1,8 @@
-use std::{os::windows::io::RawHandle, pin::Pin};
+use std::{
+    os::windows::io::RawHandle,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use async_stream::stream;
 use futures_core::stream::Stream;
@@ -27,7 +31,7 @@ pub(super) static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 static SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
 
 /// Tonic-compatible wrapper around a Windows named pipe server handle.
-pub struct TonicNamedPipeServer {
+pub(crate) struct TonicNamedPipeServer {
     inner: NamedPipeServer,
 }
 
@@ -46,9 +50,9 @@ impl Connected for TonicNamedPipeServer {
 impl AsyncRead for TonicNamedPipeServer {
     fn poll_read(
         mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
+    ) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
@@ -57,30 +61,30 @@ impl AsyncWrite for TonicNamedPipeServer {
     /// Delegate async write to the underlying pipe.
     fn poll_write(
         mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+    ) -> Poll<Result<usize, std::io::Error>> {
         Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
     /// Delegate flush to the underlying pipe.
     fn poll_flush(
         mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
         Pin::new(&mut self.inner).poll_flush(cx)
     }
 
     /// Delegate shutdown to the underlying pipe.
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
         Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
-/// Convert a Rust `&str` to a null-terminated UTF-16 buffer suitable for Win32 APIs.
+/// Convert `&str` to a null-terminated UTF-16 buffer suitable for Win32 APIs.
 fn str_to_wide_null_terminated(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(Some(0)).collect()
 }
@@ -161,16 +165,15 @@ fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
 /// 1. Creates a fresh listening instance.
 /// 2. Awaits a client connection (`connect().await`).
 /// 3. Yields the connected `TonicNamedPipeServer`.
-pub fn get_named_pipe_server_stream(
+pub(crate) fn get_named_pipe_server_stream(
 ) -> Result<impl Stream<Item = io::Result<TonicNamedPipeServer>>, std::io::Error> {
     debug!("Creating named pipe server stream");
     let stream = stream! {
-        let mut server = create_tokio_secure_pipe()?;
-
+        let mut server;
         loop {
+            server = create_tokio_secure_pipe()?;
             server.connect().await?;
             yield Ok(TonicNamedPipeServer::new(server));
-            server = create_tokio_secure_pipe()?;
         }
     };
     info!("Created named pipe server stream");
