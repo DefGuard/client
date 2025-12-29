@@ -938,7 +938,6 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
             );
             continue;
         };
-        eprintln!("=======> {:?}", tunnel_config.dns_search);
         tunnel_config.save();
     }
 
