@@ -6,7 +6,8 @@
   rustc,
   cargo,
   makeDesktopItem,
-}: let
+}:
+let
   pname = "defguard-client";
   version = "1.6.2"; # TODO: Get this from Cargo.toml or git
 
@@ -16,7 +17,10 @@
     icon = pname;
     desktopName = "Defguard";
     genericName = "Defguard VPN Client";
-    categories = ["Network" "Security"];
+    categories = [
+      "Network"
+      "Security"
+    ];
   };
 
   pnpm = pkgs.pnpm_10;
@@ -29,7 +33,7 @@
     gdk-pixbuf
     glib
     glib-networking
-    gtk4
+    gtk3
     harfbuzz
     librsvg
     libsoup_3
@@ -38,6 +42,7 @@
     openssl
     libayatana-appindicator
     desktop-file-utils
+    iproute2
   ];
 
   nativeBuildInputs = [
@@ -55,63 +60,87 @@
     rustPlatform.cargoSetupHook
     # helper to add dynamic library paths
     pkgs.makeWrapper
+    pkgs.wrapGAppsHook3
   ];
 in
-  stdenv.mkDerivation (finalAttrs: rec {
-    inherit pname version buildInputs nativeBuildInputs;
+stdenv.mkDerivation (finalAttrs: rec {
+  inherit
+    pname
+    version
+    buildInputs
+    nativeBuildInputs
+    ;
 
-    src = ../.;
+  src = ../.;
 
-    # prefetch cargo dependencies
-    cargoRoot = "src-tauri";
-    buildAndTestSubdir = "src-tauri";
+  # prefetch cargo dependencies
+  cargoRoot = "src-tauri";
+  buildAndTestSubdir = "src-tauri";
 
-    cargoDeps = rustPlatform.importCargoLock {
-      lockFile = ../src-tauri/Cargo.lock;
-    };
+  cargoDeps = rustPlatform.importCargoLock {
+    lockFile = ../src-tauri/Cargo.lock;
+  };
 
-    # prefetch pnpm dependencies
-    pnpmDeps = pkgs.pnpm.fetchDeps {
-      inherit
-        (finalAttrs)
-        pname
-        version
-        src
-        ;
+  # prefetch pnpm dependencies
+  pnpmDeps = pnpm.fetchDeps {
+    inherit (finalAttrs)
+      pname
+      version
+      src
+      ;
 
-      fetcherVersion = 2;
-      hash = "sha256-v47yaNnt7vLDPR7WVLSonmZBBOkYWnmTUqMiPZ/WCGo=";
-    };
+    fetcherVersion = 2;
+    hash = "sha256-Xtn0FIq097sLEl/iodLeVVOYxVLx1ePJ8UjJUmgB2f0=";
+  };
 
-    buildPhase = ''
-      pnpm tauri build
-    '';
+  buildPhase = ''
+    pnpm tauri build
+  '';
 
-    postInstall = ''
-      mkdir -p $out/bin
+  installPhase = ''
+    mkdir -p $out/bin
 
-      # copy client binary
-      cp src-tauri/target/release/${pname} $out/bin/
+    # copy client binary
+    cp src-tauri/target/release/${pname} $out/bin/
 
-      # copy background service binary
-      cp src-tauri/target/release/defguard-service $out/bin/
+    # copy background service binary
+    cp src-tauri/target/release/defguard-service $out/bin/
 
-      # copy CLI binary
-      cp src-tauri/target/release/dg $out/bin/
+    # copy CLI binary
+    cp src-tauri/target/release/dg $out/bin/
 
-      # add required library to client binary RPATH
-      wrapProgram $out/bin/${pname} \
-      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator pkgs.desktop-file-utils]}
+    # copy Tauri resources (icons for system tray, etc.)
+    mkdir -p $out/lib/${pname}
+    cp -r src-tauri/resources/* $out/lib/${pname}/
 
-      mkdir -p $out/share/applications
-      cp ${desktopItem}/share/applications/* $out/share/applications/
-    '';
+    mkdir -p $out/share/applications
+    cp ${desktopItem}/share/applications/* $out/share/applications/
+  '';
 
-    meta = with lib; {
-      description = "Defguard VPN Client";
-      homepage = "https://defguard.net";
-      # license = licenses.gpl3Only;
-      maintainers = with maintainers; [];
-      platforms = platforms.linux;
-    };
-  })
+  # add extra args to wrapGAppsHook3 wrapper
+  preFixup = ''
+    gappsWrapperArgs+=(
+      --prefix PATH : ${
+        lib.makeBinPath [
+          # `defguard-service` needs `ip` to manage wireguard
+          pkgs.iproute2
+          # `defguard-client` needs `update-desktop-database`
+          pkgs.desktop-file-utils
+        ]
+      }
+      --prefix LD_LIBRARY_PATH : ${
+        lib.makeLibraryPath [
+          pkgs.libayatana-appindicator
+        ]
+      }
+    )
+  '';
+
+  meta = with lib; {
+    description = "Defguard VPN Client";
+    homepage = "https://defguard.net";
+    # license = licenses.gpl3Only;
+    maintainers = with maintainers; [ ];
+    platforms = platforms.linux;
+  };
+})
