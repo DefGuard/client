@@ -1204,8 +1204,8 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
         "The tunnel to delete with ID {tunnel_id} has been identified as {tunnel}, proceeding \
         with deletion."
     );
-
-    if let Some(_connection) = app_state
+    #[allow(unused_variables)]
+    if let Some(connection) = app_state
         .remove_connection(tunnel_id, ConnectionType::Tunnel)
         .await
     {
