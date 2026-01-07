@@ -512,6 +512,9 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
         fs::remove_file(DAEMON_SOCKET_PATH)?;
     }
 
+    debug!("Binding socket file at {DAEMON_SOCKET_PATH}");
+    let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
+
     // change owner group for socket file
     // get the group ID by name
     let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
@@ -528,8 +531,6 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Setting permissions for socket file at {DAEMON_SOCKET_PATH} to 0x660");
     fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
 
-    debug!("Binding socket file at {DAEMON_SOCKET_PATH}");
-    let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
     let uds_stream = UnixListenerStream::new(uds);
 
     info!("Defguard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
