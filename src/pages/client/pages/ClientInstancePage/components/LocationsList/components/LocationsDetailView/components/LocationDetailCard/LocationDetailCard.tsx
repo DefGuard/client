@@ -92,7 +92,10 @@ export const LocationDetailCard = memo(
                   <Helper initialPlacement="left">
                     {parse(localLL.controls.traffic.helper())}
                   </Helper>
-                  <LocationCardRoute location={location} />
+                  <LocationCardRoute
+                    location={location}
+                    selectedDefguardInstance={selectedDefguardInstance}
+                  />
                 </div>
               )}
               {location?.active && (
