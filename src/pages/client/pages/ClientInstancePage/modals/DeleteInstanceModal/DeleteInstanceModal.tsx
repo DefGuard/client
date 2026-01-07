@@ -49,7 +49,6 @@ export const DeleteInstanceModal = () => {
           refetchType: 'active',
         });
       });
-      setClientStore({ selectedInstance: undefined, selectedLocation: undefined });
       close();
       closeUpdate();
     },
@@ -83,6 +82,7 @@ export const DeleteInstanceModal = () => {
       cancelText={LL.common.controls.cancel()}
       onSubmit={() => {
         if (instance) {
+          setClientStore({ selectedInstance: undefined, selectedLocation: undefined });
           mutate(instance.id);
         }
       }}
