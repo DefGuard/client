@@ -6,10 +6,12 @@
   rustc,
   cargo,
   makeDesktopItem,
+  pnpmConfigHook,
+  fetchPnpmDeps,
 }: let
   pname = "defguard-client";
   # Automatically read version from Cargo.toml
-  version = (builtins.fromTOML (builtins.readFile ../src-tauri/Cargo.toml)).workspace.package.version;
+  version = (fromTOML (builtins.readFile ../src-tauri/Cargo.toml)).workspace.package.version;
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -31,7 +33,7 @@
     glib
     glib-networking
     gtk3
-    gtk4
+    # gtk4
     harfbuzz
     librsvg
     libsoup_3
@@ -39,7 +41,11 @@
     webkitgtk_4_1
     openssl
     libayatana-appindicator
+    libayatana-indicator
+    ayatana-ido
+    libdbusmenu-gtk3
     desktop-file-utils
+    iproute2
   ];
 
   nativeBuildInputs = [
@@ -52,11 +58,12 @@
     pkgs.protobuf
     pnpm
     # configures pnpm to use pre-fetched dependencies
-    pnpm.configHook
+    pnpmConfigHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
     # helper to add runtime binary deps paths
     pkgs.makeWrapper
+    pkgs.wrapGAppsHook3
   ];
 in
   stdenv.mkDerivation (finalAttrs: rec {
@@ -72,8 +79,10 @@ in
       lockFile = ../src-tauri/Cargo.lock;
     };
 
+    # dontUseCargoBuild = true;
+
     # prefetch pnpm dependencies
-    pnpmDeps = pkgs.pnpm.fetchDeps {
+    pnpmDeps = fetchPnpmDeps {
       inherit
         (finalAttrs)
         pname
@@ -82,7 +91,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-v47yaNnt7vLDPR7WVLSonmZBBOkYWnmTUqMiPZ/WCGo=";
+      hash = "sha256-DysOn+v37aUxqvIy/afbTcIRCMRM9jSN8xF3qbcR/uM=";
     };
 
     buildPhase = ''
@@ -107,6 +116,10 @@ in
       # copy CLI binary
       install -Dm755 src-tauri/target/release/dg $out/bin/dg
 
+      # Copy resources directory (for tray icons, etc.)
+      mkdir -p $out/lib/${pname}
+      cp -r src-tauri/resources $out/lib/${pname}/
+
       # install desktop entry
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
@@ -119,10 +132,23 @@ in
       runHook postInstall
     '';
 
-    postFixup = ''
-      # Add desktop-file-utils to PATH
-      wrapProgram $out/bin/${pname} \
-        --prefix PATH : ${lib.makeBinPath [pkgs.desktop-file-utils]}
+    # add extra args to wrapGAppsHook3 wrapper
+    preFixup = ''
+      gappsWrapperArgs+=(
+        --prefix PATH : ${
+        lib.makeBinPath [
+          # `defguard-service` needs `ip` to manage wireguard
+          pkgs.iproute2
+          # `defguard-client` needs `update-desktop-database`
+          pkgs.desktop-file-utils
+        ]
+      }
+        --prefix LD_LIBRARY_PATH : ${
+        lib.makeLibraryPath [
+          pkgs.libayatana-appindicator
+        ]
+      }
+      )
     '';
 
     meta = with lib; {
