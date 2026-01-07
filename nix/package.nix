@@ -45,6 +45,8 @@
     libdbusmenu-gtk3
     desktop-file-utils
     iproute2
+    lsb-release
+    openresolv
   ];
 
   nativeBuildInputs = [
@@ -134,10 +136,13 @@ in
       gappsWrapperArgs+=(
         --prefix PATH : ${
         lib.makeBinPath [
-          # `defguard-service` needs `ip` to manage wireguard
+          # `defguard-service` needs `ip` to manage WireGuard
           pkgs.iproute2
-          # `defguard-client` needs `update-desktop-database`
+          # `defguard-service` needs `resolvconf` to manage DNS
+          pkgs.openresolv
+          # `defguard-client` needs `update-desktop-database` and `lsb_release`
           pkgs.desktop-file-utils
+          pkgs.lsb-release
         ]
       }
         --prefix LD_LIBRARY_PATH : ${
