@@ -31,8 +31,10 @@ in {
   };
 
   config = mkIf cfg.enable {
+    # Add client package
     environment.systemPackages = [cfg.package];
 
+    # Setup systemd service for the intrerface management daemon
     systemd.services.defguard-service = {
       description = "Defguard VPN Service";
       wantedBy = ["multi-user.target"];
@@ -65,6 +67,7 @@ in {
       };
     };
 
+    # Setup defguard user & group
     users.users.defguard = {
       isSystemUser = true;
       group = "defguard";
