@@ -46,8 +46,8 @@ in {
         RestartSec = 5;
         User = "defguard";
         Group = "defguard";
-        StateDirectory = "defguard";
-        LogsDirectory = "defguard";
+        StateDirectory = "defguard-service";
+        LogsDirectory = "defguard-service";
         # Add capabilities to manage network interfaces
         CapabilityBoundingSet = "CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_MODULE";
         AmbientCapabilities = "CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_MODULE";
@@ -73,6 +73,7 @@ in {
       group = "defguard";
     };
 
+    # Make sure the group exists
     users.groups.defguard = {};
   };
 }
