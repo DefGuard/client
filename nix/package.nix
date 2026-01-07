@@ -33,7 +33,6 @@
     glib
     glib-networking
     gtk3
-    # gtk4
     harfbuzz
     librsvg
     libsoup_3
@@ -61,7 +60,7 @@
     pnpmConfigHook
     # configures cargo to use pre-fetched dependencies
     rustPlatform.cargoSetupHook
-    # helper to add runtime binary deps paths
+    # helper to add runtime binary & library deps paths
     pkgs.makeWrapper
     pkgs.wrapGAppsHook3
   ];
@@ -79,8 +78,6 @@ in
       lockFile = ../src-tauri/Cargo.lock;
     };
 
-    # dontUseCargoBuild = true;
-
     # prefetch pnpm dependencies
     pnpmDeps = fetchPnpmDeps {
       inherit
@@ -91,7 +88,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-DysOn+v37aUxqvIy/afbTcIRCMRM9jSN8xF3qbcR/uM=";
+      hash = "";
     };
 
     buildPhase = ''
