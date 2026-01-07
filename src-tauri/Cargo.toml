@@ -145,7 +145,7 @@ windows = { version = "0.62", features = [
     "Win32_System_RemoteDesktop",
 ] }
 windows-acl = "0.3"
-windows-service = "0.7"
+windows-service = "0.8"
 windows-sys = { version = "0.61", features = [
     # Core Win32 types
     "Win32_Foundation",

@@ -15,7 +15,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(
         options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void
     ) {
-        log.info("\(#function) called")
         if let options = options {
             log.debug("Options: \(options)")
         }
@@ -29,12 +28,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
 
-        log.info("Tunnel configuration parsed successfully")
-
         let networkSettings = tunnelConfig.asNetworkSettings()
         self.setTunnelNetworkSettings(networkSettings) { error in
             if error != nil {
-                self.log.error("Set tunnel network settings error: \(String(describing: error))")
+                self.log.error("Failed to set tunnel network settings: \(String(describing: error))")
             }
             completionHandler(error)
             return
@@ -54,14 +51,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func stopTunnel(
         with reason: NEProviderStopReason, completionHandler: @escaping () -> Void
     ) {
-        log.info("\(#function) called with reason: \(reason)")
         adapter.stop()
         log.info("Tunnel stopped")
         completionHandler()
     }
 
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
-        log.debug("\(#function) called")
         // TODO: messageData should contain a valid message.
         if let handler = completionHandler {
             if let stats = adapter.stats() {

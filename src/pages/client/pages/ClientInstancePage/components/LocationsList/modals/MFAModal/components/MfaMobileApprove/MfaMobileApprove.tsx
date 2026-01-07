@@ -111,7 +111,7 @@ export const MfaMobileApprove = ({
     socket?.close();
     // go back to previous step
     onCancel();
-  }
+  };
 
   return (
     <div id="mobile-approve-mfa">

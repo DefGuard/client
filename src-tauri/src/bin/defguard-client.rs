@@ -103,7 +103,7 @@ async fn startup(app_handle: &AppHandle) {
             }
             semaphore_clone.store(true, Ordering::Release);
         });
-        defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+        defguard_client::apple::spawn_runloop_and_wait_for(&semaphore);
         let _ = handle.await;
 
         let (tunnels, locations) = get_all_tunnels_locations().await;
@@ -416,7 +416,7 @@ fn main() {
                 });
                 // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
                 // create a temporary one.
-                defguard_client::apple::spawn_runloop_and_wait_for(semaphore);
+                defguard_client::apple::spawn_runloop_and_wait_for(&semaphore);
                 tauri::async_runtime::block_on(async move {
                     let _ = handle.await;
                 });

@@ -32,6 +32,48 @@ pub fn get_interface_name(_name: &str) -> String {
     format!("{base_ifname}0")
 }
 
+/// Split DNS settings into resolver IP addresses and search domains.
+pub fn dns_owned(config: &Option<String>) -> (Vec<IpAddr>, Vec<String>) {
+    let mut dns = Vec::new();
+    let mut dns_search = Vec::new();
+
+    if let Some(dns_string) = config {
+        if !dns_string.is_empty() {
+            for entry in dns_string.split(',').map(str::trim) {
+                // Assume that every entry that can't be parsed as an IP address is a domain name.
+                if let Ok(ip) = entry.parse::<IpAddr>() {
+                    dns.push(ip);
+                } else {
+                    dns_search.push(entry.into());
+                }
+            }
+        }
+    }
+
+    (dns, dns_search)
+}
+
+/// Split DNS settings into resolver IP addresses and search domains.
+pub fn dns_borrow(config: &Option<String>) -> (Vec<IpAddr>, Vec<&str>) {
+    let mut dns = Vec::new();
+    let mut dns_search = Vec::new();
+
+    if let Some(dns_string) = config {
+        if !dns_string.is_empty() {
+            for entry in dns_string.split(',').map(str::trim) {
+                // Assume that every entry that can't be parsed as an IP address is a domain name.
+                if let Ok(ip) = entry.parse::<IpAddr>() {
+                    dns.push(ip);
+                } else {
+                    dns_search.push(entry);
+                }
+            }
+        }
+    }
+
+    (dns, dns_search)
+}
+
 /// Strips location name of all non-alphanumeric characters returning usable interface name.
 #[cfg(any(windows, target_os = "macos"))]
 #[must_use]

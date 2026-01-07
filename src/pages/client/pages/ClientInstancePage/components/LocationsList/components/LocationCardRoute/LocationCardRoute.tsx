@@ -2,12 +2,12 @@ import './style.scss';
 
 import { error } from '@tauri-apps/plugin-log';
 import { useMemo } from 'react';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
 import type { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import {
+  ClientConnectionType,
   ClientTrafficPolicy,
   type CommonWireguardFields,
   type DefguardInstance,
@@ -36,18 +36,19 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
   };
 
   const { LL } = useI18nContext();
+
   const toggleOptions = useMemo(() => {
-    const res: ToggleOption<number>[] = [
+    const res: ToggleOption<boolean>[] = [
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.predefinedTraffic(),
-        value: 0,
+        value: false,
         disabled:
           selectedDefguardInstance?.client_traffic_policy ===
           ClientTrafficPolicy.FORCE_ALL_TRAFFIC,
       },
       {
         text: LL.pages.client.pages.instancePage.controls.traffic.allTraffic(),
-        value: 1,
+        value: true,
         disabled:
           selectedDefguardInstance?.client_traffic_policy ===
           ClientTrafficPolicy.DISABLE_ALL_TRAFFIC,
@@ -56,17 +57,26 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
     return res;
   }, [LL.pages, selectedDefguardInstance?.client_traffic_policy]);
 
-  let selected: number;
-  if (selectedDefguardInstance?.client_traffic_policy === ClientTrafficPolicy.NONE) {
-    selected = Number(location?.route_all_traffic);
-  } else if (
-    selectedDefguardInstance?.client_traffic_policy ===
-    ClientTrafficPolicy.DISABLE_ALL_TRAFFIC
-  ) {
-    selected = 0;
-  } else {
-    selected = 1;
-  }
+  const selected = useMemo((): boolean => {
+    // handle undefined location
+    if (!location) return false;
+
+    // tunnel
+    if (location.connection_type === ClientConnectionType.TUNNEL)
+      return location.route_all_traffic;
+
+    // Defguard location
+    if (!selectedDefguardInstance) return false;
+    switch (selectedDefguardInstance.client_traffic_policy) {
+      case ClientTrafficPolicy.DISABLE_ALL_TRAFFIC:
+        return false;
+      case ClientTrafficPolicy.FORCE_ALL_TRAFFIC:
+        return true;
+      case ClientTrafficPolicy.NONE:
+        return location.route_all_traffic ?? false;
+    }
+  }, [location, selectedDefguardInstance]);
+
   return (
     <Toggle
       className="location-traffic-toggle"
@@ -75,7 +85,7 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
       disabled={location?.active}
       onChange={(v) => {
         if (!location?.active) {
-          handleChange(Boolean(v));
+          handleChange(v);
         }
       }}
     />
