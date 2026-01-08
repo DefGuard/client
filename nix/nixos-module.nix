@@ -31,8 +31,10 @@ in {
   };
 
   config = mkIf cfg.enable {
+    # Add client package
     environment.systemPackages = [cfg.package];
 
+    # Setup systemd service for the intrerface management daemon
     systemd.services.defguard-service = {
       description = "Defguard VPN Service";
       wantedBy = ["multi-user.target"];
@@ -40,36 +42,20 @@ in {
       after = ["network-online.target"];
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/defguard-service --log-level ${cfg.logLevel} --stats-period ${toString cfg.statsPeriod}";
-        Restart = "on-failure";
-        RestartSec = 5;
-        User = "defguard";
+        ExecReload = "/bin/kill -HUP $MAINPID";
         Group = "defguard";
-        StateDirectory = "defguard";
-        LogsDirectory = "defguard";
-        # Add capabilities to manage network interfaces
-        CapabilityBoundingSet = "CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_MODULE";
-        AmbientCapabilities = "CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_MODULE";
-        # Allow access to /dev/net/tun for TUN/TAP devices
-        DeviceAllow = "/dev/net/tun rw";
-        # Access to /sys for network configuration
-        BindReadOnlyPaths = [
-          "/sys"
-          "/proc"
-        ];
-        # Protect the system while giving necessary access
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        NoNewPrivileges = true;
-        # Allow the service to manage network namespaces
-        PrivateNetwork = false;
+        Restart = "on-failure";
+        RestartSec = 2;
+        KillMode = "process";
+        KillSignal = "SIGINT";
+        LimitNOFILE = 65536;
+        LimitNPROC = "infinity";
+        TasksMax = "infinity";
+        OOMScoreAdjust = -1000;
       };
     };
 
-    users.users.defguard = {
-      isSystemUser = true;
-      group = "defguard";
-    };
-
+    # Make sure the defguard group exists
     users.groups.defguard = {};
   };
 }

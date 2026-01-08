@@ -508,9 +508,11 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     // Remove existing socket if it exists
     if Path::new(DAEMON_SOCKET_PATH).exists() {
+        debug!("Removing existing socket file at {DAEMON_SOCKET_PATH}");
         fs::remove_file(DAEMON_SOCKET_PATH)?;
     }
 
+    debug!("Binding socket file at {DAEMON_SOCKET_PATH}");
     let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
 
     // change owner group for socket file
@@ -521,10 +523,12 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     })?;
 
     // change ownership - keep current user, change group
+    debug!("Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group {DAEMON_SOCKET_GROUP}");
     chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
 
     // Set socket permissions to allow client access
     // 0o660 allows read/write for owner and group only
+    debug!("Setting permissions for socket file at {DAEMON_SOCKET_PATH} to 0x660");
     fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
 
     let uds_stream = UnixListenerStream::new(uds);
