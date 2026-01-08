@@ -4,7 +4,6 @@ import { fetch } from '@tauri-apps/plugin-http';
 import { useMemo } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { shallow } from 'zustand/shallow';
 import { useI18nContext } from '../../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -40,7 +39,6 @@ export const UpdateInstanceModalForm = () => {
   const closeModal = useUpdateInstanceModal((state) => state.close);
   const toaster = useToaster();
   const queryClient = useQueryClient();
-  const setClientState = useClientStore((s) => s.setState, shallow);
   const platformInfo = useClientStore((state) => state.platformInfo);
 
   const defaultValues = useMemo(
@@ -226,10 +224,6 @@ export const UpdateInstanceModalForm = () => {
           text={localLL.controls.removeInstance()}
           onClick={() => {
             if (instance) {
-              setClientState({
-                selectedInstance: undefined,
-                selectedLocation: undefined,
-              });
               openDeleteInstance(instance);
             }
           }}
