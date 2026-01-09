@@ -11,8 +11,6 @@ jobs:
       - self-hosted
       - Linux
       - X64
-    outputs:
-      amd64_sha: ${{ steps.get_sha.outputs.AMD64_SHA }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,12 +22,6 @@ jobs:
           gh release download "${{ github.event.release.tag_name }}" \
             --pattern "*.deb" \
             --dir debs
-
-      - name: Get AMD64 DEB SHA256 # Obtain SHA for AUR
-        run: |
-          sha=$(sha256sum debs/defguard-client_*_amd64.deb | grep -v ubuntu | awk '{print $1}')
-          echo "AMD64_SHA=$sha" >> $GITHUB_OUTPUT
-        id: get_sha
 
       - name: Install ruby with deb-s3
         run: |
@@ -90,61 +82,3 @@ jobs:
           done
           (aws s3 ls s3://apt.defguard.net/dists/ --recursive; aws s3 ls s3://apt.defguard.net/pool/ --recursive) | awk '{print "<a href=\""$4"\">"$4"</a><br>"}' > index.html
           aws s3 cp index.html s3://apt.defguard.net/ --acl public-read
-
-  update-aur:
-    needs:
-      - update-apt
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    container: archlinux:latest
-    steps:
-      - name: Install dependencies
-        run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm git openssh base-devel
-      - name: Setup SSH for AUR
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          # Create SSH config file
-          cat > ~/.ssh/config << EOF
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/id_rsa
-            User aur
-            StrictHostKeyChecking accept-new
-          EOF
-          chmod 600 ~/.ssh/config
-      - name: Update AUR Package
-        run: |
-
-          git config --global user.name "Defguard Build System"
-          git config --global user.email "community@defguard.net"
-          git config --global --add safe.directory '*'
-
-          rm -rf aur-repo || true
-          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" \
-            git clone "ssh://aur@aur.archlinux.org/defguard-client.git" aur-repo
-          cd aur-repo
-          git config --global --add safe.directory "$(pwd)"
-          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-          echo "Updating to version: $VERSION"
-          sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
-
-          AMD64_SHA="${{ needs.update-apt.outputs.amd64_sha }}"
-          echo "AMD64 DEB SHA256: $AMD64_SHA"
-          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$AMD64_SHA')/" PKGBUILD
-
-          useradd -m builduser
-          chown -R builduser:builduser .
-
-          su builduser -c "makepkg --printsrcinfo" > .SRCINFO
-          git add PKGBUILD .SRCINFO
-          git commit -m "Updated to $VERSION"
-          GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" git push
-          cat PKGBUILD
-          cat .SRCINFO
