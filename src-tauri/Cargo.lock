@@ -990,7 +990,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "1.6.2"
+version = "1.6.3"
 dependencies = [
  "nix",
 ]
@@ -1363,7 +1363,7 @@ checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 
 [[package]]
 name = "defguard-client"
-version = "1.6.2"
+version = "1.6.3"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1433,7 +1433,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-dg"
-version = "1.6.2"
+version = "1.6.3"
 dependencies = [
  "clap",
  "common",
