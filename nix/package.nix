@@ -90,7 +90,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-Xtn0FIq097sLEl/iodLeVVOYxVLx1ePJ8UjJUmgB2f0=";
+      hash = "sha256-co5UK8FHDIO7bDRS4yxczz7VxGNWlPBd8h0PlmOQ3xM=";
     };
 
     buildPhase = ''
