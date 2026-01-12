@@ -10,6 +10,8 @@ case "$1" in
         if ! getent group "$GROUP_NAME" >/dev/null; then
             groupadd --system "$GROUP_NAME"
             echo "Created group $GROUP_NAME"
+        else
+            echo "Group $GROUP_NAME exists already."
         fi
 
         # Determine target user
@@ -19,6 +21,7 @@ case "$1" in
         elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
             TARGET_USER="$USER"
         fi
+        echo "Installation triggered by user $TARGET_USER"
 
         # Add user to group if we found a valid target
         if [ -n "$TARGET_USER" ]; then
@@ -40,10 +43,14 @@ case "$1" in
                     exit 1
                 fi
             fi
+        else
+            echo "User $TARGET_USER is not a valid target. Not adding the user to group $GROUP_NAME"
         fi
 
         # Handle systemd service
         if [ -d /run/systemd/system ]; then
+            echo "Updating systemd service $SERVICE_NAME"
+
             # Reload systemd to recognize new service file
             systemctl daemon-reload
 
@@ -58,6 +65,7 @@ case "$1" in
     abort-upgrade|abort-remove|abort-deconfigure)
         # On failed operations, ensure service is running if it should be
         if [ -d /run/systemd/system ]; then
+            echo "Restarting systemd service $SERVICE_NAME"
             systemctl daemon-reload
             if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
                 systemctl start "$SERVICE_NAME" || true
