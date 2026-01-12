@@ -4,6 +4,29 @@ set -e
 GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
 
+# Get the name of user who is installing the client
+get_installing_user() {
+    # Method 1: Check standard environment variables when installing with CLI
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+        INSTALLING_USER="$SUDO_USER"
+    elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
+        INSTALLING_USER="$USER"
+    fi
+    if [ -n "$INSTALLING_USER" ]; then
+        echo "$INSTALLING_USER"
+        return 0
+    fi
+
+    # Method 2: Check loginctl for latest session
+    username=$(loginctl list-users --no-legend | awk '$1 >= 1000 {print $2; exit}')
+    if [ -n "$username" ]; then
+        echo "$username"
+        return 0
+    fi
+    
+    return 1
+}
+
 case "$1" in
     1|configure)
         # Create the group if it doesn't exist
@@ -15,12 +38,7 @@ case "$1" in
         fi
 
         # Determine target user
-        TARGET_USER=""
-        if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
-            TARGET_USER="$SUDO_USER"
-        elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
-            TARGET_USER="$USER"
-        fi
+        TARGET_USER=$(get_installing_user)
         echo "Installation triggered by user $TARGET_USER"
 
         # Add user to group if we found a valid target
