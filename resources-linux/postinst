@@ -18,7 +18,8 @@ get_installing_user() {
     fi
 
     # Method 2: Check loginctl for latest session
-    username=$(loginctl list-users --no-legend | awk '$1 >= 1000 {print $2; exit}')
+    SESSION_ID=$(loginctl show-seat seat0 -p ActiveSession --value)
+    username=$(loginctl show-session "$SESSION_ID" -p Name --value)
     if [ -n "$username" ]; then
         echo "$username"
         return 0
