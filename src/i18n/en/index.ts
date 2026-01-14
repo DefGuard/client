@@ -144,7 +144,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               githubLink: `GitHub`,
               spreadWordText: `spreading the word about:`,
               defguard: `defguard!`,
-              githubDiscussions: `If you encounter any issues with Defguard, you can reach out to our community for support via: `,
+              githubDiscussions: `Reach out to our community via `,
               supportUs: 'Support Us!',
             },
           },

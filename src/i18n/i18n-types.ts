@@ -343,7 +343,7 @@ type RootTranslation = {
 							 */
 							defguard: string
 							/**
-							 * I​f​ ​y​o​u​ ​e​n​c​o​u​n​t​e​r​ ​a​n​y​ ​i​s​s​u​e​s​ ​w​i​t​h​ ​D​e​f​g​u​a​r​d​,​ ​y​o​u​ ​c​a​n​ ​r​e​a​c​h​ ​o​u​t​ ​t​o​ ​o​u​r​ ​c​o​m​m​u​n​i​t​y​ ​f​o​r​ ​s​u​p​p​o​r​t​ ​v​i​a​:​ 
+							 * R​e​a​c​h​ ​o​u​t​ ​t​o​ ​o​u​r​ ​c​o​m​m​u​n​i​t​y​ ​v​i​a​ 
 							 */
 							githubDiscussions: string
 							/**
@@ -2047,7 +2047,7 @@ export type TranslationFunctions = {
 							 */
 							defguard: () => LocalizedString
 							/**
-							 * If you encounter any issues with Defguard, you can reach out to our community for support via: 
+							 * Reach out to our community via 
 							 */
 							githubDiscussions: () => LocalizedString
 							/**
