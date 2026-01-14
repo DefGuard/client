@@ -7,7 +7,7 @@ import { useI18nContext } from '../../../../../i18n/i18n-react';
 import { IconDefguard } from '../../../../../shared/components/icons/IconDefguard/IconDeguard';
 import SvgDefguardLogoText from '../../../../../shared/components/svg/DefguardLogoText';
 import { GitHubIcon } from '../../../../../shared/components/svg/GithubIcon';
-import { githubUrl, mastodonUrl, matrixUrl } from '../../../../../shared/constants';
+import { discussionsUrl, githubUrl, mastodonUrl } from '../../../../../shared/constants';
 import { Button } from '../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import {
   ButtonSize,
@@ -172,8 +172,8 @@ export const SupportSlide = () => {
             <b>{localLL.defguard()}</b>
           </li>
           <li>
-            <span>{localLL.joinMatrix()} </span>
-            <a onClick={() => openLink(matrixUrl)}>{matrixUrl}</a>
+            <span>{localLL.githubDiscussions()} </span>
+            <a onClick={() => openLink(discussionsUrl)}>{discussionsUrl}</a>
           </li>
         </ul>
       </div>

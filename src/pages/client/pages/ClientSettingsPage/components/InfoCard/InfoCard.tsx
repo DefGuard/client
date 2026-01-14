@@ -2,7 +2,11 @@ import Markdown from 'react-markdown';
 
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { GitHubIcon } from '../../../../../../shared/components/svg/GithubIcon';
-import { githubUrl, mastodonUrl, matrixUrl } from '../../../../../../shared/constants';
+import {
+  discussionsUrl,
+  githubUrl,
+  mastodonUrl,
+} from '../../../../../../shared/constants';
 import { Button } from '../../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import {
   ButtonSize,
@@ -73,8 +77,8 @@ export const InfoCard = () => {
             <b>{supportLL.defguard()}</b>
           </li>
           <li>
-            <span>{supportLL.joinMatrix()} </span>
-            <a onClick={() => openLink(matrixUrl)}>{matrixUrl}</a>
+            <span>{supportLL.githubDiscussions()} </span>
+            <a onClick={() => openLink(discussionsUrl)}>{discussionsUrl}</a>
           </li>
         </ul>
       </div>

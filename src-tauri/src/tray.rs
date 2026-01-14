@@ -17,7 +17,7 @@ use crate::{
 };
 
 const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
-const JOIN_COMMUNITY_LINK: &str = "https://matrix.to/#/#defguard:teonite.com";
+const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
 const MAIN_WINDOW_ID: &str = "main";
@@ -28,7 +28,7 @@ const TRAY_EVENT_QUIT: &str = "quit";
 const TRAY_EVENT_SHOW: &str = "show";
 const TRAY_EVENT_HIDE: &str = "hide";
 const TRAY_EVENT_UPDATES: &str = "updates";
-const TRAY_EVENT_COMMINITY: &str = "community";
+const TRAY_EVENT_COMMUNITY: &str = "community";
 const TRAY_EVENT_FOLLOW: &str = "follow";
 
 /// Generate contents of system tray menu.
@@ -46,8 +46,8 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
     )?;
     let join_community = MenuItem::with_id(
         app,
-        TRAY_EVENT_COMMINITY,
-        "Join our community",
+        TRAY_EVENT_COMMUNITY,
+        "Community support",
         true,
         None::<&str>,
     )?;
@@ -208,7 +208,7 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
         }
-        TRAY_EVENT_COMMINITY => {
+        TRAY_EVENT_COMMUNITY => {
             let _ = webbrowser::open(JOIN_COMMUNITY_LINK);
         }
         TRAY_EVENT_FOLLOW => {
