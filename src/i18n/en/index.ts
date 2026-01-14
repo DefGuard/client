@@ -144,7 +144,7 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
               githubLink: `GitHub`,
               spreadWordText: `spreading the word about:`,
               defguard: `defguard!`,
-              joinMatrix: `join our Matrix server:`,
+              githubDiscussions: `Reach out to our community via `,
               supportUs: 'Support Us!',
             },
           },

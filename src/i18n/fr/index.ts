@@ -135,7 +135,7 @@ Si vous êtes un administrateur/devops - tous vos clients (instances) et tous le
               githubLink: `GitHub`,
               spreadWordText: `En faisant passer le mot sur :`,
               defguard: `defguard !`,
-              joinMatrix: `En nous rejoignant sur notre serveur Matrix :`,
+              githubDiscussions: `Contactez notre communauté via `,
               supportUs: 'Soutenez-nous !',
             },
           },

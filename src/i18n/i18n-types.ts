@@ -343,9 +343,9 @@ type RootTranslation = {
 							 */
 							defguard: string
 							/**
-							 * j​o​i​n​ ​o​u​r​ ​M​a​t​r​i​x​ ​s​e​r​v​e​r​:
+							 * R​e​a​c​h​ ​o​u​t​ ​t​o​ ​o​u​r​ ​c​o​m​m​u​n​i​t​y​ ​v​i​a​ 
 							 */
-							joinMatrix: string
+							githubDiscussions: string
 							/**
 							 * S​u​p​p​o​r​t​ ​U​s​!
 							 */
@@ -2047,9 +2047,9 @@ export type TranslationFunctions = {
 							 */
 							defguard: () => LocalizedString
 							/**
-							 * join our Matrix server:
+							 * Reach out to our community via 
 							 */
-							joinMatrix: () => LocalizedString
+							githubDiscussions: () => LocalizedString
 							/**
 							 * Support Us!
 							 */
