@@ -131,11 +131,9 @@ pub(crate) async fn setup_interface(
     _name: &str,
     preshared_key: Option<String>,
     mtu: Option<u32>,
-    pool: &DbPool,
+    _pool: &DbPool,
 ) -> Result<String, Error> {
-    let tunnel_config = location
-        .tunnel_configurarion(pool, preshared_key, mtu)
-        .await?;
+    let tunnel_config = location.tunnel_configurarion(preshared_key, mtu).await?;
 
     tunnel_config.save();
     tokio::time::sleep(TUNNEL_START_DELAY).await;

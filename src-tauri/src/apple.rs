@@ -30,7 +30,6 @@ use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNStatus,
 };
 use serde::Deserialize;
-use sqlx::SqliteExecutor;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
 
@@ -38,7 +37,13 @@ use crate::{
     active_connections::find_connection,
     appstate::AppState,
     database::{
-        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
+        models::{
+            instance::{ClientTrafficPolicy, Instance},
+            location::Location,
+            tunnel::Tunnel,
+            wireguard_keys::WireguardKeys,
+            Id,
+        },
         DB_POOL,
     },
     error::Error,
@@ -931,7 +936,7 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     let all_locations = Location::all(&*DB_POOL, false).await?;
     for location in &all_locations {
         // For syncing, set `preshred_key` to `None`.
-        let Ok(tunnel_config) = location.tunnel_configurarion(&*DB_POOL, None, mtu).await else {
+        let Ok(tunnel_config) = location.tunnel_configurarion(None, mtu).await else {
             error!(
                 "Failed to convert location {} to tunnel configuration.",
                 location.name
@@ -1019,17 +1024,13 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
 
 impl Location<Id> {
     /// Build [`TunnelConfiguration`] from [`Location`].
-    pub(crate) async fn tunnel_configurarion<'e, E>(
+    pub(crate) async fn tunnel_configurarion(
         &self,
-        executor: E,
         preshared_key: Option<String>,
         mtu: Option<u32>,
-    ) -> Result<TunnelConfiguration, Error>
-    where
-        E: SqliteExecutor<'e>,
-    {
+    ) -> Result<TunnelConfiguration, Error> {
         debug!("Looking for WireGuard keys for location {self} instance");
-        let Some(keys) = WireguardKeys::find_by_instance_id(executor, self.instance_id).await?
+        let Some(keys) = WireguardKeys::find_by_instance_id(&*DB_POOL, self.instance_id).await?
         else {
             error!("No keys found for instance: {}", self.instance_id);
             return Err(Error::InternalError(
@@ -1057,7 +1058,19 @@ impl Location<Id> {
         }
 
         debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
-        let allowed_ips = if self.route_all_traffic {
+        let Some(instance) = Instance::find_by_id(&*DB_POOL, self.instance_id).await? else {
+            error!("Instance {} not found", self.instance_id);
+            return Err(Error::InternalError(format!(
+                "Instance {} not found",
+                self.instance_id
+            )));
+        };
+        let route_all_traffic = match instance.client_traffic_policy {
+            ClientTrafficPolicy::ForceAllTraffic => true,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::None => self.route_all_traffic,
+        };
+        let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
         } else {

@@ -11,7 +11,10 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, Sql
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
 #[cfg(not(target_os = "macos"))]
-use crate::utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
+use crate::{
+    database::DbPool,
+    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
+};
 use crate::{
     error::Error,
     proto::{
@@ -240,19 +243,17 @@ impl Location<Id> {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub(crate) async fn interface_configuration<'e, E>(
+    pub(crate) async fn interface_configuration(
         &self,
-        executor: E,
+        pool: &DbPool,
         interface_name: String,
         preshared_key: Option<String>,
         mtu: Option<u32>,
-    ) -> Result<InterfaceConfiguration, Error>
-    where
-        E: SqliteExecutor<'e>,
-    {
+    ) -> Result<InterfaceConfiguration, Error> {
+        use crate::database::models::instance::{ClientTrafficPolicy, Instance};
+
         debug!("Looking for WireGuard keys for location {self} instance");
-        let Some(keys) = WireguardKeys::find_by_instance_id(executor, self.instance_id).await?
-        else {
+        let Some(keys) = WireguardKeys::find_by_instance_id(pool, self.instance_id).await? else {
             error!("No keys found for instance: {}", self.instance_id);
             return Err(Error::InternalError(
                 "No keys found for instance".to_string(),
@@ -279,7 +280,19 @@ impl Location<Id> {
         }
 
         debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
-        let allowed_ips = if self.route_all_traffic {
+        let Some(instance) = Instance::find_by_id(pool, self.instance_id).await? else {
+            error!("Instance {} not found", self.instance_id);
+            return Err(Error::InternalError(format!(
+                "Instance {} not found",
+                self.instance_id
+            )));
+        };
+        let route_all_traffic = match instance.client_traffic_policy {
+            ClientTrafficPolicy::ForceAllTraffic => true,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::None => self.route_all_traffic,
+        };
+        let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
         } else {
