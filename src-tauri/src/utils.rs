@@ -134,7 +134,7 @@ pub(crate) async fn setup_interface(
     pool: &DbPool,
 ) -> Result<String, Error> {
     let tunnel_config = location
-        .tunnel_configurarion(pool, preshared_key, mtu)
+        .tunnel_configurarion(preshared_key, mtu)
         .await?;
 
     tunnel_config.save();
