@@ -30,7 +30,6 @@ use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNStatus,
 };
 use serde::Deserialize;
-use sqlx::SqliteExecutor;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
 
@@ -38,7 +37,13 @@ use crate::{
     active_connections::find_connection,
     appstate::AppState,
     database::{
-        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
+        models::{
+            instance::{ClientTrafficPolicy, Instance},
+            location::Location,
+            tunnel::Tunnel,
+            wireguard_keys::WireguardKeys,
+            Id,
+        },
         DB_POOL,
     },
     error::Error,
