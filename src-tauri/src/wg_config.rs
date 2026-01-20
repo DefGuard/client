@@ -43,7 +43,7 @@ pub fn parse_wireguard_config(
     let filename = Path::new(filename)
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("unknown")
+        .unwrap_or("")
         .to_string();
 
     // Parse Interface section
