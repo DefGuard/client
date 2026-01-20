@@ -181,7 +181,8 @@ export const AddTunnelFormCard = () => {
         reader.onload = () => {
           if (reader.result && input.files) {
             const res = reader.result;
-            parseTunnelConfig(res as string)
+            const filename = input.files[0].name;
+            parseTunnelConfig(filename as string, res as string)
               .then((data) => {
                 const fileData = data as Partial<FormFields>;
                 const trimed = pickBy(

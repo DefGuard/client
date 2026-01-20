@@ -1110,9 +1110,9 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 }
 
 #[tauri::command]
-pub fn parse_tunnel_config(config: &str) -> Result<Tunnel, Error> {
+pub fn parse_tunnel_config(filename: &str, config: &str) -> Result<Tunnel, Error> {
     debug!("Parsing config file");
-    let tunnel_config = parse_wireguard_config(config).map_err(|error| {
+    let tunnel_config = parse_wireguard_config(filename, config).map_err(|error| {
         error!("{error}");
         Error::ConfigParseError(error.to_string())
     })?;
