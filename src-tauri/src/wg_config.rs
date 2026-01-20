@@ -1,6 +1,6 @@
-use std::{array::TryFromSliceError, net::IpAddr};
-
 use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
+use std::path::Path;
+use std::{array::TryFromSliceError, net::IpAddr};
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
 
@@ -34,8 +34,17 @@ impl From<DecodeError> for WireguardConfigParseError {
     }
 }
 
-pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigParseError> {
+pub fn parse_wireguard_config(
+    filename: &str,
+    config: &str,
+) -> Result<Tunnel, WireguardConfigParseError> {
     let config = ini::Ini::load_from_str(config)?;
+
+    let filename = Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown")
+        .to_string();
 
     // Parse Interface section
     let interface_section = config
@@ -53,15 +62,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
     let address = interface_section
         .get("Address")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("Address".to_string()))?;
-    // extract IP if DNS config includes search domains
-    // FIXME: actually handle search domains
-    let dns = interface_section
-        .get("DNS")
-        .map(|dns| match dns.split(',').next() {
-            Some(address) => address.to_string(),
-            None => dns.to_string(),
-        });
-
+    let dns = interface_section.get("DNS").map(|dns| dns.to_string());
     let pre_up = interface_section.get("PreUp");
     let post_up = interface_section.get("PostUp");
     let pre_down = interface_section.get("PreDown");
@@ -90,7 +91,7 @@ pub fn parse_wireguard_config(config: &str) -> Result<Tunnel, WireguardConfigPar
 
     // Create or modify the Tunnel struct with the parsed values using the `new` method
     let tunnel = Tunnel::new(
-        String::new(),
+        filename,
         pubkey,
         prvkey.into(),
         address.into(),
@@ -134,7 +135,9 @@ mod test {
 
 
         ";
-        let tunnel = parse_wireguard_config(config).unwrap();
+        let filename = "mylocation.conf";
+        let tunnel = parse_wireguard_config(filename, config).unwrap();
+        assert_eq!(tunnel.name, filename.to_string());
         assert_eq!(
             tunnel.prvkey,
             "GAA2X3DW0WakGVx+DsGjhDpTgg50s1MlmrLf24Psrlg="

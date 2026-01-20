@@ -92,8 +92,8 @@ const deleteInstance = async (id: number): Promise<void> =>
 const updateInstance = async (data: UpdateInstanceRequest): Promise<void> =>
   invokeWrapper('update_instance', data);
 
-const parseTunnelConfig = async (config: string) =>
-  invokeWrapper('parse_tunnel_config', { config: config });
+const parseTunnelConfig = async (filename: string, config: string) =>
+  invokeWrapper('parse_tunnel_config', { filename: filename, config: config });
 
 const saveTunnel = async (tunnel: TunnelRequest) =>
   invokeWrapper('save_tunnel', { tunnel: tunnel });
