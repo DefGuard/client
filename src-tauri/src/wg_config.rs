@@ -123,7 +123,7 @@ mod test {
             PrivateKey = GAA2X3DW0WakGVx+DsGjhDpTgg50s1MlmrLf24Psrlg=
             Address = 10.0.0.1/24
             ListenPort = 55055
-            DNS = 10.0.0.2, tnt, teonite.net
+            DNS = 10.0.0.2,tnt,teonite.net
             PostUp = iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT
 
             [Peer]
@@ -135,22 +135,20 @@ mod test {
 
 
         ";
-        let filename = "mylocation.conf";
-        let tunnel = parse_wireguard_config(filename, config).unwrap();
-        assert_eq!(tunnel.name, filename.to_string());
+        let tunnel = parse_wireguard_config("mylocation.conf", config).unwrap();
+        assert_eq!(tunnel.name, "mylocation");
         assert_eq!(
             tunnel.prvkey,
             "GAA2X3DW0WakGVx+DsGjhDpTgg50s1MlmrLf24Psrlg="
         );
         assert_eq!(tunnel.id, NoId);
-        assert_eq!(tunnel.name, "");
         assert_eq!(tunnel.address, "10.0.0.1/24");
         assert_eq!(
             tunnel.server_pubkey,
             "BvUB3iZq3U0jZrY6b4KbGhz0IVZzpAdbJiRZGdci9ZU="
         );
         assert_eq!(tunnel.endpoint, "10.0.0.0:1234");
-        assert_eq!(tunnel.dns, Some("10.0.0.2".to_string()));
+        assert_eq!(tunnel.dns, Some("10.0.0.2,tnt,teonite.net".to_string()));
         assert_eq!(
             tunnel.allowed_ips,
             Some("10.0.0.10/24, 10.2.0.1/24, 0.0.0.0/0".into())
