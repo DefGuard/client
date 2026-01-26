@@ -8,7 +8,7 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 #[cfg(not(target_os = "macos"))]
 use common::{find_free_tcp_port, get_interface_name};
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
+use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use prost::Message;
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
@@ -461,6 +461,7 @@ pub async fn setup_interface_tunnel(
         port,
         peers: vec![peer.clone()],
         mtu,
+        fwmark: None, // TODO: add
     };
 
     debug!("Creating interface {interface_config:?}");

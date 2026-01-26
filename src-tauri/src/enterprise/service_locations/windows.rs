@@ -10,7 +10,7 @@ use std::{
 
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{
-    host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration, WireguardInterfaceApi,
+    key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WireguardInterfaceApi,
 };
 use known_folders::get_known_folder_path;
 use log::{debug, error, warn};
@@ -546,6 +546,7 @@ impl ServiceLocationManager {
             port: find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
             peers: vec![peer.clone()],
             mtu: None,
+            fwmark: None, // TODO: add
         };
 
         let ifname = location.name.clone();

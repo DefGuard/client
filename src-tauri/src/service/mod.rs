@@ -18,10 +18,7 @@ use std::{
 };
 
 use defguard_wireguard_rs::{
-    host::{Host, Peer},
-    key::Key,
-    net::IpAddrMask,
-    InterfaceConfiguration,
+    host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
 };
 
 impl From<InterfaceConfiguration> for proto::InterfaceConfig {
@@ -56,6 +53,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
             port: config.port as u16,
             peers: config.peers.into_iter().map(Into::into).collect(),
             mtu: config.mtu,
+            fwmark: None, // TODO: add to config
         }
     }
 }

@@ -16,7 +16,7 @@ use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
 use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
-    error::WireguardInterfaceError, host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration,
+    error::WireguardInterfaceError, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
     WGApi, WireguardInterfaceApi,
 };
 use reqwest::{Client, StatusCode, Url};
@@ -225,6 +225,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         port: find_free_tcp_port().ok_or(CliError::FreeTCPPort)?,
         peers: vec![peer.clone()],
         mtu: None,
+        fwmark: None,
     };
     let configure_interface_result = wgapi.configure_interface(&config);
 
