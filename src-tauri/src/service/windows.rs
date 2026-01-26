@@ -101,12 +101,12 @@ fn run_service() -> Result<(), DaemonError> {
                 info!("Service locations storage initialized successfully");
                 Ok(api)
             }
-            Err(e) => {
+            Err(err) => {
                 error!(
-                    "Failed to initialize service locations storage: {}. Shutting down service location thread",
-                    e
+                    "Failed to initialize service locations storage: {err}. Shutting down service \
+                    location thread"
                 );
-                Err(ServiceLocationError::InitError(e.to_string()))
+                Err(ServiceLocationError::InitError(err.to_string()))
             }
         }?;
 

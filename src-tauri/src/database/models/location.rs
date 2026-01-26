@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::{host::Peer, key::Key, net::IpAddrMask, InterfaceConfiguration};
+use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
@@ -339,6 +339,7 @@ impl Location<Id> {
             port: 0,
             peers: vec![peer],
             mtu,
+            fwmark: None, // TODO: add
         };
 
         Ok(interface_config)

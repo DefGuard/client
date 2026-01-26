@@ -1,7 +1,7 @@
 use std::{fmt, time::SystemTime};
 
 use chrono::{NaiveDateTime, Utc};
-use defguard_wireguard_rs::host::Peer;
+use defguard_wireguard_rs::peer::Peer;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};

@@ -107,8 +107,7 @@ export const GlobalLogs = () => {
       stopGlobalLogWatcher();
       eventUnlisten?.();
     };
-    //eslint-disable-next-line
-  }, [startGlobalLogWatcher, stopGlobalLogWatcher]);
+  }, []);
 
   const getAllLogs = () => {
     let logs = '';
