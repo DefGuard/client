@@ -65,11 +65,11 @@ async fn startup(app_handle: &AppHandle) {
     #[cfg(windows)]
     {
         match sync_connections(app_handle).await {
-            Ok(_) => {
+            Ok(()) => {
                 info!(
                     "Synchronized application's active connections with the connections \
                     already open on the system, if there were any."
-                )
+                );
             }
             Err(err) => {
                 warn!(
@@ -77,7 +77,7 @@ async fn startup(app_handle: &AppHandle) {
                     already open on the system. \
                     The connections' state in the application may not reflect system's state. \
                     Reconnect manually to reset them. Error: {err}"
-                )
+                );
             }
         };
     }
@@ -144,9 +144,7 @@ async fn startup(app_handle: &AppHandle) {
     if let Err(err) = setup_tray(app_handle).await {
         error!("Failed to setup system tray: {err}");
     }
-    let state = app_handle.state::<AppState>();
-    let theme = state.app_config.lock().unwrap().tray_theme;
-    match configure_tray_icon(app_handle, theme).await {
+    match configure_tray_icon(app_handle).await {
         Ok(()) => info!("System tray configured."),
         Err(err) => error!("Failed to configure system tray: {err}"),
     }

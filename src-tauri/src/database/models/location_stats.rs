@@ -47,11 +47,11 @@ where
     let location = Location::find_by_public_key(executor, &peer.public_key.to_string()).await?;
     Ok(LocationStats::new(
         location.id,
-        peer.tx_bytes as i64,
-        peer.rx_bytes as i64,
+        peer.tx_bytes.cast_signed(),
+        peer.rx_bytes.cast_signed(),
         peer.last_handshake.map_or(0, |ts| {
             ts.duration_since(SystemTime::UNIX_EPOCH)
-                .map_or(0, |duration| duration.as_secs() as i64)
+                .map_or(0, |duration| duration.as_secs().cast_signed())
         }),
         listen_port,
         peer.persistent_keepalive_interval,

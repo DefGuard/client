@@ -431,11 +431,11 @@ where
     Ok(TunnelStats {
         id: NoId,
         tunnel_id: tunnel.id,
-        upload: peer.tx_bytes as i64,
-        download: peer.rx_bytes as i64,
+        upload: peer.tx_bytes.cast_signed(),
+        download: peer.rx_bytes.cast_signed(),
         last_handshake: peer.last_handshake.map_or(0, |ts| {
             ts.duration_since(SystemTime::UNIX_EPOCH)
-                .map_or(0, |duration| duration.as_secs() as i64)
+                .map_or(0, |duration| duration.as_secs().cast_signed())
         }),
         collected_at: Utc::now().naive_utc(),
         listen_port,

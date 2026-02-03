@@ -10,4 +10,4 @@ version.workspace = true
 [dependencies]
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", features = ["net"] }
+nix = { version = "0.31", features = ["net"] }

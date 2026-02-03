@@ -13,10 +13,6 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
-#[cfg(target_os = "macos")]
-use crate::apple::{
-    remove_config_for_location, remove_config_for_tunnel, stop_tunnel_for_location,
-};
 use crate::{
     active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
@@ -76,7 +72,7 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
-            handle_connection_for_location(&location, preshared_key, handle.clone()).await?;
+            handle_connection_for_location(&location, preshared_key, &handle).await?;
             reload_tray_menu(&handle).await;
             info!("Connected to location {location}");
         } else {
@@ -91,7 +87,7 @@ pub async fn connect(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
         );
-        handle_connection_for_tunnel(&tunnel, handle.clone()).await?;
+        handle_connection_for_tunnel(&tunnel, &handle).await?;
         info!("Successfully connected to tunnel {tunnel}");
     } else {
         error!("Tunnel {location_id} not found");
@@ -99,9 +95,7 @@ pub async fn connect(
     }
 
     // Update tray icon to reflect connection state.
-    let app_state: State<AppState> = handle.state();
-    let theme = { app_state.app_config.lock().unwrap().tray_theme };
-    configure_tray_icon(&handle, theme).await?;
+    configure_tray_icon(&handle).await?;
 
     Ok(())
 }
@@ -179,9 +173,7 @@ pub async fn disconnect(
         info!("Disconnected from {connection_type} {name}(ID: {location_id})");
 
         // Update tray icon to reflect connection state.
-        let app_state: State<AppState> = handle.state();
-        let theme = { app_state.app_config.lock().unwrap().tray_theme };
-        configure_tray_icon(&handle, theme).await?;
+        configure_tray_icon(&handle).await?;
 
         Ok(())
     } else {
@@ -232,7 +224,7 @@ pub struct InstanceResponse {
     pub url: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Serialize)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location<Id>>,
     instance: Instance<Id>,
@@ -301,7 +293,7 @@ pub async fn save_device_config(
     let locations = push_service_locations(&instance, keys).await?;
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
-    let res: SaveDeviceConfigResponse = SaveDeviceConfigResponse {
+    let res = SaveDeviceConfigResponse {
         locations,
         instance,
     };
@@ -1010,12 +1002,12 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             .remove_connection(location.id, ConnectionType::Location)
             .await
         {
-            let result = stop_tunnel_for_location(&location);
+            let result = location.stop_vpn_tunnel();
             error!("stop_tunnel() for location returned {result:?}");
             if !result {
                 return Err(Error::InternalError("Error from tunnel".into()));
             }
-            remove_config_for_location(&location);
+            location.remove_config();
         }
     }
 
@@ -1025,8 +1017,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
-    let theme = { app_state.app_config.lock().unwrap().tray_theme };
-    configure_tray_icon(&handle, theme).await?;
+    configure_tray_icon(&handle).await?;
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     info!("Successfully deleted instance {instance}.");
@@ -1101,8 +1092,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     reload_tray_menu(&handle).await;
 
-    let theme = { app_state.app_config.lock().unwrap().tray_theme };
-    configure_tray_icon(&handle, theme).await?;
+    configure_tray_icon(&handle).await?;
 
     handle.emit(EventKey::InstanceUpdate.into(), ())?;
     info!("Successfully deleted instance {instance}.");
@@ -1216,7 +1206,7 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
 
         #[cfg(target_os = "macos")]
         {
-            remove_config_for_tunnel(&tunnel);
+            tunnel.remove_config();
         }
 
         #[cfg(not(target_os = "macos"))]
@@ -1367,7 +1357,7 @@ pub async fn command_set_app_config(
     info!("Config changed successfully");
     if tray_changed {
         debug!("Tray theme included in config change, tray will be updated.");
-        match configure_tray_icon(&app_handle, res.tray_theme).await {
+        match configure_tray_icon(&app_handle).await {
             Ok(()) => debug!("Tray updated upon config change"),
             Err(err) => error!("Tray change failed. Reason: {err}"),
         }

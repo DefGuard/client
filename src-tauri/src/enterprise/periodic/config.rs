@@ -155,7 +155,7 @@ pub async fn poll_instance(
         instance.name
     );
 
-    check_min_version(&response, instance, handle)?;
+    check_min_version(&response, instance, handle);
 
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
@@ -294,18 +294,14 @@ struct VersionMismatchPayload {
     proxy_compatible: bool,
 }
 
-fn check_min_version(
-    response: &reqwest::Response,
-    instance: &Instance<Id>,
-    handle: &AppHandle,
-) -> Result<(), Error> {
+fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, handle: &AppHandle) {
     let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
     if notified_instances.contains(&instance.id) {
         debug!(
             "Instance {}({}) already notified about version mismatch, skipping",
             instance.name, instance.id
         );
-        return Ok(());
+        return;
     }
 
     let detected_core_version: String;
@@ -329,7 +325,7 @@ fn check_min_version(
                 core_version.cmp_precedence(&MIN_CORE_VERSION) != Ordering::Less
             } else {
                 warn!(
-                    "Core version header not a valid semver string in response for instance {}({}): \
+                    "Core version header: invalid semver string in response for instance {}({}): \
                     '{core_version}'",
                     instance.name, instance.id
                 );
@@ -338,7 +334,7 @@ fn check_min_version(
             }
         } else {
             warn!(
-                "Core version header not a valid string in response for instance {}({}): \
+                "Core version header: invalid string in response for instance {}({}): \
                 '{core_version:?}'",
                 instance.name, instance.id
             );
@@ -413,10 +409,11 @@ fn check_min_version(
 
     if should_inform && (!core_compatible || !proxy_compatible) {
         warn!(
-                "Instance {} is running incompatible versions: core {detected_core_version}, proxy {detected_proxy_version}. Required \
-                versions: core >= {MIN_CORE_VERSION}, proxy >= {MIN_PROXY_VERSION}",
-                instance.name,
-            );
+            "Instance {} is running incompatible versions: core {detected_core_version}, proxy \
+            {detected_proxy_version}. Required versions: core >= {MIN_CORE_VERSION}, proxy >= \
+            {MIN_PROXY_VERSION}",
+            instance.name,
+        );
 
         let payload = VersionMismatchPayload {
             instance_name: instance.name.clone(),
@@ -434,6 +431,4 @@ fn check_min_version(
             notified_instances.insert(instance.id);
         }
     }
-
-    Ok(())
 }

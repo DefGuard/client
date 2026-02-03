@@ -6,7 +6,7 @@ use std::{
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
-use strum::{Display, EnumString};
+use strum::{AsRefStr, EnumString};
 use tauri::{AppHandle, Manager};
 
 #[cfg(unix)]
@@ -41,15 +41,14 @@ fn get_config_file(app: &AppHandle, for_write: bool) -> File {
         .expect("Failed to create and open app config.")
 }
 
-#[derive(Debug, Clone, Deserialize, Display, EnumString, PartialEq, Serialize)]
-#[strum(serialize_all = "lowercase")]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AppTheme {
     Light,
     Dark,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Display, EnumString, PartialEq, Serialize)]
+#[derive(AsRefStr, Clone, Copy, Debug, Deserialize, EnumString, PartialEq, Serialize)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AppTrayTheme {
