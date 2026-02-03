@@ -1344,7 +1344,7 @@ pub async fn command_set_app_config(
     emit_event: bool,
     app_handle: AppHandle,
 ) -> Result<AppConfig, Error> {
-    let app_state: State<AppState> = app_handle.state();
+    let app_state = app_handle.state::<AppState>();
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
     let tray_changed = config_patch.tray_theme.is_some();
