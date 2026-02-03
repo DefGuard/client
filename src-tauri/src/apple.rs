@@ -23,11 +23,12 @@ use objc2::{
 };
 use objc2_foundation::{
     ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNotification, NSNotificationCenter, NSNotificationName, NSNumber, NSObjectProtocol,
-    NSOperationQueue, NSRunLoop, NSString,
+    NSNotification, NSNotificationCenter, NSNumber, NSObjectProtocol, NSOperationQueue, NSRunLoop,
+    NSString,
 };
 use objc2_network_extension::{
-    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNStatus,
+    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNConnection,
+    NEVPNStatus, NEVPNStatusDidChangeNotification,
 };
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -326,13 +327,7 @@ pub fn observer_thread(
     for ((key, value), manager) in initial_managers {
         debug!("Spawning initial observer for manager with key: {key}, value: {value}");
         let connection = unsafe { manager.connection() };
-
-        let observer = create_observer(
-            &NSNotificationCenter::defaultCenter(),
-            unsafe { objc2_network_extension::NEVPNStatusDidChangeNotification },
-            vpn_status_change_handler,
-            Some(connection.as_ref()),
-        );
+        let observer = create_observer(&connection);
         debug!("Registered initial observer for manager with key: {key}, value: {value}");
         observers.insert((key, value), observer);
     }
@@ -354,12 +349,7 @@ pub fn observer_thread(
 
                 let manager = manager_for_key_and_value(key, value).unwrap();
                 let connection = unsafe { manager.connection() };
-                let observer = create_observer(
-                    &NSNotificationCenter::defaultCenter(),
-                    unsafe { objc2_network_extension::NEVPNStatusDidChangeNotification },
-                    vpn_status_change_handler,
-                    Some(connection.as_ref()),
-                );
+                let observer = create_observer(&connection);
 
                 observers.insert((key, value), observer);
                 debug!("Registered observer for manager with key: {key}, value: {value}");
@@ -423,6 +413,7 @@ pub fn spawn_runloop_and_wait_for(semaphore: &Arc<AtomicBool>) {
     }
 }
 
+/// Handle VPN status change.
 fn vpn_status_change_handler(notification: &NSNotification) {
     let name = notification.name();
     debug!("Received VPN status change notification: {name:?}");
@@ -435,18 +426,21 @@ fn vpn_status_change_handler(notification: &NSNotification) {
     debug!("Sent status update request to channel");
 }
 
-fn create_observer(
-    center: &NSNotificationCenter,
-    name: &NSNotificationName,
-    handler: impl Fn(&NSNotification) + 'static,
-    object: Option<&AnyObject>,
-) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
+/// Observe VPN status change.
+fn create_observer(object: &NEVPNConnection) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
+    let center = NSNotificationCenter::defaultCenter();
     let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
-        handler(unsafe { notification.as_ref() });
+        vpn_status_change_handler(unsafe { notification.as_ref() });
     });
     let queue = NSOperationQueue::mainQueue();
     unsafe {
-        center.addObserverForName_object_queue_usingBlock(Some(name), object, Some(&queue), &block)
+        let name = NEVPNStatusDidChangeNotification;
+        center.addObserverForName_object_queue_usingBlock(
+            Some(name),
+            Some(object),
+            Some(&queue),
+            &block,
+        )
     }
 }
 
