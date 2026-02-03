@@ -26,7 +26,7 @@ use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 #[cfg(windows)]
 use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use crate::apple::{stop_tunnel_for_location, stop_tunnel_for_tunnel, tunnel_stats};
+use crate::apple::tunnel_stats;
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -176,9 +176,9 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
         if connection_type == ConnectionType::Location {
             let location_stats = LocationStats::new(
                 id,
-                stats.tx_bytes as i64,
-                stats.rx_bytes as i64,
-                stats.last_handshake as i64,
+                stats.tx_bytes.cast_signed(),
+                stats.rx_bytes.cast_signed(),
+                stats.last_handshake.cast_signed(),
                 0,
                 None,
             );
@@ -193,9 +193,9 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
         } else {
             let tunnel_stats = TunnelStats::new(
                 id,
-                stats.tx_bytes as i64,
-                stats.rx_bytes as i64,
-                stats.last_handshake as i64,
+                stats.tx_bytes.cast_signed(),
+                stats.rx_bytes.cast_signed(),
+                stats.last_handshake.cast_signed(),
                 chrono::Utc::now().naive_utc(),
                 0,
                 0,
@@ -493,29 +493,29 @@ pub async fn setup_interface_tunnel(
             interface_config.name,
             error.message()
         )));
-    } else {
-        info!(
-            "Network interface {} for tunnel {tunnel} created successfully.",
+    }
+
+    info!(
+        "Network interface {} for tunnel {tunnel} created successfully.",
+        interface_config.name
+    );
+    if let Some(post_up) = &tunnel.post_up {
+        debug!(
+            "Executing defined PostUp command after setting up the interface {} for the tunnel \
+            {tunnel}: {post_up}",
             interface_config.name
         );
-        if let Some(post_up) = &tunnel.post_up {
-            debug!(
-                "Executing defined PostUp command after setting up the interface {} for the \
-                tunnel {tunnel}: {post_up}",
-                interface_config.name
-            );
-            let _ = execute_command(post_up);
-            info!(
-                "Executed defined PostUp command after setting up the interface {} for the \
-                tunnel {tunnel}: {post_up}",
-                interface_config.name
-            );
-        }
-        debug!(
-            "Created interface {} with config: {interface_config:?}",
+        let _ = execute_command(post_up);
+        info!(
+            "Executed defined PostUp command after setting up the interface {} for the tunnel \
+            {tunnel}: {post_up}",
             interface_config.name
         );
     }
+    debug!(
+        "Created interface {} with config: {interface_config:?}",
+        interface_config.name
+    );
 
     Ok(interface_name)
 }
@@ -671,7 +671,7 @@ pub async fn get_location_interface_details(
 pub(crate) async fn handle_connection_for_location(
     location: &Location<Id>,
     preshared_key: Option<String>,
-    handle: AppHandle,
+    handle: &AppHandle,
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
@@ -708,7 +708,7 @@ pub(crate) async fn handle_connection_for_location(
 /// Setup new connection for tunnel
 pub(crate) async fn handle_connection_for_tunnel(
     tunnel: &Tunnel<Id>,
-    handle: AppHandle,
+    handle: &AppHandle,
 ) -> Result<(), Error> {
     debug!("Setting up the connection for tunnel: {}", tunnel.name);
     let state = handle.state::<AppState>();
@@ -788,7 +788,7 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = stop_tunnel_for_location(&location);
+                let result = location.stop_vpn_tunnel();
                 error!(
                     "stop_tunnel() for location {} returned {result:?}",
                     location.name
@@ -864,7 +864,7 @@ pub(crate) async fn disconnect_interface(
 
             #[cfg(target_os = "macos")]
             {
-                let result = stop_tunnel_for_tunnel(&tunnel);
+                let result = tunnel.stop_vpn_tunnel();
                 error!(
                     "stop_tunnel() for tunnel {} returned {result:?}",
                     tunnel.name
@@ -1019,7 +1019,7 @@ async fn check_connection(
 
     debug!("Spawning service log watcher for {connection_type} {name}...");
     spawn_log_watcher_task(
-        app_handle.clone(),
+        app_handle,
         id,
         interface_name,
         connection_type,

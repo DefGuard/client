@@ -7,7 +7,7 @@ clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 defguard_wireguard_rs = "0.9"
 dirs-next = "2.0"
 prost = "0.14"
-reqwest = { version = "0.12", features = ["cookies", "json"] }
+reqwest = { version = "0.13", features = ["cookies", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
@@ -56,7 +56,7 @@ required-features = ["service"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 tonic-prost-build.workspace = true
-vergen-git2 = { version = "1.0", features = ["build"] }
+vergen-git2 = { version = "9.1", features = ["build"] }
 
 [dependencies]
 anyhow = "1.0"
@@ -132,7 +132,7 @@ objc2-network-extension = "0.3"
 swift-rs = { version = "1.0", features = ["build"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30.1", features = ["user", "fs"] }
+nix = { version = "0.31", features = ["user", "fs"] }
 tokio-stream = "0.1"
 
 [target.'cfg(windows)'.dependencies]

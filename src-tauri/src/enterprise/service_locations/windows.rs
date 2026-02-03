@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     fs::{self, create_dir_all},
     path::PathBuf,
     result::Result,
@@ -101,7 +102,7 @@ fn set_protected_acls(path: &str) -> Result<(), ServiceLocationError> {
     const SYSTEM_SID: &str = "S-1-5-18"; // NT AUTHORITY\SYSTEM
     const ADMINISTRATORS_SID: &str = "S-1-5-32-544"; // BUILTIN\Administrators
 
-    const FILE_ALL_ACCESS: u32 = 0x1F01FF;
+    const FILE_ALL_ACCESS: u32 = 0x001F_01FF;
 
     match ACL::from_file_path(path, false) {
         Ok(mut acl) => {
@@ -629,7 +630,7 @@ impl ServiceLocationManager {
     ) -> Result<(), ServiceLocationError> {
         debug!("Disconnecting service locations with mode: {mode:?}");
 
-        for (instance, locations) in self.connected_service_locations.iter() {
+        for (instance, locations) in &self.connected_service_locations {
             for location in locations {
                 debug!(
                     "Found connected service location for instance_id: {instance}, \
@@ -776,16 +777,19 @@ impl ServiceLocationManager {
 
         let json = serde_json::to_string_pretty(&service_location_data)?;
 
-        debug!("Writing service location data to file: {instance_file_path:?}");
+        debug!(
+            "Writing service location data to file: {}",
+            instance_file_path.display()
+        );
 
         fs::write(&instance_file_path, &json)?;
 
         if let Some(file_path_str) = instance_file_path.to_str() {
             debug!("Setting ACLs on service location file: {file_path_str}");
-            if let Err(e) = set_protected_acls(file_path_str) {
+            if let Err(err) = set_protected_acls(file_path_str) {
                 warn!(
-                    "Failed to set ACLs on service location file {file_path_str}: {e}. File saved \
-                    but may have insecure permissions."
+                    "Failed to set ACLs on service location file {file_path_str}: {err}. \
+                    File saved but may have insecure permissions."
                 );
             } else {
                 debug!("Successfully set ACLs on service location file");
@@ -795,8 +799,8 @@ impl ServiceLocationManager {
         }
 
         debug!(
-            "Service locations saved successfully for instance {instance_id} to {:?}",
-            instance_file_path
+            "Service locations saved successfully for instance {instance_id} to {}",
+            instance_file_path.display()
         );
         Ok(())
     }
@@ -810,23 +814,24 @@ impl ServiceLocationManager {
                 let entry = entry?;
                 let file_path = entry.path();
 
-                if file_path.is_file()
-                    && file_path.extension().and_then(|s| s.to_str()) == Some("json")
-                {
+                if file_path.is_file() && file_path.extension() == Some(OsStr::new("json")) {
                     match fs::read_to_string(&file_path) {
                         Ok(data) => match serde_json::from_str::<ServiceLocationData>(&data) {
                             Ok(locations_data) => {
                                 all_locations_data.push(locations_data);
                             }
-                            Err(e) => {
+                            Err(err) => {
                                 error!(
-                                    "Failed to parse service locations from file {:?}: {e}",
-                                    file_path
+                                    "Failed to parse service locations from file {}: {err}",
+                                    file_path.display()
                                 );
                             }
                         },
-                        Err(e) => {
-                            error!("Failed to read service locations file {:?}: {e}", file_path);
+                        Err(err) => {
+                            error!(
+                                "Failed to read service locations file {}: {err}",
+                                file_path.display()
+                            );
                         }
                     }
                 }

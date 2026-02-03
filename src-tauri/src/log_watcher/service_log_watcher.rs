@@ -401,7 +401,7 @@ impl VpnExtensionLogWatcher {
 /// the App Group shared container where the Swift network extension writes logs.
 #[cfg(not(target_os = "macos"))]
 pub async fn spawn_log_watcher_task(
-    handle: AppHandle,
+    handle: &AppHandle,
     location_id: Id,
     interface_name: String,
     connection_type: ConnectionType,
@@ -425,21 +425,15 @@ pub async fn spawn_log_watcher_task(
         frontend: {event_topic}"
     );
 
-    // explicitly clone before topic is moved into the closure
-    let topic_clone = event_topic.clone();
-    let interface_name_clone = interface_name.clone();
-    let handle_clone = handle.clone();
-
     // prepare cancellation token
     let token = CancellationToken::new();
-    let token_clone = token.clone();
 
     let log_dir = get_service_log_dir(); // get log file directory
     let mut log_watcher = ServiceLogWatcher::new(
-        handle_clone,
-        token_clone,
-        topic_clone,
-        interface_name_clone,
+        handle.clone(),
+        token.clone(),
+        event_topic.clone(),
+        interface_name.clone(),
         log_level,
         from,
         log_dir,
@@ -483,7 +477,7 @@ pub async fn spawn_log_watcher_task(
 /// TODO: Currently the "service log watcher" should watch only given interface, this is not yet implemented for VPN extension logs.
 #[cfg(target_os = "macos")]
 pub async fn spawn_log_watcher_task(
-    handle: AppHandle,
+    handle: &AppHandle,
     location_id: Id,
     interface_name: String,
     connection_type: ConnectionType,

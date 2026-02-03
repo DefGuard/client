@@ -62,7 +62,7 @@ pub fn parse_wireguard_config(
     let address = interface_section
         .get("Address")
         .ok_or_else(|| WireguardConfigParseError::KeyNotFound("Address".to_string()))?;
-    let dns = interface_section.get("DNS").map(|dns| dns.to_string());
+    let dns = interface_section.get("DNS").map(ToString::to_string);
     let pre_up = interface_section.get("PreUp");
     let post_up = interface_section.get("PostUp");
     let pre_down = interface_section.get("PreDown");

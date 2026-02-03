@@ -8,7 +8,7 @@ use tauri::{
 
 use crate::{
     active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
-    app_config::AppTrayTheme,
+    appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
     error::Error,
@@ -139,7 +139,7 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|icon, event| {
             if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                show_main_window(icon.app_handle())
+                show_main_window(icon.app_handle());
             }
         })
         .on_menu_event(handle_tray_menu_event)
@@ -223,27 +223,34 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 }
 
-pub async fn configure_tray_icon(app: &AppHandle, theme: AppTrayTheme) -> Result<(), Error> {
-    let Some(tray_icon) = app.tray_by_id(TRAY_ICON_ID) else {
+/// Show correct system tray icon, depending on the theme and connection status.
+pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
+    let state = app_handle.state::<AppState>();
+    let theme = state.app_config.lock().unwrap().tray_theme;
+
+    let Some(tray_icon) = app_handle.tray_by_id(TRAY_ICON_ID) else {
         error!("System tray menu not initialized.");
         return Ok(());
     };
 
     let mut resource_str = String::from("resources/icons/tray-32x32-");
-    resource_str.push_str(&theme.to_string());
+    resource_str.push_str(theme.as_ref());
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
     if !active_connections.is_empty() {
         resource_str.push_str("-active");
     }
     resource_str.push_str(".png");
     debug!("Trying to load the tray icon from {resource_str}");
-    if let Ok(icon_path) = app.path().resolve(&resource_str, BaseDirectory::Resource) {
+    if let Ok(icon_path) = app_handle
+        .path()
+        .resolve(&resource_str, BaseDirectory::Resource)
+    {
         let icon = Image::from_path(icon_path)?;
         tray_icon.set_icon(Some(icon))?;
         debug!("Tray icon set to {resource_str} successfully.");
         Ok(())
     } else {
-        error!("Loading tray icon resource {resource_str} failed! Resource not resolved.",);
+        error!("Loading tray icon resource {resource_str} failed! Resource not resolved.");
         Err(Error::ResourceNotFound(resource_str))
     }
 }

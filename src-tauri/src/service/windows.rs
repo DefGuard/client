@@ -121,12 +121,12 @@ fn run_service() -> Result<(), DaemonError> {
 
             info!("Attempting to auto-connect to service locations");
             match manager.write().unwrap().connect_to_service_locations() {
-                Ok(_) => {
+                Ok(()) => {
                     info!("Auto-connect to service locations completed successfully");
                 }
-                Err(e) => {
+                Err(err) => {
                     warn!(
-                        "Error while trying to auto-connect to service locations: {e}. \
+                        "Error while trying to auto-connect to service locations: {err}. \
                         Will continue monitoring for login/logoff events.",
                     );
                 }
@@ -134,23 +134,24 @@ fn run_service() -> Result<(), DaemonError> {
 
             info!("Starting login/logoff event monitoring");
             loop {
-                match watch_for_login_logoff(
-                    manager.clone(),
-                ).await {
-                    Ok(_) => {
-                        warn!("Login/logoff event monitoring ended unexpectedly. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...");
+                match watch_for_login_logoff(manager.clone()).await {
+                    Ok(()) => {
+                        warn!(
+                            "Login/logoff event monitoring ended unexpectedly. Restarting in \
+                            {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
+                        );
                         tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                     }
                     Err(e) => {
                         error!(
-                            "Error in login/logoff event monitoring: {e}. Restarting in {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
+                            "Error in login/logoff event monitoring: {e}. Restarting in \
+                            {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
                         );
                         tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                         info!("Restarting login/logoff event monitoring");
                     }
                 }
             }
-
         });
 
         // Spawn the main gRPC server task
@@ -181,7 +182,7 @@ fn run_service() -> Result<(), DaemonError> {
 
                 // Continue work if no events were received within the timeout
                 Err(mpsc::RecvTimeoutError::Timeout) => (),
-            };
+            }
         }
 
         status_handle.set_service_status(ServiceStatus {

@@ -148,7 +148,7 @@ fn configure_new_interface(
             error!("{msg}");
             Status::new(Code::Internal, msg)
         })?;
-    };
+    }
 
     Ok(())
 }
@@ -254,8 +254,8 @@ impl DesktopDaemonService for DaemonService {
             .write()
             .unwrap()
             .disconnect_service_locations_by_instance(&instance_id)
-            .map_err(|e| {
-                let msg = format!("Failed to disconnect service location: {e}");
+            .map_err(|err| {
+                let msg = format!("Failed to disconnect service location: {err}");
                 error!(msg);
                 Status::internal(msg)
             })?;
@@ -271,11 +271,10 @@ impl DesktopDaemonService for DaemonService {
                 debug!("Service location deleted successfully");
                 Ok(Response::new(()))
             }
-            Err(e) => {
-                error!("Failed to delete service location: {}", e);
+            Err(err) => {
+                error!("Failed to delete service location: {err}");
                 Err(Status::internal(format!(
-                    "Failed to delete service location: {}",
-                    e
+                    "Failed to delete service location: {err}"
                 )))
             }
         }
@@ -318,7 +317,7 @@ impl DesktopDaemonService for DaemonService {
         // attempt to configure new interface
         // remove interface if configuration fails to avoid duplicate interfaces
         match configure_new_interface(ifname, &request, wgapi, &config) {
-            Ok(_) => info!("Finished configuring new interface {ifname}"),
+            Ok(()) => info!("Finished configuring new interface {ifname}"),
             Err(err) => {
                 error!("Failed to configure interface {ifname}. Error: {err}");
 
@@ -331,7 +330,7 @@ impl DesktopDaemonService for DaemonService {
 
                 return Err(err);
             }
-        };
+        }
 
         debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
@@ -552,7 +551,7 @@ pub(crate) async fn run_server(
 ) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
-    let stream = get_named_pipe_server_stream()?;
+    let stream = get_named_pipe_server_stream();
     let daemon_service = DaemonService::new(&config, service_location_manager);
 
     info!("Defguard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");

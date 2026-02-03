@@ -104,7 +104,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
         ConvertStringSecurityDescriptorToSecurityDescriptorW(
             sddl_wide.as_ptr(),
             SDDL_REVISION_1,
-            &mut descriptor as *mut PSECURITY_DESCRIPTOR,
+            (&raw mut descriptor).cast::<PSECURITY_DESCRIPTOR>(),
             std::ptr::null_mut(),
         )
     };
@@ -116,7 +116,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     // Build SECURITY_ATTRIBUTES pointing to the security descriptor
     let attributes = SECURITY_ATTRIBUTES {
         nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
-        lpSecurityDescriptor: descriptor as *mut _,
+        lpSecurityDescriptor: descriptor.cast(),
         bInheritHandle: 0,
     };
 
@@ -132,7 +132,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             65536,
             65536,
             0,
-            &attributes,
+            &raw const attributes,
         )
     };
     unsafe {
@@ -165,8 +165,8 @@ fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
 /// 1. Creates a fresh listening instance.
 /// 2. Awaits a client connection (`connect().await`).
 /// 3. Yields the connected `TonicNamedPipeServer`.
-pub(crate) fn get_named_pipe_server_stream(
-) -> Result<impl Stream<Item = io::Result<TonicNamedPipeServer>>, std::io::Error> {
+pub(crate) fn get_named_pipe_server_stream() -> impl Stream<Item = io::Result<TonicNamedPipeServer>>
+{
     debug!("Creating named pipe server stream");
     let stream = stream! {
         let mut server;
@@ -177,5 +177,5 @@ pub(crate) fn get_named_pipe_server_stream(
         }
     };
     info!("Created named pipe server stream");
-    Ok(stream)
+    stream
 }

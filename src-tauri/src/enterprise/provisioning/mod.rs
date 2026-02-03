@@ -35,8 +35,9 @@ impl ProvisioningConfig {
             Ok(content) => content,
             Err(err) => {
                 warn!(
-                    "Failed to open provisioning configuration file at {path:?}. Error details: \
-                    {err}"
+                    "Failed to open provisioning configuration file at {}. Error details: \
+                    {err}",
+                    path.display()
                 );
                 return None;
             }
@@ -49,8 +50,9 @@ impl ProvisioningConfig {
             Ok(config) => Some(config),
             Err(err) => {
                 warn!(
-                    "Failed to parse provisioning configuration file at {path:?}. Error details: \
-                    {err}"
+                    "Failed to parse provisioning configuration file at {}. Error details: \
+                    {err}",
+                    path.display()
                 );
                 None
             }
@@ -60,7 +62,10 @@ impl ProvisioningConfig {
 
 #[must_use]
 pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningConfig> {
-    debug!("Trying to find provisioning config in {app_data_dir:?}");
+    debug!(
+        "Trying to find provisioning config in {}",
+        app_data_dir.display()
+    );
 
     let config_file_path = app_data_dir.join(CONFIG_FILE_NAME);
     ProvisioningConfig::load(&config_file_path)
