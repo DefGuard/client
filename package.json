@@ -112,7 +112,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.14",
+    "@biomejs/biome": "=2.3.13",
     "@hookform/devtools": "^4.4.0",
     "@svgr/cli": "^8.1.0",
     "@tanstack/react-query": "^5.90.20",
