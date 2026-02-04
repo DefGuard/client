@@ -106,4 +106,23 @@ struct IpAddrMask: Codable, Equatable {
         }
         fatalError()
     }
+
+    /// Return address with the mask applied.
+    func maskedAddress() -> IPAddress {
+        let subnet = mask().rawValue
+        var masked = Data(address.rawValue)
+        if subnet.count != masked.count {
+            fatalError()
+        }
+        for i in 0..<subnet.count {
+            masked[i] &= subnet[i]
+        }
+        if subnet.count == 4 {
+            return IPv4Address(masked)!
+        }
+        if subnet.count == 16 {
+            return IPv6Address(masked)!
+        }
+        fatalError()
+    }
 }

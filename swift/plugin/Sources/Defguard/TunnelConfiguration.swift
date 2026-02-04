@@ -59,8 +59,10 @@ final class TunnelConfiguration: Codable {
         // IPv6 addresses
         let addrs_v6 = addresses.filter { $0.address is IPv6Address }
             .map { String(describing: $0.address) }
+        // IMPORTANT: macOS/iOS has limitations handling IPv6 prefix masks longer than /120 due to
+        // standards compliance and implementation choices in its network stack.
         let masks_v6 = addresses.filter { $0.address is IPv6Address }
-            .map { NSNumber(value: $0.cidr) }
+            .map { NSNumber(value: min(120, $0.cidr)) }
         let ipv6Settings = NEIPv6Settings(addresses: addrs_v6, networkPrefixLengths: masks_v6)
         ipv6Settings.includedRoutes = ipv6IncludedRoutes
         networkSettings.ipv6Settings = ipv6Settings
@@ -80,7 +82,7 @@ final class TunnelConfiguration: Codable {
     }
 
     /// Return array of routes for IPv4 and IPv6.
-    func routes() -> ([NEIPv4Route], [NEIPv6Route]) {
+    private func routes() -> ([NEIPv4Route], [NEIPv6Route]) {
         var ipv4IncludedRoutes = [NEIPv4Route]()
         var ipv6IncludedRoutes = [NEIPv6Route]()
 
@@ -88,13 +90,13 @@ final class TunnelConfiguration: Codable {
         for addr_mask in addresses {
             if addr_mask.address is IPv4Address {
                 let route = NEIPv4Route(
-                    destinationAddress: "\(addr_mask.address)",
+                    destinationAddress: "\(addr_mask.maskedAddress())",
                     subnetMask: "\(addr_mask.mask())")
                 route.gatewayAddress = "\(addr_mask.address)"
                 ipv4IncludedRoutes.append(route)
             } else if addr_mask.address is IPv6Address {
                 let route = NEIPv6Route(
-                    destinationAddress: "\(addr_mask.address)",
+                    destinationAddress: "\(addr_mask.maskedAddress())",
                     networkPrefixLength: NSNumber(value: addr_mask.cidr)
                 )
                 route.gatewayAddress = "\(addr_mask.address)"
