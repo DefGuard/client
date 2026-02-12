@@ -24,7 +24,7 @@ jobs:
       - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - uses: actions/setup-node@v4

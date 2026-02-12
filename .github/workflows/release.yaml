@@ -54,9 +54,9 @@ jobs:
           apt-get update
           apt-get install -y git curl ca-certificates
           git config --global --add safe.directory '*'
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
-          submodules: "recursive"
+          submodules: recursive
       - uses: pnpm/action-setup@v4
         with:
           version: 10.17
@@ -138,9 +138,9 @@ jobs:
             deb_arch: amd64
             binary_arch: x86_64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
-          submodules: "recursive"
+          submodules: recursive
       - name: Write release version
         run: |
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
@@ -294,9 +294,9 @@ jobs:
       - create-release
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
-          submodules: "recursive"
+          submodules: recursive
       - name: Write release version
         run: |
           $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
