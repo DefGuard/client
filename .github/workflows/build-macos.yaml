@@ -23,7 +23,7 @@ jobs:
       APPLE_ID: "kamil@defguard.net"
       APPLE_TEAM_ID: "82GZ7KN29J"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 

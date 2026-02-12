@@ -1,4 +1,4 @@
 vulnerabilities:
   - id: GHSA-wrw7-89jp-8q8g
-    expired_at: 2026-02-10
+    expired_at: 2026-03-09
     statement: "glib is a transitive dependency of Tauri which we cannot update ourselves. Waiting for tauri to finish migration to gtk4-rs: https://github.com/tauri-apps/tauri/issues/12563"
