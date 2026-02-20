@@ -2,8 +2,8 @@ name: Chocolatey update dry run
 
 on:
   push:
-    branches:
-      - chocolatey-update
+    tags-ignore:
+      - v*.*.*
 
 jobs:
   chocolatey-dry-run:
@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         working-directory: chocolatey/defguard
         run: |
-          $msiUrl = "https://github.com/DefGuard/client/releases/download/v$env:VERSION/Defguard_$env:VERSION_x64_en-US.msi"
+          $msiUrl = "https://github.com/DefGuard/client/releases/download/v${env:VERSION}/Defguard_${env:VERSION}_x64_en-US.msi"
           $nuspecPath = "defguard.nuspec"
           $installPath = "tools\chocolateyinstall.ps1"
 
