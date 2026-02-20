@@ -1,0 +1,73 @@
+# name: Update Chocolatey package
+
+# on:
+#   release:
+#     types: [published]
+
+# jobs:
+#   update-chocolatey:
+#     if: github.event.release.prerelease == false
+#     runs-on: windows-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v6
+
+#       - name: Set release version
+#         shell: pwsh
+#         run: |
+#           $version = "${{ github.event.release.tag_name }}".TrimStart('v').Split('-')[0]
+#           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+#       - name: Download MSI asset
+#         shell: pwsh
+#         env:
+#           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         run: |
+#           $msiName = "Defguard_${env:VERSION}_x64_en-US.msi"
+#           gh release download "${{ github.event.release.tag_name }}" --pattern $msiName --dir "$pwd"
+
+#       - name: Calculate MSI checksum
+#         shell: pwsh
+#         run: |
+#           $msiName = "Defguard_${env:VERSION}_x64_en-US.msi"
+#           $hash = (Get-FileHash -Algorithm SHA256 -Path $msiName).Hash.ToLower()
+#           "MSI_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+#       - name: Update Chocolatey package files
+#         shell: pwsh
+#         working-directory: chocolatey/defguard
+#         run: |
+#           $msiUrl = "https://github.com/DefGuard/client/releases/download/v$env:VERSION/Defguard_$env:VERSION_x64_en-US.msi"
+#           $nuspecPath = "defguard.nuspec"
+#           $installPath = "tools\chocolateyinstall.ps1"
+
+#           (Get-Content -Raw $nuspecPath) `
+#             -replace '<version>[^<]+</version>', "<version>$env:VERSION</version>" `
+#             -replace '<packageSourceUrl>[^<]+</packageSourceUrl>', "<packageSourceUrl>$msiUrl</packageSourceUrl>" |
+#             Set-Content -NoNewline -Encoding UTF8 $nuspecPath
+
+#           (Get-Content -Raw $installPath) `
+#             -replace "^\$url\s*=\s*'.*'$", "`$url        = '$msiUrl'" `
+#             -replace "checksum\s*=\s*'[^']+'", "checksum      = '$env:MSI_SHA256'" |
+#             Set-Content -NoNewline -Encoding UTF8 $installPath
+
+#       - name: Refresh local nupkg
+#         shell: pwsh
+#         working-directory: chocolatey/defguard
+#         run: |
+#           $old = Get-ChildItem -Filter "defguard.*.nupkg" | Where-Object { $_.Name -ne "defguard.$env:VERSION.nupkg" }
+#           if ($old) { $old | Remove-Item -Force }
+
+#       - name: Pack Chocolatey package
+#         shell: pwsh
+#         working-directory: chocolatey/defguard
+#         run: choco pack
+
+#       - name: Push Chocolatey package
+#         shell: pwsh
+#         working-directory: chocolatey/defguard
+#         env:
+#           CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+#         run: |
+#           $nupkg = "defguard.$env:VERSION.nupkg"
+#           choco push $nupkg --source "https://push.chocolatey.org/" -k="$env:CHOCO_API_KEY"
