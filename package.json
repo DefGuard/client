@@ -51,7 +51,7 @@
     }
   },
   "dependencies": {
-    "@floating-ui/react": "^0.27.17",
+    "@floating-ui/react": "^0.27.18",
     "@hookform/resolvers": "^3.10.0",
     "@react-hook/resize-observer": "^2.0.2",
     "@stablelib/base64": "^2.0.1",
@@ -88,7 +88,7 @@
     "lodash-es": "^4.17.23",
     "merge-refs": "^2.0.0",
     "millify": "^6.1.0",
-    "motion": "^12.34.0",
+    "motion": "^12.34.3",
     "p-timeout": "^6.1.4",
     "prop-types": "^15.8.1",
     "radash": "^12.1.1",
@@ -96,7 +96,7 @@
     "react-auth-code-input": "^3.2.1",
     "react-click-away-listener": "^2.4.0",
     "react-dom": "^19.2.4",
-    "react-hook-form": "^7.71.1",
+    "react-hook-form": "^7.71.2",
     "react-hotkeys-hook": "^5.2.4",
     "react-loading-skeleton": "^3.5.0",
     "react-markdown": "^10.1.0",
@@ -112,7 +112,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@biomejs/biome": "=2.3.13",
+    "@biomejs/biome": "^2.3.13",
     "@hookform/devtools": "^4.4.0",
     "@svgr/cli": "^8.1.0",
     "@tanstack/react-query": "^5.90.21",
@@ -120,7 +120,7 @@
     "@tauri-apps/cli": "^2.10.0",
     "@types/file-saver": "^2.0.7",
     "@types/lodash-es": "^4.17.12",
-    "@types/node": "^24.10.10",
+    "@types/node": "^24.10.13",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
@@ -130,7 +130,7 @@
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "sass": "~1.92.1",
-    "typedoc": "^0.28.16",
+    "typedoc": "^0.28.17",
     "typesafe-i18n": "^5.27.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
