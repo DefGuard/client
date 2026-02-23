@@ -15,17 +15,20 @@ struct IpAddrMask: Codable, Equatable {
             separator: "/",
             maxSplits: 1,
         )
+        let default_cidr: UInt8
         if let ipv4 = IPv4Address(String(parts[0])) {
             address = ipv4
+            default_cidr = 32
         } else if let ipv6 = IPv6Address(String(parts[0])) {
             address = ipv6
+            default_cidr = 128
         } else {
             return nil
         }
         if parts.count > 1 {
             cidr = UInt8(parts[1]) ?? 0
         } else {
-            cidr = 0
+            cidr = default_cidr
         }
     }
 
