@@ -85,6 +85,7 @@ body:
         - Terraform
         - AMI
         - Custom
+        - Not installed (WireGuard only)
     validations:
       required: true
 
@@ -122,25 +123,3 @@ body:
         # Redact secrets/certs/private keys
     validations:
       required: false
-
-  - type: input
-    id: contact_email
-    attributes:
-      label: Contact email
-      description: How can we reach you if we need more details? (Optional, but recommended)
-      placeholder: you@company.com
-    validations:
-      required: false
-
-  - type: dropdown
-    id: purchased_plan
-    attributes:
-      label: Purchased plan
-      description: Helps us route your report and match support expectations.
-      multiple: false
-      options:
-        - Open source (community)
-        - Business
-        - Enterprise
-    validations:
-      required: true
