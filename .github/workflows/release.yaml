@@ -328,7 +328,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.6.1
+        uses: tauri-apps/tauri-action@v0.5.23 # 0.5.24 - 0.6.1 give: Error: Could not find workspace directory, but version and/or name specifies to use workspace package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload unsigned bundle
