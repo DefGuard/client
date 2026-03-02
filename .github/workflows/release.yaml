@@ -18,276 +18,276 @@ jobs:
           draft: true
           generate_release_notes: true
 
-  # create-sbom:
-  #   needs:
-  #     - create-release
-  #   uses: ./.github/workflows/sbom.yml
-  #   with:
-  #     upload_url: ${{ needs.create-release.outputs.upload_url }}
-  # ubuntu-22-04-build:
-  #   needs:
-  #     - create-release
-  #   runs-on:
-  #     - self-hosted
-  #     - Linux
-  #     - ${{ matrix.architecture }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       architecture: [ARM64, X64]
-  #       include:
-  #         - architecture: ARM64
-  #           deb_arch: arm64
-  #           binary_arch: aarch64
-  #         - architecture: X64
-  #           deb_arch: amd64
-  #           binary_arch: x86_64
-  #   container:
-  #     image: ubuntu:22.04
-  #     env:
-  #       DEBIAN_FRONTEND: noninteractive
-  #       HOME: /root
-  #       RUSTUP_HOME: /root/.rustup
-  #       CARGO_HOME: /root/.cargo
-  #   steps:
-  #     - name: git install
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y git curl ca-certificates
-  #         git config --global --add safe.directory '*'
-  #     - uses: actions/checkout@v6
-  #       with:
-  #         submodules: recursive
-  #     - uses: pnpm/action-setup@v4
-  #       with:
-  #         version: 10.17
-  #         run_install: false
-  #     - uses: actions/setup-node@v5
-  #       with:
-  #         node-version: "24"
-  #     - name: Get pnpm store directory
-  #       run: |
-  #         echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-  #     - name: Write release version
-  #       run: |
-  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-  #         echo Version: $VERSION
-  #         echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-  #     - uses: actions/cache@v4
-  #       name: Setup pnpm cache
-  #       with:
-  #         path: ${{ env.STORE_PATH }}
-  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-pnpm-build-store-
-  #     - name: Install Node dependencies
-  #       run: pnpm install --frozen-lockfile
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - name: Install dependencies
-  #       run: |
-  #         apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
-  #     - name: Build packages
-  #       uses: tauri-apps/tauri-action@v0.5.23
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         args: "--bundles deb"
-  #     - name: Upload DEB
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-  #         asset_name: defguard-client${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
-  #         asset_content_type: application/octet-stream
-  #     - name: Rename dg binary
-  #       run: mv src-tauri/target/release/dg dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}
-  #     - name: Build dg deb
-  #       uses: defGuard/fpm-action@main
-  #       with:
-  #         fpm_args: "dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-  #         fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb"
-  #     - name: Upload DEB
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
-  #         asset_name: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
-  #         asset_content_type: application/octet-stream
+  create-sbom:
+    needs:
+      - create-release
+    uses: ./.github/workflows/sbom.yml
+    with:
+      upload_url: ${{ needs.create-release.outputs.upload_url }}
+  ubuntu-22-04-build:
+    needs:
+      - create-release
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [ARM64, X64]
+        include:
+          - architecture: ARM64
+            deb_arch: arm64
+            binary_arch: aarch64
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
+    container:
+      image: ubuntu:22.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        HOME: /root
+        RUSTUP_HOME: /root/.rustup
+        CARGO_HOME: /root/.cargo
+    steps:
+      - name: git install
+        run: |
+          apt-get update
+          apt-get install -y git curl ca-certificates
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Get pnpm store directory
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: |
+          apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0.5.23
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: "--bundles deb"
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: defguard-client${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_content_type: application/octet-stream
+      - name: Rename dg binary
+        run: mv src-tauri/target/release/dg dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}
+      - name: Build dg deb
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: "dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb"
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_name: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_content_type: application/octet-stream
 
-  # build-linux:
-  #   needs:
-  #     - create-release
-  #   outputs:
-  #     deb_sha256_amd64: ${{ steps.calculate-sha256.outputs.deb_sha256_amd64 }}
-  #   runs-on:
-  #     - self-hosted
-  #     - Linux
-  #     - ${{ matrix.architecture }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       architecture: [ARM64, X64]
-  #       include:
-  #         - architecture: ARM64
-  #           deb_arch: arm64
-  #           binary_arch: aarch64
-  #         - architecture: X64
-  #           deb_arch: amd64
-  #           binary_arch: x86_64
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #       with:
-  #         submodules: recursive
-  #     - name: Write release version
-  #       run: |
-  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
-  #         echo Version: $VERSION
-  #         echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-  #     - uses: actions/setup-node@v5
-  #       with:
-  #         node-version: "24"
-  #     - uses: pnpm/action-setup@v4
-  #       with:
-  #         version: 10.17
-  #         run_install: false
-  #     - name: Get pnpm store directory
-  #       shell: bash
-  #       run: |
-  #         echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-  #     - uses: actions/cache@v4
-  #       name: Setup pnpm cache
-  #       with:
-  #         path: ${{ env.STORE_PATH }}
-  #         key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-pnpm-build-store-
-  #     - name: Install Node dependencies
-  #       run: pnpm install --frozen-lockfile
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - name: Install Linux dependencies
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
-  #     - name: Build packages
-  #       uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         args: "--bundles deb,rpm"
-  #     - name: Calculate DEB SHA256
-  #       id: calculate-sha256
-  #       if: matrix.deb_arch == 'amd64'
-  #       run: |
-  #         DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
-  #         DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
-  #         echo "DEB SHA256: $DEB_SHA256"
-  #         echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
-  #         echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
-  #     - name: Upload RPM
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
-  #         asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
-  #         asset_content_type: application/octet-stream
-  #     - name: Upload DEB
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-  #         asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-  #         asset_content_type: application/octet-stream
-  #     - name: Rename client binary
-  #       run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-  #     - name: Tar client binary
-  #       uses: a7ul/tar-action@v1.2.0
-  #       with:
-  #         command: c
-  #         files: |
-  #           defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-  #         outPath: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #     - name: Upload client archive
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #         asset_name: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #         asset_content_type: application/octet-stream
-  #     - name: Rename daemon binary
-  #       run: mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-  #     - name: Tar daemon binary
-  #       uses: a7ul/tar-action@v1.2.0
-  #       with:
-  #         command: c
-  #         files: |
-  #           defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-  #         outPath: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #     - name: Upload daemon archive
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #         asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #         asset_content_type: application/octet-stream
+  build-linux:
+    needs:
+      - create-release
+    outputs:
+      deb_sha256_amd64: ${{ steps.calculate-sha256.outputs.deb_sha256_amd64 }}
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [ARM64, X64]
+        include:
+          - architecture: ARM64
+            deb_arch: arm64
+            binary_arch: aarch64
+          - architecture: X64
+            deb_arch: amd64
+            binary_arch: x86_64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17
+          run_install: false
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-build-store-
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
+      - name: Build packages
+        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: "--bundles deb,rpm"
+      - name: Calculate DEB SHA256
+        id: calculate-sha256
+        if: matrix.deb_arch == 'amd64'
+        run: |
+          DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
+          DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
+          echo "DEB SHA256: $DEB_SHA256"
+          echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
+          echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
+      - name: Upload RPM
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+          asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+          asset_content_type: application/octet-stream
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_content_type: application/octet-stream
+      - name: Rename client binary
+        run: mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+      - name: Tar client binary
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: |
+            defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          outPath: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+      - name: Upload client archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
+      - name: Rename daemon binary
+        run: mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+      - name: Tar daemon binary
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: |
+            defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          outPath: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+      - name: Upload daemon archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
 
-  #     - name: Rename dg binary
-  #       run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-  #     - name: Tar dg binary
-  #       uses: a7ul/tar-action@v1.2.0
-  #       with:
-  #         command: c
-  #         files: |
-  #           dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-  #         outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #     - name: Upload dg archive
-  #       uses: actions/upload-release-asset@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #         asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-  #         asset_content_type: application/octet-stream
-  #     - name: Build dg deb
-  #       uses: defGuard/fpm-action@main
-  #       with:
-  #         fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-  #         fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
-  #     - name: Upload DEB
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
-  #         asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
-  #         asset_content_type: application/octet-stream
-  #     - name: Build dg rpm
-  #       uses: defGuard/fpm-action@main
-  #       with:
-  #         fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
-  #         fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
-  #     - name: Upload RPM
-  #       uses: actions/upload-release-asset@v1.0.2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
-  #         asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
-  #         asset_content_type: application/octet-stream
+      - name: Rename dg binary
+        run: mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+      - name: Tar dg binary
+        uses: a7ul/tar-action@v1.2.0
+        with:
+          command: c
+          files: |
+            dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          outPath: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+      - name: Upload dg archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
+      - name: Build dg deb
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
+      - name: Upload DEB
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
+          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
+          asset_content_type: application/octet-stream
+      - name: Build dg rpm
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
+      - name: Upload RPM
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
+          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
+          asset_content_type: application/octet-stream
 
   # Builds Windows MSI and uploads it as artifact
   build-windows:
@@ -297,7 +297,7 @@ jobs:
       fail-fast: false
       matrix:
         windows_runner:
-          # - windows-latest
+          - windows-latest
           - windows-11-arm
         include:
           - windows_runner: windows-latest
@@ -346,7 +346,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-bundle
-          path: src-tauri/target/release/bundle/msi/Defguard_1.6.6_${{ matrix.cpu }}_en-US.msi
+          path: src-tauri/target/release/bundle/msi/Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
 
   # Signs the MSI and uploads it as release asset
   sign-bundle:
@@ -356,8 +356,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Match CPUs from build-windows above.
         cpu:
-          # - x64
+          - x64
           - arm64
     runs-on:
       - self-hosted
@@ -374,7 +375,7 @@ jobs:
         with:
           name: unsigned-bundle
       - name: Sign bundle
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_1.6.6_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
       - name: Upload installer asset
         uses: actions/upload-release-asset@v1
         env:
@@ -382,5 +383,5 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: Defguard-signed.msi
-          asset_name: Defguard_1.6.6_${{ matrix.cpu }}_en-US.msi
+          asset_name: Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
           asset_content_type: application/octet-stream
