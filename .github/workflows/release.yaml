@@ -340,6 +340,7 @@ jobs:
   # Signs the MSI and uploads it as release asset
   sign-bundle:
     needs:
+      - create-release
       - build-windows
     runs-on:
       - self-hosted
