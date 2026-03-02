@@ -293,7 +293,18 @@ jobs:
   build-windows:
     needs:
       - create-release
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        windows_runner:
+          # - windows-latest
+          - windows-11-arm
+        include:
+          - windows_runner: windows-latest
+            cpu: x64
+          - windows_runner: windows-11-arm
+            cpu: arm64
+    runs-on: ${{ matrix.windows_runner }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -335,13 +346,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-bundle
-          path: src-tauri/target/release/bundle/msi/Defguard_${{ env.VERSION }}_x64_en-US.msi
+          path: src-tauri/target/release/bundle/msi/Defguard_1.6.6_${{ matrix.cpu }}_en-US.msi
 
   # Signs the MSI and uploads it as release asset
   sign-bundle:
     needs:
       - create-release
       - build-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        cpu:
+          # - x64
+          - arm64
     runs-on:
       - self-hosted
       - Linux
@@ -357,7 +374,7 @@ jobs:
         with:
           name: unsigned-bundle
       - name: Sign bundle
-        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_x64_en-US.msi -out Defguard-signed.msi
+        run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_1.6.6_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
       - name: Upload installer asset
         uses: actions/upload-release-asset@v1
         env:
@@ -365,5 +382,5 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: Defguard-signed.msi
-          asset_name: Defguard_${{ env.VERSION }}_x64_en-US.msi
+          asset_name: Defguard_1.6.6_${{ matrix.cpu }}_en-US.msi
           asset_content_type: application/octet-stream
