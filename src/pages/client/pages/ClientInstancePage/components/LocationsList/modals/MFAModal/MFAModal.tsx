@@ -23,6 +23,7 @@ import { MessageBoxType } from '../../../../../../../../shared/defguard-ui/compo
 import { ModalWithTitle } from '../../../../../../../../shared/defguard-ui/components/Layout/modals/ModalWithTitle/ModalWithTitle';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import { isPresent } from '../../../../../../../../shared/defguard-ui/utils/isPresent';
+import { errorDetail } from '../../../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
 import { type DefguardInstance, LocationMfaType } from '../../../../../../types';
@@ -156,7 +157,9 @@ export const MFAModal = () => {
           return data;
         } else {
           const errorData = ((await response.json()) as unknown as MFAError).error;
-          error(`MFA failed to start with the following error: ${errorData}`);
+          error(
+            `MFA start returned non-OK for location ${location?.network_id} (method: ${method}): ${errorData}`,
+          );
           if (method === 2) {
             setScreen('openid_unavailable');
             return;
@@ -171,7 +174,10 @@ export const MFAModal = () => {
           return;
         }
       } catch (rej) {
-        error(`Failed to execute proxy request: ${rej}`);
+        const detail = errorDetail(rej);
+        error(
+          `MFA start request to proxy failed for location ${location?.network_id} (method: ${method}): ${detail}`,
+        );
         toaster.error(localLL.errors.mfaStartGeneric());
         return;
       }
@@ -456,15 +462,27 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       }
 
       const body_token = { token };
-      const response = await fetch(`${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          CLIENT_VERSION_HEADER: platformInfo.client_version,
-          CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
-        },
-        body: JSON.stringify(body_token),
-      });
+      let response: Awaited<ReturnType<typeof fetch>>;
+      try {
+        response = await fetch(`${proxyUrl + CLIENT_MFA_ENDPOINT}/finish`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            CLIENT_VERSION_HEADER: platformInfo.client_version,
+            CLIENT_PLATFORM_HEADER: platformInfo.platform_info,
+          },
+          body: JSON.stringify(body_token),
+        });
+      } catch (e) {
+        clearInterval(interval);
+        clearTimeout(timeoutId);
+        const detail = errorDetail(e);
+        error(
+          `OpenID MFA poll request failed (network error) for location ${location?.id}: ${detail}`,
+        );
+        setErrorMessage(localLL.errors.mfaStartGeneric());
+        return;
+      }
 
       if (response.ok) {
         clearInterval(interval);
@@ -491,13 +509,17 @@ const OpenIDMFAPending = ({ proxyUrl, token, resetState }: OpenIDMFAPendingProps
       const { error: errorMessage } = data;
 
       if (errorMessage === 'invalid token') {
-        error(JSON.stringify(data, null, 2));
+        error(`OpenID MFA poll failed: invalid token. Response: ${JSON.stringify(data)}`);
         setErrorMessage(localLL.errors.tokenExpired());
       } else if (errorMessage === 'login session not found') {
-        error(JSON.stringify(data, null, 2));
+        error(
+          `OpenID MFA poll failed: login session not found. Response: ${JSON.stringify(data)}`,
+        );
         setErrorMessage(localLL.errors.sessionInvalidated());
       } else {
-        error(JSON.stringify(data, null, 2));
+        error(
+          `OpenID MFA poll failed with unhandled error. Response: ${JSON.stringify(data)}`,
+        );
         setErrorMessage(localLL.errors.mfaStartGeneric());
       }
     };
@@ -609,21 +631,27 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
           errorMessage === 'invalid token' ||
           errorMessage === 'login session not found'
         ) {
-          console.error(data);
           toaster.error(localLL.errors.tokenExpired());
           resetState();
-          error(JSON.stringify(data));
+          error(
+            `MFA code finish failed: session expired or invalid token for location ${location?.id}. Response: ${JSON.stringify(data)}`,
+          );
           return;
         } else {
           toaster.error(localLL.errors.mfaFinishGeneric());
         }
 
         setMFAError(message);
-        error(JSON.stringify(data));
+        error(
+          `MFA code finish failed for location ${location?.id}. Response: ${JSON.stringify(data)}`,
+        );
         return;
       }
     } catch (rej) {
-      error(`Failed to execute proxy request: ${rej}`);
+      const detail = errorDetail(rej);
+      error(
+        `MFA code finish request to proxy failed for location ${location?.id}: ${detail}`,
+      );
       toaster.error(localLL.errors.mfaFinishGeneric());
       return;
     }

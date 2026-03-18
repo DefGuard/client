@@ -1,14 +1,15 @@
 import './style.scss';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { error } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
 import { useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
-
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { ConfirmModal } from '../../../../../../shared/defguard-ui/components/Layout/modals/ConfirmModal/ConfirmModal';
 import { ConfirmModalType } from '../../../../../../shared/defguard-ui/components/Layout/modals/ConfirmModal/types';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { errorDetail } from '../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../query';
@@ -58,7 +59,10 @@ export const DeleteInstanceModal = () => {
           message: String(e),
         }),
       );
-      console.error(e);
+      const detail = errorDetail(e);
+      error(
+        `Failed to delete instance "${instance?.name}" (id: ${instance?.id}): ${detail}`,
+      );
     },
   });
 

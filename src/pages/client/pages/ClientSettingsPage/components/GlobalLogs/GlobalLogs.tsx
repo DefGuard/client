@@ -11,6 +11,7 @@ import { ActionButton } from '../../../../../../shared/defguard-ui/components/La
 import { ActionButtonVariant } from '../../../../../../shared/defguard-ui/components/Layout/ActionButton/types';
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { Helper } from '../../../../../../shared/defguard-ui/components/Layout/Helper/Helper';
+import { errorDetail } from '../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../clientAPI/clientApi';
 import type {
   GlobalLogLevel,
@@ -47,7 +48,8 @@ export const GlobalLogs = () => {
         throw new Error('No path selected');
       }
     } catch (e) {
-      error(`Failed to save logs: ${e}`);
+      const detail = errorDetail(e);
+      error(`Failed to save logs to file: ${detail}`);
     }
   };
 

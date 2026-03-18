@@ -1,3 +1,5 @@
+import './style.scss';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { debug, error, info } from '@tauri-apps/plugin-log';
 import { useCallback } from 'react';
@@ -6,17 +8,17 @@ import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { LoaderSpinner } from '../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
 import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import useEffectOnce from '../../../../shared/defguard-ui/utils/useEffectOnce';
 import type {
   ActivateUserRequest,
   CreateDeviceResponse,
 } from '../../../../shared/hooks/api/types';
+import { errorDetail } from '../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../client/clientAPI/clientApi';
 import { clientQueryKeys } from '../../../client/query';
+import { EnrollmentStepKey } from '../../const';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../hooks/useEnrollmentApi';
-import './style.scss';
-import useEffectOnce from '../../../../shared/defguard-ui/utils/useEffectOnce';
-import { EnrollmentStepKey } from '../../const';
 
 const { saveConfig } = clientApi;
 
@@ -62,6 +64,8 @@ export const SendFinishStep = () => {
           });
         })
         .catch((e) => {
+          const detail = errorDetail(e);
+          error(`Failed to save config after user activation: ${detail}`);
           if (typeof e === 'string') {
             if (e.includes('Network Error')) {
               toaster.error(LL.common.messages.networkError());
@@ -101,8 +105,8 @@ export const SendFinishStep = () => {
           message: String(e),
         }),
       );
-      console.error(e);
-      error(String(e));
+      const detail = errorDetail(e);
+      error(`activateUser mutation failed during enrollment finish: ${detail}`);
     },
     onSuccess: () => {
       setEnrollmentStore({ loading: false, step: EnrollmentStepKey.FINISH });

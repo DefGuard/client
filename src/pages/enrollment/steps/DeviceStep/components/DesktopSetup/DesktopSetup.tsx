@@ -7,7 +7,6 @@ import { isUndefined } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
-
 import { useI18nContext } from '../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -18,6 +17,7 @@ import {
 import { Card } from '../../../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { useToaster } from '../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
 import type { CreateDeviceResponse } from '../../../../../../shared/hooks/api/types';
+import { errorDetail } from '../../../../../../shared/utils/errorDetail';
 import { generateWGKeys } from '../../../../../../shared/utils/generateWGKeys';
 import { EnrollmentStepIndicator } from '../../../../components/EnrollmentStepIndicator/EnrollmentStepIndicator';
 import { EnrollmentStepKey } from '../../../../const';
@@ -47,7 +47,8 @@ export const DesktopSetup = () => {
     useMutation({
       mutationFn: createDevice,
       onError: (e) => {
-        error(String(e));
+        const detail = errorDetail(e);
+        error(`createDevice mutation failed during enrollment: ${detail}`);
       },
     });
 

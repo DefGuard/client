@@ -23,6 +23,7 @@ import type {
   CreateDeviceResponse,
 } from '../../../../../../../../shared/hooks/api/types';
 import { routes } from '../../../../../../../../shared/routes';
+import { errorDetail } from '../../../../../../../../shared/utils/errorDetail';
 import { generateWGKeys } from '../../../../../../../../shared/utils/generateWGKeys';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
@@ -134,6 +135,8 @@ export const AddInstanceDeviceForm = () => {
             navigate(routes.client.instancePage, { replace: true });
           })
           .catch((e) => {
+            const detail = errorDetail(e);
+            error(`Failed to save device config: ${detail}`);
             toaster.error(
               LL.common.messages.errorWithMessage({
                 message: String(e),
@@ -144,7 +147,8 @@ export const AddInstanceDeviceForm = () => {
       });
     } catch (e) {
       setIsLoading(false);
-      console.error(e);
+      const detail = errorDetail(e);
+      error(`Device form submit failed for proxy ${proxyUrl}: ${detail}`);
 
       if (typeof e === 'string') {
         if (e.includes('Network Error')) {

@@ -1,4 +1,5 @@
 import './style.scss';
+
 import { useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 import { Button } from '../../../../shared/defguard-ui/components/Layout/Button/Button';
