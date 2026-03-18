@@ -345,7 +345,7 @@ jobs:
       - name: Upload unsigned bundle
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-bundle
+          name: unsigned-bundle-${{ matrix.cpu }}
           path: src-tauri/target/release/bundle/msi/Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
 
   # Signs the MSI and uploads it as release asset
@@ -373,7 +373,7 @@ jobs:
       - name: Download unsigned bundle
         uses: actions/download-artifact@v4
         with:
-          name: unsigned-bundle
+          name: unsigned-bundle-${{ matrix.cpu }}
       - name: Sign bundle
         run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
       - name: Upload installer asset
