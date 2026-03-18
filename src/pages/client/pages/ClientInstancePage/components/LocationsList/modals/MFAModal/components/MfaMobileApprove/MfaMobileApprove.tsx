@@ -1,18 +1,19 @@
+import './style.scss';
+
+import { debug, error } from '@tauri-apps/plugin-log';
 import { fromUint8Array } from 'js-base64';
 import { useEffect, useMemo } from 'react';
 import QrCode from 'react-qr-code';
 import useWebSocket from 'react-use-websocket';
 import z from 'zod';
 import { shallow } from 'zustand/shallow';
+import { Button } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
+import { MessageBox } from '../../../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
 import { useToaster } from '../../../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { errorDetail } from '../../../../../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../../../../../clientAPI/clientApi';
 import type { CommonWireguardFields } from '../../../../../../../../types';
 import { useMFAModal } from '../../useMFAModal';
-import './style.scss';
-import { debug, error } from '@tauri-apps/plugin-log';
-import { Button } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
-import { MessageBox } from '../../../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
-import { errorDetail } from '../../../../../../../../../../shared/utils/errorDetail';
 
 type MfaMobileQrData = {
   token: string;

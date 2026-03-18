@@ -1,3 +1,5 @@
+import './style.scss';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { debug, error, info } from '@tauri-apps/plugin-log';
 import { useCallback } from 'react';
@@ -6,6 +8,7 @@ import { useI18nContext } from '../../../../i18n/i18n-react';
 import { Card } from '../../../../shared/defguard-ui/components/Layout/Card/Card';
 import { LoaderSpinner } from '../../../../shared/defguard-ui/components/Layout/LoaderSpinner/LoaderSpinner';
 import { useToaster } from '../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import useEffectOnce from '../../../../shared/defguard-ui/utils/useEffectOnce';
 import type {
   ActivateUserRequest,
   CreateDeviceResponse,
@@ -13,11 +16,9 @@ import type {
 import { errorDetail } from '../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../client/clientAPI/clientApi';
 import { clientQueryKeys } from '../../../client/query';
+import { EnrollmentStepKey } from '../../const';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
 import { useEnrollmentApi } from '../../hooks/useEnrollmentApi';
-import './style.scss';
-import useEffectOnce from '../../../../shared/defguard-ui/utils/useEffectOnce';
-import { EnrollmentStepKey } from '../../const';
 
 const { saveConfig } = clientApi;
 
