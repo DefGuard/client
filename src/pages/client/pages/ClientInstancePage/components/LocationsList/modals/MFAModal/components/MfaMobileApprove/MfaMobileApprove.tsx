@@ -12,6 +12,7 @@ import './style.scss';
 import { debug, error } from '@tauri-apps/plugin-log';
 import { Button } from '../../../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
 import { MessageBox } from '../../../../../../../../../../shared/defguard-ui/components/Layout/MessageBox/MessageBox';
+import { errorDetail } from '../../../../../../../../../../shared/utils/errorDetail';
 
 type MfaMobileQrData = {
   token: string;
@@ -96,7 +97,8 @@ export const MfaMobileApprove = ({
             toaster.success('Connection authorized.');
           })
           .catch((e) => {
-            console.error(e);
+            const detail = errorDetail(e);
+            error(`MFA mobile connect failed for location ${location.id}: ${detail}`);
           });
       } else {
         // catch possible changes in api

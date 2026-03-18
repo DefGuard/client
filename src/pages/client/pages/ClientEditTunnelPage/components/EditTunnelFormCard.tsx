@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { error } from '@tauri-apps/plugin-log';
 import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-
 import { useI18nContext } from '../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { ArrowSingle } from '../../../../../shared/defguard-ui/components/icons/ArrowSingle/ArrowSingle';
@@ -23,6 +23,7 @@ import {
   patternValidWireguardKey,
 } from '../../../../../shared/patterns';
 import { routes } from '../../../../../shared/routes';
+import { errorDetail } from '../../../../../shared/utils/errorDetail';
 import { validateIpOrDomainList } from '../../../../../shared/validators/tunnel';
 import { clientApi } from '../../../clientAPI/clientApi';
 import type { Tunnel } from '../../../types';
@@ -197,9 +198,11 @@ export const EditTunnelFormCard = ({ tunnel, submitRef }: Props) => {
         navigate(routes.client.base, { replace: true });
         toaster.success(LL.pages.client.pages.editTunnelPage.messages.editSuccess());
       })
-      .catch(() =>
-        toaster.error(LL.pages.client.pages.editTunnelPage.messages.editError()),
-      );
+      .catch((e) => {
+        const detail = errorDetail(e);
+        error(`Failed to update tunnel: ${detail}`);
+        toaster.error(LL.pages.client.pages.editTunnelPage.messages.editError());
+      });
   };
 
   const { handleSubmit, control } = useForm<Tunnel>({

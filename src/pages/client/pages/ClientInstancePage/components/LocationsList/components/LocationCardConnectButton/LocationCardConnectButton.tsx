@@ -3,7 +3,6 @@ import './style.scss';
 import { error } from '@tauri-apps/plugin-log';
 import classNames from 'classnames';
 import { useState } from 'react';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import SvgIconCheckmarkSmall from '../../../../../../../../shared/components/svg/IconCheckmarkSmall';
 import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -13,6 +12,7 @@ import {
 } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/types';
 import SvgIconX from '../../../../../../../../shared/defguard-ui/components/svg/IconX';
 import { useToaster } from '../../../../../../../../shared/defguard-ui/hooks/toasts/useToaster';
+import { errorDetail } from '../../../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { type CommonWireguardFields, LocationMfaType } from '../../../../../../types';
 import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
@@ -66,8 +66,10 @@ export const LocationCardConnectButton = ({ location }: Props) => {
           message: String(e),
         }),
       );
-      error(`Error handling interface: ${e}`);
-      console.error(e);
+      const detail = errorDetail(e);
+      error(
+        `Error handling interface for location ${location?.id} (${location?.active ? 'disconnect' : 'connect'}): ${detail}`,
+      );
     }
   };
 

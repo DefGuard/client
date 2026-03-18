@@ -10,6 +10,7 @@ import type {
   ActivateUserRequest,
   CreateDeviceResponse,
 } from '../../../../shared/hooks/api/types';
+import { errorDetail } from '../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../client/clientAPI/clientApi';
 import { clientQueryKeys } from '../../../client/query';
 import { useEnrollmentStore } from '../../hooks/store/useEnrollmentStore';
@@ -62,6 +63,8 @@ export const SendFinishStep = () => {
           });
         })
         .catch((e) => {
+          const detail = errorDetail(e);
+          error(`Failed to save config after user activation: ${detail}`);
           if (typeof e === 'string') {
             if (e.includes('Network Error')) {
               toaster.error(LL.common.messages.networkError());
@@ -101,8 +104,8 @@ export const SendFinishStep = () => {
           message: String(e),
         }),
       );
-      console.error(e);
-      error(String(e));
+      const detail = errorDetail(e);
+      error(`activateUser mutation failed during enrollment finish: ${detail}`);
     },
     onSuccess: () => {
       setEnrollmentStore({ loading: false, step: EnrollmentStepKey.FINISH });
