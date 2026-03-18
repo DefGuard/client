@@ -88,7 +88,7 @@
     "lodash-es": "^4.17.23",
     "merge-refs": "^2.0.0",
     "millify": "^6.1.0",
-    "motion": "^12.37.0",
+    "motion": "^12.38.0",
     "p-timeout": "^6.1.4",
     "prop-types": "^15.8.1",
     "radash": "^12.1.1",
