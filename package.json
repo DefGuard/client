@@ -56,7 +56,7 @@
     "@react-hook/resize-observer": "^2.0.2",
     "@stablelib/base64": "^2.0.1",
     "@stablelib/x25519": "^2.0.1",
-    "@tanstack/query-core": "^5.90.20",
+    "@tanstack/query-core": "^5.91.2",
     "@tanstack/react-virtual": "3.13.18",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
@@ -112,10 +112,10 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.7",
+    "@biomejs/biome": "^2.4.8",
     "@hookform/devtools": "^4.4.0",
     "@svgr/cli": "^8.1.0",
-    "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-query": "^5.91.2",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@tauri-apps/cli": "^2.10.1",
     "@types/file-saver": "^2.0.7",
