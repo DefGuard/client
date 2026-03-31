@@ -30,7 +30,7 @@ jobs:
       - name: Rename client binary
         run: mv src-tauri/target/release/${{ inputs.flavor }} ${{ inputs.flavor }}-${{ inputs.system }}-${{ inputs.binary_arch }}-${{ github.ref_name }}
       - name: Tar client binary
-        uses: a7ul/tar-action@v1.1.0
+        uses: a7ul/tar-action@v1.2.0
         with:
           command: c
           files: |
