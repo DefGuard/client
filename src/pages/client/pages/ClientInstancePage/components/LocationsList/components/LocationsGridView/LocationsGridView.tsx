@@ -144,8 +144,9 @@ const GridItem = ({ location, selectedDefguardInstance }: GridItemProps) => {
           type={LocationUsageChartType.BAR}
         />
       )}
-      {(!locationStats || !locationStats.length) &&
-        (lastConnection || location.active) && <LocationCardNoStats />}
+      {!locationStats?.length && (lastConnection || location.active) && (
+        <LocationCardNoStats />
+      )}
     </Card>
   );
 };
