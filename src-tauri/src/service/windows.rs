@@ -20,7 +20,8 @@ use windows_service::{
 
 use crate::{
     enterprise::service_locations::{
-        windows::watch_for_login_logoff, ServiceLocationError, ServiceLocationManager,
+        windows::{watch_for_login_logoff, watch_for_network_change},
+        ServiceLocationError, ServiceLocationManager,
     },
     service::{
         config::Config,
@@ -32,6 +33,7 @@ use crate::{
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
+const NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
 const SERVICE_LOCATION_CONNECT_RETRY_DELAY_SECS: u64 = 30;
 
@@ -114,11 +116,42 @@ fn run_service() -> Result<(), DaemonError> {
 
         let service_location_manager = Arc::new(RwLock::new(service_location_manager));
 
+        // Spawn network change monitoring task first so NotifyAddrChange is registered as early
+        // as possible, minimising the window in which a network event could be missed before
+        // the watcher is listening. The retry task below is the backstop for any event that
+        // still slips through that window.
+        let service_location_manager_clone = service_location_manager.clone();
+        runtime.spawn(async move {
+            let manager = service_location_manager_clone;
+
+            info!("Starting network change monitoring");
+            loop {
+                match watch_for_network_change(manager.clone()).await {
+                    Ok(()) => {
+                        warn!(
+                            "Network change monitoring ended unexpectedly. Restarting in \
+                            {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}..."
+                        );
+                        tokio::time::sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
+                    }
+                    Err(e) => {
+                        error!(
+                            "Error in network change monitoring: {e}. Restarting in \
+                            {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}...",
+                        );
+                        tokio::time::sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
+                        info!("Restarting network change monitoring");
+                    }
+                }
+            }
+        });
+
         // Spawn service location auto-connect task with retries.
         // Each attempt skips locations that are already connected, so it is safe to call
         // connect_to_service_locations repeatedly. The retry loop exists to handle the case
         // where the connection may fail initially at startup because the network
-        // (e.g. Wi-Fi) is not yet available (mainly DNS resolution issues).
+        // (e.g. Wi-Fi) is not yet available (mainly DNS resolution issues), and serves as
+        // a backstop for any network events missed by the watcher above.
         let service_location_manager_connect = service_location_manager.clone();
         runtime.spawn(async move {
             for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
@@ -155,7 +188,7 @@ fn run_service() -> Result<(), DaemonError> {
             info!("Service location auto-connect task finished");
         });
 
-        // Spawn login/logoff monitoring task, runs concurrently with the auto-connect task above.
+        // Spawn login/logoff monitoring task, runs concurrently with the tasks above.
         let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
             let manager = service_location_manager_clone;

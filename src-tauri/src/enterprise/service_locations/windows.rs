@@ -9,6 +9,8 @@ use std::{
     time::Duration,
 };
 
+use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
+
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WireguardInterfaceApi,
@@ -36,9 +38,61 @@ use crate::{
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
+// How long to wait after a network change before attempting to connect.
+// Gives DHCP time to complete and DNS to become available.
+const NETWORK_STABILIZATION_DELAY_SECS: u64 = 3;
+// How long to wait before restarting the network change watcher on error.
+const NETWORK_CHANGE_MONITOR_RESTART_DELAY_SECS: u64 = 5;
 const DEFAULT_WIREGUARD_PORT: u16 = 51820;
 const DEFGUARD_DIR: &str = "Defguard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
+
+/// Watches for IP address changes on any network interface and attempts to connect to any
+/// service locations that are not yet connected. This handles the case where the endpoint
+/// hostname cannot be resolved at service startup because the network (e.g. Wi-Fi) is not
+/// yet available. When the network comes up and an IP is assigned, this watcher fires and
+/// retries the connection.
+///
+/// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is
+/// harmless because `connect_to_service_locations` skips already-connected locations.
+pub(crate) async fn watch_for_network_change(
+    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
+) -> Result<(), ServiceLocationError> {
+    loop {
+        // NotifyAddrChange blocks until any IP address is added or removed on any interface.
+        // Passing NULL for both handle and overlapped selects the synchronous (blocking) mode.
+        let result = unsafe { NotifyAddrChange(std::ptr::null_mut(), std::ptr::null()) };
+
+        if result != 0 {
+            error!("NotifyAddrChange failed with error code: {result}");
+            tokio::time::sleep(Duration::from_secs(
+                NETWORK_CHANGE_MONITOR_RESTART_DELAY_SECS,
+            ))
+            .await;
+            continue;
+        }
+
+        debug!(
+            "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY_SECS}s for \
+            network to stabilize before attempting service location connections..."
+        );
+        tokio::time::sleep(Duration::from_secs(NETWORK_STABILIZATION_DELAY_SECS)).await;
+
+        debug!("Attempting to connect to service locations after network change");
+        match service_location_manager
+            .write()
+            .unwrap()
+            .connect_to_service_locations()
+        {
+            Ok(()) => {
+                debug!("Service location connect attempt after network change completed");
+            }
+            Err(err) => {
+                warn!("Failed to connect to service locations after network change: {err}");
+            }
+        }
+    }
+}
 
 pub(crate) async fn watch_for_login_logoff(
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
