@@ -32,6 +32,8 @@ use crate::{
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
+const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
+const SERVICE_LOCATION_CONNECT_RETRY_DELAY_SECS: u64 = 30;
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
@@ -112,25 +114,51 @@ fn run_service() -> Result<(), DaemonError> {
 
         let service_location_manager = Arc::new(RwLock::new(service_location_manager));
 
-        // Spawn service location management task
+        // Spawn service location auto-connect task with retries.
+        // Each attempt skips locations that are already connected, so it is safe to call
+        // connect_to_service_locations repeatedly. The retry loop exists to handle the case
+        // where the connection may fail initially at startup because the network
+        // (e.g. Wi-Fi) is not yet available (mainly DNS resolution issues).
+        let service_location_manager_connect = service_location_manager.clone();
+        runtime.spawn(async move {
+            for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
+                info!(
+                    "Attempting to auto-connect to service locations \
+                    (attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
+                );
+                match service_location_manager_connect
+                    .write()
+                    .unwrap()
+                    .connect_to_service_locations()
+                {
+                    Ok(()) => {
+                        info!(
+                            "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
+                            completed"
+                        );
+                    }
+                    Err(err) => {
+                        warn!(
+                            "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
+                            failed: {err}"
+                        );
+                    }
+                }
+
+                if attempt < SERVICE_LOCATION_CONNECT_RETRY_COUNT {
+                    tokio::time::sleep(Duration::from_secs(
+                        SERVICE_LOCATION_CONNECT_RETRY_DELAY_SECS,
+                    ))
+                    .await;
+                }
+            }
+            info!("Service location auto-connect task finished");
+        });
+
+        // Spawn login/logoff monitoring task, runs concurrently with the auto-connect task above.
         let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
             let manager = service_location_manager_clone;
-
-            info!("Starting service location management task");
-
-            info!("Attempting to auto-connect to service locations");
-            match manager.write().unwrap().connect_to_service_locations() {
-                Ok(()) => {
-                    info!("Auto-connect to service locations completed successfully");
-                }
-                Err(err) => {
-                    warn!(
-                        "Error while trying to auto-connect to service locations: {err}. \
-                        Will continue monitoring for login/logoff events.",
-                    );
-                }
-            }
 
             info!("Starting login/logoff event monitoring");
             loop {

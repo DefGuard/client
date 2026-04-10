@@ -725,7 +725,7 @@ impl ServiceLocationManager {
                 if let Err(err) =
                     self.setup_service_location_interface(&location, &instance_data.private_key)
                 {
-                    debug!(
+                    warn!(
                         "Failed to setup service location interface for '{}': {err:?}",
                         location.name
                     );
