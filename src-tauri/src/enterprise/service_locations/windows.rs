@@ -42,7 +42,7 @@ const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
 // Gives DHCP time to complete and DNS to become available.
 const NETWORK_STABILIZATION_DELAY: Duration = Duration::from_secs(3);
 // How long to wait before restarting the network change watcher on error.
-const NETWORK_CHANGE_MONITOR_RESTART_DELAY: Durartion = Duration::from_secs(5);
+const NETWORK_CHANGE_MONITOR_RESTART_DELAY: Duration = Duration::from_secs(5);
 const DEFAULT_WIREGUARD_PORT: u16 = 51820;
 const DEFGUARD_DIR: &str = "Defguard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
@@ -70,7 +70,7 @@ pub(crate) async fn watch_for_network_change(
         }
 
         debug!(
-            "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY_SECS:?}s for \
+            "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY:?}s for \
             network to stabilize before attempting service location connections..."
         );
         sleep(NETWORK_STABILIZATION_DELAY).await;
