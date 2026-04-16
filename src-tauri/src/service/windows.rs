@@ -123,26 +123,9 @@ fn run_service() -> Result<(), DaemonError> {
         let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
             let manager = service_location_manager_clone;
-
             info!("Starting network change monitoring");
-            loop {
-                match watch_for_network_change(manager.clone()).await {
-                    Ok(()) => {
-                        warn!(
-                            "Network change monitoring ended unexpectedly. Restarting in \
-                            {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}..."
-                        );
-                    }
-                    Err(e) => {
-                        error!(
-                            "Error in network change monitoring: {e}. Restarting in \
-                            {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}...",
-                        );
-                    }
-                }
-                sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
-                info!("Restarting network change monitoring");
-            }
+            watch_for_network_change(manager.clone()).await;
+            error!("Network change monitoring ended unexpectedly.");
         });
 
         // Spawn service location auto-connect task with retries.
