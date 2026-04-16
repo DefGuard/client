@@ -152,6 +152,7 @@ fn run_service() -> Result<(), DaemonError> {
         // where the connection may fail initially at startup because the network
         // (e.g. Wi-Fi) is not yet available (mainly DNS resolution issues), and serves as
         // a backstop for any network events missed by the watcher above.
+        // If all locations connect successfully on a given attempt, no further retries are made.
         let service_location_manager_connect = service_location_manager.clone();
         runtime.spawn(async move {
             for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
@@ -164,10 +165,17 @@ fn run_service() -> Result<(), DaemonError> {
                     .unwrap()
                     .connect_to_service_locations()
                 {
-                    Ok(()) => {
+                    Ok(true) => {
                         info!(
+                            "All service locations connected successfully \
+                            (attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
+                        );
+                        break;
+                    }
+                    Ok(false) => {
+                        warn!(
                             "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
-                            completed"
+                            completed with some failures"
                         );
                     }
                     Err(err) => {

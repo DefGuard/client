@@ -84,7 +84,7 @@ pub(crate) async fn watch_for_network_change(
             .unwrap()
             .connect_to_service_locations()
         {
-            Ok(()) => {
+            Ok(_) => {
                 debug!("Service location connect attempt after network change completed");
             }
             Err(err) => {
@@ -734,11 +734,18 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    pub(crate) fn connect_to_service_locations(&mut self) -> Result<(), ServiceLocationError> {
+    /// Attempts to connect to all service locations that are not already connected.
+    ///
+    /// Returns `Ok(true)` if every location is now connected (either it was already connected or
+    /// it was successfully connected during this call), and `Ok(false)` if at least one location
+    /// failed to connect (indicating that a retry may be worthwhile).
+    pub(crate) fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect to VPN...");
 
         let data = self.load_service_locations()?;
         debug!("Loaded {} instance(s) from ServiceLocationApi", data.len());
+
+        let mut all_connected = true;
 
         for instance_data in data {
             debug!(
@@ -783,6 +790,7 @@ impl ServiceLocationManager {
                         "Failed to setup service location interface for '{}': {err:?}",
                         location.name
                     );
+                    all_connected = false;
                     continue;
                 }
 
@@ -803,7 +811,7 @@ impl ServiceLocationManager {
 
         debug!("Auto-connect attempt completed");
 
-        Ok(())
+        Ok(all_connected)
     }
 
     pub fn save_service_locations(
