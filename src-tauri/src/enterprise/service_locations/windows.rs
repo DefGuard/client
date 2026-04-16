@@ -57,7 +57,7 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 /// harmless because `connect_to_service_locations` skips already-connected locations.
 pub(crate) async fn watch_for_network_change(
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
-) -> Result<(), ServiceLocationError> {
+) {
     loop {
         // NotifyAddrChange blocks until any IP address is added or removed on any interface.
         // Passing NULL for both handle and overlapped selects the synchronous (blocking) mode.
@@ -65,10 +65,7 @@ pub(crate) async fn watch_for_network_change(
 
         if result != 0 {
             error!("NotifyAddrChange failed with error code: {result}");
-            sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY)
-                NETWORK_CHANGE_MONITOR_RESTART_DELAY_SECS,
-            ))
-            .await;
+            sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY).await;
             continue;
         }
 

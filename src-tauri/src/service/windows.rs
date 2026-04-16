@@ -132,17 +132,16 @@ fn run_service() -> Result<(), DaemonError> {
                             "Network change monitoring ended unexpectedly. Restarting in \
                             {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}..."
                         );
-                        sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
                     }
                     Err(e) => {
                         error!(
                             "Error in network change monitoring: {e}. Restarting in \
                             {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}...",
                         );
-                        sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
-                        info!("Restarting network change monitoring");
                     }
                 }
+                sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
+                info!("Restarting network change monitoring");
             }
         });
 
