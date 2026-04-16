@@ -35,7 +35,7 @@ const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 const NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
-const SERVICE_LOCATION_CONNECT_RETRY_DELAY_SECS: u64 = 30;
+const SERVICE_LOCATION_CONNECT_RETRY_DELAY_SECS: Duration = Duration::from_secs(30);
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking

@@ -40,9 +40,9 @@ use crate::{
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
 // How long to wait after a network change before attempting to connect.
 // Gives DHCP time to complete and DNS to become available.
-const NETWORK_STABILIZATION_DELAY_SECS: u64 = 3;
+const NETWORK_STABILIZATION_DELAY: Duration = Duration::from_secs(3);
 // How long to wait before restarting the network change watcher on error.
-const NETWORK_CHANGE_MONITOR_RESTART_DELAY_SECS: u64 = 5;
+const NETWORK_CHANGE_MONITOR_RESTART_DELAY: Durartion = Duration::from_secs(5);
 const DEFAULT_WIREGUARD_PORT: u16 = 51820;
 const DEFGUARD_DIR: &str = "Defguard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
@@ -65,7 +65,7 @@ pub(crate) async fn watch_for_network_change(
 
         if result != 0 {
             error!("NotifyAddrChange failed with error code: {result}");
-            sleep(Duration::from_secs(
+            sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY)
                 NETWORK_CHANGE_MONITOR_RESTART_DELAY_SECS,
             ))
             .await;
@@ -73,10 +73,10 @@ pub(crate) async fn watch_for_network_change(
         }
 
         debug!(
-            "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY_SECS}s for \
+            "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY_SECS:?}s for \
             network to stabilize before attempting service location connections..."
         );
-        sleep(Duration::from_secs(NETWORK_STABILIZATION_DELAY_SECS)).await;
+        sleep(NETWORK_STABILIZATION_DELAY).await;
 
         debug!("Attempting to connect to service locations after network change");
         match service_location_manager
