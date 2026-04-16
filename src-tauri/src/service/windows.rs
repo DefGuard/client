@@ -7,7 +7,7 @@ use std::{
 
 use clap::Parser;
 use error;
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, time::sleep};
 use windows_service::{
     define_windows_service,
     service::{
@@ -132,14 +132,14 @@ fn run_service() -> Result<(), DaemonError> {
                             "Network change monitoring ended unexpectedly. Restarting in \
                             {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}..."
                         );
-                        tokio::time::sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
+                        sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
                     }
                     Err(e) => {
                         error!(
                             "Error in network change monitoring: {e}. Restarting in \
                             {NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS:?}...",
                         );
-                        tokio::time::sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
+                        sleep(NETWORK_CHANGE_MONITORING_RESTART_DELAY_SECS).await;
                         info!("Restarting network change monitoring");
                     }
                 }
@@ -187,7 +187,7 @@ fn run_service() -> Result<(), DaemonError> {
                 }
 
                 if attempt < SERVICE_LOCATION_CONNECT_RETRY_COUNT {
-                    tokio::time::sleep(Duration::from_secs(
+                    sleep(Duration::from_secs(
                         SERVICE_LOCATION_CONNECT_RETRY_DELAY_SECS,
                     ))
                     .await;
@@ -209,14 +209,14 @@ fn run_service() -> Result<(), DaemonError> {
                             "Login/logoff event monitoring ended unexpectedly. Restarting in \
                             {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
                         );
-                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                        sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                     }
                     Err(e) => {
                         error!(
                             "Error in login/logoff event monitoring: {e}. Restarting in \
                             {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
                         );
-                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                        sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                         info!("Restarting login/logoff event monitoring");
                     }
                 }

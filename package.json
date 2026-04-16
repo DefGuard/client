@@ -85,7 +85,7 @@
     "html-react-parser": "^5.2.17",
     "itertools": "^2.6.0",
     "js-base64": "^3.7.8",
-    "lodash-es": "^4.17.23",
+    "lodash-es": "^4.18.1",
     "merge-refs": "^2.0.0",
     "millify": "^6.1.0",
     "motion": "^12.38.0",

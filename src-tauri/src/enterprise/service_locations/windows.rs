@@ -9,14 +9,13 @@ use std::{
     time::Duration,
 };
 
-use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
-
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WireguardInterfaceApi,
 };
 use known_folders::get_known_folder_path;
 use log::{debug, error, warn};
+use tokio::time::sleep;
 use windows::{
     core::PSTR,
     Win32::System::RemoteDesktop::{
@@ -25,6 +24,7 @@ use windows::{
     },
 };
 use windows_acl::acl::ACL;
+use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
     enterprise::service_locations::{
@@ -65,7 +65,7 @@ pub(crate) async fn watch_for_network_change(
 
         if result != 0 {
             error!("NotifyAddrChange failed with error code: {result}");
-            tokio::time::sleep(Duration::from_secs(
+            sleep(Duration::from_secs(
                 NETWORK_CHANGE_MONITOR_RESTART_DELAY_SECS,
             ))
             .await;
@@ -76,7 +76,7 @@ pub(crate) async fn watch_for_network_change(
             "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY_SECS}s for \
             network to stabilize before attempting service location connections..."
         );
-        tokio::time::sleep(Duration::from_secs(NETWORK_STABILIZATION_DELAY_SECS)).await;
+        sleep(Duration::from_secs(NETWORK_STABILIZATION_DELAY_SECS)).await;
 
         debug!("Attempting to connect to service locations after network change");
         match service_location_manager
@@ -113,7 +113,7 @@ pub(crate) async fn watch_for_login_logoff(
             }
             Err(err) => {
                 error!("Failed waiting for login/logoff event: {err:?}");
-                tokio::time::sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS)).await;
+                sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS)).await;
                 continue;
             }
         };
