@@ -160,6 +160,9 @@ windows-sys = { version = "0.61", features = [
     # HANDLE & file functions
     "Win32_System_IO",
     "Win32_System_Threading",
+
+    # Network address change notifications (NotifyAddrChange)
+    "Win32_NetworkManagement_IpHelper",
 ] }
 
 [features]

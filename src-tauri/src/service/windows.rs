@@ -7,7 +7,7 @@ use std::{
 
 use clap::Parser;
 use error;
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, time::sleep};
 use windows_service::{
     define_windows_service,
     service::{
@@ -20,7 +20,8 @@ use windows_service::{
 
 use crate::{
     enterprise::service_locations::{
-        windows::watch_for_login_logoff, ServiceLocationError, ServiceLocationManager,
+        windows::{watch_for_login_logoff, watch_for_network_change},
+        ServiceLocationError, ServiceLocationManager,
     },
     service::{
         config::Config,
@@ -32,6 +33,8 @@ use crate::{
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
+const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
+const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
@@ -112,25 +115,69 @@ fn run_service() -> Result<(), DaemonError> {
 
         let service_location_manager = Arc::new(RwLock::new(service_location_manager));
 
-        // Spawn service location management task
+        // Spawn network change monitoring task first so NotifyAddrChange is registered as early
+        // as possible, minimising the window in which a network event could be missed before
+        // the watcher is listening. The retry task below is the backstop for any event that
+        // still slips through that window.
         let service_location_manager_clone = service_location_manager.clone();
         runtime.spawn(async move {
             let manager = service_location_manager_clone;
+            info!("Starting network change monitoring");
+            watch_for_network_change(manager.clone()).await;
+            error!("Network change monitoring ended unexpectedly.");
+        });
 
-            info!("Starting service location management task");
-
-            info!("Attempting to auto-connect to service locations");
-            match manager.write().unwrap().connect_to_service_locations() {
-                Ok(()) => {
-                    info!("Auto-connect to service locations completed successfully");
+        // Spawn service location auto-connect task with retries.
+        // Each attempt skips locations that are already connected, so it is safe to call
+        // connect_to_service_locations repeatedly. The retry loop exists to handle the case
+        // where the connection may fail initially at startup because the network
+        // (e.g. Wi-Fi) is not yet available (mainly DNS resolution issues), and serves as
+        // a backstop for any network events missed by the watcher above.
+        // If all locations connect successfully on a given attempt, no further retries are made.
+        let service_location_manager_connect = service_location_manager.clone();
+        runtime.spawn(async move {
+            for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
+                info!(
+                    "Attempting to auto-connect to service locations \
+                    (attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
+                );
+                match service_location_manager_connect
+                    .write()
+                    .unwrap()
+                    .connect_to_service_locations()
+                {
+                    Ok(true) => {
+                        info!(
+                            "All service locations connected successfully \
+                            (attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
+                        );
+                        break;
+                    }
+                    Ok(false) => {
+                        warn!(
+                            "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
+                            completed with some failures"
+                        );
+                    }
+                    Err(err) => {
+                        warn!(
+                            "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
+                            failed: {err}"
+                        );
+                    }
                 }
-                Err(err) => {
-                    warn!(
-                        "Error while trying to auto-connect to service locations: {err}. \
-                        Will continue monitoring for login/logoff events.",
-                    );
+
+                if attempt < SERVICE_LOCATION_CONNECT_RETRY_COUNT {
+                    sleep(SERVICE_LOCATION_CONNECT_RETRY_DELAY).await;
                 }
             }
+            info!("Service location auto-connect task finished");
+        });
+
+        // Spawn login/logoff monitoring task, runs concurrently with the tasks above.
+        let service_location_manager_clone = service_location_manager.clone();
+        runtime.spawn(async move {
+            let manager = service_location_manager_clone;
 
             info!("Starting login/logoff event monitoring");
             loop {
@@ -140,14 +187,14 @@ fn run_service() -> Result<(), DaemonError> {
                             "Login/logoff event monitoring ended unexpectedly. Restarting in \
                             {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
                         );
-                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                        sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                     }
                     Err(e) => {
                         error!(
                             "Error in login/logoff event monitoring: {e}. Restarting in \
                             {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
                         );
-                        tokio::time::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
+                        sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
                         info!("Restarting login/logoff event monitoring");
                     }
                 }

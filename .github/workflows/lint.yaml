@@ -1,22 +1,22 @@
-name: "lint"
+name: 'lint'
 
 on:
   push:
     branches:
       - main
       - dev
-      - "release/**"
+      - 'release/**'
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
   pull_request:
     branches:
       - main
       - dev
-      - "release/**"
+      - 'release/**'
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
 
 jobs:
   lint-web:
@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: '24'
 
       - uses: pnpm/action-setup@v5
         with:
@@ -56,5 +56,6 @@ jobs:
       - name: Run Biome and Prettier Lint
         run: pnpm lint
 
-      - name: Audit
-        run: pnpm audit --prod
+      # TODO: Restore when it works again: https://github.com/pnpm/pnpm/issues/11265
+      # - name: Audit
+      #   run: pnpm audit --prod
