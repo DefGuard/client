@@ -115,17 +115,19 @@ fn run_service() -> Result<(), DaemonError> {
 
         let service_location_manager = Arc::new(RwLock::new(service_location_manager));
 
-        // Spawn network change monitoring task first so NotifyAddrChange is registered as early
-        // as possible, minimising the window in which a network event could be missed before
-        // the watcher is listening. The retry task below is the backstop for any event that
-        // still slips through that window.
+        // Spawn network change monitoring on a dedicated OS thread so the blocking
+        // NotifyAddrChange syscall does not stall Tokio's async worker threads.
+        // Register it first so no network event can be missed before the watcher is listening;
+        // the retry loop below is the backstop for any event that slips through the startup window.
         let service_location_manager_clone = service_location_manager.clone();
-        runtime.spawn(async move {
-            let manager = service_location_manager_clone;
-            info!("Starting network change monitoring");
-            watch_for_network_change(manager.clone()).await;
-            error!("Network change monitoring ended unexpectedly.");
-        });
+        std::thread::Builder::new()
+            .name("network-change-monitor".to_string())
+            .spawn(move || {
+                info!("Starting network change monitoring");
+                watch_for_network_change(service_location_manager_clone);
+                error!("Network change monitoring ended unexpectedly.");
+            })
+            .expect("Failed to spawn network change monitor thread");
 
         // Spawn service location auto-connect task with retries.
         // Each attempt skips locations that are already connected, so it is safe to call
@@ -174,32 +176,34 @@ fn run_service() -> Result<(), DaemonError> {
             info!("Service location auto-connect task finished");
         });
 
-        // Spawn login/logoff monitoring task, runs concurrently with the tasks above.
+        // Spawn login/logoff monitoring on a dedicated OS thread so the blocking
+        // WTSWaitSystemEvent syscall does not stall Tokio's async worker threads.
         let service_location_manager_clone = service_location_manager.clone();
-        runtime.spawn(async move {
-            let manager = service_location_manager_clone;
-
-            info!("Starting login/logoff event monitoring");
-            loop {
-                match watch_for_login_logoff(manager.clone()).await {
-                    Ok(()) => {
-                        warn!(
-                            "Login/logoff event monitoring ended unexpectedly. Restarting in \
-                            {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
-                        );
-                        sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
-                    }
-                    Err(e) => {
-                        error!(
-                            "Error in login/logoff event monitoring: {e}. Restarting in \
-                            {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
-                        );
-                        sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS).await;
-                        info!("Restarting login/logoff event monitoring");
+        std::thread::Builder::new()
+            .name("login-logoff-monitor".to_string())
+            .spawn(move || {
+                info!("Starting login/logoff event monitoring");
+                loop {
+                    match watch_for_login_logoff(service_location_manager_clone.clone()) {
+                        Ok(()) => {
+                            warn!(
+                                "Login/logoff event monitoring ended unexpectedly. Restarting in \
+                                {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
+                            );
+                            std::thread::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS);
+                        }
+                        Err(e) => {
+                            error!(
+                                "Error in login/logoff event monitoring: {e}. Restarting in \
+                                {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
+                            );
+                            std::thread::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS);
+                            info!("Restarting login/logoff event monitoring");
+                        }
                     }
                 }
-            }
-        });
+            })
+            .expect("Failed to spawn login/logoff monitor thread");
 
         // Spawn the main gRPC server task
         let service_location_manager_clone = service_location_manager.clone();
