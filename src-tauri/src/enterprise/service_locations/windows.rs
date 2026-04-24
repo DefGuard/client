@@ -15,7 +15,6 @@ use defguard_wireguard_rs::{
 };
 use known_folders::get_known_folder_path;
 use log::{debug, error, warn};
-use tokio::time::sleep;
 use windows::{
     core::PSTR,
     Win32::System::RemoteDesktop::{
@@ -55,7 +54,9 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 ///
 /// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is
 /// harmless because `connect_to_service_locations` skips already-connected locations.
-pub(crate) async fn watch_for_network_change(
+///
+/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall.
+pub(crate) fn watch_for_network_change(
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) {
     loop {
@@ -65,7 +66,7 @@ pub(crate) async fn watch_for_network_change(
 
         if result != 0 {
             error!("NotifyAddrChange failed with error code: {result}");
-            sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY).await;
+            std::thread::sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY);
             continue;
         }
 
@@ -73,14 +74,14 @@ pub(crate) async fn watch_for_network_change(
             "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY:?}s for \
             network to stabilize before attempting service location connections..."
         );
-        sleep(NETWORK_STABILIZATION_DELAY).await;
+        std::thread::sleep(NETWORK_STABILIZATION_DELAY);
 
         debug!("Attempting to connect to service locations after network change");
-        match service_location_manager
+        let connect_result = service_location_manager
             .write()
             .unwrap()
-            .connect_to_service_locations()
-        {
+            .connect_to_service_locations();
+        match connect_result {
             Ok(_) => {
                 debug!("Service location connect attempt after network change completed");
             }
@@ -91,11 +92,15 @@ pub(crate) async fn watch_for_network_change(
     }
 }
 
-pub(crate) async fn watch_for_login_logoff(
+/// Watches for user logon/logoff events and connects/disconnects pre-logon service locations
+/// accordingly.
+///
+/// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall.
+pub(crate) fn watch_for_login_logoff(
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) -> Result<(), ServiceLocationError> {
     loop {
-        let mut event_flags = 0;
+        let mut event_flags: u32 = 0;
         let success = unsafe {
             WTSWaitSystemEvent(
                 Some(WTS_CURRENT_SERVER_HANDLE),
@@ -110,7 +115,7 @@ pub(crate) async fn watch_for_login_logoff(
             }
             Err(err) => {
                 error!("Failed waiting for login/logoff event: {err:?}");
-                sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS)).await;
+                std::thread::sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS));
                 continue;
             }
         };
@@ -118,7 +123,6 @@ pub(crate) async fn watch_for_login_logoff(
         if event_flags & WTS_EVENT_LOGON != 0 {
             debug!("Detected user logon, attempting to auto-disconnect from service locations.");
             service_location_manager
-                .clone()
                 .write()
                 .unwrap()
                 .disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
@@ -126,7 +130,6 @@ pub(crate) async fn watch_for_login_logoff(
         if event_flags & WTS_EVENT_LOGOFF != 0 {
             debug!("Detected user logoff, attempting to auto-connect to service locations.");
             service_location_manager
-                .clone()
                 .write()
                 .unwrap()
                 .connect_to_service_locations()?;
@@ -281,7 +284,11 @@ pub(crate) fn is_user_logged_in() -> bool {
                                         buffer.0 as *mut _,
                                     );
 
-                                    // We found an active session with a username
+                                    // We found an active session with a username.
+                                    // Free the session list before returning to avoid a leak.
+                                    windows::Win32::System::RemoteDesktop::WTSFreeMemory(
+                                        pp_sessions as _,
+                                    );
                                     return true;
                                 }
                             }
