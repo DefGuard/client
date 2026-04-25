@@ -71,6 +71,10 @@ pub struct AppConfig {
     pub log_level: LevelFilter,
     /// In seconds. How much time after last network activity the connection is automatically dropped.
     pub peer_alive_period: u32,
+    /// Instance ID to automatically connect to on startup. None means no auto-connect.
+    pub default_instance: Option<i64>,
+    /// Whether to also trigger MFA for locations that require it during auto-connect.
+    pub auto_connect_mfa: bool,
 }
 
 // Important: keep in sync with client store default in frontend
@@ -82,6 +86,8 @@ impl Default for AppConfig {
             tray_theme: AppTrayTheme::Color,
             log_level: LevelFilter::Info,
             peer_alive_period: 300,
+            default_instance: None,
+            auto_connect_mfa: false,
         }
     }
 }

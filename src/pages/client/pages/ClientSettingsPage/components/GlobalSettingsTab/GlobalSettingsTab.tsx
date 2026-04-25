@@ -4,10 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  type Control,
   type SubmitHandler,
   type UseControllerProps,
   useController,
   useForm,
+  useWatch,
 } from 'react-hook-form';
 import { z } from 'zod';
 import { shallow } from 'zustand/shallow';
@@ -39,6 +41,7 @@ import {
   type TrayIconTheme,
 } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
+import type { DefguardInstance } from '../../../../types';
 
 type FormFields = AppConfig;
 
@@ -81,6 +84,8 @@ export const GlobalSettingsTab = () => {
             required_error: LL.form.errors.required(),
           })
           .gte(120, LL.form.errors.minValue({ min: 120 })),
+        default_instance: z.number().nullable(),
+        auto_connect_mfa: z.boolean(),
       }),
     [LL.form.errors],
   );
@@ -138,6 +143,16 @@ export const GlobalSettingsTab = () => {
           </Helper>
         </header>
         <FormInput controller={{ control, name: 'peer_alive_period' }} type="number" />
+      </section>
+      <section>
+        <header>
+          <h2>{localLL.defaultInstance.title()}</h2>
+          <Helper initialPlacement="right">
+            <p>{localLL.defaultInstance.helper()}</p>
+          </Helper>
+        </header>
+        <DefaultInstanceSelect controller={{ control, name: 'default_instance' }} />
+        <AutoConnectMfaOption control={control} controller={{ control, name: 'auto_connect_mfa' }} />
       </section>
     </form>
   );
@@ -326,6 +341,72 @@ const CheckForUpdatesOption = ({ controller }: FormMemberProps) => {
     <FormCheckBox
       labelPlacement="right"
       label={localLL.versionUpdate.checkboxTitle()}
+      controller={controller}
+    />
+  );
+};
+
+const AutoConnectMfaOption = ({
+  controller,
+  control,
+}: FormMemberProps & { control: Control<FormFields> }) => {
+  const { LL } = useI18nContext();
+  const localLL = LL.pages.client.pages.settingsPage.tabs.global;
+  const defaultInstance = useWatch({ control, name: 'default_instance' });
+
+  return (
+    <FormCheckBox
+      labelPlacement="right"
+      label={localLL.autoConnectMfa.title()}
+      controller={controller}
+      disabled={defaultInstance === null}
+    />
+  );
+};
+
+const DefaultInstanceSelect = ({ controller }: FormMemberProps) => {
+  const { LL } = useI18nContext();
+  const localLL = LL.pages.client.pages.settingsPage.tabs.global.defaultInstance;
+  const instances = useClientStore((state) => state.instances);
+
+  const options = useMemo((): SelectOption<number | null>[] => {
+    const noneOption: SelectOption<number | null> = {
+      key: -1,
+      label: localLL.options.none(),
+      value: null,
+    };
+    const instanceOptions: SelectOption<number | null>[] = instances.map(
+      (instance: DefguardInstance) => ({
+        key: instance.id,
+        label: instance.name,
+        value: instance.id,
+      }),
+    );
+    return [noneOption, ...instanceOptions];
+  }, [instances, localLL.options]);
+
+  const renderSelected = useCallback(
+    (value: number | null): SelectSelectedValue => {
+      const option = options.find((o) => o.value === value);
+      if (option) {
+        return {
+          key: option.key,
+          displayValue: option.label,
+        };
+      }
+      return {
+        key: -1,
+        displayValue: localLL.options.none(),
+      };
+    },
+    [options, localLL.options],
+  );
+
+  return (
+    <FormSelect
+      sizeVariant={SelectSizeVariant.STANDARD}
+      options={options}
+      renderSelected={renderSelected}
       controller={controller}
     />
   );
