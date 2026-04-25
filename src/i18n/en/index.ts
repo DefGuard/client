@@ -201,6 +201,17 @@ If you are an admin/devops - all your customers (instances) and all their tunnel
                 title: 'Updates',
                 checkboxTitle: 'Check for updates',
               },
+              defaultInstance: {
+                title: 'Default instance',
+                helper:
+                  'The instance that will be automatically connected when the client is launched.',
+                options: {
+                  none: 'None',
+                },
+              },
+              autoConnectMfa: {
+                title: 'Connect MFA locations on startup',
+              },
             },
           },
         },

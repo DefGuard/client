@@ -35,6 +35,8 @@ const defaultValues: StoreValues = {
     tray_theme: 'color',
     check_for_updates: true,
     peer_alive_period: 300,
+    default_instance: null,
+    auto_connect_mfa: false,
   },
 };
 

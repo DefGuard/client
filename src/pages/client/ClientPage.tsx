@@ -2,7 +2,8 @@ import './style.scss';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
-import { useEffect } from 'react';
+import { error } from '@tauri-apps/plugin-log';
+import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
 import AutoProvisioningManager from '../../components/AutoProvisioningManager';
@@ -10,6 +11,7 @@ import { useI18nContext } from '../../i18n/i18n-react';
 import { DeepLinkProvider } from '../../shared/components/providers/DeepLinkProvider';
 import { useToaster } from '../../shared/defguard-ui/hooks/toasts/useToaster';
 import { routes } from '../../shared/routes';
+import { errorDetail } from '../../shared/utils/errorDetail';
 import { clientApi } from './clientAPI/clientApi';
 import { ClientSideBar } from './components/ClientSideBar/ClientSideBar';
 import { MfaModalProvider } from './components/MfaModalProvider';
@@ -23,10 +25,11 @@ import {
   ClientConnectionType,
   type CommonWireguardFields,
   type DeadConDroppedPayload,
+  LocationMfaType,
   TauriEventKey,
 } from './types';
 
-const { getInstances, getTunnels, getAppConfig } = clientApi;
+const { getInstances, getTunnels, getAppConfig, getLocations, connect } = clientApi;
 
 export const ClientPage = () => {
   const queryClient = useQueryClient();
@@ -40,6 +43,8 @@ export const ClientPage = () => {
     state.listChecked,
     state.setListChecked,
   ]);
+  // Ref (not state) so the flag persists across re-renders without triggering them.
+  const autoConnectAttempted = useRef(false);
   const location = useLocation();
   const toaster = useToaster();
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
@@ -220,6 +225,47 @@ export const ClientPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appConfig]);
+
+  // Auto-connect the configured default instance once on startup.
+  useEffect(() => {
+    if (autoConnectAttempted.current || !instances || !appConfig) return;
+    const defaultInstanceId = appConfig.default_instance;
+    if (defaultInstanceId === null) return;
+    const instance = instances.find((i) => i.id === defaultInstanceId);
+    if (!instance) return;
+    autoConnectAttempted.current = true;
+    setClientState({
+      selectedInstance: { id: instance.id, type: ClientConnectionType.LOCATION },
+    });
+    getLocations({ instanceId: instance.id })
+      .then((locations) => {
+        for (const loc of locations) {
+          const mfaEnabled =
+            loc.location_mfa_mode === LocationMfaType.INTERNAL ||
+            loc.location_mfa_mode === LocationMfaType.EXTERNAL;
+          // MFA locations must go through the modal flow which collects
+          // credentials before calling connect — calling connect directly
+          // would mark the location active in the DB without a tunnel.
+          if (mfaEnabled) {
+            if (appConfig.auto_connect_mfa) openMFAModal(loc, true);
+          } else {
+            connect({ locationId: loc.id, connectionType: ClientConnectionType.LOCATION }).catch(
+              (e) => {
+                const detail = errorDetail(e);
+                error(`Auto-connect failed for location ${loc.id}: ${detail}`);
+                toaster.error(LL.common.messages.errorWithMessage({ message: detail }));
+              },
+            );
+          }
+        }
+      })
+      .catch((e) => {
+        const detail = errorDetail(e);
+        error(`Auto-connect failed to fetch locations for instance ${instance.id}: ${detail}`);
+        toaster.error(LL.common.messages.errorWithMessage({ message: detail }));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instances, appConfig]);
 
   // navigate to carousel on first app Launch
   useEffect(() => {
