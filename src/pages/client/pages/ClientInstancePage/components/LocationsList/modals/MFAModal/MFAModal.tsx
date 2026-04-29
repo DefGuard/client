@@ -392,6 +392,18 @@ const OpenIDMFALogin = ({
   const localLL = LL.modals.mfa.authentication;
   const { openLink } = clientApi;
   const displayName = openidDisplayName || 'OpenID provider';
+  const autoConnect = useMFAModal((state) => state.autoConnect);
+
+  // When triggered by startup auto-connect, open the browser and advance to
+  // the pending screen without requiring a button click.
+  useEffect(() => {
+    if (autoConnect) {
+      openLink(`${proxyUrl}openid/mfa?token=${token}`);
+      setScreen('openid_pending');
+    }
+    // only fire once when this screen first mounts during auto-connect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="mfa-modal-content">

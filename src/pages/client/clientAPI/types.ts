@@ -80,6 +80,8 @@ export type AppConfig = {
   tray_theme: TrayIconTheme;
   check_for_updates: boolean;
   peer_alive_period: number;
+  default_instance: number | null;
+  auto_connect_mfa: boolean;
 };
 
 export type ProvisioningConfig = {
