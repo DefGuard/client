@@ -2,6 +2,9 @@
 members = ["cli", "common"]
 default-members = [".", "cli"]
 
+[patch.crates-io]
+defguard_wireguard_rs = { path = "../../wireguard-rs" }
+
 [workspace.dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 defguard_wireguard_rs = "0.9"
