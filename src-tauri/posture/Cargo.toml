@@ -1,0 +1,15 @@
+[package]
+name = "posture"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+sysinfo = {version = "0.39", default-features = false, features = ["apple-app-store", "system"]}
+
+[target.'cfg(windows)'.dependencies]
+serde.workspace = true
+wmi = {version = "0.18", default-features = false}
