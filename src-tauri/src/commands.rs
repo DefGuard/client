@@ -242,7 +242,7 @@ pub async fn save_device_config(
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
-    let mut instance: Instance = instance_info.into();
+    let mut instance = Instance::from(instance_info);
     if response.token.is_some() {
         debug!(
             "The newly saved device config has a polling token, automatic configuration polling \
@@ -250,7 +250,7 @@ pub async fn save_device_config(
         );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an update, \
+            "Missing polling token for instance {}, Core and/or Edge services may need an update, \
             configuration polling won't work",
             instance.name,
         );

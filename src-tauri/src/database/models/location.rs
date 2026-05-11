@@ -80,6 +80,8 @@ pub struct Location<I = NoId> {
     pub keepalive_interval: i64,
     pub location_mfa_mode: LocationMfaMode,
     pub service_location_mode: ServiceLocationMode,
+    #[serde(default)]
+    pub posture_check_required: bool,
 }
 
 impl fmt::Display for Location<Id> {
@@ -107,14 +109,16 @@ impl Location<Id> {
         let max_service_location_mode =
             Self::get_service_location_mode_filter(include_service_locations);
         query_as!(
-          Self,
-            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id,\
-            route_all_traffic, keepalive_interval, \
-            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            Self,
+            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
+            network_id, route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
+            service_location_mode \"service_location_mode: ServiceLocationMode\", \
+            posture_check_required \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC;",
             max_service_location_mode
-      )
+        )
         .fetch_all(executor)
         .await
     }
@@ -159,7 +163,9 @@ impl Location<Id> {
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
             network_id, route_all_traffic,  keepalive_interval, \
-            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
+            service_location_mode \"service_location_mode: ServiceLocationMode\",
+            posture_check_required \
             FROM location WHERE id = $1",
             location_id
         )
@@ -180,7 +186,10 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            network_id, route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
+            service_location_mode \"service_location_mode: ServiceLocationMode\",
+            posture_check_required \
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
@@ -200,7 +209,10 @@ impl Location<Id> {
         query_as!(
             Self,
             "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
-            network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\" \
+            network_id, route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
+            service_location_mode \"service_location_mode: ServiceLocationMode\",
+            posture_check_required \
             FROM location WHERE pubkey = $1;",
             pubkey
         )
@@ -364,8 +376,9 @@ impl Location<NoId> {
         // Insert a new record when there is no ID
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
-            dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, service_location_mode) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
+            dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, \
+            service_location_mode, posture_check_required) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -379,6 +392,7 @@ impl Location<NoId> {
             self.keepalive_interval,
             self.location_mfa_mode,
             self.service_location_mode,
+            self.posture_check_required,
         )
         .fetch_one(executor)
         .await?;
@@ -397,6 +411,7 @@ impl Location<NoId> {
             keepalive_interval: self.keepalive_interval,
             location_mfa_mode: self.location_mfa_mode,
             service_location_mode: self.service_location_mode,
+            posture_check_required: self.posture_check_required,
         })
     }
 }
@@ -424,6 +439,7 @@ impl From<Location<Id>> for Location {
             keepalive_interval: location.keepalive_interval,
             location_mfa_mode: location.location_mfa_mode,
             service_location_mode: location.service_location_mode,
+            posture_check_required: location.posture_check_required,
         }
     }
 }

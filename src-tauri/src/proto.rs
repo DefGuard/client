@@ -59,6 +59,7 @@ impl defguard::client_types::DeviceConfig {
             keepalive_interval: self.keepalive_interval.into(),
             location_mfa_mode,
             service_location_mode,
+            posture_check_required: self.posture_check_required.unwrap_or_default(),
         }
     }
 }
