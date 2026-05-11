@@ -25,6 +25,7 @@ type Props = {
   proxyUrl: string;
   instanceUuid: string;
   onCancel: () => void;
+  onRefresh: () => void;
 };
 
 const { connect } = clientApi;
@@ -39,6 +40,7 @@ export const MfaMobileApprove = ({
   proxyUrl,
   instanceUuid,
   onCancel,
+  onRefresh,
 }: Props) => {
   const toaster = useToaster();
   const [closeModal, isModalOpen] = useMFAModal((s) => [s.close, s.isOpen], shallow);
@@ -59,15 +61,18 @@ export const MfaMobileApprove = ({
       },
       onClose: () => {
         debug('WebSocket connection to proxy for mobile app MFA closed.');
+        if (!expectedClose.current && isModalOpen) {
+          expectedClose.current = true;
+          onRefresh();
+        }
       },
       onError: () => {
         if (!expectedClose.current && isModalOpen) {
-          toaster.error('Unexpected error in WebSocket connection to proxy');
-          error(
-            'MFA auth using mobile app failed. Unexpected error in WebSocket connection to proxy.',
+          expectedClose.current = true;
+          debug(
+            'WebSocket connection to proxy for mobile app MFA failed, refreshing QR.',
           );
-          // go back to previous step
-          onCancel();
+          onRefresh();
         }
       },
     },
