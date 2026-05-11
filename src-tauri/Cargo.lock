@@ -728,6 +728,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bs58"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1039,7 +1048,7 @@ dependencies = [
 name = "common"
 version = "1.6.8"
 dependencies = [
- "nix 0.31.2",
+ "nix 0.31.3",
 ]
 
 [[package]]
@@ -1414,7 +1423,7 @@ dependencies = [
  "hyper-util",
  "known-folders",
  "log",
- "nix 0.31.2",
+ "nix 0.31.3",
  "objc2 0.6.4",
  "objc2-foundation 0.3.2",
  "objc2-network-extension",
@@ -1430,6 +1439,7 @@ dependencies = [
  "sqlx",
  "struct-patch",
  "strum",
+ "sysinfo",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",
@@ -1462,6 +1472,7 @@ dependencies = [
  "windows-acl",
  "windows-service",
  "windows-sys 0.61.2",
+ "wmi",
  "x25519-dalek",
 ]
 
@@ -1501,7 +1512,7 @@ dependencies = [
  "ip_network",
  "ip_network_table",
  "libc",
- "nix 0.31.2",
+ "nix 0.31.3",
  "parking_lot",
  "ring",
  "socket2",
@@ -1529,7 +1540,7 @@ dependencies = [
  "netlink-packet-utils",
  "netlink-packet-wireguard",
  "netlink-sys",
- "nix 0.31.2",
+ "nix 0.31.3",
  "regex",
  "serde",
  "thiserror 2.0.18",
@@ -3722,9 +3733,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.31.2"
+version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d6d0705320c1e6ba1d912b5e37cf18071b6c2e9b7fa8215a1e8a7651966f5d3"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
 dependencies = [
  "bitflags 2.11.1",
  "cfg-if",
@@ -4551,15 +4562,6 @@ dependencies = [
  "cpufeatures",
  "opaque-debug",
  "universal-hash",
-]
-
-[[package]]
-name = "posture"
-version = "1.6.8"
-dependencies = [
- "serde",
- "sysinfo",
- "wmi",
 ]
 
 [[package]]
@@ -5636,11 +5638,12 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.19.0"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f05839ce67618e14a09b286535c0d9c94e85ef25469b0e13cb4f844e5593eb19"
+checksum = "e72c1c2cb7b223fafb600a619537a871c2818583d619401b785e7c0b746ccde2"
 dependencies = [
  "base64 0.22.1",
+ "bs58",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -5655,9 +5658,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.19.0"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf2ebbe86054f9b45bc3881e865683ccfaccce97b9b4cb53f3039d67f355a334"
+checksum = "b90c488738ecb4fb0262f41f43bc40efc5868d9fb744319ddf5f5317f417bfac"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -6245,9 +6248,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.39.0"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd9f9fe3d2b7b75cf4f2805e5b9926e8ac47146667b16b86298c4a8bf08cc469"
+checksum = "a4deba334e1190ba7cb498327affa11e5ece10d26a30ab2f27fcf09504b8d8b6"
 dependencies = [
  "libc",
  "memchr",

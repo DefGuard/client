@@ -1,4 +1,4 @@
-use crate::{disk_encryption_status, os_name, os_type, os_version, OsType};
+use super::super::{disk_encryption_status, os_name, os_type, os_version, OsType};
 
 #[test]
 fn test_os_type() {

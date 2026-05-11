@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "common", "posture"]
+members = ["cli", "common"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
@@ -86,6 +86,7 @@ sqlx = { version = "0.8", features = [
 ] }
 struct-patch = "0.11"
 strum = { version = "0.28", features = ["derive"] }
+sysinfo = {version = "0.39", default-features = false, features = ["apple-app-store", "system"]}
 tauri = { version = "2", features = [
     "native-tls-vendored",
     "image-png",
@@ -161,6 +162,7 @@ windows-sys = { version = "0.61", features = [
     # Network address change notifications (NotifyAddrChange)
     "Win32_NetworkManagement_IpHelper",
 ] }
+wmi = {version = "0.18", default-features = false}
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

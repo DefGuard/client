@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use wmi::{WMIConnection, WMIError};
 
-use crate::InspectionError;
+use super::InspectionError;
 
 #[derive(Deserialize)]
 #[serde(rename = "Win32_EncryptableVolume")]
@@ -96,6 +96,8 @@ pub(crate) fn anti_virus_status() -> Result<bool, InspectionError> {
     Ok(false)
 }
 
+/// Check if this machine is part of an Active Directory domain.
+///
 /// Check manually in PowerShell:
 /// `Get-CimInstance -ClassName Win32_ComputerSystem`
 ///

@@ -26,8 +26,8 @@ impl fmt::Display for Instance<Id> {
     }
 }
 
-impl From<proto::InstanceInfo> for Instance<NoId> {
-    fn from(instance_info: proto::InstanceInfo) -> Self {
+impl From<proto::defguard::client_types::InstanceInfo> for Instance<NoId> {
+    fn from(instance_info: proto::defguard::client_types::InstanceInfo) -> Self {
         let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
         Self {
             id: NoId,
@@ -138,8 +138,8 @@ impl Instance<Id> {
 }
 
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
-impl PartialEq<proto::InstanceInfo> for Instance<Id> {
-    fn eq(&self, other: &proto::InstanceInfo) -> bool {
+impl PartialEq<proto::defguard::client_types::InstanceInfo> for Instance<Id> {
+    fn eq(&self, other: &proto::defguard::client_types::InstanceInfo) -> bool {
         let other_policy = ClientTrafficPolicy::from(other);
         self.name == other.name
             && self.uuid == other.id
@@ -223,8 +223,8 @@ pub enum ClientTrafficPolicy {
 }
 
 /// Retrieves `ClientTrafficPolicy` from `proto::InstanceInfo` while ensuring backwards compatibility
-impl From<&proto::InstanceInfo> for ClientTrafficPolicy {
-    fn from(instance: &proto::InstanceInfo) -> Self {
+impl From<&proto::defguard::client_types::InstanceInfo> for ClientTrafficPolicy {
+    fn from(instance: &proto::defguard::client_types::InstanceInfo) -> Self {
         match (
             instance.client_traffic_policy,
             #[allow(deprecated)]

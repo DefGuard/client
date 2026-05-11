@@ -36,7 +36,7 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::DeviceConfigResponse,
+    proto::defguard::client_types::DeviceConfigResponse,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         construct_platform_header, disconnect_interface, get_location_interface_details,

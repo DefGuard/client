@@ -17,7 +17,7 @@ use crate::{
 };
 use crate::{
     error::Error,
-    proto::{
+    proto::defguard::client_types::{
         LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
     },
 };

@@ -1,6 +1,11 @@
-mod inspector;
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
+#[cfg(target_os = "macos")]
+pub(crate) mod macos;
 #[cfg(test)]
 mod tests;
+#[cfg(windows)]
+pub(crate) mod windows;
 
 use std::{error::Error, fmt};
 
@@ -83,12 +88,12 @@ pub fn os_version() -> Result<String, InspectionError> {
 pub fn disk_encryption_status() -> Result<bool, InspectionError> {
     #[cfg(target_os = "macos")]
     {
-        inspector::macos::disk_encryption_status()
+        macos::disk_encryption_status()
     }
 
     #[cfg(windows)]
     {
-        inspector::windows::disk_encryption_status()
+        windows::disk_encryption_status()
     }
 
     #[cfg(target_os = "linux")]
@@ -99,18 +104,12 @@ pub fn disk_encryption_status() -> Result<bool, InspectionError> {
 }
 
 pub fn anti_virus_status() -> Result<bool, InspectionError> {
-    #[cfg(target_os = "macos")]
-    {
-        inspector::macos::anti_virus_status()
-    }
-
     #[cfg(windows)]
     {
-        inspector::windows::anti_virus_status()
+        windows::anti_virus_status()
     }
 
-    #[cfg(target_os = "linux")]
-    // XXX
+    #[cfg(not(windows))]
     {
         Err(InspectionError::NotApplicable)
     }
@@ -119,7 +118,7 @@ pub fn anti_virus_status() -> Result<bool, InspectionError> {
 pub fn part_of_domain() -> Result<bool, InspectionError> {
     #[cfg(windows)]
     {
-        inspector::windows::part_of_domain()
+        windows::part_of_domain()
     }
 
     #[cfg(not(windows))]

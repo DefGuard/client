@@ -43,7 +43,7 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    proto::ClientPlatformInfo,
+    proto::defguard::client_types::ClientPlatformInfo,
     ConnectionType,
 };
 #[cfg(not(target_os = "macos"))]
