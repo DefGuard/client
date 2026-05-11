@@ -2,7 +2,7 @@ import './style.scss';
 
 import { debug, error } from '@tauri-apps/plugin-log';
 import { fromUint8Array } from 'js-base64';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import QrCode from 'react-qr-code';
 import useWebSocket from 'react-use-websocket';
 import z from 'zod';
@@ -25,6 +25,7 @@ type Props = {
   proxyUrl: string;
   instanceUuid: string;
   onCancel: () => void;
+  onRefresh: () => void;
 };
 
 const { connect } = clientApi;
@@ -39,9 +40,10 @@ export const MfaMobileApprove = ({
   proxyUrl,
   instanceUuid,
   onCancel,
+  onRefresh,
 }: Props) => {
   const toaster = useToaster();
-  const [closeModal] = useMFAModal((s) => [s.close], shallow);
+  const [closeModal, isModalOpen] = useMFAModal((s) => [s.close, s.isOpen], shallow);
   const location = useMFAModal((s) => s.instance as CommonWireguardFields);
 
   const wsUrl = useMemo(
@@ -50,25 +52,32 @@ export const MfaMobileApprove = ({
     [proxyUrl],
   );
 
-  var manuallyCancelled = false;
-  const { getWebSocket, lastMessage } = useWebSocket(wsUrl, {
-    queryParams: {
-      token,
+  const expectedClose = useRef(false);
+  const { getWebSocket, lastMessage } = useWebSocket(
+    wsUrl,
+    {
+      queryParams: {
+        token,
+      },
+      onClose: () => {
+        debug('WebSocket connection to proxy for mobile app MFA closed.');
+        if (!expectedClose.current && isModalOpen) {
+          expectedClose.current = true;
+          onRefresh();
+        }
+      },
+      onError: () => {
+        if (!expectedClose.current && isModalOpen) {
+          expectedClose.current = true;
+          debug(
+            'WebSocket connection to proxy for mobile app MFA failed, refreshing QR.',
+          );
+          onRefresh();
+        }
+      },
     },
-    onClose: () => {
-      debug('WebSocket connection to proxy for mobile app MFA closed.');
-    },
-    onError: () => {
-      if (!manuallyCancelled) {
-        toaster.error('Unexpected error in WebSocket connection to proxy');
-        error(
-          'MFA auth using mobile app failed. Unexpected error in WebSocket connection to proxy.',
-        );
-        // go back to previous step
-        onCancel();
-      }
-    },
-  });
+    isModalOpen,
+  );
 
   const qrString = useMemo(() => {
     const data = {
@@ -94,6 +103,7 @@ export const MfaMobileApprove = ({
           presharedKey: schemaResult.data.preshared_key,
         })
           .then(() => {
+            expectedClose.current = true;
             closeModal();
             toaster.success('Connection authorized.');
           })
@@ -109,7 +119,7 @@ export const MfaMobileApprove = ({
   }, [lastMessage]);
 
   const cancel = () => {
-    manuallyCancelled = true;
+    expectedClose.current = true;
     const socket = getWebSocket();
     socket?.close();
     // go back to previous step
