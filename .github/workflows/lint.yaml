@@ -30,9 +30,9 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: 25
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
           run_install: false
@@ -42,16 +42,18 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v5
-        name: Setup pnpm cache
+      - name: Setup pnpm cache
+        uses: actions/cache@v5
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-lint-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-lint-store-
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      # Change to '--frozen-lockfile' once this gets fixed:
+      # https://github.com/pnpm/action-setup/issues/40
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run Biome and Prettier Lint
         run: pnpm lint

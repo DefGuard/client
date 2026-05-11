@@ -5,8 +5,8 @@ import { useMutation } from '@tanstack/react-query';
 import { fetch } from '@tauri-apps/plugin-http';
 import { error } from '@tauri-apps/plugin-log';
 import { isUndefined } from 'lodash-es';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import AuthCode from 'react-auth-code-input';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AuthCode, { type AuthCodeRef } from 'react-auth-code-input';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import { z } from 'zod';
@@ -266,9 +266,13 @@ export const MFAModal = () => {
         isPresent(startResponse) &&
         isPresent(selectedInstance) && (
           <MfaMobileApprove
+            key={startResponse.token}
             proxyUrl={proxyUrl}
             instanceUuid={selectedInstance.uuid}
             onCancel={resetAuthState}
+            onRefresh={() => {
+              handleMfaStart(4);
+            }}
             data={{
               challenge: startResponse.challenge as string,
               token: startResponse.token,
@@ -584,6 +588,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
   const closeModal = useMFAModal((state) => state.close);
 
   const [mfaError, setMFAError] = useState('');
+  const authCodeRef = useRef<AuthCodeRef>(null);
 
   const localLL = LL.modals.mfa.authentication;
   const platformInfo = useClientStore((state) => state.platformInfo);
@@ -642,6 +647,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
         }
 
         setMFAError(message);
+        authCodeRef.current?.clear();
         error(
           `MFA code finish failed for location ${location?.id}. Response: ${JSON.stringify(data)}`,
         );
@@ -678,6 +684,7 @@ const MFACodeForm = ({ description, token, proxyUrl, resetState }: MFACodeForm) 
       </div>
       <form onSubmit={handleSubmit(handleValidSubmit)}>
         <AuthCode
+          ref={authCodeRef}
           length={CODE_LENGTH}
           allowedCharacters="numeric"
           containerClassName="mfa-code-container"

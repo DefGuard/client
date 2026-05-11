@@ -37,15 +37,18 @@ jobs:
         with:
           node-version: 25
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           cache: true
           version: 10
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      # Change to '--frozen-lockfile' once this gets fixed:
+      # https://github.com/pnpm/action-setup/issues/40
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
