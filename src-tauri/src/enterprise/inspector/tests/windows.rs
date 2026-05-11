@@ -1,4 +1,4 @@
-use crate::{
+use super::super::{
     anti_virus_status, disk_encryption_status, os_name, os_type, os_version, part_of_domain, OsType,
 };
 
@@ -18,16 +18,19 @@ fn test_os_version() {
 }
 
 #[test]
+#[ignore = "development machine only"]
 fn test_disk_encryption() {
     assert!(!disk_encryption_status().unwrap());
 }
 
 #[test]
+#[ignore = "development machine only"]
 fn test_anti_virus() {
     assert!(anti_virus_status().unwrap());
 }
 
 #[test]
+#[ignore = "development machine only"]
 fn test_part_of_domain() {
     assert!(!part_of_domain().unwrap());
 }

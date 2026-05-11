@@ -539,22 +539,21 @@ pub(crate) async fn locations_changed(
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
-    let db_locations: HashSet<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
-            .await?
-            .into_iter()
-            .map(|location| {
-                let mut new_location = Location::<NoId>::from(location);
-                // Ignore `route_all_traffic` flag as Defguard core does not have it.
-                new_location.route_all_traffic = false;
-                new_location
-            })
-            .collect();
-    let core_locations: HashSet<Location> = device_config
+    let db_locations = Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
+        .await?
+        .into_iter()
+        .map(|location| {
+            let mut new_location = Location::<NoId>::from(location);
+            // Ignore `route_all_traffic` flag as Defguard core does not have it.
+            new_location.route_all_traffic = false;
+            new_location
+        })
+        .collect::<HashSet<_>>();
+    let core_locations = device_config
         .configs
         .iter()
         .map(|config| config.clone().into_location(instance.id))
-        .collect();
+        .collect::<HashSet<_>>();
 
     Ok(db_locations != core_locations)
 }

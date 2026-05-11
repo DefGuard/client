@@ -1,4 +1,4 @@
-use crate::{os_name, os_type, OsType};
+use super::super::{os_name, os_type, OsType};
 
 #[test]
 fn test_os_type() {

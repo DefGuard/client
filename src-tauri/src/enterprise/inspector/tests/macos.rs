@@ -16,6 +16,7 @@ fn test_os_version() {
 }
 
 #[test]
+#[ignore = "development machine only"]
 fn test_disk_encryption() {
     assert!(disk_encryption_status().unwrap());
 }

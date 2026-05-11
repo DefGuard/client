@@ -131,7 +131,8 @@ impl Location<Id> {
         query!(
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
-            keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12 WHERE id = $13",
+            keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12 \
+            WHERE id = $13",
             self.instance_id,
             self.name,
             self.address,
@@ -357,8 +358,9 @@ impl Location<Id> {
         Ok(interface_config)
     }
 
-    /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?` when querying locations
-    /// to exclude (<= 1) or include service locations (all service locations modes).
+    /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?`
+    /// when querying locations to exclude (<= 1) or include service locations (all service
+    /// locations modes).
     fn get_service_location_mode_filter(include_service_locations: bool) -> i32 {
         if include_service_locations {
             i32::MAX

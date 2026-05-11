@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use wmi::{WMIConnection, WMIError};
 
-use super::InspectionError;
+use super::UnavailableReason;
 
 #[derive(Deserialize)]
 #[serde(rename = "Win32_EncryptableVolume")]
@@ -34,30 +34,30 @@ struct Win32ComputerSystem {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -Namespace  "root\CIMV2\Security\MicrosoftVolumeEncryption" -query "SELECT * FROM Win32_EncryptableVolume"`
-pub(crate) fn disk_encryption_status() -> Result<bool, InspectionError> {
+pub(crate) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     let conn =
         WMIConnection::with_namespace_path("root\\CIMV2\\Security\\MicrosoftVolumeEncryption")
             .map_err(|err| {
                 if let WMIError::HResultError { .. } = err {
-                    InspectionError::PermissionDenied
+                    UnavailableReason::InsufficientPermissions
                 } else {
-                    InspectionError::DetectionFailed
+                    UnavailableReason::DetectionFailed
                 }
             })?;
 
     let volumes: Vec<Win32EncryptableVolume> = conn
         .raw_query("SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter='C:'")
-        .map_err(|_| InspectionError::DetectionFailed)?;
+        .map_err(|_| UnavailableReason::DetectionFailed)?;
 
     match volumes.first() {
         Some(vol) => {
             return match vol.protection_status {
                 0 => Ok(false),
                 1 => Ok(true),
-                _ => Err(InspectionError::DetectionFailed),
+                _ => Err(UnavailableReason::DetectionFailed),
             };
         }
-        None => Err(InspectionError::DetectionFailed),
+        None => Err(UnavailableReason::DetectionFailed),
     }
 }
 
@@ -68,17 +68,18 @@ pub(crate) fn disk_encryption_status() -> Result<bool, InspectionError> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
-pub(crate) fn anti_virus_status() -> Result<bool, InspectionError> {
+pub(crate) fn anti_virus_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2").map_err(|err| {
         if let WMIError::HResultError { .. } = err {
-            InspectionError::PermissionDenied
+            UnavailableReason::InsufficientPermissions
         } else {
-            InspectionError::DetectionFailed
+            UnavailableReason::DetectionFailed
         }
     })?;
 
-    let products: Vec<AntiVirusProduct> =
-        conn.query().map_err(|_| InspectionError::DetectionFailed)?;
+    let products: Vec<AntiVirusProduct> = conn
+        .query()
+        .map_err(|_| UnavailableReason::DetectionFailed)?;
 
     if products.is_empty() {
         return Ok(false);
@@ -103,18 +104,18 @@ pub(crate) fn anti_virus_status() -> Result<bool, InspectionError> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -query "SELECT * FROM Win32_ComputerSystem"`
-pub(crate) fn part_of_domain() -> Result<bool, InspectionError> {
+pub(crate) fn part_of_domain() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::new().map_err(|err| {
         if let WMIError::HResultError { .. } = err {
-            InspectionError::PermissionDenied
+            UnavailableReason::InsufficientPermissions
         } else {
-            InspectionError::DetectionFailed
+            UnavailableReason::DetectionFailed
         }
     })?;
 
     let system = conn
         .get::<Win32ComputerSystem>()
-        .map_err(|_| InspectionError::DetectionFailed)?;
+        .map_err(|_| UnavailableReason::DetectionFailed)?;
 
     Ok(system.part_of_domain)
 }
