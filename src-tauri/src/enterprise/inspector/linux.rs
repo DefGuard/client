@@ -64,6 +64,6 @@ fn check_luks() -> Result<bool, UnavailableReason> {
 // https://labex.io/tutorials/linux-how-to-check-if-disk-encryption-is-enabled-in-linux-558786
 // FIXME: This will check all available disks, so if any is encrypted, it will succeed.
 pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
-    // TODO: zfs encryption
+    // TODO: `zfs list -jo name,encryption,mountpoint` and check for `/` and `on`.
     check_luks()
 }
