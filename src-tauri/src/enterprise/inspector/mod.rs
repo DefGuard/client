@@ -100,7 +100,7 @@ fn os_version() -> Result<String, UnavailableReason> {
 fn linux_kernel_version() -> Result<String, UnavailableReason> {
     #[cfg(target_os = "linux")]
     {
-        System::kernel_version().ok_or_else(|| UnavailableReason::DetectionFailed)
+        System::kernel_version().ok_or(UnavailableReason::DetectionFailed)
     }
 
     #[cfg(not(target_os = "linux"))]
