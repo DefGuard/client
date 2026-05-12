@@ -62,11 +62,8 @@ fn check_luks() -> Result<bool, UnavailableReason> {
 }
 
 // https://labex.io/tutorials/linux-how-to-check-if-disk-encryption-is-enabled-in-linux-558786
-pub fn disk_encryption_status() -> Result<bool, UnavailableReason> {
+// FIXME: This will check all available disks, so if any is encrypted, it will succeed.
+pub(crate) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     // TODO: zfs encryption
     check_luks()
-}
-
-pub(crate) fn anti_virus_status() -> Result<bool, UnavailableReason> {
-    Err(UnavailableReason::NotApplicable)
 }
