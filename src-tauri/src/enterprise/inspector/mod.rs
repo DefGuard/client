@@ -82,22 +82,22 @@ impl OsType {
 
 /// Returns the operating system type.
 #[must_use]
-pub fn os_type() -> OsType {
+fn os_type() -> OsType {
     OsType::this_machine()
 }
 
 /// Returns the operating system name.
-pub fn os_name() -> Result<String, UnavailableReason> {
+fn os_name() -> Result<String, UnavailableReason> {
     System::name().ok_or(UnavailableReason::DetectionFailed)
 }
 
 /// Returns the operating system version.
-pub fn os_version() -> Result<String, UnavailableReason> {
+fn os_version() -> Result<String, UnavailableReason> {
     System::os_version().ok_or(UnavailableReason::DetectionFailed)
 }
 
 /// Returns the Linux kernel version.
-pub fn linux_kernel_version() -> Result<String, UnavailableReason> {
+fn linux_kernel_version() -> Result<String, UnavailableReason> {
     #[cfg(target_os = "linux")]
     {
         System::kernel_version().ok_or_else(|| UnavailableReason::DetectionFailed)
@@ -110,7 +110,7 @@ pub fn linux_kernel_version() -> Result<String, UnavailableReason> {
 }
 
 /// Returns the disk encryption status, preferably for the system volume.
-pub fn disk_encryption_status() -> Result<bool, UnavailableReason> {
+fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     #[cfg(target_os = "macos")]
     {
         macos::disk_encryption_status()
@@ -128,7 +128,7 @@ pub fn disk_encryption_status() -> Result<bool, UnavailableReason> {
 }
 
 /// Returns the antivirus status.
-pub fn anti_virus_status() -> Result<bool, UnavailableReason> {
+fn anti_virus_status() -> Result<bool, UnavailableReason> {
     #[cfg(windows)]
     {
         windows::anti_virus_status()
@@ -141,7 +141,7 @@ pub fn anti_virus_status() -> Result<bool, UnavailableReason> {
 }
 
 /// Checks whether the computer is part of a domain.
-pub fn part_of_domain() -> Result<bool, UnavailableReason> {
+fn part_of_domain() -> Result<bool, UnavailableReason> {
     #[cfg(windows)]
     {
         windows::part_of_domain()

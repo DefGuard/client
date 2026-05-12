@@ -3,7 +3,7 @@ use std::process::Command;
 use super::UnavailableReason;
 
 /// Check if FileVault has been enabled.
-pub(crate) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
+pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     let output = Command::new("fdesetup")
         .arg("isactive")
         .output()
@@ -14,7 +14,7 @@ pub(crate) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
 }
 
 /// Check if System Integrity Protection has been enabled.
-pub(crate) fn system_integrity_status() -> Result<bool, UnavailableReason> {
+pub(super) fn system_integrity_status() -> Result<bool, UnavailableReason> {
     let output = Command::new("csrutil")
         .arg("status")
         .output()

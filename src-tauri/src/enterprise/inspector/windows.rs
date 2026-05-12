@@ -82,7 +82,7 @@ fn system_drive_letter() -> Result<String, UnavailableReason> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -Namespace  "root\CIMV2\Security\MicrosoftVolumeEncryption" -query "SELECT * FROM Win32_EncryptableVolume"`
-pub(crate) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
+pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     let drive_letter = system_drive_letter()?;
 
     let conn =
@@ -114,7 +114,7 @@ pub(crate) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
-pub(crate) fn anti_virus_status() -> Result<bool, UnavailableReason> {
+pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
     let products: Vec<AntiVirusProduct> = conn.query()?;
     for product in products {
@@ -136,7 +136,7 @@ pub(crate) fn anti_virus_status() -> Result<bool, UnavailableReason> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -query "SELECT * FROM Win32_ComputerSystem"`
-pub(crate) fn part_of_domain() -> Result<bool, UnavailableReason> {
+pub(super) fn part_of_domain() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::new()?;
     let system = conn.get::<Win32ComputerSystem>()?;
     Ok(system.part_of_domain)
@@ -149,7 +149,7 @@ pub(crate) fn part_of_domain() -> Result<bool, UnavailableReason> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -query "SELECT * FROM Win32_QuickFixEngineering"`
-pub(crate) fn security_update_status() -> Result<bool, UnavailableReason> {
+pub(super) fn security_update_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::new()?;
     let fixes: Vec<Win32QuickFixEngineering> = conn.query().unwrap();
 
