@@ -54,6 +54,7 @@ impl fmt::Display for OsType {
 impl OsType {
     /// Returns OS type for the running machine.
     /// Note: Unsupported machines won't compile.
+    #[must_use]
     pub fn this_machine() -> Self {
         #[cfg(target_os = "macos")]
         {
@@ -78,16 +79,17 @@ impl OsType {
     }
 }
 
+#[must_use]
 pub fn os_type() -> OsType {
     OsType::this_machine()
 }
 
 pub fn os_name() -> Result<String, UnavailableReason> {
-    System::name().ok_or_else(|| UnavailableReason::DetectionFailed)
+    System::name().ok_or(UnavailableReason::DetectionFailed)
 }
 
 pub fn os_version() -> Result<String, UnavailableReason> {
-    System::os_version().ok_or_else(|| UnavailableReason::DetectionFailed)
+    System::os_version().ok_or(UnavailableReason::DetectionFailed)
 }
 
 pub fn linux_kernel_version() -> Result<String, UnavailableReason> {
@@ -145,7 +147,25 @@ pub fn part_of_domain() -> Result<bool, UnavailableReason> {
 }
 
 fn device_integrity() -> Result<bool, UnavailableReason> {
+    #[cfg(target_os = "macos")]
+    {
+        macos::system_integrity_status()
+    }
+
+    #[cfg(not(target_os = "macos"))]
     Err(UnavailableReason::NotApplicable)
+}
+
+fn security_update_status() -> Result<bool, UnavailableReason> {
+    #[cfg(windows)]
+    {
+        windows::security_update_status()
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err(UnavailableReason::NotApplicable)
+    }
 }
 
 impl From<Result<bool, UnavailableReason>> for BoolCheck {
@@ -183,7 +203,7 @@ impl DevicePostureData {
             antivirus_present: Some(BoolCheck::from(anti_virus_status())),
             windows_ad_domain_joined: Some(BoolCheck::from(part_of_domain())),
             // Not implemented
-            windows_security_update_current: None,
+            windows_security_update_current: Some(BoolCheck::from(security_update_status())),
             linux_kernel_version: Some(StringCheck::from(linux_kernel_version())),
             device_integrity: Some(BoolCheck::from(device_integrity())),
         }

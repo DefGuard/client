@@ -1,5 +1,6 @@
 use super::super::{
-    anti_virus_status, disk_encryption_status, os_name, os_type, os_version, part_of_domain, OsType,
+    anti_virus_status, disk_encryption_status, os_name, os_type, os_version, part_of_domain,
+    security_update_status, OsType,
 };
 
 #[test]
@@ -33,4 +34,10 @@ fn test_anti_virus() {
 #[ignore = "development machine only"]
 fn test_part_of_domain() {
     assert!(!part_of_domain().unwrap());
+}
+
+#[test]
+#[ignore = "development machine only"]
+fn test_security_update_status() {
+    assert!(security_update_status().unwrap());
 }
