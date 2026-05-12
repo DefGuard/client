@@ -1,4 +1,6 @@
-use super::super::{disk_encryption_status, os_name, os_type, os_version, OsType};
+use super::super::{
+    device_integrity, disk_encryption_status, os_name, os_type, os_version, OsType,
+};
 
 #[test]
 fn test_os_type() {
@@ -19,4 +21,10 @@ fn test_os_version() {
 #[ignore = "development machine only"]
 fn test_disk_encryption() {
     assert!(disk_encryption_status().unwrap());
+}
+
+#[test]
+#[ignore = "development machine only"]
+fn test_device_integrity() {
+    assert!(device_integrity().unwrap());
 }

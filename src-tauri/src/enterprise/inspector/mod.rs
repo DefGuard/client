@@ -122,9 +122,8 @@ pub fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     }
 
     #[cfg(target_os = "linux")]
-    // XXX
     {
-        Err(UnavailableReason::NotApplicable)
+        linux::disk_encryption_status()
     }
 }
 
