@@ -3,7 +3,10 @@
   "identifier": "main-capability",
   "description": "Capability for the main window",
   "local": true,
-  "windows": ["main"],
+  "remote": {
+    "urls": ["http://localhost:5071/*", "http://localhost:5072/*"]
+  },
+  "windows": ["new-ui", "old-ui"],
   "permissions": [
     "core:default",
     "core:window:allow-create",

@@ -1,0 +1,76 @@
+.icon-button {
+  --size: 36px;
+  --bg: transparent;
+  --icon: var(--c-white-80);
+  --icon-size: 20px;
+
+  border-radius: 8px;
+  height: var(--size);
+  width: var(--size);
+  display: inline-flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  cursor: pointer;
+
+  @include animate(background);
+
+  svg {
+    --icon-color: var(--icon);
+  }
+
+  &.variant {
+    &-big,
+    &-big-selected {
+      --size: 36px;
+      --icon-size: 20px;
+    }
+
+    &-small,
+    &-small-selected {
+      --size: 24px;
+      --icon-size: 16px;
+    }
+
+    &-big {
+      --bg: transparent;
+      --icon: var(--c-white-80);
+
+      &:hover {
+        --bg: var(--c-white-5);
+        --icon: var(--c-white-100);
+      }
+    }
+
+    &-big-selected {
+      --bg: var(--c-white-10);
+      --icon: var(--c-white-100);
+
+      &:hover {
+        --bg: var(--c-white-20);
+        --icon: var(--c-white-100);
+      }
+    }
+
+    &-small {
+      --bg: var(--c-white-5);
+      --icon: var(--c-white-80);
+
+      &:hover {
+        --bg: var(--c-white-10);
+        --icon: var(--c-white-100);
+      }
+    }
+
+    &-small-selected {
+      --bg: var(--c-white-10);
+      --icon: var(--c-white-100);
+
+      &:hover {
+        --bg: var(--c-white-20);
+        --icon: var(--c-white-100);
+      }
+    }
+  }
+}

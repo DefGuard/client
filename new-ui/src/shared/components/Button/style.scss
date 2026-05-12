@@ -1,0 +1,215 @@
+.btn-wrap {
+  display: inline-block;
+  min-width: 0;
+  position: relative;
+}
+
+.btn {
+  --btn-font: var(--t-button-label-primary);
+  --btn-size: var(--button-size-primary);
+  --border-color: transparent;
+  --bg-color: transparent;
+  --text-color: var(--fg-white-100);
+  --loader-bg: transparent;
+
+  height: var(--btn-size);
+  border: none;
+  box-sizing: border-box;
+  border-radius: var(--button-border-radius-primary);
+  background: var(--bg-color);
+  box-shadow: 0 0 0 1px var(--border-color);
+  color: var(--text-color);
+  min-height: var(--btn-size);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  position: relative;
+  user-select: none;
+  display: inline-block;
+  min-width: 0px;
+
+  > .btn-content {
+    display: inline-grid;
+    grid-template-columns: auto;
+    grid-template-rows: 1fr;
+    align-items: center;
+    column-gap: var(--spacing-md);
+    text-decoration: none !important;
+    justify-content: center;
+  }
+
+  @include animate(background-color, border-color, opacity, box-shadow);
+
+  &:not(.disabled, .loading) {
+    cursor: pointer;
+  }
+
+  &.disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .icon svg {
+    --icon-color: var(--text-color);
+
+    path {
+      fill: var(--icon-color);
+
+      @include animate(fill);
+    }
+  }
+
+  .text {
+    font: var(--btn-font);
+    color: inherit;
+
+    @include animate(color);
+  }
+
+  &.icon-left {
+    > .btn-content {
+      grid-template-columns: 20px auto;
+    }
+  }
+
+  &.icon-right {
+    > .btn-content {
+      grid-template-columns: auto 20px;
+    }
+  }
+
+  &.icon-both {
+    > .btn-content {
+      grid-template-columns: 20px auto 20px;
+    }
+  }
+
+  &.size-primary {
+    --btn-font: var(--t-button-label-primary);
+    --btn-size: 40px;
+
+    border-radius: 8px;
+    padding: var(--spacing-sm) var(--spacing-lg);
+  }
+
+  &.size-big {
+    --btn-font: var(--t-button-label-big);
+    --btn-size: 44px;
+
+    border-radius: 100px;
+    padding: var(--spacing-sm) var(--spacing-lg);
+  }
+
+  &.variant-primary {
+    --bg-color: var(--bg-white-100);
+    --border-color: var(--bg-white-100);
+    --text-color: var(--fg-action);
+    --loader-bg: var(--bg-white-10);
+
+    &:hover {
+      --bg-color: var(--fg-white-80);
+      --border-color: var(--bg-color);
+    }
+
+    &.disabled {
+      --bg-color: var(--bg-white-20);
+      --border-color: var(--bg-color);
+      --text-color: var(--fg-white-40);
+    }
+
+    &:not(.disabled).loading {
+      --bg-color: var(--c-white-10);
+      --border-color: var(--bg-color);
+    }
+  }
+
+  &.variant-secondary {
+    --bg-color: var(--bg-white-10);
+    --border-color: var(--bg-color);
+    --text-color: var(--fg-white-100);
+    --loader-bg: var(--bg-white-10);
+
+    &:hover {
+      --bg-color: var(--bg-white-20);
+    }
+
+    &.disabled {
+      --bg-color: var(--bg-white-5);
+      --border-color: var(--bg-color);
+      --text-color: var(--fg-white-40);
+    }
+
+    &:not(.disabled).loading {
+      --bg-color: var(--bg-white-10);
+      --border-color: var(--bg-color);
+    }
+  }
+
+  &.variant-critical {
+    --bg-color: var(--bg-critical);
+    --border-color: var(--bg-color);
+    --text-color: var(--fg-white-100);
+    --loader-bg: var(--bg-critical-disabled);
+
+    &:hover {
+      --bg-color: var(--bg-critical-faded);
+    }
+
+    &.disabled {
+      --bg-color: var(--bg-critical-disabled);
+      --border-color: var(--bg-color);
+      --text-color: var(--fg-white-40);
+    }
+
+    &:not(.disabled).loading {
+      --bg-color: var(--bg-critical-disabled);
+      --border-color: var(--bg-color);
+    }
+  }
+
+  &.variant-outlined {
+    --bg-color: transparent;
+    --border-color: var(--border-default);
+    --loader-bg: var(--bg-white-10);
+    --text-color: var(--fg-white-100);
+
+    &:hover {
+      --bg-color: var(--bg-white-5);
+    }
+
+    &.disabled {
+      --bg-color: transparent;
+      --border-color: var(--border-disabled);
+      --text-color: var(--fg-white-40);
+    }
+
+    &:not(.disabled).loading {
+      --bg-color: transparent;
+      --border-color: var(--border-disabled);
+    }
+  }
+
+  // since box-shadow adds on top of element it's needed to be set with loader overlay
+  &:not(.disabled).loading {
+    --loader-bg: var(--loader-bg);
+
+    cursor: default;
+  }
+
+  .loader-overlay {
+    background-color: var(--loader-bg);
+    border: none;
+    border-radius: inherit;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+a:has(.btn) {
+  text-decoration: none;
+}

@@ -29,10 +29,11 @@ use defguard_client::{
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
     utils::load_log_targets,
+    window::*,
     LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
-use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Builder, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[macro_use]
@@ -180,7 +181,11 @@ fn main() {
             command_get_app_config,
             command_set_app_config,
             get_provisioning_config,
-            get_platform_header
+            get_platform_header,
+            open_new_ui_window,
+            open_old_ui_window,
+            swap_to_new_ui,
+            swap_to_old_ui,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -338,6 +343,28 @@ fn main() {
 
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
+
+            // Open new UI window.
+            let new_url = if cfg!(debug_assertions) {
+                WebviewUrl::External("http://localhost:5072".parse().unwrap())
+            } else {
+                WebviewUrl::App("new-ui/index.html".into())
+            };
+            WebviewWindowBuilder::new(app, "new-ui", new_url)
+                .title("New UI")
+                .inner_size(360.0, 675.0)
+                .build()?;
+
+            // Open old UI window.
+            let old_url = if cfg!(debug_assertions) {
+                WebviewUrl::External("http://localhost:5071".parse().unwrap())
+            } else {
+                WebviewUrl::App("old-ui/index.html".into())
+            };
+            WebviewWindowBuilder::new(app, "old-ui", old_url)
+                .title("Old UI")
+                .inner_size(720.0, 920.0)
+                .build()?;
 
             info!("App setup completed, log level: {log_level}");
             Ok(())

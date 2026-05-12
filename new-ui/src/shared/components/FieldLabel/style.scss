@@ -1,0 +1,33 @@
+.field-label {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  column-gap: var(--spacing-sm);
+  position: relative;
+  padding-bottom: var(--spacing-xs);
+
+  span {
+    font: var(--t-input-title);
+    color: var(--fg-white-80);
+  }
+
+  .required-icon {
+    user-select: none;
+    position: absolute;
+    left: 0;
+    top: 2px;
+
+    path {
+      fill: var(--c-red);
+    }
+  }
+
+  &.required {
+    padding-left: 8px;
+  }
+
+  svg path {
+    fill: var(--fg-white-60);
+  }
+}

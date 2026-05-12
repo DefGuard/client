@@ -1,0 +1,7 @@
+#compact-locations-page {
+  > .locations {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-sm);
+  }
+}

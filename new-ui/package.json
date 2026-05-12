@@ -1,0 +1,50 @@
+{
+  "name": "new-ui",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "biome": "biome",
+    "lint": "biome check ./src/ && prettier src/**/*.scss --check --log-level error && stylelint \"src/**/*.scss\" -c ./.stylelintrc.json && tsc -b",
+    "fix": "biome check ./src/ --write --unsafe && prettier src/**/*.scss -w --log-level silent",
+    "tsc": "tsc",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@floating-ui/react": "^0.27.19",
+    "@tanstack/react-form": "^1.32.0",
+    "@tanstack/react-query": "^5.100.10",
+    "@tanstack/react-router": "^1.169.2",
+    "@tanstack/router-plugin": "^1.167.35",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-log": "^2.8.0",
+    "@uidotdev/usehooks": "^2.4.1",
+    "clsx": "^2.1.1",
+    "motion": "^12.38.0",
+    "p-timeout": "^7.0.1",
+    "prettier": "^3.8.3",
+    "radashi": "^12.9.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sass": "^1.99.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@tanstack/devtools-vite": "^0.6.0",
+    "@types/node": "^25.7.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "globals": "^17.6.0",
+    "stylelint": "^17.11.0",
+    "stylelint-config-standard-scss": "^17.0.0",
+    "stylelint-scss": "^7.1.1",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.12"
+  }
+}
