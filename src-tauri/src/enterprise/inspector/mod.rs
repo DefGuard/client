@@ -31,6 +31,7 @@ impl fmt::Display for UnavailableReason {
 
 impl Error for UnavailableReason {}
 
+/// Operating system type.
 pub enum OsType {
     FreeBSD,
     Linux,
@@ -52,7 +53,7 @@ impl fmt::Display for OsType {
 }
 
 impl OsType {
-    /// Returns OS type for the running machine.
+    /// Returns the OS type of the current machine.
     /// Note: Unsupported machines won't compile.
     #[must_use]
     pub fn this_machine() -> Self {
@@ -79,19 +80,23 @@ impl OsType {
     }
 }
 
+/// Returns the operating system type.
 #[must_use]
 pub fn os_type() -> OsType {
     OsType::this_machine()
 }
 
+/// Returns the operating system name.
 pub fn os_name() -> Result<String, UnavailableReason> {
     System::name().ok_or(UnavailableReason::DetectionFailed)
 }
 
+/// Returns the operating system version.
 pub fn os_version() -> Result<String, UnavailableReason> {
     System::os_version().ok_or(UnavailableReason::DetectionFailed)
 }
 
+/// Returns the Linux kernel version.
 pub fn linux_kernel_version() -> Result<String, UnavailableReason> {
     #[cfg(target_os = "linux")]
     {
@@ -104,6 +109,7 @@ pub fn linux_kernel_version() -> Result<String, UnavailableReason> {
     }
 }
 
+/// Returns the disk encryption status, preferably for the system volume.
 pub fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     #[cfg(target_os = "macos")]
     {
@@ -122,6 +128,7 @@ pub fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     }
 }
 
+/// Returns the antivirus status.
 pub fn anti_virus_status() -> Result<bool, UnavailableReason> {
     #[cfg(windows)]
     {
@@ -134,6 +141,7 @@ pub fn anti_virus_status() -> Result<bool, UnavailableReason> {
     }
 }
 
+/// Checks whether the computer is part of a domain.
 pub fn part_of_domain() -> Result<bool, UnavailableReason> {
     #[cfg(windows)]
     {
@@ -146,6 +154,7 @@ pub fn part_of_domain() -> Result<bool, UnavailableReason> {
     }
 }
 
+/// Returns the device integrity status.
 fn device_integrity() -> Result<bool, UnavailableReason> {
     #[cfg(target_os = "macos")]
     {
@@ -156,6 +165,7 @@ fn device_integrity() -> Result<bool, UnavailableReason> {
     Err(UnavailableReason::NotApplicable)
 }
 
+/// Returns the security update status.
 fn security_update_status() -> Result<bool, UnavailableReason> {
     #[cfg(windows)]
     {
@@ -168,6 +178,7 @@ fn security_update_status() -> Result<bool, UnavailableReason> {
     }
 }
 
+/// Convert `Result` to `BoolCheck`.
 impl From<Result<bool, UnavailableReason>> for BoolCheck {
     fn from(value: Result<bool, UnavailableReason>) -> Self {
         Self {
@@ -179,6 +190,7 @@ impl From<Result<bool, UnavailableReason>> for BoolCheck {
     }
 }
 
+/// Convert `Result` to `StringCheck`.
 impl From<Result<String, UnavailableReason>> for StringCheck {
     fn from(value: Result<String, UnavailableReason>) -> Self {
         Self {
@@ -191,7 +203,7 @@ impl From<Result<String, UnavailableReason>> for StringCheck {
 }
 
 impl DevicePostureData {
-    /// Do system inspection and return results.
+    /// Performs system inspection and returns the results.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -202,7 +214,6 @@ impl DevicePostureData {
             disk_encryption: Some(BoolCheck::from(disk_encryption_status())),
             antivirus_present: Some(BoolCheck::from(anti_virus_status())),
             windows_ad_domain_joined: Some(BoolCheck::from(part_of_domain())),
-            // Not implemented
             windows_security_update_current: Some(BoolCheck::from(security_update_status())),
             linux_kernel_version: Some(StringCheck::from(linux_kernel_version())),
             device_integrity: Some(BoolCheck::from(device_integrity())),
