@@ -1092,13 +1092,13 @@ pub(crate) fn construct_platform_header() -> String {
     let os = os_info::get();
 
     let platform_info = ClientPlatformInfo {
-        os_family: std::env::consts::OS.to_string(),
-        os_type: os.os_type().to_string(),
+        os_family: env::consts::FAMILY.to_string(),
+        os_type: env::consts::OS.to_string(),
         version: os.version().to_string(),
         edition: os.edition().map(str::to_string),
         codename: os.codename().map(str::to_string),
         bitness: Some(os.bitness().to_string()),
-        architecture: os.architecture().map(str::to_string),
+        architecture: Some(env::consts::ARCH.to_string()),
     };
 
     debug!("Constructed platform info header: {platform_info:?}");

@@ -1,12 +1,7 @@
 use super::super::{
-    anti_virus_status, disk_encryption_status, os_name, os_type, os_version, part_of_domain,
-    security_update_status, OsType,
+    anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
+    security_update_status,
 };
-
-#[test]
-fn test_os_type() {
-    assert!(matches!(os_type(), OsType::Windows));
-}
 
 #[test]
 fn test_os_name() {

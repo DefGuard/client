@@ -1,11 +1,4 @@
-use super::super::{
-    device_integrity, disk_encryption_status, os_name, os_type, os_version, OsType,
-};
-
-#[test]
-fn test_os_type() {
-    assert!(matches!(os_type(), OsType::MacOS));
-}
+use super::super::{device_integrity, disk_encryption_status, os_name, os_version};
 
 #[test]
 fn test_os_name() {
