@@ -15,6 +15,7 @@ import type {
   RoutingArgs,
   SaveConfigArgs,
   SaveDeviceConfigResponse,
+  SetLocationMfaMethodArgs,
   StatsArgs,
   TunnelInfo,
   TunnelRequest,
@@ -41,6 +42,9 @@ const getLocationDetails = (args: LocationDetailsArgs): Promise<LocationDetails>
 
 const updateLocationRouting = (args: RoutingArgs): Promise<Connection> =>
   invoke(TauriCommand.UpdateLocationRouting, args);
+
+const setLocationMfaMethod = (args: SetLocationMfaMethodArgs): Promise<void> =>
+  invoke(TauriCommand.SetLocationMfaMethod, args);
 
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
@@ -113,6 +117,7 @@ export const api = {
   getLocations,
   getLocationDetails,
   updateLocationRouting,
+  setLocationMfaMethod,
   // Connections
   connect,
   disconnect,

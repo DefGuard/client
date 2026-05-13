@@ -1,0 +1,9 @@
+.location-view-default {
+  .location-mfa-row {
+    display: grid;
+    grid-template-columns: auto auto 24px;
+    grid-template-rows: 1fr;
+    align-items: center;
+    column-gap: var(--spacing-md);
+  }
+}

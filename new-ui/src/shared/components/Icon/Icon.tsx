@@ -82,6 +82,7 @@ import { IconMail } from './icons/IconMail';
 import { IconMenu } from './icons/IconMenu';
 import { IconMinusCircle } from './icons/IconMinusCircle';
 import { IconMobile } from './icons/IconMobile';
+import { IconMobileLock } from './icons/IconMobileLock';
 import { IconNetworkSettings } from './icons/IconNetworkSettings';
 import { IconNotification } from './icons/IconNotification';
 import { IconOneTimePassword } from './icons/IconOneTimePassword';
@@ -171,6 +172,8 @@ export const Icon = <T extends IconKindValue>({
 }: Props<T>) => {
   const IconToRender = useMemo(() => {
     switch (iconKind) {
+      case 'mobile-lock':
+        return IconMobileLock;
       case 'sync':
         return IconSync;
       case 'attention-filled':

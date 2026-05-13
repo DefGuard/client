@@ -1,4 +1,5 @@
 export const IconKind = {
+  MobileLock: 'mobile-lock',
   IpSuggest: 'ip-suggest',
   Filtration: 'filtration',
   AddAlias: 'add-alias',

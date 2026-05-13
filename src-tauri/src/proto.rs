@@ -1,5 +1,8 @@
 use crate::database::models::{
-    location::{Location, LocationMfaMode as MfaMode, ServiceLocationMode as SLocationMode},
+    location::{
+        infer_mfa_method, Location, LocationMfaMode as MfaMode,
+        ServiceLocationMode as SLocationMode,
+    },
     Id, NoId,
 };
 
@@ -41,6 +44,7 @@ impl DeviceConfig {
             keepalive_interval: self.keepalive_interval.into(),
             location_mfa_mode,
             service_location_mode,
+            mfa_method: infer_mfa_method(location_mfa_mode, None),
         }
     }
 }

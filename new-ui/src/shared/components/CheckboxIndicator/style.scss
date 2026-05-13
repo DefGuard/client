@@ -1,0 +1,79 @@
+/* stylelint-disable no-descending-specificity */
+.checkbox-indicator {
+  & > .box-positioner {
+    display: grid;
+    grid-template-columns: 24px;
+    grid-template-rows: 24px;
+    place-items: center center;
+    justify-content: center;
+    overflow: hidden;
+
+    svg {
+      width: 20px;
+      height: 20px;
+      z-index: 0;
+
+      path {
+        fill: var(--fg-white);
+
+        @include animate(fill);
+      }
+    }
+
+    .box,
+    svg {
+      grid-column: 1 / 2;
+      grid-row: 1;
+    }
+  }
+}
+
+.checkbox-indicator .box {
+  --bg: transparent;
+  --border: var(--border-action);
+  --icon: var(--fg-action);
+
+  content: ' ';
+  display: block;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg);
+  background-clip: padding-box;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: var(--border-1) solid var(--border);
+    border-radius: inherit;
+    pointer-events: none;
+    background-color: transparent;
+    background-clip: padding-box;
+  }
+
+  @include animate(border-color, background-color);
+
+  &.error {
+    --border: var(--border-critical);
+  }
+
+  &:not(.disabled).active {
+    --bg: var(--bg-action);
+    --border: var(--bg-action);
+    --icon: var(--fg-white);
+  }
+
+  &:not(.active).disabled {
+    --border: var(--fg-white-100);
+    --bg: var(--fg-white-100);
+  }
+
+  &.active.disabled {
+    --border: var(--bg);
+    --bg: var(--bg-white-5);
+    --icon: var(--fg-white-60);
+  }
+}

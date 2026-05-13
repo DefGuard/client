@@ -21,7 +21,7 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
             instance::{ClientTrafficPolicy, Instance, InstanceInfo},
-            location::{Location, LocationMfaMode},
+            location::{infer_mfa_method, Location, LocationMfaMethod, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -547,6 +547,9 @@ pub(crate) async fn locations_changed(
                 let mut new_location = Location::<NoId>::from(location);
                 // Ignore `route_all_traffic` flag as Defguard core does not have it.
                 new_location.route_all_traffic = false;
+                // Canonicalize mfa_method so a user-set value doesn't falsely trigger a
+                // config-change detection when the mode hasn't actually changed.
+                new_location.mfa_method = infer_mfa_method(new_location.location_mfa_mode, None);
                 new_location
             })
             .collect();
@@ -638,6 +641,11 @@ pub(crate) async fn do_update_instance(
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.service_location_mode = new_location.service_location_mode;
+                // Correct mfa_method to remain consistent with the (possibly updated) mfa_mode.
+                current_location.mfa_method = infer_mfa_method(
+                    current_location.location_mfa_mode,
+                    current_location.mfa_method,
+                );
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
                 current_location
@@ -975,6 +983,33 @@ pub async fn update_location_routing(
                 Err(Error::NotFound)
             }
         }
+    }
+}
+
+#[tauri::command(async)]
+pub async fn set_location_mfa_method(
+    location_id: Id,
+    mfa_method: LocationMfaMethod,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!("Received command to set MFA method for location {location_id}");
+    if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
+        let inferred = infer_mfa_method(location.location_mfa_mode, Some(mfa_method));
+        debug!(
+            "Setting MFA method for location {}(ID: {location_id}) to {inferred:?}",
+            location.name,
+        );
+        location.mfa_method = inferred;
+        location.save(&*DB_POOL).await?;
+        debug!(
+            "MFA method updated for location {}(ID: {location_id})",
+            location.name,
+        );
+        handle.emit(EventKey::LocationUpdate.into(), ())?;
+        Ok(())
+    } else {
+        error!("Location with ID {location_id} not found, cannot set MFA method");
+        Err(Error::NotFound)
     }
 }
 

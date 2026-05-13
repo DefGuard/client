@@ -1,3 +1,40 @@
+export const MfaMethod = {
+  Totp: 'Totp',
+  Email: 'Email',
+  Oidc: 'Oidc',
+  MobileApprove: 'MobileApprove',
+} as const;
+
+export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
+
+export const apiMfaToEnum = (value: number): MfaMethodValue => {
+  switch (value) {
+    case 0:
+      return 'Totp';
+    case 1:
+      return 'Email';
+    case 2:
+      return 'Oidc';
+    case 4:
+      return 'MobileApprove';
+    default:
+      throw Error(`Unknown MFA method ${value}`);
+  }
+};
+
+export const MfaEnumToApi = (value: MfaMethodValue): number => {
+  switch (value) {
+    case 'Email':
+      return 1;
+    case 'Totp':
+      return 0;
+    case 'MobileApprove':
+      return 4;
+    case 'Oidc':
+      return 2;
+  }
+};
+
 export const AppTheme = {
   Light: 'light',
   Dark: 'dark',
@@ -42,6 +79,16 @@ export const LocationMfaMode = {
 
 export type LocationMfaMode = (typeof LocationMfaMode)[keyof typeof LocationMfaMode];
 
+export const LocationMfaMethod = {
+  Totp: 'totp',
+  Email: 'email',
+  Oidc: 'oidc',
+  Biometric: 'biometric',
+  MobileApprove: 'mobileapprove',
+} as const;
+
+export type LocationMfaMethod = (typeof LocationMfaMethod)[keyof typeof LocationMfaMethod];
+
 export const ConnectionType = {
   Location: 'Location',
   Tunnel: 'Tunnel',
@@ -60,6 +107,7 @@ export const TauriCommand = {
   AllLocations: 'all_locations',
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
+  SetLocationMfaMethod: 'set_location_mfa_method',
   // Connections
   Connect: 'connect',
   Disconnect: 'disconnect',
@@ -270,4 +318,9 @@ export type SaveConfigArgs = {
 export type UpdateInstanceArgs = {
   instanceId: number;
   response: CreateDeviceResponse;
+};
+
+export type SetLocationMfaMethodArgs = {
+  locationId: number;
+  mfaMethod: LocationMfaMethod;
 };

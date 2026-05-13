@@ -1,31 +1,46 @@
 import './style.scss';
-import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useState } from 'react';
-import { api } from '../../rust-api/api';
-import { type LocationInfo, LocationMfaMode } from '../../rust-api/types';
+import type { ReactNode } from 'react';
+import type { LocationInfo } from '../../rust-api/types';
 import { Direction, ThemeSpacing } from '../../types';
 import { Divider } from '../Divider/Divider';
 import { Fold } from '../Fold/Fold';
 import { IconKind } from '../Icon';
 import { IconButton } from '../IconButton/IconButton';
 import { IconButtonVariant } from '../IconButton/types';
-import { Toggle } from '../Toggle/Toggle';
 import { LocationCardIcon } from './components/LocationCardIcon';
+import { LocationCardProvider, useLocationCardContext } from './context/context';
+import { LocationCardViews, type LocationCardViewsValue } from './context/types';
+import { DefaultView } from './views/DefaultView/DefaultView';
+import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
 
 interface Props {
   location: LocationInfo;
+  isOpen: boolean;
+  onOpen: () => void;
+  disableOpen?: boolean;
 }
 
-export const LocationCard = ({ location }: Props) => {
-  const [isOpen, setIsOpen] = useState(false);
+const views: Record<LocationCardViewsValue, ReactNode> = {
+  [LocationCardViews.Default]: <DefaultView />,
+  [LocationCardViews.MfaTotp]: null,
+  [LocationCardViews.MfaEmail]: null,
+  [LocationCardViews.MfaOidc]: null,
+  [LocationCardViews.MfaMobile]: null,
+  [LocationCardViews.MfaSettings]: <LocationCardMfaSettings />,
+  [LocationCardViews.Connecting]: null,
+  [LocationCardViews.Connected]: null,
+  [LocationCardViews.PostureCheckFail]: null,
+};
 
-  const { mutate: updateRouting } = useMutation({
-    mutationFn: api.updateLocationRouting,
-    meta: {
-      invalidate: ['locations'],
-    },
-  });
+interface InnerProps {
+  isOpen: boolean;
+  onOpen: () => void;
+  disableOpen: boolean;
+}
+
+const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
+  const { location, currentView } = useLocationCardContext();
 
   return (
     <div
@@ -49,75 +64,33 @@ export const LocationCard = ({ location }: Props) => {
           </div>
         </div>
         <div className="right">
-          <IconButton
-            icon={IconKind.ArrowSmall}
-            variant={isOpen ? IconButtonVariant.SmallSelected : IconButtonVariant.Small}
-            iconRotation={isOpen ? Direction.DOWN : Direction.RIGHT}
-            onClick={() => {
-              setIsOpen((s) => !s);
-            }}
-          />
+          {!disableOpen && (
+            <IconButton
+              icon={IconKind.ArrowSmall}
+              variant={isOpen ? IconButtonVariant.SmallSelected : IconButtonVariant.Small}
+              iconRotation={isOpen ? Direction.DOWN : Direction.RIGHT}
+              onClick={onOpen}
+            />
+          )}
         </div>
       </div>
       <Fold open={isOpen}>
         <Divider spacing={ThemeSpacing.Md} />
-        <Toggle
-          disabled={location.active}
-          active={location.route_all_traffic}
-          label="All traffic is allowed"
-          onClick={() => {
-            updateRouting({
-              connectionType: location.connection_type,
-              locationId: location.id,
-              routeAllTraffic: !location.route_all_traffic,
-            });
-          }}
-        />
-        <Divider spacing={ThemeSpacing.Md} />
-        <ConnectButton location={location} />
+        {views[currentView]}
       </Fold>
     </div>
   );
 };
 
-const ConnectButton = ({ location }: { location: LocationInfo }) => {
-  const { mutate: connect } = useMutation({
-    mutationFn: api.connect,
-    meta: {
-      invalidate: ['locations'],
-    },
-  });
-
-  const { mutate: disconnect } = useMutation({
-    mutationFn: api.disconnect,
-    meta: {
-      invalidate: ['locations'],
-    },
-  });
-
-  if (location.location_mfa_mode !== LocationMfaMode.Disabled) return null;
-
+export const LocationCard = ({
+  location,
+  isOpen,
+  onOpen,
+  disableOpen = false,
+}: Props) => {
   return (
-    <button
-      className={clsx('connect-button', {
-        connected: location.active,
-        disconnected: !location.active,
-      })}
-      onClick={() => {
-        if (location.active) {
-          disconnect({
-            connectionType: location.connection_type,
-            locationId: location.id,
-          });
-        } else {
-          connect({
-            connectionType: location.connection_type,
-            locationId: location.id,
-          });
-        }
-      }}
-    >
-      <p>{location.active ? 'Disconnect' : 'Connect VPN'}</p>
-    </button>
+    <LocationCardProvider location={location}>
+      <LocationCardInner isOpen={isOpen} onOpen={onOpen} disableOpen={disableOpen} />
+    </LocationCardProvider>
   );
 };

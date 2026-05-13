@@ -182,6 +182,7 @@ fn main() {
             command_set_app_config,
             get_provisioning_config,
             get_platform_header,
+            set_location_mfa_method,
             open_new_ui_window,
             open_old_ui_window,
             swap_to_new_ui,
