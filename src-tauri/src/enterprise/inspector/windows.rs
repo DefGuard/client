@@ -13,7 +13,7 @@ const MAX_QUICKFIX_DAYS: i64 = 60;
 #[serde(rename = "Win32_EncryptableVolume")]
 #[serde(rename_all = "PascalCase")]
 struct Win32EncryptableVolume {
-    // drive_letter: Option<String>,
+    drive_letter: Option<String>,
     // 0 = unprotected, 1 = protected, 2 = unknown
     protection_status: u32,
 }
@@ -21,7 +21,6 @@ struct Win32EncryptableVolume {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AntiVirusProduct {
-    // display_name: String,
     product_state: u32,
 }
 
@@ -29,7 +28,6 @@ struct AntiVirusProduct {
 #[serde(rename = "Win32_ComputerSystem")]
 #[serde(rename_all = "PascalCase")]
 struct Win32ComputerSystem {
-    // domain: String,
     part_of_domain: bool,
 }
 
@@ -51,7 +49,6 @@ time::serde::format_description!(
 #[serde(rename = "Win32_QuickFixEngineering")]
 #[serde(rename_all = "PascalCase")]
 struct Win32QuickFixEngineering {
-    //hot_fix_id: String,
     #[serde(with = "wmidate::option", default)]
     installed_on: Option<Date>,
     //description: Option<String>, // "Update" or "Security Update"
@@ -83,28 +80,26 @@ fn system_drive_letter() -> Result<String, UnavailableReason> {
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -Namespace  "root\CIMV2\Security\MicrosoftVolumeEncryption" -query "SELECT * FROM Win32_EncryptableVolume"`
 pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
-    let drive_letter = system_drive_letter()?;
+    let system_drive_letter = system_drive_letter()?;
 
     let conn =
         WMIConnection::with_namespace_path("root\\CIMV2\\Security\\MicrosoftVolumeEncryption")?;
     conn.set_proxy_blanket(AuthLevel::PktPrivacy)?;
 
-    let volumes: Vec<Win32EncryptableVolume> = conn.raw_query(format!(
-        "SELECT ProtectionStatus FROM Win32_EncryptableVolume WHERE DriveLetter='{drive_letter}'"
-    ))?;
-
-    // XXX: query all drives and .filter()?
-
-    match volumes.first() {
-        Some(vol) => {
-            return match vol.protection_status {
-                0 => Ok(false),
-                1 => Ok(true),
-                _ => Err(UnavailableReason::DetectionFailed),
-            };
+    let volumes: Vec<Win32EncryptableVolume> = conn.query()?;
+    for volume in volumes {
+        if let Some(drive_letter) = volume.drive_letter {
+            if drive_letter == system_drive_letter {
+                return match volume.protection_status {
+                    0 => Ok(false),
+                    1 => Ok(true),
+                    _ => Err(UnavailableReason::DetectionFailed),
+                };
+            }
         }
-        None => Err(UnavailableReason::DetectionFailed),
     }
+
+    Err(UnavailableReason::DetectionFailed)
 }
 
 /// Determine AntiVirus status.
@@ -151,7 +146,7 @@ pub(super) fn part_of_domain() -> Result<bool, UnavailableReason> {
 /// `Get-WmiObject -query "SELECT * FROM Win32_QuickFixEngineering"`
 pub(super) fn security_update_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::new()?;
-    let fixes: Vec<Win32QuickFixEngineering> = conn.query().unwrap();
+    let fixes: Vec<Win32QuickFixEngineering> = conn.query()?;
 
     // Days from today
     let today = OffsetDateTime::now_utc().date();

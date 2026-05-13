@@ -21,7 +21,7 @@ use crate::{
 impl fmt::Display for UnavailableReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Unspecified => f.write_str("nspecified"),
+            Self::Unspecified => f.write_str("unspecified"),
             Self::DetectionFailed => f.write_str("detection failed"),
             Self::NotApplicable => f.write_str("not applicable on this platform"),
             Self::InsufficientPermissions => f.write_str("insufficient permissions"),

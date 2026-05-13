@@ -637,6 +637,7 @@ pub(crate) async fn do_update_instance(
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.service_location_mode = new_location.service_location_mode;
+                current_location.posture_check_required = new_location.posture_check_required;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
                 current_location
