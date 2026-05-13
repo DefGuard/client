@@ -36,7 +36,7 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::DeviceConfigResponse,
+    proto::defguard::client_types::DeviceConfigResponse,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         construct_platform_header, disconnect_interface, get_location_interface_details,
@@ -242,7 +242,7 @@ pub async fn save_device_config(
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
-    let mut instance: Instance = instance_info.into();
+    let mut instance = Instance::from(instance_info);
     if response.token.is_some() {
         debug!(
             "The newly saved device config has a polling token, automatic configuration polling \
@@ -250,7 +250,7 @@ pub async fn save_device_config(
         );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an update, \
+            "Missing polling token for instance {}, Core and/or Edge services may need an update, \
             configuration polling won't work",
             instance.name,
         );
@@ -539,22 +539,21 @@ pub(crate) async fn locations_changed(
     instance: &Instance<Id>,
     device_config: &DeviceConfigResponse,
 ) -> Result<bool, Error> {
-    let db_locations: HashSet<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
-            .await?
-            .into_iter()
-            .map(|location| {
-                let mut new_location = Location::<NoId>::from(location);
-                // Ignore `route_all_traffic` flag as Defguard core does not have it.
-                new_location.route_all_traffic = false;
-                new_location
-            })
-            .collect();
-    let core_locations: HashSet<Location> = device_config
+    let db_locations = Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
+        .await?
+        .into_iter()
+        .map(|location| {
+            let mut new_location = Location::<NoId>::from(location);
+            // Ignore `route_all_traffic` flag as Defguard core does not have it.
+            new_location.route_all_traffic = false;
+            new_location
+        })
+        .collect::<HashSet<_>>();
+    let core_locations = device_config
         .configs
         .iter()
         .map(|config| config.clone().into_location(instance.id))
-        .collect();
+        .collect::<HashSet<_>>();
 
     Ok(db_locations != core_locations)
 }
@@ -638,6 +637,7 @@ pub(crate) async fn do_update_instance(
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.service_location_mode = new_location.service_location_mode;
+                current_location.posture_check_required = new_location.posture_check_required;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
                 current_location

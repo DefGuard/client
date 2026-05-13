@@ -266,9 +266,13 @@ export const MFAModal = () => {
         isPresent(startResponse) &&
         isPresent(selectedInstance) && (
           <MfaMobileApprove
+            key={startResponse.token}
             proxyUrl={proxyUrl}
             instanceUuid={selectedInstance.uuid}
             onCancel={resetAuthState}
+            onRefresh={() => {
+              handleMfaStart(4);
+            }}
             data={{
               challenge: startResponse.challenge as string,
               token: startResponse.token,

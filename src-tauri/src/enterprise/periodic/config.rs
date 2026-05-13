@@ -21,7 +21,9 @@ use crate::{
     },
     error::Error,
     events::EventKey,
-    proto::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
+    proto::defguard::client_types::{
+        DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse,
+    },
     utils::construct_platform_header,
     CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION,
     PKG_VERSION,

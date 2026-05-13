@@ -75,6 +75,7 @@ export type CommonWireguardFields = {
   pubkey: string;
   instance_id: number;
   network_id: number;
+  // TODO: device posture data, if available
 };
 
 export type SelectedInstance = {

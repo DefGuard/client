@@ -30,8 +30,8 @@ authors = ["Defguard"]
 edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
-rust-version = "1.87"
-version = "1.6.8"
+rust-version = "1.95"
+version = "1.6.9"
 
 [package]
 name = "defguard-client"
@@ -69,6 +69,7 @@ defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 hyper-util = "0.1"
 log = { version = "0.4", features = ["serde"] }
+os_info = { version = "3.14", default-features = false }
 prost.workspace = true
 regex = "1.12"
 reqwest.workspace = true
@@ -84,8 +85,9 @@ sqlx = { version = "0.8", features = [
     "uuid",
     "macros",
 ] }
-struct-patch = "0.10"
+struct-patch = "0.12"
 strum = { version = "0.28", features = ["derive"] }
+sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
 tauri = { version = "2", features = [
     "native-tls-vendored",
     "image-png",
@@ -120,16 +122,12 @@ x25519-dalek = { version = "2", features = [
     "serde",
     "static_secrets",
 ] }
-os_info = "3.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
 objc2 = "0.6"
 objc2-foundation = "0.3"
 objc2-network-extension = "0.3"
-
-[target.'cfg(target_os = "macos")'.build-dependencies]
-swift-rs = { version = "1.0", features = ["build"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["user", "fs"] }
@@ -164,6 +162,7 @@ windows-sys = { version = "0.61", features = [
     # Network address change notifications (NotifyAddrChange)
     "Win32_NetworkManagement_IpHelper",
 ] }
+wmi = {version = "0.18", default-features = false}
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

@@ -60,18 +60,21 @@ const SYSTEM_SYNC_DELAY: Duration = Duration::from_millis(500);
 const LOCATION_ID: &str = "locationId";
 const TUNNEL_ID: &str = "tunnelId";
 
-static OBSERVER_COMMS: LazyLock<(
-    Mutex<Sender<(&'static str, Id)>>,
-    Mutex<Option<Receiver<(&'static str, Id)>>>,
-)> = LazyLock::new(|| {
+type ObserverSender = Mutex<Sender<(&'static str, Id)>>;
+type ObserverReceiver = Mutex<Option<Receiver<(&'static str, Id)>>>;
+
+static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::new(|| {
     let (tx, rx) = mpsc::channel();
     (Mutex::new(tx), Mutex::new(Some(rx)))
 });
-static VPN_STATE_UPDATE_COMMS: LazyLock<(Mutex<Sender<()>>, Mutex<Option<Receiver<()>>>)> =
-    LazyLock::new(|| {
-        let (tx, rx) = mpsc::channel();
-        (Mutex::new(tx), Mutex::new(Some(rx)))
-    });
+
+type VpnStateSender = Mutex<Sender<()>>;
+type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
+
+static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> = LazyLock::new(|| {
+    let (tx, rx) = mpsc::channel();
+    (Mutex::new(tx), Mutex::new(Some(rx)))
+});
 
 /// Thread responsible for handling VPN status update requests.
 /// This is an async function.
