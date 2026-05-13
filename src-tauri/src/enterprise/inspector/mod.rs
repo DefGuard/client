@@ -201,6 +201,7 @@ impl From<Result<String, UnavailableReason>> for StringCheck {
     }
 }
 
+#[allow(unused)]
 impl DevicePostureData {
     /// Performs system inspection and returns the results.
     #[must_use]
