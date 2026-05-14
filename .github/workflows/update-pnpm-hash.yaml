@@ -24,6 +24,7 @@ jobs:
           # matches what we read from disk - avoids a race if the branch is
           # updated while this job is in flight.
           ref: ${{ github.event.pull_request.head.sha }}
+          submodules: recursive
 
       - uses: cachix/install-nix-action@v31
         with:
@@ -88,34 +89,29 @@ jobs:
           script: |
             const fs = require('fs');
             const content = fs.readFileSync('nix/package.nix', 'utf8');
+            // GraphQL createCommitOnBranch requires base64-encoded file contents.
             const encoded = Buffer.from(content).toString('base64');
 
-            // Fetch the current blob SHA so createOrUpdateFileContents can
-            // do a safe update (will 409 if the branch moved under us).
-            const { data: file } = await github.rest.repos.getContent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path: 'nix/package.nix',
-              ref: context.payload.pull_request.head.sha,
-            });
-
-            // Creating the commit via the REST API means GitHub signs it
-            // automatically - the commit will carry the Verified badge.
-            await github.rest.repos.createOrUpdateFileContents({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path: 'nix/package.nix',
-              message: 'chore(nix): update pnpm deps hash',
-              content: encoded,
-              sha: file.sha,
-              branch: context.payload.pull_request.head.ref,
-              committer: {
-                name: 'github-actions[bot]',
-                email: '41898282+github-actions[bot]@users.noreply.github.com',
-              },
-              author: {
-                name: 'github-actions[bot]',
-                email: '41898282+github-actions[bot]@users.noreply.github.com',
+            // The GraphQL createCommitOnBranch mutation creates commits that
+            // GitHub signs automatically - producing a Verified badge.
+            await github.graphql(`
+              mutation CreateCommit($input: CreateCommitOnBranchInput!) {
+                createCommitOnBranch(input: $input) {
+                  commit { url }
+                }
+              }
+            `, {
+              input: {
+                branch: {
+                  repositoryNameWithOwner: `${context.repo.owner}/${context.repo.repo}`,
+                  branchName: context.payload.pull_request.head.ref,
+                },
+                message: { headline: 'chore(nix): update pnpm deps hash' },
+                fileChanges: {
+                  additions: [{ path: 'nix/package.nix', contents: encoded }],
+                },
+                // Safety check - fails if the branch moved under us.
+                expectedHeadOid: context.payload.pull_request.head.sha,
               },
             });
 
