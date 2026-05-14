@@ -3,7 +3,7 @@ import { type PropsWithChildren, useEffect } from 'react';
 import { isPresent } from '../../../shared/defguard-ui/utils/isPresent';
 import { MFAModal } from '../pages/ClientInstancePage/components/LocationsList/modals/MFAModal/MFAModal';
 import { useMFAModal } from '../pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
-import type { CommonWireguardFields } from '../types';
+import { type CommonWireguardFields, TauriEventKey } from '../types';
 
 type Props = PropsWithChildren;
 
@@ -13,17 +13,20 @@ type Payload = {
 
 export const MfaModalProvider = ({ children }: Props) => {
   const openMFAModal = useMFAModal((state) => state.open);
-  // listen for rust backend requesting MFA
+  // listen for Rust backend requesting MFA
 
   useEffect(() => {
     let unlisten: UnlistenFn;
 
     (async () => {
-      unlisten = await listen<Payload>('mfa-trigger', ({ payload: { location } }) => {
-        if (isPresent(location)) {
-          openMFAModal(location);
-        }
-      });
+      unlisten = await listen<Payload>(
+        TauriEventKey.MFA_TRIGGER,
+        ({ payload: { location } }) => {
+          if (isPresent(location)) {
+            openMFAModal(location);
+          }
+        },
+      );
     })();
 
     return () => {

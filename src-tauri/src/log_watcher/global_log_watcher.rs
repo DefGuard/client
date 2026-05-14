@@ -637,7 +637,7 @@ pub async fn spawn_global_log_watcher_task(
     let app_state = handle.state::<AppState>();
 
     // Show logs only from the last hour
-    let from = Some(Utc::now() - Duration::from_secs(60 * 60));
+    let from = Some(Utc::now() - Duration::from_hours(1));
 
     let event_topic = "log-update-global".to_string();
 

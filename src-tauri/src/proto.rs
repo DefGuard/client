@@ -6,9 +6,28 @@ use crate::database::models::{
     Id, NoId,
 };
 
-tonic::include_proto!("defguard.proxy");
+pub(crate) mod defguard {
+    #[allow(dead_code)]
+    pub(crate) mod enterprise {
+        pub(crate) mod posture {
+            pub(crate) mod v2 {
+                tonic::include_proto!("defguard.enterprise.posture.v2");
+            }
+        }
+    }
 
-impl DeviceConfig {
+    pub(crate) mod proxy {
+        pub(crate) mod v1 {
+            tonic::include_proto!("defguard.proxy.v1");
+        }
+    }
+
+    pub mod client_types {
+        tonic::include_proto!("defguard.client_types");
+    }
+}
+
+impl defguard::client_types::DeviceConfig {
     #[must_use]
     pub(crate) fn into_location(self, instance_id: Id) -> Location<NoId> {
         let location_mfa_mode = match self.location_mfa_mode {
@@ -45,6 +64,7 @@ impl DeviceConfig {
             location_mfa_mode,
             service_location_mode,
             mfa_method: infer_mfa_method(location_mfa_mode, None),
+            posture_check_required: self.posture_check_required.unwrap_or_default(),
         }
     }
 }

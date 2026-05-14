@@ -271,19 +271,13 @@ async fn handle_location_tray_menu(id: String, app: &AppHandle) {
                         info!("Connect location with ID {id}");
                         // Check if MFA is enabled. If so, trigger modal on frontend.
                         if location.mfa_enabled() {
-                            info!(
-                                "MFA enabled for location with ID {:?}, trigger MFA modal",
-                                location.id
-                            );
+                            info!("MFA enabled for location with ID {id}, trigger MFA modal");
                             show_main_window(app);
                             let _ = app.emit(EventKey::MfaTrigger.into(), &location);
                         } else if let Err(err) =
                             connect(location_id, ConnectionType::Location, None, app.clone()).await
                         {
-                            info!(
-                                "Unable to connect location with ID {}, error: {err:?}",
-                                location.id
-                            );
+                            info!("Unable to connect location with ID {id}, error: {err:?}");
                         }
                     }
                 }
