@@ -2,11 +2,18 @@ import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../../../rust-api/api';
-import { type LocationInfo } from '../../../../rust-api/types';
+import { LocationMfaMode } from '../../../../rust-api/types';
+import { useLocationCardContext } from '../../context/context';
+import { LocationCardViews } from '../../context/types';
 
-export const ConnectButton = ({ location }: { location: LocationInfo }) => {
+export const ConnectButton = () => {
+  const { location, setView, startMfa } = useLocationCardContext();
+
   const { mutate: connect } = useMutation({
     mutationFn: api.connect,
+    onSuccess: () => {
+      setView(LocationCardViews.Connected);
+    },
     meta: {
       invalidate: ['locations'],
     },
@@ -14,6 +21,9 @@ export const ConnectButton = ({ location }: { location: LocationInfo }) => {
 
   const { mutate: disconnect } = useMutation({
     mutationFn: api.disconnect,
+    onSuccess: () => {
+      setView(LocationCardViews.Default);
+    },
     meta: {
       invalidate: ['locations'],
     },
@@ -32,10 +42,14 @@ export const ConnectButton = ({ location }: { location: LocationInfo }) => {
             locationId: location.id,
           });
         } else {
-          connect({
-            connectionType: location.connection_type,
-            locationId: location.id,
-          });
+          if (location.location_mfa_mode !== LocationMfaMode.Disabled) {
+            startMfa();
+          } else {
+            connect({
+              connectionType: location.connection_type,
+              locationId: location.id,
+            });
+          }
         }
       }}
     >

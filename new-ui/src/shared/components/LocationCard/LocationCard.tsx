@@ -13,6 +13,7 @@ import { LocationCardProvider, useLocationCardContext } from './context/context'
 import { LocationCardViews, type LocationCardViewsValue } from './context/types';
 import { DefaultView } from './views/DefaultView/DefaultView';
 import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
+import { LocationCardMfaTotpView } from './views/LocationCardMfaTotpView/LocationCardMfaTotpView';
 
 interface Props {
   location: LocationInfo;
@@ -23,7 +24,7 @@ interface Props {
 
 const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.Default]: <DefaultView />,
-  [LocationCardViews.MfaTotp]: null,
+  [LocationCardViews.MfaTotp]: <LocationCardMfaTotpView />,
   [LocationCardViews.MfaEmail]: null,
   [LocationCardViews.MfaOidc]: null,
   [LocationCardViews.MfaMobile]: null,

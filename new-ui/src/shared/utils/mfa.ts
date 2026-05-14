@@ -1,4 +1,4 @@
-import type { MfaMethodValue } from "../rust-api/types";
+import type { MfaMethodValue } from '../rust-api/types';
 
 export const mfaToText = (factor: MfaMethodValue): string => {
   switch (factor) {

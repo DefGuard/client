@@ -56,7 +56,7 @@ export const DefaultView = () => {
         </div>
       )}
       <SizedBox height={ThemeSpacing.Xl3} />
-      <ConnectButton location={location} />
+      <ConnectButton />
     </div>
   );
 };

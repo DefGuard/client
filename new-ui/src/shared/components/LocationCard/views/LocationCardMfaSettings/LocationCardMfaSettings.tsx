@@ -2,7 +2,12 @@ import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api } from '../../../../rust-api/api';
-import { LocationMfaMode, MfaMethod, type MfaMethodValue } from '../../../../rust-api/types';
+import {
+  LocationMfaMode,
+  MfaMethod,
+  type MfaMethodValue,
+} from '../../../../rust-api/types';
+import { ThemeSpacing } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
@@ -10,10 +15,11 @@ import { Controls } from '../../../Controls/Controls';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { SizedBox } from '../../../SizedBox/SizedBox';
+import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { MfaSelector } from '../../components/MfaSelector/MfaSelector';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
-
 
 export const LocationCardMfaSettings = () => {
   const { mutate: setMfaMethod } = useMutation({
@@ -32,14 +38,10 @@ export const LocationCardMfaSettings = () => {
   );
 
   const MfaFactorsList = useMemo((): MfaMethodValue[] => {
-    if(location.location_mfa_mode === LocationMfaMode.Internal) {
-      return [
-        MfaMethod.Totp,
-        MfaMethod.Email,
-        MfaMethod.MobileApprove,
-      ];
+    if (location.location_mfa_mode === LocationMfaMode.Internal) {
+      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove];
     }
-    return [MfaMethod.Oidc]
+    return [MfaMethod.Oidc];
   }, [location.location_mfa_mode]);
 
   const handleSubmit = () => {
@@ -54,13 +56,13 @@ export const LocationCardMfaSettings = () => {
 
   return (
     <div className="location-card-mfa-settings">
-      <div className="header">
-        <p>Change MFA Method</p>
+      <LocationViewHeader title="Change MFA Method">
         <p>
           If you're having issues with your current verification method, you can choose
           another one or set a new default.
         </p>
-      </div>
+      </LocationViewHeader>
+      <SizedBox height={ThemeSpacing.Xl} />
       <div className="methods">
         {MfaFactorsList.map((factor) => (
           <MfaSelector

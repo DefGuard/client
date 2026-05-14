@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "biome": "biome",
-    "lint": "biome check ./src/ && prettier src/**/*.scss --check --log-level error && stylelint \"src/**/*.scss\" -c ./.stylelintrc.json && tsc -b",
+    "lint": "biome check ./src/ && prettier src/**/*.scss --check --log-level error && stylelint \"src/**/*.scss\" -c ./.stylelintrc.json --fix && tsc -b",
     "fix": "biome check ./src/ --write --unsafe && prettier src/**/*.scss -w --log-level silent",
     "tsc": "tsc",
     "preview": "vite preview"

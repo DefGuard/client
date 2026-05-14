@@ -1,6 +1,6 @@
 .connect-button {
   --bg: linear-gradient(180deg, #fff 0%, #d3ddfb 100%);
-  --shadow: 0 4px 5px 0 rgba(53, 84, 179, 0.07);
+  --shadow: 0 4px 5px 0 rgb(53 84 179 / 7%);
   --color: var(--fg-action);
   --border: var(--bg);
 
@@ -22,13 +22,13 @@
   padding: 0 var(--spacing-lg);
 
   &.connected {
-    --bg: linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0));
+    --bg: linear-gradient(rgb(255 255 255 / 0%), rgb(255 255 255 / 0%));
     --color: var(--fg-white-100);
     --border: var(--border-default);
 
     &:hover {
       --border: var(--bg-white-5);
-      --bg: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
+      --bg: linear-gradient(rgb(255 255 255 / 5%), rgb(255 255 255 / 5%));
     }
   }
 
