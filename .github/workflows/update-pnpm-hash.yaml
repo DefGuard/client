@@ -25,37 +25,45 @@ jobs:
           # updated while this job is in flight.
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: DeterminateSystems/nix-installer-action@v14
+      - uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: Compute correct pnpm deps hash
         id: hash
         run: |
           set -euo pipefail
 
+          echo "=== starting hash computation ==="
+          echo "nix: $(which nix 2>/dev/null || echo 'NOT IN PATH')"
+          echo "nix version: $(nix --version 2>/dev/null || echo 'unavailable')"
+
           # A valid-format but always-wrong sha256 hash.
           # Identical to lib.fakeHash in nixpkgs.
           FAKE="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
           # Extract the current pnpm hash.
-          # Pattern targets the bare `hash = "..."` key inside pnpmDeps.
-          # This is distinct from the cargo outputHashes entries, which use
-          # string keys like `"boringtun-0.6.0" = "sha256-..."`.
-          CURRENT=$(grep -oP '^\s+hash = "\Ksha256-[^"]+' nix/package.nix)
+          CURRENT=$(sed -n 's/^[[:space:]]*hash = "\(sha256-[^"]*\)".*/\1/p' nix/package.nix | head -1)
+          if [ -z "$CURRENT" ]; then
+            echo "::error::Could not extract current hash from nix/package.nix"
+            exit 1
+          fi
+          echo "current hash: ${CURRENT}"
           echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
 
           # Swap in the fake hash so Nix will fail and report the real one.
           sed -i "s|hash = \"${CURRENT}\"|hash = \"${FAKE}\"|" nix/package.nix
 
           # Build only the pnpmDeps fixed-output derivation.
-          # Targeting .pnpmDeps in isolation avoids pulling down all Cargo
-          # crates unnecessarily - stdenv.mkDerivation exposes its input
-          # attributes on the resulting derivation, so this is valid.
           SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+          echo "building pnpmDeps for ${SYSTEM}..."
           BUILD_LOG=$(nix build --no-link --no-write-lock-file \
             ".#packages.${SYSTEM}.default.pnpmDeps" 2>&1 || true)
 
           # Nix prints "got: sha256-..." in the hash mismatch error.
-          NEW=$(printf '%s' "$BUILD_LOG" | grep -oP 'got:\s+\Ksha256-\S+')
+          NEW=$(printf '%s' "$BUILD_LOG" | sed -n 's/.*got:[[:space:]]*\(sha256-[^[:space:]]*\).*/\1/p' | head -1)
           if [ -z "$NEW" ]; then
             echo "::error::Could not extract the correct hash from nix output."
             echo "Full build log:"
@@ -63,6 +71,7 @@ jobs:
             exit 1
           fi
 
+          echo "new hash: ${NEW}"
           echo "new=${NEW}" >> "$GITHUB_OUTPUT"
 
           # Write the correct hash back into the file.
