@@ -13,11 +13,10 @@
   --loader-bg: transparent;
 
   height: var(--btn-size);
-  border: none;
+  border: 1px solid var(--border-color);
   box-sizing: border-box;
   border-radius: var(--button-border-radius-primary);
   background: var(--bg-color);
-  box-shadow: 0 0 0 1px var(--border-color);
   color: var(--text-color);
   min-height: var(--btn-size);
   padding: var(--spacing-sm) var(--spacing-lg);
@@ -34,9 +33,10 @@
     column-gap: var(--spacing-md);
     text-decoration: none !important;
     justify-content: center;
+    color: inherit;
   }
 
-  @include animate(background-color, border-color, opacity, box-shadow);
+  @include animate(background-color, border-color, opacity);
 
   &:not(.disabled, .loading) {
     cursor: pointer;

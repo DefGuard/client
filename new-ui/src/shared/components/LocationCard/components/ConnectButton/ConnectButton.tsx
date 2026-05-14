@@ -2,7 +2,7 @@ import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../../../rust-api/api';
-import { type LocationInfo, LocationMfaMode } from '../../../../rust-api/types';
+import { type LocationInfo } from '../../../../rust-api/types';
 
 export const ConnectButton = ({ location }: { location: LocationInfo }) => {
   const { mutate: connect } = useMutation({
@@ -18,8 +18,6 @@ export const ConnectButton = ({ location }: { location: LocationInfo }) => {
       invalidate: ['locations'],
     },
   });
-
-  if (location.location_mfa_mode !== LocationMfaMode.Disabled) return null;
 
   return (
     <button

@@ -1,7 +1,7 @@
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../../../rust-api/api';
-import { LocationMfaMode } from '../../../../rust-api/types';
+import { LocationMfaMode, MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { mfaToText } from '../../../../utils/mfa';
 import { Divider } from '../../../Divider/Divider';
@@ -14,7 +14,9 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
 export const DefaultView = () => {
-  const { location, mfaMethod, setView } = useLocationCardContext();
+  const { location, setView } = useLocationCardContext();
+
+  const mfaMethod = location.mfa_method ?? MfaMethod.Totp;
 
   const { mutate: updateRouting } = useMutation({
     mutationFn: api.updateLocationRouting,
@@ -38,7 +40,6 @@ export const DefaultView = () => {
         }}
       />
       <Divider spacing={ThemeSpacing.Md} />
-      <p>{location.location_mfa_mode}</p>
       {location.location_mfa_mode !== LocationMfaMode.Disabled && mfaMethod && (
         <div className="location-mfa-row">
           <div className="mfa-badge">

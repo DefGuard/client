@@ -1,40 +1,3 @@
-export const MfaMethod = {
-  Totp: 'Totp',
-  Email: 'Email',
-  Oidc: 'Oidc',
-  MobileApprove: 'MobileApprove',
-} as const;
-
-export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
-
-export const apiMfaToEnum = (value: number): MfaMethodValue => {
-  switch (value) {
-    case 0:
-      return 'Totp';
-    case 1:
-      return 'Email';
-    case 2:
-      return 'Oidc';
-    case 4:
-      return 'MobileApprove';
-    default:
-      throw Error(`Unknown MFA method ${value}`);
-  }
-};
-
-export const MfaEnumToApi = (value: MfaMethodValue): number => {
-  switch (value) {
-    case 'Email':
-      return 1;
-    case 'Totp':
-      return 0;
-    case 'MobileApprove':
-      return 4;
-    case 'Oidc':
-      return 2;
-  }
-};
-
 export const AppTheme = {
   Light: 'light',
   Dark: 'dark',
@@ -79,7 +42,7 @@ export const LocationMfaMode = {
 
 export type LocationMfaMode = (typeof LocationMfaMode)[keyof typeof LocationMfaMode];
 
-export const LocationMfaMethod = {
+export const MfaMethod = {
   Totp: 'totp',
   Email: 'email',
   Oidc: 'oidc',
@@ -87,7 +50,7 @@ export const LocationMfaMethod = {
   MobileApprove: 'mobileapprove',
 } as const;
 
-export type LocationMfaMethod = (typeof LocationMfaMethod)[keyof typeof LocationMfaMethod];
+export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
 
 export const ConnectionType = {
   Location: 'Location',
@@ -176,6 +139,7 @@ export type LocationInfo = {
   pubkey: string;
   network_id: number;
   location_mfa_mode: LocationMfaMode;
+  mfa_method?: MfaMethodValue;
 };
 
 export type LocationStats = {
@@ -322,5 +286,5 @@ export type UpdateInstanceArgs = {
 
 export type SetLocationMfaMethodArgs = {
   locationId: number;
-  mfaMethod: LocationMfaMethod;
+  mfaMethod: MfaMethodValue;
 };

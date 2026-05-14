@@ -9,13 +9,9 @@
     overflow: hidden;
 
     svg {
-      width: 20px;
-      height: 20px;
       z-index: 0;
 
       path {
-        fill: var(--fg-white);
-
         @include animate(fill);
       }
     }
@@ -61,19 +57,19 @@
   }
 
   &:not(.disabled).active {
-    --bg: var(--bg-action);
-    --border: var(--bg-action);
-    --icon: var(--fg-white);
+    --bg: var(--bg-white-100);
+    --border: var(--bg);
+    --icon: var(--fg-action);
   }
 
   &:not(.active).disabled {
-    --border: var(--fg-white-100);
-    --bg: var(--fg-white-100);
+    --border: var(--border-disabled);
+    --bg: var(--bg-white-5);
   }
 
   &.active.disabled {
     --border: var(--bg);
-    --bg: var(--bg-white-5);
+    --bg: var(--bg-white-10);
     --icon: var(--fg-white-60);
   }
 }

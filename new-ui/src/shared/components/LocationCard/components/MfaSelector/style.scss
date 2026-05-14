@@ -16,16 +16,23 @@
   padding: 0 var(--spacing-md);
   min-height: 40px;
   border-radius: 8px;
+  cursor: pointer;
 
   transition-duration: 250ms;
   transition-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
   transition-property: border-color, background, color;
 
-  &:hover,
-  &.selected {
-    --bg: var(--bg-color-white);
+  &:hover {
+    --bg: var(--bg-white-5);
     --color: var(--fg-white-100);
     --border: var(--border-default);
+    --icon: var(--fg-white-100);
+  }
+
+  &.selected {
+    --bg: var(--bg-white-5);
+    --color: var(--fg-white-100);
+    --border: transparent;
     --icon: var(--fg-white-100);
   }
 

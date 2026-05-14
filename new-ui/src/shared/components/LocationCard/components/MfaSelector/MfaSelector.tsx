@@ -1,12 +1,12 @@
 import './style.scss';
 import clsx from 'clsx';
 import { type HTMLProps, type MouseEventHandler, useMemo } from 'react';
-import type { MfaMethodValue } from '../../../../rust-api/types';
+import type { MfaMethod } from '../../../../rust-api/types';
 import { mfaToText } from '../../../../utils/mfa';
 import { Icon, IconKind, type IconKindValue } from '../../../Icon';
 
 interface Props {
-  factor: MfaMethodValue;
+  factor: MfaMethod;
   selected?: boolean;
   isDefault?: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
@@ -22,14 +22,16 @@ export const MfaSelector = ({
 }: Props) => {
   const iconKind = useMemo((): IconKindValue => {
     switch (factor) {
-      case 'Email':
+      case 'email':
         return 'mail';
-      case 'MobileApprove':
+      case 'mobileapprove':
         return 'mobile-lock';
-      case 'Oidc':
+      case 'oidc':
         return 'token';
-      case 'Totp':
+      case 'totp':
         return 'mobile-lock';
+      case 'biometric':
+        return 'biometric';
     }
   }, [factor]);
 

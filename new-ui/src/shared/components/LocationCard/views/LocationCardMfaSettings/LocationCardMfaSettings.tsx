@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { MfaMethod, type MfaMethodValue } from '../../../../rust-api/types';
+import './style.scss';
+import { useMutation } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { api } from '../../../../rust-api/api';
+import { LocationMfaMode, MfaMethod, type MfaMethodValue } from '../../../../rust-api/types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
@@ -11,21 +14,40 @@ import { MfaSelector } from '../../components/MfaSelector/MfaSelector';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
-const MFA_FACTORS: MfaMethodValue[] = [
-  MfaMethod.Totp,
-  MfaMethod.Email,
-  MfaMethod.MobileApprove,
-  MfaMethod.Oidc,
-];
 
 export const LocationCardMfaSettings = () => {
-  const { previousView, mfaMethod, setView, setMfaMethod } = useLocationCardContext();
+  const { mutate: setMfaMethod } = useMutation({
+    mutationFn: api.setLocationMfaMethod,
+    meta: {
+      invalidate: [['locations']],
+    },
+  });
+
+  const { previousView, setView, location } = useLocationCardContext();
+
+  const mfaMethod = location.mfa_method ?? MfaMethod.Totp;
+
   const [selectedPref, setSelectedPref] = useState<MfaMethodValue>(
     mfaMethod ?? MfaMethod.Totp,
   );
+
+  const MfaFactorsList = useMemo((): MfaMethodValue[] => {
+    if(location.location_mfa_mode === LocationMfaMode.Internal) {
+      return [
+        MfaMethod.Totp,
+        MfaMethod.Email,
+        MfaMethod.MobileApprove,
+      ];
+    }
+    return [MfaMethod.Oidc]
+  }, [location.location_mfa_mode]);
+
   const handleSubmit = () => {
     if (selectedPref !== mfaMethod) {
-      setMfaMethod(selectedPref);
+      setMfaMethod({
+        locationId: location.id,
+        mfaMethod: selectedPref,
+      });
       setView(previousView ?? LocationCardViews.Default);
     }
   };
@@ -40,7 +62,7 @@ export const LocationCardMfaSettings = () => {
         </p>
       </div>
       <div className="methods">
-        {MFA_FACTORS.map((factor) => (
+        {MfaFactorsList.map((factor) => (
           <MfaSelector
             key={factor}
             factor={factor}
@@ -50,7 +72,6 @@ export const LocationCardMfaSettings = () => {
           />
         ))}
       </div>
-      {/* TODO: Add the pref MFA method to the location model */}
       <Checkbox
         active={
           previousView === LocationCardViews.Default ? true : mfaMethod === selectedPref
@@ -65,10 +86,13 @@ export const LocationCardMfaSettings = () => {
           variant={IconButtonVariant.BigSelected}
           icon={IconKind.ArrowBig}
           iconRotation="left"
-          onClick={handleSubmit}
+          onClick={() => {
+            setView(previousView ?? LocationCardViews.Default);
+          }}
         />
         <div className="right">
           <Button
+            disabled={selectedPref === mfaMethod}
             variant={ButtonVariant.Primary}
             size={'primary'}
             text="Submit"

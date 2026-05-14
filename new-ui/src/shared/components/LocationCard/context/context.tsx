@@ -1,14 +1,6 @@
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
-import { useCompactLocationStore } from '../../../../pages/compact/CompactLocationsPage/hooks/useCompactLocationsStore';
+import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
 import type { LocationInfo } from '../../../rust-api/types';
-import { MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
+import { MfaMethod } from '../../../rust-api/types';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
@@ -16,8 +8,6 @@ interface LocationCardContextValue {
   previousView: LocationCardViewsValue | null;
   setView: (view: LocationCardViewsValue) => void;
   location: LocationInfo;
-  mfaMethod: MfaMethodValue | null;
-  setMfaMethod: (method: MfaMethodValue | null) => void;
   startMfa: () => void;
 }
 
@@ -45,8 +35,6 @@ export const LocationCardProvider = ({
     LocationCardViews.Default,
   );
 
-  const [mfaMethod, setMfaMethod] = useState<MfaMethodValue | null>(null);
-
   const setView = useCallback(
     (view: LocationCardViewsValue) => {
       setPreviousView(currentView);
@@ -56,7 +44,7 @@ export const LocationCardProvider = ({
   );
 
   const startMfa = useCallback(() => {
-    switch (mfaMethod) {
+    switch (location.mfa_method) {
       case MfaMethod.Totp:
         setView(LocationCardViews.MfaTotp);
         break;
@@ -70,12 +58,7 @@ export const LocationCardProvider = ({
         setView(LocationCardViews.MfaMobile);
         break;
     }
-  }, [mfaMethod, setView]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: should only have mfaMethod
-  useEffect(() => {
-    useCompactLocationStore.getState().setLocationMfa(location.id, mfaMethod);
-  }, [mfaMethod]);
+  }, [location.mfa_method, setView]);
 
   return (
     <LocationCardContext.Provider
@@ -84,8 +67,6 @@ export const LocationCardProvider = ({
         previousView,
         setView,
         location: location,
-        mfaMethod,
-        setMfaMethod,
         startMfa,
       }}
     >

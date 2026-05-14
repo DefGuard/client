@@ -49,7 +49,7 @@ export const Button = ({
   };
 
   return (
-    <div className="btn-wrap">
+    <div className={clsx("btn-wrap", `size-${size}`)}>
       <button
         {...containerProps}
         data-variant={variant}
