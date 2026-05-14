@@ -1,6 +1,6 @@
-import type { MfaMethod } from '../rust-api/types';
+import type { MfaMethodValue } from "../rust-api/types";
 
-export const mfaToText = (factor: MfaMethod): string => {
+export const mfaToText = (factor: MfaMethodValue): string => {
   switch (factor) {
     case 'email':
       return 'Email';

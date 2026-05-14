@@ -1,12 +1,12 @@
 import './style.scss';
 import clsx from 'clsx';
 import { type HTMLProps, type MouseEventHandler, useMemo } from 'react';
-import type { MfaMethod } from '../../../../rust-api/types';
+import type { MfaMethodValue } from '../../../../rust-api/types';
 import { mfaToText } from '../../../../utils/mfa';
 import { Icon, IconKind, type IconKindValue } from '../../../Icon';
 
 interface Props {
-  factor: MfaMethod;
+  factor: MfaMethodValue;
   selected?: boolean;
   isDefault?: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
