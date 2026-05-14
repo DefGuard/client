@@ -1,0 +1,115 @@
+name: Update pnpm deps Nix hash
+
+on:
+  pull_request:
+    paths:
+      - pnpm-lock.yaml
+
+concurrency:
+  group: pnpm-hash-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update-pnpm-hash:
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Check out the exact PR head commit so the sha we pass to the API
+          # matches what we read from disk - avoids a race if the branch is
+          # updated while this job is in flight.
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Compute correct pnpm deps hash
+        id: hash
+        run: |
+          set -euo pipefail
+
+          # A valid-format but always-wrong sha256 hash.
+          # Identical to lib.fakeHash in nixpkgs.
+          FAKE="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
+          # Extract the current pnpm hash.
+          # Pattern targets the bare `hash = "..."` key inside pnpmDeps.
+          # This is distinct from the cargo outputHashes entries, which use
+          # string keys like `"boringtun-0.6.0" = "sha256-..."`.
+          CURRENT=$(grep -oP '^\s+hash = "\Ksha256-[^"]+' nix/package.nix)
+          echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
+
+          # Swap in the fake hash so Nix will fail and report the real one.
+          sed -i "s|hash = \"${CURRENT}\"|hash = \"${FAKE}\"|" nix/package.nix
+
+          # Build only the pnpmDeps fixed-output derivation.
+          # Targeting .pnpmDeps in isolation avoids pulling down all Cargo
+          # crates unnecessarily - stdenv.mkDerivation exposes its input
+          # attributes on the resulting derivation, so this is valid.
+          SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+          BUILD_LOG=$(nix build --no-link --no-write-lock-file \
+            ".#packages.${SYSTEM}.default.pnpmDeps" 2>&1 || true)
+
+          # Nix prints "got: sha256-..." in the hash mismatch error.
+          NEW=$(printf '%s' "$BUILD_LOG" | grep -oP 'got:\s+\Ksha256-\S+')
+          if [ -z "$NEW" ]; then
+            echo "::error::Could not extract the correct hash from nix output."
+            echo "Full build log:"
+            printf '%s\n' "$BUILD_LOG"
+            exit 1
+          fi
+
+          echo "new=${NEW}" >> "$GITHUB_OUTPUT"
+
+          # Write the correct hash back into the file.
+          sed -i "s|hash = \"${FAKE}\"|hash = \"${NEW}\"|" nix/package.nix
+
+      # Only commit when the hash actually changed; skip if it was already correct.
+      - name: Commit updated hash
+        if: steps.hash.outputs.current != steps.hash.outputs.new
+        uses: actions/github-script@v7
+        env:
+          OLD_HASH: ${{ steps.hash.outputs.current }}
+          NEW_HASH: ${{ steps.hash.outputs.new }}
+        with:
+          script: |
+            const fs = require('fs');
+            const content = fs.readFileSync('nix/package.nix', 'utf8');
+            const encoded = Buffer.from(content).toString('base64');
+
+            // Fetch the current blob SHA so createOrUpdateFileContents can
+            // do a safe update (will 409 if the branch moved under us).
+            const { data: file } = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: 'nix/package.nix',
+              ref: context.payload.pull_request.head.sha,
+            });
+
+            // Creating the commit via the REST API means GitHub signs it
+            // automatically - the commit will carry the Verified badge.
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: 'nix/package.nix',
+              message: 'chore(nix): update pnpm deps hash',
+              content: encoded,
+              sha: file.sha,
+              branch: context.payload.pull_request.head.ref,
+              committer: {
+                name: 'github-actions[bot]',
+                email: '41898282+github-actions[bot]@users.noreply.github.com',
+              },
+              author: {
+                name: 'github-actions[bot]',
+                email: '41898282+github-actions[bot]@users.noreply.github.com',
+              },
+            });
+
+            console.log(
+              `pnpm deps hash updated: ${process.env.OLD_HASH} -> ${process.env.NEW_HASH}`
+            );
