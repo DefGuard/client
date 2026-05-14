@@ -32,20 +32,26 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
+          fi
 
       - uses: actions/setup-node@v6
         with:
           node-version: 25
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           cache: true
           version: 10
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      # Change to '--frozen-lockfile' once this gets fixed:
+      # https://github.com/pnpm/action-setup/issues/40
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 

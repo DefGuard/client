@@ -2,7 +2,7 @@
 pub mod client;
 pub mod config;
 pub mod proto {
-    tonic::include_proto!("client");
+    tonic::include_proto!("defguard.client.v1");
 }
 #[cfg(not(target_os = "macos"))]
 pub mod daemon;

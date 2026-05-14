@@ -1,0 +1,164 @@
+// TODO: use `async_raw_query`
+
+use serde::Deserialize;
+use time::{Date, OffsetDateTime};
+
+use wmi::{AuthLevel, WMIConnection, WMIError};
+
+use super::UnavailableReason;
+
+const MAX_QUICKFIX_DAYS: i64 = 60;
+
+#[derive(Deserialize)]
+#[serde(rename = "Win32_EncryptableVolume")]
+#[serde(rename_all = "PascalCase")]
+struct Win32EncryptableVolume {
+    drive_letter: Option<String>,
+    // 0 = unprotected, 1 = protected, 2 = unknown
+    protection_status: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AntiVirusProduct {
+    product_state: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename = "Win32_ComputerSystem")]
+#[serde(rename_all = "PascalCase")]
+struct Win32ComputerSystem {
+    part_of_domain: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename = "Win32_OperatingSystem")]
+#[serde(rename_all = "PascalCase")]
+struct Win32OperatingSystem {
+    system_drive: String,
+}
+
+// Custom format for `installed_on`.
+time::serde::format_description!(
+    wmidate,
+    Date,
+    "[month padding:none]/[day padding:none]/[year]"
+);
+
+#[derive(Deserialize)]
+#[serde(rename = "Win32_QuickFixEngineering")]
+#[serde(rename_all = "PascalCase")]
+struct Win32QuickFixEngineering {
+    #[serde(with = "wmidate::option", default)]
+    installed_on: Option<Date>,
+    //description: Option<String>, // "Update" or "Security Update"
+}
+
+/// Convert `WMIError` to `UnavailableReason`.
+impl From<WMIError> for UnavailableReason {
+    fn from(err: WMIError) -> Self {
+        if let WMIError::HResultError { .. } = err {
+            UnavailableReason::InsufficientPermissions
+        } else {
+            UnavailableReason::DetectionFailed
+        }
+    }
+}
+
+/// Determine system drive letter.
+fn system_drive_letter() -> Result<String, UnavailableReason> {
+    let conn = WMIConnection::new()?;
+    let mut results: Vec<Win32OperatingSystem> = conn.query()?;
+    match results.pop() {
+        Some(result) => Ok(result.system_drive),
+        None => Err(UnavailableReason::DetectionFailed),
+    }
+}
+
+/// This requires Administrator access, and only detects BitLocker for drive C:.
+///
+/// Equivalent to PowerShell command:
+/// `Get-WmiObject -Namespace  "root\CIMV2\Security\MicrosoftVolumeEncryption" -query "SELECT * FROM Win32_EncryptableVolume"`
+pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
+    let system_drive_letter = system_drive_letter()?;
+
+    let conn =
+        WMIConnection::with_namespace_path("root\\CIMV2\\Security\\MicrosoftVolumeEncryption")?;
+    conn.set_proxy_blanket(AuthLevel::PktPrivacy)?;
+
+    let volumes: Vec<Win32EncryptableVolume> = conn.query()?;
+    for volume in volumes {
+        if let Some(drive_letter) = volume.drive_letter {
+            if drive_letter == system_drive_letter {
+                return match volume.protection_status {
+                    0 => Ok(false),
+                    1 => Ok(true),
+                    _ => Err(UnavailableReason::DetectionFailed),
+                };
+            }
+        }
+    }
+
+    Err(UnavailableReason::DetectionFailed)
+}
+
+/// Determine AntiVirus status.
+///
+/// Check manually in PowerShell:
+/// `Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct`
+///
+/// Equivalent to PowerShell command:
+/// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
+pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
+    let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
+    let products: Vec<AntiVirusProduct> = conn.query()?;
+    for product in products {
+        let enabled = (product.product_state & 0x0001_0000) != 0;
+        let realtime = (product.product_state & 0x0002_0000) != 0;
+        // let up_to_date = (product.product_state & 0x0004_0000) != 0;
+        if enabled || realtime {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+/// Check if this machine is part of an Active Directory domain.
+///
+/// Check manually in PowerShell:
+/// `Get-CimInstance -ClassName Win32_ComputerSystem`
+///
+/// Equivalent to PowerShell command:
+/// `Get-WmiObject -query "SELECT * FROM Win32_ComputerSystem"`
+pub(super) fn part_of_domain() -> Result<bool, UnavailableReason> {
+    let conn = WMIConnection::new()?;
+    let system = conn.get::<Win32ComputerSystem>()?;
+    Ok(system.part_of_domain)
+}
+
+/// Find the latest security patch.
+///
+/// Check manually in PowerShell:
+/// `Get-CimInstance -ClassName Win32_QuickFixEngineering`
+///
+/// Equivalent to PowerShell command:
+/// `Get-WmiObject -query "SELECT * FROM Win32_QuickFixEngineering"`
+pub(super) fn security_update_status() -> Result<bool, UnavailableReason> {
+    let conn = WMIConnection::new()?;
+    let fixes: Vec<Win32QuickFixEngineering> = conn.query()?;
+
+    // Days from today
+    let today = OffsetDateTime::now_utc().date();
+    let mut max_days = i64::MAX;
+    for fix in fixes {
+        if let Some(installed_on) = fix.installed_on {
+            let days = (today - installed_on).whole_days();
+            if days < max_days {
+                max_days = days;
+            }
+        }
+    }
+
+    Ok(max_days <= MAX_QUICKFIX_DAYS)
+}

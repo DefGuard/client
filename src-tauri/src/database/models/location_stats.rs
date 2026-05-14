@@ -59,7 +59,8 @@ where
 }
 
 impl LocationStats {
-    #[cfg(not(target_os = "macos"))]
+    // Although not used on macOS, allow dead code for `sqlx prepare`.
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     pub(crate) async fn get_name<'e, E>(&self, executor: E) -> Result<String, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
