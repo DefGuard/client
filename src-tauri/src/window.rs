@@ -5,12 +5,12 @@ use tauri::{
 
 use crate::appstate::AppState;
 
-const NEW_UI_WINDOW_ID: &str = "new-ui";
-const OLD_UI_WINDOW_ID: &str = "old-ui";
-const NEW_UI_WIDTH: f64 = 360.0;
-const NEW_UI_HEIGHT: f64 = 675.0;
-const OLD_UI_WIDTH: f64 = 720.0;
-const OLD_UI_HEIGHT: f64 = 920.0;
+pub const NEW_UI_WINDOW_ID: &str = "new-ui";
+pub const OLD_UI_WINDOW_ID: &str = "old-ui";
+pub const NEW_UI_WIDTH: f64 = 360.0;
+pub const NEW_UI_HEIGHT: f64 = 675.0;
+pub const OLD_UI_WIDTH: f64 = 720.0;
+pub const OLD_UI_HEIGHT: f64 = 920.0;
 
 fn new_ui_url() -> WebviewUrl {
     if cfg!(debug_assertions) {

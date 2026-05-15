@@ -15,16 +15,13 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window::show_new_ui_window_near_tray,
+    window::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
     ConnectionType,
 };
 
 const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
-
-const NEW_UI_WINDOW_ID: &str = "new-ui";
-const OLD_UI_WINDOW_ID: &str = "old-ui";
 
 const TRAY_ICON_ID: &str = "tray";
 
