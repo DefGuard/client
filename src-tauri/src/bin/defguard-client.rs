@@ -356,6 +356,7 @@ fn main() {
             WebviewWindowBuilder::new(app, "new-ui", new_url)
                 .title("New UI")
                 .inner_size(360.0, 675.0)
+                .visible(false)
                 .build()?;
 
             // Open old UI window.

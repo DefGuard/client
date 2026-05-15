@@ -6,6 +6,8 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime,
 };
 
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
+
 use crate::{
     active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     appstate::AppState,
@@ -13,6 +15,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
+    window::show_new_ui_window_near_tray,
     ConnectionType,
 };
 
@@ -20,7 +23,8 @@ const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
-const MAIN_WINDOW_ID: &str = "main";
+const NEW_UI_WINDOW_ID: &str = "new-ui";
+const OLD_UI_WINDOW_ID: &str = "old-ui";
 
 const TRAY_ICON_ID: &str = "tray";
 
@@ -30,6 +34,22 @@ const TRAY_EVENT_HIDE: &str = "hide";
 const TRAY_EVENT_UPDATES: &str = "updates";
 const TRAY_EVENT_COMMUNITY: &str = "community";
 const TRAY_EVENT_FOLLOW: &str = "follow";
+
+fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
+    let position = match event {
+        TrayIconEvent::Click {
+            button_state: MouseButtonState::Down,
+            position,
+            ..
+        }
+        | TrayIconEvent::DoubleClick { position, .. } => Some(*position),
+        _ => None,
+    };
+
+    if let Some(position) = position {
+        *app.state::<AppState>().tray_click_position.lock().unwrap() = Some(position);
+    }
+}
 
 /// Generate contents of system tray menu.
 async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error> {
@@ -129,6 +149,16 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
+        .on_tray_icon_event(|icon, event| {
+            store_tray_click_position(icon.app_handle(), &event);
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_new_ui_window_near_tray(icon.app_handle());
+            }
+        })
         .on_menu_event(handle_tray_menu_event)
         .build(app)?;
     // On other systems (especially Windows), system tray menu is on right-click,
@@ -138,8 +168,13 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|icon, event| {
-            if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                show_main_window(icon.app_handle());
+            store_tray_click_position(icon.app_handle(), &event);
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_new_ui_window_near_tray(icon.app_handle());
             }
         })
         .on_menu_event(handle_tray_menu_event)
@@ -169,16 +204,21 @@ fn hide_main_window(app: &AppHandle) {
         warn!("Failed to hide application: {err}");
     }
     #[cfg(not(target_os = "macos"))]
-    if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
-        if let Err(err) = main_window.hide() {
-            warn!("Failed to hide main window: {err}");
+    for window_id in [NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID] {
+        if let Some(window) = app.get_webview_window(window_id) {
+            if let Err(err) = window.hide() {
+                warn!("Failed to hide window {window_id}: {err}");
+            }
         }
     }
 }
 
 pub fn show_main_window(app: &AppHandle) {
-    if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
-        if let Err(err) = main_window.unminimize() {
+    if let Some(window) = app
+        .get_webview_window(NEW_UI_WINDOW_ID)
+        .or_else(|| app.get_webview_window(OLD_UI_WINDOW_ID))
+    {
+        if let Err(err) = window.unminimize() {
             warn!("Failed to unminimize main window: {err}");
         }
         #[cfg(target_os = "macos")]
@@ -187,11 +227,11 @@ pub fn show_main_window(app: &AppHandle) {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            if let Err(err) = main_window.show() {
+            if let Err(err) = window.show() {
                 warn!("Failed to show main window: {err}");
             }
         }
-        let _ = main_window.set_focus();
+        let _ = window.set_focus();
     }
 }
 
@@ -203,7 +243,7 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
             info!("Received QUIT request. Initiating shutdown...");
             handle.exit(0);
         }
-        TRAY_EVENT_SHOW => show_main_window(app),
+        TRAY_EVENT_SHOW => show_new_ui_window_near_tray(app),
         TRAY_EVENT_HIDE => hide_main_window(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
