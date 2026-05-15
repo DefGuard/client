@@ -40,6 +40,8 @@ export const LocationCardConnectButton = ({ location }: Props) => {
 
   const handleClick = async () => {
     setIsLoading(true);
+    console.log('location:', location);
+    console.log('location.posture_check_required:', location?.posture_check_required);
     try {
       if (location) {
         if (location?.active) {
@@ -50,6 +52,8 @@ export const LocationCardConnectButton = ({ location }: Props) => {
         } else {
           if (mfaEnabled) {
             openMFAModal(location);
+          } else if (location.posture_check_required) {
+            console.log('location.posture_check_required');
           } else {
             await connect({
               locationId: location?.id,

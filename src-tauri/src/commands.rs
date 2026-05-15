@@ -418,6 +418,7 @@ pub struct LocationInfo {
     pub pubkey: String,
     pub network_id: Id,
     pub location_mfa_mode: LocationMfaMode,
+    pub posture_check_required: bool,
 }
 
 impl LocationInfo {
@@ -470,6 +471,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             pubkey: location.pubkey,
             network_id: location.network_id,
             location_mfa_mode: location.location_mfa_mode,
+            posture_check_required: location.posture_check_required,
         };
         location_info.push(info);
     }
