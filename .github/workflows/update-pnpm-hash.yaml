@@ -18,7 +18,7 @@ jobs:
       - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Check out the exact PR head commit so the sha we pass to the API
           # matches what we read from disk - avoids a race if the branch is
@@ -37,8 +37,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "=== starting hash computation ==="
-          echo "nix: $(which nix 2>/dev/null || echo 'NOT IN PATH')"
           echo "nix version: $(nix --version 2>/dev/null || echo 'unavailable')"
 
           # A valid-format but always-wrong sha256 hash.
@@ -114,7 +112,3 @@ jobs:
                 expectedHeadOid: context.payload.pull_request.head.sha,
               },
             });
-
-            console.log(
-              `pnpm deps hash updated: ${process.env.OLD_HASH} -> ${process.env.NEW_HASH}`
-            );
