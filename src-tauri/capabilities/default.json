@@ -8,6 +8,8 @@
   },
   "windows": ["new-ui", "old-ui"],
   "permissions": [
+    "core:webview:allow-create-webview",
+    "core:webview:allow-create-webview-window",
     "core:default",
     "core:window:allow-create",
     "core:window:allow-center",
@@ -52,6 +54,7 @@
     "dialog:default",
     "clipboard-manager:allow-write-text",
     "process:allow-exit",
+    "allow-app-commands",
     {
       "identifier": "http:default",
       "allow": [
