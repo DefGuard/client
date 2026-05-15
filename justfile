@@ -10,4 +10,4 @@ dev:
 build:
     cd new-ui; pnpm build
     pnpm build
-    cargo tauri build
+    cargo tauri build --config .\src-tauri\tauri.local.conf.json

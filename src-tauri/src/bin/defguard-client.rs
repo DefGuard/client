@@ -351,7 +351,7 @@ fn main() {
             let new_url = if cfg!(debug_assertions) {
                 WebviewUrl::External("http://localhost:5072".parse().unwrap())
             } else {
-                WebviewUrl::App("new-ui/index.html/".into())
+                WebviewUrl::App("new-ui/".into())
             };
             WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_url)
                 .title("New UI")

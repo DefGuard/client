@@ -5,6 +5,7 @@ import { queryClient } from './query';
 
 export const router = createRouter({
   routeTree,
+  basepath: import.meta.env.BASE_URL,
   defaultPreloadStaleTime: 0,
   defaultNotFoundComponent: NotFoundRoute,
   context: {

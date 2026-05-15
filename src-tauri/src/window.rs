@@ -16,7 +16,7 @@ fn new_ui_url() -> WebviewUrl {
     if cfg!(debug_assertions) {
         WebviewUrl::External("http://localhost:5072".parse().unwrap())
     } else {
-        WebviewUrl::App("new-ui/index.html".into())
+        WebviewUrl::App("new-ui/".into())
     }
 }
 
