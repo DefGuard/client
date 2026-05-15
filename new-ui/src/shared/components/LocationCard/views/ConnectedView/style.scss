@@ -10,16 +10,8 @@
       box-sizing: border-box;
       padding: var(--spacing-sm) var(--spacing-md);
 
-      > .icon-box {
+      > .box-icon {
         margin-bottom: 13px;
-        background: var(--bg-white-10);
-        border-radius: 8px;
-        display: flex;
-        flex-flow: row nowrap;
-        align-items: center;
-        justify-content: center;
-        height: 24px;
-        width: 24px;
       }
 
       > .label {

@@ -100,9 +100,17 @@ export const TauriCommand = {
   OpenLink: 'open_link',
   StartGlobalLogWatcher: 'start_global_logwatcher',
   StopGlobalLogWatcher: 'stop_global_logwatcher',
+  AllActiveConnections: 'all_active_connections',
+  DisconnectLocations: 'disconnect_locations',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];
+
+export type ActiveConnectionSummary = {
+  id: number;
+  name: string;
+  connection_type: ConnectionType;
+};
 
 export type AppConfig = {
   theme: AppThemeValue;

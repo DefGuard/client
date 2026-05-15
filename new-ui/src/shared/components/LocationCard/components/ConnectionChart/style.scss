@@ -1,0 +1,21 @@
+.connection-chart {
+  > .chart-container {
+    padding-bottom: var(--spacing-lg);
+  }
+
+  > .stats-summary {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-3xl);
+
+    > .summary {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-sm);
+    }
+  }
+}

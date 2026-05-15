@@ -6,6 +6,7 @@ import type { ConnectionArgs, LocationDetailsArgs, StatsArgs } from './types';
 export const getInstancesQueryOptions = queryOptions({
   queryKey: ['instances'] as const,
   queryFn: () => api.getInstances(),
+  refetchInterval: 30_000,
 });
 
 export const getLocationsQueryOptions = (instanceId: number) =>

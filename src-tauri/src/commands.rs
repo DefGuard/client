@@ -14,7 +14,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
-    active_connections::{find_connection, get_connection_id_by_type},
+    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
@@ -183,6 +183,78 @@ pub async fn disconnect(
         );
         Err(Error::NotFound)
     }
+}
+
+#[tauri::command(async)]
+pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> Result<(), Error> {
+    debug!(
+        "Received a command to disconnect {} location(s): {location_ids:?}",
+        location_ids.len()
+    );
+    let state = handle.state::<AppState>();
+    let mut any_disconnected = false;
+
+    for location_id in location_ids {
+        match Location::find_by_id(&*DB_POOL, location_id).await? {
+            Some(location) if location.is_service_location() => {
+                debug!(
+                    "Skipping service location {location}(ID: {location_id}) in \
+                    disconnect_locations"
+                );
+                continue;
+            }
+            None => {
+                debug!("Location with ID {location_id} not found in the database, skipping.");
+                continue;
+            }
+            _ => {}
+        }
+
+        let name = get_tunnel_or_location_name(location_id, ConnectionType::Location).await;
+        debug!("Disconnecting from location {name}(ID: {location_id})");
+
+        if let Some(connection) = state
+            .remove_connection(location_id, ConnectionType::Location)
+            .await
+        {
+            disconnect_interface(&connection).await?;
+            stop_log_watcher_task(&handle, &connection.interface_name)?;
+            if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
+                match err {
+                    Error::CoreNotEnterprise => {
+                        debug!(
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the core is not enterprise."
+                        );
+                    }
+                    Error::NoToken => {
+                        debug!(
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the instance has no polling token."
+                        );
+                    }
+                    _ => {
+                        warn!(
+                            "Error while trying to fetch instance config after disconnecting \
+                            from {name}(ID: {location_id}): {err}"
+                        );
+                    }
+                }
+            }
+            info!("Disconnected from location {name}(ID: {location_id})");
+            any_disconnected = true;
+        } else {
+            debug!("No active connection found for location {name}(ID: {location_id}), skipping.");
+        }
+    }
+
+    if any_disconnected {
+        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        reload_tray_menu(&handle).await;
+        configure_tray_icon(&handle).await?;
+    }
+
+    Ok(())
 }
 
 /// Triggers poll on location's instance config. Config will be updated if there are no more active
@@ -1448,6 +1520,37 @@ pub fn get_provisioning_config(
 #[must_use]
 pub fn get_platform_header() -> String {
     construct_platform_header()
+}
+
+#[derive(Debug, Serialize)]
+pub struct ActiveConnectionSummary {
+    pub id: Id,
+    pub name: String,
+    pub connection_type: ConnectionType,
+}
+
+#[tauri::command(async)]
+pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Error> {
+    debug!("Getting information about all active connections.");
+    let connections = ACTIVE_CONNECTIONS.lock().await;
+    let mut result = Vec::with_capacity(connections.len());
+    for conn in connections.iter() {
+        if conn.connection_type == ConnectionType::Location {
+            match Location::find_by_id(&*DB_POOL, conn.location_id).await? {
+                Some(location) if location.is_service_location() => continue,
+                None => continue,
+                _ => {}
+            }
+        }
+        let name = get_tunnel_or_location_name(conn.location_id, conn.connection_type).await;
+        result.push(ActiveConnectionSummary {
+            id: conn.location_id,
+            name,
+            connection_type: conn.connection_type,
+        });
+    }
+    debug!("Returning {} active connections.", result.len());
+    Ok(result)
 }
 
 #[cfg(test)]

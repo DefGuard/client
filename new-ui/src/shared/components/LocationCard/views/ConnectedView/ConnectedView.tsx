@@ -3,12 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useEffect, useMemo } from 'react';
 import { api } from '../../../../rust-api/api';
+import { LocationMfaMode } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { mfaToText } from '../../../../utils/mfa';
+import { BoxIcon } from '../../../BoxIcon/BoxIcon';
 import { Divider } from '../../../Divider/Divider';
 import { Icon, IconKind } from '../../../Icon';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { ConnectButton } from '../../components/ConnectButton/ConnectButton';
+import { ConnectionChart } from '../../components/ConnectionChart/ConnectionChart';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
@@ -34,7 +37,7 @@ export const ConnectedView = () => {
   });
 
   const lastConnectedText = useMemo(() => {
-    if (!lastConnection) return '';
+    if (!lastConnection) return 'Never';
     return dayjs.utc(lastConnection.end).local().format('DD MMM YYYY');
   }, [lastConnection]);
 
@@ -50,21 +53,23 @@ export const ConnectedView = () => {
       <SizedBox height={ThemeSpacing.Md} />
       <div className="tiles">
         <div className="tile">
-          <div className="icon-box">
-            <Icon icon={IconKind.Globe} size={16} />
-          </div>
+          <BoxIcon>
+            <Icon icon={IconKind.Globe} />
+          </BoxIcon>
           <p className="label">Allowed traffic</p>
           <p className="label-value">
             {location.route_all_traffic ? 'All traffic' : 'Predefined traffic'}
           </p>
         </div>
-        <div className="tile">
-          <div className="icon-box">
-            <Icon icon={IconKind.LockClosed} size={16} />
+        {location.location_mfa_mode !== LocationMfaMode.Disabled && (
+          <div className="tile">
+            <BoxIcon>
+              <Icon icon={IconKind.LockClosed} />
+            </BoxIcon>
+            <p className="label">Active MFA</p>
+            <p className="label-value">{mfaToText(location.mfa_method ?? 'totp')}</p>
           </div>
-          <p className="label">Active MFA</p>
-          <p className="label-value">{mfaToText(location.mfa_method ?? 'totp')}</p>
-        </div>
+        )}
       </div>
       <Divider spacing={ThemeSpacing.Xl} />
       <div className="connection-info">
@@ -77,6 +82,11 @@ export const ConnectedView = () => {
           <div className="label-value">{location.address}</div>
         </div>
       </div>
+      <SizedBox height={ThemeSpacing.Xl} />
+      <ConnectionChart
+        locationId={location.id}
+        connectionType={location.connection_type}
+      />
       <SizedBox height={ThemeSpacing.Xl2} />
       <ConnectButton />
     </div>

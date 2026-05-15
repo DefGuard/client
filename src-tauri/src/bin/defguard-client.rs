@@ -187,6 +187,8 @@ fn main() {
             open_old_ui_window,
             swap_to_new_ui,
             swap_to_old_ui,
+            all_active_connections,
+            disconnect_locations,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

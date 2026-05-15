@@ -1,13 +1,14 @@
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
-import type { LocationInfo } from '../../../rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
+  location: LocationInfo;
+  instance: InstanceInfo;
   currentView: LocationCardViewsValue;
   previousView: LocationCardViewsValue | null;
   setView: (view: LocationCardViewsValue) => void;
-  location: LocationInfo;
   startMfa: () => void;
 }
 
@@ -22,12 +23,14 @@ export const useLocationCardContext = (): LocationCardContextValue => {
 };
 
 interface LocationCardProviderProps {
+  instance: InstanceInfo;
   location: LocationInfo;
   children: ReactNode;
 }
 
 export const LocationCardProvider = ({
   location,
+  instance,
   children,
 }: LocationCardProviderProps) => {
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
@@ -66,7 +69,8 @@ export const LocationCardProvider = ({
         currentView,
         previousView,
         setView,
-        location: location,
+        location,
+        instance,
         startMfa,
       }}
     >

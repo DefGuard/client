@@ -1,7 +1,7 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import type { LocationInfo } from '../../rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
 import { Direction } from '../../types';
 import { Fold } from '../Fold/Fold';
 import { IconKind } from '../Icon';
@@ -21,6 +21,7 @@ interface Props {
   isOpen: boolean;
   onOpen: () => void;
   disableOpen?: boolean;
+  instance: InstanceInfo;
 }
 
 const views: Record<LocationCardViewsValue, ReactNode> = {
@@ -85,10 +86,11 @@ export const LocationCard = ({
   location,
   isOpen,
   onOpen,
+  instance,
   disableOpen = false,
 }: Props) => {
   return (
-    <LocationCardProvider location={location}>
+    <LocationCardProvider location={location} instance={instance}>
       <LocationCardInner isOpen={isOpen} onOpen={onOpen} disableOpen={disableOpen} />
     </LocationCardProvider>
   );

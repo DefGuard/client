@@ -3,6 +3,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 
 import type {
+  ActiveConnectionSummary,
   AppConfig,
   AppConfigPatch,
   Connection,
@@ -110,6 +111,12 @@ const startGlobalLogWatcher = (): Promise<void> =>
 const stopGlobalLogWatcher = (): Promise<void> =>
   invoke(TauriCommand.StopGlobalLogWatcher);
 
+const getAllActiveConnections = (): Promise<ActiveConnectionSummary[]> =>
+  invoke(TauriCommand.AllActiveConnections);
+
+const disconnectLocations = (locationIds: number[]): Promise<void> =>
+  invoke(TauriCommand.DisconnectLocations, { locationIds });
+
 const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
   const platform = await getPlatformHeader();
   const version = await getVersion().catch(() => 'unknown');
@@ -155,4 +162,6 @@ export const api = {
   openLink,
   startGlobalLogWatcher,
   stopGlobalLogWatcher,
+  getAllActiveConnections,
+  disconnectLocations,
 };

@@ -24,7 +24,6 @@ export const LocationCardMfaTotpView = () => {
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = useCallback(() => {
-    console.log(totpCode);
     if (!isPresent(totpCode)) {
       setError('Enter code');
       return;
