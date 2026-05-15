@@ -5,6 +5,7 @@ import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { CodeInput } from '../../../CodeInput/CodeInput';
 import { Controls } from '../../../Controls/Controls';
+import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
@@ -23,6 +24,7 @@ export const LocationCardMfaTotpView = () => {
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = useCallback(() => {
+    console.log(totpCode);
     if (!isPresent(totpCode)) {
       setError('Enter code');
       return;
@@ -51,6 +53,7 @@ export const LocationCardMfaTotpView = () => {
         if (e.key === 'Enter') handleVerify();
       }}
     >
+      <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title="Two-factor authentication">
         <p>Paste the code from your Authenticator Application.</p>
       </LocationViewHeader>

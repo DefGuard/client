@@ -32,7 +32,7 @@ export const LocationCardProvider = ({
 }: LocationCardProviderProps) => {
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
-    LocationCardViews.Default,
+    location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
 
   const setView = useCallback(

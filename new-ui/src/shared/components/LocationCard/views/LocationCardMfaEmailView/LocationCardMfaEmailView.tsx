@@ -5,6 +5,7 @@ import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { CodeInput } from '../../../CodeInput/CodeInput';
 import { Controls } from '../../../Controls/Controls';
+import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
@@ -51,6 +52,7 @@ export const LocationCardMfaEmailView = () => {
         if (e.key === 'Enter') handleVerify();
       }}
     >
+      <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title="Email verification">
         <p>Enter the 6-digit code sent to your email address.</p>
       </LocationViewHeader>

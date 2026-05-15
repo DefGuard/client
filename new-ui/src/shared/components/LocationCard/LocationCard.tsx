@@ -2,8 +2,7 @@ import './style.scss';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import type { LocationInfo } from '../../rust-api/types';
-import { Direction, ThemeSpacing } from '../../types';
-import { Divider } from '../Divider/Divider';
+import { Direction } from '../../types';
 import { Fold } from '../Fold/Fold';
 import { IconKind } from '../Icon';
 import { IconButton } from '../IconButton/IconButton';
@@ -11,6 +10,7 @@ import { IconButtonVariant } from '../IconButton/types';
 import { LocationCardIcon } from './components/LocationCardIcon';
 import { LocationCardProvider, useLocationCardContext } from './context/context';
 import { LocationCardViews, type LocationCardViewsValue } from './context/types';
+import { ConnectedView } from './views/ConnectedView/ConnectedView';
 import { DefaultView } from './views/DefaultView/DefaultView';
 import { LocationCardMfaEmailView } from './views/LocationCardMfaEmailView/LocationCardMfaEmailView';
 import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
@@ -31,7 +31,7 @@ const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.MfaMobile]: null,
   [LocationCardViews.MfaSettings]: <LocationCardMfaSettings />,
   [LocationCardViews.Connecting]: null,
-  [LocationCardViews.Connected]: null,
+  [LocationCardViews.Connected]: <ConnectedView />,
   [LocationCardViews.PostureCheckFail]: null,
 };
 
@@ -76,10 +76,7 @@ const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
           )}
         </div>
       </div>
-      <Fold open={isOpen}>
-        <Divider spacing={ThemeSpacing.Md} />
-        {views[currentView]}
-      </Fold>
+      <Fold open={isOpen}>{views[currentView]}</Fold>
     </div>
   );
 };

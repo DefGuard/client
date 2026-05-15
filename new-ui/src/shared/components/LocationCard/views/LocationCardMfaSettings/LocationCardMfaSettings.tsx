@@ -12,6 +12,7 @@ import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
 import { Controls } from '../../../Controls/Controls';
+import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
@@ -56,6 +57,7 @@ export const LocationCardMfaSettings = () => {
 
   return (
     <div className="location-card-mfa-settings">
+      <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title="Change MFA Method">
         <p>
           If you're having issues with your current verification method, you can choose

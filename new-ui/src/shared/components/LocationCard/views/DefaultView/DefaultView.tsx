@@ -27,6 +27,7 @@ export const DefaultView = () => {
 
   return (
     <div className="location-view-default">
+      <Divider spacing={ThemeSpacing.Md} />
       <Toggle
         disabled={location.active}
         active={location.route_all_traffic}
