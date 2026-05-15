@@ -1,3 +1,93 @@
 .connection-watcher {
   display: block;
+  box-sizing: border-box;
+  border-radius: 8px;
+  user-select: none;
+  min-height: 20px;
+
+  &:not(.connected) {
+    padding: 0 var(--spacing-sm);
+    display: inline-flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    flex-grow: 0;
+    min-width: 0;
+
+    .no-connection-label {
+      font: var(--t-body-xxs-500);
+      color: var(--fg-white-60);
+    }
+  }
+
+  &.connected {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    cursor: pointer;
+    padding: 0 var(--spacing-xs);
+    background-color: var(--bg-success);
+
+    > .connected-row {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-xs);
+
+      p {
+        font: var(--t-body-xxs-500);
+        color: var(--fg-action);
+      }
+    }
+  }
+}
+
+.connection-watcher-floating {
+  display: flex;
+  flex-flow: column;
+
+  .label {
+    box-sizing: border-box;
+    padding-left: var(--spacing-sm);
+    font: var(--t-menu-title);
+    color: var(--fg-white-60);
+    min-height: 24px;
+  }
+
+  .connection {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    padding: 0 var(--spacing-sm);
+    column-gap: var(--spacing-md);
+    min-height: 36px;
+
+    svg circle {
+      fill: var(--bg-success);
+    }
+  }
+
+  .disconnect {
+    box-sizing: border-box;
+    background: transparent;
+    border: 0;
+    padding: 0 var(--spacing-sm);
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-sm);
+    min-height: 36px;
+    cursor: pointer;
+
+    p {
+      font: var(--t-menu-text);
+      color: var(--fg-white-100);
+    }
+  }
 }

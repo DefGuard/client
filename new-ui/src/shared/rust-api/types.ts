@@ -106,6 +106,44 @@ export const TauriCommand = {
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];
 
+/** Typed enum for every Tauri event emitted by the backend. */
+export const TauriEvent = {
+  ConnectionChanged: 'connection-changed',
+  InstanceUpdate: 'instance-update',
+  LocationUpdate: 'location-update',
+  AppVersionFetch: 'app-version-fetch',
+  ConfigChanged: 'config-changed',
+  DeadConnectionDropped: 'dead-connection-dropped',
+  DeadConnectionReconnected: 'dead-connection-reconnected',
+  ApplicationConfigChanged: 'application-config-changed',
+  AddInstance: 'add-instance',
+  MfaTrigger: 'mfa-trigger',
+  VersionMismatch: 'version-mismatch',
+  UuidMismatch: 'uuid-mismatch',
+} as const;
+
+export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];
+
+/** Payload for the `dead-connection-dropped` event. Mirrors `DeadConnDroppedOut` in events.rs. */
+export type DeadConnectionDroppedPayload = {
+  name: string;
+  con_type: ConnectionType;
+  peer_alive_period: number;
+};
+
+/** Payload for the `dead-connection-reconnected` event. Mirrors `DeadConnReconnected` in events.rs. */
+export type DeadConnectionReconnectedPayload = {
+  name: string;
+  con_type: ConnectionType;
+  peer_alive_period: number;
+};
+
+/** Payload for the `add-instance` event. Mirrors `AddInstancePayload` in events.rs. */
+export type AddInstanceEventPayload = {
+  token: string;
+  url: string;
+};
+
 export type ActiveConnectionSummary = {
   id: number;
   name: string;

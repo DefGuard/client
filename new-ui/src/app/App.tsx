@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { MainBackground } from '../shared/components/MainBackground/MainBackground';
+import { TauriEventProvider } from '../shared/providers/TauriEventProvider';
 import { queryClient } from './query';
 import { router } from './router';
 
@@ -10,7 +11,9 @@ function App() {
       <MainBackground />
       <div id="app-content">
         <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
+          <TauriEventProvider>
+            <RouterProvider router={router} />
+          </TauriEventProvider>
         </QueryClientProvider>
       </div>
     </div>

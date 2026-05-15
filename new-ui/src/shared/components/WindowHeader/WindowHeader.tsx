@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import './style.scss';
+import { ConnectionWatcher } from './components/ConnectionWatcher/ConnectionsWatcher';
 
 interface Props {
   variant: 'compact' | 'desktop';
@@ -11,6 +12,7 @@ export const WindowHeader = ({ variant }: Props) => {
       <LogoIcon />
       <div className="info">
         <p>Defguard VPN Client</p>
+        <ConnectionWatcher />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 export const IconKind = {
+  DisconnectAll: 'disconnect-all',
   MobileLock: 'mobile-lock',
   IpSuggest: 'ip-suggest',
   Filtration: 'filtration',

@@ -3,6 +3,12 @@ import { queryOptions } from '@tanstack/react-query';
 import { api } from './api';
 import type { ConnectionArgs, LocationDetailsArgs, StatsArgs } from './types';
 
+export const getAllActiveConnectionQueryOptions = queryOptions({
+  queryKey: ['alive-connections'] as const,
+  queryFn: api.getAllActiveConnections,
+  refetchInterval: 5_000,
+});
+
 export const getInstancesQueryOptions = queryOptions({
   queryKey: ['instances'] as const,
   queryFn: () => api.getInstances(),
