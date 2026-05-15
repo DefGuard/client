@@ -1,3 +1,5 @@
+import { getVersion } from '@tauri-apps/api/app';
+
 import { invoke } from '@tauri-apps/api/core';
 
 import type {
@@ -5,6 +7,7 @@ import type {
   AppConfigPatch,
   Connection,
   ConnectionArgs,
+  EdgeRequestHeaders,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
@@ -107,7 +110,17 @@ const startGlobalLogWatcher = (): Promise<void> =>
 const stopGlobalLogWatcher = (): Promise<void> =>
   invoke(TauriCommand.StopGlobalLogWatcher);
 
+const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
+  const platform = await getPlatformHeader();
+  const version = await getVersion().catch(() => 'unknown');
+  return {
+    'defguard-client-platform': platform,
+    'defguard-client-version': version,
+  };
+};
+
 export const api = {
+  getEdgeRequestHeaders,
   // Instances
   getInstances,
   deleteInstance,

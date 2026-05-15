@@ -12,6 +12,7 @@ import { LocationCardIcon } from './components/LocationCardIcon';
 import { LocationCardProvider, useLocationCardContext } from './context/context';
 import { LocationCardViews, type LocationCardViewsValue } from './context/types';
 import { DefaultView } from './views/DefaultView/DefaultView';
+import { LocationCardMfaEmailView } from './views/LocationCardMfaEmailView/LocationCardMfaEmailView';
 import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
 import { LocationCardMfaTotpView } from './views/LocationCardMfaTotpView/LocationCardMfaTotpView';
 
@@ -25,7 +26,7 @@ interface Props {
 const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.Default]: <DefaultView />,
   [LocationCardViews.MfaTotp]: <LocationCardMfaTotpView />,
-  [LocationCardViews.MfaEmail]: null,
+  [LocationCardViews.MfaEmail]: <LocationCardMfaEmailView />,
   [LocationCardViews.MfaOidc]: null,
   [LocationCardViews.MfaMobile]: null,
   [LocationCardViews.MfaSettings]: <LocationCardMfaSettings />,

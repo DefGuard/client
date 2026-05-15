@@ -14,30 +14,30 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 import { useMfaConnect } from '../../hooks/useMfaConnect';
 
-export const LocationCardMfaTotpView = () => {
+export const LocationCardMfaEmailView = () => {
   const { setView } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } =
-    useMfaConnect(0);
+    useMfaConnect(1);
 
-  const [totpCode, setTotpCode] = useState<string | null>(null);
+  const [emailCode, setEmailCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleVerify = useCallback(() => {
-    if (!isPresent(totpCode)) {
+    if (!isPresent(emailCode)) {
       setError('Enter code');
       return;
     }
-    if (totpCode.replaceAll(' ', '').length !== 6) {
+    if (emailCode.length !== 6) {
       setError('6 digits are required');
       return;
     }
-    verifyCode(totpCode);
-  }, [totpCode, verifyCode]);
+    verifyCode(emailCode);
+  }, [emailCode, verifyCode]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
   useEffect(() => {
     setError(null);
-  }, [totpCode, setError]);
+  }, [emailCode, setError]);
 
   // Reflect server-side verify errors into the local error state
   useEffect(() => {
@@ -46,19 +46,19 @@ export const LocationCardMfaTotpView = () => {
 
   return (
     <div
-      className="location-card-mfa-totp-view"
+      className="location-card-mfa-email-view"
       onKeyDown={(e) => {
         if (e.key === 'Enter') handleVerify();
       }}
     >
-      <LocationViewHeader title="Two-factor authentication">
-        <p>Paste the code from your Authenticator Application.</p>
+      <LocationViewHeader title="Email verification">
+        <p>Enter the 6-digit code sent to your email address.</p>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
       <CodeInput
         length={6}
-        value={totpCode}
-        onChange={setTotpCode}
+        value={emailCode}
+        onChange={setEmailCode}
         error={startError ?? error}
       />
       <Controls>
@@ -75,8 +75,7 @@ export const LocationCardMfaTotpView = () => {
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={handleVerify}
-            loading={isVerifying}
-            disabled={isStarting}
+            loading={isStarting || isVerifying}
           />
         </div>
       </Controls>

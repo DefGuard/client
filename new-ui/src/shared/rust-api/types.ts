@@ -1,3 +1,8 @@
+export type EdgeRequestHeaders = {
+  'defguard-client-version': string;
+  'defguard-client-platform': string;
+};
+
 export const AppTheme = {
   Light: 'light',
   Dark: 'dark',
