@@ -90,7 +90,7 @@ in
         ;
 
       fetcherVersion = 2;
-      hash = "sha256-vDLgpFaO+48s+tj1/2m2fgNJpCfnNkFJpQkC4Xah59E=";
+      hash = "sha256-XXsR+zc4HsHByzzd2oHyAOrrpH9t2juUcAIoimlukbc=";
     };
 
     buildPhase = ''
@@ -138,13 +138,19 @@ in
         lib.makeBinPath [
           # `defguard-service` needs `ip` to manage WireGuard
           pkgs.iproute2
-          # `defguard-service` needs `resolvconf` to manage DNS
-          pkgs.openresolv
           # `defguard-client` needs `update-desktop-database` and `lsb_release`
           pkgs.desktop-file-utils
           pkgs.lsb-release
         ]
       }
+        # `defguard-service` needs `resolvconf` to manage DNS. openresolv is
+        # added as a suffix so the system PATH is checked first - on systems
+        # with services.resolved enabled, NixOS puts systemd's resolvconf compat
+        # there, which correctly integrates with systemd-resolved. openresolv
+        # serves as a fallback for systems that don't use systemd-resolved.
+        # Same approach used to fix the identical wg-quick issue in nixpkgs:
+        # https://github.com/NixOS/nixpkgs/issues/139526
+        --suffix PATH : ${lib.makeBinPath [pkgs.openresolv]}
         --prefix LD_LIBRARY_PATH : ${
         lib.makeLibraryPath [
           pkgs.libayatana-appindicator
