@@ -1334,8 +1334,7 @@ fn select_reported_app_version(
 ) -> String {
     build_version_override
         .filter(|version| !version.trim().is_empty())
-        .map(str::to_owned)
-        .unwrap_or_else(|| package_version.to_owned())
+        .map_or_else(|| package_version.to_owned(), str::to_owned)
 }
 
 fn reported_app_version(handle: &AppHandle) -> String {
