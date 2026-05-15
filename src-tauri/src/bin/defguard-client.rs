@@ -353,9 +353,9 @@ fn main() {
             } else {
                 WebviewUrl::App("new-ui/index.html".into())
             };
-            WebviewWindowBuilder::new(app, "new-ui", new_url)
+            WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_url)
                 .title("New UI")
-                .inner_size(360.0, 675.0)
+                .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
                 .visible(false)
                 .build()?;
 
@@ -365,9 +365,9 @@ fn main() {
             } else {
                 WebviewUrl::App("old-ui/index.html".into())
             };
-            WebviewWindowBuilder::new(app, "old-ui", old_url)
+            WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_url)
                 .title("Old UI")
-                .inner_size(720.0, 920.0)
+                .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
                 .build()?;
 
             info!("App setup completed, log level: {log_level}");
