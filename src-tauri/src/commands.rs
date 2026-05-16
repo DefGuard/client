@@ -39,7 +39,9 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::defguard::client_types::DeviceConfigResponse,
+    proto::defguard::{
+        client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
+    },
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         construct_platform_header, disconnect_interface, get_location_interface_details,
@@ -1430,6 +1432,12 @@ pub async fn connect_with_posture(
 ) -> Result<(), Error> {
     debug!("Received a command to connect with posture check to location with ID {location_id}");
     connect_with_posture_check(location_id, &handle).await
+}
+
+#[tauri::command(async)]
+pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
+    debug!("Received a command to prepare posture report");
+    Ok(DevicePostureData::new())
 }
 
 #[cfg(test)]

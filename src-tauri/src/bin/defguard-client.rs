@@ -181,7 +181,8 @@ fn main() {
             command_get_app_config,
             command_set_app_config,
             get_provisioning_config,
-            get_platform_header
+            get_platform_header,
+            get_posture_data,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

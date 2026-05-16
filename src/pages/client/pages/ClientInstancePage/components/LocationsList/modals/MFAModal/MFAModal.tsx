@@ -31,7 +31,7 @@ import { MfaMobileApprove } from './components/MfaMobileApprove/MfaMobileApprove
 import { BrowserErrorIcon, BrowserPendingIcon, GoToBrowserIcon } from './Icons';
 import { useMFAModal } from './useMFAModal';
 
-const { connect } = clientApi;
+const { connect, getPostureData } = clientApi;
 
 const CODE_LENGTH = 6;
 const CLIENT_MFA_ENDPOINT = 'api/v1/client-mfa';
@@ -112,11 +112,17 @@ export const MFAModal = () => {
       setProxyUrl(selectedInstance.proxy_url);
       const mfaStartUrl = `${selectedInstance.proxy_url + CLIENT_MFA_ENDPOINT}/start`;
 
+      console.log("MFAMofal, location.posture_check_required:", location.posture_check_required);
+      const posture_data = location.posture_check_required
+        ? await getPostureData()
+        : undefined;
       const data = {
         method,
         pubkey: selectedInstance.pubkey,
         location_id: location.network_id,
+        posture_data,
       };
+      console.log("MFAModal, data:", data);
 
       try {
         const response = await fetch(mfaStartUrl, {
@@ -168,7 +174,7 @@ export const MFAModal = () => {
           if (errorData === 'selected MFA method not available') {
             toaster.error(localLL.errors.mfaNotConfigured());
           } else {
-            toaster.error(localLL.errors.mfaStartGeneric());
+            toaster.error(errorData);
           }
 
           return;
