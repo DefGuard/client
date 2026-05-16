@@ -46,6 +46,10 @@ pub enum Error {
     ConversionError(String),
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
+    #[error("HTTP request error: {0}")]
+    HttpError(String),
+    #[error("Posture check failed: {0}")]
+    PostureCheckFailed(String),
 }
 
 // we must manually implement serde::Serialize

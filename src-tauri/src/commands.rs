@@ -29,7 +29,10 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::{periodic::config::poll_instance, provisioning::ProvisioningConfig},
+    enterprise::{
+        periodic::config::poll_instance, posture::connect_with_posture_check,
+        provisioning::ProvisioningConfig,
+    },
     error::Error,
     events::EventKey,
     log_watcher::{
@@ -1413,6 +1416,20 @@ pub fn get_provisioning_config(
 #[must_use]
 pub fn get_platform_header() -> String {
     construct_platform_header()
+}
+
+/// Connect to a location that requires a posture check.
+///
+/// Collects device posture data, sends it to the proxy, and on success establishes
+/// the WireGuard tunnel using the returned preshared key.
+#[tauri::command(async)]
+pub async fn connect_with_posture(
+    location_id: Id,
+    _connection_type: ConnectionType,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!("Received a command to connect with posture check to location with ID {location_id}");
+    connect_with_posture_check(location_id, &handle).await
 }
 
 #[cfg(test)]
