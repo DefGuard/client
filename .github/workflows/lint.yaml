@@ -30,11 +30,11 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10
+          version: 11
           run_install: false
 
       - name: Get pnpm store directory
