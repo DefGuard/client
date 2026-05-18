@@ -48,8 +48,10 @@ jobs:
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
       - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install Node dependencies for New UI
         run: |
-          pnpm install --no-frozen-lockfile
           cd new-ui
           pnpm install --no-frozen-lockfile
 
