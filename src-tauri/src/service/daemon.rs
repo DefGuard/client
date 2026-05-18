@@ -516,8 +516,7 @@ impl DesktopDaemonService for DaemonService {
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         debug!("Get posture data request received");
-        todo!();
-        Ok(Response::new(()))
+        Ok(Response::new(DevicePostureData::new()))
     }
 }
 

@@ -12,7 +12,7 @@ use std::{env::consts::OS, error::Error, fmt};
 use sysinfo::System;
 
 use crate::{
-    proto::defguard::enterprise::posture::v2::{
+    service::proto::defguard::enterprise::posture::v2::{
         bool_check, string_check, BoolCheck, DevicePostureData, StringCheck, UnavailableReason,
     },
     VERSION,

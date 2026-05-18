@@ -39,9 +39,8 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::defguard::{
-        client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
-    },
+    proto::defguard::client_types::DeviceConfigResponse,
+    service::proto::defguard::enterprise::posture::v2::DevicePostureData,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         construct_platform_header, disconnect_interface, get_location_interface_details,
@@ -1435,9 +1434,25 @@ pub async fn connect_with_posture(
 }
 
 #[tauri::command(async)]
+#[cfg(not(windows))]
 pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     debug!("Received a command to prepare posture report");
     Ok(DevicePostureData::new())
+}
+
+#[tauri::command(async)]
+#[cfg(windows)]
+pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
+    debug!("Received a command to prepare posture report");
+    DAEMON_CLIENT
+        .clone()
+        .get_posture_data(tonic::Request::new(()))
+        .await
+        .map(|response| response.into_inner())
+        .map_err(|err| {
+            error!("Failed to get posture data from the daemon: {err}");
+            Error::InternalError(format!("Failed to get posture data from the daemon: {err}"))
+        })
 }
 
 #[cfg(test)]

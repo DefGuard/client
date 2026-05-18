@@ -10,7 +10,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    proto::defguard::enterprise::posture::v2::{
+    service::proto::defguard::enterprise::posture::v2::{
         DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
     },
     tray::{configure_tray_icon, reload_tray_menu},

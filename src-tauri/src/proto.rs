@@ -4,22 +4,12 @@ use crate::database::models::{
 };
 
 pub(crate) mod defguard {
-    pub(crate) mod enterprise {
-        pub(crate) mod posture {
-            pub(crate) mod v2 {
-                tonic::include_proto!("defguard.enterprise.posture.v2");
-            }
-        }
-    }
+    pub(crate) use crate::service::proto::defguard::client_types;
 
     pub(crate) mod proxy {
         pub(crate) mod v1 {
             tonic::include_proto!("defguard.proxy.v1");
         }
-    }
-
-    pub mod client_types {
-        tonic::include_proto!("defguard.client_types");
     }
 }
 

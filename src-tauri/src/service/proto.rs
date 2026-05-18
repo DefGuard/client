@@ -11,4 +11,8 @@ pub mod defguard {
             tonic::include_proto!("defguard.client.v1");
         }
     }
+
+    pub mod client_types {
+        tonic::include_proto!("defguard.client_types");
+    }
 }
