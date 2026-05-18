@@ -11,6 +11,9 @@ on:
     tags:
       - v*.*.*
 
+env:
+  SQLX_OFFLINE: "1"
+
 jobs:
   build-macos:
     runs-on:
