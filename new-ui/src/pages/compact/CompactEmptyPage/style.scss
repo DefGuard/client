@@ -1,0 +1,24 @@
+#compact-empty-page {
+  .empty-card {
+    border-radius: 12px;
+    box-sizing: border-box;
+    padding: var(--spacing-lg);
+    background-color: var(--bg-dark-blue-40);
+    width: 100%;
+    min-height: 277px;
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+
+    > .icon {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    > p {
+      font: var(--t-body-xs-400);
+      color: var(--bg-white-100);
+      padding-bottom: var(--spacing-xl);
+    }
+  }
+}

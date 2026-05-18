@@ -1,0 +1,46 @@
+.empty-state {
+  display: flex;
+  flex-flow: column;
+  flex: none;
+  align-items: center;
+  justify-content: flex-start;
+  height: auto;
+  user-select: none;
+
+  & > p,
+  & > span {
+    text-align: center;
+  }
+
+  .title {
+    color: var(--fg-muted);
+    font: var(--t-body-primary-500);
+  }
+
+  .subtitle {
+    color: var(--fg-muted);
+    font: var(--t-body-sm-400);
+  }
+
+  .secondary-action {
+    background-color: transparent;
+    text-align: center;
+    color: var(--fg-action);
+    border: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .empty-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    padding: 4px;
+    border: 1px dashed var(--border-faded);
+    border-radius: 100px;
+  }
+}

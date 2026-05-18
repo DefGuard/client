@@ -1,0 +1,119 @@
+/* stylelint-disable no-descending-specificity */
+.menu {
+  display: flex;
+  flex-flow: column;
+  box-sizing: border-box;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-disabled);
+  background-color: var(--bg-default);
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 7%);
+  overflow: hidden auto;
+  z-index: 5;
+
+  .menu-spacer {
+    user-select: none;
+    padding: var(--spacing-sm) 0;
+
+    & > .line {
+      display: block;
+      content: ' ';
+      background-color: var(--bg-white-20);
+      height: 1px;
+      width: 100%;
+    }
+  }
+
+  .menu-header {
+    display: flex;
+    flex-flow: row nowrap;
+    column-gap: var(--spacing-md);
+    justify-content: space-between;
+    flex: none;
+
+    p {
+      font: var(--t-menu-title);
+      color: var(--fg-muted);
+      padding-left: var(--spacing-sm);
+    }
+
+    .interaction-box {
+      button {
+        height: 26px;
+        width: 26px;
+      }
+
+      &:hover {
+        svg {
+          path {
+            fill: var(--fg-action);
+          }
+        }
+      }
+    }
+  }
+
+  .menu-item {
+    --bg-color: var(--bg-default);
+    --color: var(--fg-default);
+    --icon-fill: var(--fg-muted);
+
+    display: flex;
+    flex-flow: row nowrap;
+    flex: none;
+    align-items: center;
+    border-radius: var(--radius-md);
+    padding: 0 var(--spacing-sm);
+    column-gap: var(--spacing-md);
+    background-color: var(--bg-color);
+    cursor: pointer;
+    height: 36px;
+    color: var(--color);
+    position: relative;
+    min-width: 115px;
+
+    @include animate(background-color);
+
+    &.disabled {
+      cursor: not-allowed;
+    }
+
+    &.nested {
+      // account for positioned icon on the right side
+      padding: 0 calc(var(--spacing-sm) + var(--spacing-md) + 20px) 0 var(--spacing-sm);
+    }
+
+    &.variant-danger {
+      --color: var(--fg-critical);
+      --icon-fill: var(--fg-critical);
+    }
+
+    &:not(.disabled) {
+      &:hover {
+        --bg-color: var(--bg-muted);
+      }
+    }
+
+    p {
+      font: var(--t-menu-text);
+      color: inherit;
+    }
+
+    & > .icon svg path {
+      fill: var(--icon-fill);
+    }
+
+    & > .suffix {
+      position: absolute;
+      height: 20px;
+      width: 20px;
+      top: 50%;
+      right: var(--spacing-sm);
+      transform: translateY(-50%);
+
+      svg path {
+        fill: var(--fg-muted);
+      }
+    }
+  }
+}

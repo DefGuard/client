@@ -1,0 +1,260 @@
+$font-fallback:
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  Roboto,
+  Oxygen,
+  Ubuntu,
+  Cantarell,
+  'Open Sans',
+  'Helvetica Neue',
+  sans-serif;
+$geist:
+  geist,
+  #{$font-fallback};
+$source-code-pro:
+  'Source Code Pro',
+  #{$font-fallback};
+$jetbrains:
+  'JetBrains Mono',
+  #{$font-fallback};
+/* stylelint-disable value-keyword-case */
+:root {
+  // font settings
+  --font-family-title: #{$geist};
+  --font-family-body: #{$geist};
+  --font-family-component: #{$geist};
+  --font-family-code: #{$source-code-pro};
+  --font-family-jetbrains: #{$jetbrains};
+
+  --t-body-xxs-600: normal 600 11px/14px #{$geist};
+  --t-body-xxs-500: normal 500 11px/14px #{$geist};
+  --t-body-xxs-400: normal 400 11px/14px #{$geist};
+
+  --t-body-xs-600: normal 600 12px/16px #{$geist};
+  --t-body-xs-500: normal 500 12px/16px #{$geist};
+  --t-body-xs-400: normal 400 12px/16px #{$geist};
+
+  --t-body-sm-600: normal 600 14px/20px #{$geist};
+  --t-body-sm-500: normal 500 14px/20px #{$geist};
+  --t-body-sm-400: normal 400 14px/20px #{$geist};
+
+  --t-body-primary-400: normal 400 16px/24px #{$geist};
+  --t-body-primary-600: normal 600 16px/24px #{$geist};
+  --t-body-primary-500: normal 500 16px/24px #{$geist};
+
+  --t-h1: normal 600 32px/44px #{$geist};
+  --t-h2: normal 600 28px/40px #{$geist};
+  --t-h3: normal 600 24px/32px #{$geist};
+  --t-h4: normal 600 20px/28px #{$geist};
+  --t-h5: normal 600 18px/28px #{$geist};
+
+  --t-primary-400: normal 400 16px/24px #{$geist};
+  --t-primary-500: normal 500 16px/24px #{$geist};
+  --t-primary-600: normal 600 16px/24px #{$geist};
+
+  --t-small-400: normal 400 14px/20px #{$geist};
+  --t-small-500: normal 500 14px/20px #{$geist};
+  --t-small-600: normal 600 14px/20px #{$geist};
+
+  --t-tiny-400: normal 400 12px/16px #{$geist};
+  --t-tiny-500: normal 500 12px/16px #{$geist};
+  --t-tiny-600: normal 600 12px/16px #{$geist};
+
+  --t-smallest-400: normal 400 11px/16px #{$geist};
+  --t-smallest-500: normal 500 11px/16px #{$geist};
+  --t-smallest-600: normal 600 11px/16px #{$geist};
+
+  // border width
+  --border-1: 1px;
+  --border-2: 2px;
+
+  // border-radius
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-xxl: 24px;
+  --radius-xxxl: 32px;
+  --radius-full: 100px;
+
+  // scale
+  --size-xs: 16px;
+  --size-sm: 20px;
+  --size-md: 24px;
+  --size-xl: 32px;
+  --size-2xl: 36px;
+  --size-3xl: 40px;
+  --size-4xl: 44px;
+  --size-5xl: 60px;
+
+  // spacing
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+  --spacing-4xl: 40px;
+  --spacing-5xl: 48px;
+  --spacing-6xl: 64px;
+  --spacing-7xl: 80px;
+  --spacing-8xl: 96px;
+  --spacing-9xl: 120px;
+
+  // color basis
+  --c-white-100: rgb(255 255 255);
+  --c-white-90: rgb(255 255 255 / 90%);
+  --c-white-80: rgb(255 255 255 / 80%);
+  --c-white-70: rgb(255 255 255 / 70%);
+  --c-white-60: rgb(255 255 255 / 60%);
+  --c-white-50: rgb(255 255 255 / 50%);
+  --c-white-40: rgb(255 255 255 / 40%);
+  --c-white-30: rgb(255 255 255 / 30%);
+  --c-white-20: rgb(255 255 255 / 20%);
+  --c-white-10: rgb(255 255 255 / 10%);
+  --c-white-5: rgb(255 255 255 / 5%);
+  --c-dark-neutral-1400: rgb(20 21 23);
+  --c-dark-neutral-1300: rgb(25 26 28);
+  --c-dark-neutral-1200: rgb(36 38 41);
+  --c-dark-neutral-1100: rgb(46 49 54);
+  --c-dark-neutral-1000: rgb(50 54 60);
+  --c-dark-neutral-900: rgb(61 67 75);
+  --c-dark-neutral-800: rgb(74 80 89);
+  --c-dark-neutral-700: rgb(94 102 114);
+  --c-dark-neutral-600: rgb(126 135 148);
+  --c-dark-neutral-500: rgb(147 156 169);
+  --c-dark-neutral-400: rgb(162 172 186);
+  --c-dark-neutral-300: rgb(184 192 205);
+  --c-dark-neutral-200: rgb(223 227 233);
+  --c-dark-neutral-100: rgb(240 242 245);
+  --c-dark-neutral-50: rgb(247 248 250);
+  --c-saturated-additional-error: rgb(204 60 60);
+  --c-saturated-additional-warning: rgb(255 149 0);
+  --c-saturated-additional-success: rgb(116 255 184);
+  --c-saturated-additional-blue-neutral: rgb(80 115 225);
+  --c-saturated-red-800: rgb(35 24 26);
+  --c-saturated-red-700: rgb(124 37 37);
+  --c-saturated-red-600: rgb(143 42 42);
+  --c-saturated-red-500: rgb(204 60 60);
+  --c-saturated-red-400: rgb(213 93 93);
+  --c-saturated-red-300: rgb(225 142 142);
+  --c-saturated-red-200: rgb(234 175 175);
+  --c-saturated-red-100: rgb(250 236 236);
+  --c-saturated-red-500-transparent: rgb(204 60 60 / 20%);
+  --c-saturated-dark-blue-100: rgb(0 25 137);
+  --c-saturated-dark-blue-90: rgb(0 25 137 / 90%);
+  --c-saturated-dark-blue-80: rgb(0 25 137 / 80%);
+  --c-saturated-dark-blue-70: rgb(0 25 137 / 70%);
+  --c-saturated-dark-blue-60: rgb(0 25 137 / 60%);
+  --c-saturated-dark-blue-50: rgb(0 25 137 / 50%);
+  --c-saturated-dark-blue-40: rgb(0 25 137 / 40%);
+  --c-saturated-dark-blue-30: rgb(0 25 137 / 30%);
+  --c-saturated-dark-blue-20: rgb(0 25 137 / 20%);
+  --c-saturated-dark-blue-10: rgb(0 25 137 / 10%);
+  --c-saturated-dark-blue-5: rgb(0 25 137 / 5%);
+  --c-saturated-green-700: rgb(2 78 23);
+  --c-saturated-green-600: rgb(2 90 27);
+  --c-saturated-green-500: rgb(3 128 38);
+  --c-saturated-green-400: rgb(46 150 75);
+  --c-saturated-green-300: rgb(109 181 129);
+  --c-saturated-green-200: rgb(152 203 166);
+  --c-saturated-green-100: rgb(230 242 233);
+  --c-saturated-green-500-transparent: rgb(3 128 38 / 8%);
+  --c-saturated-orange-700: rgb(156 91 0);
+  --c-saturated-orange-600: rgb(179 104 0);
+  --c-saturated-orange-500: rgb(255 149 0);
+  --c-saturated-orange-400: rgb(255 167 43);
+  --c-saturated-orange-300: rgb(255 194 107);
+  --c-saturated-orange-200: rgb(255 212 150);
+  --c-saturated-orange-100: rgb(255 244 230);
+  --c-saturated-orange-500-transparent: rgb(255 149 0 / 8%);
+  --c-saturated-violet-700: rgb(53 36 82);
+  --c-saturated-violet-600: rgb(83 55 128);
+  --c-saturated-violet-500: rgb(102 55 178);
+  --c-saturated-violet-400: rgb(136 106 186);
+  --c-saturated-violet-300: rgb(172 151 207);
+  --c-saturated-violet-200: rgb(196 181 221);
+  --c-saturated-violet-100: rgb(241 237 247);
+  --c-saturated-violet-transparent: rgb(102 55 178 / 8%);
+  --c-saturated-blue-800: rgb(21 24 31);
+  --c-saturated-blue-700: rgb(38 57 115);
+  --c-saturated-blue-600: rgb(51 77 156);
+  --c-saturated-blue-500: rgb(57 97 219);
+  --c-saturated-blue-400: rgb(87 119 217);
+  --c-saturated-blue-300: rgb(140 161 222);
+  --c-saturated-blue-200: rgb(180 196 242);
+  --c-saturated-blue-100: rgb(237 241 252);
+  --c-saturated-blue-50: rgb(249 250 254);
+  --c-saturated-blue-500-transparent: rgb(50 92 219 / 8%);
+
+  // Components
+
+  // Menu
+  --t-menu-title: 600 12px/24px #{$geist};
+  --t-menu-text: 400 14px/24px #{$geist};
+  --menu-spacing-icon: var(--spacing-md);
+  --menu-padding-sides: var(--spacing-sm);
+  --menu-border-radius-group: var(--radius-lg);
+  --menu-border-radius-item: var(--radius-md);
+  --menu-height: var(--size-2xl);
+
+  // Icons
+
+  --icon-size-lg: 32px;
+  --icon-size: 20px;
+  --icon-size-xs: 16px;
+
+  // Modals
+
+  --modal-title-size: 16px;
+  --modal-size-md: 640px;
+  --modal-size-sm: 480px;
+  --modal-spacing: var(--spacing-md);
+  --modal-spacing-sides: var(--spacing-lg);
+  --modal-border-radius: var(--radius-lg);
+
+  // Buttons
+
+  --t-button-label-big: normal 500 14px / normal #{$geist};
+  --t-button-label-primary: normal 500 14px / normal #{$geist};
+
+  // Badge
+  --badge-border-radius: var(--radius-md);
+  --badge-spacing: var(--spacing-sm);
+  --badge-gap: var(--spacing-xs);
+  --t-badge: var(--t-body-xs-500);
+  --badge-height: 24px;
+
+  // Inputs
+  --t-input-title: normal 500 12px / 16px #{$geist};
+  --t-input-text-primary: normal 400 14px / 20px #{$geist};
+  --t-input-text-big: normal 400 16px / 20px #{$geist};
+  --t-input-error-message: normal 400 12px / 16px #{$geist};
+  --input-border-radius: var(--radius-md);
+  --input-size-primary: 36px;
+  --input-size-lg: 44px;
+  --input-spacing-xs: var(--spacing-xs);
+  --input-spacing-sm: var(--spacing-sm);
+  --input-spacing-lg: var(--spacing-md);
+
+  // Tooltip
+  --t-tooltip: normal 400 12px / 16px #{$geist};
+  --tooltip-letter-spacing: 0.3;
+  --tooltip-spacing: var(--spacing-sm) var(--spacing-md);
+
+  // custom
+
+  // how much space does error message in all takes
+  --form-field-error-space: 24px;
+
+  // how much space error should gap from main container
+  --form-field-error-gap: 8px;
+
+  // navigation
+  --nav-width: 270px;
+
+  --menu-shadow: 0 4px 12px 0 rgb(0 0 0 / 7%);
+}

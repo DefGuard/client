@@ -1,0 +1,38 @@
+.loader-spinner {
+  display: inline-block;
+  user-select: none;
+
+  &.variant-primary {
+    --spinner-track: var(--c-white-30);
+    --spinner-indicator: var(--c-white-100);
+  }
+
+  & > .icon {
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  svg {
+    & > path {
+      stroke: var(--spinner-indicator);
+      fill: unset !important;
+
+      @include animate(stroke);
+    }
+
+    & > circle {
+      stroke: var(--spinner-track);
+
+      @include animate(stroke);
+    }
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
