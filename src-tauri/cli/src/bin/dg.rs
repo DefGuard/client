@@ -40,6 +40,7 @@ mod proto {
             include!(concat!(env!("OUT_DIR"), "/defguard.client_types.rs"));
         }
 
+        #[allow(dead_code)]
         pub mod enterprise {
             pub mod posture {
                 pub mod v2 {
