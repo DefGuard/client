@@ -11,7 +11,7 @@ $packageArgs = @{
 
   softwareName  = 'defguard*'
 
-  checksum      = 'be99afe71ab88e0add4905721471d0d40935c33ae7cdb47084ba53a91d675cc7'
+  checksum      = 'f7291e9d74cc270445bc1adc2624c2b74289f2276221f1c355f96d1db021871b'
   checksumType  = 'sha256'
 
 
