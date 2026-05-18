@@ -112,7 +112,6 @@ export const MFAModal = () => {
       setProxyUrl(selectedInstance.proxy_url);
       const mfaStartUrl = `${selectedInstance.proxy_url + CLIENT_MFA_ENDPOINT}/start`;
 
-      console.log("MFAMofal, location.posture_check_required:", location.posture_check_required);
       const posture_data = location.posture_check_required
         ? await getPostureData()
         : undefined;
@@ -122,7 +121,6 @@ export const MFAModal = () => {
         location_id: location.network_id,
         posture_data,
       };
-      console.log("MFAModal, data:", data);
 
       try {
         const response = await fetch(mfaStartUrl, {
