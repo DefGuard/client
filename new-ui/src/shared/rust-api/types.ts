@@ -102,6 +102,8 @@ export const TauriCommand = {
   StopGlobalLogWatcher: 'stop_global_logwatcher',
   AllActiveConnections: 'all_active_connections',
   DisconnectLocations: 'disconnect_locations',
+  //Window
+  SwapToOldUi: 'swap_to_old_ui',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];

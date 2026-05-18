@@ -152,34 +152,36 @@ export function Select<T>(props: SelectProps<T>): JSX.Element {
                 />
               );
             })}
-            {renderedGroups.map((group, groupIndex) => {
-              const isLast = renderedGroups.length - 1 === groupIndex;
-              const groupKey = group.key ?? `${group.label}-${groupIndex}`;
+            {renderedGroups
+              .filter((group) => group.options.length > 0)
+              .map((group, groupIndex, activeGroups) => {
+                const isLast = activeGroups.length - 1 === groupIndex;
+                const groupKey = group.key ?? `${group.label}-${groupIndex}`;
 
-              return (
-                <Fragment key={`group-${groupKey}`}>
-                  <div className="select-group" role="group" aria-label={group.label}>
-                    <div className="section-title" role="presentation">
-                      <p>{group.label}</p>
+                return (
+                  <Fragment key={`group-${groupKey}`}>
+                    <div className="select-group" role="group" aria-label={group.label}>
+                      <div className="section-title" role="presentation">
+                        <p>{group.label}</p>
+                      </div>
                     </div>
-                  </div>
-                  {group.options.map((option, optionIndex) => {
-                    const isSelected = props.value?.key === option.key;
-                    const isLast = group.options.length - 1 === optionIndex;
-                    return (
-                      <SelectOptionItem
-                        isLast={isLast}
-                        isSelected={isSelected}
-                        key={`group-option-${groupKey}-${optionIndex}-${option.key}`}
-                        onSelect={handleChange}
-                        option={option}
-                      />
-                    );
-                  })}
-                  {!isLast && <Divider spacing={ThemeSpacing.Sm} />}
-                </Fragment>
-              );
-            })}
+                    {group.options.map((option, optionIndex) => {
+                      const isSelected = props.value?.key === option.key;
+                      const isLast = group.options.length - 1 === optionIndex;
+                      return (
+                        <SelectOptionItem
+                          isLast={isLast}
+                          isSelected={isSelected}
+                          key={`group-option-${groupKey}-${optionIndex}-${option.key}`}
+                          onSelect={handleChange}
+                          option={option}
+                        />
+                      );
+                    })}
+                    {!isLast && <Divider spacing={ThemeSpacing.Sm} />}
+                  </Fragment>
+                );
+              })}
           </FloatingMenu>
         </FloatingPortal>
       )}

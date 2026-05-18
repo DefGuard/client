@@ -1,7 +1,11 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
+import {
+  ConnectionType,
+  type InstanceInfo,
+  type LocationInfo,
+} from '../../rust-api/types';
 import { Direction } from '../../types';
 import { Fold } from '../Fold/Fold';
 import { IconKind } from '../Icon';
@@ -55,7 +59,11 @@ const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
         <div className="left">
           <LocationCardIcon />
           <div className="info">
-            <p className="label">Location</p>
+            <p className="label">
+              {location.connection_type === ConnectionType.Location
+                ? 'Location'
+                : 'Tunnel'}
+            </p>
             <div className="bottom">
               <p className="location-name">{location.name}</p>
               {location.active && (

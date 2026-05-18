@@ -21,9 +21,9 @@
   min-height: var(--btn-size);
   padding: var(--spacing-sm) var(--spacing-lg);
   position: relative;
-  user-select: none;
   display: inline-block;
   min-width: 0;
+  user-select: none;
 
   > .btn-content {
     display: inline-grid;

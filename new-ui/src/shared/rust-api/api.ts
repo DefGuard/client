@@ -126,6 +126,8 @@ const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
   };
 };
 
+const swapToOldUi = async () => invoke(TauriCommand.SwapToOldUi);
+
 export const api = {
   getEdgeRequestHeaders,
   // Instances
@@ -164,4 +166,6 @@ export const api = {
   stopGlobalLogWatcher,
   getAllActiveConnections,
   disconnectLocations,
+  // Window
+  swapToOldUi,
 };
