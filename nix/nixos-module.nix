@@ -3,35 +3,34 @@
   lib,
   pkgs,
   ...
-}:
-with lib; let
+}: let
   craneLib = mkCraneLib pkgs;
   defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
   cfg = config.programs.defguard-client;
 in {
   options.programs.defguard-client = {
-    enable = mkEnableOption "Defguard VPN client and service";
+    enable = lib.mkEnableOption "Defguard VPN client and service";
 
-    package = mkOption {
-      type = types.package;
+    package = lib.mkOption {
+      type = lib.types.package;
       default = defguard-client;
       description = "defguard-client package to use";
     };
 
-    logLevel = mkOption {
-      type = types.str;
+    logLevel = lib.mkOption {
+      type = lib.types.str;
       default = "info";
       description = "Log level for defguard-service";
     };
 
-    statsPeriod = mkOption {
-      type = types.int;
+    statsPeriod = lib.mkOption {
+      type = lib.types.int;
       default = 30;
       description = "Interval in seconds for interface statistics updates";
     };
   };
 
-  config = mkIf cfg.enable {
+  config = lib.mkIf cfg.enable {
     environment.systemPackages = [cfg.package];
 
     systemd.services.defguard-service = {
