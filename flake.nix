@@ -3,6 +3,7 @@
     nixpkgs.url = "nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
+    crane.url = "github:ipetkov/crane";
 
     # let git manage submodules
     self.submodules = true;
@@ -25,6 +26,7 @@
     nixpkgs,
     flake-utils,
     rust-overlay,
+    crane,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
@@ -33,18 +35,19 @@
         inherit system;
         overlays = [rust-overlay.overlays.default];
       };
+      craneLib = crane.mkLib pkgs;
     in {
       devShells.default = import ./nix/shell.nix {
         inherit pkgs;
       };
 
       packages.default = pkgs.callPackage ./nix/package.nix {
-        inherit pkgs;
+        inherit pkgs craneLib;
       };
 
       formatter = pkgs.alejandra;
     })
     // {
-      nixosModules.default = import ./nix/nixos-module.nix;
+      nixosModules.default = import ./nix/nixos-module.nix {mkCraneLib = crane.mkLib;};
     };
 }

@@ -1,11 +1,12 @@
-{
+{mkCraneLib}: {
   config,
   lib,
   pkgs,
   ...
 }:
 with lib; let
-  defguard-client = pkgs.callPackage ./package.nix {};
+  craneLib = mkCraneLib pkgs;
+  defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
   cfg = config.programs.defguard-client;
 in {
   options.programs.defguard-client = {
