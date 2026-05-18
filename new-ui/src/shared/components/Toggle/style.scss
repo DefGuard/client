@@ -1,0 +1,72 @@
+.toggle {
+  --circle-x: 3px;
+  --circle-shadow: 0 1px 1px 0 rgb(0 0 0 0);
+  --border: var(--bg);
+  --bg: var(--bg-white-30);
+  --circle: var(--fg-white-100);
+
+  cursor: pointer;
+  display: inline-flex;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  column-gap: var(--spacing-md);
+
+  .inner {
+    user-select: none;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    width: 36px;
+    height: 20px;
+    box-sizing: border-box;
+    border-radius: var(--radius-full);
+    background-color: var(--bg);
+    border: var(--border-1) solid var(--border);
+    min-width: 36px;
+    flex-shrink: 0;
+
+    @include animate(border-color, background-color);
+
+    .circle {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      background-color: var(--circle);
+      margin-left: var(--circle-x);
+      border-radius: var(--radius-full);
+      box-shadow: var(--circle-shadow);
+
+      @include animate(background-color, margin-left, box-shadow);
+    }
+  }
+
+  & > p {
+    user-select: none;
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-100);
+
+    @include animate(color);
+  }
+
+  &.disabled {
+    --circle: var(--border-disabled);
+    --circle-x: 3px;
+    --border: var(--circle);
+    --bg: var(--bg-white-5);
+
+    cursor: not-allowed;
+
+    p {
+      color: var(--fg-white-60);
+    }
+  }
+
+  &:not(.disabled).active {
+    --border: var(--bg);
+    --bg: var(--bg-white-90);
+    --circle: var(--c-saturated-additional-blue-neutral);
+    --circle-x: 16px;
+  }
+}

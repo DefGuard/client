@@ -1,0 +1,14 @@
+.box-icon {
+  background: var(--bg-white-10);
+  border-radius: 8px;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  width: 24px;
+
+  .icon {
+    --icon-size: 16px;
+  }
+}

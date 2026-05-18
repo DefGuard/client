@@ -1,0 +1,21 @@
+.location-card-mfa-settings {
+  > .header {
+    padding-bottom: var(--spacing-xl);
+
+    :nth-child(1) {
+      font: var(--t-body-sm-500);
+    }
+
+    :nth-child(2) {
+      font: var(--t-body-xs-400);
+      color: var(--fg-white-70);
+    }
+  }
+
+  > .methods {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+  }
+}

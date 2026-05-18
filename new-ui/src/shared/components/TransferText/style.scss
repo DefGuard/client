@@ -1,0 +1,13 @@
+.transfer-text {
+  --color: var(--fg-white-100);
+
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  column-gap: var(--spacing-xs);
+
+  span {
+    font: var(--t-body-xxs-500);
+    color: var(--color);
+  }
+}

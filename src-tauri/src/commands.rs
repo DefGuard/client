@@ -14,14 +14,14 @@ use tauri::{AppHandle, Emitter, Manager, State};
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
-    active_connections::{find_connection, get_connection_id_by_type},
+    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
             instance::{ClientTrafficPolicy, Instance, InstanceInfo},
-            location::{Location, LocationMfaMode},
+            location::{infer_mfa_method, Location, LocationMfaMethod, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -183,6 +183,78 @@ pub async fn disconnect(
         );
         Err(Error::NotFound)
     }
+}
+
+#[tauri::command(async)]
+pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> Result<(), Error> {
+    debug!(
+        "Received a command to disconnect {} location(s): {location_ids:?}",
+        location_ids.len()
+    );
+    let state = handle.state::<AppState>();
+    let mut any_disconnected = false;
+
+    for location_id in location_ids {
+        match Location::find_by_id(&*DB_POOL, location_id).await? {
+            Some(location) if location.is_service_location() => {
+                debug!(
+                    "Skipping service location {location}(ID: {location_id}) in \
+                    disconnect_locations"
+                );
+                continue;
+            }
+            None => {
+                debug!("Location with ID {location_id} not found in the database, skipping.");
+                continue;
+            }
+            _ => {}
+        }
+
+        let name = get_tunnel_or_location_name(location_id, ConnectionType::Location).await;
+        debug!("Disconnecting from location {name}(ID: {location_id})");
+
+        if let Some(connection) = state
+            .remove_connection(location_id, ConnectionType::Location)
+            .await
+        {
+            disconnect_interface(&connection).await?;
+            stop_log_watcher_task(&handle, &connection.interface_name)?;
+            if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
+                match err {
+                    Error::CoreNotEnterprise => {
+                        debug!(
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the core is not enterprise."
+                        );
+                    }
+                    Error::NoToken => {
+                        debug!(
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the instance has no polling token."
+                        );
+                    }
+                    _ => {
+                        warn!(
+                            "Error while trying to fetch instance config after disconnecting \
+                            from {name}(ID: {location_id}): {err}"
+                        );
+                    }
+                }
+            }
+            info!("Disconnected from location {name}(ID: {location_id})");
+            any_disconnected = true;
+        } else {
+            debug!("No active connection found for location {name}(ID: {location_id}), skipping.");
+        }
+    }
+
+    if any_disconnected {
+        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        reload_tray_menu(&handle).await;
+        configure_tray_icon(&handle).await?;
+    }
+
+    Ok(())
 }
 
 /// Triggers poll on location's instance config. Config will be updated if there are no more active
@@ -418,6 +490,7 @@ pub struct LocationInfo {
     pub pubkey: String,
     pub network_id: Id,
     pub location_mfa_mode: LocationMfaMode,
+    pub mfa_method: Option<LocationMfaMethod>,
 }
 
 impl LocationInfo {
@@ -470,6 +543,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             pubkey: location.pubkey,
             network_id: location.network_id,
             location_mfa_mode: location.location_mfa_mode,
+            mfa_method: location.mfa_method,
         };
         location_info.push(info);
     }
@@ -546,10 +620,13 @@ pub(crate) async fn locations_changed(
             let mut new_location = Location::<NoId>::from(location);
             // Ignore `route_all_traffic` flag as Defguard core does not have it.
             new_location.route_all_traffic = false;
+            // Canonicalize mfa_method so a user-set value doesn't falsely trigger a
+            // config-change detection when the mode hasn't actually changed.
+            new_location.mfa_method = infer_mfa_method(new_location.location_mfa_mode, None);
             new_location
         })
         .collect::<HashSet<_>>();
-    let core_locations = device_config
+    let core_locations: HashSet<Location> = device_config
         .configs
         .iter()
         .map(|config| config.clone().into_location(instance.id))
@@ -637,6 +714,11 @@ pub(crate) async fn do_update_instance(
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.service_location_mode = new_location.service_location_mode;
+                // Correct mfa_method to remain consistent with the (possibly updated) mfa_mode.
+                current_location.mfa_method = infer_mfa_method(
+                    current_location.location_mfa_mode,
+                    current_location.mfa_method,
+                );
                 current_location.posture_check_required = new_location.posture_check_required;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");
@@ -978,6 +1060,33 @@ pub async fn update_location_routing(
     }
 }
 
+#[tauri::command(async)]
+pub async fn set_location_mfa_method(
+    location_id: Id,
+    mfa_method: LocationMfaMethod,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!("Received command to set MFA method for location {location_id}");
+    if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
+        let inferred = infer_mfa_method(location.location_mfa_mode, Some(mfa_method));
+        debug!(
+            "Setting MFA method for location {}(ID: {location_id}) to {inferred:?}",
+            location.name,
+        );
+        location.mfa_method = inferred;
+        location.save(&*DB_POOL).await?;
+        debug!(
+            "MFA method updated for location {}(ID: {location_id})",
+            location.name,
+        );
+        handle.emit(EventKey::LocationUpdate.into(), ())?;
+        Ok(())
+    } else {
+        error!("Location with ID {location_id} not found, cannot set MFA method");
+        Err(Error::NotFound)
+    }
+}
+
 #[cfg(target_os = "macos")]
 #[tauri::command(async)]
 pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), Error> {
@@ -1297,8 +1406,7 @@ fn select_reported_app_version(
 ) -> String {
     build_version_override
         .filter(|version| !version.trim().is_empty())
-        .map(str::to_owned)
-        .unwrap_or_else(|| package_version.to_owned())
+        .map_or_else(|| package_version.to_owned(), str::to_owned)
 }
 
 fn reported_app_version(handle: &AppHandle) -> String {
@@ -1411,6 +1519,37 @@ pub fn get_provisioning_config(
 #[must_use]
 pub fn get_platform_header() -> String {
     construct_platform_header()
+}
+
+#[derive(Debug, Serialize)]
+pub struct ActiveConnectionSummary {
+    pub id: Id,
+    pub name: String,
+    pub connection_type: ConnectionType,
+}
+
+#[tauri::command(async)]
+pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Error> {
+    debug!("Getting information about all active connections.");
+    let connections = ACTIVE_CONNECTIONS.lock().await;
+    let mut result = Vec::with_capacity(connections.len());
+    for conn in connections.iter() {
+        if conn.connection_type == ConnectionType::Location {
+            match Location::find_by_id(&*DB_POOL, conn.location_id).await? {
+                Some(location) if location.is_service_location() => continue,
+                None => continue,
+                _ => {}
+            }
+        }
+        let name = get_tunnel_or_location_name(conn.location_id, conn.connection_type).await;
+        result.push(ActiveConnectionSummary {
+            id: conn.location_id,
+            name,
+            connection_type: conn.connection_type,
+        });
+    }
+    debug!("Returning {} active connections.", result.len());
+    Ok(result)
 }
 
 #[cfg(test)]

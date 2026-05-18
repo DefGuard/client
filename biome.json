@@ -9,6 +9,7 @@
     "ignoreUnknown": false,
     "includes": [
       "src/**",
+      "!new-ui",
       "!src/i18n/*.ts",
       "!src/i18n/*.tsx",
       "!src/i18n/i18n-util",

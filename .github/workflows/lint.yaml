@@ -30,11 +30,12 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10
+          cache: true
+          version: 11
           run_install: false
 
       - name: Get pnpm store directory
@@ -42,22 +43,28 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - name: Setup pnpm cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-lint-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-lint-store-
-
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
       - name: Install Node dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Install Node dependencies for new UI
+        run: |
+          cd new-ui
+          pnpm install --no-frozen-lockfile
+
       - name: Run Biome and Prettier Lint
         run: pnpm lint
 
-      # TODO: Restore when it works again: https://github.com/pnpm/pnpm/issues/11265
-      # - name: Audit
-      #   run: pnpm audit --prod
+      - name: Audit
+        run: pnpm audit --prod
+
+      - name: Run Biome and Prettier Lint for new UI
+        run: |
+          cd new-ui
+          pnpm lint
+
+      - name: Audit new UI
+        run: |
+          cd new-ui
+          pnpm audit --prod
