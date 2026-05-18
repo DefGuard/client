@@ -47,7 +47,7 @@
     openresolv
   ];
 
-  # Rust-only native inputs, shared by buildDepsOnly and the main build.
+  # Rust/cargo inputs shared by buildDepsOnly and the main build.
   cargoNativeBuildInputs = [
     rustc
     cargo
@@ -55,8 +55,6 @@
     pkgs.gobject-introspection
     pkgs.cargo-tauri
     pkgs.protobuf
-    pkgs.makeWrapper
-    pkgs.wrapGAppsHook3
   ];
 
   # Source filter for buildDepsOnly: Cargo files plus extras needed by build.rs
@@ -84,7 +82,7 @@
   # Pre-compile cargo dependencies; cached as long as Cargo.lock is unchanged.
   # Features must match the main build (tauri.linux.conf.json adds --features service).
   cargoArtifacts = craneLib.buildDepsOnly {
-    pname = pname;
+    inherit pname;
     inherit version buildInputs cargoVendorDir;
     src = depsSrc;
     nativeBuildInputs = cargoNativeBuildInputs;
@@ -110,6 +108,8 @@ in
     nativeBuildInputs =
       cargoNativeBuildInputs
       ++ [
+        pkgs.makeWrapper
+        pkgs.wrapGAppsHook3
         pkgs.nodejs_24
         pnpm
         pnpmConfigHook
@@ -155,8 +155,7 @@ in
       # section from tauri.linux.conf.json rather than merging with it.
       pnpm tauri build \
         --config '{"build":{"beforeBuildCommand":"","features":["service"]}}' \
-        --bundles deb \
-        --verbose
+        --bundles deb
 
       runHook postBuild
     '';
