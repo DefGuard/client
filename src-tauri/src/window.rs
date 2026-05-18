@@ -12,7 +12,7 @@ pub const NEW_UI_HEIGHT: f64 = 675.0;
 pub const OLD_UI_WIDTH: f64 = 920.0;
 pub const OLD_UI_HEIGHT: f64 = 720.0;
 
-fn new_ui_url() -> WebviewUrl {
+pub fn new_ui_url() -> WebviewUrl {
     if cfg!(defguard_client_dev) {
         WebviewUrl::External("http://localhost:5072".parse().unwrap())
     } else {
@@ -20,7 +20,7 @@ fn new_ui_url() -> WebviewUrl {
     }
 }
 
-fn old_ui_url() -> WebviewUrl {
+pub fn old_ui_url() -> WebviewUrl {
     if cfg!(defguard_client_dev) {
         WebviewUrl::External("http://localhost:5071".parse().unwrap())
     } else {
