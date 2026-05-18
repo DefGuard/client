@@ -56,8 +56,13 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Run Biome and Prettier Lint
-        run: pnpm lint
+        run: |
+          pnpm lint
+          cd new-ui
+          pnpm lint
 
-      # TODO: Restore when it works again: https://github.com/pnpm/pnpm/issues/11265
-      # - name: Audit
-      #   run: pnpm audit --prod
+      - name: Audit
+        run: |
+          pnpm audit --prod
+          cd new-ui
+          pnpm audit --prod
