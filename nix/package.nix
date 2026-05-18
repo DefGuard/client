@@ -41,10 +41,6 @@
     libayatana-indicator
     ayatana-ido
     libdbusmenu-gtk3
-    desktop-file-utils
-    iproute2
-    lsb-release
-    openresolv
   ];
 
   # Rust/cargo inputs shared by buildDepsOnly and the main build.
