@@ -1,4 +1,4 @@
-{pkgs ? import <nixpkgs> {}}: let
+{pkgs ? import <nixpkgs> {}, craneLib}: let
   # add development-related cargo tooling
   rustToolchain = pkgs.rust-bin.stable.latest.default.override {
     extensions = ["rust-analyzer" "rust-src" "rustfmt" "clippy"];
@@ -12,7 +12,7 @@
   };
 
   defguard-client = pkgs.callPackage ./package.nix {
-    inherit rustPlatform;
+    inherit craneLib;
     cargo = rustToolchain;
     rustc = rustToolchain;
   };

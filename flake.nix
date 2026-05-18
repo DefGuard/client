@@ -42,7 +42,7 @@
 
       craneLib = crane.mkLib pkgs;
     in {
-      devShells.default = import ./nix/shell.nix {pkgs = devPkgs;};
+      devShells.default = import ./nix/shell.nix {pkgs = devPkgs; inherit craneLib;};
 
       packages.default = pkgs.callPackage ./nix/package.nix {
         inherit pkgs craneLib;
