@@ -32,31 +32,29 @@ in {
   };
 
   config = mkIf cfg.enable {
-    # Add client package
     environment.systemPackages = [cfg.package];
 
-    # Setup systemd service for the intrerface management daemon
     systemd.services.defguard-service = {
       description = "Defguard VPN Service";
+      documentation = ["https://docs.defguard.net"];
       wantedBy = ["multi-user.target"];
       wants = ["network-online.target"];
       after = ["network-online.target"];
       serviceConfig = {
+        Group = "defguard";
         ExecStart = "${cfg.package}/bin/defguard-service --log-level ${cfg.logLevel} --stats-period ${toString cfg.statsPeriod}";
         ExecReload = "/bin/kill -HUP $MAINPID";
-        Group = "defguard";
-        Restart = "on-failure";
-        RestartSec = 2;
         KillMode = "process";
         KillSignal = "SIGINT";
         LimitNOFILE = 65536;
         LimitNPROC = "infinity";
+        Restart = "on-failure";
+        RestartSec = 2;
         TasksMax = "infinity";
         OOMScoreAdjust = -1000;
       };
     };
 
-    # Make sure the defguard group exists
     users.groups.defguard = {};
   };
 }
