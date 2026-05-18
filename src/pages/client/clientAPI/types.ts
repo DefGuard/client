@@ -133,6 +133,7 @@ export type TauriCommandKey =
   | 'all_locations'
   | 'connect'
   | 'connect_with_posture'
+  | 'get_posture_data'
   | 'disconnect'
   | 'location_stats'
   | 'last_connection'

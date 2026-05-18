@@ -133,7 +133,7 @@ const stopGlobalLogWatcher = async (): Promise<void> =>
 const getAppConfig = async (): Promise<AppConfig> =>
   invokeWrapper('command_get_app_config');
 
-const getPostureData = async (): Promise<DevicePostureData> =>
+const getPostureData = async (): Promise<unknown> =>
   invokeWrapper('get_posture_data');
 
 const getProvisioningConfig = async (): Promise<ProvisioningConfig | null> =>
