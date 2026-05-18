@@ -55,7 +55,7 @@ use crate::{
 use crate::{
     service::{
         client::DAEMON_CLIENT,
-        proto::{
+        proto::defguard::client::v1::{
             DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
         },
     },

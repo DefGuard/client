@@ -4,7 +4,6 @@ use crate::database::models::{
 };
 
 pub(crate) mod defguard {
-    #[allow(dead_code)]
     pub(crate) mod enterprise {
         pub(crate) mod posture {
             pub(crate) mod v2 {

@@ -27,20 +27,19 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 use super::{
     config::Config,
-    proto::{
+    proto::defguard::client::v1::{
         desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-        CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
+        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
 };
 #[cfg(windows)]
 use crate::enterprise::service_locations::ServiceLocationManager;
 #[cfg(windows)]
 use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-use crate::{
-    enterprise::service_locations::ServiceLocationError,
-    service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
-    VERSION,
-};
+#[cfg(not(windows))]
+use crate::service::proto::defguard::enterprise::posture::v2::DevicePostureData;
+use crate::{enterprise::service_locations::ServiceLocationError, VERSION};
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -239,6 +238,19 @@ impl DesktopDaemonService for DaemonService {
         }
 
         Ok(Response::new(()))
+    }
+
+    #[cfg(not(windows))]
+    async fn get_posture_data(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<DevicePostureData>, Status> {
+        debug!(
+            "Get posture data request received, this is currently not supported on Unix systems"
+        );
+        Err(Status::unimplemented(
+            "Posture data is not supported on Unix systems",
+        ))
     }
 
     #[cfg(windows)]
@@ -496,6 +508,16 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::ReadInterfaceDataStream
         ))
+    }
+
+    #[cfg(windows)]
+    async fn get_posture_data(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<DevicePostureData>, Status> {
+        debug!("Get posture data request received");
+        todo!();
+        Ok(Response::new(()))
     }
 }
 

@@ -51,7 +51,9 @@ use crate::{
     database::models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
     service::{
         client::DAEMON_CLIENT,
-        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
+        proto::defguard::client::v1::{
+            CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+        },
     },
 };
 

@@ -8,7 +8,7 @@ use crate::{
         location::{Location, ServiceLocationMode},
         Id,
     },
-    service::proto::ServiceLocation,
+    service::proto::defguard::client::v1::ServiceLocation,
 };
 
 #[cfg(windows)]
