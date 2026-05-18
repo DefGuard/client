@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 $toolsDir   = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
-$url        = 'https://github.com/DefGuard/client/releases/download/v1.6.5/Defguard_1.6.5_x64_en-US.msi'
+$url        = 'https://github.com/DefGuard/client/releases/download/v1.6.8/Defguard_1.6.8_x64_en-US.msi'
 
 
 $packageArgs = @{
