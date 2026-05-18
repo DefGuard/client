@@ -8,7 +8,10 @@
     "active": true,
     "category": "Utility",
     "copyright": "Defguard",
-    "targets": ["deb", "app"],
+    "targets": [
+      "deb",
+      "app"
+    ],
     "externalBin": [],
     "icon": [
       "icons/32x32.png",
@@ -29,7 +32,10 @@
           "./resources-windows/fragments/service.wxs",
           "./resources-windows/fragments/provisioning.wxs"
         ],
-        "componentRefs": ["DefguardServiceFragment", "ProvisioningScriptFragment"],
+        "componentRefs": [
+          "DefguardServiceFragment",
+          "ProvisioningScriptFragment"
+        ],
         "template": "./resources-windows/msi/main.wxs"
       }
     },
@@ -42,7 +48,9 @@
       },
       "minimumSystemVersion": "13.5"
     },
-    "resources": ["resources/icons/*"],
+    "resources": [
+      "resources/icons/*"
+    ],
     "shortDescription": "Defguard desktop client",
     "longDescription": "Defguard desktop client",
     "linux": {
@@ -55,14 +63,18 @@
           "../control/prerm": "../resources-linux/prerm",
           "../control/postrm": "../resources-linux/postrm"
         },
-        "depends": ["desktop-file-utils"]
+        "depends": [
+          "desktop-file-utils"
+        ]
       },
       "rpm": {
         "files": {
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
         },
-        "depends": ["desktop-file-utils"],
+        "depends": [
+          "desktop-file-utils"
+        ],
         "postInstallScript": "../resources-linux/postinst",
         "preRemoveScript": "../resources-linux/prerm",
         "postRemoveScript": "../resources-linux/postrm"
@@ -72,10 +84,12 @@
   "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
-  "version": "1.6.9",
+  "version": "2.1.0",
   "app": {
     "security": {
-      "capabilities": ["main-capability"],
+      "capabilities": [
+        "main-capability"
+      ],
       "csp": null
     },
     "windows": []
@@ -83,7 +97,9 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["defguard"]
+        "schemes": [
+          "defguard"
+        ]
       }
     }
   }
