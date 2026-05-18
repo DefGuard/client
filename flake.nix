@@ -30,20 +30,25 @@
     ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
-      # add rust overlay
-      pkgs = import nixpkgs {
+      # Plain nixpkgs — used for packages and checks.
+      pkgs = import nixpkgs {inherit system;};
+
+      # nixpkgs with rust-overlay — only needed for the dev shell, which uses
+      # pkgs.rust-bin to get a customised Rust toolchain.
+      devPkgs = import nixpkgs {
         inherit system;
         overlays = [rust-overlay.overlays.default];
       };
+
       craneLib = crane.mkLib pkgs;
     in {
-      devShells.default = import ./nix/shell.nix {
-        inherit pkgs;
-      };
+      devShells.default = import ./nix/shell.nix {pkgs = devPkgs;};
 
       packages.default = pkgs.callPackage ./nix/package.nix {
         inherit pkgs craneLib;
       };
+
+      checks.default = self.packages.${system}.default;
 
       formatter = pkgs.alejandra;
     })
