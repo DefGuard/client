@@ -134,7 +134,6 @@ const CodeForm = ({ inputRef }: CodeFormProps) => {
         },
       );
       error(`MFA configuration failed! \nReason: ${err.message}`);
-      console.error(err);
     },
   });
 

@@ -1,22 +1,22 @@
-name: "lint"
+name: 'lint'
 
 on:
   push:
     branches:
       - main
       - dev
-      - "release/**"
+      - 'release/**'
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
   pull_request:
     branches:
       - main
       - dev
-      - "release/**"
+      - 'release/**'
     paths-ignore:
-      - "*.md"
-      - "LICENSE"
+      - '*.md'
+      - 'LICENSE'
 
 jobs:
   lint-web:
@@ -27,11 +27,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
 
-      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 25
+
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
           run_install: false
@@ -41,19 +42,22 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
+      - name: Setup pnpm cache
+        uses: actions/cache@v5
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-lint-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-lint-store-
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      # Change to '--frozen-lockfile' once this gets fixed:
+      # https://github.com/pnpm/action-setup/issues/40
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run Biome and Prettier Lint
         run: pnpm lint
 
-      - name: Audit
-        run: pnpm audit --prod
+      # TODO: Restore when it works again: https://github.com/pnpm/pnpm/issues/11265
+      # - name: Audit
+      #   run: pnpm audit --prod

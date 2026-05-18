@@ -6,6 +6,7 @@ import type { ProvisioningConfig } from '../pages/client/clientAPI/types';
 import { clientQueryKeys } from '../pages/client/query';
 import { useToaster } from '../shared/defguard-ui/hooks/toasts/useToaster';
 import useAddInstance from '../shared/hooks/useAddInstance';
+import { errorDetail } from '../shared/utils/errorDetail';
 
 const { getProvisioningConfig } = clientApi;
 
@@ -26,8 +27,9 @@ export default function AutoProvisioningManager({ children }: PropsWithChildren)
         token: config.enrollment_token,
       });
     } catch (e) {
+      const detail = errorDetail(e);
       error(
-        `Failed to handle automatic client provisioning with ${JSON.stringify(config)}.\n Error: ${JSON.stringify(e)}`,
+        `Failed to handle automatic client provisioning (url: ${config.enrollment_url}): ${detail}`,
       );
       toaster.error(
         'Automatic client provisioning failed, please contact your administrator.',

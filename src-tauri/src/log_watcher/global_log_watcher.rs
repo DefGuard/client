@@ -312,7 +312,7 @@ impl GlobalLogWatcher {
 
             trace!("Read 0 bytes from both log files, we've reached EOF in both cases.");
             if !parsed_lines.is_empty() {
-                parsed_lines.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+                parsed_lines.sort_by_key(|a| a.timestamp);
                 trace!("Emitting parsed lines for the frontend");
                 self.handle.emit(&self.event_topic, &parsed_lines)?;
                 trace!("Emitted {} lines to the frontend", parsed_lines.len());
@@ -427,7 +427,7 @@ impl GlobalLogWatcher {
 
             trace!("Reached EOF in all log files.");
             if !parsed_lines.is_empty() {
-                parsed_lines.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+                parsed_lines.sort_by_key(|a| a.timestamp);
                 trace!("Emitting parsed lines for the frontend");
                 self.handle.emit(&self.event_topic, &parsed_lines)?;
                 trace!("Emitted {} lines to the frontend", parsed_lines.len());

@@ -1,6 +1,6 @@
+use std::{array::TryFromSliceError, net::IpAddr, path::Path};
+
 use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
-use std::path::Path;
-use std::{array::TryFromSliceError, net::IpAddr};
 use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
 

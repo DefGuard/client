@@ -6,6 +6,7 @@ import { clientApi } from '../../pages/client/clientAPI/clientApi.ts';
 import { useClientStore } from '../../pages/client/hooks/useClientStore';
 import { TauriEventKey } from '../../pages/client/types';
 import type { NewApplicationVersionInfo } from '../../shared/hooks/api/types';
+import { errorDetail } from '../../shared/utils/errorDetail';
 import {
   type ApplicationUpdateStore,
   useApplicationUpdateStore,
@@ -83,7 +84,8 @@ export const ApplicationUpdateManager = () => {
           dismissed: false,
         });
       } catch (e) {
-        error(`Failed to check latest app version: ${e}`);
+        const detail = errorDetail(e);
+        error(`Failed to check latest app version (current: ${appVersion}): ${detail}`);
       }
     };
 

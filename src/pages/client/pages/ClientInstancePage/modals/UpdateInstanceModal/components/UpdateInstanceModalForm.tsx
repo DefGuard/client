@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetch } from '@tauri-apps/plugin-http';
+import { error } from '@tauri-apps/plugin-log';
 import { useMemo } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -16,6 +17,7 @@ import type {
   CreateDeviceResponse,
   EnrollmentStartResponse,
 } from '../../../../../../../shared/hooks/api/types';
+import { errorDetail } from '../../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../hooks/useClientStore';
 import { clientQueryKeys } from '../../../../../query';
@@ -93,11 +95,20 @@ export const UpdateInstanceModalForm = () => {
       token: values.token,
     };
 
-    const res = await fetch(endpointUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data),
-    });
+    let res: Awaited<ReturnType<typeof fetch>>;
+    try {
+      res = await fetch(endpointUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      const detail = errorDetail(e);
+      error(`Failed to reach enrollment start endpoint (${endpointUrl}): ${detail}`);
+      toaster.error(LL.common.messages.errorWithMessage({ message: String(e) }));
+      return;
+    }
+
     if (res.ok) {
       const enrollmentData = (await res.json()) as EnrollmentStartResponse;
       let proxy_api_url = values.url;
@@ -111,6 +122,9 @@ export const UpdateInstanceModalForm = () => {
           .getSetCookie()
           .find((cookie) => cookie.startsWith('defguard_proxy='));
         if (!authCookie) {
+          error(
+            `No auth cookie returned from enrollment start for instance ${instance.uuid}`,
+          );
           toaster.error(
             LL.common.messages.errorWithMessage({
               message: LL.common.messages.noCookie(),
@@ -119,16 +133,25 @@ export const UpdateInstanceModalForm = () => {
           return;
         }
         headers.Cookie = authCookie;
-        const instanceInfoResponse = await fetch(
-          `${proxy_api_url}/enrollment/network_info`,
-          {
+
+        let instanceInfoResponse: Awaited<ReturnType<typeof fetch>>;
+        try {
+          instanceInfoResponse = await fetch(`${proxy_api_url}/enrollment/network_info`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
-          },
-        );
+          });
+        } catch (e) {
+          const detail = errorDetail(e);
+          error(
+            `Failed to reach network_info endpoint for instance ${instance.uuid}: ${detail}`,
+          );
+          toaster.error(LL.common.messages.errorWithMessage({ message: String(e) }));
+          return;
+        }
+
         if (instanceInfoResponse.ok) {
           const data = (await instanceInfoResponse.json()) as CreateDeviceResponse;
           updateInstance({
@@ -149,11 +172,16 @@ export const UpdateInstanceModalForm = () => {
               );
               closeModal();
             })
-            .catch(() => {
+            .catch((e) => {
+              const detail = errorDetail(e);
+              error(`Failed to update instance: ${detail}`);
               toaster.error(LL.common.messages.error());
             });
         } else {
           // Device does not match used enrollment token.
+          error(
+            `network_info returned non-ok status ${instanceInfoResponse.status} for instance ${instance.uuid}`,
+          );
           toaster.error(
             LL.common.messages.errorWithMessage({
               message: 'Token is not valid for this device',
@@ -169,6 +197,9 @@ export const UpdateInstanceModalForm = () => {
         }
       } else {
         // Instance not found in client, use add instance.
+        error(
+          `Enrollment start returned unknown instance UUID: ${enrollmentData.instance.id}`,
+        );
         toaster.error(localLL.messages.errorInstanceNotFound());
         setError(
           'token',
@@ -182,6 +213,9 @@ export const UpdateInstanceModalForm = () => {
       }
     } else {
       // Token or URL is invalid.
+      error(
+        `Enrollment start returned non-ok status ${res.status} for URL ${endpointUrl}`,
+      );
       toaster.error(
         LL.common.messages.errorWithMessage({
           message: 'Token or URL is invalid',

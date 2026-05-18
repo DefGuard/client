@@ -1,8 +1,10 @@
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { error } from '@tauri-apps/plugin-log';
 import { useCallback } from 'react';
 
 import { useI18nContext } from '../../i18n/i18n-react';
 import { useToaster } from '../defguard-ui/hooks/toasts/useToaster';
+import { errorDetail } from '../utils/errorDetail';
 
 export const useClipboard = () => {
   const { LL } = useI18nContext();
@@ -20,7 +22,8 @@ export const useClipboard = () => {
         }
       } catch (e) {
         toaster.error(LL.common.messages.clipboard.error());
-        console.error(e);
+        const detail = errorDetail(e);
+        error(`Failed to write to clipboard: ${detail}`);
       }
     },
     [LL.common.messages, toaster],

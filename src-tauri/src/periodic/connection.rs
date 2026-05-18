@@ -51,7 +51,7 @@ async fn reconnect(
             payload.emit(app_handle);
             match connect(con_id, con_type, None, app_handle.clone()).await {
                 Ok(()) => {
-                    info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.",);
+                    info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.");
                 }
                 Err(err) => {
                     error!("Reconnect attempt failed, disconnect succeeded but connect failed. Error: {err}");

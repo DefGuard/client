@@ -23,9 +23,9 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "certificateThumbprint": null,
+      "certificateThumbprint": "9d3df627dbf037f1553582ce9a806d09c9b78654",
       "digestAlgorithm": "sha256",
-      "timestampUrl": "",
+      "timestampUrl": "http://time.certum.pl/",
       "wix": {
         "upgradeCode": "923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43",
         "bannerPath": "./resources-windows/msi/top_banner.png",
@@ -86,7 +86,7 @@
   "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
-  "version": "1.6.6",
+  "version": "1.6.9",
   "app": {
     "security": {
       "capabilities": [

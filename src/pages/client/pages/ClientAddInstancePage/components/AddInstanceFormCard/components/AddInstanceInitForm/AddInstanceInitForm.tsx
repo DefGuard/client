@@ -9,7 +9,6 @@ import { useMemo, useState } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { FormInput } from '../../../../../../../../shared/defguard-ui/components/Form/FormInput/FormInput';
 import { Button } from '../../../../../../../../shared/defguard-ui/components/Layout/Button/Button';
@@ -24,6 +23,7 @@ import type {
   EnrollmentStartResponse,
 } from '../../../../../../../../shared/hooks/api/types';
 import { routes } from '../../../../../../../../shared/routes';
+import { errorDetail } from '../../../../../../../../shared/utils/errorDetail';
 import { useEnrollmentStore } from '../../../../../../../enrollment/hooks/store/useEnrollmentStore';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { useClientStore } from '../../../../../../hooks/useClientStore';
@@ -96,7 +96,9 @@ export const AddInstanceInitForm = () => {
       .then(async (res: Response) => {
         if (!res.ok) {
           setIsLoading(false);
-          error(JSON.stringify(res.status));
+          error(
+            `Enrollment start returned non-OK status ${res.status} for URL: ${endpointUrl}`,
+          );
           const errorMessage = ((await res.json()) as EnrollmentError).error;
 
           switch (errorMessage) {
@@ -120,9 +122,7 @@ export const AddInstanceInitForm = () => {
         if (!authCookie) {
           setIsLoading(false);
           error(
-            LL.common.messages.errorWithMessage({
-              message: LL.common.messages.noCookie(),
-            }),
+            `Enrollment start response for ${endpointUrl} is missing defguard_proxy set-cookie header`,
           );
           throw Error(
             LL.common.messages.errorWithMessage({
@@ -154,34 +154,57 @@ export const AddInstanceInitForm = () => {
             body: JSON.stringify({
               pubkey: instance.pubkey,
             }),
-          }).then(async (res) => {
-            invoke<void>('update_instance', {
-              instanceId: instance.id,
-              response: (await res.json()) as CreateDeviceResponse,
-            })
-              .then(() => {
-                info('Configured device');
-                toaster.success(
-                  LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
-                );
-                const _selectedInstance: SelectedInstance = {
-                  id: instance.id,
-                  type: ClientConnectionType.LOCATION,
-                };
-                setClientState({
-                  selectedInstance: _selectedInstance,
-                });
-                navigate(routes.client.base, { replace: true });
-              })
-              .catch((e) => {
-                error(e);
+          })
+            .then(async (res) => {
+              if (!res.ok) {
+                const detail = `network_info returned status ${res.status} for instance ${instance.uuid}`;
+                error(`Failed to fetch network info: ${detail}`);
                 toaster.error(
                   LL.common.messages.errorWithMessage({
-                    message: String(e),
+                    message: detail,
                   }),
                 );
-              });
-          });
+                return;
+              }
+              invoke<void>('update_instance', {
+                instanceId: instance.id,
+                response: (await res.json()) as CreateDeviceResponse,
+              })
+                .then(() => {
+                  info('Configured device');
+                  toaster.success(
+                    LL.pages.enrollment.steps.deviceSetup.desktopSetup.messages.deviceConfigured(),
+                  );
+                  const _selectedInstance: SelectedInstance = {
+                    id: instance.id,
+                    type: ClientConnectionType.LOCATION,
+                  };
+                  setClientState({
+                    selectedInstance: _selectedInstance,
+                  });
+                  navigate(routes.client.base, { replace: true });
+                })
+                .catch((e) => {
+                  const detail = errorDetail(e);
+                  error(`Failed to save config during instance add: ${detail}`);
+                  toaster.error(
+                    LL.common.messages.errorWithMessage({
+                      message: String(e),
+                    }),
+                  );
+                });
+            })
+            .catch((e) => {
+              const detail = errorDetail(e);
+              error(
+                `Failed to reach network_info endpoint for instance ${instance.uuid}: ${detail}`,
+              );
+              toaster.error(
+                LL.common.messages.errorWithMessage({
+                  message: String(e),
+                }),
+              );
+            });
         }
         // register new instance
         // is user in need of full enrollment ?
@@ -220,6 +243,8 @@ export const AddInstanceInitForm = () => {
       })
       .catch((e) => {
         setIsLoading(false);
+        const detail = errorDetail(e);
+        error(`Failed to initialize instance: ${detail}`);
         if (typeof e === 'string') {
           if (e.includes('Network Error')) {
             toaster.error(LL.common.messages.networkError());

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useI18nContext } from '../../../../../../../../i18n/i18n-react';
 import { Toggle } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/Toggle';
 import type { ToggleOption } from '../../../../../../../../shared/defguard-ui/components/Layout/Toggle/types';
+import { errorDetail } from '../../../../../../../../shared/utils/errorDetail';
 import { clientApi } from '../../../../../../clientAPI/clientApi';
 import {
   ClientConnectionType,
@@ -30,8 +31,10 @@ export const LocationCardRoute = ({ location, selectedDefguardInstance }: Props)
         });
       }
     } catch (e) {
-      error(`Error handling routing: ${e}`);
-      console.error(e);
+      const detail = errorDetail(e);
+      error(
+        `Failed to update routing for location ${location?.id} (type: ${location?.connection_type}, routeAllTraffic: ${value}): ${detail}`,
+      );
     }
   };
 

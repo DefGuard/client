@@ -31,7 +31,7 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.87"
-version = "1.6.6"
+version = "1.6.9"
 
 [package]
 name = "defguard-client"
@@ -85,7 +85,7 @@ sqlx = { version = "0.8", features = [
     "macros",
 ] }
 struct-patch = "0.10"
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 tauri = { version = "2", features = [
     "native-tls-vendored",
     "image-png",
@@ -96,7 +96,7 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
+tauri-plugin-http = { version = "2", features = ["unsafe-headers", "native-tls"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
@@ -160,6 +160,9 @@ windows-sys = { version = "0.61", features = [
     # HANDLE & file functions
     "Win32_System_IO",
     "Win32_System_Threading",
+
+    # Network address change notifications (NotifyAddrChange)
+    "Win32_NetworkManagement_IpHelper",
 ] }
 
 [features]

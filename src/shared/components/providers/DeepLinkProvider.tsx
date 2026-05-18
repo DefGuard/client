@@ -3,6 +3,7 @@ import { error } from '@tauri-apps/plugin-log';
 import { type PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import z, { string } from 'zod';
 import useAddInstance from '../../hooks/useAddInstance';
+import { errorDetail } from '../../utils/errorDetail';
 
 enum DeepLink {
   AddInstance = 'addinstance',
@@ -92,9 +93,8 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
             try {
               handleValidLink(payload, start[0]);
             } catch (e) {
-              error(
-                `Failed to handle valid deep link ${payload.link}!\n${JSON.stringify(e)}`,
-              );
+              const detail = errorDetail(e);
+              error(`Failed to handle startup deep link "${payload.link}": ${detail}`);
             }
           }
         }
@@ -106,8 +106,10 @@ export const DeepLinkProvider = ({ children }: PropsWithChildren) => {
               try {
                 handleValidLink(payload);
               } catch (e) {
-                error(`Failed to handle valid deep link ${payload?.link} action!`);
-                error(JSON.stringify(e));
+                const detail = errorDetail(e);
+                error(
+                  `Failed to handle valid deep link "${payload?.link}" action: ${detail}`,
+                );
               }
             }
           }
