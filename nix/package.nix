@@ -192,6 +192,12 @@ in
     SQLX_OFFLINE = "true";
     doInstallCargoArtifacts = false;
 
+    # passthru attrs are ignored by the build but addressable by external tools:
+    # pnpmDeps — referenced by the update-pnpm-hash.yaml CI workflow
+    passthru = {
+      inherit pnpmDeps;
+    };
+
     meta = with lib; {
       description = "Defguard VPN Client";
       homepage = "https://defguard.net";
