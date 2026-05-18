@@ -348,7 +348,7 @@ fn main() {
             app.manage(state);
 
             // Open new UI window.
-            let new_url = if cfg!(defguard_client_env) {
+            let new_url = if cfg!(defguard_client_dev) {
                 WebviewUrl::External("http://localhost:5072".parse().unwrap())
             } else {
                 WebviewUrl::App("new-ui/".into())
@@ -360,7 +360,7 @@ fn main() {
                 .build()?;
 
             // Open old UI window.
-            let old_url = if cfg!(defguard_client_env) {
+            let old_url = if cfg!(defguard_client_dev) {
                 WebviewUrl::External("http://localhost:5071".parse().unwrap())
             } else {
                 WebviewUrl::App("old-ui/index.html/".into())
