@@ -1532,11 +1532,7 @@ pub fn get_platform_header() -> String {
 /// Collects device posture data, sends it to the proxy, and on success establishes
 /// the WireGuard tunnel using the returned preshared key.
 #[tauri::command(async)]
-pub async fn connect_with_posture(
-    location_id: Id,
-    _connection_type: ConnectionType,
-    handle: AppHandle,
-) -> Result<(), Error> {
+pub async fn connect_with_posture(location_id: Id, handle: AppHandle) -> Result<(), Error> {
     debug!("Received a command to connect with posture check to location with ID {location_id}");
     connect_with_posture_check(location_id, &handle).await
 }
