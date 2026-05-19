@@ -102,6 +102,10 @@ jobs:
           cd new-ui
           pnpm build
 
+      - name: Build old UI
+        run: |
+          pnpm build
+
       - name: Build packages
         uses: tauri-apps/tauri-action@v0.5.23
         env:

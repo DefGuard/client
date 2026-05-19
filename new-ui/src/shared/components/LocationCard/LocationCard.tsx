@@ -17,6 +17,7 @@ import { LocationCardViews, type LocationCardViewsValue } from './context/types'
 import { ConnectedView } from './views/ConnectedView/ConnectedView';
 import { DefaultView } from './views/DefaultView/DefaultView';
 import { LocationCardMfaEmailView } from './views/LocationCardMfaEmailView/LocationCardMfaEmailView';
+import { LocationCardMfaOidcView } from './views/LocationCardMfaOidcView/LocationCardMfaOidcView';
 import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
 import { LocationCardMfaTotpView } from './views/LocationCardMfaTotpView/LocationCardMfaTotpView';
 
@@ -32,7 +33,7 @@ const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.Default]: <DefaultView />,
   [LocationCardViews.MfaTotp]: <LocationCardMfaTotpView />,
   [LocationCardViews.MfaEmail]: <LocationCardMfaEmailView />,
-  [LocationCardViews.MfaOidc]: null,
+  [LocationCardViews.MfaOidc]: <LocationCardMfaOidcView />,
   [LocationCardViews.MfaMobile]: null,
   [LocationCardViews.MfaSettings]: <LocationCardMfaSettings />,
   [LocationCardViews.Connecting]: null,

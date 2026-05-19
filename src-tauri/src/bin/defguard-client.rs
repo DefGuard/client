@@ -33,7 +33,7 @@ use defguard_client::{
     LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
-use tauri::{AppHandle, Builder, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Builder, Manager, RunEvent, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[macro_use]
@@ -350,24 +350,14 @@ fn main() {
             app.manage(state);
 
             // Open new UI window.
-            let new_url = if cfg!(defguard_client_dev) {
-                WebviewUrl::External("http://localhost:5072".parse().unwrap())
-            } else {
-                WebviewUrl::App("new-ui/".into())
-            };
-            WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_url)
+            WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
                 .title("New UI")
                 .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
                 .visible(false)
                 .build()?;
 
             // Open old UI window.
-            let old_url = if cfg!(defguard_client_dev) {
-                WebviewUrl::External("http://localhost:5071".parse().unwrap())
-            } else {
-                WebviewUrl::App("old-ui/index.html/".into())
-            };
-            WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_url)
+            WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_ui_url())
                 .title("Old UI")
                 .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
                 .build()?;
