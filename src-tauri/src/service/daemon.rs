@@ -23,7 +23,7 @@ use tonic::{
     transport::Server,
     Code, Response, Status,
 };
-use tracing::{debug, error, info, info_span, Instrument};
+use tracing::{debug, error, info, info_span, warn, Instrument};
 
 use super::{
     config::Config,
@@ -245,11 +245,11 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
-        debug!(
-            "Get posture data request received, this is currently not supported on Unix systems"
+        warn!(
+            "Daemon service received a get_posture_data request. Daemon posture requests are only supported on windows systems. Unix systems perform client-side posture checks."
         );
         Err(Status::unimplemented(
-            "Posture data is not supported on Unix systems",
+            "Service-side posture checks are only supported on Unix systems",
         ))
     }
 

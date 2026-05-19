@@ -47,7 +47,7 @@ pub async fn connect_with_posture_check(
     let posture_data = DevicePostureData::new();
 
     let request = DevicePostureCheckRequest {
-        location_id,
+        location_id: location.network_id,
         pubkey: keys.pubkey,
         device_posture_data: Some(posture_data),
     };
