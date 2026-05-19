@@ -29,7 +29,10 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::{periodic::config::poll_instance, provisioning::ProvisioningConfig},
+    enterprise::{
+        periodic::config::poll_instance, posture::authorize_posture_session,
+        provisioning::ProvisioningConfig,
+    },
     error::Error,
     events::EventKey,
     log_watcher::{
@@ -37,6 +40,7 @@ use crate::{
         service_log_watcher::stop_log_watcher_task,
     },
     proto::defguard::client_types::DeviceConfigResponse,
+    service::proto::defguard::enterprise::posture::v2::DevicePostureData,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         construct_platform_header, disconnect_interface, get_location_interface_details,
@@ -50,7 +54,7 @@ use crate::{
 use crate::{
     service::{
         client::DAEMON_CLIENT,
-        proto::{
+        proto::defguard::client::v1::{
             DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
         },
     },
@@ -72,6 +76,11 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
+            let preshared_key = if location.posture_check_required && preshared_key.is_none() {
+                Some(authorize_posture_session(&location).await?)
+            } else {
+                preshared_key
+            };
             handle_connection_for_location(&location, preshared_key, &handle).await?;
             reload_tray_menu(&handle).await;
             info!("Connected to location {location}");
@@ -490,6 +499,7 @@ pub struct LocationInfo {
     pub pubkey: String,
     pub network_id: Id,
     pub location_mfa_mode: LocationMfaMode,
+    pub posture_check_required: bool,
     pub mfa_method: Option<LocationMfaMethod>,
 }
 
@@ -543,6 +553,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             pubkey: location.pubkey,
             network_id: location.network_id,
             location_mfa_mode: location.location_mfa_mode,
+            posture_check_required: location.posture_check_required,
             mfa_method: location.mfa_method,
         };
         location_info.push(info);
@@ -1519,6 +1530,28 @@ pub fn get_provisioning_config(
 #[must_use]
 pub fn get_platform_header() -> String {
     construct_platform_header()
+}
+
+#[tauri::command(async)]
+#[cfg(not(windows))]
+pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
+    debug!("Received a command to prepare posture report");
+    Ok(DevicePostureData::new())
+}
+
+#[tauri::command(async)]
+#[cfg(windows)]
+pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
+    debug!("Received a command to prepare posture report");
+    DAEMON_CLIENT
+        .clone()
+        .get_posture_data(tonic::Request::new(()))
+        .await
+        .map(|response| response.into_inner())
+        .map_err(|err| {
+            error!("Failed to get posture data from the daemon: {err}");
+            Error::InternalError(format!("Failed to get posture data from the daemon: {err}"))
+        })
 }
 
 #[derive(Debug, Serialize)]

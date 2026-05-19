@@ -12,11 +12,12 @@ use tower::service_fn;
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
+use crate::service::proto::defguard::client::v1::desktop_daemon_service_client::DesktopDaemonServiceClient;
+
 #[cfg(unix)]
 use super::daemon::DAEMON_SOCKET_PATH;
 #[cfg(windows)]
 use super::named_pipe::PIPE_NAME;
-use super::proto::desktop_daemon_service_client::DesktopDaemonServiceClient;
 
 pub(crate) static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> =
     LazyLock::new(|| {

@@ -36,4 +36,5 @@ commands.allow = [
   "swap_to_old_ui",
   "all_active_connections",
   "disconnect_locations",
+  "get_posture_data",
 ]

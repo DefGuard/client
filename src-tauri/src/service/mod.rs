@@ -1,9 +1,8 @@
 #[cfg(not(target_os = "macos"))]
 pub mod client;
 pub mod config;
-pub mod proto {
-    tonic::include_proto!("defguard.client.v1");
-}
+pub mod proto;
+
 #[cfg(not(target_os = "macos"))]
 pub mod daemon;
 #[cfg(windows)]
@@ -21,7 +20,11 @@ use defguard_wireguard_rs::{
     host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
 };
 
-impl From<InterfaceConfiguration> for proto::InterfaceConfig {
+use crate::service::proto::defguard::client::v1::{
+    InterfaceConfig, InterfaceData, Peer as ProtoPeer,
+};
+
+impl From<InterfaceConfiguration> for InterfaceConfig {
     fn from(config: InterfaceConfiguration) -> Self {
         Self {
             name: config.name,
@@ -39,8 +42,8 @@ impl From<InterfaceConfiguration> for proto::InterfaceConfig {
     }
 }
 
-impl From<proto::InterfaceConfig> for InterfaceConfiguration {
-    fn from(config: proto::InterfaceConfig) -> Self {
+impl From<InterfaceConfig> for InterfaceConfiguration {
+    fn from(config: InterfaceConfig) -> Self {
         let addresses = config
             .address
             .split(',')
@@ -58,7 +61,7 @@ impl From<proto::InterfaceConfig> for InterfaceConfiguration {
     }
 }
 
-impl From<Peer> for proto::Peer {
+impl From<Peer> for ProtoPeer {
     fn from(peer: Peer) -> Self {
         Self {
             public_key: peer.public_key.to_lower_hex(),
@@ -82,8 +85,8 @@ impl From<Peer> for proto::Peer {
     }
 }
 
-impl From<proto::Peer> for Peer {
-    fn from(peer: proto::Peer) -> Self {
+impl From<ProtoPeer> for Peer {
+    fn from(peer: ProtoPeer) -> Self {
         Self {
             public_key: Key::decode(peer.public_key).expect("Failed to parse public key"),
             preshared_key: peer
@@ -111,7 +114,7 @@ impl From<proto::Peer> for Peer {
     }
 }
 
-impl From<Host> for proto::InterfaceData {
+impl From<Host> for InterfaceData {
     fn from(host: Host) -> Self {
         Self {
             listen_port: u32::from(host.listen_port),
@@ -143,7 +146,7 @@ mod tests {
         base_peer.tx_bytes = 100;
         base_peer.rx_bytes = 200;
 
-        let proto_peer: proto::Peer = base_peer.clone().into();
+        let proto_peer: ProtoPeer = base_peer.clone().into();
 
         let converted_peer: Peer = proto_peer.into();
 
