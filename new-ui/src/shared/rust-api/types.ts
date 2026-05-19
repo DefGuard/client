@@ -286,8 +286,6 @@ export type SaveDeviceConfigResponse = {
   locations: LocationInfo[];
 };
 
-// ── Request argument types ───────────────────────────────────────────────────
-
 export type ConnectionArgs = {
   locationId: number;
   connectionType: ConnectionType;
