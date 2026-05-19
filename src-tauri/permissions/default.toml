@@ -6,6 +6,7 @@ commands.allow = [
   "save_device_config",
   "all_instances",
   "connect",
+  "connect_with_posture",
   "disconnect",
   "update_instance",
   "location_stats",
@@ -36,4 +37,5 @@ commands.allow = [
   "swap_to_old_ui",
   "all_active_connections",
   "disconnect_locations",
+  "get_posture_data",
 ]
