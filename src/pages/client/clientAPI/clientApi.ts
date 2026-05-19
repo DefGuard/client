@@ -68,9 +68,6 @@ const getLocations = async (
 const connect = async (data: ConnectionRequest): Promise<void> =>
   invokeWrapper('connect', data);
 
-const connectWithPosture = async (data: ConnectionRequest): Promise<void> =>
-  invokeWrapper('connect_with_posture', data);
-
 const disconnect = async (data: ConnectionRequest): Promise<void> =>
   invokeWrapper('disconnect', data);
 
@@ -159,7 +156,6 @@ export const clientApi = {
   getTunnels,
   getLocations,
   connect,
-  connectWithPosture,
   disconnect,
   getLocationStats,
   getLastConnection,

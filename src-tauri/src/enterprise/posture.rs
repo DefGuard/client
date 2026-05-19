@@ -1,6 +1,5 @@
 use reqwest::StatusCode;
 use serde::Deserialize;
-use tauri::AppHandle;
 
 use crate::{
     database::{
@@ -11,19 +10,13 @@ use crate::{
     service::proto::defguard::enterprise::posture::v2::{
         DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
     },
-    tray::{configure_tray_icon, reload_tray_menu},
-    utils::{handle_connection_for_location, post_with_headers},
+    utils::post_with_headers,
 };
 
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
-/// Collects device posture data, sends it to the proxy, and on success establishes
-/// the WireGuard tunnel using the returned preshared key.
-pub async fn connect_with_posture_check(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
-    let location = Location::find_by_id(&*DB_POOL, location_id)
-        .await?
-        .ok_or(Error::NotFound)?;
-
+/// Collects device posture data, sends it to the proxy, and returns the runtime preshared key.
+pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String, Error> {
     let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
         .await?
         .ok_or(Error::NotFound)?;
@@ -61,12 +54,8 @@ pub async fn connect_with_posture_check(location_id: Id, handle: &AppHandle) -> 
                 .json()
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
-            debug!("Posture check approved for location {location_id}, connecting...");
-            handle_connection_for_location(&location, Some(body.preshared_key), handle).await?;
-            reload_tray_menu(handle).await;
-            configure_tray_icon(handle).await?;
-            info!("Connected to location {location} after posture check");
-            Ok(())
+            info!("Posture check approved for location {}", location.id);
+            Ok(body.preshared_key)
         }
         StatusCode::FORBIDDEN => {
             #[derive(Deserialize)]
@@ -78,8 +67,8 @@ pub async fn connect_with_posture_check(location_id: Id, handle: &AppHandle) -> 
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
             error!(
-                "Posture check rejected for location {location_id}: {}",
-                body.error
+                "Posture check rejected for location {}: {}",
+                location.id, body.error
             );
             Err(Error::PostureCheckFailed(body.error))
         }

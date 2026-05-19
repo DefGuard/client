@@ -159,7 +159,6 @@ fn main() {
             save_device_config,
             all_instances,
             connect,
-            connect_with_posture,
             disconnect,
             update_instance,
             location_stats,

@@ -17,7 +17,7 @@ import { clientApi } from '../../../../../../clientAPI/clientApi';
 import { type CommonWireguardFields, LocationMfaType } from '../../../../../../types';
 import { useMFAModal } from '../../modals/MFAModal/useMFAModal';
 
-const { connect, connectWithPosture, disconnect } = clientApi;
+const { connect, disconnect } = clientApi;
 
 type Props = {
   location?: CommonWireguardFields;
@@ -50,11 +50,6 @@ export const LocationCardConnectButton = ({ location }: Props) => {
         } else {
           if (mfaEnabled) {
             openMFAModal(location);
-          } else if (location.posture_check_required) {
-            await connectWithPosture({
-              locationId: location.id,
-              connectionType: location.connection_type,
-            });
           } else {
             await connect({
               locationId: location?.id,
