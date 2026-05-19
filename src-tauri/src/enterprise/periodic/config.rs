@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter, Url};
@@ -24,13 +24,11 @@ use crate::{
     proto::defguard::client_types::{
         DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse,
     },
-    utils::construct_platform_header,
-    CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION,
-    PKG_VERSION,
+    utils::post_with_headers,
+    MIN_CORE_VERSION, MIN_PROXY_VERSION,
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
-const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
 /// Periodically retrieves and updates configuration for all [`Instance`]s.
@@ -138,14 +136,7 @@ pub async fn poll_instance(
                 instance.proxy_url
             ))
         })?;
-    let response = Client::new()
-        .post(url)
-        .json(&request)
-        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
-        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
-        .timeout(HTTP_REQ_TIMEOUT)
-        .send()
-        .await;
+    let response = post_with_headers(url, &request).await;
     let response = response.map_err(|err| {
         Error::InternalError(format!(
             "HTTP request failed for instance {}({}), url: {}, {err}",

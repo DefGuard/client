@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
 use serde::Deserialize;
 use tauri::AppHandle;
 
@@ -14,11 +12,9 @@ use crate::{
         DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
     },
     tray::{configure_tray_icon, reload_tray_menu},
-    utils::{construct_platform_header, handle_connection_for_location},
-    CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION,
+    utils::{handle_connection_for_location, post_with_headers},
 };
 
-const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
 /// Collects device posture data, sends it to the proxy, and on success establishes
@@ -55,13 +51,7 @@ pub async fn connect_with_posture_check(location_id: Id, handle: &AppHandle) -> 
         .map_err(|e| Error::InternalError(format!("Failed to build posture URL: {e}")))?;
 
     debug!("Sending posture check request to {proxy_url}");
-    let response = Client::new()
-        .post(proxy_url)
-        .json(&request)
-        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
-        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
-        .timeout(HTTP_TIMEOUT)
-        .send()
+    let response = post_with_headers(proxy_url, &request)
         .await
         .map_err(|e| Error::HttpError(e.to_string()))?;
 
