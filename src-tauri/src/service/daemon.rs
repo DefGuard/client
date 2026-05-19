@@ -37,7 +37,6 @@ use super::{
 use crate::enterprise::service_locations::ServiceLocationManager;
 #[cfg(windows)]
 use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-#[cfg(not(windows))]
 use crate::service::proto::defguard::enterprise::posture::v2::DevicePostureData;
 use crate::{enterprise::service_locations::ServiceLocationError, VERSION};
 

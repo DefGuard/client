@@ -33,6 +33,7 @@ in
       sqlx-cli
       vtsls
       trivy
+      just
     ];
 
     shellHook = with pkgs; ''
