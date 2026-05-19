@@ -15,6 +15,7 @@
   "dependencies": {
     "@biomejs/biome": "^2.4.15",
     "@floating-ui/react": "^0.27.19",
+    "@stablelib/base64": "^2.0.1",
     "@tanstack/react-form": "^1.32.0",
     "@tanstack/react-query": "^5.100.10",
     "@tanstack/react-router": "^1.170.4",
