@@ -6,7 +6,7 @@ use tauri::AppHandle;
 
 use crate::{
     database::{
-        models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys},
+        models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
         DB_POOL,
     },
     error::Error,
@@ -23,10 +23,7 @@ const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
 /// Collects device posture data, sends it to the proxy, and on success establishes
 /// the WireGuard tunnel using the returned preshared key.
-pub async fn connect_with_posture_check(
-    location_id: crate::database::models::Id,
-    handle: &AppHandle,
-) -> Result<(), Error> {
+pub async fn connect_with_posture_check(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
     let location = Location::find_by_id(&*DB_POOL, location_id)
         .await?
         .ok_or(Error::NotFound)?;
