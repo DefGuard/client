@@ -1,5 +1,6 @@
 use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
+#[cfg(not(target_os = "linux"))]
 use crate::database::{models::location::Location, DB_POOL};
 
 /// Returns `true` if there are any non-service locations in the database.
