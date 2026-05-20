@@ -2,7 +2,6 @@
 
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
-
 use wmi::{AuthLevel, WMIConnection, WMIError};
 
 use super::UnavailableReason;
