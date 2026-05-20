@@ -13,7 +13,8 @@ use sysinfo::System;
 
 use crate::{
     proto::defguard::enterprise::posture::v2::{
-        bool_check, string_check, BoolCheck, DevicePostureData, StringCheck, UnavailableReason,
+        bool_check, int32_check, string_check, BoolCheck, DevicePostureData, Int32Check,
+        StringCheck, UnavailableReason,
     },
     VERSION,
 };
@@ -109,11 +110,11 @@ fn device_integrity() -> Result<bool, UnavailableReason> {
     Err(UnavailableReason::NotApplicable)
 }
 
-/// Returns the security update status.
-fn security_update_status() -> Result<bool, UnavailableReason> {
+/// Returns the number of days since the last installed Windows security update.
+fn security_update_age_days() -> Result<i32, UnavailableReason> {
     #[cfg(windows)]
     {
-        windows::security_update_status()
+        windows::security_update_age_days()
     }
 
     #[cfg(not(windows))]
@@ -129,6 +130,18 @@ impl From<Result<bool, UnavailableReason>> for BoolCheck {
             result: Some(match value {
                 Ok(inner) => bool_check::Result::Value(inner),
                 Err(err) => bool_check::Result::Unavailable(err as i32),
+            }),
+        }
+    }
+}
+
+/// Convert `Result` to `Int32Check`.
+impl From<Result<i32, UnavailableReason>> for Int32Check {
+    fn from(value: Result<i32, UnavailableReason>) -> Self {
+        Self {
+            result: Some(match value {
+                Ok(inner) => int32_check::Result::Value(inner),
+                Err(err) => int32_check::Result::Unavailable(err as i32),
             }),
         }
     }
@@ -159,7 +172,7 @@ impl DevicePostureData {
             disk_encryption: Some(BoolCheck::from(disk_encryption_status())),
             antivirus_present: Some(BoolCheck::from(anti_virus_status())),
             windows_ad_domain_joined: Some(BoolCheck::from(part_of_domain())),
-            windows_security_update_current: Some(BoolCheck::from(security_update_status())),
+            windows_security_update_age_days: Some(Int32Check::from(security_update_age_days())),
             linux_kernel_version: Some(StringCheck::from(linux_kernel_version())),
             device_integrity: Some(BoolCheck::from(device_integrity())),
         }
