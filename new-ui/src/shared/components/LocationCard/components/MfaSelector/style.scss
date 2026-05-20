@@ -3,7 +3,7 @@
   --border: var(--border-default);
   --icon: var(--fg-white-80);
   --color: var(--fg-white-80);
-  --box-shadow: box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0);
+  --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 0%);
 
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) 16px;
@@ -36,7 +36,7 @@
     --color: var(--fg-white-100);
     --border: var(--border-action-disabled);
     --icon: var(--fg-white-100);
-    --box-shadow: box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0.05);
+    --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 5%);
   }
 
   > .middle {
