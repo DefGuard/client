@@ -15,7 +15,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
+    window_manager::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
     ConnectionType,
 };
 

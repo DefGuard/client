@@ -29,11 +29,11 @@ use defguard_client::{
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
     utils::load_log_targets,
-    window::*,
+    window_manager::*,
     LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
-use tauri::{AppHandle, Builder, Manager, RunEvent, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[macro_use]
@@ -348,18 +348,7 @@ fn main() {
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
-            // Open new UI window.
-            WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
-                .title("New UI")
-                .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
-                .visible(false)
-                .build()?;
-
-            // Open old UI window.
-            WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_ui_url())
-                .title("Old UI")
-                .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
-                .build()?;
+            WindowManager::open_full_view(app_handle)?;
 
             info!("App setup completed, log level: {log_level}");
             Ok(())
