@@ -2,12 +2,9 @@
 
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
-
 use wmi::{AuthLevel, WMIConnection, WMIError};
 
 use super::UnavailableReason;
-
-const MAX_QUICKFIX_DAYS: i64 = 60;
 
 #[derive(Deserialize)]
 #[serde(rename = "Win32_EncryptableVolume")]
@@ -137,28 +134,24 @@ pub(super) fn part_of_domain() -> Result<bool, UnavailableReason> {
     Ok(system.part_of_domain)
 }
 
-/// Find the latest security patch.
+/// Number of days since the most recently installed security patch.
 ///
 /// Check manually in PowerShell:
 /// `Get-CimInstance -ClassName Win32_QuickFixEngineering`
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -query "SELECT * FROM Win32_QuickFixEngineering"`
-pub(super) fn security_update_status() -> Result<bool, UnavailableReason> {
+pub(super) fn security_update_age_days() -> Result<i32, UnavailableReason> {
     let conn = WMIConnection::new()?;
     let fixes: Vec<Win32QuickFixEngineering> = conn.query()?;
 
-    // Days from today
     let today = OffsetDateTime::now_utc().date();
-    let mut max_days = i64::MAX;
-    for fix in fixes {
-        if let Some(installed_on) = fix.installed_on {
-            let days = (today - installed_on).whole_days();
-            if days < max_days {
-                max_days = days;
-            }
-        }
-    }
+    let min_days = fixes
+        .into_iter()
+        .filter_map(|fix| fix.installed_on)
+        .map(|installed_on| (today - installed_on).whole_days())
+        .min()
+        .ok_or(UnavailableReason::DetectionFailed)?;
 
-    Ok(max_days <= MAX_QUICKFIX_DAYS)
+    i32::try_from(min_days).map_err(|_| UnavailableReason::DetectionFailed)
 }

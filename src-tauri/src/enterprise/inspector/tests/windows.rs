@@ -1,6 +1,6 @@
 use super::super::{
     anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
-    security_update_status,
+    security_update_age_days,
 };
 
 #[test]
@@ -33,6 +33,6 @@ fn test_part_of_domain() {
 
 #[test]
 #[ignore = "development machine only"]
-fn test_security_update_status() {
-    assert!(security_update_status().unwrap());
+fn test_security_update_age_days() {
+    assert!(security_update_age_days().unwrap() >= 0);
 }
