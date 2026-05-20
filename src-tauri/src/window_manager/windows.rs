@@ -192,13 +192,13 @@ impl WindowManager {
             let icon_width = 0;
             let icon_height = 0;
 
-            let icon_center_x = icon_x + (icon_width as i32 / 2);
+            let icon_center_x = icon_x + (icon_width / 2);
             let default_x = icon_center_x - (physical_width / 2);
             let max_x = work_right - physical_gap - physical_width;
             let min_x = work_left + physical_gap;
             let clamped_x = default_x.clamp(min_x, max_x);
 
-            let icon_center_y = icon_y + (icon_height as i32 / 2);
+            let icon_center_y = icon_y + (icon_height / 2);
             let default_y = icon_center_y - (physical_height / 2);
             let max_y = work_bottom - physical_gap - physical_height;
             let min_y = work_top + physical_gap;
