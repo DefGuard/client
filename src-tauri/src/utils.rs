@@ -1,7 +1,5 @@
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
-#[cfg(target_os = "macos")]
-use std::time::Duration;
 use std::{env, path::Path, process::Command, time::Duration};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
