@@ -3,6 +3,7 @@ use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use crate::database::{models::location::Location, DB_POOL};
 
 /// Returns `true` if there are any non-service locations in the database.
+#[cfg(not(target_os = "linux"))]
 pub async fn has_non_service_locations() -> bool {
     match Location::all(&*DB_POOL, false).await {
         Ok(locations) => !locations.is_empty(),

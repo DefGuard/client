@@ -28,8 +28,9 @@ fn get_tray_window_position(
     size: PhysicalSize<u32>,
 ) -> Option<LogicalPosition<f64>> {
     let app_state = app.state::<AppState>();
+    let tray_click_position = app_state.tray_click_position.lock().unwrap().to_owned();
 
-    if let Some(tray_position) = app_state.tray_click_position.lock().unwrap().to_owned() {
+    if let Some(tray_position) = tray_click_position {
         let monitor = get_monitor_for_position(app, tray_position.x, tray_position.y)?;
 
         let scale_factor = monitor.scale_factor();
