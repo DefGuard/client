@@ -23,7 +23,9 @@ use tonic::{
     transport::Server,
     Code, Response, Status,
 };
-use tracing::{debug, error, info, info_span, warn, Instrument};
+#[cfg(not(windows))]
+use tracing::warn;
+use tracing::{debug, error, info, info_span, Instrument};
 
 use super::{
     config::Config,
@@ -33,12 +35,15 @@ use super::{
         ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
 };
+use crate::{
+    enterprise::service_locations::ServiceLocationError,
+    service::proto::defguard::enterprise::posture::v2::DevicePostureData, VERSION,
+};
 #[cfg(windows)]
-use crate::enterprise::service_locations::ServiceLocationManager;
-#[cfg(windows)]
-use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-use crate::service::proto::defguard::enterprise::posture::v2::DevicePostureData;
-use crate::{enterprise::service_locations::ServiceLocationError, VERSION};
+use crate::{
+    enterprise::service_locations::ServiceLocationManager,
+    service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME},
+};
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";

@@ -36,10 +36,10 @@ fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
     let position = match event {
         TrayIconEvent::Click {
             button_state: MouseButtonState::Down,
-            position,
+            rect,
             ..
         }
-        | TrayIconEvent::DoubleClick { position, .. } => Some(*position),
+        | TrayIconEvent::DoubleClick { rect, .. } => Some(rect.position.to_physical(1.0)),
         _ => None,
     };
 
