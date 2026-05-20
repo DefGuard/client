@@ -1,6 +1,6 @@
 use tauri::{
-    webview::WebviewWindowBuilder, AppHandle, LogicalPosition, Manager, Monitor, Position,
-    WebviewUrl, WebviewWindow,
+    webview::WebviewWindowBuilder, AppHandle, LogicalPosition, Manager, Monitor, PhysicalSize,
+    Position, WebviewUrl, WebviewWindow,
 };
 
 use crate::appstate::AppState;
@@ -11,6 +11,10 @@ pub const NEW_UI_WIDTH: f64 = 360.0;
 pub const NEW_UI_HEIGHT: f64 = 675.0;
 pub const OLD_UI_WIDTH: f64 = 920.0;
 pub const OLD_UI_HEIGHT: f64 = 720.0;
+#[cfg(windows)]
+const TASKBAR_HEIGHT: f64 = 48.0;
+#[cfg(not(windows))]
+const TASKBAR_HEIGHT: f64 = 0.0;
 
 #[must_use]
 pub fn new_ui_url() -> WebviewUrl {
@@ -52,8 +56,7 @@ fn get_monitor_for_position(app: &AppHandle, x: f64, y: f64) -> Option<Monitor> 
 
 fn get_tray_window_position(
     app: &AppHandle,
-    width: f64,
-    height: f64,
+    size: PhysicalSize<u32>,
 ) -> Option<LogicalPosition<f64>> {
     let app_state = app.state::<AppState>();
     let tray_position = app_state.tray_click_position.lock().unwrap().to_owned()?;
@@ -64,29 +67,26 @@ fn get_tray_window_position(
     let monitor_position = monitor.position().to_logical::<f64>(scale_factor);
     let monitor_size = monitor.size().to_logical::<f64>(scale_factor);
     let tray_position = tray_position.to_logical::<f64>(scale_factor);
+    let window_size = size.to_logical::<f64>(scale_factor);
 
-    let mut x = tray_position.x - (width / 2.0);
-    let center_y = monitor_position.y + (monitor_size.height / 2.0);
-    let mut y = if tray_position.y < center_y {
-        tray_position.y
-    } else {
-        tray_position.y - height
-    };
+    let mut x = tray_position.x;
+    let mut y = tray_position.y;
 
     x = x.clamp(
         monitor_position.x,
-        monitor_position.x + monitor_size.width - width,
+        monitor_position.x + monitor_size.width - window_size.width,
     );
     y = y.clamp(
         monitor_position.y,
-        monitor_position.y + monitor_size.height - height,
+        monitor_position.y + monitor_size.height - window_size.height - TASKBAR_HEIGHT,
     );
 
     Some(LogicalPosition::new(x, y))
 }
 
-fn position_window_near_tray(app: &AppHandle, window: &WebviewWindow, width: f64, height: f64) {
-    if let Some(position) = get_tray_window_position(app, width, height) {
+fn position_window_near_tray(app: &AppHandle, window: &WebviewWindow) {
+    let size = window.outer_size().unwrap_or_default();
+    if let Some(position) = get_tray_window_position(app, size) {
         if let Err(err) = window.set_position(Position::Logical(position)) {
             warn!("Failed to position window near tray icon: {err}");
         }
@@ -105,7 +105,7 @@ fn show_new_ui_window_internal(app: &AppHandle, near_tray: bool) {
             .unwrap()
     };
     if near_tray {
-        position_window_near_tray(app, &window, NEW_UI_WIDTH, NEW_UI_HEIGHT);
+        position_window_near_tray(app, &window);
     }
     #[cfg(target_os = "macos")]
     let _ = app.show();
