@@ -1,8 +1,6 @@
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
-#[cfg(target_os = "macos")]
-use std::time::Duration;
-use std::{env, path::Path, process::Command};
+use std::{env, path::Path, process::Command, time::Duration};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 #[cfg(not(target_os = "macos"))]
@@ -10,6 +8,8 @@ use common::{find_free_tcp_port, get_interface_name};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use prost::Message;
+use reqwest::{Client, Response};
+use serde::Serialize;
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
@@ -44,14 +44,16 @@ use crate::{
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     proto::defguard::client_types::ClientPlatformInfo,
-    ConnectionType,
+    ConnectionType, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION,
 };
 #[cfg(not(target_os = "macos"))]
 use crate::{
     database::models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
     service::{
         client::DAEMON_CLIENT,
-        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
+        proto::defguard::client::v1::{
+            CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+        },
     },
 };
 
@@ -1115,4 +1117,22 @@ pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>)
     let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
     let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
     (tunnels, locations)
+}
+
+const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
+pub(crate) async fn post_with_headers<T>(
+    url: tauri::Url,
+    data: &T,
+) -> Result<Response, reqwest::Error>
+where
+    T: Serialize + ?Sized,
+{
+    Client::new()
+        .post(url)
+        .json(data)
+        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
+        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
+        .timeout(HTTP_REQ_TIMEOUT)
+        .send()
+        .await
 }

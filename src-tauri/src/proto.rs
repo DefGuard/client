@@ -1,26 +1,18 @@
 use crate::database::models::{
-    location::{Location, LocationMfaMode as MfaMode, ServiceLocationMode as SLocationMode},
+    location::{
+        infer_mfa_method, Location, LocationMfaMode as MfaMode,
+        ServiceLocationMode as SLocationMode,
+    },
     Id, NoId,
 };
 
 pub(crate) mod defguard {
-    #[allow(dead_code)]
-    pub(crate) mod enterprise {
-        pub(crate) mod posture {
-            pub(crate) mod v2 {
-                tonic::include_proto!("defguard.enterprise.posture.v2");
-            }
-        }
-    }
+    pub(crate) use crate::service::proto::defguard::client_types;
 
     pub(crate) mod proxy {
         pub(crate) mod v1 {
             tonic::include_proto!("defguard.proxy.v1");
         }
-    }
-
-    pub mod client_types {
-        tonic::include_proto!("defguard.client_types");
     }
 }
 
@@ -60,6 +52,7 @@ impl defguard::client_types::DeviceConfig {
             keepalive_interval: self.keepalive_interval.into(),
             location_mfa_mode,
             service_location_mode,
+            mfa_method: infer_mfa_method(location_mfa_mode, None),
             posture_check_required: self.posture_check_required.unwrap_or_default(),
         }
     }

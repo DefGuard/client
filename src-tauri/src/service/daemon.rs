@@ -23,23 +23,26 @@ use tonic::{
     transport::Server,
     Code, Response, Status,
 };
+#[cfg(not(windows))]
+use tracing::warn;
 use tracing::{debug, error, info, info_span, Instrument};
 
 use super::{
     config::Config,
-    proto::{
+    proto::defguard::client::v1::{
         desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-        CreateInterfaceRequest, InterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
+        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
 };
-#[cfg(windows)]
-use crate::enterprise::service_locations::ServiceLocationManager;
-#[cfg(windows)]
-use crate::service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
 use crate::{
     enterprise::service_locations::ServiceLocationError,
-    service::proto::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
-    VERSION,
+    service::proto::defguard::enterprise::posture::v2::DevicePostureData, VERSION,
+};
+#[cfg(windows)]
+use crate::{
+    enterprise::service_locations::ServiceLocationManager,
+    service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME},
 };
 
 #[cfg(unix)]
@@ -239,6 +242,19 @@ impl DesktopDaemonService for DaemonService {
         }
 
         Ok(Response::new(()))
+    }
+
+    #[cfg(not(windows))]
+    async fn get_posture_data(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<DevicePostureData>, Status> {
+        warn!(
+            "Daemon service received a get_posture_data request. Daemon posture requests are only supported on windows systems. Unix systems perform client-side posture checks."
+        );
+        Err(Status::unimplemented(
+            "Service-side posture checks are only supported on Unix systems",
+        ))
     }
 
     #[cfg(windows)]
@@ -496,6 +512,15 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::ReadInterfaceDataStream
         ))
+    }
+
+    #[cfg(windows)]
+    async fn get_posture_data(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<DevicePostureData>, Status> {
+        debug!("Get posture data request received");
+        Ok(Response::new(DevicePostureData::new()))
     }
 }
 

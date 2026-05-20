@@ -1,0 +1,69 @@
+.location-card {
+  border-radius: 12px;
+  box-sizing: border-box;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--bg-dark-blue-40);
+
+  > .top-track {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    user-select: none;
+
+    > .left {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-md);
+
+      > .info {
+        display: flex;
+        flex-flow: column;
+
+        .label {
+          font: var(--t-body-xs-400);
+          color: var(--fg-white-70);
+        }
+
+        .location-name {
+          font: var(--t-body-primary-600);
+          color: var(--fg-white-100);
+        }
+
+        > .bottom {
+          display: flex;
+          flex-flow: row nowrap;
+          align-items: center;
+          justify-content: flex-start;
+          column-gap: var(--spacing-sm);
+        }
+
+        .online-badge {
+          display: inline-block;
+          box-sizing: border-box;
+          padding: 1px 4px;
+          border-radius: 4px;
+          background-color: #74ffb8;
+
+          p {
+            font-family: var(--font-family-body);
+            font-size: 10px;
+            letter-spacing: 0.1px;
+            font-weight: 600;
+            color: #2f50c2;
+          }
+        }
+      }
+    }
+
+    > .right {
+      margin-left: auto;
+    }
+  }
+
+  .controls {
+    padding-top: var(--spacing-3xl);
+  }
+}

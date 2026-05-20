@@ -1,0 +1,25 @@
+#window-header {
+  &.variant {
+    &-compact {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-lg);
+      padding-bottom: var(--spacing-lg);
+    }
+  }
+
+  > .info {
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
+    row-gap: var(--spacing-xs);
+
+    > .label {
+      font: var(--t-body-sm-500);
+      color: var(--fg-white-100);
+      text-align: left;
+    }
+  }
+}

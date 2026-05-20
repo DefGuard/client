@@ -1,10 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "build": {
-    "beforeBuildCommand": "pnpm build",
-    "beforeDevCommand": "pnpm dev",
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:3001"
+    "devUrl": "http://localhost:5072"
   },
   "bundle": {
     "active": true,
@@ -86,7 +84,7 @@
   "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
-  "version": "1.6.9",
+  "version": "2.1.0",
   "app": {
     "security": {
       "capabilities": [
@@ -94,23 +92,7 @@
       ],
       "csp": null
     },
-    "windows": [
-      {
-        "fullscreen": false,
-        "center": true,
-        "maximized": true,
-        "height": 720,
-        "resizable": true,
-        "maximizable": true,
-        "minimizable": true,
-        "closable": true,
-        "title": "Defguard",
-        "width": 992,
-        "minWidth": 650,
-        "minHeight": 450,
-        "useHttpsScheme": true
-      }
-    ]
+    "windows": []
   },
   "plugins": {
     "deep-link": {

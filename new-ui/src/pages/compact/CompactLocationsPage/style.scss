@@ -1,0 +1,31 @@
+#compact-locations-page {
+  display: flex;
+  flex-flow: column;
+  min-height: 100dvh;
+
+  > .compact-footer {
+    display: flex;
+    flex-flow: column;
+  }
+
+  > .window-header,
+  > .compact-footer {
+    flex: 0 0 auto;
+  }
+
+  > .scroll-wrap {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+    row-gap: var(--spacing-sm);
+
+    > .locations {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-sm);
+      width: 100%;
+    }
+  }
+}

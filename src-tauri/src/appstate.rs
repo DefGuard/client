@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use tauri::async_runtime::{spawn, JoinHandle};
+use tauri::{
+    async_runtime::{spawn, JoinHandle},
+    PhysicalPosition,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -15,6 +18,7 @@ use crate::{
 pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
+    pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
 }
@@ -25,6 +29,7 @@ impl AppState {
         Self {
             log_watchers: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
+            tray_click_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
         }

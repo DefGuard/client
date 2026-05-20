@@ -1,0 +1,88 @@
+.field-box {
+  --border-color: var(--border-default);
+  --background-color: transparent;
+
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 1fr;
+  align-items: center;
+  column-gap: var(--spacing-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  outline: none;
+  background-color: var(--background-color);
+
+  @include animate(border-color, background-color);
+
+  p,
+  span {
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  &.size-default {
+    min-height: 36px;
+
+    p,
+    span {
+      font: var(--t-input-text-primary);
+      color: var(--fg-white-100);
+    }
+  }
+
+  &.grid-default {
+    grid-template-columns: 1fr;
+  }
+
+  &.grid-left {
+    grid-template-columns: 20px 1fr;
+  }
+
+  &.grid-right {
+    grid-template-columns: 1fr 20px;
+  }
+
+  &.grid-both {
+    grid-template-columns: 20px 1fr 20px;
+  }
+
+  .placeholder {
+    color: var(--fg-white-50);
+    font: var(--t-input-text-primary);
+  }
+
+  .interaction-box {
+    & > button {
+      height: 28px;
+      width: 28px;
+    }
+  }
+
+  &:not(.disabled, .error) {
+    &:hover {
+      --border-color: var(--border-emphasis);
+    }
+
+    &:focus-within,
+    &.focus {
+      --border-color: var(--border-action);
+    }
+  }
+
+  &.error {
+    --border-color: var(--border-critical);
+  }
+
+  &.disabled {
+    --border-color: var(--border-disabled);
+    --background-color: var(--bg-white-10);
+
+    cursor: not-allowed;
+  }
+}

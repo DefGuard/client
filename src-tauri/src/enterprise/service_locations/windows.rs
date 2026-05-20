@@ -32,7 +32,7 @@ use crate::{
     },
     service::{
         daemon::setup_wgapi,
-        proto::{ServiceLocation, ServiceLocationMode},
+        proto::defguard::client::v1::{ServiceLocation, ServiceLocationMode},
     },
 };
 
