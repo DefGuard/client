@@ -57,7 +57,12 @@ const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
       data-network={location.network_id}
       data-id={location.id}
     >
-      <div className="top-track">
+      <div
+        className={clsx('top-track', {
+          interactive: !disableOpen,
+        })}
+        onClick={onOpen}
+      >
         <div className="left">
           <LocationCardIcon />
           <div className="info">
@@ -82,7 +87,6 @@ const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
               icon={IconKind.ArrowSmall}
               variant={isOpen ? IconButtonVariant.SmallSelected : IconButtonVariant.Small}
               iconRotation={isOpen ? Direction.DOWN : Direction.RIGHT}
-              onClick={onOpen}
             />
           )}
         </div>

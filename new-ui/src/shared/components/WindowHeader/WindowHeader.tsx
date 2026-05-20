@@ -11,7 +11,7 @@ export const WindowHeader = ({ variant }: Props) => {
     <div id="window-header" className={clsx(`variant-${variant}`)}>
       <LogoIcon />
       <div className="info">
-        <p>Defguard VPN Client</p>
+        <p className="label">Defguard VPN Client</p>
         <ConnectionWatcher />
       </div>
     </div>

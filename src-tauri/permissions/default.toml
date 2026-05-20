@@ -34,6 +34,7 @@ commands.allow = [
   "open_old_ui_window",
   "swap_to_new_ui",
   "swap_to_old_ui",
+  "close_tray_window",
   "all_active_connections",
   "disconnect_locations",
   "get_posture_data",

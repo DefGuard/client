@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
-import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
+import type { InstanceInfo, LocationInfo, MfaMethodValue } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
@@ -10,6 +10,8 @@ interface LocationCardContextValue {
   previousView: LocationCardViewsValue | null;
   setView: (view: LocationCardViewsValue) => void;
   startMfa: () => void;
+  localMfaMethod: MfaMethodValue;
+  setLocalMfaMethod: (method: MfaMethodValue) => void;
 }
 
 const LocationCardContext = createContext<LocationCardContextValue | null>(null);
@@ -37,6 +39,9 @@ export const LocationCardProvider = ({
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
+  const [localMfaMethod, setLocalMfaMethod] = useState<MfaMethodValue>(
+    location.mfa_method ?? MfaMethod.Totp,
+  );
 
   const setView = useCallback(
     (view: LocationCardViewsValue) => {
@@ -47,7 +52,7 @@ export const LocationCardProvider = ({
   );
 
   const startMfa = useCallback(() => {
-    switch (location.mfa_method) {
+    switch (localMfaMethod) {
       case MfaMethod.Totp:
         setView(LocationCardViews.MfaTotp);
         break;
@@ -61,7 +66,7 @@ export const LocationCardProvider = ({
         setView(LocationCardViews.MfaMobile);
         break;
     }
-  }, [location.mfa_method, setView]);
+  }, [localMfaMethod, setView]);
 
   return (
     <LocationCardContext.Provider
@@ -72,6 +77,8 @@ export const LocationCardProvider = ({
         location,
         instance,
         startMfa,
+        localMfaMethod,
+        setLocalMfaMethod,
       }}
     >
       {children}

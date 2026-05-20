@@ -26,7 +26,6 @@
     display: flex;
     flex-flow: row nowrap;
     align-items: center;
-    cursor: pointer;
     padding: 0 var(--spacing-xs);
     background-color: var(--bg-success);
 
@@ -55,6 +54,8 @@
     font: var(--t-menu-title);
     color: var(--fg-white-60);
     min-height: 24px;
+    line-height: 24px;
+    font-weight: 400;
   }
 
   .connection {
@@ -69,6 +70,10 @@
 
     svg circle {
       fill: var(--bg-success);
+    }
+
+    p {
+      font: var(--t-menu-text);
     }
   }
 

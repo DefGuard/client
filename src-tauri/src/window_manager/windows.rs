@@ -136,13 +136,9 @@ impl WindowManager {
         monitors
     }
 
-    pub fn open_tray(
-        app: &tauri::AppHandle,
-        icon_x: i32,
-        icon_y: i32,
-        icon_width: u32,
-        icon_height: u32,
-    ) -> tauri::Result<tauri::WebviewWindow> {
+    pub fn open_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+        let state = tauri::Manager::state::<crate::appstate::AppState>(app);
+        let tray_pos = *state.tray_click_position.lock().unwrap();
         let monitors = Self::get_monitors();
         let primary = monitors
             .iter()
@@ -190,24 +186,37 @@ impl WindowManager {
                 0
             };
 
-        let icon_center_x = icon_x + (icon_width as i32 / 2);
-        let default_x = icon_center_x - (physical_width / 2);
-        let max_x = work_right - physical_gap - physical_width;
-        let min_x = work_left + physical_gap;
-        let clamped_x = default_x.clamp(min_x, max_x);
+        let (final_x, final_y) = if let Some(pos) = tray_pos {
+            let icon_x = pos.x as i32;
+            let icon_y = pos.y as i32;
+            let icon_width = 0;
+            let icon_height = 0;
 
-        let icon_center_y = icon_y + (icon_height as i32 / 2);
-        let default_y = icon_center_y - (physical_height / 2);
-        let max_y = work_bottom - physical_gap - physical_height;
-        let min_y = work_top + physical_gap;
-        let clamped_y = default_y.clamp(min_y, max_y);
+            let icon_center_x = icon_x + (icon_width as i32 / 2);
+            let default_x = icon_center_x - (physical_width / 2);
+            let max_x = work_right - physical_gap - physical_width;
+            let min_x = work_left + physical_gap;
+            let clamped_x = default_x.clamp(min_x, max_x);
 
-        let (final_x, final_y) = match primary.taskbar_position {
-            TaskbarPosition::Bottom => (clamped_x, work_bottom - physical_height - physical_gap),
-            TaskbarPosition::Top => (clamped_x, work_top + physical_gap),
-            TaskbarPosition::Left => (work_left + physical_gap, clamped_y),
-            TaskbarPosition::Right => (work_right - physical_width - physical_gap, clamped_y),
-            _ => (clamped_x, work_bottom - physical_height - physical_gap),
+            let icon_center_y = icon_y + (icon_height as i32 / 2);
+            let default_y = icon_center_y - (physical_height / 2);
+            let max_y = work_bottom - physical_gap - physical_height;
+            let min_y = work_top + physical_gap;
+            let clamped_y = default_y.clamp(min_y, max_y);
+
+            match primary.taskbar_position {
+                TaskbarPosition::Bottom => {
+                    (clamped_x, work_bottom - physical_height - physical_gap)
+                }
+                TaskbarPosition::Top => (clamped_x, work_top + physical_gap),
+                TaskbarPosition::Left => (work_left + physical_gap, clamped_y),
+                TaskbarPosition::Right => (work_right - physical_width - physical_gap, clamped_y),
+                _ => (clamped_x, work_bottom - physical_height - physical_gap),
+            }
+        } else {
+            let x = work_right - physical_width - physical_gap;
+            let y = work_bottom - physical_height - physical_gap;
+            (x, y)
         };
 
         window.set_always_on_top(true)?;
@@ -227,28 +236,44 @@ impl WindowManager {
     }
 
     pub fn open_full_view(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+        log::info!("open_full_view: Getting monitors");
         let monitors = Self::get_monitors();
+        log::info!("open_full_view: Found {} monitors", monitors.len());
         let primary = monitors
             .iter()
             .find(|m| m.is_primary)
             .unwrap_or(&monitors[0]);
+        log::info!(
+            "open_full_view: Primary monitor scale factor: {}",
+            primary.scale_factor
+        );
 
+        log::info!("open_full_view: Checking if old-ui window exists");
         let window = if let Some(window) = tauri::Manager::get_webview_window(app, OLD_UI_WINDOW_ID)
         {
+            log::info!("open_full_view: old-ui window exists, unminimizing");
             let _ = window.unminimize();
             window
         } else {
-            Self::build_full_window(app)?
+            log::info!("open_full_view: old-ui window does not exist, building it");
+            let win = Self::build_full_window(app)?;
+            log::info!("open_full_view: old-ui window built successfully");
+            win
         };
 
+        log::info!("open_full_view: Querying outer_size");
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
             width: (OLD_UI_WIDTH * primary.scale_factor) as u32,
             height: (OLD_UI_HEIGHT * primary.scale_factor) as u32,
         });
+        log::info!("open_full_view: outer_size = {:?}", outer_size);
+
+        log::info!("open_full_view: Querying inner_size");
         let inner_size = window.inner_size().unwrap_or(tauri::PhysicalSize {
             width: (OLD_UI_WIDTH * primary.scale_factor) as u32,
             height: (OLD_UI_HEIGHT * primary.scale_factor) as u32,
         });
+        log::info!("open_full_view: inner_size = {:?}", inner_size);
 
         let physical_width = outer_size.width as i32;
         let physical_height = outer_size.height as i32;
@@ -299,8 +324,15 @@ impl WindowManager {
             _ => {}
         }
 
+        log::info!(
+            "open_full_view: Setting position to ({}, {})",
+            window_x,
+            window_y
+        );
         window.set_position(tauri::PhysicalPosition::new(window_x, window_y))?;
+        log::info!("open_full_view: Position set, showing window");
         window.show()?;
+        log::info!("open_full_view: Window shown successfully");
         Ok(window)
     }
 }

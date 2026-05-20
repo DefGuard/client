@@ -1,7 +1,7 @@
 .location-card {
-  border-radius: 12px;
+  border-radius: 16px;
   box-sizing: border-box;
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-lg);
   background-color: var(--bg-dark-blue-40);
 
   > .top-track {
@@ -10,6 +10,17 @@
     align-items: center;
     justify-content: flex-start;
     user-select: none;
+
+    &.interactive {
+      cursor: pointer;
+
+      &:hover {
+        > .right > .icon-button {
+          --bg: var(--c-white-20);
+          --icon: var(--c-white-100);
+        }
+      }
+    }
 
     > .left {
       display: flex;
