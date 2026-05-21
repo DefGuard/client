@@ -126,8 +126,7 @@ const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
   };
 };
 
-const getPostureData = async (): Promise<unknown> =>
-  invoke(TauriCommand.GetPostureData);
+const getPostureData = async (): Promise<unknown> => invoke(TauriCommand.GetPostureData);
 
 const swapToOldUi = async () => invoke(TauriCommand.SwapToOldUi);
 
