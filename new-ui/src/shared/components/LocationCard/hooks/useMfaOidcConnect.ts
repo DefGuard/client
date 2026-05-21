@@ -4,14 +4,13 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
+import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
-const MFA_ENDPOINT = 'api/v1/client-mfa';
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1_000; // 5 minutes
 
-type MfaStartResponse = { token: string };
 type MfaFinishResponse = { preshared_key: string };
 type MfaErrorResponse = { error: string };
 
@@ -65,7 +64,7 @@ export const useMfaOidcConnect = () => {
 
       const poll = async () => {
         try {
-          const res = await fetch(`${proxyUrl}${MFA_ENDPOINT}/finish`, {
+          const res = await fetch(`${proxyUrl}${CLIENT_MFA_ENDPOINT}/finish`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify({ token }),
@@ -128,49 +127,18 @@ export const useMfaOidcConnect = () => {
     setPollError(null);
     stopPolling();
 
-    let headers: Record<string, string>;
     try {
-      headers = await api.getEdgeRequestHeaders();
-    } catch {
-      setStartError('Failed to load request headers');
-      setIsStarting(false);
-      return;
-    }
-
-    let posture_data: unknown;
-    try {
-      posture_data = location.posture_check_required
-        ? await api.getPostureData()
-        : undefined;
-    } catch {
-      setStartError('Failed to load posture data');
-      setIsStarting(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${instance.proxy_url}${MFA_ENDPOINT}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({
-          method: 2,
-          pubkey: instance.pubkey,
-          location_id: location.network_id,
-          posture_data,
-        }),
+      const { response, headers } = await startClientMfaSession({
+        instance,
+        location,
+        method: 2,
       });
-
-      if (res.ok) {
-        const data = (await res.json()) as MfaStartResponse;
-        await api.openLink(`${instance.proxy_url}openid/mfa?token=${data.token}`);
-        startPolling(data.token, instance.proxy_url, headers);
-      } else {
-        const data = (await res.json()) as MfaErrorResponse;
-        setStartError(data.error ?? 'Failed to start OIDC authentication');
-        error(`OIDC MFA start failed for location ${location.id}: ${data.error}`);
-      }
+      await api.openLink(`${instance.proxy_url}openid/mfa?token=${response.token}`);
+      startPolling(response.token, instance.proxy_url, headers);
     } catch (e) {
-      setStartError('Failed to reach server');
+      setStartError(
+        e instanceof Error ? e.message : 'Failed to start OIDC authentication',
+      );
       error(`OIDC MFA start network error for location ${location.id}: ${e}`);
     } finally {
       setIsStarting(false);

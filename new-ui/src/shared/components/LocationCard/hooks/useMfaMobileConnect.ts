@@ -1,22 +1,11 @@
 import { encode } from '@stablelib/base64';
 import { useMutation } from '@tanstack/react-query';
-import { fetch } from '@tauri-apps/plugin-http';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
+import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
-
-const MFA_ENDPOINT = 'api/v1/client-mfa';
-
-type MfaStartResponse = {
-  token: string;
-  challenge: string;
-};
-
-type MfaErrorResponse = {
-  error: string;
-};
 
 type TokenData = {
   token: string;
@@ -55,7 +44,7 @@ export const useMfaMobileConnect = () => {
       .replace(
         /^https:/,
         'wss:',
-      )}${MFA_ENDPOINT}/remote?token=${encodeURIComponent(tokenData.token)}`;
+      )}${CLIENT_MFA_ENDPOINT}/remote?token=${encodeURIComponent(tokenData.token)}`;
 
     expectedCloseRef.current = false;
     const ws = new WebSocket(wsUrl);
@@ -144,48 +133,22 @@ export const useMfaMobileConnect = () => {
     // Clear previous token → triggers WS cleanup via effect
     setTokenData(null);
 
-    let headers: Record<string, string>;
     try {
-      headers = await api.getEdgeRequestHeaders();
-    } catch {
-      setStartError('Failed to load request headers');
-      setIsStarting(false);
-      return;
-    }
-
-    let posture_data: unknown;
-    try {
-      posture_data = location.posture_check_required
-        ? await api.getPostureData()
-        : undefined;
-    } catch {
-      setStartError('Failed to load posture data');
-      setIsStarting(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${instance.proxy_url}${MFA_ENDPOINT}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({
-          method: 4,
-          pubkey: instance.pubkey,
-          location_id: location.network_id,
-          posture_data,
-        }),
+      const { response } = await startClientMfaSession({
+        instance,
+        location,
+        method: 4,
       });
-
-      if (res.ok) {
-        const data = (await res.json()) as MfaStartResponse;
-        setTokenData({ token: data.token, challenge: data.challenge });
-      } else {
-        const data = (await res.json()) as MfaErrorResponse;
-        setStartError(data.error ?? 'Failed to start mobile authentication');
-        error(`Mobile MFA start failed for location ${location.id}: ${data.error}`);
+      if (!response.challenge) {
+        setStartError('Unsupported response from proxy');
+        return;
       }
+
+      setTokenData({ token: response.token, challenge: response.challenge });
     } catch (e) {
-      setStartError('Failed to reach server');
+      setStartError(
+        e instanceof Error ? e.message : 'Failed to start mobile authentication',
+      );
       error(`Mobile MFA start network error for location ${location.id}: ${e}`);
     } finally {
       setIsStarting(false);
