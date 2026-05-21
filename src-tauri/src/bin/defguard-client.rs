@@ -156,6 +156,7 @@ fn main() {
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
+            has_any_visible_locations,
             save_device_config,
             all_instances,
             connect,
@@ -194,8 +195,8 @@ fn main() {
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                // Only prevent close on the tray (new-ui) window; let other windows close normally.
-                if window.label() == NEW_UI_WINDOW_ID {
+                let label = window.label();
+                if label == NEW_UI_WINDOW_ID || label == OLD_UI_WINDOW_ID {
                     #[cfg(not(target_os = "macos"))]
                     let _ = window.hide();
 
@@ -351,6 +352,15 @@ fn main() {
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
+            // Pre-build both windows hidden so they can be shown/hidden without recreation.
+            if let Err(e) = WindowManager::build_tray_window(app_handle) {
+                warn!("Failed to pre-build tray window: {e}");
+            }
+            if let Err(e) = WindowManager::build_full_window(app_handle) {
+                warn!("Failed to pre-build full window: {e}");
+            }
+
+            // Decide which window to show based on platform and available locations.
             #[cfg(target_os = "linux")]
             {
                 let _ = WindowManager::open_full_view(app_handle);
@@ -363,7 +373,7 @@ fn main() {
                 if has_locations {
                     WindowManager::open_tray(app_handle)?;
                 } else {
-                    info!("No locations found, spawning full view on startup.");
+                    info!("No locations found, showing full view on startup.");
                     let _ = WindowManager::open_full_view(app_handle);
                 }
             }

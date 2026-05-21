@@ -567,6 +567,26 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
     Ok(location_info)
 }
 
+/// Returns `true` if there is at least one visible (non-service) location across all instances.
+/// Shares the same visibility filter as [`all_locations`] (`include_service_locations = false`).
+#[tauri::command(async)]
+pub async fn has_any_visible_locations() -> Result<bool, Error> {
+    trace!("Checking whether any visible locations exist.");
+    let instances = Instance::all(&*DB_POOL).await?;
+    for instance in &instances {
+        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
+        if !locations.is_empty() {
+            trace!(
+                "Found at least one visible location in instance {}.",
+                instance.name
+            );
+            return Ok(true);
+        }
+    }
+    trace!("No visible locations found.");
+    Ok(false)
+}
+
 #[derive(Serialize, Debug)]
 pub struct LocationInterfaceDetails {
     pub location_id: Id,

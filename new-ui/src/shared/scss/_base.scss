@@ -71,3 +71,21 @@ ol {
   margin: 0;
   padding: 0;
 }
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 100px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--fg-white-50) transparent;
+}

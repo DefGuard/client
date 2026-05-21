@@ -21,6 +21,11 @@ export const getLocationsQueryOptions = (instanceId: number) =>
     queryFn: () => api.getLocations(instanceId),
   });
 
+export const hasAnyVisibleLocationsQueryOptions = queryOptions({
+  queryKey: ['has-any-visible-locations'] as const,
+  queryFn: () => api.hasAnyVisibleLocations(),
+});
+
 export const getLocationDetailsQueryOptions = (args: LocationDetailsArgs) =>
   queryOptions({
     queryKey: ['location-details', args.locationId, args.connectionType] as const,

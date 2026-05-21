@@ -26,11 +26,13 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       listen(TauriEvent.InstanceUpdate, () => {
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
         void queryClient.invalidateQueries({ queryKey: ['locations'] });
+        void queryClient.invalidateQueries({ queryKey: ['has-any-visible-locations'] });
       }),
 
       listen(TauriEvent.LocationUpdate, () => {
         void queryClient.invalidateQueries({ queryKey: ['locations'] });
         void queryClient.invalidateQueries({ queryKey: ['location-details'] });
+        void queryClient.invalidateQueries({ queryKey: ['has-any-visible-locations'] });
       }),
 
       listen(TauriEvent.AppVersionFetch, () => {
@@ -41,6 +43,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         void queryClient.invalidateQueries({ queryKey: ['settings'] });
         void queryClient.invalidateQueries({ queryKey: ['provisioning-config'] });
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
+        void queryClient.invalidateQueries({ queryKey: ['has-any-visible-locations'] });
       }),
 
       listen<DeadConnectionDroppedPayload>(TauriEvent.DeadConnectionDropped, () => {

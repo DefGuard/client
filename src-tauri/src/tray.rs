@@ -8,6 +8,8 @@ use tauri::{
 
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
+#[cfg(not(target_os = "linux"))]
+use crate::window_manager::WindowManager;
 use crate::{
     active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     appstate::AppState,
@@ -38,8 +40,7 @@ fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
             button_state: MouseButtonState::Down,
             rect,
             ..
-        }
-        | TrayIconEvent::DoubleClick { rect, .. } => Some(rect.position.to_physical(1.0)),
+        } => Some(rect.position.to_physical(1.0)),
         _ => None,
     };
 
@@ -141,11 +142,9 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
 pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     let tray_menu = generate_tray_menu(app).await?;
 
-    // On macOS, always show menu under system tray icon.
-    #[cfg(target_os = "macos")]
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
-        .show_menu_on_left_click(true)
+        .show_menu_on_left_click(cfg!(target_os = "macos"))
         .on_tray_icon_event(|icon, event| {
             store_tray_click_position(icon.app_handle(), &event);
             if let TrayIconEvent::Click {
@@ -154,26 +153,29 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
                 ..
             } = event
             {
-                show_new_ui_window_near_tray(icon.app_handle());
-            }
-        })
-        .on_menu_event(handle_tray_menu_event)
-        .build(app)?;
-    // On other systems (especially Windows), system tray menu is on right-click,
-    // and double-click shows the main window.
-    #[cfg(not(target_os = "macos"))]
-    TrayIconBuilder::with_id(TRAY_ICON_ID)
-        .menu(&tray_menu)
-        .show_menu_on_left_click(false)
-        .on_tray_icon_event(|icon, event| {
-            store_tray_click_position(icon.app_handle(), &event);
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                show_new_ui_window_near_tray(icon.app_handle());
+                let app = icon.app_handle();
+                let any_visible = [NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID].iter().any(|id| {
+                    app.get_webview_window(id)
+                        .and_then(|w| w.is_visible().ok())
+                        .unwrap_or(false)
+                });
+                if any_visible {
+                    hide_visible_windows(app);
+                } else {
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        let has_locations = tauri::async_runtime::block_on(
+                            crate::window_manager::has_non_service_locations(),
+                        );
+                        if has_locations {
+                            show_new_ui_window_near_tray(app);
+                        } else {
+                            let _ = WindowManager::open_full_view(app);
+                        }
+                    }
+                    #[cfg(target_os = "linux")]
+                    show_new_ui_window_near_tray(app);
+                }
             }
         })
         .on_menu_event(handle_tray_menu_event)
@@ -197,16 +199,15 @@ pub(crate) async fn reload_tray_menu(app: &AppHandle) {
     }
 }
 
-fn hide_main_window(app: &AppHandle) {
+fn hide_visible_windows(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Err(err) = app.hide() {
         warn!("Failed to hide application: {err}");
     }
-    #[cfg(not(target_os = "macos"))]
-    for window_id in [NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID] {
-        if let Some(window) = app.get_webview_window(window_id) {
+    for (id, window) in app.webview_windows() {
+        if window.is_visible().unwrap_or(false) {
             if let Err(err) = window.hide() {
-                warn!("Failed to hide window {window_id}: {err}");
+                warn!("Failed to hide window {id}: {err}");
             }
         }
     }
@@ -224,11 +225,8 @@ pub fn show_main_window(app: &AppHandle) {
         if let Err(err) = app.show() {
             warn!("Failed to show application: {err}");
         }
-        #[cfg(not(target_os = "macos"))]
-        {
-            if let Err(err) = window.show() {
-                warn!("Failed to show main window: {err}");
-            }
+        if let Err(err) = window.show() {
+            warn!("Failed to show main window: {err}");
         }
         let _ = window.set_focus();
     }
@@ -243,7 +241,7 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
             handle.exit(0);
         }
         TRAY_EVENT_SHOW => show_new_ui_window_near_tray(app),
-        TRAY_EVENT_HIDE => hide_main_window(app),
+        TRAY_EVENT_HIDE => hide_visible_windows(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
         }

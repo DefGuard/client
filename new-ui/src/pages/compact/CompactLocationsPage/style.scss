@@ -1,7 +1,7 @@
 #compact-locations-page {
   display: flex;
   flex-flow: column;
-  min-height: 100dvh;
+  height: 100dvh;
 
   > .compact-footer {
     display: flex;
@@ -21,11 +21,22 @@
     min-height: 0;
     row-gap: var(--spacing-sm);
 
+    &.windows {
+      scrollbar-gutter: stable;
+      overflow-y: scroll;
+
+      > .locations {
+        padding-right: 6px;
+      }
+    }
+
     > .locations {
       display: flex;
       flex-flow: column;
       row-gap: var(--spacing-sm);
       width: 100%;
+      box-sizing: border-box;
+      padding-right: 6px;
     }
   }
 }

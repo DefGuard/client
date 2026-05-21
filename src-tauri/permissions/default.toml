@@ -3,6 +3,7 @@ identifier = "allow-app-commands"
 description = "Allow all application commands for both UI windows (old-ui and new-ui)."
 commands.allow = [
   "all_locations",
+  "has_any_visible_locations",
   "save_device_config",
   "all_instances",
   "connect",

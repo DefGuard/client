@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import { TauriEventProvider } from '../shared/providers/TauriEventProvider';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -12,5 +13,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponent() {
-  return <Outlet />;
+  return (
+    <TauriEventProvider>
+      <Outlet />
+    </TauriEventProvider>
+  );
 }

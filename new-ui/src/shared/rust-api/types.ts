@@ -73,6 +73,7 @@ export const TauriCommand = {
   SaveDeviceConfig: 'save_device_config',
   // Locations
   AllLocations: 'all_locations',
+  HasAnyVisibleLocations: 'has_any_visible_locations',
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
   SetLocationMfaMethod: 'set_location_mfa_method',
