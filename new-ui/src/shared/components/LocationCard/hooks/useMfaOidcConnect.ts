@@ -137,6 +137,17 @@ export const useMfaOidcConnect = () => {
       return;
     }
 
+    let posture_data: unknown;
+    try {
+      posture_data = location.posture_check_required
+        ? await api.getPostureData()
+        : undefined;
+    } catch {
+      setStartError('Failed to load posture data');
+      setIsStarting(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${instance.proxy_url}${MFA_ENDPOINT}/start`, {
         method: 'POST',
@@ -145,6 +156,7 @@ export const useMfaOidcConnect = () => {
           method: 2,
           pubkey: instance.pubkey,
           location_id: location.network_id,
+          posture_data,
         }),
       });
 

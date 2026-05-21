@@ -73,9 +73,17 @@ export const useMfaConnect = (method: 0 | 1) => {
         return;
       }
 
-      const posture_data = location.posture_check_required
-        ? await api.getPostureData()
-        : undefined;
+      let posture_data: unknown;
+      try {
+        posture_data = location.posture_check_required
+          ? await api.getPostureData()
+          : undefined;
+      } catch {
+        setStartError('Failed to load posture data');
+        setIsStarting(false);
+        return;
+      }
+
       try {
         const res = await fetch(`${instance.proxy_url}${MFA_ENDPOINT}/start`, {
           method: 'POST',
