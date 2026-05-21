@@ -29,7 +29,10 @@ type MfaStartErrorResponse = {
   error?: string;
 };
 
-export const shouldShowPostureError = (err: unknown, location: LocationInfo): boolean =>
+export const shouldShowPostureError = (
+  err: unknown,
+  location: LocationInfo,
+): err is MfaStartError =>
   err instanceof MfaStartError && err.status === 403 && location.posture_check_required;
 
 type StartClientMfaSessionParams = {
