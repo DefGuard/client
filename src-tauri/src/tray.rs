@@ -8,6 +8,8 @@ use tauri::{
 
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
+#[cfg(not(target_os = "linux"))]
+use crate::window_manager::WindowManager;
 use crate::{
     active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     appstate::AppState,
@@ -15,9 +17,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window_manager::{
-        show_new_ui_window_near_tray, WindowManager, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID,
-    },
+    window_manager::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
     ConnectionType,
 };
 
