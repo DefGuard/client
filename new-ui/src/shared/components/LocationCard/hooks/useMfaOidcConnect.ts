@@ -4,7 +4,11 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
+import {
+  CLIENT_MFA_ENDPOINT,
+  shouldShowPostureError,
+  startClientMfaSession,
+} from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
@@ -15,7 +19,7 @@ type MfaFinishResponse = { preshared_key: string };
 type MfaErrorResponse = { error: string };
 
 export const useMfaOidcConnect = () => {
-  const { location, setView } = useLocationCardContext();
+  const { location, setPostureError, setView } = useLocationCardContext();
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -136,6 +140,11 @@ export const useMfaOidcConnect = () => {
       await api.openLink(`${instance.proxy_url}openid/mfa?token=${response.token}`);
       startPolling(response.token, instance.proxy_url, headers);
     } catch (e) {
+      if (shouldShowPostureError(e, location)) {
+        setPostureError(e.message);
+        setView(LocationCardViews.PostureCheckFail);
+        return;
+      }
       setStartError(
         e instanceof Error ? e.message : 'Failed to start OIDC authentication',
       );
@@ -143,7 +152,7 @@ export const useMfaOidcConnect = () => {
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, startPolling, stopPolling]);
+  }, [instance, location, setPostureError, setView, startPolling, stopPolling]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

@@ -3,7 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
-import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
+import {
+  CLIENT_MFA_ENDPOINT,
+  shouldShowPostureError,
+  startClientMfaSession,
+} from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
@@ -13,7 +17,7 @@ type TokenData = {
 };
 
 export const useMfaMobileConnect = () => {
-  const { location, instance, setView } = useLocationCardContext();
+  const { location, instance, setPostureError, setView } = useLocationCardContext();
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -146,6 +150,11 @@ export const useMfaMobileConnect = () => {
 
       setTokenData({ token: response.token, challenge: response.challenge });
     } catch (e) {
+      if (shouldShowPostureError(e, location)) {
+        setPostureError(e.message);
+        setView(LocationCardViews.PostureCheckFail);
+        return;
+      }
       setStartError(
         e instanceof Error ? e.message : 'Failed to start mobile authentication',
       );
@@ -153,7 +162,7 @@ export const useMfaMobileConnect = () => {
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location]);
+  }, [instance, location, setPostureError, setView]);
 
   const reset = useCallback(() => {
     if (wsRef.current) {

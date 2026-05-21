@@ -9,9 +9,12 @@ import type {
 export const CLIENT_MFA_ENDPOINT = 'api/v1/client-mfa';
 
 export class MfaStartError extends Error {
-  constructor(message: string) {
+  public readonly status?: number;
+
+  constructor(message: string, status?: number) {
     super(message);
     this.name = 'MfaStartError';
+    this.status = status;
   }
 }
 
@@ -25,6 +28,9 @@ export type MfaStartResponse = {
 type MfaStartErrorResponse = {
   error?: string;
 };
+
+export const shouldShowPostureError = (err: unknown, location: LocationInfo): boolean =>
+  err instanceof MfaStartError && err.status === 403 && location.posture_check_required;
 
 type StartClientMfaSessionParams = {
   instance: InstanceInfo;
@@ -74,8 +80,14 @@ export const startClientMfaSession = async ({
     });
 
     if (!response.ok) {
-      const data = (await response.json()) as MfaStartErrorResponse;
-      throw new MfaStartError(data.error ?? 'Failed to start MFA');
+      let message = 'Failed to start MFA';
+      try {
+        const data = (await response.json()) as MfaStartErrorResponse;
+        message = data.error ?? message;
+      } catch {
+        // Keep the response status even if the proxy sends a malformed error body.
+      }
+      throw new MfaStartError(message, response.status);
     }
 
     return {
