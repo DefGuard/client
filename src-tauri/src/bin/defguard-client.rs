@@ -29,11 +29,11 @@ use defguard_client::{
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
     utils::load_log_targets,
-    window::*,
+    window_manager::*,
     LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
-use tauri::{AppHandle, Builder, Manager, RunEvent, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[macro_use]
@@ -188,18 +188,22 @@ fn main() {
             open_old_ui_window,
             swap_to_new_ui,
             swap_to_old_ui,
+            close_tray_window,
             all_active_connections,
             disconnect_locations,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                #[cfg(not(target_os = "macos"))]
-                let _ = window.hide();
+                // Only prevent close on the tray (new-ui) window; let other windows close normally.
+                if window.label() == NEW_UI_WINDOW_ID {
+                    #[cfg(not(target_os = "macos"))]
+                    let _ = window.hide();
 
-                #[cfg(target_os = "macos")]
-                let _ = tauri::AppHandle::hide(window.app_handle());
+                    #[cfg(target_os = "macos")]
+                    let _ = tauri::AppHandle::hide(window.app_handle());
 
-                api.prevent_close();
+                    api.prevent_close();
+                }
             }
         })
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
@@ -214,7 +218,6 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
@@ -348,18 +351,22 @@ fn main() {
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
-            // Open new UI window.
-            WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
-                .title("New UI")
-                .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
-                .visible(false)
-                .build()?;
-
-            // Open old UI window.
-            WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_ui_url())
-                .title("Old UI")
-                .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
-                .build()?;
+            #[cfg(target_os = "linux")]
+            {
+                let _ = WindowManager::open_full_view(app_handle);
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                let has_locations = tauri::async_runtime::block_on(
+                    defguard_client::window_manager::has_non_service_locations()
+                );
+                if has_locations {
+                    WindowManager::open_tray(app_handle)?;
+                } else {
+                    info!("No locations found, spawning full view on startup.");
+                    let _ = WindowManager::open_full_view(app_handle);
+                }
+            }
 
             info!("App setup completed, log level: {log_level}");
             Ok(())

@@ -38,7 +38,11 @@ export const DefaultView = () => {
           <Toggle
             disabled={location.active}
             active={location.route_all_traffic}
-            label="All traffic is allowed"
+            label={
+              location.route_all_traffic
+                ? 'All traffic is allowed'
+                : 'Predefined traffic only'
+            }
             onClick={() => {
               updateRouting({
                 connectionType: location.connection_type,

@@ -104,6 +104,7 @@ export const TauriCommand = {
   DisconnectLocations: 'disconnect_locations',
   //Window
   SwapToOldUi: 'swap_to_old_ui',
+  CloseTrayWindow: 'close_tray_window',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];

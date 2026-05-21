@@ -30,13 +30,17 @@ export const LocationCardMfaSettings = () => {
     },
   });
 
-  const { previousView, setView, location } = useLocationCardContext();
+  const { previousView, setView, location, localMfaMethod, setLocalMfaMethod } =
+    useLocationCardContext();
 
-  const mfaMethod = location.mfa_method ?? MfaMethod.Totp;
+  const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
 
-  const [selectedPref, setSelectedPref] = useState<MfaMethodValue>(
-    mfaMethod ?? MfaMethod.Totp,
+  const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(
+    localMfaMethod ?? MfaMethod.Totp,
   );
+
+  const isFromDefault = previousView === LocationCardViews.Default;
+  const [setAsDefault, setSetAsDefault] = useState(true);
 
   const MfaFactorsList = useMemo((): MfaMethodValue[] => {
     if (location.location_mfa_mode === LocationMfaMode.Internal) {
@@ -46,13 +50,14 @@ export const LocationCardMfaSettings = () => {
   }, [location.location_mfa_mode]);
 
   const handleSubmit = () => {
-    if (selectedPref !== mfaMethod) {
+    setLocalMfaMethod(selectedMethod);
+    if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
       setMfaMethod({
         locationId: location.id,
-        mfaMethod: selectedPref,
+        mfaMethod: selectedMethod,
       });
-      setView(previousView ?? LocationCardViews.Default);
     }
+    setView(previousView ?? LocationCardViews.Default);
   };
 
   return (
@@ -70,21 +75,19 @@ export const LocationCardMfaSettings = () => {
           <MfaSelector
             key={factor}
             factor={factor}
-            selected={selectedPref === factor}
-            isDefault={mfaMethod === factor}
+            selected={selectedMethod === factor}
+            isDefault={locationDefaultMfaMethod === factor}
             onClick={() => setSelectedPref(factor)}
           />
         ))}
       </div>
-      <Checkbox
-        active={
-          previousView === LocationCardViews.Default ? true : mfaMethod === selectedPref
-        }
-        disabled={
-          previousView === LocationCardViews.Default ? true : mfaMethod === selectedPref
-        }
-        text="Set as default MFA method"
-      />
+      {!isFromDefault && (
+        <Checkbox
+          active={isFromDefault ? true : setAsDefault}
+          onClick={() => setSetAsDefault((prev) => !prev)}
+          text="Set as default MFA method"
+        />
+      )}
       <Controls>
         <IconButton
           variant={IconButtonVariant.BigSelected}
@@ -96,10 +99,9 @@ export const LocationCardMfaSettings = () => {
         />
         <div className="right">
           <Button
-            disabled={selectedPref === mfaMethod}
             variant={ButtonVariant.Primary}
             size={'primary'}
-            text="Submit"
+            text="Save changes"
             onClick={handleSubmit}
           />
         </div>

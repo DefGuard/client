@@ -4,10 +4,11 @@ import {
   FloatingPortal,
   size as floatingSize,
   offset,
+  safePolygon,
   shift,
-  useClick,
   useDismiss,
   useFloating,
+  useHover,
   useInteractions,
 } from '@floating-ui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -57,9 +58,8 @@ export const ConnectionWatcher = () => {
     whileElementsMounted: autoUpdate,
   });
 
-  const click = useClick(context, {
-    toggle: true,
-    enabled: connected,
+  const hover = useHover(context, {
+    handleClose: safePolygon(),
   });
 
   const dismiss = useDismiss(context, {
@@ -67,7 +67,7 @@ export const ConnectionWatcher = () => {
     outsidePress: true,
   });
 
-  const { getFloatingProps, getReferenceProps } = useInteractions([click, dismiss]);
+  const { getFloatingProps, getReferenceProps } = useInteractions([hover, dismiss]);
 
   return (
     <>

@@ -25,11 +25,11 @@ export const MfaSelector = ({
       case 'email':
         return 'mail';
       case 'mobileapprove':
-        return 'mobile-lock';
+        return 'mobile';
       case 'oidc':
         return 'token';
       case 'totp':
-        return 'mobile-lock';
+        return 'lock-closed';
       case 'biometric':
         return 'biometric';
     }

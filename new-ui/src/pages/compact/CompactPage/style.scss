@@ -1,4 +1,11 @@
 .compact-page {
   box-sizing: border-box;
-  padding: 8px;
+  padding: var(--spacing-md);
+  position: relative;
+
+  > .close-window {
+    position: absolute;
+    right: var(--spacing-md);
+    top: var(--spacing-md);
+  }
 }

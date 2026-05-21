@@ -32,7 +32,7 @@ pub mod service;
 pub mod tray;
 pub mod utils;
 pub mod wg_config;
-pub mod window;
+pub mod window_manager;
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);

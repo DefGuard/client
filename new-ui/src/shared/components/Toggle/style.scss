@@ -26,6 +26,7 @@
     border: var(--border-1) solid var(--border);
     min-width: 36px;
     flex-shrink: 0;
+    background-clip: padding-box;
 
     @include animate(border-color, background-color);
 

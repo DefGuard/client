@@ -24,6 +24,7 @@
   display: inline-block;
   min-width: 0;
   user-select: none;
+  background-clip: padding-box;
 
   > .btn-content {
     display: inline-grid;
@@ -60,6 +61,7 @@
   .text {
     font: var(--btn-font);
     color: inherit;
+    user-select: none;
 
     @include animate(color);
   }
@@ -84,7 +86,7 @@
 
   &.size-primary {
     --btn-font: var(--t-button-label-primary);
-    --btn-size: 40px;
+    --btn-size: 36px;
 
     border-radius: 8px;
     padding: var(--spacing-sm) var(--spacing-lg);

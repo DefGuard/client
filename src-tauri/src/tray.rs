@@ -15,7 +15,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
+    window_manager::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
     ConnectionType,
 };
 
@@ -148,8 +148,9 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
         .show_menu_on_left_click(true)
         .on_tray_icon_event(|icon, event| {
             store_tray_click_position(icon.app_handle(), &event);
-            if let TrayIconEvent::DoubleClick {
+            if let TrayIconEvent::Click {
                 button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
                 ..
             } = event
             {
@@ -166,8 +167,9 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|icon, event| {
             store_tray_click_position(icon.app_handle(), &event);
-            if let TrayIconEvent::DoubleClick {
+            if let TrayIconEvent::Click {
                 button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
                 ..
             } = event
             {

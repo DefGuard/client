@@ -5,9 +5,10 @@
     grid-template-rows: 1fr;
     align-items: center;
     column-gap: var(--spacing-md);
+    user-select: none;
 
     > .name {
-      font: var(--t-body-xs-500);
+      font: var(--t-body-sm-400);
       color: var(--fg-white-100);
     }
 
@@ -17,10 +18,12 @@
       display: inline-flex;
       flex-flow: row nowrap;
       align-items: center;
+      justify-content: center;
       padding: 0 4px;
-      height: 18px;
-      width: 32px;
-      background-color: var(--bg-white-100);
+      min-height: 20px;
+      width: 36px;
+      background-color: transparent;
+      border: 1px solid var(--bg-white-60);
 
       p {
         font: var(--font-family-body);
@@ -28,7 +31,7 @@
         font-weight: 500;
         line-height: 16px;
         letter-spacing: 0.11px;
-        color: var(--fg-action);
+        color: var(--fg-white-60);
       }
     }
   }

@@ -3,6 +3,7 @@
   --border: var(--border-default);
   --icon: var(--fg-white-80);
   --color: var(--fg-white-80);
+  --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 0%);
 
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) 16px;
@@ -13,26 +14,29 @@
   user-select: none;
   align-items: center;
   box-sizing: border-box;
+  box-shadow: var(--box-shadow);
   padding: 0 var(--spacing-md);
   min-height: 40px;
   border-radius: 8px;
   cursor: pointer;
   transition-duration: 250ms;
   transition-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
-  transition-property: border-color, background, color;
+  transition-property: border-color, background, color, box-shadow;
+  background-clip: padding-box;
 
   &:hover {
     --bg: var(--bg-white-5);
     --color: var(--fg-white-100);
-    --border: var(--border-default);
+    --border: var(--border-action-disabled);
     --icon: var(--fg-white-100);
   }
 
   &.selected {
-    --bg: var(--bg-white-5);
+    --bg: var(--bg-white-10);
     --color: var(--fg-white-100);
-    --border: transparent;
+    --border: var(--border-action-disabled);
     --icon: var(--fg-white-100);
+    --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 5%);
   }
 
   > .middle {
@@ -40,7 +44,7 @@
     flex-flow: row nowrap;
     align-items: center;
     justify-content: flex-start;
-    column-gap: var(--spacing-xs);
+    column-gap: var(--spacing-md);
   }
 
   .default-badge {
@@ -71,6 +75,6 @@
 
   .name {
     color: inherit;
-    font: var(--t-body-xs);
+    font: var(--t-body-sm-400);
   }
 }
