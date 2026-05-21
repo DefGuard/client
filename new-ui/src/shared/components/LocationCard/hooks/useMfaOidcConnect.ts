@@ -4,13 +4,10 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import {
-  CLIENT_MFA_ENDPOINT,
-  shouldShowPostureError,
-  startClientMfaSession,
-} from '../api/startClientMfaSession';
+import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
+import { handleMfaStartError } from './handleMfaStartError';
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1_000; // 5 minutes
@@ -140,9 +137,7 @@ export const useMfaOidcConnect = () => {
       await api.openLink(`${instance.proxy_url}openid/mfa?token=${response.token}`);
       startPolling(response.token, instance.proxy_url, headers);
     } catch (e) {
-      if (shouldShowPostureError(e, location)) {
-        setPostureError(e.message);
-        setView(LocationCardViews.PostureCheckFail);
+      if (handleMfaStartError({ err: e, location, setPostureError, setView })) {
         return;
       }
       setStartError(

@@ -5,13 +5,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { EdgeRequestHeaders } from '../../../rust-api/types';
-import {
-  CLIENT_MFA_ENDPOINT,
-  shouldShowPostureError,
-  startClientMfaSession,
-} from '../api/startClientMfaSession';
+import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
+import { handleMfaStartError } from './handleMfaStartError';
 
 type MfaFinishResponse = {
   preshared_key: string;
@@ -66,9 +63,7 @@ export const useMfaConnect = (method: 0 | 1) => {
         setRequestHeaders(headers);
         setToken(response.token);
       } catch (err) {
-        if (shouldShowPostureError(err, location)) {
-          setPostureError(err.message);
-          setView(LocationCardViews.PostureCheckFail);
+        if (handleMfaStartError({ err, location, setPostureError, setView })) {
           return;
         }
         setStartError(err instanceof Error ? err.message : 'Failed to start MFA');

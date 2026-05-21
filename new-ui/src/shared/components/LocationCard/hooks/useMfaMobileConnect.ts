@@ -3,13 +3,10 @@ import { useMutation } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
-import {
-  CLIENT_MFA_ENDPOINT,
-  shouldShowPostureError,
-  startClientMfaSession,
-} from '../api/startClientMfaSession';
+import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
+import { handleMfaStartError } from './handleMfaStartError';
 
 type TokenData = {
   token: string;
@@ -150,9 +147,7 @@ export const useMfaMobileConnect = () => {
 
       setTokenData({ token: response.token, challenge: response.challenge });
     } catch (e) {
-      if (shouldShowPostureError(e, location)) {
-        setPostureError(e.message);
-        setView(LocationCardViews.PostureCheckFail);
+      if (handleMfaStartError({ err: e, location, setPostureError, setView })) {
         return;
       }
       setStartError(
