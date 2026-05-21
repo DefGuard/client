@@ -61,6 +61,30 @@ use crate::{
     utils::execute_command,
 };
 
+#[derive(Debug, Serialize, thiserror::Error)]
+#[serde(tag = "kind", content = "message", rename_all = "camelCase")]
+pub enum ConnectError {
+    #[error("Posture check failed: {0}")]
+    PostureCheckFailed(String),
+    #[error("{0}")]
+    Other(String),
+}
+
+impl From<Error> for ConnectError {
+    fn from(error: Error) -> Self {
+        match error {
+            Error::PostureCheckFailed(message) => Self::PostureCheckFailed(message),
+            error => Self::Other(error.to_string()),
+        }
+    }
+}
+
+impl From<sqlx::Error> for ConnectError {
+    fn from(error: sqlx::Error) -> Self {
+        Error::from(error).into()
+    }
+}
+
 /// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
@@ -68,7 +92,7 @@ pub async fn connect(
     connection_type: ConnectionType,
     preshared_key: Option<String>,
     handle: AppHandle,
-) -> Result<(), Error> {
+) -> Result<(), ConnectError> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
     if connection_type == ConnectionType::Location {
         if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
@@ -89,7 +113,7 @@ pub async fn connect(
                 "Location with ID {location_id} not found in the database, aborting connection \
                 attempt"
             );
-            return Err(Error::NotFound);
+            return Err(Error::NotFound.into());
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
         debug!(
@@ -100,7 +124,7 @@ pub async fn connect(
         info!("Successfully connected to tunnel {tunnel}");
     } else {
         error!("Tunnel {location_id} not found");
-        return Err(Error::NotFound);
+        return Err(Error::NotFound.into());
     }
 
     // Update tray icon to reflect connection state.
