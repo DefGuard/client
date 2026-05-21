@@ -41,6 +41,9 @@ const saveDeviceConfig = (args: SaveConfigArgs): Promise<SaveDeviceConfigRespons
 const getLocations = (instanceId: number): Promise<LocationInfo[]> =>
   invoke(TauriCommand.AllLocations, { instanceId });
 
+const hasAnyVisibleLocations = (): Promise<boolean> =>
+  invoke(TauriCommand.HasAnyVisibleLocations);
+
 const getLocationDetails = (args: LocationDetailsArgs): Promise<LocationDetails> =>
   invoke(TauriCommand.LocationInterfaceDetails, args);
 
@@ -139,6 +142,7 @@ export const api = {
   saveDeviceConfig,
   // Locations
   getLocations,
+  hasAnyVisibleLocations,
   getLocationDetails,
   updateLocationRouting,
   setLocationMfaMethod,

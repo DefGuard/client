@@ -1,6 +1,8 @@
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { useLoaderData } from '@tanstack/react-router';
+import { platform } from '@tauri-apps/plugin-os';
+import clsx from 'clsx';
 import { useEffect, useMemo } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
@@ -18,6 +20,8 @@ import { isPresent } from '../../../shared/utils/isPresent';
 import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
 import { useCompactLocationStore } from './hooks/useCompactLocationsStore';
+
+const isWindows = platform() === 'windows';
 
 export const CompactLocationsPage = () => {
   const selection = useCompactLocationStore((s) => s.compactViewSelection);
@@ -65,7 +69,11 @@ export const CompactLocationsPage = () => {
       }}
     >
       <WindowHeader variant="compact" />
-      <div className="scroll-wrap">
+      <div
+        className={clsx('scroll-wrap', {
+          windows: isWindows,
+        })}
+      >
         <InstanceSwitcher />
         <div className="locations">
           {isPresent(instanceInfo) &&

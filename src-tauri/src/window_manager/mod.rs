@@ -58,6 +58,7 @@ impl WindowManager {
             .title("Defguard")
             .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
             .decorations(true)
+            .visible(false)
             .build()
     }
 }
@@ -93,28 +94,13 @@ pub fn swap_to_old_ui(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         // Sleep briefly to let the IPC handler return
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        tracing::info!("swap_to_old_ui task: Opening full view");
-        match WindowManager::open_full_view(&app) {
-            Ok(_) => {
-                tracing::info!(
-                    "swap_to_old_ui task: open_full_view succeeded, sleeping before destroy"
-                );
-                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-                if let Some(w) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
-                    tracing::info!("swap_to_old_ui task: Destroying new-ui window");
-                    if let Err(e) = w.destroy() {
-                        tracing::error!(
-                            "swap_to_old_ui task: Failed to destroy new-ui window: {:?}",
-                            e
-                        );
-                    }
-                } else {
-                    tracing::warn!("swap_to_old_ui task: new-ui window not found to destroy");
-                }
+        if let Some(w) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+            if let Err(e) = w.hide() {
+                tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {:?}", e);
             }
-            Err(e) => {
-                tracing::error!("swap_to_old_ui task: open_full_view failed: {:?}", e);
-            }
+        }
+        if let Err(e) = WindowManager::open_full_view(&app) {
+            tracing::error!("swap_to_old_ui task: Failed to open full view: {:?}", e);
         }
     });
 }
@@ -125,15 +111,15 @@ pub fn close_tray_window(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         if let Some(w) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
-            tracing::info!("close_tray_window task: Destroying new-ui window");
-            if let Err(e) = w.destroy() {
+            tracing::info!("close_tray_window task: Hiding new-ui window");
+            if let Err(e) = w.hide() {
                 tracing::error!(
-                    "close_tray_window task: Failed to destroy new-ui window: {:?}",
+                    "close_tray_window task: Failed to hide new-ui window: {:?}",
                     e
                 );
             }
         } else {
-            tracing::warn!("close_tray_window task: new-ui window not found to destroy");
+            tracing::warn!("close_tray_window task: new-ui window not found");
         }
     });
 }
@@ -143,19 +129,11 @@ pub fn swap_to_new_ui(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        tracing::info!("swap_to_new_ui task: Showing new UI window");
         show_new_ui_window(&app);
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
         if let Some(w) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
-            tracing::info!("swap_to_new_ui task: Destroying old-ui window");
-            if let Err(e) = w.destroy() {
-                tracing::error!(
-                    "swap_to_new_ui task: Failed to destroy old-ui window: {:?}",
-                    e
-                );
+            if let Err(e) = w.hide() {
+                tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {:?}", e);
             }
-        } else {
-            tracing::warn!("swap_to_new_ui task: old-ui window not found to destroy");
         }
     });
 }
