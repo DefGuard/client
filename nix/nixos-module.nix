@@ -42,7 +42,7 @@ in {
       serviceConfig = {
         Group = "defguard";
         ExecStart = "${cfg.package}/bin/defguard-service --log-level ${cfg.logLevel} --stats-period ${toString cfg.statsPeriod}";
-        ExecReload = "/bin/kill -HUP $MAINPID";
+        ExecReload = "kill -HUP $MAINPID";
         KillMode = "process";
         KillSignal = "SIGINT";
         LimitNOFILE = 65536;
@@ -51,6 +51,13 @@ in {
         RestartSec = 2;
         TasksMax = "infinity";
         OOMScoreAdjust = -1000;
+        # Security hardening
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectControlGroups = true;
+        ProtectKernelModules = true;
+        RestrictRealtime = true;
+        LockPersonality = true;
       };
     };
 

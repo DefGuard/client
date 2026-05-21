@@ -59,9 +59,6 @@
     (craneLib.filterCargoSources path type)
     || (lib.hasSuffix ".proto" path)
     || (lib.hasSuffix "tauri.conf.json" path)
-    || (lib.hasSuffix "tauri.linux.conf.json" path)
-    || (lib.hasSuffix "tauri.macos.conf.json" path)
-    || (lib.hasSuffix "tauri.windows.conf.json" path)
     || (lib.hasInfix "/capabilities/" path)
     || (lib.hasInfix "/.sqlx/" path)
     || (lib.hasSuffix ".sql" path);
