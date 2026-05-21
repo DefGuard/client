@@ -24,11 +24,14 @@ enum State {
     /// Network routes monitor.
     private var networkMonitor: NWPathMonitor?
     /// Keep alive timer
-    private var keepAliveTimer: Timer?
+    private var keepAliveTimer: DispatchSourceTimer?
     /// Unified logger (writes to both system log and file)
     private let log = Log(category: "Adapter")
     /// Adapter state.
     private var state: State = .stopped
+    /// Serialize tunnel I/O and connection state changes off the main queue.
+    private let ioQueue = DispatchQueue(label: "net.defguard.VPNExtension.adapter")
+    private let ioQueueKey = DispatchSpecificKey<Void>()
 
     /// For statistics returned to Rust code.
     var locationId: UInt64?
@@ -40,6 +43,7 @@ enum State {
     /// - Parameter packetTunnelProvider: an instance of `NEPacketTunnelProvider`. Internally stored
     init(with packetTunnelProvider: NEPacketTunnelProvider) {
         self.packetTunnelProvider = packetTunnelProvider
+        self.ioQueue.setSpecific(key: ioQueueKey, value: ())
     }
 
     deinit {
@@ -47,6 +51,41 @@ enum State {
     }
 
     func start(tunnelConfiguration: TunnelConfiguration) throws {
+        try syncOnQueue {
+            try startOnQueue(tunnelConfiguration: tunnelConfiguration)
+        }
+    }
+
+    func stop() {
+        syncOnQueue {
+            stopOnQueue()
+        }
+    }
+
+    // Obtain tunnel statistics.
+    func stats() -> Stats? {
+        syncOnQueue {
+            guard let stats = tunnel?.stats() else { return nil }
+            return Stats(
+                txBytes: stats.txBytes,
+                rxBytes: stats.rxBytes,
+                lastHandshake: stats.lastHandshake,
+                locationId: locationId,
+                tunnelId: tunnelId
+            )
+        }
+    }
+
+    private func syncOnQueue<T>(_ work: () throws -> T) rethrows -> T {
+        if DispatchQueue.getSpecific(key: ioQueueKey) == nil {
+            return try ioQueue.sync {
+                try work()
+            }
+        }
+        return try work()
+    }
+
+    private func startOnQueue(tunnelConfiguration: TunnelConfiguration) throws {
         guard case .stopped = self.state else {
             log.error("Invalid state - cannot start tunnel")
             // TODO: throw invalid state
@@ -63,7 +102,7 @@ enum State {
         networkMonitor.pathUpdateHandler = { [weak self] path in
             self?.networkPathUpdate(path: path)
         }
-        networkMonitor.start(queue: .main)
+        networkMonitor.start(queue: ioQueue)
         self.networkMonitor = networkMonitor
 
         log.info("Initializing Tunnel")
@@ -94,12 +133,12 @@ enum State {
         log.info("Tunnel started successfully")
     }
 
-    func stop() {
+    private func stopOnQueue() {
         log.info("Stopping Adapter")
         connection?.cancel()
         connection = nil
         tunnel = nil
-        keepAliveTimer?.invalidate()
+        keepAliveTimer?.cancel()
         keepAliveTimer = nil
         // Cancel network monitor
         networkMonitor?.cancel()
@@ -110,21 +149,13 @@ enum State {
         log.flush()
     }
 
-    // Obtain tunnel statistics.
-    func stats() -> Stats? {
-        if let stats = tunnel?.stats() {
-            return Stats(
-                txBytes: stats.txBytes,
-                rxBytes: stats.rxBytes,
-                lastHandshake: stats.lastHandshake,
-                locationId: locationId,
-                tunnelId: tunnelId
-            )
-        }
-        return nil
+    private func handleTunnelResult(_ result: TunnelResult) {
+        var tunnelPackets = [NEPacket]()
+        handleTunnelResult(result, tunnelPackets: &tunnelPackets)
+        flushTunnelPackets(tunnelPackets)
     }
 
-    private func handleTunnelResult(_ result: TunnelResult) {
+    private func handleTunnelResult(_ result: TunnelResult, tunnelPackets: inout [NEPacket]) {
         switch result {
         case .done:
             // Nothing to do.
@@ -151,14 +182,15 @@ enum State {
         case .writeToNetwork(let data):
             sendToEndpoint(data: data)
         case .writeToTunnelV4(let data):
-            packetTunnelProvider?.packetFlow.writePacketObjects([
-                NEPacket(data: data, protocolFamily: sa_family_t(AF_INET))
-            ])
+            tunnelPackets.append(NEPacket(data: data, protocolFamily: sa_family_t(AF_INET)))
         case .writeToTunnelV6(let data):
-            packetTunnelProvider?.packetFlow.writePacketObjects([
-                NEPacket(data: data, protocolFamily: sa_family_t(AF_INET6))
-            ])
+            tunnelPackets.append(NEPacket(data: data, protocolFamily: sa_family_t(AF_INET6)))
         }
+    }
+
+    private func flushTunnelPackets(_ tunnelPackets: [NEPacket]) {
+        guard !tunnelPackets.isEmpty else { return }
+        packetTunnelProvider?.packetFlow.writePacketObjects(tunnelPackets)
     }
 
     /// Initialise UDP connection to endpoint.
@@ -177,7 +209,7 @@ enum State {
             self?.endpointStateChange(state: state)
         }
 
-        connection.start(queue: .main)
+        connection.start(queue: ioQueue)
         self.connection = connection
     }
 
@@ -194,15 +226,21 @@ enum State {
         log.debug("NWConnection path: \(String(describing: self.connection?.currentPath))")
         receive()
 
-        // Use Timer to send keep-alive packets.
-        keepAliveTimer?.invalidate()
+        // Use a dispatch timer to avoid bouncing keep-alives through the main run loop.
+        keepAliveTimer?.cancel()
         log.info("Creating keep-alive timer")
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] timer in
+        let timer = DispatchSource.makeTimerSource(queue: ioQueue)
+        timer.schedule(
+            deadline: .now() + .milliseconds(250),
+            repeating: .milliseconds(250),
+            leeway: .milliseconds(25)
+        )
+        timer.setEventHandler { [weak self] in
             guard let self = self, let tunnel = self.tunnel else { return }
             self.handleTunnelResult(tunnel.tick())
         }
         keepAliveTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
+        timer.resume()
     }
 
     /// Send packets to UDP endpoint.
@@ -226,7 +264,9 @@ enum State {
         connection?.receiveMessage { [weak self] data, context, isComplete, error in
             guard let self = self else { return }
             if let data = data, let tunnel = self.tunnel {
-                self.handleTunnelResult(tunnel.read(src: data))
+                autoreleasepool {
+                    self.handleTunnelResult(tunnel.read(src: data))
+                }
             }
             if error == nil {
                 // continue receiving
@@ -239,16 +279,32 @@ enum State {
 
     /// Read tunnel packets.
     private func readPackets() {
+        // Packets received to the tunnel's virtual interface.
+        packetTunnelProvider?.packetFlow.readPacketObjects { [weak self] packets in
+            guard let self = self else { return }
+
+            self.ioQueue.async {
+                self.processTunnelPackets(packets)
+
+                // continue reading
+                self.readPackets()
+            }
+        }
+    }
+
+    private func processTunnelPackets(_ packets: [NEPacket]) {
         guard let tunnel = self.tunnel else { return }
 
-        // Packets received to the tunnel's virtual interface.
-        packetTunnelProvider?.packetFlow.readPacketObjects { packets in
-            for packet in packets {
-                self.handleTunnelResult(tunnel.write(src: packet.data))
+        var tunnelPackets = [NEPacket]()
+        tunnelPackets.reserveCapacity(packets.count)
+
+        for packet in packets {
+            autoreleasepool {
+                self.handleTunnelResult(tunnel.write(src: packet.data), tunnelPackets: &tunnelPackets)
             }
-            // continue reading
-            self.readPackets()
         }
+
+        flushTunnelPackets(tunnelPackets)
     }
 
     /// Handle UDP connection state changes.
