@@ -47,14 +47,13 @@ jobs:
           $installPath = "tools\chocolateyinstall.ps1"
 
           (Get-Content -Raw $nuspecPath) `
-            -replace '<version>[^<]+</version>', "<version>$env:VERSION</version>" `
-            -replace '<packageSourceUrl>[^<]+</packageSourceUrl>', "<packageSourceUrl>$env:MSI_URL</packageSourceUrl>" |
+            -replace '<version>[^<]+</version>', "<version>$env:VERSION</version>" |
             Set-Content -NoNewline -Encoding UTF8 $nuspecPath
 
-          (Get-Content -Raw $installPath) `
-            -replace "^\$url\s*=\s*'.*'$", "`$url        = '$env:MSI_URL'" `
-            -replace "checksum\s*=\s*'[^']+'", "checksum      = '$env:MSI_SHA256'" |
-            Set-Content -NoNewline -Encoding UTF8 $installPath
+          $content = Get-Content -Raw $installPath
+          $content = $content -replace '__MSI_URL__',      $env:MSI_URL
+          $content = $content -replace '__MSI_CHECKSUM__', $env:MSI_SHA256
+          $content | Set-Content -NoNewline -Encoding UTF8 $installPath
 
       - name: Refresh local nupkg
         shell: pwsh
