@@ -102,6 +102,7 @@ export const TauriCommand = {
   StopGlobalLogWatcher: 'stop_global_logwatcher',
   AllActiveConnections: 'all_active_connections',
   DisconnectLocations: 'disconnect_locations',
+  GetPostureData: 'get_posture_data',
   //Window
   SwapToOldUi: 'swap_to_old_ui',
 } as const;
@@ -193,6 +194,7 @@ export type LocationInfo = {
   network_id: number;
   location_mfa_mode: LocationMfaMode;
   mfa_method?: MfaMethodValue;
+  posture_check_required: boolean;
 };
 
 export type LocationStats = {
