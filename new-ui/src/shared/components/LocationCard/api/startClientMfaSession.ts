@@ -8,6 +8,7 @@ import type {
 
 export const CLIENT_MFA_ENDPOINT = 'api/v1/client-mfa';
 
+/** Error raised when the MFA start request or its prerequisites fail. */
 export class MfaStartError extends Error {
   public readonly status?: number;
 
@@ -18,34 +19,44 @@ export class MfaStartError extends Error {
   }
 }
 
+/**
+ * MFA method identifiers expected by the desktop-client MFA API:
+ * 0 = TOTP, 1 = email, 2 = OIDC, 4 = mobile approval.
+ */
 export type MfaStartMethod = 0 | 1 | 2 | 4;
 
+/** Successful MFA start response returned by the proxy. */
 export type MfaStartResponse = {
   token: string;
   challenge?: string;
 };
 
+/** Error response shape returned by the proxy for MFA start failures. */
 type MfaStartErrorResponse = {
   error?: string;
 };
 
+/** Narrows MFA start errors that should open the posture failure view. */
 export const shouldShowPostureError = (
   err: unknown,
   location: LocationInfo,
 ): err is MfaStartError =>
   err instanceof MfaStartError && err.status === 403 && location.posture_check_required;
 
+/** Input required to start a desktop-client MFA session. */
 type StartClientMfaSessionParams = {
   instance: InstanceInfo;
   location: LocationInfo;
   method: MfaStartMethod;
 };
 
+/** MFA start response plus request headers required by later MFA calls. */
 type StartClientMfaSessionResult = {
   response: MfaStartResponse;
   headers: EdgeRequestHeaders;
 };
 
+/** Starts an MFA session, including posture data when the location requires it. */
 export const startClientMfaSession = async ({
   instance,
   location,

@@ -27,6 +27,7 @@ import type {
   UpdateInstanceRequest,
 } from './types';
 
+/** Extracts a human-readable message from Tauri command rejections. */
 const getInvokeErrorMessage = (command: TauriCommandKey, e: unknown): string => {
   if (
     typeof e === 'object' &&

@@ -9,6 +9,7 @@ type HandleMfaStartErrorParams = {
   setView: (view: LocationCardViewsValue) => void;
 };
 
+/** Handles MFA start posture failures and reports whether the error was consumed. */
 export const handleMfaStartError = ({
   err,
   location,
