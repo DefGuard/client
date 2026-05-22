@@ -39,7 +39,18 @@ fn os_name() -> Result<String, UnavailableReason> {
 
 /// Returns the operating system version.
 fn os_version() -> Result<String, UnavailableReason> {
-    System::os_version().ok_or(UnavailableReason::DetectionFailed)
+    #[cfg(windows)]
+    {
+        // Windows can report versions like "11 (26200)"; core expects a parseable major.
+        System::os_version()
+            .and_then(|version| version.split_whitespace().next().map(ToString::to_string))
+            .ok_or(UnavailableReason::DetectionFailed)
+    }
+
+    #[cfg(not(windows))]
+    {
+        System::os_version().ok_or(UnavailableReason::DetectionFailed)
+    }
 }
 
 /// Returns the Linux kernel version.

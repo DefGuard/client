@@ -1,6 +1,8 @@
 use reqwest::StatusCode;
 use serde::Deserialize;
 
+#[cfg(windows)]
+use crate::service::client::DAEMON_CLIENT;
 use crate::{
     database::{
         models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
@@ -30,7 +32,7 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
             ))
         })?;
 
-    let posture_data = DevicePostureData::new();
+    let posture_data = get_posture_data().await?;
 
     let request = DevicePostureCheckRequest {
         location_id: location.network_id,
@@ -75,5 +77,24 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
         status => Err(Error::HttpError(format!(
             "Unexpected proxy response: {status}"
         ))),
+    }
+}
+
+pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
+    #[cfg(windows)]
+    {
+        DAEMON_CLIENT
+            .clone()
+            .get_posture_data(tonic::Request::new(()))
+            .await
+            .map(|response| response.into_inner())
+            .map_err(|err| {
+                error!("Failed to get posture data from the daemon: {err}");
+                Error::InternalError(format!("Failed to get posture data from the daemon: {err}"))
+            })
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(DevicePostureData::new())
     }
 }

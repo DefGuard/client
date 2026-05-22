@@ -30,7 +30,7 @@ use crate::{
         DB_POOL,
     },
     enterprise::{
-        periodic::config::poll_instance, posture::authorize_posture_session,
+        self, periodic::config::poll_instance, posture::authorize_posture_session,
         provisioning::ProvisioningConfig,
     },
     error::Error,
@@ -1577,25 +1577,9 @@ pub fn get_platform_header() -> String {
 }
 
 #[tauri::command(async)]
-#[cfg(not(windows))]
 pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     debug!("Received a command to prepare posture report");
-    Ok(DevicePostureData::new())
-}
-
-#[tauri::command(async)]
-#[cfg(windows)]
-pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
-    debug!("Received a command to prepare posture report");
-    DAEMON_CLIENT
-        .clone()
-        .get_posture_data(tonic::Request::new(()))
-        .await
-        .map(|response| response.into_inner())
-        .map_err(|err| {
-            error!("Failed to get posture data from the daemon: {err}");
-            Error::InternalError(format!("Failed to get posture data from the daemon: {err}"))
-        })
+    enterprise::posture::get_posture_data().await
 }
 
 #[derive(Debug, Serialize)]
