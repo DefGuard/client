@@ -10,9 +10,12 @@ use crate::window_manager::{WindowManager, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID};
 
 #[cfg(target_os = "macos")]
 use cocoa::{
-    appkit::{NSView, NSWindow, NSWindowStyleMask},
+    appkit::{NSView, NSWindow, NSWindowButton, NSWindowStyleMask, NSWindowTitleVisibility},
     base::id,
 };
+
+#[cfg(target_os = "macos")]
+use objc::{msg_send, sel, sel_impl};
 
 #[cfg(target_os = "macos")]
 pub fn enable_rounded_corners<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
@@ -32,6 +35,26 @@ pub fn enable_rounded_corners<R: Runtime>(window: WebviewWindow<R>) -> Result<()
 
                 ns_window.setStyleMask_(style_mask);
                 ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
+
+                // Hide the window title
+                ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+
+                // Hide the standard window buttons (close, minimize, zoom)
+                let close_button =
+                    ns_window.standardWindowButton_(NSWindowButton::NSWindowCloseButton);
+                if !close_button.is_null() {
+                    let _: () = msg_send![close_button, setHidden: cocoa::base::YES];
+                }
+                let miniaturize_button =
+                    ns_window.standardWindowButton_(NSWindowButton::NSWindowMiniaturizeButton);
+                if !miniaturize_button.is_null() {
+                    let _: () = msg_send![miniaturize_button, setHidden: cocoa::base::YES];
+                }
+                let zoom_button =
+                    ns_window.standardWindowButton_(NSWindowButton::NSWindowZoomButton);
+                if !zoom_button.is_null() {
+                    let _: () = msg_send![zoom_button, setHidden: cocoa::base::YES];
+                }
 
                 let content_view = ns_window.contentView();
                 content_view.setWantsLayer(cocoa::base::YES);
