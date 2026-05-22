@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::time::sleep;
 
 #[cfg(not(target_os = "linux"))]
@@ -21,7 +21,7 @@ pub const NEW_UI_WIDTH: f64 = 380.0;
 pub const NEW_UI_HEIGHT: f64 = 640.0;
 pub const OLD_UI_WIDTH: f64 = 1280.0;
 pub const OLD_UI_HEIGHT: f64 = 920.0;
-#[cfg_attr(target_os = "linux", allow(unused_variables))]
+#[cfg(not(target_os = "linux"))]
 const WINDOW_GAP: f64 = 20.0;
 const WINDOW_TITLE: &str = "Defguard";
 // Sleep briefly to let the IPC handler return.
@@ -76,6 +76,39 @@ impl WindowManager {
             .decorations(true)
             .visible(false)
             .build()
+    }
+}
+
+#[cfg(not(windows))]
+impl WindowManager {
+    pub fn open_tray(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+        let window = if let Some(window) = app.get_webview_window(NEW_UI_WINDOW_ID) {
+            let _ = window.unminimize();
+            window
+        } else {
+            Self::build_tray_window(app)?
+        };
+        #[cfg(target_os = "macos")]
+        macos::position_window_near_tray(app, &window);
+        #[cfg(target_os = "macos")]
+        let _ = app.show();
+        let _ = window.show();
+        let _ = window.set_focus();
+        Ok(window)
+    }
+
+    pub fn open_full_view(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+        let window = if let Some(window) = app.get_webview_window(OLD_UI_WINDOW_ID) {
+            let _ = window.unminimize();
+            window
+        } else {
+            Self::build_full_window(app)?
+        };
+        #[cfg(target_os = "macos")]
+        let _ = app.show();
+        let _ = window.show();
+        let _ = window.set_focus();
+        Ok(window)
     }
 }
 

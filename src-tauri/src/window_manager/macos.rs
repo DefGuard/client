@@ -8,10 +8,7 @@ use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Position, Runtime, WebviewWindow,
 };
 
-use crate::{
-    appstate::AppState,
-    window_manager::{WindowManager, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID, WINDOW_GAP},
-};
+use crate::{appstate::AppState, window_manager::WINDOW_GAP};
 
 pub fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
     window
@@ -106,41 +103,12 @@ fn get_tray_window_position(
     Some(LogicalPosition::new(x, y))
 }
 
-fn position_window_near_tray(app: &AppHandle, window: &WebviewWindow) {
+pub(super) fn position_window_near_tray(app: &AppHandle, window: &WebviewWindow) {
     let size = window.outer_size().unwrap_or_default();
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     if let Some(position) = get_tray_window_position(app, size.to_logical::<f64>(scale_factor)) {
         if let Err(err) = window.set_position(Position::Logical(position)) {
             warn!("Failed to position window near tray icon: {err}");
         }
-    }
-}
-
-impl WindowManager {
-    pub fn open_tray(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        let window = if let Some(window) = app.get_webview_window(NEW_UI_WINDOW_ID) {
-            let _ = window.unminimize();
-            window
-        } else {
-            Self::build_tray_window(app)?
-        };
-        position_window_near_tray(app, &window);
-        let _ = app.show();
-        let _ = window.show();
-        let _ = window.set_focus();
-        Ok(window)
-    }
-
-    pub fn open_full_view(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        let window = if let Some(window) = app.get_webview_window(OLD_UI_WINDOW_ID) {
-            let _ = window.unminimize();
-            window
-        } else {
-            Self::build_full_window(app)?
-        };
-        let _ = app.show();
-        let _ = window.show();
-        let _ = window.set_focus();
-        Ok(window)
     }
 }
