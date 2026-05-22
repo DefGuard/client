@@ -16,7 +16,7 @@ import { useMfaOidcConnect } from '../../hooks/useMfaOidcConnect';
 type Screen = 'idle' | 'polling' | 'error';
 
 export const LocationCardMfaOidcView = () => {
-  const { setView } = useLocationCardContext();
+  const { setView, setPostureError } = useLocationCardContext();
   const { start, isStarting, startError, isPolling, pollError } = useMfaOidcConnect();
   const [screen, setScreen] = useState<Screen>('idle');
 
@@ -35,8 +35,9 @@ export const LocationCardMfaOidcView = () => {
 
   const errorMessage = startError ?? pollError;
 
-  const resetToIdle = () => {
-    setScreen('idle');
+  const backToLocation = () => {
+    setPostureError(null);
+    setView(LocationCardViews.Default);
   };
 
   return (
@@ -76,7 +77,7 @@ export const LocationCardMfaOidcView = () => {
             <Button
               text="Try again"
               variant={ButtonVariant.Primary}
-              onClick={resetToIdle}
+              onClick={backToLocation}
             />
           )}
         </div>

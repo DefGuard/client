@@ -8,7 +8,9 @@ interface LocationCardContextValue {
   instance: InstanceInfo;
   currentView: LocationCardViewsValue;
   previousView: LocationCardViewsValue | null;
+  postureError: string | null;
   setView: (view: LocationCardViewsValue) => void;
+  setPostureError: (error: string | null) => void;
   startMfa: () => void;
   localMfaMethod: MfaMethodValue;
   setLocalMfaMethod: (method: MfaMethodValue) => void;
@@ -36,6 +38,7 @@ export const LocationCardProvider = ({
   children,
 }: LocationCardProviderProps) => {
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
+  const [postureError, setPostureError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
@@ -73,7 +76,9 @@ export const LocationCardProvider = ({
       value={{
         currentView,
         previousView,
+        postureError,
         setView,
+        setPostureError,
         location,
         instance,
         startMfa,

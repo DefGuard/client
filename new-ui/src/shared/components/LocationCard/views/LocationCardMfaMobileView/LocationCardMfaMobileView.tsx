@@ -17,8 +17,8 @@ import { useMfaMobileConnect } from '../../hooks/useMfaMobileConnect';
 type Screen = 'loading' | 'qr' | 'error';
 
 export const LocationCardMfaMobileView = () => {
-  const { setView } = useLocationCardContext();
-  const { start, startError, qrValue, connectionError, reset } = useMfaMobileConnect();
+  const { setView, setPostureError } = useLocationCardContext();
+  const { start, startError, qrValue, connectionError } = useMfaMobileConnect();
   const [screen, setScreen] = useState<Screen>('loading');
   const startedRef = useRef(false);
 
@@ -37,10 +37,9 @@ export const LocationCardMfaMobileView = () => {
     }
   }, [startError, connectionError, qrValue]);
 
-  const retry = () => {
-    reset();
-    setScreen('loading');
-    void start();
+  const backToLocation = () => {
+    setPostureError(null);
+    setView(LocationCardViews.Default);
   };
 
   const errorMessage = startError ?? connectionError;
@@ -69,7 +68,11 @@ export const LocationCardMfaMobileView = () => {
         />
         <div className="right">
           {screen === 'error' && (
-            <Button text="Try again" variant={ButtonVariant.Primary} onClick={retry} />
+            <Button
+              text="Try again"
+              variant={ButtonVariant.Primary}
+              onClick={backToLocation}
+            />
           )}
         </div>
       </Controls>

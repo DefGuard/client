@@ -21,6 +21,7 @@ import { LocationCardMfaMobileView } from './views/LocationCardMfaMobileView/Loc
 import { LocationCardMfaOidcView } from './views/LocationCardMfaOidcView/LocationCardMfaOidcView';
 import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
 import { LocationCardMfaTotpView } from './views/LocationCardMfaTotpView/LocationCardMfaTotpView';
+import { LocationCardPostureCheckFailView } from './views/LocationCardPostureCheckFailView/LocationCardPostureCheckFailView';
 
 interface Props {
   location: LocationInfo;
@@ -39,7 +40,7 @@ const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.MfaSettings]: <LocationCardMfaSettings />,
   [LocationCardViews.Connecting]: null,
   [LocationCardViews.Connected]: <ConnectedView />,
-  [LocationCardViews.PostureCheckFail]: null,
+  [LocationCardViews.PostureCheckFail]: <LocationCardPostureCheckFailView />,
 };
 
 interface InnerProps {

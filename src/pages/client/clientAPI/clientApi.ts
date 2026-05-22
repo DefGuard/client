@@ -27,6 +27,20 @@ import type {
   UpdateInstanceRequest,
 } from './types';
 
+/** Extracts a human-readable message from Tauri command rejections. */
+const getInvokeErrorMessage = (command: TauriCommandKey, e: unknown): string => {
+  if (
+    typeof e === 'object' &&
+    e !== null &&
+    'message' in e &&
+    typeof e.message === 'string'
+  ) {
+    return e.message;
+  }
+
+  return `Invoking "${command}" failed due to unknown error: ${JSON.stringify(e)}`;
+};
+
 // Streamlines logging for invokes
 async function invokeWrapper<T>(
   command: TauriCommandKey,
@@ -43,9 +57,7 @@ async function invokeWrapper<T>(
     return res;
     // TODO: handle more error types ?
   } catch (e) {
-    let message: string = `Invoking "${command}" failed due to unknown error: ${JSON.stringify(
-      e,
-    )}`;
+    let message = getInvokeErrorMessage(command, e);
     trace(message);
     if (e instanceof TimeoutError) {
       message = `Invoking "${command}" timed out after ${timeout / 1000} seconds`;
