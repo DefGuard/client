@@ -10,17 +10,11 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
 export const LocationCardPostureCheckFailView = () => {
-  const { postureError, previousView, setPostureError, setView } =
-    useLocationCardContext();
+  const { postureError, setPostureError, setView } = useLocationCardContext();
 
-  const retryView =
-    previousView && previousView !== LocationCardViews.PostureCheckFail
-      ? previousView
-      : LocationCardViews.Default;
-
-  const tryAgain = () => {
+  const backToLocation = () => {
     setPostureError(null);
-    setView(retryView);
+    setView(LocationCardViews.Default);
   };
 
   return (
@@ -34,7 +28,11 @@ export const LocationCardPostureCheckFailView = () => {
         </p>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
-      <Button text="Try again" variant={ButtonVariant.Secondary} onClick={tryAgain} />
+      <Button
+        text="Try again"
+        variant={ButtonVariant.Secondary}
+        onClick={backToLocation}
+      />
     </div>
   );
 };
