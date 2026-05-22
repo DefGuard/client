@@ -21,6 +21,7 @@ pub const NEW_UI_WIDTH: f64 = 380.0;
 pub const NEW_UI_HEIGHT: f64 = 640.0;
 pub const OLD_UI_WIDTH: f64 = 1280.0;
 pub const OLD_UI_HEIGHT: f64 = 920.0;
+#[cfg_attr(target_os = "linux", allow(unused_variables))]
 const WINDOW_GAP: f64 = 20.0;
 const WINDOW_TITLE: &str = "Defguard";
 // Sleep briefly to let the IPC handler return.
@@ -85,6 +86,7 @@ pub mod windows;
 pub mod macos;
 
 // Export tauri commands so they can be registered in main.rs
+#[cfg_attr(target_os = "linux", allow(unused_variables))]
 pub(crate) fn show_new_ui_window(app: &AppHandle) {
     #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_tray(app);
@@ -99,6 +101,7 @@ pub fn open_new_ui_window(app: AppHandle) {
     show_new_ui_window(&app);
 }
 
+#[cfg_attr(target_os = "linux", allow(unused_variables))]
 #[tauri::command]
 pub fn open_old_ui_window(app: AppHandle) {
     #[cfg(not(target_os = "linux"))]
