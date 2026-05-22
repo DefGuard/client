@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::time::sleep;
 
 #[cfg(not(target_os = "linux"))]
@@ -58,6 +58,9 @@ impl WindowManager {
             .skip_taskbar(true);
         #[cfg(target_os = "macos")]
         let window = window.hidden_title(true);
+
+        #[cfg(target_os = "windows")]
+        let window = window.decorations(false);
 
         let window = window.build()?;
 
