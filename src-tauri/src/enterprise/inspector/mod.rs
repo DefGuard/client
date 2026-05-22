@@ -39,7 +39,15 @@ fn os_name() -> Result<String, UnavailableReason> {
 
 /// Returns the operating system version.
 fn os_version() -> Result<String, UnavailableReason> {
-    System::os_version().ok_or(UnavailableReason::DetectionFailed)
+    #[cfg(windows)]
+    {
+        windows::os_version()
+    }
+
+    #[cfg(not(windows))]
+    {
+        System::os_version().ok_or(UnavailableReason::DetectionFailed)
+    }
 }
 
 /// Returns the Linux kernel version.
