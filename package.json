@@ -35,21 +35,6 @@
       "last 1 safari version"
     ]
   },
-  "pnpm": {
-    "peerDependencyRules": {
-      "ignoreMissing": [
-        "react-native"
-      ]
-    },
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "@swc/core",
-      "esbuild"
-    ],
-    "overrides": {
-      "mdast-util-to-hast": "13.2.1"
-    }
-  },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
     "@hookform/resolvers": "^3.10.0",
