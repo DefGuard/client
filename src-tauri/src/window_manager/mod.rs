@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+#[cfg(not(target_os = "windows"))]
+use tauri::Manager;
 use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::time::sleep;
 
