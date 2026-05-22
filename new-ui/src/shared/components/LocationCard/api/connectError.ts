@@ -1,19 +1,20 @@
-export type ConnectError =
-  | {
-      kind: 'postureCheckFailed';
-      message: string;
-    }
-  | {
-      kind: 'other';
-      message: string;
-    };
+import z from 'zod';
 
-export const isPostureCheckFailedConnectError = (
-  err: unknown,
-): err is Extract<ConnectError, { kind: 'postureCheckFailed' }> =>
-  typeof err === 'object' &&
-  err !== null &&
-  'kind' in err &&
-  'message' in err &&
-  err.kind === 'postureCheckFailed' &&
-  typeof err.message === 'string';
+const connectErrorSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('postureCheckFailed'),
+    message: z.string(),
+  }),
+  z.object({
+    kind: z.literal('other'),
+    message: z.string(),
+  }),
+]);
+
+export type ConnectError = z.infer<typeof connectErrorSchema>;
+
+export const parseConnectError = (err: unknown): ConnectError | null => {
+  const result = connectErrorSchema.safeParse(err);
+
+  return result.success ? result.data : null;
+};

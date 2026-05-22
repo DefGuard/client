@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../../../../rust-api/api';
 import { LocationMfaMode } from '../../../../rust-api/types';
-import { isPostureCheckFailedConnectError } from '../../api/connectError';
+import { parseConnectError } from '../../api/connectError';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
@@ -16,8 +16,13 @@ export const ConnectButton = () => {
       setView(LocationCardViews.Connected);
     },
     onError: (err) => {
-      if (location.posture_check_required && isPostureCheckFailedConnectError(err)) {
-        setPostureError(err.message);
+      const connectError = parseConnectError(err);
+
+      if (
+        location.posture_check_required &&
+        connectError?.kind === 'postureCheckFailed'
+      ) {
+        setPostureError(connectError.message);
         setView(LocationCardViews.PostureCheckFail);
       }
     },
