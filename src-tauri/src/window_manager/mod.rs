@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tokio::time::sleep;
 
 #[cfg(not(target_os = "linux"))]
 use crate::database::{models::location::Location, DB_POOL};
@@ -18,11 +21,14 @@ pub const NEW_UI_WIDTH: f64 = 380.0;
 pub const NEW_UI_HEIGHT: f64 = 640.0;
 pub const OLD_UI_WIDTH: f64 = 1280.0;
 pub const OLD_UI_HEIGHT: f64 = 920.0;
-pub const WINDOW_GAP: f64 = 20.0;
+const WINDOW_GAP: f64 = 20.0;
+const WINDOW_TITLE: &str = "Defguard";
+// Sleep briefly to let the IPC handler return.
+const UI_SWAP_DELAY: Duration = Duration::from_millis(50);
 
 #[must_use]
 pub fn new_ui_url() -> WebviewUrl {
-    if cfg!(any(defguard_client_dev, debug_assertions)) {
+    if cfg!(any(defguard_client_dev)) {
         WebviewUrl::External("http://localhost:5072".parse().unwrap())
     } else {
         WebviewUrl::App("new-ui/".into())
@@ -31,7 +37,7 @@ pub fn new_ui_url() -> WebviewUrl {
 
 #[must_use]
 pub fn old_ui_url() -> WebviewUrl {
-    if cfg!(any(defguard_client_dev, debug_assertions)) {
+    if cfg!(any(defguard_client_dev)) {
         WebviewUrl::External("http://localhost:5071".parse().unwrap())
     } else {
         WebviewUrl::App("old-ui/index.html".into())
@@ -43,17 +49,19 @@ pub struct WindowManager;
 impl WindowManager {
     pub fn build_tray_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         let window = WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
-            .title("Defguard")
+            .title(WINDOW_TITLE)
             .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
             .resizable(false)
-            .decorations(false)
             .visible(false)
             .always_on_top(true)
-            .skip_taskbar(true)
-            .build()?;
+            .skip_taskbar(true);
+        #[cfg(target_os = "macos")]
+        let window = window.hidden_title(true);
+
+        let window = window.build()?;
 
         #[cfg(target_os = "macos")]
-        if let Err(err) = macos::enable_rounded_corners(window.clone()) {
+        if let Err(err) = macos::enable_rounded_corners(&window) {
             tracing::warn!("Failed to enable rounded corners on tray window: {err}");
         }
 
@@ -62,7 +70,7 @@ impl WindowManager {
 
     pub fn build_full_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_ui_url())
-            .title("Defguard")
+            .title(WINDOW_TITLE)
             .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
             .decorations(true)
             .visible(false)
@@ -70,10 +78,10 @@ impl WindowManager {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub mod windows;
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 pub mod macos;
 
 // Export tauri commands so they can be registered in main.rs
@@ -99,15 +107,14 @@ pub fn open_old_ui_window(app: AppHandle) {
 pub fn swap_to_old_ui(app: AppHandle) {
     tracing::info!("swap_to_old_ui called");
     tauri::async_runtime::spawn(async move {
-        // Sleep briefly to let the IPC handler return
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        if let Some(w) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
-            if let Err(e) = w.hide() {
-                tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {:?}", e);
+        sleep(UI_SWAP_DELAY).await;
+        if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+            if let Err(err) = window.hide() {
+                tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
             }
         }
-        if let Err(e) = WindowManager::open_full_view(&app) {
-            tracing::error!("swap_to_old_ui task: Failed to open full view: {:?}", e);
+        if let Err(err) = WindowManager::open_full_view(&app) {
+            tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
         }
     });
 }
@@ -116,14 +123,11 @@ pub fn swap_to_old_ui(app: AppHandle) {
 pub fn close_tray_window(app: AppHandle) {
     tracing::info!("close_tray_window called");
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        if let Some(w) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+        sleep(UI_SWAP_DELAY).await;
+        if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
             tracing::info!("close_tray_window task: Hiding new-ui window");
-            if let Err(e) = w.hide() {
-                tracing::error!(
-                    "close_tray_window task: Failed to hide new-ui window: {:?}",
-                    e
-                );
+            if let Err(err) = window.hide() {
+                tracing::error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
             }
         } else {
             tracing::warn!("close_tray_window task: new-ui window not found");
@@ -135,11 +139,11 @@ pub fn close_tray_window(app: AppHandle) {
 pub fn swap_to_new_ui(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        sleep(UI_SWAP_DELAY).await;
         show_new_ui_window(&app);
-        if let Some(w) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
-            if let Err(e) = w.hide() {
-                tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {:?}", e);
+        if let Some(window) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
+            if let Err(err) = window.hide() {
+                tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
             }
         }
     });
