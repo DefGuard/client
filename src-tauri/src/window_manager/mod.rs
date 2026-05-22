@@ -101,6 +101,7 @@ pub fn open_new_ui_window(app: AppHandle) {
 
 #[tauri::command]
 pub fn open_old_ui_window(app: AppHandle) {
+    #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_full_view(&app);
 }
 
