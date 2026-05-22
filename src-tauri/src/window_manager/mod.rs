@@ -55,14 +55,12 @@ impl WindowManager {
             .title(WINDOW_TITLE)
             .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
             .resizable(false)
+            .decorations(false)
             .visible(false)
             .always_on_top(true)
             .skip_taskbar(true);
         #[cfg(target_os = "macos")]
         let window = window.hidden_title(true);
-
-        #[cfg(target_os = "windows")]
-        let window = window.decorations(false);
 
         let window = window.build()?;
 
