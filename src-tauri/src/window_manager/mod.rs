@@ -117,8 +117,11 @@ pub fn swap_to_old_ui(app: AppHandle) {
                 tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
             }
         }
-        if let Err(err) = WindowManager::open_full_view(&app) {
-            tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
+        #[cfg(not(target_os = "linux"))]
+        {
+            if let Err(err) = WindowManager::open_full_view(&app) {
+                tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
+            }
         }
     });
 }
