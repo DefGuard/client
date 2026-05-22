@@ -4,7 +4,7 @@ default-members = [".", "cli"]
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = { git = "ssh://git@github.com/DefGuard/wireguard-rs.git", rev = "302ea8c93f411a74cc5b36207ba1e4a418c11aa3" }
+defguard_wireguard_rs = { git = "ssh://git@github.com/DefGuard/wireguard-rs.git", rev = "83cd93d22995ea6e567e5304bd7e1089803b66ba" }
 dirs-next = "2.0"
 prost = "0.14"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
