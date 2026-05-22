@@ -60,6 +60,7 @@ export const ConnectionWatcher = () => {
 
   const hover = useHover(context, {
     handleClose: safePolygon(),
+    enabled: connected,
   });
 
   const dismiss = useDismiss(context, {

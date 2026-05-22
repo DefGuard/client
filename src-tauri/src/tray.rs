@@ -144,38 +144,48 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
 
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
-        .show_menu_on_left_click(cfg!(target_os = "macos"))
+        .show_menu_on_left_click(false)
         .on_tray_icon_event(|icon, event| {
             store_tray_click_position(icon.app_handle(), &event);
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                let app = icon.app_handle();
-                let any_visible = [NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID].iter().any(|id| {
-                    app.get_webview_window(id)
-                        .and_then(|w| w.is_visible().ok())
-                        .unwrap_or(false)
-                });
-                if any_visible {
-                    hide_visible_windows(app);
-                } else {
-                    #[cfg(not(target_os = "linux"))]
-                    {
-                        let has_locations = tauri::async_runtime::block_on(
-                            crate::window_manager::has_non_service_locations(),
-                        );
-                        if has_locations {
-                            show_new_ui_window_near_tray(app);
-                        } else {
-                            let _ = WindowManager::open_full_view(app);
-                        }
-                    }
-                    #[cfg(target_os = "linux")]
-                    show_new_ui_window_near_tray(app);
+            match event {
+                #[cfg(target_os = "macos")]
+                TrayIconEvent::Click {
+                    button: MouseButton::Right,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => {
+                    let _ = icon.show_menu();
                 }
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => {
+                    let app = icon.app_handle();
+                    let any_visible = [NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID].iter().any(|id| {
+                        app.get_webview_window(id)
+                            .and_then(|w| w.is_visible().ok())
+                            .unwrap_or(false)
+                    });
+                    if any_visible {
+                        hide_visible_windows(app);
+                    } else {
+                        #[cfg(not(target_os = "linux"))]
+                        {
+                            let has_locations = tauri::async_runtime::block_on(
+                                crate::window_manager::has_non_service_locations(),
+                            );
+                            if has_locations {
+                                show_new_ui_window_near_tray(app);
+                            } else {
+                                let _ = WindowManager::open_full_view(app);
+                            }
+                        }
+                        #[cfg(target_os = "linux")]
+                        show_new_ui_window_near_tray(app);
+                    }
+                }
+                _ => {}
             }
         })
         .on_menu_event(handle_tray_menu_event)

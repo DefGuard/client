@@ -42,7 +42,7 @@ pub struct WindowManager;
 
 impl WindowManager {
     pub fn build_tray_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
+        let window = WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
             .title("Defguard")
             .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
             .resizable(false)
@@ -50,7 +50,14 @@ impl WindowManager {
             .visible(false)
             .always_on_top(true)
             .skip_taskbar(true)
-            .build()
+            .build()?;
+
+        #[cfg(target_os = "macos")]
+        if let Err(err) = macos::enable_rounded_corners(window.clone()) {
+            tracing::warn!("Failed to enable rounded corners on tray window: {err}");
+        }
+
+        Ok(window)
     }
 
     pub fn build_full_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
