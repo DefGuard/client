@@ -33,7 +33,6 @@ struct Win32ComputerSystem {
 #[serde(rename_all = "PascalCase")]
 struct Win32OperatingSystem {
     system_drive: String,
-    version: String,
 }
 
 // Custom format for `installed_on`.
@@ -61,13 +60,6 @@ impl From<WMIError> for UnavailableReason {
             UnavailableReason::DetectionFailed
         }
     }
-}
-
-/// Returns the numeric Windows version reported by WMI.
-pub(super) fn os_version() -> Result<String, UnavailableReason> {
-    let conn = WMIConnection::new()?;
-    let os = conn.get::<Win32OperatingSystem>()?;
-    Ok(os.version)
 }
 
 /// Determine system drive letter.

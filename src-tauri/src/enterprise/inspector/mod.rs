@@ -41,7 +41,10 @@ fn os_name() -> Result<String, UnavailableReason> {
 fn os_version() -> Result<String, UnavailableReason> {
     #[cfg(windows)]
     {
-        windows::os_version()
+        // Windows can report versions like "11 (26200)"; core expects a parseable major.
+        System::os_version()
+            .and_then(|version| version.split_whitespace().next().map(ToString::to_string))
+            .ok_or(UnavailableReason::DetectionFailed)
     }
 
     #[cfg(not(windows))]
