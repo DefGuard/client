@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use tauri::{AppHandle, LogicalPosition, Manager, Monitor, PhysicalSize, Position, WebviewWindow};
 
 #[cfg(target_os = "macos")]
