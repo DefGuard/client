@@ -20,13 +20,29 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         guard let protocolConfig = self.protocolConfiguration as? NETunnelProviderProtocol,
-            let providerConfig = protocolConfig.providerConfiguration,
-            let tunnelConfig = try? TunnelConfiguration.from(dictionary: providerConfig)
+              let providerConfig = protocolConfig.providerConfiguration
+        else {
+          log.error("Failed to parse provider configuration")
+          completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
+          return
+        }
+
+#if os(macOS)
+        guard let tunnelConfig = try? TunnelConfiguration.from(dictionary: providerConfig)
         else {
             log.error("Failed to parse tunnel configuration")
             completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
             return
         }
+#else
+        guard let startData = try? TunnelStartData.from(dictionary: providerConfig)
+        else {
+            log.error("Failed to parse tunnel configuration")
+            completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
+            return
+        }
+        let tunnelConfig = TunnelConfiguration(fromStartData: startData)
+#endif
 
         let networkSettings = tunnelConfig.asNetworkSettings()
         self.setTunnelNetworkSettings(networkSettings) { error in

@@ -124,6 +124,61 @@ final class TunnelConfiguration: Codable {
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
     }
 
+#if os(iOS)
+    /// Helper function allowing to parse comma-separated string of addresses.
+    private func parseAddresses(fromString string: String) -> [IpAddrMask] {
+        var addresses: [IpAddrMask] = []
+
+        for addr in string.split(separator: ",").map({
+            String($0.trimmingCharacters(in: .whitespaces))
+        }) {
+            if let addr_mask = IpAddrMask(fromString: addr) {
+                addresses.append(addr_mask)
+            }
+        }
+
+        return addresses
+    }
+
+    init(fromStartData startData: TunnelStartData) {
+        name = startData.locationName
+        privateKey = startData.privateKey
+        let peer = Peer(publicKey: startData.publicKey)
+        peers = [peer]
+
+        addresses = self.parseAddresses(fromString: startData.address)
+
+        // DNS settings
+        let dnsRecords = startData.dns?.split(separator: ",").map {
+            $0.trimmingCharacters(in: .whitespaces)
+        } ?? []
+        if !dnsRecords.isEmpty {
+            for record in dnsRecords {
+                if IPv4Address(record) != nil || IPv6Address(record) != nil {
+                    dns.append(record)
+                } else {
+                    dnsSearch.append(record)
+                }
+            }
+        }
+
+        // Peer settings
+        peer.preSharedKey = startData.presharedKey
+        peer.endpoint = Endpoint(from: startData.endpoint)
+        peer.persistentKeepAlive = UInt16(startData.keepalive)
+        peer.allowedIPs =
+        switch startData.traffic {
+            case .All:
+                [
+                    IpAddrMask(address: IPv4Address.any, cidr: 0),
+                    IpAddrMask(address: IPv6Address.any, cidr: 0),
+                ]
+            case .Predefined:
+                self.parseAddresses(fromString: startData.allowedIps)
+        }
+    }
+#endif
+
     /// Client connection expects one peer, so check for that.
     func isValidForClientConnection() -> Bool {
         return peers.count == 1
