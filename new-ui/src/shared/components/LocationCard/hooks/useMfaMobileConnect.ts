@@ -3,7 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
-import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
+import {
+  CLIENT_MFA_ENDPOINT,
+  MfaStartMethod,
+  startClientMfaSession,
+} from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { handleMfaStartError } from './handleMfaStartError';
@@ -138,7 +142,7 @@ export const useMfaMobileConnect = () => {
       const { response } = await startClientMfaSession({
         instance,
         location,
-        method: 4,
+        method: MfaStartMethod.MobileApprove,
       });
       if (!response.challenge) {
         setStartError('Unsupported response from proxy');

@@ -19,11 +19,15 @@ export class MfaStartError extends Error {
   }
 }
 
-/**
- * MFA method identifiers expected by the desktop-client MFA API:
- * 0 = TOTP, 1 = email, 2 = OIDC, 4 = mobile approval.
- */
-export type MfaStartMethod = 0 | 1 | 2 | 4;
+/** MFA method identifiers expected by the desktop-client MFA API */
+export const MfaStartMethod = {
+  Totp: 0,
+  Email: 1,
+  Oidc: 2,
+  MobileApprove: 4,
+} as const;
+
+export type MfaStartMethod = (typeof MfaStartMethod)[keyof typeof MfaStartMethod];
 
 /** Successful MFA start response returned by the proxy. */
 export type MfaStartResponse = {

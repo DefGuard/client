@@ -4,7 +4,11 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
+import {
+  CLIENT_MFA_ENDPOINT,
+  MfaStartMethod,
+  startClientMfaSession,
+} from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { handleMfaStartError } from './handleMfaStartError';
@@ -132,7 +136,7 @@ export const useMfaOidcConnect = () => {
       const { response, headers } = await startClientMfaSession({
         instance,
         location,
-        method: 2,
+        method: MfaStartMethod.Oidc,
       });
       await api.openLink(`${instance.proxy_url}openid/mfa?token=${response.token}`);
       startPolling(response.token, instance.proxy_url, headers);

@@ -5,7 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { EdgeRequestHeaders } from '../../../rust-api/types';
-import { CLIENT_MFA_ENDPOINT, startClientMfaSession } from '../api/startClientMfaSession';
+import {
+  CLIENT_MFA_ENDPOINT,
+  type MfaStartMethod,
+  startClientMfaSession,
+} from '../api/startClientMfaSession';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { handleMfaStartError } from './handleMfaStartError';
@@ -18,7 +22,9 @@ type MfaErrorResponse = {
   error: string;
 };
 
-export const useMfaConnect = (method: 0 | 1) => {
+type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
+
+export const useMfaConnect = (method: CodeMfaStartMethod) => {
   const { location, setPostureError, setView } = useLocationCardContext();
 
   const [token, setToken] = useState<string | null>(null);

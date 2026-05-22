@@ -100,7 +100,7 @@ export const MFAModal = () => {
     }
   }, [location, resetAuthState]);
 
-  // selectedMethod: 0 = authenticator app, 1 = email, 2 = OpenID, 3 = MobileApprove
+  // selectedMethod: 0 = authenticator app, 1 = email, 2 = OpenID, 4 = MobileApprove
   const startMFA = useCallback(
     async (method: number) => {
       if (!location) return toaster.error(localLL.errors.locationNotSpecified());
