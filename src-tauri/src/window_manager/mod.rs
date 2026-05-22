@@ -86,6 +86,7 @@ pub mod macos;
 
 // Export tauri commands so they can be registered in main.rs
 pub(crate) fn show_new_ui_window(app: &AppHandle) {
+    #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_tray(app);
 }
 
