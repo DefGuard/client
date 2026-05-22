@@ -261,6 +261,8 @@ fn main() {
                         let _ = app.opener().open_url(REPORT_URL, None::<&str>);
                     }
                 });
+
+                app.set_dock_visibility(false);
             }
 
             // Register for Linux and debug Windows builds.

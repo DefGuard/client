@@ -106,6 +106,8 @@ pub fn open_old_ui_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_old_ui(app: AppHandle) {
     tracing::info!("swap_to_old_ui called");
+    #[cfg(target_os = "macos")]
+    let _ = app.set_dock_visibility(true);
     tauri::async_runtime::spawn(async move {
         sleep(UI_SWAP_DELAY).await;
         if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
@@ -138,6 +140,8 @@ pub fn close_tray_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_new_ui(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
+    #[cfg(target_os = "macos")]
+    let _ = app.set_dock_visibility(false);
     tauri::async_runtime::spawn(async move {
         sleep(UI_SWAP_DELAY).await;
         show_new_ui_window(&app);
