@@ -31,6 +31,7 @@ in
       trunk
       sqlx-cli
       vtsls
+      trivy
     ];
 
     shellHook = with pkgs; ''
