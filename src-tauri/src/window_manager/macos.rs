@@ -1,7 +1,42 @@
 use tauri::{AppHandle, LogicalPosition, Manager, Monitor, PhysicalSize, Position, WebviewWindow};
 
+#[cfg(target_os = "macos")]
+use tauri::Runtime;
+
 use crate::appstate::AppState;
 use crate::window_manager::{WindowManager, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID};
+
+#[cfg(target_os = "macos")]
+use cocoa::{
+    appkit::{NSView, NSWindow, NSWindowStyleMask},
+    base::id,
+};
+
+#[cfg(target_os = "macos")]
+pub fn enable_rounded_corners<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
+    window
+        .with_webview(move |webview| {
+            unsafe {
+                let ns_window = webview.ns_window() as id;
+
+                let mut style_mask = ns_window.styleMask();
+
+                // Add necessary styles for rounded corners
+                style_mask |= NSWindowStyleMask::NSFullSizeContentViewWindowMask;
+                style_mask |= NSWindowStyleMask::NSTitledWindowMask;
+                style_mask |= NSWindowStyleMask::NSClosableWindowMask;
+                style_mask |= NSWindowStyleMask::NSMiniaturizableWindowMask;
+                style_mask |= NSWindowStyleMask::NSResizableWindowMask;
+
+                ns_window.setStyleMask_(style_mask);
+                ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
+
+                let content_view = ns_window.contentView();
+                content_view.setWantsLayer(cocoa::base::YES);
+            }
+        })
+        .map_err(|e| e.to_string())
+}
 
 /// Try to get monitor at the given position, with a fall back to primary monitor, and then to the
 /// first one on the list of available monitors.
