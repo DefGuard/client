@@ -370,14 +370,6 @@ fn main() {
                 warn!("Failed to pre-build full window: {e}");
             }
 
-            // If the app was cold-launched by a deep link the full view must open, not the tray.
-            let launched_by_deep_link = app_handle
-                .deep_link()
-                .get_current()
-                .ok()
-                .flatten()
-                .is_some();
-
             // Decide which window to show based on platform and available locations.
             #[cfg(target_os = "linux")]
             {
@@ -385,6 +377,13 @@ fn main() {
             }
             #[cfg(not(target_os = "linux"))]
             {
+                // If the app was cold-launched by a deep link the full view must open, not the tray.
+                let launched_by_deep_link = app_handle
+                    .deep_link()
+                    .get_current()
+                    .ok()
+                    .flatten()
+                    .is_some();
                 if launched_by_deep_link {
                     info!("App launched via deep link, opening full view directly.");
                     let _ = WindowManager::open_full_view(app_handle);
