@@ -154,27 +154,45 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
             } = event
             {
                 let app = icon.app_handle();
-                let any_visible = [NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID].iter().any(|id| {
-                    app.get_webview_window(id)
+
+                #[cfg(target_os = "linux")]
+                show_main_window(app);
+
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let main_visible = app
+                        .get_webview_window(OLD_UI_WINDOW_ID)
                         .and_then(|w| w.is_visible().ok())
-                        .unwrap_or(false)
-                });
-                if any_visible {
-                    hide_visible_windows(app);
-                } else {
-                    #[cfg(not(target_os = "linux"))]
-                    {
+                        .unwrap_or(false);
+
+                    if main_visible {
+                        if let Some(w) = app.get_webview_window(OLD_UI_WINDOW_ID) {
+                            let _ = w.hide();
+                        }
+                    }
+
+                    let tray_visible = app
+                        .get_webview_window(NEW_UI_WINDOW_ID)
+                        .and_then(|w| w.is_visible().ok())
+                        .unwrap_or(false);
+
+                    if tray_visible {
+                        if let Some(w) = app.get_webview_window(NEW_UI_WINDOW_ID) {
+                            let _ = w.hide();
+                        }
+                    } else {
                         let has_locations = tauri::async_runtime::block_on(
                             crate::window_manager::has_non_service_locations(),
                         );
                         if has_locations {
+                            if let Some(old_ui) = app.get_webview_window(OLD_UI_WINDOW_ID) {
+                                let _ = old_ui.hide();
+                            }
                             show_new_ui_window_near_tray(app);
                         } else {
                             let _ = WindowManager::open_full_view(app);
                         }
                     }
-                    #[cfg(target_os = "linux")]
-                    show_main_window(app);
                 }
             }
         })

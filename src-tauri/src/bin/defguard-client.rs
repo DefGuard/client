@@ -28,7 +28,7 @@ use defguard_client::{
     events::handle_deep_link,
     periodic::run_periodic_tasks,
     service,
-    tray::{configure_tray_icon, setup_tray, show_main_window},
+    tray::{configure_tray_icon, setup_tray},
     utils::load_log_targets,
     window_manager::*,
     LOG_FILENAME, VERSION,
@@ -211,9 +211,25 @@ fn main() {
         })
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
         // Single instance plugin should always be the first to register.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            // Running instance might be hidden, so show it.
-            show_main_window(app);
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let is_deep_link = argv.iter().any(|a| a.starts_with("defguard://"));
+            // User tried to spawn second instance, mirror tray left click path.
+            if !is_deep_link {
+                #[cfg(target_os = "linux")]
+                let _ = WindowManager::open_full_view(app);
+
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let has_locations = tauri::async_runtime::block_on(
+                        defguard_client::window_manager::has_non_service_locations(),
+                    );
+                    if has_locations {
+                        let _ = WindowManager::open_tray(app);
+                    } else {
+                        let _ = WindowManager::open_full_view(app);
+                    }
+                }
+            }
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())

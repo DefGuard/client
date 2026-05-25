@@ -105,8 +105,9 @@ pub struct AddInstancePayload<'a> {
 
 /// Handle deep-link URLs.
 pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
+    debug!("Deep link received.");
     for link in urls {
-        if link.path() == "/addinstance" {
+        if link.host_str() == Some("addinstance") {
             let mut token = None;
             let mut url = None;
             for (key, value) in link.query_pairs() {
@@ -118,12 +119,9 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
                 }
             }
             if let (Some(token), Some(url)) = (token, url) {
-                info!("Deep link received: token={token}, url={url}");
-                // If the compact tray window is visible, hide it before opening main view.
+                info!("Valid Deep link received.");
                 if let Some(tray_win) = app_handle.get_webview_window(NEW_UI_WINDOW_ID) {
-                    if tray_win.is_visible().unwrap_or(false) {
-                        let _ = tray_win.hide();
-                    }
+                    let _ = tray_win.hide();
                 }
                 if let Err(e) = WindowManager::open_full_view(app_handle) {
                     warn!("Deep link: failed to open main window: {e}");

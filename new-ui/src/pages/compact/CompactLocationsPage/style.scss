@@ -24,10 +24,7 @@
     &.windows {
       scrollbar-gutter: stable;
       overflow-y: scroll;
-
-      > .locations {
-        padding-right: 6px;
-      }
+      padding-right: 6px;
     }
 
     > .locations {
@@ -36,7 +33,6 @@
       row-gap: var(--spacing-sm);
       width: 100%;
       box-sizing: border-box;
-      padding-right: 6px;
     }
   }
 }
