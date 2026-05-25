@@ -26,8 +26,6 @@ pub const OLD_UI_HEIGHT: f64 = 920.0;
 #[cfg(not(target_os = "linux"))]
 const WINDOW_GAP: f64 = 20.0;
 const WINDOW_TITLE: &str = "Defguard";
-// Sleep briefly to let the IPC handler return.
-const UI_SWAP_DELAY: Duration = Duration::from_millis(50);
 
 #[must_use]
 pub fn new_ui_url() -> WebviewUrl {
@@ -144,13 +142,12 @@ pub fn open_old_ui_window(app: AppHandle) {
     let _ = WindowManager::open_full_view(&app);
 }
 
-#[tauri::command(async)]
-pub async fn swap_to_old_ui(app: AppHandle) {
+#[tauri::command]
+pub fn swap_to_old_ui(app: AppHandle) {
     tracing::info!("swap_to_old_ui called");
     #[cfg(target_os = "macos")]
     let _ = app.set_dock_visibility(true);
 
-    sleep(UI_SWAP_DELAY).await;
     if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
         if let Err(err) = window.hide() {
             tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
@@ -164,11 +161,10 @@ pub async fn swap_to_old_ui(app: AppHandle) {
     }
 }
 
-#[tauri::command(async)]
-pub async fn close_tray_window(app: AppHandle) {
+#[tauri::command]
+pub fn close_tray_window(app: AppHandle) {
     tracing::info!("close_tray_window called");
 
-    sleep(UI_SWAP_DELAY).await;
     if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
         tracing::info!("close_tray_window task: Hiding new-ui window");
         if let Err(err) = window.hide() {
@@ -179,13 +175,12 @@ pub async fn close_tray_window(app: AppHandle) {
     }
 }
 
-#[tauri::command(async)]
-pub async fn swap_to_new_ui(app: AppHandle) {
+#[tauri::command]
+pub fn swap_to_new_ui(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
     #[cfg(target_os = "macos")]
     let _ = app.set_dock_visibility(false);
 
-    sleep(UI_SWAP_DELAY).await;
     show_new_ui_window(&app);
     if let Some(window) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
         if let Err(err) = window.hide() {
