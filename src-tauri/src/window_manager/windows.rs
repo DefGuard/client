@@ -266,14 +266,14 @@ impl WindowManager {
             width: (OLD_UI_WIDTH * primary.scale_factor) as u32,
             height: (OLD_UI_HEIGHT * primary.scale_factor) as u32,
         });
-        log::info!("open_full_view: outer_size = {:?}", outer_size);
+        log::info!("open_full_view: outer_size = {outer_size:?}");
 
         log::info!("open_full_view: Querying inner_size");
         let inner_size = window.inner_size().unwrap_or(tauri::PhysicalSize {
             width: (OLD_UI_WIDTH * primary.scale_factor) as u32,
             height: (OLD_UI_HEIGHT * primary.scale_factor) as u32,
         });
-        log::info!("open_full_view: inner_size = {:?}", inner_size);
+        log::info!("open_full_view: inner_size = {inner_size:?}");
 
         let physical_width = outer_size.width as i32;
         let physical_height = outer_size.height as i32;
@@ -324,11 +324,7 @@ impl WindowManager {
             _ => {}
         }
 
-        log::info!(
-            "open_full_view: Setting position to ({}, {})",
-            window_x,
-            window_y
-        );
+        log::info!("open_full_view: Setting position to ({window_x}, {window_y})");
         window.set_position(tauri::PhysicalPosition::new(window_x, window_y))?;
         log::info!("open_full_view: Position set, showing window");
         window.show()?;
