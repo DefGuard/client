@@ -25,6 +25,7 @@ use defguard_client::{
         DB_POOL,
     },
     enterprise::provisioning::handle_client_initialization,
+    events::handle_deep_link,
     periodic::run_periodic_tasks,
     service,
     tray::{configure_tray_icon, setup_tray, show_main_window},
@@ -34,6 +35,7 @@ use defguard_client::{
 };
 use log::{Level, LevelFilter};
 use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{Target, TargetKind};
 
 #[macro_use]
@@ -274,6 +276,14 @@ fn main() {
 
             let app_handle = app.app_handle();
 
+            // Single Rust-side entry point for all deep link events (runtime).
+            {
+                let handle = app_handle.clone();
+                app.deep_link().on_open_url(move |event| {
+                    handle_deep_link(&handle, &event.urls());
+                });
+            }
+
             // Prepare `AppConfig`.
             let config = AppConfig::new(app_handle);
 
@@ -369,14 +379,26 @@ fn main() {
             }
             #[cfg(not(target_os = "linux"))]
             {
-                let has_locations = tauri::async_runtime::block_on(
-                    defguard_client::window_manager::has_non_service_locations()
-                );
-                if has_locations {
-                    WindowManager::open_tray(app_handle)?;
-                } else {
-                    info!("No locations found, showing full view on startup.");
+                // If the app was cold-launched by a deep link the full view must open, not the tray.
+                let launched_by_deep_link = app_handle
+                    .deep_link()
+                    .get_current()
+                    .ok()
+                    .flatten()
+                    .is_some();
+                if launched_by_deep_link {
+                    info!("App launched via deep link, opening full view directly.");
                     let _ = WindowManager::open_full_view(app_handle);
+                } else {
+                    let has_locations = tauri::async_runtime::block_on(
+                        defguard_client::window_manager::has_non_service_locations()
+                    );
+                    if has_locations {
+                        WindowManager::open_tray(app_handle)?;
+                    } else {
+                        info!("No locations found, showing full view on startup.");
+                        let _ = WindowManager::open_full_view(app_handle);
+                    }
                 }
             }
 
@@ -418,6 +440,11 @@ fn main() {
                 service::config::DEFAULT_LOG_DIR
             );
             tauri::async_runtime::block_on(startup(app_handle));
+
+            // Handle a deep link that launched the app (startup case).
+            if let Ok(Some(urls)) = app_handle.deep_link().get_current() {
+                handle_deep_link(app_handle, &urls);
+            }
 
             // Handle Ctrl-C.
             debug!("Setting up Ctrl-C handler.");

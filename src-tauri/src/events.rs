@@ -1,8 +1,11 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Url};
+use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::{tray::show_main_window, ConnectionType};
+use crate::{
+    window_manager::{WindowManager, NEW_UI_WINDOW_ID},
+    ConnectionType,
+};
 
 // Match src/pages/client/types.ts.
 #[non_exhaustive]
@@ -115,7 +118,16 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
                 }
             }
             if let (Some(token), Some(url)) = (token, url) {
-                show_main_window(app_handle);
+                info!("Deep link received: token={token}, url={url}");
+                // If the compact tray window is visible, hide it before opening main view.
+                if let Some(tray_win) = app_handle.get_webview_window(NEW_UI_WINDOW_ID) {
+                    if tray_win.is_visible().unwrap_or(false) {
+                        let _ = tray_win.hide();
+                    }
+                }
+                if let Err(e) = WindowManager::open_full_view(app_handle) {
+                    warn!("Deep link: failed to open main window: {e}");
+                }
                 let _ = app_handle.emit(
                     EventKey::AddInstance.into(),
                     AddInstancePayload {

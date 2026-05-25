@@ -113,6 +113,7 @@ export enum TauriEventKey {
   DEAD_CONNECTION_DROPPED = 'dead-connection-dropped',
   DEAD_CONNECTION_RECONNECTED = 'dead-connection-reconnected',
   APPLICATION_CONFIG_CHANGED = 'application-config-changed',
+  ADD_INSTANCE = 'add-instance',
   MFA_TRIGGER = 'mfa-trigger',
   VERSION_MISMATCH = 'version-mismatch',
   UUID_MISMATCH = 'uuid-mismatch',
