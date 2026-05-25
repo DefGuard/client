@@ -144,55 +144,52 @@ pub fn open_old_ui_window(app: AppHandle) {
     let _ = WindowManager::open_full_view(&app);
 }
 
-#[tauri::command]
-pub fn swap_to_old_ui(app: AppHandle) {
+#[tauri::command(async)]
+pub async fn swap_to_old_ui(app: AppHandle) {
     tracing::info!("swap_to_old_ui called");
     #[cfg(target_os = "macos")]
     let _ = app.set_dock_visibility(true);
-    tauri::async_runtime::spawn(async move {
-        sleep(UI_SWAP_DELAY).await;
-        if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
-            if let Err(err) = window.hide() {
-                tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
-            }
+
+    sleep(UI_SWAP_DELAY).await;
+    if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+        if let Err(err) = window.hide() {
+            tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
         }
-        #[cfg(not(target_os = "linux"))]
-        {
-            if let Err(err) = WindowManager::open_full_view(&app) {
-                tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
-            }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        if let Err(err) = WindowManager::open_full_view(&app) {
+            tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
         }
-    });
+    }
 }
 
-#[tauri::command]
-pub fn close_tray_window(app: AppHandle) {
+#[tauri::command(async)]
+pub async fn close_tray_window(app: AppHandle) {
     tracing::info!("close_tray_window called");
-    tauri::async_runtime::spawn(async move {
-        sleep(UI_SWAP_DELAY).await;
-        if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
-            tracing::info!("close_tray_window task: Hiding new-ui window");
-            if let Err(err) = window.hide() {
-                tracing::error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
-            }
-        } else {
-            tracing::warn!("close_tray_window task: new-ui window not found");
+
+    sleep(UI_SWAP_DELAY).await;
+    if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+        tracing::info!("close_tray_window task: Hiding new-ui window");
+        if let Err(err) = window.hide() {
+            tracing::error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
         }
-    });
+    } else {
+        tracing::warn!("close_tray_window task: new-ui window not found");
+    }
 }
 
-#[tauri::command]
-pub fn swap_to_new_ui(app: AppHandle) {
+#[tauri::command(async)]
+pub async fn swap_to_new_ui(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
     #[cfg(target_os = "macos")]
     let _ = app.set_dock_visibility(false);
-    tauri::async_runtime::spawn(async move {
-        sleep(UI_SWAP_DELAY).await;
-        show_new_ui_window(&app);
-        if let Some(window) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
-            if let Err(err) = window.hide() {
-                tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
-            }
+
+    sleep(UI_SWAP_DELAY).await;
+    show_new_ui_window(&app);
+    if let Some(window) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
+        if let Err(err) = window.hide() {
+            tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
         }
-    });
+    }
 }
