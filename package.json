@@ -42,7 +42,7 @@
     "@stablelib/base64": "^2.0.1",
     "@stablelib/x25519": "^2.0.1",
     "@tanstack/query-core": "^5.100.14",
-    "@tanstack/react-virtual": "^3.13.25",
+    "@tanstack/react-virtual": "^3.13.26",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
