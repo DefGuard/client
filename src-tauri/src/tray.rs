@@ -17,7 +17,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window_manager::{show_new_ui_window_near_tray, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
+    window_manager::{show_new_ui_window, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
     ConnectionType,
 };
 
@@ -188,7 +188,7 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
                             if let Some(old_ui) = app.get_webview_window(OLD_UI_WINDOW_ID) {
                                 let _ = old_ui.hide();
                             }
-                            show_new_ui_window_near_tray(app);
+                            show_new_ui_window(app);
                         } else {
                             let _ = WindowManager::open_full_view(app);
                         }
@@ -258,7 +258,7 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
             info!("Received QUIT request. Initiating shutdown...");
             handle.exit(0);
         }
-        TRAY_EVENT_SHOW => show_new_ui_window_near_tray(app),
+        TRAY_EVENT_SHOW => show_new_ui_window(app),
         TRAY_EVENT_HIDE => hide_visible_windows(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);

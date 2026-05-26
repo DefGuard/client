@@ -512,6 +512,15 @@ fn main() {
                 });
             }
         }
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } => {
+            if !has_visible_windows {
+                let _ = WindowManager::open_tray(app_handle);
+            }
+        }
         _ => {
             trace!("Received event: {event:?}");
         }
