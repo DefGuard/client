@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "DELETE FROM location WHERE id = $1;",
+  "query": "DELETE FROM location WHERE id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -8,5 +8,5 @@
     },
     "nullable": []
   },
-  "hash": "1c996712f62a1005990733cd9eee7a94bdcf2ef01b559304aea1d642fab7ae22"
+  "hash": "31e1b340bfbdf29dde642b657124a0705b638769ce6631c1b455cbf45e82bb14"
 }

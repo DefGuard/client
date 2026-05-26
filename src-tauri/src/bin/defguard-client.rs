@@ -155,6 +155,7 @@ async fn startup(app_handle: &AppHandle) {
 }
 
 /// Open the appropriate window, either the old or the new UI, depending if there are locations.
+#[cfg(not(target_os = "linux"))]
 fn open_appropriate_window(app_handle: &AppHandle) {
     let has_locations = async_runtime::block_on(has_non_service_locations());
     if has_locations {
