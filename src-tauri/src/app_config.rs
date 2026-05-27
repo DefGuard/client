@@ -6,7 +6,6 @@ use std::{
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
-use strum::{AsRefStr, EnumString};
 use tauri::{AppHandle, Manager};
 
 #[cfg(unix)]
@@ -48,16 +47,6 @@ pub enum AppTheme {
     Dark,
 }
 
-#[derive(AsRefStr, Clone, Copy, Debug, Deserialize, EnumString, PartialEq, Serialize)]
-#[strum(serialize_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
-pub enum AppTrayTheme {
-    Color,
-    White,
-    Black,
-    Gray,
-}
-
 // config stored in config.json in app data
 // config is loaded once at startup and saved when modified to the app data file
 // information's needed at startup of the application.
@@ -65,7 +54,6 @@ pub enum AppTrayTheme {
 #[patch(attribute(derive(Debug, Deserialize, Serialize)))]
 pub struct AppConfig {
     pub theme: AppTheme,
-    pub tray_theme: AppTrayTheme,
     pub check_for_updates: bool,
     pub log_level: LevelFilter,
     /// In seconds. How much time after last network activity the connection is automatically dropped.
@@ -80,7 +68,6 @@ impl Default for AppConfig {
         Self {
             theme: AppTheme::Light,
             check_for_updates: true,
-            tray_theme: AppTrayTheme::Color,
             log_level: LevelFilter::Info,
             peer_alive_period: 300,
             mtu: 0,

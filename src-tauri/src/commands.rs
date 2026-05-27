@@ -1527,7 +1527,6 @@ pub async fn command_set_app_config(
     let app_state = app_handle.state::<AppState>();
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
-    let tray_changed = config_patch.tray_theme.is_some();
     let res = {
         let mut app_config = app_state.app_config.lock().unwrap();
         app_config.apply(config_patch);
@@ -1535,13 +1534,6 @@ pub async fn command_set_app_config(
         app_config.clone()
     };
     info!("Config changed successfully");
-    if tray_changed {
-        debug!("Tray theme included in config change, tray will be updated.");
-        match configure_tray_icon(&app_handle).await {
-            Ok(()) => debug!("Tray updated upon config change"),
-            Err(err) => error!("Tray change failed. Reason: {err}"),
-        }
-    }
     if emit_event {
         match app_handle.emit(EventKey::ApplicationConfigChanged.into(), ()) {
             Ok(()) => debug!("Config changed event emitted successfully"),

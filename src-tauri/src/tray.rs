@@ -280,16 +280,12 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
 
 /// Show correct system tray icon, depending on the theme and connection status.
 pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
-    let state = app_handle.state::<AppState>();
-    let theme = state.app_config.lock().unwrap().tray_theme;
-
     let Some(tray_icon) = app_handle.tray_by_id(TRAY_ICON_ID) else {
         error!("System tray menu not initialized.");
         return Ok(());
     };
 
-    let mut resource_str = String::from("resources/icons/tray-32x32-");
-    resource_str.push_str(theme.as_ref());
+    let mut resource_str = String::from("resources/icons/tray-32x32");
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
     if !active_connections.is_empty() {
         resource_str.push_str("-active");
