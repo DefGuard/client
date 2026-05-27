@@ -39,3 +39,9 @@
 .icon[style*='--icon-color'] svg circle {
   stroke: var(--icon-color);
 }
+
+.icon svg.stroke-icon path,
+.icon[style*='--icon-color'] svg.stroke-icon path {
+  fill: none;
+  stroke: var(--icon-color, var(--c-white-100));
+}

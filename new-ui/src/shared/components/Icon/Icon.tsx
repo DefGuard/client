@@ -61,6 +61,7 @@ import { IconFiltration } from './icons/IconFiltration';
 import { IconGateway } from './icons/IconGateway';
 import { IconGithub } from './icons/IconGithub';
 import { IconGlobe } from './icons/IconGlobe';
+import { IconGlobeBlocked } from './icons/IconGlobeBlocked';
 import { IconGroups } from './icons/IconGroups';
 import { IconHamburger } from './icons/IconHamburger';
 import { IconHelp } from './icons/IconHelp';
@@ -291,6 +292,8 @@ export const Icon = <T extends IconKindValue>({
         return IconFileAdd;
       case 'globe':
         return IconGlobe;
+      case 'globe-blocked':
+        return IconGlobeBlocked;
       case 'help':
         return IconHelp;
       case 'access-settings':

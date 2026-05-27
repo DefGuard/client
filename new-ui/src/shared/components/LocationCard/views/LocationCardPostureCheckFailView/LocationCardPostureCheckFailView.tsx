@@ -1,5 +1,5 @@
 import './style.scss';
-import { ThemeSpacing } from '../../../../types';
+import { ThemeSpacing, ThemeVariable } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Divider } from '../../../Divider/Divider';
@@ -17,22 +17,34 @@ export const LocationCardPostureCheckFailView = () => {
     setView(LocationCardViews.Default);
   };
 
+  const postureErrors = postureError
+    ? postureError
+        .split(',')
+        .map((error) => error.trim())
+        .filter(Boolean)
+    : ['Your device did not pass posture check.'];
+
   return (
     <div className="location-card-posture-check-fail-view">
       <Divider spacing={ThemeSpacing.Md} />
-      <Icon className="posture-warning-icon" icon={IconKind.WarningFilled} size={48} />
+      <Icon
+        className="posture-error-icon"
+        icon={IconKind.GlobeBlocked}
+        size={48}
+        staticColor={ThemeVariable.FgWhite70}
+      />
       <SizedBox height={ThemeSpacing.Md} />
       <LocationViewHeader title="Posture check failed">
-        <p className="error">
-          {postureError ?? 'Your device did not pass posture check.'}
-        </p>
+        <div className="posture-errors">
+          {postureErrors.map((error) => (
+            <p className="error" key={error}>
+              {error}
+            </p>
+          ))}
+        </div>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
-      <Button
-        text="Try again"
-        variant={ButtonVariant.Secondary}
-        onClick={backToLocation}
-      />
+      <Button text="Got it" variant={ButtonVariant.Secondary} onClick={backToLocation} />
     </div>
   );
 };
