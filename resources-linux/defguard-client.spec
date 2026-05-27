@@ -21,8 +21,8 @@ Desktop client for managing WireGuard VPN connections
 %{__mkdir} -p %{buildroot}/%{_datadir}/icons/hicolor/32x32/apps
 %{__install} -m 755 src-tauri/target/release/defguard-client %{buildroot}/%{_bindir}/
 %{__install} -m 755 src-tauri/target/release/defguard-service %{buildroot}/%{_sbindir}/
-%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-black.png
-%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-black-active.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-active.png
 %{__install} -m 644 resources-linux/defguard-service.service %{buildroot}/%{_prefix}/lib/systemd/system/
 %{__install} -m 644 resources-linux/defguard-client.desktop %{buildroot}/%{_datadir}/applications/defguard-client.desktop
 %{__install} -m 644 src-tauri/icons/128x128.png %{buildroot}/%{_datadir}/icons/hicolor/128x128/apps/defguard-client.png
