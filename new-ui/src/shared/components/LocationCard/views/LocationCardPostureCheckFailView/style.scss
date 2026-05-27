@@ -3,12 +3,10 @@
   flex-direction: column;
   align-items: center;
 
-  .posture-warning-icon {
+  .posture-error-icon {
     display: block;
-
-    svg path {
-      fill: var(--fg-white-70);
-    }
+    width: 48px;
+    height: 48px;
   }
 
   .location-card-view-header {
@@ -19,7 +17,15 @@
       color: var(--fg-white-70);
     }
 
+    .posture-errors {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
     p.error {
+      margin: 0;
       color: var(--fg-white-70);
     }
   }
