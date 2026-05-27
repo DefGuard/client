@@ -5,7 +5,7 @@ use std::str::FromStr;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
@@ -129,7 +129,7 @@ impl Location<Id> {
     pub(crate) async fn all<'e, E>(
         executor: E,
         include_service_locations: bool,
-    ) -> Result<Vec<Self>, SqlxError>
+    ) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -143,14 +143,34 @@ impl Location<Id> {
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
             mfa_method \"mfa_method: _\", posture_check_required \
             FROM location WHERE service_location_mode <= $1 \
-            ORDER BY name ASC;",
+            ORDER BY name ASC",
             max_service_location_mode
         )
         .fetch_all(executor)
         .await
     }
 
-    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
+    #[cfg(any(windows, target_os = "macos"))]
+    pub(crate) async fn exist<'e, E>(
+        executor: E,
+        include_service_locations: bool,
+    ) -> sqlx::Result<bool>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let max_service_location_mode =
+            Self::get_service_location_mode_filter(include_service_locations);
+        let result = query_scalar!(
+            "SELECT EXISTS (SELECT 1 FROM location WHERE service_location_mode <= $1)",
+            max_service_location_mode
+        )
+        .fetch_one(executor)
+        .await?;
+
+        Ok(result != 0)
+    }
+
+    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -186,7 +206,7 @@ impl Location<Id> {
     pub(crate) async fn find_by_id<'e, E>(
         executor: E,
         location_id: Id,
-    ) -> Result<Option<Self>, SqlxError>
+    ) -> sqlx::Result<Option<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -208,7 +228,7 @@ impl Location<Id> {
         executor: E,
         instance_id: Id,
         include_service_locations: bool,
-    ) -> Result<Vec<Self>, SqlxError>
+    ) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -230,10 +250,7 @@ impl Location<Id> {
         .await
     }
 
-    pub(crate) async fn find_by_public_key<'e, E>(
-        executor: E,
-        pubkey: &str,
-    ) -> Result<Self, SqlxError>
+    pub(crate) async fn find_by_public_key<'e, E>(executor: E, pubkey: &str) -> sqlx::Result<Self>
     where
         E: SqliteExecutor<'e>,
     {
@@ -244,18 +261,18 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
             mfa_method \"mfa_method: _\", posture_check_required \
-            FROM location WHERE pubkey = $1;",
+            FROM location WHERE pubkey = $1",
             pubkey
         )
         .fetch_one(executor)
         .await
     }
 
-    pub(crate) async fn delete<'e, E>(&self, executor: E) -> Result<(), SqlxError>
+    pub(crate) async fn delete<'e, E>(&self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
-        query!("DELETE FROM location WHERE id = $1;", self.id)
+        query!("DELETE FROM location WHERE id = $1", self.id)
             .execute(executor)
             .await?;
         Ok(())
@@ -270,7 +287,7 @@ impl Location<Id> {
         E: SqliteExecutor<'e>,
     {
         query!(
-            "UPDATE location SET route_all_traffic = 0 WHERE instance_id = $1;",
+            "UPDATE location SET route_all_traffic = 0 WHERE instance_id = $1",
             instance_id
         )
         .execute(executor)
@@ -401,7 +418,7 @@ impl Location<Id> {
 }
 
 impl Location<NoId> {
-    pub(crate) async fn save<'e, E>(self, executor: E) -> Result<Location<Id>, SqlxError>
+    pub(crate) async fn save<'e, E>(self, executor: E) -> sqlx::Result<Location<Id>>
     where
         E: SqliteExecutor<'e>,
     {

@@ -8,10 +8,7 @@ use crate::database::{models::location::Location, DB_POOL};
 /// Returns `true` if there are any non-service locations in the database.
 #[cfg(not(target_os = "linux"))]
 pub async fn has_non_service_locations() -> bool {
-    match Location::all(&*DB_POOL, false).await {
-        Ok(locations) => !locations.is_empty(),
-        Err(_) => false,
-    }
+    Location::exist(&*DB_POOL, false).await.unwrap_or_default()
 }
 
 pub const NEW_UI_WINDOW_ID: &str = "new-ui";
@@ -89,6 +86,8 @@ impl WindowManager {
         #[cfg(target_os = "macos")]
         macos::position_window_near_tray(app, &window);
         #[cfg(target_os = "macos")]
+        let _ = app.set_dock_visibility(false);
+        #[cfg(target_os = "macos")]
         let _ = app.show();
         let _ = window.show();
         let _ = window.set_focus();
@@ -102,6 +101,8 @@ impl WindowManager {
         } else {
             Self::build_full_window(app)?
         };
+        #[cfg(target_os = "macos")]
+        let _ = app.set_dock_visibility(true);
         #[cfg(target_os = "macos")]
         let _ = app.show();
         let _ = window.show();
@@ -123,10 +124,6 @@ pub(crate) fn show_new_ui_window(app: &AppHandle) {
     let _ = WindowManager::open_tray(app);
 }
 
-pub(crate) fn show_new_ui_window_near_tray(app: &AppHandle) {
-    show_new_ui_window(app);
-}
-
 #[tauri::command]
 pub fn open_new_ui_window(app: AppHandle) {
     show_new_ui_window(&app);
@@ -142,9 +139,6 @@ pub fn open_old_ui_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_old_ui(app: AppHandle) {
     tracing::info!("swap_to_old_ui called");
-    #[cfg(target_os = "macos")]
-    let _ = app.set_dock_visibility(true);
-
     if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
         if let Err(err) = window.hide() {
             tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
@@ -175,9 +169,6 @@ pub fn close_tray_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_new_ui(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
-    #[cfg(target_os = "macos")]
-    let _ = app.set_dock_visibility(false);
-
     show_new_ui_window(&app);
     if let Some(window) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
         if let Err(err) = window.hide() {

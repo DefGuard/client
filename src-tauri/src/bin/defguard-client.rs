@@ -34,7 +34,7 @@ use defguard_client::{
     LOG_FILENAME, VERSION,
 };
 use log::{Level, LevelFilter};
-use tauri::{AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -100,7 +100,7 @@ async fn startup(app_handle: &AppHandle) {
             .lock()
             .expect("failed to lock app state")
             .mtu();
-        let handle = tauri::async_runtime::spawn(async move {
+        let handle = async_runtime::spawn(async move {
             if let Err(err) = defguard_client::apple::sync_locations_and_tunnels(mtu).await {
                 error!("Failed to sync locations and tunnels: {err}");
             }
@@ -122,7 +122,7 @@ async fn startup(app_handle: &AppHandle) {
         });
 
         let handle = app_handle.clone();
-        tauri::async_runtime::spawn(async move {
+        async_runtime::spawn(async move {
             defguard_client::apple::connection_state_update_thread(&handle).await;
             error!("Connection state update thread has exited unexpectedly, quitting the app.");
             handle.exit(0);
@@ -131,7 +131,7 @@ async fn startup(app_handle: &AppHandle) {
 
     // Run periodic tasks.
     let periodic_tasks_handle = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
+    async_runtime::spawn(async move {
         run_periodic_tasks(&periodic_tasks_handle).await;
         // One of the tasks exited, so something went wrong, quit the app
         error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
@@ -152,6 +152,17 @@ async fn startup(app_handle: &AppHandle) {
         Err(err) => error!("Failed to configure system tray: {err}"),
     }
     debug!("Tray menu has been re-generated successfully.");
+}
+
+/// Open the appropriate window, either the old or the new UI, depending if there are locations.
+#[cfg(not(target_os = "linux"))]
+fn open_appropriate_window(app_handle: &AppHandle) {
+    let has_locations = async_runtime::block_on(has_non_service_locations());
+    if has_locations {
+        let _ = WindowManager::open_tray(app_handle);
+    } else {
+        let _ = WindowManager::open_full_view(app_handle);
+    }
 }
 
 fn main() {
@@ -220,14 +231,7 @@ fn main() {
 
                 #[cfg(not(target_os = "linux"))]
                 {
-                    let has_locations = tauri::async_runtime::block_on(
-                        defguard_client::window_manager::has_non_service_locations(),
-                    );
-                    if has_locations {
-                        let _ = WindowManager::open_tray(app);
-                    } else {
-                        let _ = WindowManager::open_full_view(app);
-                    }
+                    open_appropriate_window(app);
                 }
             }
         }))
@@ -370,12 +374,12 @@ fn main() {
             )?;
 
             // run DB migrations
-            tauri::async_runtime::block_on(handle_db_migrations());
+            async_runtime::block_on(handle_db_migrations());
 
             // Check if client needs to be initialized
             // and try to load provisioning config if necessary
             let provisioning_config =
-                tauri::async_runtime::block_on(handle_client_initialization(app_handle));
+                async_runtime::block_on(handle_client_initialization(app_handle));
 
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
@@ -395,7 +399,8 @@ fn main() {
             }
             #[cfg(not(target_os = "linux"))]
             {
-                // If the app was cold-launched by a deep link the full view must open, not the tray.
+                // If the app was cold-launched by a deep-link, the full view must open, not the
+                // tray.
                 let launched_by_deep_link = app_handle
                     .deep_link()
                     .get_current()
@@ -406,15 +411,7 @@ fn main() {
                     info!("App launched via deep link, opening full view directly.");
                     let _ = WindowManager::open_full_view(app_handle);
                 } else {
-                    let has_locations = tauri::async_runtime::block_on(
-                        defguard_client::window_manager::has_non_service_locations()
-                    );
-                    if has_locations {
-                        WindowManager::open_tray(app_handle)?;
-                    } else {
-                        info!("No locations found, showing full view on startup.");
-                        let _ = WindowManager::open_full_view(app_handle);
-                    }
+                    open_appropriate_window(app_handle);
                 }
             }
 
@@ -455,7 +452,7 @@ fn main() {
                 log_dir.display(),
                 service::config::DEFAULT_LOG_DIR
             );
-            tauri::async_runtime::block_on(startup(app_handle));
+            async_runtime::block_on(startup(app_handle));
 
             // Handle a deep link that launched the app (startup case).
             if let Ok(Some(urls)) = app_handle.deep_link().get_current() {
@@ -465,7 +462,7 @@ fn main() {
             // Handle Ctrl-C.
             debug!("Setting up Ctrl-C handler.");
             let app_handle_clone = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
+            async_runtime::spawn(async move {
                 tokio::signal::ctrl_c()
                     .await
                     .expect("Signal handler failure");
@@ -490,7 +487,7 @@ fn main() {
                 let semaphore = Arc::new(AtomicBool::new(false));
                 let semaphore_clone = Arc::clone(&semaphore);
 
-                let handle = tauri::async_runtime::spawn(async move {
+                let handle = async_runtime::spawn(async move {
                     let _ = close_all_connections().await;
                     // This will clean the database file, pruning write-ahead log.
                     DB_POOL.close().await;
@@ -499,17 +496,26 @@ fn main() {
                 // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
                 // create a temporary one.
                 defguard_client::apple::spawn_runloop_and_wait_for(&semaphore);
-                tauri::async_runtime::block_on(async move {
+                async_runtime::block_on(async move {
                     let _ = handle.await;
                 });
             }
             #[cfg(not(target_os = "macos"))]
             {
-                tauri::async_runtime::block_on(async move {
+                async_runtime::block_on(async move {
                     let _ = close_all_connections().await;
                     // This will clean the database file, pruning write-ahead log.
                     DB_POOL.close().await;
                 });
+            }
+        }
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } => {
+            if !has_visible_windows {
+                open_appropriate_window(app_handle);
             }
         }
         _ => {
