@@ -59,15 +59,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Install NodeJS
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26
+
+      - uses: pnpm/action-setup@v6
         with:
           cache: true
           version: 11
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
+          run_install: false
 
       - name: Get pnpm store directory
         run: |
