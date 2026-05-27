@@ -11,21 +11,24 @@
 
   .location-card-view-header {
     align-items: center;
+    row-gap: var(--spacing-sm);
     text-align: center;
 
     > .title {
-      color: var(--fg-white-70);
+      font: var(--t-body-sm-600);
+      color: var(--fg-white-100);
     }
 
     .posture-errors {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: var(--spacing-xs);
     }
 
     p.error {
       margin: 0;
+      font: var(--t-body-xs-400);
       color: var(--fg-white-70);
     }
   }

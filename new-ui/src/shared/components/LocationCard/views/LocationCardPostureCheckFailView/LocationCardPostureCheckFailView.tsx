@@ -1,10 +1,10 @@
 import './style.scss';
-import { ThemeSpacing } from '../../../../types';
+import { ThemeSpacing, ThemeVariable } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Divider } from '../../../Divider/Divider';
+import { Icon, IconKind } from '../../../Icon';
 import { SizedBox } from '../../../SizedBox/SizedBox';
-import globeBlockedIcon from '../../assets/globe_blocked.svg';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
@@ -27,7 +27,12 @@ export const LocationCardPostureCheckFailView = () => {
   return (
     <div className="location-card-posture-check-fail-view">
       <Divider spacing={ThemeSpacing.Md} />
-      <img className="posture-error-icon" src={globeBlockedIcon} alt="" />
+      <Icon
+        className="posture-error-icon"
+        icon={IconKind.GlobeBlocked}
+        size={48}
+        staticColor={ThemeVariable.FgWhite70}
+      />
       <SizedBox height={ThemeSpacing.Md} />
       <LocationViewHeader title="Posture check failed">
         <div className="posture-errors">
