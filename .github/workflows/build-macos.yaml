@@ -11,6 +11,12 @@ on:
     tags:
       - v*.*.*
 
+env:
+  CARGO_TERM_COLOR: always
+  # sccache
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
 jobs:
   build-macos:
     runs-on:
@@ -33,11 +39,13 @@ jobs:
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
 
-      - uses: actions/setup-node@v6
+      - name: Install NodeJS
+        uses: actions/setup-node@v6
         with:
           node-version: 26
 
-      - uses: pnpm/action-setup@v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
         with:
           cache: true
           version: 11
@@ -51,6 +59,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Set build number
         run: |

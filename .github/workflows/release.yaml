@@ -4,6 +4,12 @@ on:
     tags:
       - v*.*.*
 
+env:
+  CARGO_TERM_COLOR: always
+  # sccache
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
 jobs:
   create-release:
     name: create-release
@@ -87,12 +93,15 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
       - name: Install dependencies
         run: |
           apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -187,7 +196,7 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -353,7 +362,7 @@ jobs:
   #       with:
   #         repo-token: ${{ secrets.GITHUB_TOKEN }}
   #     - name: Build packages
-  #       uses: tauri-apps/tauri-action@v0.5.23 # 0.5.24 - 0.6.1 give: Error: Could not find workspace directory, but version and/or name specifies to use workspace package
+  #       uses: tauri-apps/tauri-action@v0
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #     - name: Upload unsigned bundle
