@@ -30,12 +30,13 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10
+          cache: true
           run_install: false
+          version: 11
 
       - name: Get pnpm store directory
         shell: bash

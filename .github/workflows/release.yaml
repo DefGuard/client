@@ -62,11 +62,12 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10
+          cache: true
+          version: 11
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - name: Get pnpm store directory
         run: |
@@ -77,14 +78,6 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-
-      - uses: actions/cache@v5
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
 
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
@@ -167,25 +160,18 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10
+          cache: true
+          version: 11
           run_install: false
 
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
 
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
@@ -344,10 +330,10 @@ jobs:
   #         echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
   #     - uses: actions/setup-node@v6
   #       with:
-  #         node-version: 25
+  #         node-version: 26
   #     - uses: pnpm/action-setup@v6
   #       with:
-  #         version: 10
+  #         version: 11
   #         run_install: false
   #     - name: Get pnpm store directory
   #       shell: bash

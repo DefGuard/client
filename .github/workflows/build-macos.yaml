@@ -35,12 +35,12 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - uses: pnpm/action-setup@v6
         with:
           cache: true
-          version: 10
+          version: 11
 
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
