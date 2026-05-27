@@ -50,10 +50,10 @@ jobs:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
     steps:
-      - name: git install
+      - name: Install git
         run: |
           apt-get update
-          apt-get install -y git curl ca-certificates
+          apt-get install -y ca-certificates curl git libatomic1
           git config --global --add safe.directory '*'
       - uses: actions/checkout@v6
         with:
