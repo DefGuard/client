@@ -79,7 +79,7 @@ jobs:
       # Only commit when the hash actually changed; skip if it was already correct.
       - name: Commit updated hash
         if: steps.hash.outputs.current != steps.hash.outputs.new
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           OLD_HASH: ${{ steps.hash.outputs.current }}
           NEW_HASH: ${{ steps.hash.outputs.new }}

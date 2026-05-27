@@ -4,6 +4,12 @@ on:
     tags:
       - v*.*.*
 
+env:
+  CARGO_TERM_COLOR: always
+  # sccache
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
 jobs:
   create-release:
     name: create-release
@@ -62,11 +68,12 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10
+          cache: true
+          version: 11
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - name: Get pnpm store directory
         run: |
@@ -78,14 +85,6 @@ jobs:
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
 
-      - uses: actions/cache@v5
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
-
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
       - name: Install Node dependencies
@@ -94,12 +93,15 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
       - name: Install dependencies
         run: |
           apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -167,25 +169,18 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v6
         with:
-          node-version: 25
+          node-version: 26
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10
+          cache: true
+          version: 11
           run_install: false
 
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-build-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-build-store-
 
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
@@ -201,7 +196,7 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -344,10 +339,10 @@ jobs:
   #         echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
   #     - uses: actions/setup-node@v6
   #       with:
-  #         node-version: 25
+  #         node-version: 26
   #     - uses: pnpm/action-setup@v6
   #       with:
-  #         version: 10
+  #         version: 11
   #         run_install: false
   #     - name: Get pnpm store directory
   #       shell: bash
@@ -367,7 +362,7 @@ jobs:
   #       with:
   #         repo-token: ${{ secrets.GITHUB_TOKEN }}
   #     - name: Build packages
-  #       uses: tauri-apps/tauri-action@v0.5.23 # 0.5.24 - 0.6.1 give: Error: Could not find workspace directory, but version and/or name specifies to use workspace package
+  #       uses: tauri-apps/tauri-action@v0
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #     - name: Upload unsigned bundle
