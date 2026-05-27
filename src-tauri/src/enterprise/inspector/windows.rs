@@ -109,16 +109,9 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
 pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
     let products: Vec<AntiVirusProduct> = conn.query()?;
-    for product in products {
-        let enabled = (product.product_state & 0x0001_0000) != 0;
-        let realtime = (product.product_state & 0x0002_0000) != 0;
-        // let up_to_date = (product.product_state & 0x0004_0000) != 0;
-        if enabled || realtime {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
+    Ok(products
+        .iter()
+        .any(|product| (product.product_state & 0x0000_F000) == 0x0000_1000))
 }
 
 /// Check if this machine is part of an Active Directory domain.
