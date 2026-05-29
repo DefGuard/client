@@ -15,11 +15,17 @@ import { LocationViewHeader } from '../../components/LocationViewHeader/Location
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 import { useMfaConnect } from '../../hooks/useMfaConnect';
+import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/LocationCardMfaStartLoader';
+
+const MIN_POSTURE_LOADER_MS = 500;
 
 export const LocationCardMfaTotpView = () => {
-  const { setView } = useLocationCardContext();
+  const { setView, location } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     MfaStartMethod.Totp,
+    {
+      debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
+    },
   );
 
   const [totpCode, setTotpCode] = useState<string | null>(null);
@@ -46,6 +52,12 @@ export const LocationCardMfaTotpView = () => {
   useEffect(() => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
+
+  // Show loader when posture is being evaluated
+  const showLoader = location.posture_check_required && isStarting && !startError;
+  if (showLoader) {
+    return <LocationCardMfaStartLoader />;
+  }
 
   return (
     <div
