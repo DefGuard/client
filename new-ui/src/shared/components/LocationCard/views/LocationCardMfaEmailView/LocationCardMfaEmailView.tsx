@@ -1,3 +1,4 @@
+import './style.scss';
 import { useCallback, useEffect, useState } from 'react';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
