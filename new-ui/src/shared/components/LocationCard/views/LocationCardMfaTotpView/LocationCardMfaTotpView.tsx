@@ -10,13 +10,13 @@ import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { LoaderSpinner } from '../../../LoaderSpinner/LoaderSpinner';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { MfaStartMethod } from '../../api/startClientMfaSession';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 import { useMfaConnect } from '../../hooks/useMfaConnect';
-import { LoaderSpinner } from '../../../LoaderSpinner/LoaderSpinner';
 
 export const LocationCardMfaTotpView = () => {
   const { setView, location } = useLocationCardContext();
@@ -50,8 +50,7 @@ export const LocationCardMfaTotpView = () => {
   }, [verifyError]);
 
   // Show loader when posture is being evaluated
-  const showLoader =
-    location.posture_check_required && isStarting && !startError;
+  const showLoader = location.posture_check_required && isStarting && !startError;
   if (showLoader) {
     return (
       <div className="mfa-start-loader">
