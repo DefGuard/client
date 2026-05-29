@@ -43,10 +43,6 @@ export type SaveTunnelRequest = {
   response: CreateDeviceResponse;
 };
 
-export type TrayIconTheme = 'color' | 'white' | 'black' | 'gray';
-
-export const availableTrayThemes: TrayIconTheme[] = ['color', 'white', 'gray', 'black'];
-
 export type LogLevel = 'ERROR' | 'INFO' | 'DEBUG' | 'TRACE' | 'WARN';
 
 export const availableLogLevels: LogLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
@@ -77,7 +73,6 @@ export type InterfaceLogsRequest = {
 export type AppConfig = {
   theme: ThemeKey;
   log_level: LogLevel;
-  tray_theme: TrayIconTheme;
   check_for_updates: boolean;
   peer_alive_period: number;
   mtu: number;

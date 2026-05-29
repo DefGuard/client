@@ -32,7 +32,6 @@ const defaultValues: StoreValues = {
   appConfig: {
     log_level: 'INFO',
     theme: 'light',
-    tray_theme: 'color',
     check_for_updates: true,
     peer_alive_period: 300,
     mtu: 0,

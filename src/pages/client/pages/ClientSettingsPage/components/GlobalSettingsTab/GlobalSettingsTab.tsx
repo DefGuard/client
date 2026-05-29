@@ -34,9 +34,7 @@ import {
 import {
   type AppConfig,
   availableLogLevels,
-  availableTrayThemes,
   type LogLevel,
-  type TrayIconTheme,
 } from '../../../../clientAPI/types';
 import { useClientStore } from '../../../../hooks/useClientStore';
 
@@ -70,10 +68,6 @@ export const GlobalSettingsTab = () => {
           .string()
           .min(1, LL.form.errors.required())
           .refine((v) => availableLogLevels.includes(v as LogLevel)),
-        tray_theme: z
-          .string()
-          .min(1, LL.form.errors.required())
-          .refine((v) => availableTrayThemes.includes(v as TrayIconTheme)),
         check_for_updates: z.boolean(),
         peer_alive_period: z
           .number({
@@ -121,10 +115,6 @@ export const GlobalSettingsTab = () => {
       <section className="spaced">
         <h2>{localLL.versionUpdate.title()}</h2>
         <CheckForUpdatesOption controller={{ control, name: 'check_for_updates' }} />
-      </section>
-      <section>
-        <h2>{localLL.tray.title()}</h2>
-        <TrayIconThemeSelect controller={{ control, name: 'tray_theme' }} />
       </section>
       <section>
         <h2>{localLL.logging.title()}</h2>
@@ -272,64 +262,6 @@ const LoggingLevelSelect = ({ controller }: FormMemberProps) => {
         renderSelected={renderSelected}
       />
     </>
-  );
-};
-
-const TrayIconThemeSelect = ({ controller }: FormMemberProps) => {
-  const { LL } = useI18nContext();
-  const localLL = LL.pages.client.pages.settingsPage.tabs.global;
-
-  const trayThemeSelectOptions = useMemo((): SelectOption<TrayIconTheme>[] => {
-    const res: SelectOption<TrayIconTheme>[] = [
-      {
-        label: localLL.tray.options.color(),
-        value: 'color',
-        key: 0,
-      },
-      {
-        value: 'gray',
-        key: 1,
-        label: localLL.tray.options.gray(),
-      },
-      {
-        value: 'white',
-        key: 2,
-        label: localLL.tray.options.white(),
-      },
-      {
-        value: 'black',
-        key: 3,
-        label: localLL.tray.options.black(),
-      },
-    ];
-    return res;
-  }, [localLL.tray.options]);
-
-  const renderSelectedTrayTheme = useCallback(
-    (theme: TrayIconTheme): SelectSelectedValue => {
-      const option = trayThemeSelectOptions.find((t) => t.value === theme);
-      if (option) {
-        return {
-          key: option.key,
-          displayValue: option.label,
-        };
-      }
-      return {
-        key: 'color',
-        displayValue: 'color',
-      };
-    },
-    [trayThemeSelectOptions],
-  );
-
-  return (
-    <FormSelect
-      sizeVariant={SelectSizeVariant.STANDARD}
-      options={trayThemeSelectOptions}
-      label={localLL.tray.label()}
-      renderSelected={renderSelectedTrayTheme}
-      controller={controller}
-    />
   );
 };
 
