@@ -1,28 +1,21 @@
-#![allow(deprecated)]
-
-use objc2_app_kit::{
-    NSClosableWindowMask, NSFullSizeContentViewWindowMask, NSMiniaturizableWindowMask,
-    NSResizableWindowMask, NSTitledWindowMask, NSWindow, NSWindowButton,
-};
+use objc2_app_kit::{NSWindow, NSWindowButton, NSWindowStyleMask};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Position, Runtime, WebviewWindow,
 };
 
 use crate::{appstate::AppState, window_manager::WINDOW_GAP};
 
-pub fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
+/// Enforce rounded window corners. Not yet available in Tauri.
+pub(crate) fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
     window
         .with_webview(move |webview| {
             let ns_window = unsafe { &*webview.ns_window().cast::<NSWindow>() };
-            let mut style_mask = ns_window.styleMask();
-
             // Add necessary styles for rounded corners.
-            style_mask |= NSFullSizeContentViewWindowMask;
-            style_mask |= NSTitledWindowMask;
-            style_mask |= NSClosableWindowMask;
-            style_mask |= NSMiniaturizableWindowMask;
-            style_mask |= NSResizableWindowMask;
-
+            let style_mask = ns_window.styleMask()
+                | NSWindowStyleMask::Borderless
+                | NSWindowStyleMask::Titled
+                | NSWindowStyleMask::Closable
+                | NSWindowStyleMask::Miniaturizable;
             ns_window.setStyleMask(style_mask);
             ns_window.setTitlebarAppearsTransparent(true);
 
