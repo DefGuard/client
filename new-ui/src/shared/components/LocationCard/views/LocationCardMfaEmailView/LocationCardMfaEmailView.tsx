@@ -17,10 +17,15 @@ import { LocationCardViews } from '../../context/types';
 import { useMfaConnect } from '../../hooks/useMfaConnect';
 import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/LocationCardMfaStartLoader';
 
+const MIN_POSTURE_LOADER_MS = 500;
+
 export const LocationCardMfaEmailView = () => {
   const { setView, location } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     MfaStartMethod.Email,
+    {
+      debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
+    },
   );
 
   const [emailCode, setEmailCode] = useState<string | null>(null);

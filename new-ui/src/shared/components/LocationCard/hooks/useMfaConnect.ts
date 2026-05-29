@@ -24,11 +24,25 @@ type MfaErrorResponse = {
 
 type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
 
-export const useMfaConnect = (method: CodeMfaStartMethod) => {
+type UseMfaConnectOptions = {
+  debounceMs?: number;
+};
+
+const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
+  const remainingMs = Math.max(minimumMs - (performance.now() - startedAt), 0);
+  if (remainingMs === 0) return;
+
+  await new Promise((resolve) => window.setTimeout(resolve, remainingMs));
+};
+
+export const useMfaConnect = (
+  method: CodeMfaStartMethod,
+  { debounceMs = 0 }: UseMfaConnectOptions = {},
+) => {
   const { location, setPostureError, setView } = useLocationCardContext();
 
   const [token, setToken] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
+  const [isStarting, setIsStarting] = useState(debounceMs > 0);
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
@@ -55,7 +69,9 @@ export const useMfaConnect = (method: CodeMfaStartMethod) => {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional one-shot trigger via startCalled ref
   useEffect(() => {
     if (!instance || startCalled.current) return;
+
     startCalled.current = true;
+    const startedAt = performance.now();
 
     setIsStarting(true);
 
@@ -66,9 +82,11 @@ export const useMfaConnect = (method: CodeMfaStartMethod) => {
           location,
           method,
         });
+        await waitForMinimumDuration(startedAt, debounceMs);
         setRequestHeaders(headers);
         setToken(response.token);
       } catch (err) {
+        await waitForMinimumDuration(startedAt, debounceMs);
         if (handleMfaStartError({ err, location, setPostureError, setView })) {
           return;
         }
