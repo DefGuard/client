@@ -15,9 +15,10 @@ import { LocationViewHeader } from '../../components/LocationViewHeader/Location
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 import { useMfaConnect } from '../../hooks/useMfaConnect';
+import { LoaderSpinner } from '../../../LoaderSpinner/LoaderSpinner';
 
 export const LocationCardMfaEmailView = () => {
-  const { setView } = useLocationCardContext();
+  const { setView, location } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     MfaStartMethod.Email,
   );
@@ -47,6 +48,20 @@ export const LocationCardMfaEmailView = () => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
 
+  // Show loader when posture is being evaluated
+  const showLoader =
+    location.posture_check_required && isStarting && !startError;
+  if (showLoader) {
+    return (
+      <div className="mfa-start-loader">
+        <Divider spacing={ThemeSpacing.Md} />
+        <div className="loader-content">
+          <LoaderSpinner variant="primary" size={32} />
+          <p>Checking device requirements...</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className="location-card-mfa-email-view"

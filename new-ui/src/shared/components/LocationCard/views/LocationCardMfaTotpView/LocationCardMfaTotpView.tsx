@@ -49,6 +49,7 @@ export const LocationCardMfaTotpView = () => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
 
+  // Show loader when posture is being evaluated
   const showLoader =
     location.posture_check_required && isStarting && !startError;
   if (showLoader) {
