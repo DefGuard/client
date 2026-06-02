@@ -1,23 +1,19 @@
 use std::{
     fs::{create_dir_all, File, OpenOptions},
-    path::PathBuf,
+    path::Path,
 };
 
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
-use tauri::{AppHandle, Manager};
 
 #[cfg(unix)]
 use crate::set_perms;
 
 static APP_CONFIG_FILE_NAME: &str = "config.json";
 
-fn get_config_file_path(app: &AppHandle) -> PathBuf {
-    let mut config_file_path = app
-        .path()
-        .app_data_dir()
-        .expect("Failed to access app data");
+fn get_config_file_path(config_dir: &Path) -> std::path::PathBuf {
+    let mut config_file_path = config_dir.to_path_buf();
     if !config_file_path.exists() {
         create_dir_all(&config_file_path).expect("Failed to create missing app data dir");
     }
@@ -29,8 +25,8 @@ fn get_config_file_path(app: &AppHandle) -> PathBuf {
     config_file_path
 }
 
-fn get_config_file(app: &AppHandle, for_write: bool) -> File {
-    let config_file_path = get_config_file_path(app);
+fn get_config_file(config_dir: &Path, for_write: bool) -> File {
+    let config_file_path = get_config_file_path(config_dir);
     OpenOptions::new()
         .create(true)
         .read(true)
@@ -76,20 +72,20 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    /// Try to load application configuration from application data directory.
+    /// Try to load application configuration from the given config directory.
     /// If reading the configuration file fails, default settings will be returned.
     #[must_use]
-    pub fn new(app: &AppHandle) -> Self {
-        let config_path = get_config_file_path(app);
+    pub fn new(config_dir: &Path) -> Self {
+        let config_path = get_config_file_path(config_dir);
         if !config_path.exists() {
             eprintln!(
                 "Application configuration file doesn't exist; initializing it with the defaults."
             );
             let res = Self::default();
-            res.save(app);
+            res.save(config_dir);
             return res;
         }
-        let config_file = get_config_file(app, false);
+        let config_file = get_config_file(config_dir, false);
         let mut app_config = Self::default();
         match serde_json::from_reader::<_, AppConfigPatch>(config_file) {
             Ok(patch) => {
@@ -100,16 +96,16 @@ impl AppConfig {
                 eprintln!(
                     "Failed to deserialize application configuration file: {err}. Using defaults."
                 );
-                app_config.save(app);
+                app_config.save(config_dir);
             }
         }
         app_config
     }
 
-    /// Saves currently loaded AppConfig into app data dir file.
+    /// Saves currently loaded AppConfig into the given config directory file.
     /// Warning: this will always overwrite file contents.
-    pub fn save(&self, app: &AppHandle) {
-        let file = get_config_file(app, true);
+    pub fn save(&self, config_dir: &Path) {
+        let file = get_config_file(config_dir, true);
         match serde_json::to_writer(file, &self) {
             Ok(()) => debug!("Application configuration file has been saved."),
             Err(err) => {

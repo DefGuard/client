@@ -2,7 +2,6 @@
 #![allow(clippy::result_large_err)]
 
 pub mod active_connections;
-pub mod app_config;
 #[cfg(target_os = "macos")]
 pub mod apple;
 pub mod appstate;
@@ -15,7 +14,6 @@ pub mod proto;
 pub mod service;
 pub mod tray;
 pub mod utils;
-pub mod wg_config;
 pub mod window_manager;
 
 // Re-export from core so existing imports keep working.
@@ -24,12 +22,14 @@ pub use defguard_client_core::version::{
     MIN_PROXY_VERSION,
 };
 pub use defguard_client_core::{
+    app_config,
     app_data_dir,
     database,
     error,
     get_aggregation,
     into_location,
     set_perms,
+    wg_config,
     // Shared types
     CommonConnection,
     CommonConnectionInfo,

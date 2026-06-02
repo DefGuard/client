@@ -9,9 +9,11 @@ use std::{
     os::unix::fs::PermissionsExt,
 };
 
+pub mod app_config;
 pub mod database;
 pub mod error;
 pub mod version;
+pub mod wg_config;
 
 // Re-export proto module for backward compatibility within core.
 pub use defguard_client_proto::defguard as proto;

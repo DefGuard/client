@@ -305,7 +305,11 @@ fn main() {
             }
 
             // Prepare `AppConfig`.
-            let config = AppConfig::new(app_handle);
+            let config_dir = app_handle
+                .path()
+                .app_data_dir()
+                .expect("Failed to access app data");
+            let config = AppConfig::new(&config_dir);
 
             // Setup logging.
 

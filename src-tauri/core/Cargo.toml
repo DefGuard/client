@@ -30,6 +30,8 @@ sqlx = { version = "0.8", features = [
 ] }
 strum = { version = "0.28", features = ["derive"] }
 thiserror.workspace = true
+rust-ini = "0.21"
+struct-patch = "0.12"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["user", "fs"] }

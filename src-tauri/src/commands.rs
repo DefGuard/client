@@ -1530,7 +1530,11 @@ pub async fn command_set_app_config(
     let res = {
         let mut app_config = app_state.app_config.lock().unwrap();
         app_config.apply(config_patch);
-        app_config.save(&app_handle);
+        let config_dir = app_handle
+            .path()
+            .app_data_dir()
+            .expect("Failed to access app data");
+        app_config.save(&config_dir);
         app_config.clone()
     };
     info!("Config changed successfully");
