@@ -12,6 +12,7 @@ use std::{
 pub mod app_config;
 pub mod database;
 pub mod error;
+pub mod proxy;
 pub mod version;
 pub mod wg_config;
 

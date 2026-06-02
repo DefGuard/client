@@ -24,7 +24,7 @@ use crate::{
     proto::defguard::client_types::{
         DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse,
     },
-    utils::post_with_headers,
+    proxy::post_with_headers,
     MIN_CORE_VERSION, MIN_PROXY_VERSION,
 };
 

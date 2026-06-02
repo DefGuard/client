@@ -28,6 +28,7 @@ pub use defguard_client_core::{
     error,
     get_aggregation,
     into_location,
+    proxy,
     set_perms,
     wg_config,
     // Shared types

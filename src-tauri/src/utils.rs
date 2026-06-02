@@ -1,15 +1,11 @@
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
-use std::{env, path::Path, process::Command, time::Duration};
+use std::{env, path::Path, process::Command};
 
-use base64::{prelude::BASE64_STANDARD, Engine};
 #[cfg(not(target_os = "macos"))]
 use common::{find_free_tcp_port, get_interface_name};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
-use prost::Message;
-use reqwest::{Client, Response};
-use serde::Serialize;
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
@@ -43,8 +39,7 @@ use crate::{
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    proto::defguard::client_types::ClientPlatformInfo,
-    ConnectionType, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION,
+    ConnectionType,
 };
 #[cfg(not(target_os = "macos"))]
 use crate::{
@@ -1096,49 +1091,10 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
 }
 
 #[must_use]
-pub(crate) fn construct_platform_header() -> String {
-    let os = os_info::get();
-
-    let platform_info = ClientPlatformInfo {
-        os_family: env::consts::FAMILY.to_string(),
-        os_type: env::consts::OS.to_string(),
-        version: os.version().to_string(),
-        edition: os.edition().map(str::to_string),
-        codename: os.codename().map(str::to_string),
-        bitness: Some(os.bitness().to_string()),
-        architecture: Some(env::consts::ARCH.to_string()),
-    };
-
-    debug!("Constructed platform info header: {platform_info:?}");
-
-    let buffer = platform_info.encode_to_vec();
-
-    BASE64_STANDARD.encode(buffer)
-}
-
-#[must_use]
 /// Utility function to get all tunnels and locations from the database.
 #[cfg(target_os = "macos")]
 pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
     let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
     let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
     (tunnels, locations)
-}
-
-const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
-pub(crate) async fn post_with_headers<T>(
-    url: tauri::Url,
-    data: &T,
-) -> Result<Response, reqwest::Error>
-where
-    T: Serialize + ?Sized,
-{
-    Client::new()
-        .post(url)
-        .json(data)
-        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
-        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
-        .timeout(HTTP_REQ_TIMEOUT)
-        .send()
-        .await
 }

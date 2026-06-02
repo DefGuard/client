@@ -16,6 +16,9 @@ defguard-client-proto = { path = "../client-proto" }
 defguard_wireguard_rs.workspace = true
 dirs-next.workspace = true
 log = { version = "0.4", features = ["serde"] }
+os_info = { version = "3.14", default-features = false }
+prost.workspace = true
+reqwest.workspace = true
 semver = "1.0"
 serde.workspace = true
 serde_json.workspace = true

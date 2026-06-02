@@ -10,10 +10,10 @@ use crate::{
     },
     enterprise::inspector::device_posture_data,
     error::Error,
+    proxy::post_with_headers,
     service::proto::defguard::enterprise::posture::v2::{
         DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
     },
-    utils::post_with_headers,
 };
 
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
