@@ -1483,6 +1483,7 @@ name = "defguard-client-core"
 version = "2.1.0"
 dependencies = [
  "base64 0.22.1",
+ "block2 0.6.2",
  "chrono",
  "common",
  "defguard-client-proto",
@@ -1491,6 +1492,10 @@ dependencies = [
  "hyper-util",
  "log",
  "nix",
+ "objc2 0.6.4",
+ "objc2-app-kit",
+ "objc2-foundation 0.3.2",
+ "objc2-network-extension",
  "os_info",
  "prost",
  "reqwest 0.13.4",
