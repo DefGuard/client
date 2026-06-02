@@ -1,4 +1,5 @@
 pub mod conversions;
+pub mod posture_ext;
 
 pub mod defguard {
     pub mod client_types {

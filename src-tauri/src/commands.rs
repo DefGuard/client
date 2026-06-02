@@ -39,7 +39,7 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::defguard::client_types::DeviceConfigResponse,
+    proto::{defguard::client_types::DeviceConfigResponse, into_location},
     service::proto::defguard::enterprise::posture::v2::DevicePostureData,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
@@ -380,7 +380,7 @@ pub async fn save_device_config(
         keys.pubkey, instance.name, instance.id
     );
     for dev_config in response.configs {
-        let new_location = dev_config.into_location(instance.id);
+        let new_location = into_location(dev_config, instance.id);
         debug!(
             "Saving location {} for instance {}({})",
             new_location.name, instance.name, instance.id
@@ -684,7 +684,7 @@ pub(crate) async fn locations_changed(
     let core_locations: HashSet<Location> = device_config
         .configs
         .iter()
-        .map(|config| config.clone().into_location(instance.id))
+        .map(|config| into_location(config.clone(), instance.id))
         .collect::<HashSet<_>>();
 
     Ok(db_locations != core_locations)
@@ -746,7 +746,7 @@ pub(crate) async fn do_update_instance(
             Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
         for dev_config in response.configs {
             // parse device config
-            let new_location = dev_config.into_location(instance.id);
+            let new_location = into_location(dev_config, instance.id);
 
             // check if location is already present in current locations
             let saved_location = if let Some(position) = current_locations

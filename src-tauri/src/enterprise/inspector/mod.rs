@@ -7,30 +7,16 @@ mod tests;
 #[cfg(windows)]
 pub(crate) mod windows;
 
-use std::{env::consts::OS, error::Error, fmt};
+use std::env::consts::OS;
 
 use sysinfo::System;
 
 use crate::{
     service::proto::defguard::enterprise::posture::v2::{
-        bool_check, int32_check, string_check, BoolCheck, DevicePostureData, Int32Check,
-        StringCheck, UnavailableReason,
+        BoolCheck, DevicePostureData, Int32Check, StringCheck, UnavailableReason,
     },
     VERSION,
 };
-
-impl fmt::Display for UnavailableReason {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Unspecified => f.write_str("unspecified"),
-            Self::DetectionFailed => f.write_str("detection failed"),
-            Self::NotApplicable => f.write_str("not applicable on this platform"),
-            Self::InsufficientPermissions => f.write_str("insufficient permissions"),
-        }
-    }
-}
-
-impl Error for UnavailableReason {}
 
 /// Returns the operating system name.
 fn os_name() -> Result<String, UnavailableReason> {
@@ -134,58 +120,18 @@ fn security_update_age_days() -> Result<i32, UnavailableReason> {
     }
 }
 
-/// Convert `Result` to `BoolCheck`.
-impl From<Result<bool, UnavailableReason>> for BoolCheck {
-    fn from(value: Result<bool, UnavailableReason>) -> Self {
-        Self {
-            result: Some(match value {
-                Ok(inner) => bool_check::Result::Value(inner),
-                Err(err) => bool_check::Result::Unavailable(err as i32),
-            }),
-        }
-    }
-}
-
-/// Convert `Result` to `Int32Check`.
-impl From<Result<i32, UnavailableReason>> for Int32Check {
-    fn from(value: Result<i32, UnavailableReason>) -> Self {
-        Self {
-            result: Some(match value {
-                Ok(inner) => int32_check::Result::Value(inner),
-                Err(err) => int32_check::Result::Unavailable(err as i32),
-            }),
-        }
-    }
-}
-
-/// Convert `Result` to `StringCheck`.
-impl From<Result<String, UnavailableReason>> for StringCheck {
-    fn from(value: Result<String, UnavailableReason>) -> Self {
-        Self {
-            result: Some(match value {
-                Ok(inner) => string_check::Result::Value(inner),
-                Err(err) => string_check::Result::Unavailable(err as i32),
-            }),
-        }
-    }
-}
-
-#[allow(unused)]
-impl DevicePostureData {
-    /// Performs system inspection and returns the results.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            defguard_client_version: VERSION.to_owned(),
-            os_type: OS.to_string(),
-            os_name: Some(StringCheck::from(os_name())),
-            os_version: Some(StringCheck::from(os_version())),
-            disk_encryption: Some(BoolCheck::from(disk_encryption_status())),
-            antivirus_present: Some(BoolCheck::from(anti_virus_status())),
-            windows_ad_domain_joined: Some(BoolCheck::from(part_of_domain())),
-            windows_security_update_age_days: Some(Int32Check::from(security_update_age_days())),
-            linux_kernel_version: Some(StringCheck::from(linux_kernel_version())),
-            device_integrity: Some(BoolCheck::from(device_integrity())),
-        }
+#[must_use]
+pub(crate) fn device_posture_data() -> DevicePostureData {
+    DevicePostureData {
+        defguard_client_version: VERSION.to_owned(),
+        os_type: OS.to_string(),
+        os_name: Some(StringCheck::from(os_name())),
+        os_version: Some(StringCheck::from(os_version())),
+        disk_encryption: Some(BoolCheck::from(disk_encryption_status())),
+        antivirus_present: Some(BoolCheck::from(anti_virus_status())),
+        windows_ad_domain_joined: Some(BoolCheck::from(part_of_domain())),
+        windows_security_update_age_days: Some(Int32Check::from(security_update_age_days())),
+        linux_kernel_version: Some(StringCheck::from(linux_kernel_version())),
+        device_integrity: Some(BoolCheck::from(device_integrity())),
     }
 }

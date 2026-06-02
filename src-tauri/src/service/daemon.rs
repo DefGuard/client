@@ -35,6 +35,8 @@ use super::{
         ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
 };
+#[cfg(windows)]
+use crate::enterprise::inspector::device_posture_data;
 use crate::{
     enterprise::service_locations::ServiceLocationError,
     service::proto::defguard::enterprise::posture::v2::DevicePostureData, VERSION,
@@ -520,7 +522,7 @@ impl DesktopDaemonService for DaemonService {
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         debug!("Get posture data request received");
-        Ok(Response::new(DevicePostureData::new()))
+        Ok(Response::new(device_posture_data()))
     }
 }
 

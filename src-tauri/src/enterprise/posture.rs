@@ -8,6 +8,7 @@ use crate::{
         models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
         DB_POOL,
     },
+    enterprise::inspector::device_posture_data,
     error::Error,
     service::proto::defguard::enterprise::posture::v2::{
         DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
@@ -95,6 +96,6 @@ pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     }
     #[cfg(not(windows))]
     {
-        Ok(DevicePostureData::new())
+        Ok(device_posture_data())
     }
 }
