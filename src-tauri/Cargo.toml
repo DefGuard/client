@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "common", "client-proto", "core", "enterprise/posture", "enterprise/provisioning"]
+members = ["cli", "common", "client-proto", "core", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
@@ -65,6 +65,7 @@ chrono = { version = "0.4", features = ["serde"] }
 defguard-client-proto = { path = "client-proto" }
 defguard-client-core = { path = "core" }
 defguard-posture = { path = "enterprise/posture" }
+defguard-config-sync = { path = "enterprise/config-sync" }
 defguard-provisioning = { path = "enterprise/provisioning" }
 common = { path = "common" }
 dark-light = "2.0"

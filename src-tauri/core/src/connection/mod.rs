@@ -1,3 +1,4 @@
+pub mod active_connections;
 pub mod daemon_client;
 pub mod setup;
 

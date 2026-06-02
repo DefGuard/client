@@ -1419,6 +1419,7 @@ dependencies = [
  "dark-light",
  "defguard-client-core",
  "defguard-client-proto",
+ "defguard-config-sync",
  "defguard-posture",
  "defguard-provisioning",
  "defguard_wireguard_rs",
@@ -1529,6 +1530,23 @@ dependencies = [
  "tonic-prost",
  "tonic-prost-build",
  "x25519-dalek",
+]
+
+[[package]]
+name = "defguard-config-sync"
+version = "2.1.0"
+dependencies = [
+ "defguard-client-core",
+ "defguard-client-proto",
+ "log",
+ "reqwest 0.13.4",
+ "semver",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tauri",
+ "tokio",
+ "tonic",
 ]
 
 [[package]]
