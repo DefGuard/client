@@ -1048,7 +1048,7 @@ dependencies = [
 name = "common"
 version = "2.1.0"
 dependencies = [
- "nix",
+ "nix 0.31.3",
 ]
 
 [[package]]
@@ -1429,7 +1429,7 @@ dependencies = [
  "hyper-util",
  "known-folders",
  "log",
- "nix",
+ "nix 0.31.3",
  "objc2 0.6.4",
  "objc2-app-kit",
  "objc2-foundation 0.3.2",
@@ -1495,7 +1495,7 @@ dependencies = [
  "dirs-next",
  "hyper-util",
  "log",
- "nix",
+ "nix 0.31.3",
  "objc2 0.6.4",
  "objc2-app-kit",
  "objc2-foundation 0.3.2",
@@ -1599,13 +1599,28 @@ dependencies = [
 name = "defguard-service"
 version = "2.1.0"
 dependencies = [
+ "anyhow",
+ "async-stream",
+ "clap",
  "common",
  "defguard-client-proto",
+ "defguard-posture",
  "defguard-service-locations",
  "defguard_wireguard_rs",
+ "futures-core",
  "log",
+ "nix 0.30.1",
+ "serde",
  "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
  "tonic",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "windows-core 0.61.2",
+ "windows-service",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1644,7 +1659,7 @@ dependencies = [
  "ip_network",
  "ip_network_table",
  "libc",
- "nix",
+ "nix 0.31.3",
  "parking_lot",
  "ring",
  "socket2",
@@ -1672,7 +1687,7 @@ dependencies = [
  "netlink-packet-utils",
  "netlink-packet-wireguard",
  "netlink-sys",
- "nix",
+ "nix 0.31.3",
  "regex",
  "serde",
  "thiserror 2.0.18",
@@ -3853,6 +3868,18 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nix"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+dependencies = [
+ "bitflags 2.11.1",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
+name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
@@ -4396,7 +4423,7 @@ checksum = "9cf20a545b305cf1da722b236b5155c9bb35f1d5ceb28c048bd96ca842f41b5b"
 dependencies = [
  "android_system_properties",
  "log",
- "nix",
+ "nix 0.31.3",
  "objc2 0.6.4",
  "objc2-foundation 0.3.2",
  "objc2-ui-kit",

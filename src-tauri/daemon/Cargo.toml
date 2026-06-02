@@ -9,12 +9,34 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+anyhow = "1.0"
+clap = { workspace = true }
 common = { path = "../common" }
 defguard-client-proto = { path = "../client-proto" }
+defguard-posture = { path = "../enterprise/posture" }
 defguard-service-locations = { path = "../enterprise/service-locations" }
 defguard_wireguard_rs = { workspace = true }
 log = { version = "0.4", features = ["serde"] }
+serde = { workspace = true }
 thiserror = { workspace = true }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = "0.2"
+tracing-subscriber = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.30", features = ["fs", "user"] }
 
 [target.'cfg(windows)'.dependencies]
-tonic = { workspace = true }
+async-stream = "0.3"
+futures-core = "0.3"
+tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
+windows-core = "0.61"
+windows-service = "0.8"
+windows-sys = "0.61"
+
+[[bin]]
+name = "defguard-service"
+path = "src/bin/defguard-service.rs"

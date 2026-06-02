@@ -49,10 +49,6 @@ version.workspace = true
 [[bin]]
 name = "defguard-client"
 
-[[bin]]
-name = "defguard-service"
-required-features = ["service"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 vergen-git2 = { version = "9.1", features = ["build"] }
@@ -178,7 +174,6 @@ wmi = {version = "0.18", default-features = false}
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
-service = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

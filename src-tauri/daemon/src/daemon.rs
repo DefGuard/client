@@ -27,25 +27,21 @@ use tonic::{
 use tracing::warn;
 use tracing::{debug, error, info, info_span, Instrument};
 
-use super::{
-    config::Config,
-    proto::defguard::client::v1::{
-        desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
-        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-    },
-};
+use crate::config::Config;
 #[cfg(windows)]
-use crate::enterprise::inspector::device_posture_data;
-use crate::{
-    enterprise::service_locations::ServiceLocationError,
-    service::proto::defguard::enterprise::posture::v2::DevicePostureData, VERSION,
+use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
+use crate::version::VERSION;
+use defguard_client_proto::defguard::client::v1::{
+    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
+    RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
+use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
 #[cfg(windows)]
-use crate::{
-    enterprise::service_locations::ServiceLocationManager,
-    service::named_pipe::{get_named_pipe_server_stream, PIPE_NAME},
-};
+use defguard_posture::inspector::device_posture_data;
+use defguard_service_locations::ServiceLocationError;
+#[cfg(windows)]
+use defguard_service_locations::ServiceLocationManager;
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -541,21 +537,24 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Binding socket file at {DAEMON_SOCKET_PATH}");
     let uds = UnixListener::bind(DAEMON_SOCKET_PATH)?;
 
-    // change owner group for socket file
-    // get the group ID by name
-    let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
-        error!("Group '{DAEMON_SOCKET_GROUP}' not found");
-        crate::error::Error::InternalError(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
-    })?;
+    #[cfg(target_os = "linux")]
+    {
+        // change owner group for socket file
+        // get the group ID by name
+        let group = Group::from_name(DAEMON_SOCKET_GROUP)?.ok_or_else(|| {
+            error!("Group '{DAEMON_SOCKET_GROUP}' not found");
+            crate::Error::Internal(format!("Group '{DAEMON_SOCKET_GROUP}' not found"))
+        })?;
 
-    // change ownership - keep current user, change group
-    debug!("Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group {DAEMON_SOCKET_GROUP}");
-    chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
+        // change ownership - keep current user, change group
+        debug!("Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group {DAEMON_SOCKET_GROUP}");
+        chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
 
-    // Set socket permissions to allow client access
-    // 0o660 allows read/write for owner and group only
-    debug!("Setting permissions for socket file at {DAEMON_SOCKET_PATH} to 0x660");
-    fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
+        // Set socket permissions to allow client access
+        // 0o660 allows read/write for owner and group only
+        debug!("Setting permissions for socket file at {DAEMON_SOCKET_PATH} to 0x660");
+        fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
+    }
 
     let uds_stream = UnixListenerStream::new(uds);
 

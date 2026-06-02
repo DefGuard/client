@@ -6,7 +6,6 @@ use std::{
 };
 
 use clap::Parser;
-use error;
 use tokio::{runtime::Runtime, time::sleep};
 use windows_service::{
     define_windows_service,
@@ -19,15 +18,13 @@ use windows_service::{
 };
 
 use crate::{
-    enterprise::service_locations::{
-        windows::{watch_for_login_logoff, watch_for_network_change},
-        ServiceLocationError, ServiceLocationManager,
-    },
-    service::{
-        config::Config,
-        daemon::{run_server, DaemonError},
-        utils::logging_setup,
-    },
+    config::Config,
+    daemon::{run_server, DaemonError},
+    utils::logging_setup,
+};
+use defguard_service_locations::{
+    windows::{watch_for_login_logoff, watch_for_network_change},
+    ServiceLocationError, ServiceLocationManager,
 };
 
 static SERVICE_NAME: &str = "DefguardService";
