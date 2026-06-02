@@ -1488,6 +1488,7 @@ dependencies = [
  "defguard-client-proto",
  "defguard_wireguard_rs",
  "dirs-next",
+ "hyper-util",
  "log",
  "nix",
  "os_info",
@@ -1502,6 +1503,10 @@ dependencies = [
  "struct-patch",
  "strum",
  "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tower",
+ "windows-sys 0.61.2",
  "x25519-dalek",
 ]
 

@@ -24,6 +24,7 @@ pub use defguard_client_core::version::{
 pub use defguard_client_core::{
     app_config,
     app_data_dir,
+    connection,
     database,
     error,
     get_aggregation,

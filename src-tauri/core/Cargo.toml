@@ -19,11 +19,11 @@ log = { version = "0.4", features = ["serde"] }
 os_info = { version = "3.14", default-features = false }
 prost.workspace = true
 reqwest.workspace = true
+rust-ini = "0.21"
 semver = "1.0"
 serde.workspace = true
 serde_json.workspace = true
 serde_with = "3.11"
-x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
 sqlx = { version = "0.8", features = [
     "chrono",
     "sqlite",
@@ -32,9 +32,17 @@ sqlx = { version = "0.8", features = [
     "macros",
 ] }
 strum = { version = "0.28", features = ["derive"] }
-thiserror.workspace = true
-rust-ini = "0.21"
 struct-patch = "0.12"
+thiserror.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tower = "0.5"
+x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
+
+hyper-util = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["user", "fs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation"] }
