@@ -6,7 +6,7 @@
   "remote": {
     "urls": ["http://localhost:5071/*", "http://localhost:5072/*"]
   },
-  "windows": ["new-ui", "old-ui"],
+  "windows": ["compact-view", "full-view"],
   "permissions": [
     "core:webview:allow-create-webview",
     "core:webview:allow-create-webview-window",

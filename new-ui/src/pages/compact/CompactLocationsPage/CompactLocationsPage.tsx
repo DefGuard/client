@@ -27,7 +27,7 @@ export const CompactLocationsPage = () => {
   const selection = useCompactLocationStore((s) => s.compactViewSelection);
   const openLocation = useCompactLocationStore((s) => s.expandedLocation);
 
-  const routeData = useLoaderData({ from: '/' });
+  const routeData = useLoaderData({ from: '/compact/' });
 
   const queryInstanceId = useMemo(() => {
     if (!isPresent(selection)) return routeData.instances[0].id;
@@ -107,7 +107,7 @@ export const CompactLocationsPage = () => {
             size="primary"
             text="Open Defguard"
             onClick={() => {
-              void api.swapToOldUi();
+              void api.swapToFullView();
             }}
           />
         </Controls>

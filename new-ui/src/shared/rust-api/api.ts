@@ -131,7 +131,9 @@ const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
 
 const getPostureData = async (): Promise<unknown> => invoke(TauriCommand.GetPostureData);
 
-const swapToOldUi = async () => invoke(TauriCommand.SwapToOldUi);
+const swapToFullView = async () => invoke(TauriCommand.SwapToFullView);
+
+const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
 
@@ -176,6 +178,7 @@ export const api = {
   disconnectLocations,
   getPostureData,
   // Window
-  swapToOldUi,
+  swapToFullView,
+  swapToTray,
   closeTrayWindow,
 };

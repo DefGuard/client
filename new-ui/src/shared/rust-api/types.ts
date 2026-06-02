@@ -105,7 +105,8 @@ export const TauriCommand = {
   DisconnectLocations: 'disconnect_locations',
   GetPostureData: 'get_posture_data',
   //Window
-  SwapToOldUi: 'swap_to_old_ui',
+  SwapToFullView: 'swap_to_full_view',
+  SwapToTray: 'swap_to_tray',
   CloseTrayWindow: 'close_tray_window',
 } as const;
 

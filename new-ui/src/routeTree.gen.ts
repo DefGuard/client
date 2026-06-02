@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as EmptyRouteImport } from './routes/empty'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
+import { Route as FullIndexRouteImport } from './routes/full/index'
+import { Route as CompactIndexRouteImport } from './routes/compact/index'
+import { Route as FullAddRouteImport } from './routes/full/add'
 
 const EmptyRoute = EmptyRouteImport.update({
   id: '/empty',
@@ -28,34 +31,74 @@ const PlaygroundIndexRoute = PlaygroundIndexRouteImport.update({
   path: '/playground/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FullIndexRoute = FullIndexRouteImport.update({
+  id: '/full/',
+  path: '/full/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompactIndexRoute = CompactIndexRouteImport.update({
+  id: '/compact/',
+  path: '/compact/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FullAddRoute = FullAddRouteImport.update({
+  id: '/full/add',
+  path: '/full/add',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/add': typeof FullAddRoute
+  '/compact/': typeof CompactIndexRoute
+  '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/add': typeof FullAddRoute
+  '/compact': typeof CompactIndexRoute
+  '/full': typeof FullIndexRoute
   '/playground': typeof PlaygroundIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/add': typeof FullAddRoute
+  '/compact/': typeof CompactIndexRoute
+  '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/empty' | '/playground/'
+  fullPaths:
+    | '/'
+    | '/empty'
+    | '/full/add'
+    | '/compact/'
+    | '/full/'
+    | '/playground/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/empty' | '/playground'
-  id: '__root__' | '/' | '/empty' | '/playground/'
+  to: '/' | '/empty' | '/full/add' | '/compact' | '/full' | '/playground'
+  id:
+    | '__root__'
+    | '/'
+    | '/empty'
+    | '/full/add'
+    | '/compact/'
+    | '/full/'
+    | '/playground/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmptyRoute: typeof EmptyRoute
+  FullAddRoute: typeof FullAddRoute
+  CompactIndexRoute: typeof CompactIndexRoute
+  FullIndexRoute: typeof FullIndexRoute
   PlaygroundIndexRoute: typeof PlaygroundIndexRoute
 }
 
@@ -82,12 +125,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaygroundIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/full/': {
+      id: '/full/'
+      path: '/full'
+      fullPath: '/full/'
+      preLoaderRoute: typeof FullIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compact/': {
+      id: '/compact/'
+      path: '/compact'
+      fullPath: '/compact/'
+      preLoaderRoute: typeof CompactIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/full/add': {
+      id: '/full/add'
+      path: '/full/add'
+      fullPath: '/full/add'
+      preLoaderRoute: typeof FullAddRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmptyRoute: EmptyRoute,
+  FullAddRoute: FullAddRoute,
+  CompactIndexRoute: CompactIndexRoute,
+  FullIndexRoute: FullIndexRoute,
   PlaygroundIndexRoute: PlaygroundIndexRoute,
 }
 export const routeTree = rootRouteImport

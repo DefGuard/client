@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::{
-    window_manager::{WindowManager, NEW_UI_WINDOW_ID},
+    window_manager::{WindowManager, COMPACT_WINDOW_ID},
     ConnectionType,
 };
 
@@ -120,7 +120,7 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
             }
             if let (Some(token), Some(url)) = (token, url) {
                 info!("Valid Deep link received.");
-                if let Some(tray_win) = app_handle.get_webview_window(NEW_UI_WINDOW_ID) {
+                if let Some(tray_win) = app_handle.get_webview_window(COMPACT_WINDOW_ID) {
                     let _ = tray_win.hide();
                 }
                 if let Err(e) = WindowManager::open_full_view(app_handle) {

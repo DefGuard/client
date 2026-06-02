@@ -19,7 +19,7 @@ export const CompactEmptyPage = () => {
             variant={ButtonVariant.Primary}
             size={ButtonSize.Primary}
             onClick={() => {
-              void api.swapToOldUi();
+              void api.swapToFullView();
             }}
           />
         </div>
