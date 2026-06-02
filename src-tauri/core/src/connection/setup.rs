@@ -2,6 +2,8 @@
 
 use std::str::FromStr;
 
+use std::process::Command;
+
 use common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use tonic::Code;
@@ -279,7 +281,6 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
 }
 
 pub fn execute_command(command: &str) -> Result<(), Error> {
-    use std::process::Command;
     log::debug!("Executing command: {command}");
     let mut command_parts = command.split_whitespace();
 

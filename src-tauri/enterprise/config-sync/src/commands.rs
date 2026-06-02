@@ -14,10 +14,11 @@ use defguard_client_proto::defguard::{
     client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
     client_types::DeviceConfigResponse,
 };
-use sqlx::{Sqlite, Transaction};
+use sqlx::{Sqlite, SqliteExecutor, Transaction};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_service_locations::to_service_location;
 
 pub async fn locations_changed(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -247,10 +248,6 @@ pub async fn do_update_instance(
     Ok(())
 }
 
-use defguard_service_locations::to_service_location;
-
-use sqlx::SqliteExecutor;
-
 pub async fn disable_enterprise_features<'e, E>(
     instance: &mut Instance<Id>,
     executor: E,
@@ -258,8 +255,6 @@ pub async fn disable_enterprise_features<'e, E>(
 where
     E: SqliteExecutor<'e>,
 {
-    use defguard_client_core::database::models::instance::ClientTrafficPolicy;
-
     log::debug!(
         "Disabling enterprise features for instance {}({})",
         instance.name,

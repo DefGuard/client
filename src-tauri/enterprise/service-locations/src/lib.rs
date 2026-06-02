@@ -4,6 +4,7 @@ use defguard_client_core::database::models::{
     location::{Location, ServiceLocationMode},
     Id,
 };
+use defguard_client_core::error::Error as CoreError;
 use defguard_client_proto::defguard::client::v1::ServiceLocation;
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 use serde::{Deserialize, Serialize};
@@ -82,12 +83,12 @@ impl fmt::Debug for SingleServiceLocationData {
 
 pub fn to_service_location(
     location: &Location<Id>,
-) -> Result<ServiceLocation, defguard_client_core::error::Error> {
+) -> Result<ServiceLocation, CoreError> {
     if !location.is_service_location() {
         log::warn!(
             "Location {location} is not a service location, so it can't be converted to one."
         );
-        return Err(defguard_client_core::error::Error::ConversionError(
+        return Err(CoreError::ConversionError(
             format!(
             "Failed to convert location {location} to a service location as it's either not marked \
             as one or has MFA enabled."
@@ -101,7 +102,7 @@ pub fn to_service_location(
             "Location {location} has an invalid service location mode, so it can't be converted to \
             one."
         );
-            return Err(defguard_client_core::error::Error::ConversionError(
+            return Err(CoreError::ConversionError(
                 format!(
                 "Location {location} has an invalid service location mode ({:?}), so it can't be \
                 converted to one.",
