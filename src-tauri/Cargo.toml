@@ -1,6 +1,6 @@
 [workspace]
 members = ["cli", "common", "client-proto", "core", "daemon", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
-default-members = [".", "cli"]
+default-members = [".", "cli", "daemon"]
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }

@@ -137,6 +137,27 @@ exceptions = [
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-client-core" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-service" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-client-proto" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-posture" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-provisioning" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-config-sync" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-service-locations" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

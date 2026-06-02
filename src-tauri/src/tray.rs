@@ -135,15 +135,14 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         }
     }
 
-    Ok(menu
-        .separator()
+    menu.separator()
         .items(&[&show, &hide])
         .separator()
         .items(&[&subscribe_updates, &join_community, &follow_us])
         .separator()
         .item(&quit)
         .build()
-        .map_err(crate::tauri_err_to_app_err)?)
+        .map_err(crate::tauri_err_to_app_err)
 }
 
 /// Setup system tray.

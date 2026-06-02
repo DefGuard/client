@@ -440,7 +440,7 @@ async fn push_service_locations(
                 saved_location.name, saved_location.id, instance.name, instance.id,
             );
             service_locations.push(crate::enterprise::service_locations::to_service_location(
-                &saved_location,
+                saved_location,
             )?);
         }
     }
