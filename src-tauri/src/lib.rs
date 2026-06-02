@@ -1,8 +1,6 @@
 // FIXME: actually refactor errors instead
 #![allow(clippy::result_large_err)]
 
-use semver::Version;
-
 pub mod active_connections;
 pub mod app_config;
 #[cfg(target_os = "macos")]
@@ -21,11 +19,16 @@ pub mod wg_config;
 pub mod window_manager;
 
 // Re-export from core so existing imports keep working.
+pub use defguard_client_core::version::{
+    Version, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, LOG_FILENAME, MIN_CORE_VERSION,
+    MIN_PROXY_VERSION,
+};
 pub use defguard_client_core::{
     app_data_dir,
     database,
     error,
     get_aggregation,
+    into_location,
     set_perms,
     // Shared types
     CommonConnection,
@@ -41,13 +44,7 @@ pub use defguard_client_core::{
 };
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
-pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
-pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
-pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
-pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-// Must be without ".log" suffix!
-pub const LOG_FILENAME: &str = "defguard-client";
 
 #[macro_use]
 extern crate log;

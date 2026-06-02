@@ -35,11 +35,12 @@ use crate::{
     },
     error::Error,
     events::EventKey,
+    into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::{defguard::client_types::DeviceConfigResponse, into_location},
+    proto::defguard::client_types::DeviceConfigResponse,
     service::proto::defguard::enterprise::posture::v2::DevicePostureData,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{

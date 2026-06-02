@@ -1490,6 +1490,7 @@ dependencies = [
  "dirs-next",
  "log",
  "nix",
+ "semver",
  "serde",
  "serde_json",
  "serde_with",
