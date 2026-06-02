@@ -1,5 +1,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 
+/// Package version from the workspace (shared across all binaries).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Obtain a free TCP port on localhost.
 #[must_use]
 pub fn find_free_tcp_port() -> Option<u16> {

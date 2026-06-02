@@ -1596,6 +1596,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-service"
+version = "2.1.0"
+dependencies = [
+ "common",
+ "defguard-client-proto",
+ "defguard-service-locations",
+ "defguard_wireguard_rs",
+ "log",
+ "thiserror 2.0.18",
+ "tonic",
+]
+
+[[package]]
 name = "defguard-service-locations"
 version = "2.1.0"
 dependencies = [

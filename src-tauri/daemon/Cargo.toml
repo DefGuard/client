@@ -1,0 +1,20 @@
+[package]
+name = "defguard-service"
+description = "Defguard client daemon service"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license = "AGPL-3.0"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+defguard-client-proto = { path = "../client-proto" }
+defguard-service-locations = { path = "../enterprise/service-locations" }
+defguard_wireguard_rs = { workspace = true }
+log = { version = "0.4", features = ["serde"] }
+thiserror = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+tonic = { workspace = true }
