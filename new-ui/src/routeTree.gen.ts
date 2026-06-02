@@ -14,7 +14,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
 import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as CompactIndexRouteImport } from './routes/compact/index'
-import { Route as FullAddRouteImport } from './routes/full/add'
+import { Route as FullAddIndexRouteImport } from './routes/full/add/index'
+import { Route as FullAddInstanceRouteImport } from './routes/full/add/instance'
 
 const EmptyRoute = EmptyRouteImport.update({
   id: '/empty',
@@ -41,65 +42,83 @@ const CompactIndexRoute = CompactIndexRouteImport.update({
   path: '/compact/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FullAddRoute = FullAddRouteImport.update({
-  id: '/full/add',
-  path: '/full/add',
+const FullAddIndexRoute = FullAddIndexRouteImport.update({
+  id: '/full/add/',
+  path: '/full/add/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FullAddInstanceRoute = FullAddInstanceRouteImport.update({
+  id: '/full/add/instance',
+  path: '/full/add/instance',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
-  '/full/add': typeof FullAddRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/add/instance': typeof FullAddInstanceRoute
+  '/full/add/': typeof FullAddIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
-  '/full/add': typeof FullAddRoute
   '/compact': typeof CompactIndexRoute
   '/full': typeof FullIndexRoute
   '/playground': typeof PlaygroundIndexRoute
+  '/full/add/instance': typeof FullAddInstanceRoute
+  '/full/add': typeof FullAddIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
-  '/full/add': typeof FullAddRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/add/instance': typeof FullAddInstanceRoute
+  '/full/add/': typeof FullAddIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/empty'
-    | '/full/add'
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/add/instance'
+    | '/full/add/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/empty' | '/full/add' | '/compact' | '/full' | '/playground'
+  to:
+    | '/'
+    | '/empty'
+    | '/compact'
+    | '/full'
+    | '/playground'
+    | '/full/add/instance'
+    | '/full/add'
   id:
     | '__root__'
     | '/'
     | '/empty'
-    | '/full/add'
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/add/instance'
+    | '/full/add/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmptyRoute: typeof EmptyRoute
-  FullAddRoute: typeof FullAddRoute
   CompactIndexRoute: typeof CompactIndexRoute
   FullIndexRoute: typeof FullIndexRoute
   PlaygroundIndexRoute: typeof PlaygroundIndexRoute
+  FullAddInstanceRoute: typeof FullAddInstanceRoute
+  FullAddIndexRoute: typeof FullAddIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -139,11 +158,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompactIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/full/add': {
-      id: '/full/add'
+    '/full/add/': {
+      id: '/full/add/'
       path: '/full/add'
-      fullPath: '/full/add'
-      preLoaderRoute: typeof FullAddRouteImport
+      fullPath: '/full/add/'
+      preLoaderRoute: typeof FullAddIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/full/add/instance': {
+      id: '/full/add/instance'
+      path: '/full/add/instance'
+      fullPath: '/full/add/instance'
+      preLoaderRoute: typeof FullAddInstanceRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -152,10 +178,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmptyRoute: EmptyRoute,
-  FullAddRoute: FullAddRoute,
   CompactIndexRoute: CompactIndexRoute,
   FullIndexRoute: FullIndexRoute,
   PlaygroundIndexRoute: PlaygroundIndexRoute,
+  FullAddInstanceRoute: FullAddInstanceRoute,
+  FullAddIndexRoute: FullAddIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

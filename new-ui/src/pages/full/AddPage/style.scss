@@ -1,0 +1,11 @@
+#add-page-view .page-content {
+  .cards {
+    display: flex;
+    flex-flow: row wrap;
+    gap: var(--spacing-3xl);
+
+    > div {
+      width: 342px;
+    }
+  }
+}
