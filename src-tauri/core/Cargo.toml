@@ -1,0 +1,13 @@
+[package]
+name = "defguard-client-core"
+description = "Shared business logic for the Defguard desktop client (Tauri-free)"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file = "../../LICENSE.md"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+defguard-client-proto = { path = "../client-proto" }

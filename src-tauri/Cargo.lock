@@ -1417,6 +1417,7 @@ dependencies = [
  "clap",
  "common",
  "dark-light",
+ "defguard-client-core",
  "defguard-client-proto",
  "defguard_wireguard_rs",
  "dirs-next",
@@ -1475,6 +1476,14 @@ dependencies = [
  "windows-sys 0.61.2",
  "wmi",
  "x25519-dalek",
+]
+
+[[package]]
+name = "defguard-client-core"
+version = "2.1.0"
+dependencies = [
+ "common",
+ "defguard-client-proto",
 ]
 
 [[package]]
