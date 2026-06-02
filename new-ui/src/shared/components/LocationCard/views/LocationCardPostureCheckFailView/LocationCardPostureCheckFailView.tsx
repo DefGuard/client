@@ -1,5 +1,5 @@
 import './style.scss';
-import { ThemeSpacing, ThemeVariable } from '../../../../types';
+import { ThemeSpacing } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Divider } from '../../../Divider/Divider';
@@ -7,7 +7,7 @@ import { SizedBox } from '../../../SizedBox/SizedBox';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
-import noConnection from '../../images/no-connection.svg';
+import { NoConnectionIcon } from '../../images/NoConnectionIcon';
 
 export const LocationCardPostureCheckFailView = () => {
   const { postureError, setPostureError, setView } = useLocationCardContext();
@@ -28,7 +28,7 @@ export const LocationCardPostureCheckFailView = () => {
     <div className="location-card-posture-check-fail-view">
       <Divider spacing={ThemeSpacing.Md} />
       <SizedBox height={ThemeSpacing.Xl} />
-      <img src={noConnection} />
+      <NoConnectionIcon />
       <SizedBox height={ThemeSpacing.Xl} />
       <LocationViewHeader title="Posture check failed">
         <div className="posture-errors">
