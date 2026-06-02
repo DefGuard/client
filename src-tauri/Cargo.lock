@@ -1488,6 +1488,7 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+ "x25519-dalek",
 ]
 
 [[package]]

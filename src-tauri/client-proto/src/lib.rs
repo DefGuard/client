@@ -1,3 +1,5 @@
+pub mod conversions;
+
 pub mod defguard {
     pub mod client_types {
         tonic::include_proto!("defguard.client_types");
