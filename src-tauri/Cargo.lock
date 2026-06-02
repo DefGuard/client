@@ -1478,6 +1478,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-client-proto"
+version = "2.1.0"
+dependencies = [
+ "defguard_wireguard_rs",
+ "prost",
+ "serde",
+ "serde_with",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
+
+[[package]]
 name = "defguard-dg"
 version = "2.1.0"
 dependencies = [

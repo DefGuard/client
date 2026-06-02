@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "common"]
+members = ["cli", "common", "client-proto"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
