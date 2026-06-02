@@ -67,59 +67,7 @@ pub(crate) async fn setup_interface(
     mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
-    debug!("Setting up interface for location: {location}");
-    let interface_name = get_interface_name(name);
-
-    // request interface configuration
-    debug!("Looking for a free port for interface {interface_name}.");
-    let Some(port) = find_free_tcp_port() else {
-        let msg = format!(
-            "Couldn't find free port during interface {interface_name} setup for location \
-            {location}"
-        );
-        error!("{msg}");
-        return Err(Error::InternalError(msg));
-    };
-    debug!("Found free port: {port} for interface {interface_name}.");
-
-    let mut interface_config = location
-        .interface_configuration(pool, interface_name.clone(), preshared_key, mtu)
-        .await?;
-    interface_config.mtu = mtu;
-    debug!("Creating interface for location {location} with configuration {interface_config:?}");
-    let request = CreateInterfaceRequest {
-        config: Some(interface_config.clone().into()),
-        dns: location.dns.clone(),
-    };
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-        if error.code() == Code::Unavailable {
-            error!(
-                "Failed to set up connection for location {location}; background service is \
-                unavailable. Make sure the service is running. Error: {error}, Interface \
-                configuration: {interface_config:?}"
-            );
-            Err(Error::InternalError(
-                "Background service is unavailable. Make sure the service is running.".into(),
-            ))
-        } else {
-            error!(
-                "Failed to send a request to the background service to create an interface for \
-                location {location} with the following configuration: {interface_config:?}. \
-                Error: {error}"
-            );
-            Err(Error::InternalError(format!(
-                "Failed to send a request to the background service to create an interface for \
-                location {location}. Error: {error}. Check logs for details."
-            )))
-        }
-    } else {
-        info!(
-            "The interface for location {location} has been created successfully, interface \
-            name: {}.",
-            interface_config.name
-        );
-        Ok(interface_name)
-    }
+    crate::connection::setup::setup_interface(location, name, preshared_key, mtu, pool).await
 }
 
 #[cfg(target_os = "macos")]
