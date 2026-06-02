@@ -1420,6 +1420,7 @@ dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
  "defguard-posture",
+ "defguard-provisioning",
  "defguard_wireguard_rs",
  "dirs-next",
  "futures-core",
@@ -1562,6 +1563,16 @@ dependencies = [
  "serde",
  "serde_json",
  "sysinfo",
+]
+
+[[package]]
+name = "defguard-provisioning"
+version = "2.1.0"
+dependencies = [
+ "defguard-client-core",
+ "log",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
