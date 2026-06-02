@@ -1,20 +1,21 @@
-use reqwest::StatusCode;
+use reqwest::{StatusCode, Url};
 use serde::Deserialize;
 
 #[cfg(windows)]
-use crate::service::client::DAEMON_CLIENT;
-use crate::{
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_core::{
     database::{
         models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
         DB_POOL,
     },
-    enterprise::inspector::device_posture_data,
     error::Error,
     proxy::post_with_headers,
-    service::proto::defguard::enterprise::posture::v2::{
-        DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
-    },
 };
+use defguard_client_proto::defguard::enterprise::posture::v2::{
+    DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
+};
+
+use crate::inspector::device_posture_data;
 
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
@@ -41,7 +42,7 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
         device_posture_data: Some(posture_data),
     };
 
-    let proxy_url = tauri::Url::parse(&instance.proxy_url)
+    let proxy_url = Url::parse(&instance.proxy_url)
         .map_err(|e| Error::InternalError(format!("Invalid proxy URL: {e}")))?
         .join(POSTURE_ENDPOINT)
         .map_err(|e| Error::InternalError(format!("Failed to build posture URL: {e}")))?;

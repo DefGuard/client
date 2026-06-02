@@ -11,11 +11,9 @@ use std::env::consts::OS;
 
 use sysinfo::System;
 
-use crate::{
-    service::proto::defguard::enterprise::posture::v2::{
-        BoolCheck, DevicePostureData, Int32Check, StringCheck, UnavailableReason,
-    },
-    VERSION,
+use defguard_client_core::version::PKG_VERSION;
+use defguard_client_proto::defguard::enterprise::posture::v2::{
+    BoolCheck, DevicePostureData, Int32Check, StringCheck, UnavailableReason,
 };
 
 /// Returns the operating system name.
@@ -123,7 +121,7 @@ fn security_update_age_days() -> Result<i32, UnavailableReason> {
 #[must_use]
 pub(crate) fn device_posture_data() -> DevicePostureData {
     DevicePostureData {
-        defguard_client_version: VERSION.to_owned(),
+        defguard_client_version: PKG_VERSION.to_owned(),
         os_type: OS.to_string(),
         os_name: Some(StringCheck::from(os_name())),
         os_version: Some(StringCheck::from(os_version())),

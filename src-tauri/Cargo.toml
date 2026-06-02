@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "common", "client-proto", "core"]
+members = ["cli", "common", "client-proto", "core", "enterprise/posture"]
 default-members = [".", "cli"]
 
 [workspace.dependencies]
@@ -64,6 +64,7 @@ clap.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 defguard-client-proto = { path = "client-proto" }
 defguard-client-core = { path = "core" }
+defguard-posture = { path = "enterprise/posture" }
 common = { path = "common" }
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }

@@ -1419,6 +1419,7 @@ dependencies = [
  "dark-light",
  "defguard-client-core",
  "defguard-client-proto",
+ "defguard-posture",
  "defguard_wireguard_rs",
  "dirs-next",
  "futures-core",
@@ -1548,6 +1549,19 @@ dependencies = [
  "tonic-prost-build",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "defguard-posture"
+version = "2.1.0"
+dependencies = [
+ "defguard-client-core",
+ "defguard-client-proto",
+ "log",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "sysinfo",
 ]
 
 [[package]]
