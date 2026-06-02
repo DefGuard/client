@@ -11,6 +11,7 @@ version.workspace = true
 [dependencies]
 defguard-client-core = { path = "../../core" }
 defguard-client-proto = { path = "../../client-proto" }
+defguard-service-locations = { path = "../service-locations" }
 log = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.13", features = ["json"] }
 semver = { version = "1.0", features = ["serde"] }

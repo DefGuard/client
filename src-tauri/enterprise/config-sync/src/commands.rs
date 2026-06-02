@@ -11,7 +11,7 @@ use defguard_client_core::{
     into_location,
 };
 use defguard_client_proto::defguard::{
-    client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest, ServiceLocation},
+    client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
     client_types::DeviceConfigResponse,
 };
 use sqlx::{Sqlite, Transaction};
@@ -247,46 +247,7 @@ pub async fn do_update_instance(
     Ok(())
 }
 
-pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, Error> {
-    use defguard_client_core::database::models::location::ServiceLocationMode;
-
-    if !location.is_service_location() {
-        log::warn!(
-            "Location {location} is not a service location, so it can't be converted to one."
-        );
-        return Err(Error::ConversionError(format!(
-            "Failed to convert location {location} to a service location as it's either not \
-            marked as one or has MFA enabled."
-        )));
-    }
-
-    let mode = match location.service_location_mode {
-        ServiceLocationMode::Disabled => {
-            log::warn!(
-                "Location {location} has an invalid service location mode, so it can't be \
-                converted to one."
-            );
-            return Err(Error::ConversionError(format!(
-                "Location {location} has an invalid service location mode ({:?}), so it can't be \
-                converted to one.",
-                location.service_location_mode
-            )));
-        }
-        ServiceLocationMode::PreLogon => 0,
-        ServiceLocationMode::AlwaysOn => 1,
-    };
-
-    Ok(ServiceLocation {
-        name: location.name.clone(),
-        address: location.address.clone(),
-        pubkey: location.pubkey.clone(),
-        endpoint: location.endpoint.clone(),
-        allowed_ips: location.allowed_ips.clone(),
-        dns: location.dns.clone().unwrap_or_default(),
-        keepalive_interval: location.keepalive_interval.try_into().unwrap_or(0),
-        mode,
-    })
-}
+use defguard_service_locations::to_service_location;
 
 use sqlx::SqliteExecutor;
 

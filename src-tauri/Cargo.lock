@@ -1422,6 +1422,7 @@ dependencies = [
  "defguard-config-sync",
  "defguard-posture",
  "defguard-provisioning",
+ "defguard-service-locations",
  "defguard_wireguard_rs",
  "dirs-next",
  "futures-core",
@@ -1538,6 +1539,7 @@ version = "2.1.0"
 dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
+ "defguard-service-locations",
  "log",
  "reqwest 0.13.4",
  "semver",
@@ -1591,6 +1593,27 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "defguard-service-locations"
+version = "2.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "common",
+ "defguard-client-core",
+ "defguard-client-proto",
+ "defguard_wireguard_rs",
+ "known-folders",
+ "log",
+ "prost",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "windows 0.62.2",
+ "windows-acl",
+ "windows-service",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
