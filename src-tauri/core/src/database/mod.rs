@@ -15,7 +15,7 @@ const DB_NAME: &str = "defguard.db";
 
 pub mod models;
 
-pub(crate) type DbPool = SqlitePool;
+pub type DbPool = SqlitePool;
 
 pub static DB_POOL: LazyLock<SqlitePool> = LazyLock::new(|| {
     let db_url = prepare_db_url().expect("Wrong database URL.");
@@ -96,7 +96,7 @@ fn prepare_db_url() -> Result<String, Error> {
 
 pub async fn handle_db_migrations() {
     debug!("Running database migrations, if there are any.");
-    sqlx::migrate!()
+    sqlx::migrate!("../migrations")
         .run(&*DB_POOL)
         .await
         .expect("Failed to apply database migrations.");

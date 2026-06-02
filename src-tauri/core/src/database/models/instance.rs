@@ -26,8 +26,8 @@ impl fmt::Display for Instance<Id> {
     }
 }
 
-impl From<proto::defguard::client_types::InstanceInfo> for Instance<NoId> {
-    fn from(instance_info: proto::defguard::client_types::InstanceInfo) -> Self {
+impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
+    fn from(instance_info: proto::client_types::InstanceInfo) -> Self {
         let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
         Self {
             id: NoId,
@@ -45,7 +45,7 @@ impl From<proto::defguard::client_types::InstanceInfo> for Instance<NoId> {
 }
 
 impl Instance<Id> {
-    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> Result<(), sqlx::Error>
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -85,7 +85,7 @@ impl Instance<Id> {
         Ok(instances)
     }
 
-    pub(crate) async fn find_by_id<'e, E>(executor: E, id: Id) -> Result<Option<Self>, sqlx::Error>
+    pub async fn find_by_id<'e, E>(executor: E, id: Id) -> Result<Option<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -101,7 +101,7 @@ impl Instance<Id> {
         Ok(instance)
     }
 
-    pub(crate) async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), sqlx::Error>
+    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -112,7 +112,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub(crate) async fn delete<'e, E>(&self, executor: E) -> Result<(), sqlx::Error>
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -120,7 +120,7 @@ impl Instance<Id> {
         Ok(())
     }
 
-    pub(crate) async fn all_with_token<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
+    pub async fn all_with_token<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -138,8 +138,8 @@ impl Instance<Id> {
 }
 
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
-impl PartialEq<proto::defguard::client_types::InstanceInfo> for Instance<Id> {
-    fn eq(&self, other: &proto::defguard::client_types::InstanceInfo) -> bool {
+impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
+    fn eq(&self, other: &proto::client_types::InstanceInfo) -> bool {
         let other_policy = ClientTrafficPolicy::from(other);
         self.name == other.name
             && self.uuid == other.id
@@ -223,8 +223,8 @@ pub enum ClientTrafficPolicy {
 }
 
 /// Retrieves `ClientTrafficPolicy` from `proto::InstanceInfo` while ensuring backwards compatibility
-impl From<&proto::defguard::client_types::InstanceInfo> for ClientTrafficPolicy {
-    fn from(instance: &proto::defguard::client_types::InstanceInfo) -> Self {
+impl From<&proto::client_types::InstanceInfo> for ClientTrafficPolicy {
+    fn from(instance: &proto::client_types::InstanceInfo) -> Self {
         match (
             instance.client_traffic_policy,
             #[allow(deprecated)]

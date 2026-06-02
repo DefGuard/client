@@ -8,8 +8,8 @@ use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
 
 use super::{connection::ActiveConnection, Id, NoId, PURGE_DURATION};
 use crate::{
-    commands::DateTimeAggregation, error::Error, CommonConnection, CommonConnectionInfo,
-    CommonLocationStats, ConnectionType,
+    error::Error, CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+    DateTimeAggregation,
 };
 
 #[serde_as]
@@ -57,7 +57,7 @@ impl fmt::Display for Tunnel<NoId> {
 }
 
 impl Tunnel<Id> {
-    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
+    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -90,7 +90,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub(crate) async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -98,10 +98,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub(crate) async fn find_by_id<'e, E>(
-        executor: E,
-        tunnel_id: Id,
-    ) -> Result<Option<Self>, SqlxError>
+    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: Id) -> Result<Option<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -116,7 +113,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub(crate) async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -132,7 +129,7 @@ impl Tunnel<Id> {
         Ok(tunnels)
     }
 
-    pub(crate) async fn find_by_server_public_key<'e, E>(
+    pub async fn find_by_server_public_key<'e, E>(
         executor: E,
         pubkey: &str,
     ) -> Result<Self, SqlxError>
@@ -151,7 +148,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub(crate) async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
+    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -166,7 +163,7 @@ impl Tunnel<Id> {
 impl Tunnel<NoId> {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub(crate) fn new(
+    pub fn new(
         name: String,
         pubkey: String,
         prvkey: String,
@@ -203,7 +200,7 @@ impl Tunnel<NoId> {
         }
     }
 
-    pub(crate) async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
+    pub async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
     where
         E: SqliteExecutor<'e>,
     {
@@ -255,13 +252,13 @@ impl Tunnel<NoId> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TunnelStats<I = NoId> {
     id: I,
-    pub(crate) tunnel_id: Id,
+    pub tunnel_id: Id,
     upload: i64,
     download: i64,
-    pub(crate) last_handshake: i64,
-    pub(crate) collected_at: NaiveDateTime,
+    pub last_handshake: i64,
+    pub collected_at: NaiveDateTime,
     listen_port: u32,
-    pub(crate) persistent_keepalive_interval: u16,
+    pub persistent_keepalive_interval: u16,
 }
 
 impl TunnelStats {
@@ -331,7 +328,7 @@ impl TunnelStats<NoId> {
 }
 
 impl TunnelStats<Id> {
-    pub(crate) async fn all_by_tunnel_id<'e, E>(
+    pub async fn all_by_tunnel_id<'e, E>(
         executor: E,
         tunnel_id: Id,
         from: &NaiveDateTime,
@@ -366,7 +363,7 @@ impl TunnelStats<Id> {
         Ok(stats)
     }
 
-    pub(crate) async fn latest_by_download_change<'e, E>(
+    pub async fn latest_by_download_change<'e, E>(
         executor: E,
         tunnel_id: Id,
     ) -> Result<Option<Self>, Error>
@@ -632,7 +629,7 @@ mod tests {
         }
     }
 
-    #[sqlx::test]
+    #[sqlx::test(migrations = "../migrations")]
     async fn purge_stats(pool: SqlitePool) {
         let tunnel = Tunnel::new(
             "test".into(),

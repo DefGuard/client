@@ -14,7 +14,7 @@ pub struct Connection<I = NoId> {
 }
 
 impl Connection<NoId> {
-    pub(crate) async fn save<'e, E>(self, executor: E) -> Result<Connection<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> Result<Connection<Id>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -36,7 +36,7 @@ impl Connection<NoId> {
         })
     }
 
-    pub(crate) async fn latest_by_location_id<'e, E>(
+    pub async fn latest_by_location_id<'e, E>(
         executor: E,
         location_id: Id,
     ) -> Result<Option<Connection<Id>>, Error>
@@ -81,10 +81,7 @@ impl From<ConnectionInfo> for CommonConnectionInfo {
 }
 
 impl ConnectionInfo {
-    pub(crate) async fn all_by_location_id<'e, E>(
-        executor: E,
-        location_id: Id,
-    ) -> Result<Vec<Self>, Error>
+    pub async fn all_by_location_id<'e, E>(executor: E, location_id: Id) -> Result<Vec<Self>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -130,11 +127,7 @@ pub struct ActiveConnection {
 
 impl ActiveConnection {
     #[must_use]
-    pub(crate) fn new(
-        location_id: Id,
-        interface_name: String,
-        connection_type: ConnectionType,
-    ) -> Self {
+    pub fn new(location_id: Id, interface_name: String, connection_type: ConnectionType) -> Self {
         let start = Utc::now().naive_utc();
         Self {
             location_id,

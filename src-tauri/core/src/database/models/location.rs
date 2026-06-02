@@ -10,17 +10,12 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
+use crate::error::Error;
+use crate::proto::client_types::{
+    LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+};
 #[cfg(not(target_os = "macos"))]
-use crate::{
-    database::DbPool,
-    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
-};
-use crate::{
-    error::Error,
-    proto::defguard::client_types::{
-        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
-    },
-};
+use crate::{database::DbPool, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
@@ -76,7 +71,7 @@ pub enum LocationMfaMethod {
     MobileApprove = 4,
 }
 
-pub(crate) fn infer_mfa_method(
+pub fn infer_mfa_method(
     mode: LocationMfaMode,
     method: Option<LocationMfaMethod>,
 ) -> Option<LocationMfaMethod> {
@@ -126,10 +121,7 @@ impl fmt::Display for Location<NoId> {
 impl Location<Id> {
     /// Ignores service locations
     #[cfg(any(windows, target_os = "macos"))]
-    pub(crate) async fn all<'e, E>(
-        executor: E,
-        include_service_locations: bool,
-    ) -> sqlx::Result<Vec<Self>>
+    pub async fn all<'e, E>(executor: E, include_service_locations: bool) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -151,10 +143,7 @@ impl Location<Id> {
     }
 
     #[cfg(any(windows, target_os = "macos"))]
-    pub(crate) async fn exist<'e, E>(
-        executor: E,
-        include_service_locations: bool,
-    ) -> sqlx::Result<bool>
+    pub async fn exist<'e, E>(executor: E, include_service_locations: bool) -> sqlx::Result<bool>
     where
         E: SqliteExecutor<'e>,
     {
@@ -170,7 +159,7 @@ impl Location<Id> {
         Ok(result != 0)
     }
 
-    pub(crate) async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
+    pub async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -203,10 +192,7 @@ impl Location<Id> {
         Ok(())
     }
 
-    pub(crate) async fn find_by_id<'e, E>(
-        executor: E,
-        location_id: Id,
-    ) -> sqlx::Result<Option<Self>>
+    pub async fn find_by_id<'e, E>(executor: E, location_id: Id) -> sqlx::Result<Option<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -224,7 +210,7 @@ impl Location<Id> {
         .await
     }
 
-    pub(crate) async fn find_by_instance_id<'e, E>(
+    pub async fn find_by_instance_id<'e, E>(
         executor: E,
         instance_id: Id,
         include_service_locations: bool,
@@ -250,7 +236,7 @@ impl Location<Id> {
         .await
     }
 
-    pub(crate) async fn find_by_public_key<'e, E>(executor: E, pubkey: &str) -> sqlx::Result<Self>
+    pub async fn find_by_public_key<'e, E>(executor: E, pubkey: &str) -> sqlx::Result<Self>
     where
         E: SqliteExecutor<'e>,
     {
@@ -268,7 +254,7 @@ impl Location<Id> {
         .await
     }
 
-    pub(crate) async fn delete<'e, E>(&self, executor: E) -> sqlx::Result<()>
+    pub async fn delete<'e, E>(&self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -279,7 +265,7 @@ impl Location<Id> {
     }
 
     /// Disables all traffic for locations related to the given instance
-    pub(crate) async fn disable_all_traffic_for_all<'e, E>(
+    pub async fn disable_all_traffic_for_all<'e, E>(
         executor: E,
         instance_id: Id,
     ) -> Result<(), Error>
@@ -295,7 +281,7 @@ impl Location<Id> {
         Ok(())
     }
 
-    pub(crate) fn mfa_enabled(&self) -> bool {
+    pub fn mfa_enabled(&self) -> bool {
         match self.location_mfa_mode {
             LocationMfaMode::Disabled => false,
             LocationMfaMode::Internal | LocationMfaMode::External => true,
@@ -303,7 +289,7 @@ impl Location<Id> {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub(crate) async fn interface_configuration(
+    pub async fn interface_configuration(
         &self,
         pool: &DbPool,
         interface_name: String,
@@ -418,7 +404,7 @@ impl Location<Id> {
 }
 
 impl Location<NoId> {
-    pub(crate) async fn save<'e, E>(self, executor: E) -> sqlx::Result<Location<Id>>
+    pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<Location<Id>>
     where
         E: SqliteExecutor<'e>,
     {

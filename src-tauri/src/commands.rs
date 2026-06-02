@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
@@ -172,7 +172,9 @@ pub async fn disconnect(
             "Emitting the event informing the frontend about the disconnection from \
             {connection_type} {name}({location_id})"
         );
-        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        handle
+            .emit(EventKey::ConnectionChanged.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
         reload_tray_menu(&handle).await;
@@ -282,7 +284,9 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
     }
 
     if any_disconnected {
-        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        handle
+            .emit(EventKey::ConnectionChanged.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         reload_tray_menu(&handle).await;
         configure_tray_icon(&handle).await?;
     }
@@ -308,7 +312,9 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     };
     poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -397,7 +403,9 @@ pub async fn save_device_config(
 
     let locations = push_service_locations(&instance, keys).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     let res = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -433,7 +441,9 @@ async fn push_service_locations(
                 "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
                 saved_location.name, saved_location.id, instance.name, instance.id,
             );
-            service_locations.push(saved_location.to_service_location()?);
+            service_locations.push(crate::enterprise::service_locations::to_service_location(
+                &saved_location,
+            )?);
         }
     }
 
@@ -653,7 +663,9 @@ pub async fn update_instance(
         do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        app_handle.emit(EventKey::InstanceUpdate.into(), ())?;
+        app_handle
+            .emit(EventKey::InstanceUpdate.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
@@ -791,7 +803,9 @@ pub(crate) async fn do_update_instance(
                     "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
                     saved_location.name, saved_location.id, instance.name, instance.id,
                 );
-                service_locations.push(saved_location.to_service_location()?);
+                service_locations.push(crate::enterprise::service_locations::to_service_location(
+                    &saved_location,
+                )?);
             }
         }
 
@@ -901,35 +915,6 @@ pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Err
     })
 }
 
-pub(crate) enum DateTimeAggregation {
-    Hour,
-    Second,
-}
-
-impl DateTimeAggregation {
-    /// Returns database format string for a given aggregation variant.
-    #[must_use]
-    pub(crate) fn fstring(&self) -> &'static str {
-        match self {
-            Self::Hour => "%Y-%m-%d %H:00:00",
-            Self::Second => "%Y-%m-%d %H:%M:%S",
-        }
-    }
-}
-
-pub(crate) fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
-    // Use hourly aggregation for longer periods
-    let aggregation = match Utc::now().naive_utc() - from {
-        duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
-        duration if duration < Duration::zero() => Err(Error::InternalError(format!(
-            "Negative duration between dates: now ({}) and {from}",
-            Utc::now().naive_utc(),
-        ))),
-        _ => Ok(DateTimeAggregation::Second),
-    }?;
-    Ok(aggregation)
-}
-
 #[tauri::command(async)]
 pub async fn location_stats(
     location_id: Id,
@@ -938,7 +923,7 @@ pub async fn location_stats(
 ) -> Result<Vec<CommonLocationStats<Id>>, Error> {
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
-    let aggregation = get_aggregation(from)?;
+    let aggregation = crate::get_aggregation(from)?;
     let stats = match connection_type {
         ConnectionType::Location => {
             LocationStats::all_by_location_id(&*DB_POOL, location_id, &from, &aggregation, None)
@@ -1091,7 +1076,9 @@ pub async fn update_location_routing(
                 location.route_all_traffic = route_all_traffic;
                 location.save(&*DB_POOL).await?;
                 debug!("Location routing updated for location {name}(ID: {location_id})");
-                handle.emit(EventKey::LocationUpdate.into(), ())?;
+                handle
+                    .emit(EventKey::LocationUpdate.into(), ())
+                    .map_err(crate::tauri_err_to_app_err)?;
                 Ok(())
             } else {
                 error!(
@@ -1105,7 +1092,9 @@ pub async fn update_location_routing(
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&*DB_POOL).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
-                handle.emit(EventKey::LocationUpdate.into(), ())?;
+                handle
+                    .emit(EventKey::LocationUpdate.into(), ())
+                    .map_err(crate::tauri_err_to_app_err)?;
                 Ok(())
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
@@ -1134,7 +1123,9 @@ pub async fn set_location_mfa_method(
             "MFA method updated for location {}(ID: {location_id})",
             location.name,
         );
-        handle.emit(EventKey::LocationUpdate.into(), ())?;
+        handle
+            .emit(EventKey::LocationUpdate.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         Ok(())
     } else {
         error!("Location with ID {location_id} not found, cannot set MFA method");
@@ -1183,7 +1174,9 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     configure_tray_icon(&handle).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -1258,7 +1251,9 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     configure_tray_icon(&handle).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -1279,7 +1274,9 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
     debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
-    handle.emit(EventKey::LocationUpdate.into(), ())?;
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -1288,7 +1285,9 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
-    handle.emit(EventKey::LocationUpdate.into(), ())?;
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     Ok(())
 }
 

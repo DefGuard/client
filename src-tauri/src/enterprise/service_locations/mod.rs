@@ -83,41 +83,41 @@ impl fmt::Debug for SingleServiceLocationData {
     }
 }
 
-impl Location<Id> {
-    pub fn to_service_location(&self) -> Result<ServiceLocation, crate::error::Error> {
-        if !self.is_service_location() {
-            warn!("Location {self} is not a service location, so it can't be converted to one.");
+pub fn to_service_location(
+    location: &Location<Id>,
+) -> Result<ServiceLocation, crate::error::Error> {
+    if !location.is_service_location() {
+        warn!("Location {location} is not a service location, so it can't be converted to one.");
+        return Err(crate::error::Error::ConversionError(format!(
+            "Failed to convert location {location} to a service location as it's either not marked \
+            as one or has MFA enabled."
+        )));
+    }
+
+    let mode = match location.service_location_mode {
+        ServiceLocationMode::Disabled => {
+            warn!(
+            "Location {location} has an invalid service location mode, so it can't be converted to \
+            one."
+        );
             return Err(crate::error::Error::ConversionError(format!(
-                "Failed to convert location {self} to a service location as it's either not marked \
-                as one or has MFA enabled."
+                "Location {location} has an invalid service location mode ({:?}), so it can't be \
+                converted to one.",
+                location.service_location_mode
             )));
         }
+        ServiceLocationMode::PreLogon => 0,
+        ServiceLocationMode::AlwaysOn => 1,
+    };
 
-        let mode = match self.service_location_mode {
-            ServiceLocationMode::Disabled => {
-                warn!(
-                "Location {self} has an invalid service location mode, so it can't be converted to \
-                one."
-            );
-                return Err(crate::error::Error::ConversionError(format!(
-                    "Location {self} has an invalid service location mode ({:?}), so it can't be \
-                    converted to one.",
-                    self.service_location_mode
-                )));
-            }
-            ServiceLocationMode::PreLogon => 0,
-            ServiceLocationMode::AlwaysOn => 1,
-        };
-
-        Ok(ServiceLocation {
-            name: self.name.clone(),
-            address: self.address.clone(),
-            pubkey: self.pubkey.clone(),
-            endpoint: self.endpoint.clone(),
-            allowed_ips: self.allowed_ips.clone(),
-            dns: self.dns.clone().unwrap_or_default(),
-            keepalive_interval: self.keepalive_interval.try_into().unwrap_or(0),
-            mode,
-        })
-    }
+    Ok(ServiceLocation {
+        name: location.name.clone(),
+        address: location.address.clone(),
+        pubkey: location.pubkey.clone(),
+        endpoint: location.endpoint.clone(),
+        allowed_ips: location.allowed_ips.clone(),
+        dns: location.dns.clone().unwrap_or_default(),
+        keepalive_interval: location.keepalive_interval.try_into().unwrap_or(0),
+        mode,
+    })
 }

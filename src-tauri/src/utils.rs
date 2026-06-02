@@ -689,7 +689,9 @@ pub(crate) async fn handle_connection_for_location(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit(EventKey::ConnectionChanged.into(), ())?;
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
@@ -725,7 +727,9 @@ pub(crate) async fn handle_connection_for_tunnel(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit(EventKey::ConnectionChanged.into(), ())?;
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
@@ -1016,7 +1020,9 @@ async fn check_connection(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    app_handle.emit(EventKey::ConnectionChanged.into(), ())?;
+    app_handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     debug!("Spawning service log watcher for {connection_type} {name}...");

@@ -27,7 +27,7 @@ pub enum Error {
     #[error("Object not found")]
     NotFound,
     #[error("Tauri error: {0}")]
-    Tauri(#[from] tauri::Error),
+    Tauri(String),
     #[error("Failed to parse str to enum")]
     StrumError(#[from] strum::ParseError),
     #[error("Required resource not found {0}")]

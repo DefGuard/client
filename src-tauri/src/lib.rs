@@ -1,19 +1,7 @@
 // FIXME: actually refactor errors instead
 #![allow(clippy::result_large_err)]
-#[cfg(unix)]
-use std::path::Path;
-use std::{fmt, path::PathBuf};
-#[cfg(not(windows))]
-use std::{
-    fs::{set_permissions, Permissions},
-    os::unix::fs::PermissionsExt,
-};
 
-use chrono::NaiveDateTime;
 use semver::Version;
-use serde::{Deserialize, Serialize};
-
-use self::database::models::{Id, NoId};
 
 pub mod active_connections;
 pub mod app_config;
@@ -21,9 +9,7 @@ pub mod app_config;
 pub mod apple;
 pub mod appstate;
 pub mod commands;
-pub mod database;
 pub mod enterprise;
-pub mod error;
 pub mod events;
 pub mod log_watcher;
 pub mod periodic;
@@ -34,6 +20,26 @@ pub mod utils;
 pub mod wg_config;
 pub mod window_manager;
 
+// Re-export from core so existing imports keep working.
+pub use defguard_client_core::{
+    app_data_dir,
+    database,
+    error,
+    get_aggregation,
+    set_perms,
+    // Shared types
+    CommonConnection,
+    CommonConnectionInfo,
+    CommonLocationStats,
+    CommonWireguardFields,
+    ConnectionType,
+    // DateTime aggregation
+    DateTimeAggregation,
+    // Constants
+    DEFAULT_ROUTE_IPV4,
+    DEFAULT_ROUTE_IPV6,
+};
+
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
 pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
@@ -42,93 +48,11 @@ pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 // Must be without ".log" suffix!
 pub const LOG_FILENAME: &str = "defguard-client";
-// This must match tauri.bundle.identifier from tauri.conf.json.
-const BUNDLE_IDENTIFIER: &str = "net.defguard";
-// Returns the path to the user's data directory.
-#[must_use]
-pub fn app_data_dir() -> Option<PathBuf> {
-    dirs_next::data_dir().map(|dir| dir.join(BUNDLE_IDENTIFIER))
-}
-
-/// Ensures path has appropriate permissions set (dg25-28):
-/// - 700 for directories
-/// - 600 for files
-#[cfg(unix)]
-pub fn set_perms(path: &Path) {
-    let perms = if path.is_dir() { 0o700 } else { 0o600 };
-    if let Err(err) = set_permissions(path, Permissions::from_mode(perms)) {
-        warn!(
-            "Failed to set permissions on path {}: {err}",
-            path.display()
-        );
-    }
-}
-
-/// Location type used in commands to check if we using tunnel or location
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
-pub enum ConnectionType {
-    Tunnel,
-    Location,
-}
-
-impl fmt::Display for ConnectionType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ConnectionType::Tunnel => write!(f, "tunnel"),
-            ConnectionType::Location => write!(f, "location"),
-        }
-    }
-}
 
 #[macro_use]
 extern crate log;
 
-/// Common fields for Tunnel and Location
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommonWireguardFields {
-    pub instance_id: Id,
-    // Native network ID from Defguard Core.
-    pub network_id: Id,
-    pub name: String,
-    pub address: String,
-    pub pubkey: String,
-    pub endpoint: String,
-    pub allowed_ips: String,
-    pub dns: Option<String>,
-    pub route_all_traffic: bool,
-}
-
-/// Common fields for Connection and TunnelConnection due to shared command
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommonConnection<I = NoId> {
-    pub id: I,
-    pub location_id: Id,
-    pub start: NaiveDateTime,
-    pub end: NaiveDateTime,
-    pub connection_type: ConnectionType,
-}
-
-// Common fields for LocationStats and TunnelStats due to shared command
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommonLocationStats<I = NoId> {
-    pub id: I,
-    pub location_id: Id,
-    pub upload: i64,
-    pub download: i64,
-    pub last_handshake: i64,
-    pub collected_at: NaiveDateTime,
-    pub listen_port: u32,
-    pub persistent_keepalive_interval: Option<u16>,
-    pub connection_type: ConnectionType,
-}
-
-// Common fields for ConnectionInfo and TunnelConnectionInfo due to shared command
-#[derive(Debug, Serialize)]
-pub struct CommonConnectionInfo {
-    pub id: Id,
-    pub location_id: Id,
-    pub start: NaiveDateTime,
-    pub end: NaiveDateTime,
-    pub upload: Option<i32>,
-    pub download: Option<i32>,
+/// Converts a tauri emit result into our error type.
+pub fn tauri_err_to_app_err(e: tauri::Error) -> defguard_client_core::error::Error {
+    defguard_client_core::error::Error::Tauri(e.to_string())
 }

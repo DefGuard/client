@@ -52,24 +52,30 @@ fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
 /// Generate contents of system tray menu.
 async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error> {
     debug!("Generating tray menu.");
-    let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)?;
-    let hide = MenuItem::with_id(app, TRAY_EVENT_HIDE, "Hide", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
+    let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
+    let hide = MenuItem::with_id(app, TRAY_EVENT_HIDE, "Hide", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
     let subscribe_updates = MenuItem::with_id(
         app,
         TRAY_EVENT_UPDATES,
         "Subscribe for updates",
         true,
         None::<&str>,
-    )?;
+    )
+    .map_err(crate::tauri_err_to_app_err)?;
     let join_community = MenuItem::with_id(
         app,
         TRAY_EVENT_COMMUNITY,
         "Community support",
         true,
         None::<&str>,
-    )?;
-    let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)?;
+    )
+    .map_err(crate::tauri_err_to_app_err)?;
+    let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
 
     let mut menu = MenuBuilder::new(app);
     debug!("Getting all instances information for the tray menu");
@@ -94,7 +100,8 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                         location.menu_label(),
                         true,
                         None::<&str>,
-                    )?;
+                    )
+                    .map_err(crate::tauri_err_to_app_err)?;
                     menu = menu.item(&menu_item);
                 }
             } else {
@@ -114,10 +121,11 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                             location.menu_label(),
                             true,
                             None::<&str>,
-                        )?;
+                        )
+                        .map_err(crate::tauri_err_to_app_err)?;
                         instance_menu = instance_menu.item(&menu_item);
                     }
-                    let submenu = instance_menu.build()?;
+                    let submenu = instance_menu.build().map_err(crate::tauri_err_to_app_err)?;
                     menu = menu.item(&submenu);
                 }
             }
@@ -134,7 +142,8 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         .items(&[&subscribe_updates, &join_community, &follow_us])
         .separator()
         .item(&quit)
-        .build()?)
+        .build()
+        .map_err(crate::tauri_err_to_app_err)?)
 }
 
 /// Setup system tray.
@@ -197,8 +206,8 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
             }
         })
         .on_menu_event(handle_tray_menu_event)
-        .build(app)?;
-
+        .build(app)
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Tray menu successfully generated");
     Ok(())
 }
@@ -296,8 +305,10 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
         .path()
         .resolve(&resource_str, BaseDirectory::Resource)
     {
-        let icon = Image::from_path(icon_path)?;
-        tray_icon.set_icon(Some(icon))?;
+        let icon = Image::from_path(icon_path).map_err(crate::tauri_err_to_app_err)?;
+        tray_icon
+            .set_icon(Some(icon))
+            .map_err(crate::tauri_err_to_app_err)?;
         debug!("Tray icon set to {resource_str} successfully.");
         Ok(())
     } else {

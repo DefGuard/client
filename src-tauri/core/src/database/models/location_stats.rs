@@ -6,18 +6,18 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{location::Location, Id, NoId, PURGE_DURATION};
-use crate::{commands::DateTimeAggregation, error::Error, CommonLocationStats, ConnectionType};
+use crate::{error::Error, CommonLocationStats, ConnectionType, DateTimeAggregation};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {
     id: I,
-    pub(crate) location_id: Id,
+    pub location_id: Id,
     upload: i64,
     download: i64,
-    pub(crate) last_handshake: i64,
-    pub(crate) collected_at: NaiveDateTime,
+    pub last_handshake: i64,
+    pub collected_at: NaiveDateTime,
     listen_port: u32,
-    pub(crate) persistent_keepalive_interval: Option<u16>,
+    pub persistent_keepalive_interval: Option<u16>,
 }
 
 impl From<LocationStats<Id>> for CommonLocationStats<Id> {
@@ -61,7 +61,7 @@ where
 impl LocationStats {
     // Although not used on macOS, allow dead code for `sqlx prepare`.
     #[cfg_attr(target_os = "macos", allow(dead_code))]
-    pub(crate) async fn get_name<'e, E>(&self, executor: E) -> Result<String, sqlx::Error>
+    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -73,7 +73,7 @@ impl LocationStats {
 
 impl LocationStats<NoId> {
     #[must_use]
-    pub(crate) fn new(
+    pub fn new(
         location_id: Id,
         upload: i64,
         download: i64,
@@ -93,7 +93,7 @@ impl LocationStats<NoId> {
         }
     }
 
-    pub(crate) async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
     where
         E: SqliteExecutor<'e>,
     {
@@ -127,7 +127,7 @@ impl LocationStats<NoId> {
 }
 
 impl LocationStats<Id> {
-    pub(crate) async fn all_by_location_id<'e, E>(
+    pub async fn all_by_location_id<'e, E>(
         executor: E,
         location_id: Id,
         from: &NaiveDateTime,
@@ -168,7 +168,7 @@ impl LocationStats<Id> {
         Ok(stats)
     }
 
-    pub(crate) async fn latest_by_download_change<'e, E>(
+    pub async fn latest_by_download_change<'e, E>(
         executor: E,
         location_id: Id,
     ) -> Result<Option<Self>, Error>

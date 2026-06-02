@@ -163,9 +163,11 @@ pub async fn poll_instance(
                 disabling.",
                 instance.name, instance.id
             );
-            instance
-                .disable_enterprise_features(transaction.as_mut())
-                .await?;
+            crate::enterprise::models::instance::disable_enterprise_features(
+                instance,
+                transaction.as_mut(),
+            )
+            .await?;
         } else {
             debug!(
                 "Instance {}({}) has enterprise features disabled, and we have them disabled as \
