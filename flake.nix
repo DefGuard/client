@@ -41,17 +41,36 @@
       };
 
       craneLib = crane.mkLib pkgs;
+
+      defguard-client = pkgs.callPackage ./nix/package.nix {
+        inherit pkgs craneLib;
+      };
     in {
       devShells.default = import ./nix/shell.nix {
         pkgs = devPkgs;
         inherit crane;
       };
 
-      packages.default = pkgs.callPackage ./nix/package.nix {
-        inherit pkgs craneLib;
+      packages = {
+        default = defguard-client;
+        inherit defguard-client;
+        defguard-service =
+          pkgs.runCommand "defguard-service" {
+            nativeBuildInputs = [pkgs.makeWrapper];
+          } ''
+            mkdir -p $out/bin
+            cp ${defguard-client}/bin/defguard-service $out/bin/
+          '';
+        dg =
+          pkgs.runCommand "dg" {
+            nativeBuildInputs = [pkgs.makeWrapper];
+          } ''
+            mkdir -p $out/bin
+            cp ${defguard-client}/bin/dg $out/bin/
+          '';
       };
 
-      checks.default = self.packages.${system}.default;
+      checks.default = defguard-client;
 
       formatter = pkgs.alejandra;
     })
