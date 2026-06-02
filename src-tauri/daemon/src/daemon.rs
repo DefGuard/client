@@ -30,7 +30,7 @@ use tracing::{debug, error, info, info_span, Instrument};
 use crate::config::Config;
 #[cfg(windows)]
 use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-use crate::version::VERSION;
+use crate::VERSION;
 use defguard_client_proto::defguard::client::v1::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
