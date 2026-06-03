@@ -4,6 +4,10 @@ use std::{
     time::Duration,
 };
 
+pub use defguard_client_config_sync::commands::{
+    disable_enterprise_features, do_update_instance, locations_changed,
+};
+use defguard_client_config_sync::{config_changed, fetch_instance_config};
 use defguard_client_core::{
     connection::active_connections::active_connections,
     database::{
@@ -13,10 +17,6 @@ use defguard_client_core::{
     error::Error,
     events::EventKey,
 };
-pub use defguard_config_sync::commands::{
-    disable_enterprise_features, do_update_instance, locations_changed,
-};
-use defguard_config_sync::{config_changed, fetch_instance_config};
 use log::{debug, error, info};
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter};

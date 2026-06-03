@@ -22,7 +22,7 @@ use crate::{
     daemon::{run_server, DaemonError},
     utils::logging_setup,
 };
-use defguard_service_locations::{
+use defguard_client_service_locations::{
     windows::{watch_for_login_logoff, watch_for_network_change},
     ServiceLocationError, ServiceLocationManager,
 };

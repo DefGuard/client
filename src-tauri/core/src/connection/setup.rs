@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use std::process::Command;
 
-use common::{find_free_tcp_port, get_interface_name};
+use defguard_client_common::{find_free_tcp_port, get_interface_name};
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use tonic::Code;
 

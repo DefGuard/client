@@ -1,4 +1,4 @@
-pub use defguard_provisioning::{try_get_provisioning_config, ProvisioningConfig};
+pub use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
 
 use tauri::{AppHandle, Manager};
 

@@ -1045,13 +1045,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "2.1.0"
-dependencies = [
- "nix 0.31.3",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1415,14 +1408,14 @@ dependencies = [
  "block2 0.6.2",
  "chrono",
  "clap",
- "common",
  "dark-light",
+ "defguard-client-common",
+ "defguard-client-config-sync",
  "defguard-client-core",
+ "defguard-client-posture",
  "defguard-client-proto",
- "defguard-config-sync",
- "defguard-posture",
- "defguard-provisioning",
- "defguard-service-locations",
+ "defguard-client-provisioning",
+ "defguard-client-service-locations",
  "defguard_wireguard_rs",
  "dirs-next",
  "futures-core",
@@ -1483,13 +1476,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-client-common"
+version = "2.1.0"
+dependencies = [
+ "nix 0.31.3",
+]
+
+[[package]]
+name = "defguard-client-config-sync"
+version = "2.1.0"
+dependencies = [
+ "defguard-client-core",
+ "defguard-client-proto",
+ "defguard-client-service-locations",
+ "log",
+ "reqwest 0.13.4",
+ "semver",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "defguard-client-core"
 version = "2.1.0"
 dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
  "chrono",
- "common",
+ "defguard-client-common",
  "defguard-client-proto",
  "defguard_wireguard_rs",
  "dirs-next",
@@ -1520,6 +1537,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-client-posture"
+version = "2.1.0"
+dependencies = [
+ "defguard-client-core",
+ "defguard-client-proto",
+ "log",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "sysinfo",
+]
+
+[[package]]
 name = "defguard-client-proto"
 version = "2.1.0"
 dependencies = [
@@ -1534,58 +1564,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "defguard-config-sync"
-version = "2.1.0"
-dependencies = [
- "defguard-client-core",
- "defguard-client-proto",
- "defguard-service-locations",
- "log",
- "reqwest 0.13.4",
- "semver",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "tonic",
-]
-
-[[package]]
-name = "defguard-dg"
-version = "2.1.0"
-dependencies = [
- "clap",
- "common",
- "defguard_wireguard_rs",
- "dirs-next",
- "prost",
- "reqwest 0.13.4",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "defguard-posture"
-version = "2.1.0"
-dependencies = [
- "defguard-client-core",
- "defguard-client-proto",
- "log",
- "reqwest 0.13.4",
- "serde",
- "serde_json",
- "sysinfo",
-]
-
-[[package]]
-name = "defguard-provisioning"
+name = "defguard-client-provisioning"
 version = "2.1.0"
 dependencies = [
  "defguard-client-core",
@@ -1595,16 +1574,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "defguard-service"
+name = "defguard-client-service"
 version = "2.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
  "clap",
- "common",
+ "defguard-client-common",
+ "defguard-client-posture",
  "defguard-client-proto",
- "defguard-posture",
- "defguard-service-locations",
+ "defguard-client-service-locations",
  "defguard_wireguard_rs",
  "futures-core",
  "log",
@@ -1623,11 +1602,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "defguard-service-locations"
+name = "defguard-client-service-locations"
 version = "2.1.0"
 dependencies = [
  "base64 0.22.1",
- "common",
+ "defguard-client-common",
  "defguard-client-core",
  "defguard-client-proto",
  "defguard_wireguard_rs",
@@ -1641,6 +1620,27 @@ dependencies = [
  "windows-acl",
  "windows-service",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "defguard-dg"
+version = "2.1.0"
+dependencies = [
+ "clap",
+ "defguard-client-common",
+ "defguard_wireguard_rs",
+ "dirs-next",
+ "prost",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

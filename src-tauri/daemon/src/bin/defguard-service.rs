@@ -7,7 +7,7 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     use clap::Parser;
-    use defguard_service::{config::Config, daemon::run_server, utils::logging_setup};
+    use defguard_client_service::{config::Config, daemon::run_server, utils::logging_setup};
 
     // parse config
     let config: Config = Config::parse();
@@ -21,5 +21,5 @@ async fn main() -> anyhow::Result<()> {
 
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    defguard_service::windows::run()
+    defguard_client_service::windows::run()
 }

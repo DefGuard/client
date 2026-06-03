@@ -3,13 +3,18 @@ members = ["cli", "common", "client-proto", "core", "daemon", "enterprise/postur
 default-members = [".", "cli", "daemon"]
 
 [workspace.dependencies]
+base64 = "0.22"
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 defguard_wireguard_rs = "0.9"
 dirs-next = "2.0"
+log = { version = "0.4", features = ["serde"] }
 prost = "0.14"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
+semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_with = "3.11"
+sqlx = { version = "0.8", features = ["chrono", "runtime-tokio", "sqlite", "uuid", "macros"] }
 thiserror = "2.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { version = "0.14", default-features = false, features = [
@@ -55,37 +60,31 @@ vergen-git2 = { version = "9.1", features = ["build"] }
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.22"
+base64.workspace = true
 clap.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 defguard-client-proto = { path = "client-proto" }
 defguard-client-core = { path = "core" }
-defguard-posture = { path = "enterprise/posture" }
-defguard-config-sync = { path = "enterprise/config-sync" }
-defguard-service-locations = { path = "enterprise/service-locations" }
-defguard-provisioning = { path = "enterprise/provisioning" }
-common = { path = "common" }
+defguard-client-posture = { path = "enterprise/posture" }
+defguard-client-config-sync = { path = "enterprise/config-sync" }
+defguard-client-service-locations = { path = "enterprise/service-locations" }
+defguard-client-provisioning = { path = "enterprise/provisioning" }
+defguard-client-common = { path = "common" }
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 hyper-util = "0.1"
-log = { version = "0.4", features = ["serde"] }
+log.workspace = true
 os_info = { version = "3.14", default-features = false }
 prost.workspace = true
 regex = "1.12"
 reqwest.workspace = true
 rust-ini = "0.21"
-semver = "1.0"
+semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_with = "3.11"
-sqlx = { version = "0.8", features = [
-    "chrono",
-    "sqlite",
-    "runtime-tokio",
-    "uuid",
-    "macros",
-] }
+serde_with.workspace = true
+sqlx.workspace = true
 struct-patch = "0.12"
 strum = { version = "0.28", features = ["derive"] }
 sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }

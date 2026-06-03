@@ -8,5 +8,5 @@ pub mod named_pipe;
 #[cfg(windows)]
 pub mod windows;
 
-pub use common::VERSION;
+pub use defguard_client_common::VERSION;
 pub use error::Error;

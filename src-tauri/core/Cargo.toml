@@ -9,28 +9,22 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-base64 = "0.22"
+base64.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
-common = { path = "../common" }
+defguard-client-common = { path = "../common" }
 defguard-client-proto = { path = "../client-proto" }
 defguard_wireguard_rs.workspace = true
 dirs-next.workspace = true
-log = { version = "0.4", features = ["serde"] }
+log.workspace = true
 os_info = { version = "3.14", default-features = false }
 prost.workspace = true
 reqwest.workspace = true
 rust-ini = "0.21"
-semver = "1.0"
+semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_with = "3.11"
-sqlx = { version = "0.8", features = [
-    "chrono",
-    "sqlite",
-    "runtime-tokio",
-    "uuid",
-    "macros",
-] }
+serde_with.workspace = true
+sqlx.workspace = true
 strum = { version = "0.28", features = ["derive"] }
 struct-patch = "0.12"
 thiserror.workspace = true

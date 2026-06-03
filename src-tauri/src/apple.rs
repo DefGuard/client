@@ -15,7 +15,7 @@ use std::{
 };
 
 use block2::RcBlock;
-use common::dns_owned;
+use defguard_client_common::dns_owned;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
 use objc2::{
     rc::Retained,

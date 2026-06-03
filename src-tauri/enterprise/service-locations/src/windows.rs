@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use common::{dns_borrow, find_free_tcp_port, get_interface_name};
+use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use defguard_client_proto::defguard::client::v1::{ServiceLocation, ServiceLocationMode};
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,

@@ -18,7 +18,7 @@ use sqlx::{Sqlite, SqliteExecutor, Transaction};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-use defguard_service_locations::to_service_location;
+use defguard_client_service_locations::to_service_location;
 
 pub async fn locations_changed(
     transaction: &mut Transaction<'_, Sqlite>,

@@ -1,5 +1,5 @@
 [package]
-name = "defguard-provisioning"
+name = "defguard-client-provisioning"
 description = "Zero-touch provisioning for the Defguard desktop client"
 authors.workspace = true
 edition.workspace = true
@@ -10,6 +10,6 @@ version.workspace = true
 
 [dependencies]
 defguard-client-core = { path = "../../core" }
-log = { version = "0.4", features = ["serde"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -7,7 +7,7 @@ use std::{
 #[cfg(unix)]
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
-use common::dns_borrow;
+use defguard_client_common::dns_borrow;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, Kernel, WGApi, WireguardInterfaceApi,
 };
@@ -31,17 +31,17 @@ use crate::config::Config;
 #[cfg(windows)]
 use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
 use crate::VERSION;
+#[cfg(windows)]
+use defguard_client_posture::inspector::device_posture_data;
 use defguard_client_proto::defguard::client::v1::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
     RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
 use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
+use defguard_client_service_locations::ServiceLocationError;
 #[cfg(windows)]
-use defguard_posture::inspector::device_posture_data;
-use defguard_service_locations::ServiceLocationError;
-#[cfg(windows)]
-use defguard_service_locations::ServiceLocationManager;
+use defguard_client_service_locations::ServiceLocationManager;
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -562,7 +562,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
-        .trace_fn(|_| tracing::info_span!("defguard_service"))
+        .trace_fn(|_| tracing::info_span!("defguard_client_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
         .serve_with_incoming(uds_stream)
         .await?;
@@ -584,7 +584,7 @@ pub(crate) async fn run_server(
     debug!("Defguard daemon configuration: {config:?}");
 
     Server::builder()
-        .trace_fn(|_| tracing::info_span!("defguard_service"))
+        .trace_fn(|_| tracing::info_span!("defguard_client_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
         .serve_with_incoming(stream)
         .await?;

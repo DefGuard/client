@@ -12,7 +12,7 @@ tonic-prost-build.workspace = true
 
 [dependencies]
 clap.workspace = true
-common = { path = "../common" }
+common = { package = "defguard-client-common", path = "../common" }
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 prost.workspace = true

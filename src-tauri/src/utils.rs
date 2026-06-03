@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::{env, path::Path, process::Command};
 
 #[cfg(not(target_os = "macos"))]
-use common::{find_free_tcp_port, get_interface_name};
+use defguard_client_common::{find_free_tcp_port, get_interface_name};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use sqlx::query;
