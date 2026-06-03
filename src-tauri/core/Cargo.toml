@@ -36,7 +36,7 @@ x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secret
 hyper-util = "0.1"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", features = ["user", "fs"] }
+nix = { version = "0.31", features = ["user", "fs", "net"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation"] }
