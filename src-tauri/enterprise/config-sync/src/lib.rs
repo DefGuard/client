@@ -1,137 +1,63 @@
 #[macro_use]
 extern crate log;
 
-use std::{
-    cmp::Ordering,
-    collections::HashSet,
-    str::FromStr,
-    sync::{LazyLock, Mutex},
-    time::Duration,
-};
+use std::cmp::Ordering;
+use std::str::FromStr;
 
 pub mod commands;
 
 use defguard_client_core::{
-    connection::active_connections::active_connections,
-    database::{
-        models::{instance::Instance, Id},
-        DB_POOL,
-    },
+    database::models::{instance::Instance, Id},
     error::Error,
-    events::EventKey,
     proxy::post_with_headers,
     version::{MIN_CORE_VERSION, MIN_PROXY_VERSION},
 };
-use defguard_client_proto::defguard::client_types::{
-    DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse,
-};
-use reqwest::StatusCode;
+use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
+use reqwest::{StatusCode, Url};
+use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
-use tauri::{AppHandle, Emitter, Url};
-use tokio::time::sleep;
 
-use crate::commands::{disable_enterprise_features, do_update_instance, locations_changed};
+use crate::commands::disable_enterprise_features;
 
-const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
-/// Periodically retrieves and updates configuration for all [`Instance`]s.
-/// Updates are only performed if no connections are established to the [`Instance`],
-/// otherwise event is emmited and UI message is displayed.
-pub async fn poll_config(handle: AppHandle) {
-    debug!("Starting the configuration polling loop.");
-    // Polling starts sooner than app's frontend may load in dev builds, causing events (toasts) to be lost,
-    // you may want to wait here before starting if you want to debug it.
-    loop {
-        let Ok(mut transaction) = DB_POOL.begin().await else {
-            error!(
-                "Failed to begin database transaction for config polling, retrying in {}s",
-                INTERVAL_SECONDS.as_secs()
-            );
-            sleep(INTERVAL_SECONDS).await;
-            continue;
-        };
-        let Ok(mut instances) = Instance::all_with_token(&mut *transaction).await else {
-            error!(
-                "Failed to retireve instances for config polling, retrying in {}s",
-                INTERVAL_SECONDS.as_secs()
-            );
-            let _ = transaction.rollback().await;
-            sleep(INTERVAL_SECONDS).await;
-            continue;
-        };
-        debug!(
-            "Found {} instances with a config polling token, proceeding with polling their \
-            configuration.",
-            instances.len()
-        );
-        let mut config_retrieved = 0;
-        for instance in &mut instances {
-            if instance.token.is_some() {
-                if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
-                    match err {
-                        Error::CoreNotEnterprise => {
-                            debug!(
-                                "Tried to contact core for instance {instance} config but it's not \
-                                enterprise, can't retrieve config"
-                            );
-                        }
-                        Error::NoToken => {
-                            debug!(
-                                "Instance {instance} has no token, can't retrieve its config from \
-                                the core",
-                            );
-                        }
-                        _ => {
-                            error!(
-                                "Failed to retrieve instance {instance} config from core: {err}"
-                            );
-                        }
-                    }
-                } else {
-                    config_retrieved += 1;
-                    debug!(
-                        "Finished processing configuration polling request for instance {instance}"
-                    );
-                }
-            }
-        }
-        if let Err(err) = transaction.commit().await {
-            error!(
-                "Failed to commit config polling transaction, configuration won't be updated: \
-                {err}"
-            );
-        }
-        if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
-            error!("Failed to emit instance update event to the frontend: {err}");
-        }
-        if config_retrieved > 0 {
-            info!(
-                "Automatically retrieved the newest instance configuration from core for \
-                {config_retrieved} instances, sleeping for {}s",
-                INTERVAL_SECONDS.as_secs(),
-            );
-            debug!("Instances for which configuration was retrieved from core: {instances:?}");
-        } else {
-            debug!(
-                "No configuration updates retrieved, sleeping {}s",
-                INTERVAL_SECONDS.as_secs(),
-            );
-        }
-        sleep(INTERVAL_SECONDS).await;
-    }
+const CORE_VERSION_HEADER: &str = "defguard-core-version";
+const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
+const PROXY_VERSION_HEADER: &str = "defguard-component-version";
+
+/// Result of a successful config fetch from the proxy.
+#[derive(Debug)]
+pub struct FetchedConfig {
+    pub response: InstanceInfoResponse,
+    pub version_mismatch: Option<VersionMismatchPayload>,
 }
 
-/// Retrieves configuration for given [`Instance`].
-/// Updates the instance if there aren't any active connections, otherwise displays UI message.
-pub async fn poll_instance(
+/// Payload emitted when a version mismatch is detected.
+#[derive(Clone, Debug, Serialize)]
+pub struct VersionMismatchPayload {
+    pub instance_name: String,
+    pub instance_id: Id,
+    pub core_version: String,
+    pub proxy_version: String,
+    pub core_required_version: String,
+    pub proxy_required_version: String,
+    pub core_compatible: bool,
+    pub proxy_compatible: bool,
+}
+
+/// Talks to the proxy for a single instance: builds the request, POSTs it,
+/// handles 402 PAYMENT_REQUIRED by disabling enterprise features, parses the
+/// response, and checks the version headers.
+///
+/// Does **not** apply config changes or emit events — those are the caller's
+/// responsibility.
+pub async fn fetch_instance_config(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
-    handle: &AppHandle,
-) -> Result<(), Error> {
+) -> Result<FetchedConfig, Error> {
     debug!("Getting config from core for instance {}", instance.name);
-    // Query proxy api
+
     let request = build_request(instance)?;
     let url = Url::from_str(&instance.proxy_url)
         .and_then(|url| url.join(POLLING_ENDPOINT))
@@ -141,8 +67,7 @@ pub async fn poll_instance(
                 instance.proxy_url
             ))
         })?;
-    let response = post_with_headers(url, &request).await;
-    let response = response.map_err(|err| {
+    let response = post_with_headers(url, &request).await.map_err(|err| {
         Error::InternalError(format!(
             "HTTP request failed for instance {}({}), url: {}, {err}",
             instance.name, instance.id, instance.proxy_url
@@ -153,7 +78,7 @@ pub async fn poll_instance(
         instance.name
     );
 
-    check_min_version(&response, instance, handle);
+    let version_mismatch = check_min_version(&response, instance);
 
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
@@ -190,65 +115,34 @@ pub async fn poll_instance(
             instance.name, instance.id,
         ))
     })?;
-    let device_config = response
-        .device_config
-        .as_ref()
-        .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+
+    if response.device_config.is_none() {
+        return Err(Error::InternalError(
+            "Device config not present in response".to_string(),
+        ));
+    }
+
     debug!("Parsed the config for instance {}", instance.name);
-    trace!("Parsed config: {device_config:?}");
+    trace!("Parsed config: {:?}", response.device_config);
 
-    // Early return if config didn't change
-    if !config_changed(transaction, instance, device_config).await? {
-        debug!(
-            "Config for instance {}({}) didn't change",
-            instance.name, instance.id
-        );
-        return Ok(());
-    }
-
-    debug!(
-        "Config for instance {}({}) changed",
-        instance.name, instance.id
-    );
-
-    // Config changed. If there are no active connections for this instance, update the database.
-    // Otherwise just display a message to reconnect.
-    //
-    if active_connections(instance).await?.is_empty() {
-        debug!(
-            "Updating instance {}({}) configuration: {device_config:?}",
-            instance.name, instance.id,
-        );
-        do_update_instance(transaction, instance, device_config.clone()).await?;
-        info!(
-            "Updated instance {}({}) configuration based on core's response",
-            instance.name, instance.id
-        );
-    } else {
-        debug!(
-            "Emitting config-changed event for instance {}({})",
-            instance.name, instance.id,
-        );
-        let _ = handle.emit(EventKey::ConfigChanged.into(), &instance.name);
-        info!(
-            "Emitted config-changed event for instance {}({})",
-            instance.name, instance.id,
-        );
-    }
-
-    Ok(())
+    Ok(FetchedConfig {
+        response,
+        version_mismatch,
+    })
 }
 
-async fn config_changed(
+/// Checks if config has changed compared to what's in the database.
+pub async fn config_changed(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
-    device_config: &DeviceConfigResponse,
+    device_config: &defguard_client_proto::defguard::client_types::DeviceConfigResponse,
 ) -> Result<bool, Error> {
     debug!(
         "Checking if config and any of the locations changed for instance {}({})",
         instance.name, instance.id
     );
-    let locations_changed = locations_changed(transaction, instance, device_config).await?;
+    let locations_changed =
+        commands::locations_changed(transaction, instance, device_config).await?;
     let info_changed = match &device_config.instance {
         Some(info) => instance != info,
         None => false,
@@ -260,6 +154,8 @@ async fn config_changed(
     Ok(locations_changed || info_changed)
 }
 
+// --- private helpers -------------------------------------------------------
+
 /// Retrieves token to build InstanceInfoRequest
 fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
     let token = instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
@@ -269,39 +165,16 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
     })
 }
 
-/// Tracks instance IDs that for which we already sent notification about version mismatches
-/// to prevent duplicate notifications in the app's lifetime.
-static NOTIFIED_INSTANCES: LazyLock<Mutex<HashSet<Id>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
-
-const CORE_VERSION_HEADER: &str = "defguard-core-version";
-const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
-const PROXY_VERSION_HEADER: &str = "defguard-component-version";
-
-#[derive(Clone, Serialize)]
-struct VersionMismatchPayload {
-    instance_name: String,
-    instance_id: Id,
-    core_version: String,
-    proxy_version: String,
-    core_required_version: String,
-    proxy_required_version: String,
-    core_compatible: bool,
-    proxy_compatible: bool,
-}
-
-fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, handle: &AppHandle) {
-    let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
-    if notified_instances.contains(&instance.id) {
-        debug!(
-            "Instance {}({}) already notified about version mismatch, skipping",
-            instance.name, instance.id
-        );
-        return;
-    }
-
+/// Checks response headers for version compatibility.
+/// Pure — returns `Some(payload)` when versions are incompatible, `None` when
+/// everything is compatible or headers are missing.
+fn check_min_version(
+    response: &reqwest::Response,
+    instance: &Instance<Id>,
+) -> Option<VersionMismatchPayload> {
     let detected_core_version: String;
     let detected_proxy_version: String;
+
     let defguard_core_connected: Option<bool> = response
         .headers()
         .get(CORE_CONNECTED_HEADER)
@@ -316,7 +189,7 @@ fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, hand
 
     let core_compatible = if let Some(core_version) = response.headers().get(CORE_VERSION_HEADER) {
         if let Ok(core_version) = core_version.to_str() {
-            if let Ok(core_version) = semver::Version::from_str(core_version) {
+            if let Ok(core_version) = Version::from_str(core_version) {
                 detected_core_version = core_version.to_string();
                 core_version.cmp_precedence(&MIN_CORE_VERSION) != Ordering::Less
             } else {
@@ -349,13 +222,13 @@ fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, hand
     let proxy_compatible = if let Some(proxy_version) = response.headers().get(PROXY_VERSION_HEADER)
     {
         if let Ok(proxy_version) = proxy_version.to_str() {
-            if let Ok(proxy_version) = semver::Version::from_str(proxy_version) {
+            if let Ok(proxy_version) = Version::from_str(proxy_version) {
                 detected_proxy_version = proxy_version.to_string();
                 proxy_version.cmp_precedence(&MIN_PROXY_VERSION) != Ordering::Less
             } else {
                 warn!(
-                    "Proxy version header not a valid semver string in response for instance {}({}): \
-                    '{proxy_version}'",
+                    "Proxy version header not a valid semver string in response for instance \
+                        {}({}): '{proxy_version}'",
                     instance.name, instance.id
                 );
                 detected_proxy_version = proxy_version.to_string();
@@ -364,7 +237,7 @@ fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, hand
         } else {
             warn!(
                 "Proxy version header not a valid string in response for instance {}({}): \
-                '{proxy_version:?}'",
+                    '{proxy_version:?}'",
                 instance.name, instance.id
             );
             detected_proxy_version = "unknown".to_string();
@@ -411,7 +284,7 @@ fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, hand
             instance.name,
         );
 
-        let payload = VersionMismatchPayload {
+        Some(VersionMismatchPayload {
             instance_name: instance.name.clone(),
             instance_id: instance.id,
             core_version: detected_core_version,
@@ -420,11 +293,8 @@ fn check_min_version(response: &reqwest::Response, instance: &Instance<Id>, hand
             proxy_required_version: MIN_PROXY_VERSION.to_string(),
             core_compatible,
             proxy_compatible,
-        };
-        if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload) {
-            error!("Failed to emit version mismatch event to the frontend: {err}");
-        } else {
-            notified_instances.insert(instance.id);
-        }
+        })
+    } else {
+        None
     }
 }

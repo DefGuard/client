@@ -81,19 +81,15 @@ impl fmt::Debug for SingleServiceLocationData {
     }
 }
 
-pub fn to_service_location(
-    location: &Location<Id>,
-) -> Result<ServiceLocation, CoreError> {
+pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, CoreError> {
     if !location.is_service_location() {
         log::warn!(
             "Location {location} is not a service location, so it can't be converted to one."
         );
-        return Err(CoreError::ConversionError(
-            format!(
+        return Err(CoreError::ConversionError(format!(
             "Failed to convert location {location} to a service location as it's either not marked \
             as one or has MFA enabled."
-        ),
-        ));
+        )));
     }
 
     let mode = match location.service_location_mode {
@@ -102,13 +98,11 @@ pub fn to_service_location(
             "Location {location} has an invalid service location mode, so it can't be converted to \
             one."
         );
-            return Err(CoreError::ConversionError(
-                format!(
+            return Err(CoreError::ConversionError(format!(
                 "Location {location} has an invalid service location mode ({:?}), so it can't be \
                 converted to one.",
                 location.service_location_mode
-            ),
-            ));
+            )));
         }
         ServiceLocationMode::PreLogon => 0,
         ServiceLocationMode::AlwaysOn => 1,

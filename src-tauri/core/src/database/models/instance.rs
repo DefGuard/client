@@ -101,6 +101,22 @@ impl Instance<Id> {
         Ok(instance)
     }
 
+    pub async fn find_by_name<'e, E>(executor: E, name: &str) -> Result<Option<Self>, sqlx::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let instance = query_as!(
+            Self,
+            "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
+            client_traffic_policy, enterprise_enabled, openid_display_name \
+            FROM instance WHERE name = $1;",
+            name
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(instance)
+    }
+
     pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), sqlx::Error>
     where
         E: SqliteExecutor<'e>,

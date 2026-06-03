@@ -1546,7 +1546,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "tauri",
  "tokio",
  "tonic",
 ]
