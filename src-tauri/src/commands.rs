@@ -52,9 +52,7 @@ use crate::{
 use crate::{
     service::{
         client::DAEMON_CLIENT,
-        proto::defguard::client::v1::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-        },
+        proto::defguard::client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
     },
     utils::execute_command,
 };
@@ -968,27 +966,13 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
         );
     }
     for location in instance_locations {
-        if let Some(connection) = app_state
+        if let Some(_connection) = app_state
             .remove_connection(location.id, ConnectionType::Location)
             .await
         {
             debug!("Found active connection for location {location}, closing...");
-            let request = RemoveInterfaceRequest {
-                interface_name: connection.interface_name.clone(),
-                endpoint: location.endpoint.clone(),
-            };
-            client.remove_interface(request).await.map_err(|status| {
-                error!(
-                    "Error occurred while removing interface {} for location {location}, \
-                    status: {status}",
-                    connection.interface_name
-                );
-                Error::InternalError(format!(
-                    "There was an error while removing interface for location {location}, \
-                    error message: {}. Check logs for more details.",
-                    status.message()
-                ))
-            })?;
+            use defguard_client_core::connection::{tear_down, ConnectionTarget};
+            tear_down(ConnectionTarget::Location(&location)).await?;
             info!(
                 "The connection to location {location} has been closed, as it was associated \
                 with the instance {instance} that is being deleted."
@@ -1152,27 +1136,8 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                     connection.interface_name
                 );
             }
-            let request = RemoveInterfaceRequest {
-                interface_name: connection.interface_name.clone(),
-                endpoint: tunnel.endpoint.clone(),
-            };
-            DAEMON_CLIENT
-                .clone()
-                .remove_interface(request)
-                .await
-                .map_err(|status| {
-                    error!(
-                        "An error occurred while removing interface {} for tunnel {tunnel}, \
-                        status: {status}",
-                        connection.interface_name
-                    );
-                    Error::InternalError(format!(
-                        "An error occurred while removing interface {} for tunnel {tunnel}, error \
-                        message: {}. Check logs for more details.",
-                        connection.interface_name,
-                        status.message()
-                    ))
-                })?;
+            use defguard_client_core::connection::{tear_down, ConnectionTarget};
+            tear_down(ConnectionTarget::Tunnel(&tunnel)).await?;
             info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",

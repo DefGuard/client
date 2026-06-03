@@ -139,9 +139,9 @@ pub async fn tear_down(target: ConnectionTarget<'_>) -> Result<(), Error> {
     }
 }
 
-// Legacy re-exports - used by the desktop root crate (src/utils.rs).
+// Legacy re-exports - now pub(crate) since desktop migrated to bring_up / tear_down.
 #[cfg(not(target_os = "macos"))]
-pub use setup::{disconnect_interface, execute_command, setup_interface, setup_interface_tunnel};
+pub(crate) use setup::disconnect_interface;
 
 #[cfg(target_os = "macos")]
 pub use apple::{

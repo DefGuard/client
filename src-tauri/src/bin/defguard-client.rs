@@ -89,6 +89,7 @@ async fn startup(app_handle: &AppHandle) {
         use defguard_client::{
             apple::get_managers_for_tunnels_and_locations, utils::get_all_tunnels_locations,
         };
+        use defguard_client_core::connection::sync_locations_and_tunnels;
 
         let semaphore = Arc::new(AtomicBool::new(false));
         let semaphore_clone = Arc::clone(&semaphore);
@@ -101,7 +102,7 @@ async fn startup(app_handle: &AppHandle) {
             .expect("failed to lock app state")
             .mtu();
         let handle = async_runtime::spawn(async move {
-            if let Err(err) = defguard_client::apple::sync_locations_and_tunnels(mtu).await {
+            if let Err(err) = sync_locations_and_tunnels(mtu).await {
                 error!("Failed to sync locations and tunnels: {err}");
             }
             semaphore_clone.store(true, Ordering::Release);
