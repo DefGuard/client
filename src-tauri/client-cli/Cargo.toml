@@ -1,0 +1,28 @@
+[package]
+name = "defguard-cli"
+description = "Command-line client for Defguard VPN — connect, disconnect, status"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file = "../../LICENSE.md"
+rust-version.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "defguard-cli"
+
+[dependencies]
+clap = { workspace = true, features = ["cargo", "derive", "env"] }
+common = { package = "defguard-client-common", path = "../common" }
+defguard_core = { package = "defguard-client-core", path = "../core" }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Dummy feature to let tauri build the release.
+[features]
+custom-protocol = []

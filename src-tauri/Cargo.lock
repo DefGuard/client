@@ -1399,6 +1399,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-cli"
+version = "2.1.0"
+dependencies = [
+ "clap",
+ "defguard-client-common",
+ "defguard-client-core",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "defguard-client"
 version = "2.1.0"
 dependencies = [

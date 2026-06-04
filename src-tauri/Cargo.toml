@@ -1,6 +1,6 @@
 [workspace]
-members = ["cli", "common", "client-proto", "core", "daemon", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
-default-members = [".", "cli", "daemon"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
+default-members = [".", "cli", "client-cli", "daemon"]
 
 [workspace.dependencies]
 base64 = "0.22"
