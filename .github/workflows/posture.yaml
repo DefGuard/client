@@ -34,6 +34,17 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
 
+      - name: Debug crypto block support
+        run: |
+          set -euo pipefail
+          uname -a
+          ls -l /dev/loop* /dev/loop-control || true
+          losetup -f || true
+          ls -l /dev/mapper /dev/mapper/control || true
+          cat /proc/devices | grep -E 'loop|device-mapper' || true
+          grep -E 'loop|dm_crypt|dm_mod' /proc/modules || true
+          lsblk -Jo NAME,FSTYPE,TYPE
+
       - name: Prepare block device support
         run: |
           set -euo pipefail
