@@ -50,3 +50,15 @@ impl From<Result<String, UnavailableReason>> for StringCheck {
         }
     }
 }
+
+/// Convert `WMIError` to `UnavailableReason`.
+#[cfg(windows)]
+impl From<wmi::WMIError> for UnavailableReason {
+    fn from(err: wmi::WMIError) -> Self {
+        if let wmi::WMIError::HResultError { .. } = err {
+            UnavailableReason::InsufficientPermissions
+        } else {
+            UnavailableReason::DetectionFailed
+        }
+    }
+}

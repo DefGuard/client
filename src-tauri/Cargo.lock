@@ -1563,6 +1563,7 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+ "wmi",
  "x25519-dalek",
 ]
 

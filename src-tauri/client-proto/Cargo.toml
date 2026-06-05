@@ -20,5 +20,8 @@ tonic-prost.workspace = true
 
 defguard_wireguard_rs.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+wmi = { version = "0.18", default-features = false }
+
 [dev-dependencies]
 x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
