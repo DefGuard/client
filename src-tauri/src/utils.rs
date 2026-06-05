@@ -526,7 +526,15 @@ pub(crate) async fn disconnect_interface(
                 return Err(Error::NotFound);
             };
 
-            tear_down(&interface_name, &location.endpoint).await?;
+            use defguard_client_core::connection::active_state::ActiveConnectionInfo;
+            let conn_info = ActiveConnectionInfo {
+                connection_type: ConnectionType::Location,
+                target_id: location.id,
+                name: location.name.clone(),
+                interface_name: interface_name.clone(),
+                stats: None,
+            };
+            tear_down(&conn_info, &DB_POOL).await?;
 
             let connection: Connection = active_connection.into();
             let connection = connection.save(&*DB_POOL).await?;
@@ -563,7 +571,15 @@ pub(crate) async fn disconnect_interface(
                 );
             }
 
-            tear_down(&interface_name, &tunnel.endpoint).await?;
+            use defguard_client_core::connection::active_state::ActiveConnectionInfo;
+            let conn_info = ActiveConnectionInfo {
+                connection_type: ConnectionType::Tunnel,
+                target_id: tunnel.id,
+                name: tunnel.name.clone(),
+                interface_name: interface_name.clone(),
+                stats: None,
+            };
+            tear_down(&conn_info, &DB_POOL).await?;
             if let Some(post_down) = &tunnel.post_down {
                 debug!(
                     "Executing defined PostDown command after removing the interface {} for the \

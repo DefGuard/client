@@ -1,9 +1,9 @@
 //! Reconstruct currently-active WireGuard connections by querying the platform backend.
 //!
 //! The daemon (Linux/Windows) and Network Extension managers (macOS) are the shared
-//! source of truth for interface state.  `active_state` enumerates candidate interfaces,
-//! queries live stats from the backend, and matches each peer's public key to a
-//! `Location` or `Tunnel` in the database.
+//! source of truth for interface state.  `active_state` calls the daemon's `ListInterfaces`
+//! RPC for an unfiltered snapshot of all managed interfaces, then matches each peer's
+//! public key to a `Location` or `Tunnel` in the database.
 
 use crate::{
     database::{
@@ -41,100 +41,78 @@ pub struct InterfaceStats {
 /// Query the platform backend for all currently-up WireGuard interfaces and match each
 /// peer back to a known `Location` or `Tunnel`.
 ///
-/// On Linux this enumerates interfaces whose name starts with `"wg"` via
-/// `nix::if_nameindex`, probes the daemon for each, and performs pubkey matching.
-/// On Windows and macOS the `#[cfg]` branches are stubbed; they follow the same
-/// pattern using platform-specific enumeration.
+/// On Linux/Windows this calls the daemon's `ListInterfaces` RPC, which returns an
+/// **unfiltered** snapshot of all managed interfaces (unlike `ReadInterfaceData`, which
+/// drops peers that haven't completed a handshake or whose stats haven't changed).
+///
+/// On macOS the Network Extension path is stubbed (pending the NE spike).
 pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
-    #[cfg(target_os = "linux")]
+    #[cfg(not(target_os = "macos"))]
     {
-        active_state_linux(pool).await
+        active_state_daemon(pool).await
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     {
-        // Stub: return empty for non-Linux platforms until per-platform
-        // enumeration is implemented (Phase 2 follow-up).
+        // Stub: NE-based enumeration pending the macOS spike.
         let _ = pool;
         Ok(Vec::new())
     }
 }
 
-#[cfg(target_os = "linux")]
-use sqlx;
-async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
-    use defguard_client_proto::defguard::client::v1::ReadInterfaceDataRequest;
+#[cfg(not(target_os = "macos"))]
+async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
+    use tonic::Code;
 
     use crate::connection::daemon_client::DAEMON_CLIENT;
 
-    let ifaces = nix::ifaddrs::getifaddrs().map_err(|err| {
-        log::error!("Failed to enumerate network interfaces: {err}");
-        Error::InternalError(format!("Failed to enumerate network interfaces: {err}"))
-    })?;
+    let request = tonic::Request::new(());
+    let response = DAEMON_CLIENT
+        .clone()
+        .list_interfaces(request)
+        .await
+        .map_err(|err| {
+            if err.code() == Code::Unavailable {
+                log::error!("Daemon unavailable: {err}");
+                Error::InternalError(
+                    "Background service is unavailable. Make sure the service is running.".into(),
+                )
+            } else {
+                log::error!("Failed to call ListInterfaces: {err}");
+                Error::InternalError(format!("ListInterfaces failed: {err}"))
+            }
+        })?;
+    let inner = response.into_inner();
+
+    log::info!(
+        "ListInterfaces returned {} managed interface(s)",
+        inner.interfaces.len()
+    );
 
     let mut results = Vec::new();
-    let mut seen = std::collections::HashSet::new();
 
-    for iface in ifaces {
-        let name = iface.interface_name;
-        if !name.starts_with("wg") {
+    for managed in &inner.interfaces {
+        let Some(iface_data) = &managed.data else {
             continue;
-        }
-
-        // Deduplicate: getifaddrs returns one entry per address family.
-        if !seen.insert(name.to_string()) {
-            continue;
-        }
-
-        log::info!("Probing daemon for WireGuard interface {name}");
-
-        let request = ReadInterfaceDataRequest {
-            interface_name: name.to_string(),
         };
 
-        let mut stream = match DAEMON_CLIENT.clone().read_interface_data(request).await {
-            Ok(response) => response.into_inner(),
-            Err(err) => {
-                log::warn!("Failed to connect to stats stream for interface {name}: {err}");
-                continue;
-            }
-        };
-
-        // Take only the first stream item — a one-shot stats snapshot.
-        let interface_data = match stream.message().await {
-            Ok(Some(data)) => data,
-            Ok(None) => {
-                log::debug!("Empty stats stream for interface {name}, skipping");
-                continue;
-            }
-            Err(err) => {
-                log::warn!("Error reading stats for interface {name}: {err}");
-                continue;
-            }
-        };
-
-        log::debug!(
-            "Received interface data for {name}: listen_port={}, peer_count={}",
-            interface_data.listen_port,
-            interface_data.peers.len()
-        );
-
-        for peer in &interface_data.peers {
+        for peer in &iface_data.peers {
             let public_key = &peer.public_key;
 
             // Try matching the peer to a Location first.
             match Location::find_by_public_key(pool, public_key).await {
                 Ok(location) => {
-                    log::debug!(
-                        "Matched interface {name} peer {public_key} to location {}",
-                        location.name
+                    log::info!(
+                        "Matched peer {public_key} to location {} (id={})",
+                        location.name,
+                        location.id
                     );
                     results.push(ActiveConnectionInfo {
                         connection_type: ConnectionType::Location,
                         target_id: location.id,
                         name: location.name.clone(),
-                        interface_name: name.to_string(),
-                        stats: peer_stats(&interface_data, peer),
+                        interface_name: managed.interface_name.clone(),
+                        stats: peer_stats(iface_data, peer),
                     });
                     continue;
                 }
@@ -150,16 +128,17 @@ async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, 
             // Then try matching to a Tunnel.
             match Tunnel::find_by_server_public_key(pool, public_key).await {
                 Ok(tunnel) => {
-                    log::debug!(
-                        "Matched interface {name} peer {public_key} to tunnel {}",
-                        tunnel.name
+                    log::info!(
+                        "Matched peer {public_key} to tunnel {} (id={})",
+                        tunnel.name,
+                        tunnel.id
                     );
                     results.push(ActiveConnectionInfo {
                         connection_type: ConnectionType::Tunnel,
                         target_id: tunnel.id,
                         name: tunnel.name.clone(),
-                        interface_name: name.to_string(),
-                        stats: peer_stats(&interface_data, peer),
+                        interface_name: managed.interface_name.clone(),
+                        stats: peer_stats(iface_data, peer),
                     });
                     continue;
                 }
@@ -172,10 +151,7 @@ async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, 
                 }
             }
 
-            log::debug!(
-                "Peer {public_key} on interface {name} does not match any \
-                 Location or Tunnel, skipping"
-            );
+            log::debug!("Peer {public_key} does not match any Location or Tunnel, skipping");
         }
     }
 
@@ -183,8 +159,8 @@ async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, 
     Ok(results)
 }
 
-/// Extract per-peer stats from an `InterfaceData` stream item.
-#[cfg(target_os = "linux")]
+/// Extract per-peer stats from an `InterfaceData` response.
+#[cfg(not(target_os = "macos"))]
 fn peer_stats(
     iface: &defguard_client_proto::defguard::client::v1::InterfaceData,
     peer: &defguard_client_proto::defguard::client::v1::Peer,

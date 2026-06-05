@@ -6,12 +6,15 @@ pub mod setup;
 #[cfg(target_os = "macos")]
 pub mod apple;
 
+use active_state::ActiveConnectionInfo;
+
 use crate::{
     database::{
         models::{location::Location, tunnel::Tunnel, Id},
         DbPool,
     },
     error::Error,
+    ConnectionType,
 };
 
 /// Identifies the type of connection target - a server-side Location or an imported Tunnel.
@@ -70,64 +73,105 @@ pub async fn bring_up(
     }
 }
 
-/// Tear down a WireGuard interface by name and endpoint.
+/// Tear down a WireGuard interface identified by `ActiveConnectionInfo`.
 ///
-/// On Linux/Windows this sends a `RemoveInterface` request to the local daemon.
-/// Use this when you know the actual interface name (e.g. from `active_state`).
-#[cfg(not(target_os = "macos"))]
-pub async fn tear_down(ifname: &str, endpoint: &str) -> Result<(), Error> {
-    use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
-    use tonic::Code;
-
-    use crate::connection::daemon_client::DAEMON_CLIENT;
-
-    let request = RemoveInterfaceRequest {
-        interface_name: ifname.to_string(),
-        endpoint: endpoint.to_string(),
-    };
-
-    if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-        if error.code() == Code::Unavailable {
-            Err(Error::InternalError(
-                "Background service is unavailable. Make sure the service is running.".into(),
-            ))
-        } else {
-            Err(Error::InternalError(format!(
-                "Failed to remove interface {ifname}: {error}"
-            )))
-        }
-    } else {
-        log::info!("Interface {ifname} removed successfully.");
-        Ok(())
-    }
-}
-
-/// Tear down a WireGuard interface for the given target.
+/// On Linux/Windows this looks up the location or tunnel from the database to get the
+/// endpoint, then sends a `RemoveInterface` request to the local daemon.
 ///
 /// On macOS this stops the Network Extension VPN tunnel.
-/// On Linux/Windows, prefer `tear_down(ifname, endpoint)` to avoid deriving
-/// the wrong interface name.
-#[cfg(target_os = "macos")]
-pub async fn tear_down(target: ConnectionTarget<'_>) -> Result<(), Error> {
-    match target {
-        ConnectionTarget::Location(loc) => {
-            if !loc.stop_vpn_tunnel() {
-                Err(Error::InternalError(format!(
-                    "Failed to stop VPN tunnel for location {}",
-                    loc.name
-                )))
-            } else {
-                Ok(())
+pub async fn tear_down(conn: &ActiveConnectionInfo, pool: &DbPool) -> Result<(), Error> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
+        use tonic::Code;
+
+        use crate::connection::daemon_client::DAEMON_CLIENT;
+
+        let endpoint = match conn.connection_type {
+            ConnectionType::Location => {
+                let location = Location::find_by_id(pool, conn.target_id)
+                    .await?
+                    .ok_or_else(|| {
+                        Error::ResourceNotFound(format!(
+                            "Location with id {} not found",
+                            conn.target_id
+                        ))
+                    })?;
+                location.endpoint.clone()
             }
-        }
-        ConnectionTarget::Tunnel(tunnel) => {
-            if !tunnel.stop_vpn_tunnel() {
-                Err(Error::InternalError(format!(
-                    "Failed to stop VPN tunnel for tunnel {}",
-                    tunnel.name
-                )))
+            ConnectionType::Tunnel => {
+                let tunnel = Tunnel::find_by_id(pool, conn.target_id)
+                    .await?
+                    .ok_or_else(|| {
+                        Error::ResourceNotFound(format!(
+                            "Tunnel with id {} not found",
+                            conn.target_id
+                        ))
+                    })?;
+                tunnel.endpoint.clone()
+            }
+        };
+
+        let request = RemoveInterfaceRequest {
+            interface_name: conn.interface_name.clone(),
+            endpoint: endpoint.clone(),
+        };
+
+        if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+            if error.code() == Code::Unavailable {
+                Err(Error::InternalError(
+                    "Background service is unavailable. Make sure the service is running.".into(),
+                ))
             } else {
-                Ok(())
+                Err(Error::InternalError(format!(
+                    "Failed to remove interface {}: {error}",
+                    conn.interface_name
+                )))
+            }
+        } else {
+            log::info!("Interface {} removed successfully.", conn.interface_name);
+            Ok(())
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        match conn.connection_type {
+            ConnectionType::Location => {
+                let location = Location::find_by_id(pool, conn.target_id)
+                    .await?
+                    .ok_or_else(|| {
+                        Error::ResourceNotFound(format!(
+                            "Location with id {} not found",
+                            conn.target_id
+                        ))
+                    })?;
+                if !location.stop_vpn_tunnel() {
+                    Err(Error::InternalError(format!(
+                        "Failed to stop VPN tunnel for location {}",
+                        location.name
+                    )))
+                } else {
+                    Ok(())
+                }
+            }
+            ConnectionType::Tunnel => {
+                let tunnel = Tunnel::find_by_id(pool, conn.target_id)
+                    .await?
+                    .ok_or_else(|| {
+                        Error::ResourceNotFound(format!(
+                            "Tunnel with id {} not found",
+                            conn.target_id
+                        ))
+                    })?;
+                if !tunnel.stop_vpn_tunnel() {
+                    Err(Error::InternalError(format!(
+                        "Failed to stop VPN tunnel for tunnel {}",
+                        tunnel.name
+                    )))
+                } else {
+                    Ok(())
+                }
             }
         }
     }

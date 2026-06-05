@@ -971,8 +971,15 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             .await
         {
             debug!("Found active connection for location {location}, closing...");
-            use defguard_client_core::connection::tear_down;
-            tear_down(&connection.interface_name, &location.endpoint).await?;
+            use defguard_client_core::connection::{active_state::ActiveConnectionInfo, tear_down};
+            let conn_info = ActiveConnectionInfo {
+                connection_type: ConnectionType::Location,
+                target_id: location.id,
+                name: location.name.clone(),
+                interface_name: connection.interface_name.clone(),
+                stats: None,
+            };
+            tear_down(&conn_info, &*defguard_client_core::database::DB_POOL).await?;
             info!(
                 "The connection to location {location} has been closed, as it was associated \
                 with the instance {instance} that is being deleted."
@@ -1136,8 +1143,15 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                     connection.interface_name
                 );
             }
-            use defguard_client_core::connection::tear_down;
-            tear_down(&connection.interface_name, &tunnel.endpoint).await?;
+            use defguard_client_core::connection::{active_state::ActiveConnectionInfo, tear_down};
+            let conn_info = ActiveConnectionInfo {
+                connection_type: ConnectionType::Tunnel,
+                target_id: tunnel.id,
+                name: tunnel.name.clone(),
+                interface_name: connection.interface_name.clone(),
+                stats: None,
+            };
+            tear_down(&conn_info, &*defguard_client_core::database::DB_POOL).await?;
             info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
