@@ -34,6 +34,18 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
 
+      - name: Prepare block device support
+        run: |
+          set -euo pipefail
+          modprobe loop || true
+          modprobe dm-crypt || true
+          [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
+          for i in $(seq 0 31); do
+            [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
+          done
+          losetup -f
+          test -e /dev/mapper/contro
+
       - name: Setup an encrypted partition
         run: |
           set -euo pipefail
