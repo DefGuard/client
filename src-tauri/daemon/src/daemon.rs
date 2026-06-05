@@ -35,7 +35,8 @@ use crate::VERSION;
 use defguard_client_posture::inspector::device_posture_data;
 use defguard_client_proto::defguard::client::v1::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
+    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ListInterfacesResponse,
+    ReadInterfaceDataRequest,
     RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
 use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
@@ -510,6 +511,39 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::ReadInterfaceDataStream
         ))
+    }
+
+    /// Returns a one-shot snapshot of all managed interfaces with peer data.
+    /// Unlike read_interface_data, peers are NOT filtered by handshake state or stat changes.
+    async fn list_interfaces(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<ListInterfacesResponse>, Status> {
+        debug!("Received ListInterfaces request");
+        let Ok(wgapis_map) = self.wgapis.read() else {
+            error!("Failed to acquire read lock for WGApis");
+            return Err(Status::new(Code::Internal, "read lock error"));
+        };
+        let interfaces: Vec<InterfaceData> = wgapis_map
+            .iter()
+            .filter_map(|(ifname, wgapi)| {
+                match wgapi.read_interface_data() {
+                    Ok(host) => {
+                        debug!("ListInterfaces: returning data for {ifname}");
+                        Some(host.into())
+                    }
+                    Err(err) => {
+                        error!("ListInterfaces: failed to read data for {ifname}: {err}");
+                        None
+                    }
+                }
+            })
+            .collect();
+        debug!(
+            "ListInterfaces: returning {} managed interface(s)",
+            interfaces.len()
+        );
+        Ok(Response::new(ListInterfacesResponse { interfaces }))
     }
 
     #[cfg(windows)]
