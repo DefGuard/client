@@ -70,71 +70,64 @@ pub async fn bring_up(
     }
 }
 
-/// Tear down a WireGuard interface for the given target.
+/// Tear down a WireGuard interface by name and endpoint.
 ///
 /// On Linux/Windows this sends a `RemoveInterface` request to the local daemon.
-/// On macOS it stops the Network Extension VPN tunnel.
-pub async fn tear_down(target: ConnectionTarget<'_>) -> Result<(), Error> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        use defguard_client_common::get_interface_name;
-        use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
-        use tonic::Code;
+/// Use this when you know the actual interface name (e.g. from `active_state`).
+#[cfg(not(target_os = "macos"))]
+pub async fn tear_down(ifname: &str, endpoint: &str) -> Result<(), Error> {
+    use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
+    use tonic::Code;
 
-        use crate::connection::daemon_client::DAEMON_CLIENT;
+    use crate::connection::daemon_client::DAEMON_CLIENT;
 
-        let (ifname, endpoint) = match target {
-            ConnectionTarget::Location(loc) => {
-                (get_interface_name(&loc.name), loc.endpoint.clone())
-            }
-            ConnectionTarget::Tunnel(tunnel) => {
-                (get_interface_name(&tunnel.name), tunnel.endpoint.clone())
-            }
-        };
+    let request = RemoveInterfaceRequest {
+        interface_name: ifname.to_string(),
+        endpoint: endpoint.to_string(),
+    };
 
-        let request = RemoveInterfaceRequest {
-            interface_name: ifname.clone(),
-            endpoint,
-        };
-
-        if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-            if error.code() == Code::Unavailable {
-                Err(Error::InternalError(
-                    "Background service is unavailable. Make sure the service is running.".into(),
-                ))
-            } else {
-                Err(Error::InternalError(format!(
-                    "Failed to remove interface {ifname}: {error}"
-                )))
-            }
+    if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+        if error.code() == Code::Unavailable {
+            Err(Error::InternalError(
+                "Background service is unavailable. Make sure the service is running.".into(),
+            ))
         } else {
-            log::info!("Interface {ifname} removed successfully.");
-            Ok(())
+            Err(Error::InternalError(format!(
+                "Failed to remove interface {ifname}: {error}"
+            )))
         }
+    } else {
+        log::info!("Interface {ifname} removed successfully.");
+        Ok(())
     }
+}
 
-    #[cfg(target_os = "macos")]
-    {
-        match target {
-            ConnectionTarget::Location(loc) => {
-                if !loc.stop_vpn_tunnel() {
-                    Err(Error::InternalError(format!(
-                        "Failed to stop VPN tunnel for location {}",
-                        loc.name
-                    )))
-                } else {
-                    Ok(())
-                }
+/// Tear down a WireGuard interface for the given target.
+///
+/// On macOS this stops the Network Extension VPN tunnel.
+/// On Linux/Windows, prefer `tear_down(ifname, endpoint)` to avoid deriving
+/// the wrong interface name.
+#[cfg(target_os = "macos")]
+pub async fn tear_down(target: ConnectionTarget<'_>) -> Result<(), Error> {
+    match target {
+        ConnectionTarget::Location(loc) => {
+            if !loc.stop_vpn_tunnel() {
+                Err(Error::InternalError(format!(
+                    "Failed to stop VPN tunnel for location {}",
+                    loc.name
+                )))
+            } else {
+                Ok(())
             }
-            ConnectionTarget::Tunnel(tunnel) => {
-                if !tunnel.stop_vpn_tunnel() {
-                    Err(Error::InternalError(format!(
-                        "Failed to stop VPN tunnel for tunnel {}",
-                        tunnel.name
-                    )))
-                } else {
-                    Ok(())
-                }
+        }
+        ConnectionTarget::Tunnel(tunnel) => {
+            if !tunnel.stop_vpn_tunnel() {
+                Err(Error::InternalError(format!(
+                    "Failed to stop VPN tunnel for tunnel {}",
+                    tunnel.name
+                )))
+            } else {
+                Ok(())
             }
         }
     }

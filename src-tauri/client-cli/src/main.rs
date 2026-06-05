@@ -7,6 +7,7 @@ mod cli;
 mod commands;
 mod exit;
 mod output;
+mod resolve;
 mod state;
 
 use cli::Cli;
@@ -40,9 +41,51 @@ async fn main() -> ExitCode {
     let result = match cli.command {
         cli::Commands::List => commands::list::handle(&st, cli.json).await,
         cli::Commands::Status => commands::status::handle(&st, cli.json).await,
-        cli::Commands::Connect { .. }
-        | cli::Commands::Disconnect { .. }
-        | cli::Commands::Location { .. }
+        cli::Commands::Connect {
+            name,
+            tunnel,
+            id,
+            instance,
+            code,
+            code_command,
+            mfa_method: _mfa_method,
+            all_traffic: _all_traffic,
+            no_all_traffic: _no_all_traffic,
+        } => {
+            commands::connect::handle(
+                &st,
+                cli.json,
+                name.as_deref(),
+                tunnel,
+                id,
+                instance.as_deref(),
+                code.as_deref(),
+                code_command.as_deref(),
+                None,
+                false,
+                false,
+            )
+            .await
+        }
+        cli::Commands::Disconnect {
+            name,
+            tunnel,
+            id,
+            instance,
+            all,
+        } => {
+            commands::disconnect::handle(
+                &st,
+                cli.json,
+                name.as_deref(),
+                tunnel,
+                id,
+                instance.as_deref(),
+                all,
+            )
+            .await
+        }
+        cli::Commands::Location { .. }
         | cli::Commands::Instance { .. }
         | cli::Commands::Tunnel { .. }
         | cli::Commands::Enroll { .. } => {

@@ -526,7 +526,7 @@ pub(crate) async fn disconnect_interface(
                 return Err(Error::NotFound);
             };
 
-            tear_down(ConnectionTarget::Location(&location)).await?;
+            tear_down(&interface_name, &location.endpoint).await?;
 
             let connection: Connection = active_connection.into();
             let connection = connection.save(&*DB_POOL).await?;
@@ -563,7 +563,7 @@ pub(crate) async fn disconnect_interface(
                 );
             }
 
-            tear_down(ConnectionTarget::Tunnel(&tunnel)).await?;
+            tear_down(&interface_name, &tunnel.endpoint).await?;
             if let Some(post_down) = &tunnel.post_down {
                 debug!(
                     "Executing defined PostDown command after removing the interface {} for the \

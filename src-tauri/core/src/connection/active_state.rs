@@ -73,6 +73,7 @@ async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, 
     })?;
 
     let mut results = Vec::new();
+    let mut seen = std::collections::HashSet::new();
 
     for iface in ifaces {
         let name = iface.interface_name;
@@ -80,7 +81,12 @@ async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, 
             continue;
         }
 
-        log::debug!("Probing daemon for interface {name}");
+        // Deduplicate: getifaddrs returns one entry per address family.
+        if !seen.insert(name.to_string()) {
+            continue;
+        }
+
+        log::info!("Probing daemon for WireGuard interface {name}");
 
         let request = ReadInterfaceDataRequest {
             interface_name: name.to_string(),
@@ -173,7 +179,7 @@ async fn active_state_linux(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, 
         }
     }
 
-    log::debug!("active_state: found {} active connection(s)", results.len());
+    log::info!("active_state: found {} active connection(s)", results.len());
     Ok(results)
 }
 

@@ -966,13 +966,13 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
         );
     }
     for location in instance_locations {
-        if let Some(_connection) = app_state
+        if let Some(connection) = app_state
             .remove_connection(location.id, ConnectionType::Location)
             .await
         {
             debug!("Found active connection for location {location}, closing...");
-            use defguard_client_core::connection::{tear_down, ConnectionTarget};
-            tear_down(ConnectionTarget::Location(&location)).await?;
+            use defguard_client_core::connection::tear_down;
+            tear_down(&connection.interface_name, &location.endpoint).await?;
             info!(
                 "The connection to location {location} has been closed, as it was associated \
                 with the instance {instance} that is being deleted."
@@ -1136,8 +1136,8 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                     connection.interface_name
                 );
             }
-            use defguard_client_core::connection::{tear_down, ConnectionTarget};
-            tear_down(ConnectionTarget::Tunnel(&tunnel)).await?;
+            use defguard_client_core::connection::tear_down;
+            tear_down(&connection.interface_name, &tunnel.endpoint).await?;
             info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
