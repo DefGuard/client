@@ -31,6 +31,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tower = "0.5"
+tracing = { workspace = true }
 x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
 
 hyper-util = "0.1"

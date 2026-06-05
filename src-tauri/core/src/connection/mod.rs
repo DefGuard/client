@@ -1,5 +1,6 @@
 pub mod active_connections;
 pub mod daemon_client;
+#[cfg(not(target_os = "macos"))]
 pub mod setup;
 
 #[cfg(target_os = "macos")]
@@ -10,6 +11,6 @@ pub use setup::{disconnect_interface, execute_command, setup_interface, setup_in
 
 #[cfg(target_os = "macos")]
 pub use apple::{
-    get_managers_for_tunnels_and_locations, location_tunnel_configuration,
-    sync_locations_and_tunnels, tunnel_stats, tunnel_tunnel_configuration, TunnelConfiguration,
+    get_managers_for_tunnels_and_locations, sync_locations_and_tunnels, tunnel_stats,
+    TunnelConfiguration,
 };

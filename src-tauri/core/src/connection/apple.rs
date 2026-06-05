@@ -50,6 +50,7 @@ use crate::{
 
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 const SYSTEM_SYNC_DELAY: Duration = Duration::from_millis(500);
+const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
 const LOCATION_ID: &str = "locationId";
 const TUNNEL_ID: &str = "tunnelId";
 
@@ -297,7 +298,7 @@ fn manager_for_key_and_value(key: &str, value: Id) -> Option<Retained<NETunnelPr
 }
 
 /// Tunnel configuration shared with VPNExtension (written in Swift).
-pub(crate) struct TunnelConfiguration {
+pub struct TunnelConfiguration {
     location_id: Option<Id>,
     tunnel_id: Option<Id>,
     name: String,
@@ -509,7 +510,7 @@ impl TunnelConfiguration {
 }
 
 /// Retrieve VPN tunnel statistics from VPNExtension.
-pub(crate) fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
+pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
     let new_stats = Arc::new(Mutex::new(None));
     let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
 
