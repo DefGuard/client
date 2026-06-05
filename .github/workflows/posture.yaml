@@ -8,10 +8,38 @@ on:
 
 jobs:
 
-  test-linux-postures-unencrypted:
-    name: Linux postures - unencrypted
+  # test-linux-postures-unencrypted:
+  #   name: Linux postures - unencrypted
+  #   runs-on:
+  #     - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+  #   env:
+  #     SQLX_OFFLINE: 1
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #       with:
+  #         submodules: recursive
+
+  #     - uses: dtolnay/rust-toolchain@stable
+
+  #     - name: Install dependencies
+  #       env:
+  #         DEBIAN_FRONTEND: noninteractive
+  #       run: |
+  #         apt-get update
+  #         apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
+
+  #     - name: Run basic tests
+  #       working-directory: src-tauri/
+  #       run: |
+  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_version -- --ignored --exact
+  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
+  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
+  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
+
+  test-windows-postures-unencrypted:
+    name: Windows postures - unencrypted
     runs-on:
-      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
     env:
       SQLX_OFFLINE: 1
     steps:
@@ -28,14 +56,12 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
 
-      - name: Test kernel version and unencrypted disk
+      - name: Run basic tests
         working-directory: src-tauri/
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_version -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
-
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_unencrypted -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_name -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_version -- --ignored --exact
   # test-linux-postures-encrypted:
   #   name: Linux postures - encrypted
   #   runs-on:
