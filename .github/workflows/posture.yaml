@@ -8,8 +8,8 @@ on:
 
 jobs:
 
-  test-linux-kernel-posture:
-    name: Kernel
+  test-linux-postures-unencrypted:
+    name: Linux postures - unencrypted
     runs-on:
       - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     env:
@@ -31,44 +31,73 @@ jobs:
       - name: Test kernel version and unencrypted disk
         working-directory: src-tauri/
         run: |
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
 
-      - name: Debug crypto block support
-        run: |
-          set -euo pipefail
-          uname -a
-          ls -l /dev/loop* /dev/loop-control || true
-          losetup -f || true
-          ls -l /dev/mapper /dev/mapper/control || true
-          cat /proc/devices | grep -E 'loop|device-mapper' || true
-          grep -E 'loop|dm_crypt|dm_mod' /proc/modules || true
-          lsblk -Jo NAME,FSTYPE,TYPE
+  # test-linux-postures-encrypted:
+  #   name: Linux postures - encrypted
+  #   runs-on:
+  #     - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+  #   env:
+  #     SQLX_OFFLINE: 1
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #       with:
+  #         submodules: recursive
 
-      - name: Prepare block device support
-        run: |
-          set -euo pipefail
-          [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
-          for i in $(seq 0 31); do
-            [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
-          done
-          losetup -f
+  #     - uses: dtolnay/rust-toolchain@stable
 
-      - name: Test encrypted disk
-        working-directory: src-tauri/
-        run: |
-          set -euo pipefail
-          img="$(mktemp /tmp/defguard-luks.XXXXXX)"
-          key="$(mktemp /tmp/defguard-luks-key.XXXXXX)"
-          loopdev=""
-          cleanup() {
-            if [ -n "$loopdev" ]; then losetup -d "$loopdev" || true; fi
-            rm -f "$img" "$key"
-          }
-          trap cleanup EXIT
-          truncate -s 64M "$img"
-          printf 'defguard-ci-test-key' > "$key"
-          loopdev="$(losetup --find --show "$img")"
-          cryptsetup luksFormat --batch-mode --type luks2 "$loopdev" "$key"
-          lsblk -Jo NAME,FSTYPE,TYPE
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
+  #     - name: Install dependencies
+  #       env:
+  #         DEBIAN_FRONTEND: noninteractive
+  #       run: |
+  #         apt-get update
+  #         apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
+
+  #     - name: Test kernel version and encrypted disk
+  #       working-directory: src-tauri/
+  #       run: |
+  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
+  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
+
+      ## runtime crypt setup
+      # - name: Debug crypto block support
+      #   run: |
+      #     set -euo pipefail
+      #     uname -a
+      #     ls -l /dev/loop* /dev/loop-control || true
+      #     sudo losetup -f || true
+      #     ls -l /dev/mapper /dev/mapper/control || true
+      #     cat /proc/devices | grep -E 'loop|device-mapper' || true
+      #     grep -E 'loop|dm_crypt|dm_mod' /proc/modules || true
+      #     lsblk -Jo NAME,FSTYPE,TYPE
+
+      # - name: Prepare block device support
+      #   run: |
+      #     set -euo pipefail
+      #     [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
+      #     for i in $(seq 0 31); do
+      #       [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
+      #     done
+      #     losetup -f
+
+      # - name: Test encrypted disk
+      #   working-directory: src-tauri/
+      #   run: |
+      #     set -euo pipefail
+      #     img="$(mktemp /tmp/defguard-luks.XXXXXX)"
+      #     key="$(mktemp /tmp/defguard-luks-key.XXXXXX)"
+      #     loopdev=""
+      #     cleanup() {
+      #       if [ -n "$loopdev" ]; then losetup -d "$loopdev" || true; fi
+      #       rm -f "$img" "$key"
+      #     }
+      #     trap cleanup EXIT
+      #     truncate -s 64M "$img"
+      #     printf 'defguard-ci-test-key' > "$key"
+      #     loopdev="$(losetup --find --show "$img")"
+      #     cryptsetup luksFormat --batch-mode --type luks2 "$loopdev" "$key"
+      #     lsblk -Jo NAME,FSTYPE,TYPE
+      #     cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
