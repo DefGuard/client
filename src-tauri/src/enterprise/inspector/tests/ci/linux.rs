@@ -14,7 +14,7 @@ fn uname() -> String {
         .to_owned()
 }
 
-fn expected_linux_os_version() -> String {
+fn expected_os_version() -> String {
     if let Ok(os_release) = std::fs::read_to_string("/etc/os-release") {
         if let Some(value) = os_release
             .lines()
@@ -32,16 +32,31 @@ fn expected_linux_os_version() -> String {
         .expect("DISTRIB_RELEASE missing from /etc/lsb-release")
 }
 
+fn expected_os_name() -> String {
+    if let Ok(os_release) = std::fs::read_to_string("/etc/os-release") {
+        if let Some(value) = os_release.lines().find_map(|line| line.strip_prefix("NAME=")) {
+            return value.replace('"', "");
+        }
+    }
+    let lsb_release = std::fs::read_to_string("/etc/lsb-release")
+        .expect("failed to read /etc/lsb-release");
+    lsb_release
+        .lines()
+        .find_map(|line| line.strip_prefix("DISTRIB_ID="))
+        .map(|value| value.replace('"', ""))
+        .expect("DISTRIB_ID missing from /etc/lsb-release")
+}
+
 #[test]
 #[ignore = "CI posture testing only"]
 fn test_linux_os_name() {
-    assert_eq!(os_name().unwrap(), "test");
+    assert_eq!(os_name().unwrap(), expected_os_name());
 }
 
 #[test]
 #[ignore = "CI posture testing only"]
 fn test_linux_os_version() {
-    assert_eq!(os_version().unwrap(), expected_linux_os_version());
+    assert_eq!(os_version().unwrap(), expected_os_version());
 }
 
 #[test]
