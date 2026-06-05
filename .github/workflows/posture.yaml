@@ -26,7 +26,7 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update
-          apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup util-linux
+          apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
 
       - name: Test kernel version and unencrypted disk
         working-directory: src-tauri/
@@ -48,23 +48,20 @@ jobs:
       - name: Prepare block device support
         run: |
           set -euo pipefail
-          modprobe loop || true
-          modprobe dm-crypt || true
           [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
           for i in $(seq 0 31); do
             [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
           done
           losetup -f
-          test -e /dev/mapper/contro
 
-      - name: Setup an encrypted partition
+      - name: Test encrypted disk
+        working-directory: src-tauri/
         run: |
           set -euo pipefail
           img="$(mktemp /tmp/defguard-luks.XXXXXX)"
           key="$(mktemp /tmp/defguard-luks-key.XXXXXX)"
           loopdev=""
           cleanup() {
-            if [ -n "${mapper_opened:-}" ]; then cryptsetup close defguard-posture-test || true; fi
             if [ -n "$loopdev" ]; then losetup -d "$loopdev" || true; fi
             rm -f "$img" "$key"
           }
@@ -73,11 +70,5 @@ jobs:
           printf 'defguard-ci-test-key' > "$key"
           loopdev="$(losetup --find --show "$img")"
           cryptsetup luksFormat --batch-mode --type luks2 "$loopdev" "$key"
-          cryptsetup open "$loopdev" defguard-posture-test --key-file "$key"
-          mapper_opened=1
           lsblk -Jo NAME,FSTYPE,TYPE
-
-      - name: Test encrypted disk
-        working-directory: src-tauri/
-        run: |
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
