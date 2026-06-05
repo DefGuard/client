@@ -1,6 +1,8 @@
 use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
 
 use crate::{
+    mfa,
+    mfa_code::CodeSource,
     output,
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
@@ -16,17 +18,10 @@ pub async fn handle(
     instance: Option<&str>,
     code: Option<&str>,
     code_command: Option<&str>,
-    mfa_method: Option<&str>,
+    _mfa_method: Option<&str>,
     _all_traffic: bool,
     _no_all_traffic: bool,
 ) -> Result<(), CliError> {
-    // Phase 5 TODO: handle MFA (code, code_command, mfa_method)
-    if code.is_some() || code_command.is_some() {
-        return Err(CliError::Usage(
-            "MFA not yet implemented. Use Phase 5 build.".into(),
-        ));
-    }
-
     let spec = TargetSpec {
         name: name.map(String::from),
         tunnel,
@@ -36,7 +31,7 @@ pub async fn handle(
 
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
 
-    // if the target is already connected, report and exit 0.
+    // Idempotency: if the target is already connected, report and exit 0.
     let (target_id, target_name) = match &target {
         ResolvedTarget::Location(loc) => (loc.id, loc.name.as_str()),
         ResolvedTarget::Tunnel(tun) => (tun.id, tun.name.as_str()),
@@ -45,7 +40,6 @@ pub async fn handle(
         .await
         .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
     if active.iter().any(|c| c.target_id == target_id) {
-        // Already connected - no interface (idempotent, help Bitwarden wrappers).
         if json {
             output::emit(
                 &serde_json::json!({ "connected": target_name, "already": true }),
@@ -59,16 +53,36 @@ pub async fn handle(
 
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(loc) => {
-            // Check if MFA is required.
-            if loc.mfa_enabled() {
-                return Err(CliError::MfaInputRequired(format!(
-                    "Location '{}' requires MFA. Provide --code or --code-command.",
-                    loc.name
-                )));
-            }
+            // Determine the MFA code source from CLI flags.
+            let code_source = code
+                .map(|c| CodeSource::Literal(c.to_string()))
+                .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
 
-            // Posture check (enterprise feature).
-            if loc.posture_check_required {
+            if loc.mfa_enabled() {
+                use defguard_core::database::{models::instance::Instance, DB_POOL};
+
+                let source = if let Some(s) = code_source {
+                    s
+                } else if atty::is(atty::Stream::Stdin) {
+                    CodeSource::Interactive
+                } else {
+                    return Err(CliError::MfaInputRequired(format!(
+                        "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
+                        loc.name
+                    )));
+                };
+
+                let inst = Instance::find_by_id(&*DB_POOL, loc.instance_id)
+                    .await
+                    .map_err(|e| CliError::Other(format!("Failed to load instance: {e}")))?
+                    .ok_or_else(|| {
+                        CliError::Other(format!("Instance {} not found", loc.instance_id))
+                    })?;
+
+                let psk = mfa::authorize(loc, &source, &inst).await?;
+                (loc.name.clone(), Some(psk), None)
+            } else if loc.posture_check_required {
+                // Posture only (no MFA).
                 let psk = defguard_client_posture::authorize_posture_session(loc)
                     .await
                     .map_err(|e| CliError::Other(e.to_string()))?;

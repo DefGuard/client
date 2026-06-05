@@ -6,11 +6,13 @@ mod cli;
 mod commands;
 mod exit;
 mod logging;
+mod mfa;
+mod mfa_code;
 mod output;
 mod resolve;
 mod state;
 
-use cli::Cli;
+use cli::{Cli, LocationCommand};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -78,8 +80,31 @@ async fn main() -> ExitCode {
             )
             .await
         }
-        cli::Commands::Location { .. }
-        | cli::Commands::Instance { .. }
+        cli::Commands::Location(sub) => match sub {
+            LocationCommand::List => commands::location::handle_list(&st, cli.json).await,
+            LocationCommand::Set {
+                name,
+                instance,
+                mfa_method,
+                route_all_traffic,
+                no_route_all_traffic,
+            } => {
+                commands::location::handle_set(
+                    &st,
+                    cli.json,
+                    &name,
+                    instance.as_deref(),
+                    mfa_method.as_deref(),
+                    if route_all_traffic { Some(true) } else { None },
+                    no_route_all_traffic,
+                )
+                .await
+            }
+            LocationCommand::Show { name, instance } => {
+                commands::location::handle_show(&st, cli.json, &name, instance.as_deref()).await
+            }
+        },
+        cli::Commands::Instance { .. }
         | cli::Commands::Tunnel { .. }
         | cli::Commands::Enroll { .. } => {
             // These commands are implemented in later phases.
