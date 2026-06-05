@@ -53,6 +53,9 @@ pub async fn resolve_connect_target(
 }
 
 /// Resolve a target for the `disconnect` command.
+///
+/// No-arg / --all resolution is handled directly in the disconnect handler
+/// using `active_state`; this function is only called when a target is named.
 pub async fn resolve_disconnect_target(
     spec: &TargetSpec,
     pool: &DbPool,

@@ -73,6 +73,54 @@ pub async fn handle(
             Err(CliError::Other(errors.join("; ")))
         }
     } else {
+        // No-arg disconnect: if exactly one connection is active, disconnect it.
+        if name.is_none() && !tunnel && id.is_none() && instance.is_none() {
+            let active = active_state(&state.pool)
+                .await
+                .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
+
+            match active.len() {
+                0 => {
+                    if json {
+                        output::emit(
+                            &serde_json::json!({ "disconnected": null, "message": "no active connections" }),
+                            json,
+                        );
+                    } else {
+                        println!("No active connections.");
+                    }
+                    return Ok(());
+                }
+                1 => {
+                    let conn = &active[0];
+                    let ifname = conn.interface_name.clone();
+                    let name = conn.name.clone();
+                    tracing::info!(
+                        "Disconnecting sole active connection {name} on interface {ifname}..."
+                    );
+                    tear_down(conn, &state.pool)
+                        .await
+                        .map_err(|e| CliError::Other(format!("Failed to disconnect: {e}")))?;
+                    if json {
+                        output::emit(
+                            &serde_json::json!({ "disconnected": name, "interface": ifname }),
+                            json,
+                        );
+                    } else {
+                        println!("Disconnected from {name} ({ifname})");
+                    }
+                    return Ok(());
+                }
+                _ => {
+                    let names: Vec<_> = active.iter().map(|c| c.name.as_str()).collect();
+                    return Err(CliError::Usage(format!(
+                        "Multiple active connections ({}). Specify which to disconnect, --all to disconnect all.",
+                        names.join(", ")
+                    )));
+                }
+            }
+        }
+
         let spec = TargetSpec {
             name: name.map(String::from),
             tunnel,
