@@ -43,6 +43,16 @@ jobs:
     env:
       SQLX_OFFLINE: 1
     steps:
+      - name: Enable long paths
+        shell: powershell
+        run: |
+          git config --system core.longpaths true
+          New-ItemProperty `
+            -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name "LongPathsEnabled" `
+            -Value 1 `
+            -PropertyType DWORD `
+            -Force
       - uses: actions/checkout@v6
         with:
           submodules: recursive
