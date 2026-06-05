@@ -1,4 +1,4 @@
-use defguard_core::connection::{bring_up, ConnectionTarget};
+use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
 
 use crate::{
     output,
@@ -34,6 +34,27 @@ pub async fn handle(
     };
 
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
+
+    // if the target is already connected, report and exit 0.
+    let (target_id, target_name) = match &target {
+        ResolvedTarget::Location(loc) => (loc.id, loc.name.as_str()),
+        ResolvedTarget::Tunnel(tun) => (tun.id, tun.name.as_str()),
+    };
+    let active = active_state(&state.pool)
+        .await
+        .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
+    if active.iter().any(|c| c.target_id == target_id) {
+        // Already connected - no interface (idempotent, help Bitwarden wrappers).
+        if json {
+            output::emit(
+                &serde_json::json!({ "connected": target_name, "already": true }),
+                json,
+            );
+        } else {
+            println!("Already connected to {target_name}");
+        }
+        return Ok(());
+    }
 
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(loc) => {
