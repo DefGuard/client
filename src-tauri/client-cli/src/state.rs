@@ -6,6 +6,7 @@ pub struct State {
     /// The shared SQLite pool (initialized with WAL + busy_timeout).
     pub pool: DbPool,
     /// The resolved data directory.
+    #[allow(dead_code)]
     pub data_dir: String,
 }
 
@@ -18,6 +19,7 @@ pub enum CliError {
     NotFound(String),
 
     #[error("daemon unavailable: {0}")]
+    #[allow(dead_code)]
     Unavailable(String),
 
     #[error("MFA failed: {0}")]
