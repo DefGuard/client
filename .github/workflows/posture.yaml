@@ -80,6 +80,7 @@ jobs:
 
       - name: Run basic tests
         working-directory: src-tauri/
+        shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_unencrypted -- --ignored --exact
