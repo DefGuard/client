@@ -31,15 +31,51 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
             .collect();
         output::emit(&serde_json::json!({ "locations": locations }), json);
     } else {
+        if rows.is_empty() {
+            println!("No locations configured.");
+            return Ok(());
+        }
+
+        // Compute column widths.
+        let name_w = rows
+            .iter()
+            .map(|r| r.get::<String, _>("name").len())
+            .max()
+            .unwrap_or(4)
+            .max(8); // "LOCATION"
+        let endpoint_w = rows
+            .iter()
+            .map(|r| r.get::<String, _>("endpoint").len())
+            .max()
+            .unwrap_or(8)
+            .max(8); // "ENDPOINT"
+        let inst_w = rows
+            .iter()
+            .map(|r| r.get::<String, _>("instance_name").len())
+            .max()
+            .unwrap_or(8)
+            .max(8); // "INSTANCE"
+
+        println!(
+            "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  MFA  Route",
+            "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE"
+        );
+
         for row in &rows {
             let name: String = row.get("name");
             let address: String = row.get("address");
+            let endpoint: String = row.get("endpoint");
             let instance: String = row.get("instance_name");
             let mfa: Option<i32> = row.get("mfa_method");
             let route: bool = row.get("route_all_traffic");
             println!(
-                "{name} — {address} ({instance}) — MFA: {} — Route all: {route}",
-                mfa_label(mfa)
+                "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>5}",
+                name,
+                address,
+                endpoint,
+                instance,
+                mfa_label(mfa),
+                if route { "yes" } else { "no" }
             );
         }
     }
