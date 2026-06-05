@@ -1405,6 +1405,7 @@ dependencies = [
  "clap",
  "defguard-client-common",
  "defguard-client-core",
+ "defguard-client-posture",
  "serde",
  "serde_json",
  "sqlx",

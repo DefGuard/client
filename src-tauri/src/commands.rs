@@ -979,7 +979,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
                 interface_name: connection.interface_name.clone(),
                 stats: None,
             };
-            tear_down(&conn_info, &*defguard_client_core::database::DB_POOL).await?;
+            tear_down(&conn_info, &defguard_client_core::database::DB_POOL).await?;
             info!(
                 "The connection to location {location} has been closed, as it was associated \
                 with the instance {instance} that is being deleted."
@@ -1151,7 +1151,7 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                 interface_name: connection.interface_name.clone(),
                 stats: None,
             };
-            tear_down(&conn_info, &*defguard_client_core::database::DB_POOL).await?;
+            tear_down(&conn_info, &defguard_client_core::database::DB_POOL).await?;
             info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",

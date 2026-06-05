@@ -1,5 +1,5 @@
 use defguard_core::database::{
-    models::{instance::Instance, location::Location, tunnel::Tunnel, Id},
+    models::{location::Location, tunnel::Tunnel, Id},
     DbPool,
 };
 use sqlx::Row;

@@ -6,6 +6,7 @@ use crate::{
     state::{CliError, State},
 };
 
+#[allow(clippy::too_many_arguments)]
 pub async fn handle(
     state: &State,
     json: bool,
@@ -66,20 +67,13 @@ pub async fn handle(
                 )));
             }
 
-            // Posture check (enterprise feature, optional).
-            #[cfg(feature = "posture")]
-            {
-                if loc.posture_check_required {
-                    let psk = defguard_client_posture::authorize_posture_session(&state.pool)
-                        .await
-                        .map_err(|e| CliError::Other(e.to_string()))?;
-                    (loc.name.clone(), psk, None)
-                } else {
-                    (loc.name.clone(), None, None)
-                }
-            }
-            #[cfg(not(feature = "posture"))]
-            {
+            // Posture check (enterprise feature).
+            if loc.posture_check_required {
+                let psk = defguard_client_posture::authorize_posture_session(loc)
+                    .await
+                    .map_err(|e| CliError::Other(e.to_string()))?;
+                (loc.name.clone(), Some(psk), None)
+            } else {
                 (loc.name.clone(), None, None)
             }
         }
