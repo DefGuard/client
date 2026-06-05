@@ -1547,6 +1547,9 @@ dependencies = [
  "serde",
  "serde_json",
  "sysinfo",
+ "time",
+ "tonic",
+ "wmi",
 ]
 
 [[package]]
