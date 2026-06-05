@@ -36,8 +36,8 @@ use defguard_client_posture::inspector::device_posture_data;
 use defguard_client_proto::defguard::client::v1::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ListInterfacesResponse,
-    ReadInterfaceDataRequest,
-    RemoveInterfaceRequest, SaveServiceLocationsRequest,
+    ManagedInterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+    SaveServiceLocationsRequest,
 };
 use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
 use defguard_client_service_locations::ServiceLocationError;
@@ -524,18 +524,19 @@ impl DesktopDaemonService for DaemonService {
             error!("Failed to acquire read lock for WGApis");
             return Err(Status::new(Code::Internal, "read lock error"));
         };
-        let interfaces: Vec<InterfaceData> = wgapis_map
+        let interfaces: Vec<ManagedInterfaceData> = wgapis_map
             .iter()
-            .filter_map(|(ifname, wgapi)| {
-                match wgapi.read_interface_data() {
-                    Ok(host) => {
-                        debug!("ListInterfaces: returning data for {ifname}");
-                        Some(host.into())
-                    }
-                    Err(err) => {
-                        error!("ListInterfaces: failed to read data for {ifname}: {err}");
-                        None
-                    }
+            .filter_map(|(ifname, wgapi)| match wgapi.read_interface_data() {
+                Ok(host) => {
+                    debug!("ListInterfaces: returning data for {ifname}");
+                    Some(ManagedInterfaceData {
+                        interface_name: ifname.clone(),
+                        data: Some(host.into()),
+                    })
+                }
+                Err(err) => {
+                    error!("ListInterfaces: failed to read data for {ifname}: {err}");
+                    None
                 }
             })
             .collect();
