@@ -1,0 +1,20 @@
+name: "Test posture checks gathering"
+on:
+  push:
+    # tags:
+    #   - v*.*.*
+    branches:
+      - posture-checks-ci
+
+jobs:
+
+  test-linux-kernel-posture:
+    name: Kernel
+    runs-on:
+      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    env:
+      SQLX_OFFLINE: 1
+    steps:
+      - name: Run test
+        run: |
+          cargo test --locked --lib enterprise::inspector::tests::linux::test_linux_kernel_version -- --ignored --exact

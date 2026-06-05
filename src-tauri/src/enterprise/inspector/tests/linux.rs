@@ -1,4 +1,4 @@
-use super::super::{disk_encryption_status, os_name, os_version};
+use super::super::{disk_encryption_status, linux_kernel_version, os_name, os_version};
 
 #[test]
 fn test_os_name() {
@@ -14,4 +14,10 @@ fn test_os_version() {
 #[ignore = "development machine only"]
 fn test_disk_encryption() {
     assert!(!disk_encryption_status().unwrap());
+}
+
+#[test]
+#[ignore = "CI posture testing only"]
+fn test_linux_kernel_version() {
+    assert_eq!(linux_kernel_version().unwrap(), "6.18.28");
 }
