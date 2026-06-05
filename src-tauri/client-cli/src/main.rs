@@ -1,11 +1,11 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use tracing_subscriber::EnvFilter;
 
 mod cli;
 mod commands;
 mod exit;
+mod logging;
 mod output;
 mod resolve;
 mod state;
@@ -17,15 +17,8 @@ async fn main() -> ExitCode {
     let cli = Cli::parse();
 
     // Init logging to stderr so stdout stays data-only.
-    let log_filter = if cli.verbose {
-        EnvFilter::new("debug")
-    } else {
-        EnvFilter::new("info")
-    };
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_env_filter(log_filter)
-        .init();
+    // Quiet (WARN) by default; -v for INFO, -vv for DEBUG, -vvv for TRACE.
+    logging::init(cli.verbose);
 
     // Resolve state (data-dir, DB pool, migrations).
     let st = match state::init(cli.data_dir.as_deref()).await {

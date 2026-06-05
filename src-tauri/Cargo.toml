@@ -28,7 +28,7 @@ tonic = { version = "0.14", default-features = false, features = [
 tonic-prost = "0.14"
 tonic-prost-build = "0.14"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "tracing-log"] }
 
 [workspace.package]
 authors = ["Defguard"]

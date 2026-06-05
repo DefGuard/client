@@ -11,9 +11,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
 
-    /// Increase log verbosity (debug level).  Diagnostics go to stderr.
-    #[arg(short = 'v', long, global = true)]
-    pub verbose: bool,
+    /// Increase log verbosity (staged: -v INFO, -vv DEBUG, -vvv TRACE).
+    /// Diagnostics go to stderr.  Honors DG_LOG / RUST_LOG env.
+    #[arg(short = 'v', long, action = clap::ArgAction::Count, global = true)]
+    pub verbose: u8,
 
     /// Override the data directory.  Defaults to $DG_DATA_DIR or the platform
     /// standard application-data directory.
