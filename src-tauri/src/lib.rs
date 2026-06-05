@@ -30,7 +30,6 @@ pub use defguard_client_core::{
     get_aggregation,
     into_location,
     proxy,
-    set_perms,
     wg_config,
     // Shared types
     CommonConnection,
@@ -44,6 +43,9 @@ pub use defguard_client_core::{
     DEFAULT_ROUTE_IPV4,
     DEFAULT_ROUTE_IPV6,
 };
+
+#[cfg(unix)]
+pub use defguard_client_core::set_perms;
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");

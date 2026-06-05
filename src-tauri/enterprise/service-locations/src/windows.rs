@@ -50,9 +50,7 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 /// harmless because `connect_to_service_locations` skips already-connected locations.
 ///
 /// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall.
-pub(crate) fn watch_for_network_change(
-    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
-) {
+pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLocationManager>>) {
     loop {
         // NotifyAddrChange blocks until any IP address is added or removed on any interface.
         // Passing NULL for both handle and overlapped selects the synchronous (blocking) mode.
@@ -90,7 +88,7 @@ pub(crate) fn watch_for_network_change(
 /// accordingly.
 ///
 /// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall.
-pub(crate) fn watch_for_login_logoff(
+pub fn watch_for_login_logoff(
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) -> Result<(), ServiceLocationError> {
     loop {
@@ -405,7 +403,7 @@ impl ServiceLocationManager {
     // Resets the state of the service location:
     // 1. If it's an always on location, disconnects and reconnects it.
     // 2. Otherwise, just disconnects it if the user is not logged in.
-    pub(crate) fn reset_service_location_state(
+    pub fn reset_service_location_state(
         &mut self,
         instance_id: &str,
         location_pubkey: &str,
@@ -464,7 +462,7 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    pub(crate) fn disconnect_service_locations_by_instance(
+    pub fn disconnect_service_locations_by_instance(
         &mut self,
         instance_id: &str,
     ) -> Result<(), ServiceLocationError> {
@@ -745,7 +743,7 @@ impl ServiceLocationManager {
     /// Returns `Ok(true)` if every location is now connected (either it was already connected or
     /// it was successfully connected during this call), and `Ok(false)` if at least one location
     /// failed to connect (indicating that a retry may be worthwhile).
-    pub(crate) fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
+    pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect to VPN...");
 
         let data = self.load_service_locations()?;
@@ -950,7 +948,7 @@ impl ServiceLocationManager {
         }
     }
 
-    pub(crate) fn delete_all_service_locations_for_instance(
+    pub fn delete_all_service_locations_for_instance(
         &self,
         instance_id: &str,
     ) -> Result<(), ServiceLocationError> {

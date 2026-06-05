@@ -119,7 +119,7 @@ fn security_update_age_days() -> Result<i32, UnavailableReason> {
 }
 
 #[must_use]
-pub(crate) fn device_posture_data() -> DevicePostureData {
+pub fn device_posture_data() -> DevicePostureData {
     DevicePostureData {
         defguard_client_version: PKG_VERSION.to_owned(),
         os_type: OS.to_string(),
