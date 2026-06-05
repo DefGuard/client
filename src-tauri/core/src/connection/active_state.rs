@@ -97,13 +97,22 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
         };
 
         for peer in &iface_data.peers {
-            let public_key = &peer.public_key;
+            // The daemon returns public keys as lower hex (Key::to_lower_hex()),
+            // but the database stores them as base64.  Convert for matching.
+            let public_key_hex = &peer.public_key;
+            let public_key_b64 = match hex_to_base64(public_key_hex) {
+                Ok(k) => k,
+                Err(e) => {
+                    log::warn!("Failed to convert hex pubkey to base64: {e}");
+                    continue;
+                }
+            };
 
             // Try matching the peer to a Location first.
-            match Location::find_by_public_key(pool, public_key).await {
+            match Location::find_by_public_key(pool, &public_key_b64).await {
                 Ok(location) => {
                     log::info!(
-                        "Matched peer {public_key} to location {} (id={})",
+                        "Matched peer to location {} (id={})",
                         location.name,
                         location.id
                     );
@@ -120,19 +129,15 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
                     // Not a Location, try Tunnel below.
                 }
                 Err(err) => {
-                    log::warn!("DB error looking up public key {public_key}: {err}");
+                    log::warn!("DB error looking up public key: {err}");
                     continue;
                 }
             }
 
             // Then try matching to a Tunnel.
-            match Tunnel::find_by_server_public_key(pool, public_key).await {
+            match Tunnel::find_by_server_public_key(pool, &public_key_b64).await {
                 Ok(tunnel) => {
-                    log::info!(
-                        "Matched peer {public_key} to tunnel {} (id={})",
-                        tunnel.name,
-                        tunnel.id
-                    );
+                    log::info!("Matched peer to tunnel {} (id={})", tunnel.name, tunnel.id);
                     results.push(ActiveConnectionInfo {
                         connection_type: ConnectionType::Tunnel,
                         target_id: tunnel.id,
@@ -146,12 +151,12 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
                     // Not a Tunnel either.
                 }
                 Err(err) => {
-                    log::warn!("DB error looking up server public key {public_key}: {err}");
+                    log::warn!("DB error looking up server public key: {err}");
                     continue;
                 }
             }
 
-            log::debug!("Peer {public_key} does not match any Location or Tunnel, skipping");
+            log::debug!("Peer does not match any Location or Tunnel, skipping");
         }
     }
 
@@ -171,4 +176,19 @@ fn peer_stats(
         rx_bytes: peer.rx_bytes,
         last_handshake: peer.last_handshake,
     })
+}
+
+use base64::Engine as _;
+
+/// Convert a hex-encoded public key to base64, matching the database format.
+#[cfg(not(target_os = "macos"))]
+fn hex_to_base64(hex: &str) -> Result<String, Error> {
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&hex[i..std::cmp::min(i + 2, hex.len())], 16)
+                .map_err(|_| Error::ConversionError(format!("Invalid hex pubkey: {hex}")))
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
