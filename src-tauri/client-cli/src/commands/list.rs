@@ -13,7 +13,8 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
 
     // Query locations.
     let loc_rows = sqlx::query(
-        "SELECT l.name, l.address, l.endpoint, l.location_mfa_mode, i.name AS instance_name \
+        "SELECT l.name, l.address, l.endpoint, l.location_mfa_mode, l.route_all_traffic, \
+         i.name AS instance_name \
          FROM location l JOIN instance i ON l.instance_id = i.id \
          ORDER BY l.name ASC",
     )
@@ -46,6 +47,7 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
                     "address": r.get::<String, _>("address"),
                     "endpoint": r.get::<String, _>("endpoint"),
                     "mfa_enabled": mfa_mode != 1,
+                    "route_all_traffic": r.get::<bool, _>("route_all_traffic"),
                 })
             })
             .collect();
@@ -103,8 +105,8 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
             if let Some(locs) = locations {
                 println!("\n{inst_name} ({inst_url})");
                 println!(
-                    "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  MFA",
-                    "LOCATION", "ADDRESS", "ENDPOINT"
+                    "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {:>3}  {:<11}",
+                    "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
                 );
 
                 for loc in locs.iter() {
@@ -113,9 +115,11 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
                     let endpoint: String = loc.get("endpoint");
                     let mfa_mode: i64 = loc.get("location_mfa_mode");
                     let mfa = if mfa_mode == 1 { "no" } else { "yes" };
+                    let route: bool = loc.get("route_all_traffic");
+                    let route_label = if route { "All-traffic" } else { "Predefined" };
 
                     println!(
-                        "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {mfa:>3}",
+                        "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {mfa:>3}  {route_label:<11}",
                         name, address, endpoint
                     );
                 }
@@ -132,15 +136,15 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
                 .map(|r| r.get::<String, _>("name").len())
                 .max()
                 .unwrap_or(4)
-                .max(4); // "NAME"
+                .max(loc_name_w); // align with location column
             let tun_endpoint_w = tun_rows
                 .iter()
                 .map(|r| r.get::<String, _>("endpoint").len())
                 .max()
                 .unwrap_or(8)
-                .max(8); // "ENDPOINT"
+                .max(endpoint_w); // align with location column
 
-            println!("\nImported Tunnels");
+            println!("\nTunnels");
             println!(
                 "  {:<tun_name_w$}  {:<15}  {:<tun_endpoint_w$}",
                 "NAME", "ADDRESS", "ENDPOINT"

@@ -57,8 +57,8 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
             .max(8); // "INSTANCE"
 
         println!(
-            "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  MFA  Route",
-            "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE"
+            "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:<11}",
+            "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
         );
 
         for row in &rows {
@@ -69,13 +69,13 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
             let mfa: Option<i32> = row.get("mfa_method");
             let route: bool = row.get("route_all_traffic");
             println!(
-                "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>5}",
+                "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>11}",
                 name,
                 address,
                 endpoint,
                 instance,
                 mfa_label(mfa),
-                if route { "yes" } else { "no" }
+                if route { "All-traffic" } else { "Predefined" }
             );
         }
     }
