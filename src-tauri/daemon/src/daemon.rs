@@ -1,3 +1,5 @@
+#[cfg(all(unix, not(target_os = "macos")))]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -5,11 +7,26 @@ use std::{
     time::{Duration, SystemTime},
 };
 #[cfg(unix)]
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+use std::{fs, path::Path};
 
 use defguard_client_common::dns_borrow;
+#[cfg(windows)]
+use defguard_client_posture::inspector::device_posture_data;
+use defguard_client_proto::defguard::client::v1::{
+    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
+    RemoveInterfaceRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
+use defguard_client_service_locations::ServiceLocationError;
+#[cfg(windows)]
+use defguard_client_service_locations::ServiceLocationManager;
+#[cfg(not(target_os = "macos"))]
+use defguard_wireguard_rs::Kernel;
+#[cfg(target_os = "macos")]
+use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
-    error::WireguardInterfaceError, InterfaceConfiguration, Kernel, WGApi, WireguardInterfaceApi,
+    error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 #[cfg(unix)]
 use nix::unistd::{chown, Group};
@@ -27,21 +44,9 @@ use tonic::{
 use tracing::warn;
 use tracing::{debug, error, info, info_span, Instrument};
 
-use crate::config::Config;
 #[cfg(windows)]
 use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-use crate::VERSION;
-#[cfg(windows)]
-use defguard_client_posture::inspector::device_posture_data;
-use defguard_client_proto::defguard::client::v1::{
-    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
-    RemoveInterfaceRequest, SaveServiceLocationsRequest,
-};
-use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
-use defguard_client_service_locations::ServiceLocationError;
-#[cfg(windows)]
-use defguard_client_service_locations::ServiceLocationManager;
+use crate::{config::Config, VERSION};
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -102,7 +107,7 @@ impl DaemonService {
 fn configure_new_interface(
     ifname: &str,
     request: &CreateInterfaceRequest,
-    wgapi: &mut WGApi,
+    wgapi: &mut WG,
     interface_config: &InterfaceConfiguration,
 ) -> Result<(), Status> {
     // The WireGuard DNS config value can be a list of IP addresses and domain names, which will

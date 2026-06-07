@@ -27,7 +27,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", features = ["fs", "user"] }
+nix = { version = "0.31", features = ["fs", "user"] }
 
 [target.'cfg(windows)'.dependencies]
 async-stream = "0.3"

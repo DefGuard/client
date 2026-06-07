@@ -1,5 +1,7 @@
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
+#[cfg(target_os = "macos")]
+use std::time::Duration;
 use std::{env, path::Path, process::Command};
 
 #[cfg(not(target_os = "macos"))]
@@ -78,7 +80,7 @@ pub(crate) async fn setup_interface(
     mtu: Option<u32>,
     _pool: &DbPool,
 ) -> Result<String, Error> {
-    let tunnel_config = location.tunnel_configurarion(preshared_key, mtu).await?;
+    let tunnel_config = location.tunnel_configuration(preshared_key, mtu).await?;
 
     tunnel_config.save();
     tokio::time::sleep(TUNNEL_START_DELAY).await;
@@ -473,7 +475,7 @@ pub async fn setup_interface_tunnel(
 ) -> Result<String, Error> {
     debug!("Setting up interface for tunnel: {tunnel}");
 
-    let tunnel_config = tunnel.tunnel_configurarion(mtu)?;
+    let tunnel_config = tunnel.tunnel_configuration(mtu)?;
 
     tunnel_config.save();
     tokio::time::sleep(TUNNEL_START_DELAY).await;

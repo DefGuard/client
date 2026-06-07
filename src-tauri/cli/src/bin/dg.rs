@@ -511,6 +511,7 @@ async fn wait_for_hangup() {
         hangup.recv().await;
     }
 }
+
 /// Dummy version of the above function for non-UNIX systems.
 #[cfg(not(unix))]
 async fn wait_for_hangup() {
