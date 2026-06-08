@@ -1218,17 +1218,8 @@ pub struct AppVersionInfo {
 
 const PRODUCT_NAME: &str = "defguard-client";
 
-fn select_reported_app_version(
-    package_version: &str,
-    build_version_override: Option<&str>,
-) -> String {
-    build_version_override
-        .filter(|version| !version.trim().is_empty())
-        .map_or_else(|| package_version.to_owned(), str::to_owned)
-}
-
 fn reported_app_version(handle: &AppHandle) -> String {
-    select_reported_app_version(
+    defguard_client_core::version::select_reported_app_version(
         &handle.package_info().version.to_string(),
         option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
     )
@@ -1370,27 +1361,4 @@ pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Er
     }
     debug!("Returning {} active connections.", result.len());
     Ok(result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::select_reported_app_version;
-
-    #[test]
-    fn reported_app_version_uses_override_when_present() {
-        assert_eq!(
-            select_reported_app_version("1.6.8", Some("1.6.8-beta1")),
-            "1.6.8-beta1"
-        );
-    }
-
-    #[test]
-    fn reported_app_version_falls_back_to_package_version_without_override() {
-        assert_eq!(select_reported_app_version("1.6.8", None), "1.6.8");
-    }
-
-    #[test]
-    fn reported_app_version_ignores_empty_override() {
-        assert_eq!(select_reported_app_version("1.6.8", Some("   ")), "1.6.8");
-    }
 }
