@@ -131,7 +131,7 @@ confidence-threshold = 0.8
 exceptions = [
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "common" },
+    ], crate = "defguard-client-common" },
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client" },
@@ -140,22 +140,25 @@ exceptions = [
     ], crate = "defguard-client-core" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-service" },
+    ], crate = "defguard-client-service" },
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client-proto" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-posture" },
+    ], crate = "defguard-dg" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-provisioning" },
+    ], crate = "defguard-client-posture" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-config-sync" },
+    ], crate = "defguard-client-provisioning" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-service-locations" },
+    ], crate = "defguard-client-config-sync" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-client-service-locations" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
