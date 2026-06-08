@@ -1,3 +1,4 @@
+import './style.scss';
 import { useNavigate } from '@tanstack/react-router';
 import { useId } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
