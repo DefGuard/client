@@ -40,7 +40,7 @@ fn error_kind(err: &CliError) -> String {
     match err {
         CliError::Usage(_) => "usage".into(),
         CliError::NotFound(_) => "notFound".into(),
-        CliError::Unavailable(_) => "unavailable".into(),
+        CliError::DaemonUnavailable(_) => "unavailable".into(),
         CliError::MfaFailed(_) => "mfaFailed".into(),
         CliError::MfaInputRequired(_) => "mfaInputRequired".into(),
         CliError::NotEnrolled(_) => "notEnrolled".into(),

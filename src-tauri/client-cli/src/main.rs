@@ -14,16 +14,21 @@ mod state;
 
 use cli::{Cli, LocationCommand};
 
+use crate::{
+    cli::Commands,
+    commands::{connect, disconnect, list, location, status},
+    state::State,
+};
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
 
     // Init logging to stderr so stdout stays data-only.
-    // Quiet (WARN) by default; -v for INFO, -vv for DEBUG, -vvv for TRACE.
     logging::init(cli.verbose);
 
     // Resolve state (data-dir, DB pool, migrations).
-    let st = match state::init(cli.data_dir.as_deref()).await {
+    let state = match State::init(cli.data_dir.as_deref()).await {
         Ok(s) => s,
         Err(err) => {
             let code = exit::exit_code_for(&err);
@@ -34,9 +39,9 @@ async fn main() -> ExitCode {
 
     // Dispatch command.
     let result = match cli.command {
-        cli::Commands::List => commands::list::handle(&st, cli.json).await,
-        cli::Commands::Status => commands::status::handle(&st, cli.json).await,
-        cli::Commands::Connect {
+        Commands::List => list::handle(&state, cli.json).await,
+        Commands::Status => status::handle(&state, cli.json).await,
+        Commands::Connect {
             name,
             tunnel,
             id,
@@ -47,8 +52,8 @@ async fn main() -> ExitCode {
             all_traffic: _all_traffic,
             no_all_traffic: _no_all_traffic,
         } => {
-            commands::connect::handle(
-                &st,
+            connect::handle(
+                &state,
                 cli.json,
                 name.as_deref(),
                 tunnel,
@@ -62,15 +67,15 @@ async fn main() -> ExitCode {
             )
             .await
         }
-        cli::Commands::Disconnect {
+        Commands::Disconnect {
             name,
             tunnel,
             id,
             instance,
             all,
         } => {
-            commands::disconnect::handle(
-                &st,
+            disconnect::handle(
+                &state,
                 cli.json,
                 name.as_deref(),
                 tunnel,
@@ -80,8 +85,8 @@ async fn main() -> ExitCode {
             )
             .await
         }
-        cli::Commands::Location(sub) => match sub {
-            LocationCommand::List => commands::location::handle_list(&st, cli.json).await,
+        Commands::Location(sub) => match sub {
+            LocationCommand::List => location::handle_list(&state, cli.json).await,
             LocationCommand::Set {
                 name,
                 instance,
@@ -89,8 +94,8 @@ async fn main() -> ExitCode {
                 route_all_traffic,
                 no_route_all_traffic,
             } => {
-                commands::location::handle_set(
-                    &st,
+                location::handle_set(
+                    &state,
                     cli.json,
                     &name,
                     instance.as_deref(),
@@ -101,13 +106,10 @@ async fn main() -> ExitCode {
                 .await
             }
             LocationCommand::Show { name, instance } => {
-                commands::location::handle_show(&st, cli.json, &name, instance.as_deref()).await
+                location::handle_show(&state, cli.json, &name, instance.as_deref()).await
             }
         },
-        cli::Commands::Instance { .. }
-        | cli::Commands::Tunnel { .. }
-        | cli::Commands::Enroll { .. } => {
-            // These commands are implemented in later phases.
+        Commands::Instance { .. } | Commands::Tunnel { .. } | Commands::Enroll { .. } => {
             let err = state::CliError::Usage("command not yet implemented".into());
             output::emit_error(&err, cli.json);
             return ExitCode::from(exit::exit_code_for(&err));

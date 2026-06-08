@@ -15,7 +15,7 @@ pub fn exit_code_for(err: &CliError) -> u8 {
     match err {
         CliError::Usage(_) => 2,
         CliError::NotFound(_) => 3,
-        CliError::Unavailable(_) => 4,
+        CliError::DaemonUnavailable(_) => 4,
         CliError::MfaFailed(_) | CliError::MfaInputRequired(_) => 5,
         CliError::NotEnrolled(_) => 6,
         CliError::Database(_) => 1,
