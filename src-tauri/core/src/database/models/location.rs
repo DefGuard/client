@@ -481,3 +481,69 @@ impl From<Location<Id>> for Location {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_infer_mfa_method() {
+        use LocationMfaMethod::{Biometric, Email, Oidc, Totp};
+        use LocationMfaMode::{Disabled, External, Internal};
+
+        // Disabled mode passes the configured method through unchanged.
+        assert_eq!(infer_mfa_method(Disabled, None), None);
+        assert_eq!(infer_mfa_method(Disabled, Some(Totp)), Some(Totp));
+
+        // Internal mode forces Totp when no method or OIDC is configured.
+        assert_eq!(infer_mfa_method(Internal, None), Some(Totp));
+        assert_eq!(infer_mfa_method(Internal, Some(Oidc)), Some(Totp));
+        // Internal mode keeps any other explicit method.
+        assert_eq!(infer_mfa_method(Internal, Some(Email)), Some(Email));
+        assert_eq!(infer_mfa_method(Internal, Some(Biometric)), Some(Biometric));
+
+        // External mode always resolves to OIDC, ignoring the configured method.
+        assert_eq!(infer_mfa_method(External, None), Some(Oidc));
+        assert_eq!(infer_mfa_method(External, Some(Totp)), Some(Oidc));
+    }
+
+    #[test]
+    fn test_location_mfa_mode_from_proto() {
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::Unspecified),
+            LocationMfaMode::Disabled
+        );
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::Disabled),
+            LocationMfaMode::Disabled
+        );
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::Internal),
+            LocationMfaMode::Internal
+        );
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::External),
+            LocationMfaMode::External
+        );
+    }
+
+    #[test]
+    fn test_service_location_mode_from_proto() {
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Unspecified),
+            ServiceLocationMode::Disabled
+        );
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Disabled),
+            ServiceLocationMode::Disabled
+        );
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Prelogon),
+            ServiceLocationMode::PreLogon
+        );
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Alwayson),
+            ServiceLocationMode::AlwaysOn
+        );
+    }
+}

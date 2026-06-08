@@ -127,3 +127,90 @@ impl AppConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
+    use super::{AppConfig, AppTheme, APP_CONFIG_FILE_NAME};
+
+    #[test]
+    fn test_new_creates_defaults_when_missing() {
+        let dir = tempdir().unwrap();
+        let config = AppConfig::new(dir.path());
+        let default = AppConfig::default();
+
+        assert_eq!(config.theme, default.theme);
+        assert_eq!(config.check_for_updates, default.check_for_updates);
+        assert_eq!(config.log_level, default.log_level);
+        assert_eq!(config.peer_alive_period, default.peer_alive_period);
+        assert_eq!(config.mtu(), default.mtu());
+        // The config file is written out on first load.
+        assert!(dir.path().join(APP_CONFIG_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn test_new_falls_back_on_corrupt_json() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join(APP_CONFIG_FILE_NAME), b"{ not valid json").unwrap();
+
+        let config = AppConfig::new(dir.path());
+
+        assert_eq!(config.theme, AppConfig::default().theme);
+        assert_eq!(
+            config.peer_alive_period,
+            AppConfig::default().peer_alive_period
+        );
+    }
+
+    #[test]
+    fn test_new_applies_partial_patch() {
+        let dir = tempdir().unwrap();
+        // Only override peer_alive_period; everything else stays at the defaults.
+        fs::write(
+            dir.path().join(APP_CONFIG_FILE_NAME),
+            br#"{"peer_alive_period": 42}"#,
+        )
+        .unwrap();
+
+        let config = AppConfig::new(dir.path());
+
+        assert_eq!(config.peer_alive_period, 42);
+        assert_eq!(config.theme, AppConfig::default().theme);
+        assert_eq!(
+            config.check_for_updates,
+            AppConfig::default().check_for_updates
+        );
+    }
+
+    #[test]
+    fn test_save_round_trip() {
+        let dir = tempdir().unwrap();
+        let config = AppConfig {
+            theme: AppTheme::Dark,
+            ..AppConfig::default()
+        };
+        config.save(dir.path());
+
+        let reloaded = AppConfig::new(dir.path());
+        assert_eq!(reloaded.theme, AppTheme::Dark);
+    }
+
+    #[test]
+    fn test_mtu_zero_is_none() {
+        let config = AppConfig::default();
+        assert_eq!(config.mtu, 0);
+        assert_eq!(config.mtu(), None);
+    }
+
+    #[test]
+    fn test_mtu_nonzero_is_some() {
+        let config = AppConfig {
+            mtu: 1400,
+            ..AppConfig::default()
+        };
+        assert_eq!(config.mtu(), Some(1400));
+    }
+}

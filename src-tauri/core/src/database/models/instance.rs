@@ -277,3 +277,100 @@ impl From<i64> for ClientTrafficPolicy {
         Self::from(value as i32)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_client_traffic_policy_from_i32() {
+        assert_eq!(ClientTrafficPolicy::from(0), ClientTrafficPolicy::None);
+        assert_eq!(
+            ClientTrafficPolicy::from(1),
+            ClientTrafficPolicy::DisableAllTraffic
+        );
+        assert_eq!(
+            ClientTrafficPolicy::from(2),
+            ClientTrafficPolicy::ForceAllTraffic
+        );
+        // Unknown discriminants fall back to None.
+        assert_eq!(ClientTrafficPolicy::from(99), ClientTrafficPolicy::None);
+        assert_eq!(ClientTrafficPolicy::from(-1), ClientTrafficPolicy::None);
+    }
+
+    #[test]
+    fn test_client_traffic_policy_from_i64() {
+        assert_eq!(
+            ClientTrafficPolicy::from(2_i64),
+            ClientTrafficPolicy::ForceAllTraffic
+        );
+        assert_eq!(ClientTrafficPolicy::from(99_i64), ClientTrafficPolicy::None);
+    }
+
+    #[test]
+    fn test_client_traffic_policy_from_option() {
+        assert_eq!(ClientTrafficPolicy::from(None), ClientTrafficPolicy::None);
+        assert_eq!(
+            ClientTrafficPolicy::from(Some(2)),
+            ClientTrafficPolicy::ForceAllTraffic
+        );
+    }
+
+    fn base_info() -> proto::client_types::InstanceInfo {
+        proto::client_types::InstanceInfo {
+            id: "uuid-1".into(),
+            name: "instance".into(),
+            url: "https://core.example".into(),
+            proxy_url: "https://proxy.example".into(),
+            username: "alice".into(),
+            enterprise_enabled: true,
+            openid_display_name: Some("OIDC".into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_client_traffic_policy_from_instance_info() {
+        // Explicit policy wins over the deprecated bool, even when the bool is set.
+        let mut info = base_info();
+        info.client_traffic_policy = Some(2);
+        #[allow(deprecated)]
+        {
+            info.disable_all_traffic = true;
+        }
+        assert_eq!(
+            ClientTrafficPolicy::from(&info),
+            ClientTrafficPolicy::ForceAllTraffic
+        );
+
+        // No explicit policy: the deprecated bool decides.
+        let mut info = base_info();
+        #[allow(deprecated)]
+        {
+            info.disable_all_traffic = true;
+        }
+        assert_eq!(
+            ClientTrafficPolicy::from(&info),
+            ClientTrafficPolicy::DisableAllTraffic
+        );
+
+        let info = base_info();
+        assert_eq!(ClientTrafficPolicy::from(&info), ClientTrafficPolicy::None);
+    }
+
+    #[test]
+    fn test_instance_from_instance_info() {
+        let info = base_info();
+        let instance: Instance<NoId> = info.into();
+
+        assert_eq!(instance.uuid, "uuid-1");
+        assert_eq!(instance.name, "instance");
+        assert_eq!(instance.url, "https://core.example");
+        assert_eq!(instance.proxy_url, "https://proxy.example");
+        assert_eq!(instance.username, "alice");
+        assert!(instance.token.is_none());
+        assert!(instance.enterprise_enabled);
+        assert_eq!(instance.openid_display_name, Some("OIDC".to_string()));
+        assert_eq!(instance.client_traffic_policy, ClientTrafficPolicy::None);
+    }
+}
