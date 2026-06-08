@@ -8,8 +8,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(not(target_os = "macos"))]
+use crate::utils::execute_command;
 use crate::{
-    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
@@ -37,9 +38,7 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::defguard::client_types::DeviceConfigResponse,
     proxy::construct_platform_header,
-    service::proto::defguard::enterprise::posture::v2::DevicePostureData,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
@@ -48,16 +47,16 @@ use crate::{
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-#[cfg(not(target_os = "macos"))]
-use crate::{
-    service::{
-        client::DAEMON_CLIENT,
-        proto::defguard::client::v1::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-        },
-    },
-    utils::execute_command,
+use defguard_client_core::connection::active_connections::{
+    find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
 };
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::client_types::DeviceConfigResponse;
+use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
 
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]

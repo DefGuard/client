@@ -6,6 +6,7 @@ use std::{
     result::Result,
     str::FromStr,
     sync::{Arc, RwLock},
+    thread::sleep,
     time::Duration,
 };
 
@@ -58,7 +59,7 @@ pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLoca
 
         if result != 0 {
             error!("NotifyAddrChange failed with error code: {result}");
-            std::thread::sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY);
+            sleep(NETWORK_CHANGE_MONITOR_RESTART_DELAY);
             continue;
         }
 
@@ -66,7 +67,7 @@ pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLoca
             "Network address change detected, waiting {NETWORK_STABILIZATION_DELAY:?}s for \
             network to stabilize before attempting service location connections..."
         );
-        std::thread::sleep(NETWORK_STABILIZATION_DELAY);
+        sleep(NETWORK_STABILIZATION_DELAY);
 
         debug!("Attempting to connect to service locations after network change");
         let connect_result = service_location_manager
@@ -107,7 +108,7 @@ pub fn watch_for_login_logoff(
             }
             Err(err) => {
                 error!("Failed waiting for login/logoff event: {err:?}");
-                std::thread::sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS));
+                sleep(Duration::from_secs(LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS));
                 continue;
             }
         };

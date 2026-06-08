@@ -13,9 +13,12 @@ use std::{
 };
 
 use block2::RcBlock;
-use defguard_client_core::database::models::tunnel_configuration::{
-    id_from_manager, manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID,
-    TUNNEL_ID,
+use defguard_client_core::{
+    connection::active_connections::find_connection,
+    database::models::tunnel_configuration::{
+        id_from_manager, manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID,
+        TUNNEL_ID,
+    },
 };
 use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_foundation::{
@@ -31,7 +34,6 @@ use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
 
 use crate::{
-    active_connections::find_connection,
     appstate::AppState,
     database::{
         models::{location::Location, tunnel::Tunnel, Id},

@@ -1,5 +1,6 @@
 use std::{fmt, fs, path::Path};
 
+use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 
 const CONFIG_FILE_NAME: &str = "provisioning.json";
@@ -30,7 +31,7 @@ impl ProvisioningConfig {
         let file_content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(err) => {
-                log::warn!(
+                warn!(
                     "Failed to open provisioning configuration file at {}. Error details: {err}",
                     path.display()
                 );
@@ -43,7 +44,7 @@ impl ProvisioningConfig {
         match serde_json::from_str::<Self>(file_content) {
             Ok(config) => Some(config),
             Err(err) => {
-                log::warn!(
+                warn!(
                     "Failed to parse provisioning configuration file at {}. Error details: {err}",
                     path.display()
                 );
@@ -56,7 +57,7 @@ impl ProvisioningConfig {
 /// Try to find and load the provisioning configuration from the given app data directory.
 #[must_use]
 pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningConfig> {
-    log::debug!(
+    debug!(
         "Trying to find provisioning config in {}",
         app_data_dir.display()
     );

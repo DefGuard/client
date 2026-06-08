@@ -12,12 +12,14 @@ use std::{fs, path::Path};
 use defguard_client_common::dns_borrow;
 #[cfg(windows)]
 use defguard_client_posture::inspector::device_posture_data;
-use defguard_client_proto::defguard::client::v1::{
-    desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ReadInterfaceDataRequest,
-    RemoveInterfaceRequest, SaveServiceLocationsRequest,
+use defguard_client_proto::defguard::{
+    client::v1::{
+        desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
+        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+    },
+    enterprise::posture::v2::DevicePostureData,
 };
-use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(windows)]
 use defguard_client_service_locations::ServiceLocationManager;

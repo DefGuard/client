@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use std::cmp::Ordering;
-use std::str::FromStr;
+use std::{cmp::Ordering, str::FromStr};
 
 pub mod commands;
 
@@ -50,7 +49,7 @@ pub struct VersionMismatchPayload {
 /// handles 402 PAYMENT_REQUIRED by disabling enterprise features, parses the
 /// response, and checks the version headers.
 ///
-/// Does **not** apply config changes or emit events — those are the caller's
+/// Does **not** apply config changes or emit events - those are the caller's
 /// responsibility.
 pub async fn fetch_instance_config(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -154,8 +153,6 @@ pub async fn config_changed(
     Ok(locations_changed || info_changed)
 }
 
-// --- private helpers -------------------------------------------------------
-
 /// Retrieves token to build InstanceInfoRequest
 fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> {
     let token = instance.token.as_ref().ok_or_else(|| Error::NoToken)?;
@@ -166,7 +163,7 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
 }
 
 /// Checks response headers for version compatibility.
-/// Pure — returns `Some(payload)` when versions are incompatible, `None` when
+/// Returns `Some(payload)` when versions are incompatible, `None` when
 /// everything is compatible or headers are missing.
 fn check_min_version(
     response: &reqwest::Response,

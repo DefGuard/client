@@ -21,10 +21,12 @@ use windows_service::{
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
-#[cfg(windows)]
-use crate::active_connections::find_connection;
 #[cfg(target_os = "macos")]
 use crate::apple::tunnel_stats;
+#[cfg(not(target_os = "macos"))]
+use crate::database::models::{
+    location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats,
+};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
@@ -43,15 +45,12 @@ use crate::{
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     ConnectionType,
 };
+#[cfg(windows)]
+use defguard_client_core::connection::active_connections::find_connection;
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 #[cfg(not(target_os = "macos"))]
-use crate::{
-    database::models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
-    service::{
-        client::DAEMON_CLIENT,
-        proto::defguard::client::v1::{
-            CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest,
-        },
-    },
+use defguard_client_proto::defguard::client::v1::{
+    CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest,
 };
 
 pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";

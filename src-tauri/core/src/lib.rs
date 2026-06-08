@@ -9,6 +9,11 @@ use std::{
     os::unix::fs::PermissionsExt,
 };
 
+use database::models::location::{
+    infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode,
+};
+use defguard_client_proto::defguard::client_types::DeviceConfig;
+
 pub mod app_config;
 pub mod connection;
 pub mod database;
@@ -142,11 +147,6 @@ pub fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, error
     }?;
     Ok(aggregation)
 }
-
-use database::models::location::{
-    infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode,
-};
-use defguard_client_proto::defguard::client_types::DeviceConfig;
 
 #[must_use]
 pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId> {
