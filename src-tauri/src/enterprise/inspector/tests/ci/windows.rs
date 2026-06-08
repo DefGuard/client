@@ -43,7 +43,7 @@ fn test_os_name() {
 #[test]
 #[ignore = "CI posture testing only"]
 fn test_os_version() {
-    assert_eq!(os_version().unwrap(), "Server 2022");
+    assert_eq!(os_version().unwrap(), "11");
 }
 
 #[test]

@@ -88,6 +88,83 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_name -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_version -- --ignored --exact
 
+  test-windows-postures-encrypted:
+    name: Windows postures - encrypted
+    runs-on:
+      # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - windows-latest
+    env:
+      SQLX_OFFLINE: 1
+    steps:
+      - name: Enable long paths
+        shell: powershell
+        run: |
+          git config --system core.longpaths true
+          New-ItemProperty `
+            -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name "LongPathsEnabled" `
+            -Value 1 `
+            -PropertyType DWORD `
+            -Force
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install MSVC build tools
+        shell: powershell
+        run: |
+          choco install visualstudio2022buildtools `
+            --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait --norestart" `
+            -y
+
+      - name: Add Git Bash to PATH
+        shell: powershell
+        run: |
+          "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc
+        shell: powershell
+        run: |
+          choco install protoc -y
+          protoc --version
+
+      - name: Enable BitLocker on system drive
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          whoami
+          net session
+          Get-Tpm
+          Get-BitLockerVolume -MountPoint "C:"
+          $volume = Get-BitLockerVolume -MountPoint "C:"
+          if ($volume.ProtectionStatus -ne "On") {
+            Enable-BitLocker `
+              -MountPoint "C:" `
+              -EncryptionMethod XtsAes256 `
+              -UsedSpaceOnly `
+              -TpmProtector `
+              -SkipHardwareTest
+          }
+          $deadline = (Get-Date).AddMinutes(5)
+          do {
+            Start-Sleep -Seconds 10
+            $volume = Get-BitLockerVolume -MountPoint "C:"
+            $volume | Format-List
+          } while ($volume.ProtectionStatus -ne "On" -and (Get-Date) -lt $deadline)
+          if ($volume.ProtectionStatus -ne "On") {
+            throw "BitLocker protection did not turn on before timeout"
+          }
+
+      - name: Run basic tests
+        working-directory: src-tauri/
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_encrypted -- --ignored --exact
+
   # test-linux-postures-encrypted:
   #   name: Linux postures - encrypted
   #   runs-on:
