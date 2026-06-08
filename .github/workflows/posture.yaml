@@ -39,7 +39,8 @@ jobs:
   test-windows-postures-unencrypted:
     name: Windows postures - unencrypted
     runs-on:
-      - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - windows-latest
     env:
       SQLX_OFFLINE: 1
     steps:
