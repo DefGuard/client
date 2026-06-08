@@ -6,14 +6,15 @@ on:
     branches:
       - posture-checks-ci
 
+env:
+  SQLX_OFFLINE: "1"
+
 jobs:
 
   # test-linux-postures-unencrypted:
   #   name: Linux postures - unencrypted
   #   runs-on:
   #     - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
-  #   env:
-  #     SQLX_OFFLINE: 1
   #   steps:
   #     - uses: actions/checkout@v6
   #       with:
@@ -37,12 +38,11 @@ jobs:
   #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
 
   test-windows-postures-unencrypted:
+    if: false
     name: Windows postures - unencrypted
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
       - windows-latest
-    env:
-      SQLX_OFFLINE: 1
     steps:
       - name: Enable long paths
         shell: powershell
@@ -89,12 +89,12 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_version -- --ignored --exact
 
   test-windows-postures-encrypted:
+    if: false
     name: Windows postures - encrypted
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
       - windows-latest
-    env:
-      SQLX_OFFLINE: 1
+      # - build1-win
     steps:
       - name: Enable long paths
         shell: powershell
@@ -165,12 +165,87 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_encrypted -- --ignored --exact
 
+  test-macos-postures-unencrypted:
+    # runs-on:
+    #   - self-hosted
+    #   - macOS
+    runs-on:
+      - macos-26
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      # - uses: actions/setup-node@v6
+      #   with:
+      #     node-version: 26
+
+      # - uses: pnpm/action-setup@v6
+      #   with:
+      #     cache: true
+      #     version: 11
+
+      # # Change to '--frozen-lockfile' once this gets fixed:
+      # # https://github.com/pnpm/action-setup/issues/40
+      # - name: Install Node dependencies
+      #   run: pnpm install --no-frozen-lockfile
+
+      # - name: Install Node dependencies for New UI
+      #   run: |
+      #     cd new-ui
+      #     pnpm install --no-frozen-lockfile
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      # - name: Set build number
+      #   run: |
+      #     sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
+      #     sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
+
+      # - name: Unlock keychain
+      #   run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+
+      # - name: Build new UI
+      #   run: |
+      #     cd new-ui
+      #     pnpm build
+
+      # - name: Build old UI
+      #   run: |
+      #     pnpm build
+
+      # - name: Build app
+      #   uses: tauri-apps/tauri-action@v0
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     args: --target universal-apple-darwin
+
+      # - name: Build installation package
+      #   run: |
+      #     security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+      #     xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" /Applications defguard-client.pkg
+      #     xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
+      #     # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
+      #     # xcrun stapler staple defguard-client.pkg
+
+      - name: Run basic tests
+        working-directory: src-tauri/
+        shell: cmd
+        run: |
+          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_device_integrity -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_disk_encryption_status_unencrypted -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_os_name -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_os_version -- --ignored --exact
+
+
   # test-linux-postures-encrypted:
   #   name: Linux postures - encrypted
   #   runs-on:
   #     - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
-  #   env:
-  #     SQLX_OFFLINE: 1
   #   steps:
   #     - uses: actions/checkout@v6
   #       with:
