@@ -1,0 +1,29 @@
+#session-timeout {
+  min-height: 100dvh;
+  min-width: 100%;
+
+  > .positioner {
+    height: 100dvh;
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+
+    > svg {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .title {
+      padding-bottom: var(--spacing-xs);
+      font: var(--t-small-500);
+      color: var(--fg-white-100);
+    }
+
+    .description {
+      padding-bottom: var(--spacing-lg);
+      font: var(--t-body-xs-400);
+      color: var(--fg-white-60);
+    }
+  }
+}

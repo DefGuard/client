@@ -16,11 +16,13 @@
     "@biomejs/biome": "^2.4.16",
     "@floating-ui/react": "^0.27.19",
     "@stablelib/base64": "^2.0.1",
+    "@stablelib/x25519": "^2.0.1",
     "@tanstack/react-form": "^1.33.0",
-    "@tanstack/react-query": "^5.100.14",
-    "@tanstack/react-router": "^1.170.10",
-    "@tanstack/router-plugin": "^1.168.13",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-router": "^1.170.11",
+    "@tanstack/router-plugin": "^1.168.14",
     "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-log": "^2.8.0",
     "@tauri-apps/plugin-os": "^2.3.2",
@@ -37,6 +39,7 @@
     "react": "^19.2.7",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.7",
+    "rxjs": "^7.8.2",
     "sass": "^1.100.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
@@ -52,7 +55,7 @@
     "globals": "^17.6.0",
     "stylelint": "^17.12.0",
     "stylelint-config-standard-scss": "^17.0.0",
-    "stylelint-scss": "^7.1.1",
+    "stylelint-scss": "^7.2.0",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   }

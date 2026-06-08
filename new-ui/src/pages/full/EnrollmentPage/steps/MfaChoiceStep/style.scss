@@ -1,0 +1,60 @@
+#mfa-choice-step {
+  .methods {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
+    width: 100%;
+  }
+
+  .method-selection-block {
+    --border: var(--border-disabled);
+
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    padding: var(--spacing-lg) var(--spacing-md);
+    user-select: none;
+
+    &.active {
+      --border: var(--border-emphasis);
+    }
+
+    > .track {
+      display: grid;
+      grid-template-columns:
+        20px var(--spacing-lg) minmax(0, 412px) minmax(var(--spacing-lg), 1fr)
+        24px;
+      grid-template-rows: 1fr;
+
+      .icon-track {
+        align-self: start;
+        grid-column: 1 / 2;
+      }
+
+      .info-block {
+        grid-column: 3 / 4;
+
+        .title {
+          font: var(--t-body-sm-500);
+          padding-bottom: var(--spacing-xs);
+        }
+
+        .description {
+          font: var(--t-body-xs-400);
+          color: var(--fg-white-70);
+        }
+      }
+
+      .indicator-track {
+        grid-column: 5 / 6;
+        display: flex;
+        flex-flow: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+      }
+    }
+  }
+}

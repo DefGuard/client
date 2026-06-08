@@ -1,19 +1,28 @@
 import { getVersion } from '@tauri-apps/api/app';
 
 import { invoke } from '@tauri-apps/api/core';
-
+import { fetch } from '@tauri-apps/plugin-http';
+import { generateWGKeys } from '../utils/generateWGKeys';
+import { enrollmentToMfaMethod } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
+  AddInstanceRequest,
+  AddInstanceResult,
   AppConfig,
   AppConfigPatch,
   Connection,
   ConnectionArgs,
   EdgeRequestHeaders,
+  EnrollmentMfaMethod,
+  EnrollmentStartResponse,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaSetupFinishRequest,
+  MfaSetupFinishResponse,
+  MfaSetupStartResponse,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -137,6 +146,123 @@ const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
 
+const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
+  try {
+    let proxyUrl = values.url;
+    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
+    proxyUrl = `${proxyUrl}/api/v1`;
+
+    const edgeHeaders = await getEdgeRequestHeaders();
+
+    const startRes = await fetch(`${proxyUrl}/enrollment/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
+      body: JSON.stringify({ token: values.token }),
+    });
+
+    if (!startRes.ok) {
+      const body = (await startRes.json()) as { error?: string };
+      return { error: body.error ?? `Enrollment start failed (${startRes.status})` };
+    }
+
+    const cookie = startRes.headers
+      .getSetCookie()
+      .find((c) => c.startsWith('defguard_proxy='));
+    if (!cookie) return { error: 'Auth cookie missing from enrollment response' };
+
+    const resp = (await startRes.json()) as EnrollmentStartResponse;
+    console.log({ resp });
+
+    const instances = await getInstances();
+    const existing = instances.find((i) => i.uuid === resp.instance.id);
+    if (existing) {
+      const netRes = await fetch(`${proxyUrl}/enrollment/network_info`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: cookie,
+          ...edgeHeaders,
+        },
+        body: JSON.stringify({ pubkey: existing.pubkey }),
+      });
+      if (!netRes.ok) return { error: `network_info failed (${netRes.status})` };
+      await updateInstance({ instanceId: existing.id, response: await netRes.json() });
+      return {};
+    }
+
+    const { publicKey, privateKey } = generateWGKeys();
+    const deviceRes = await fetch(`${proxyUrl}/enrollment/create_device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+        ...edgeHeaders,
+      },
+      body: JSON.stringify({ name: values.name, pubkey: publicKey }),
+    });
+
+    if (!deviceRes.ok) {
+      const body = (await deviceRes.json()) as { error?: string };
+      return { error: body.error ?? `create_device failed (${deviceRes.status})` };
+    }
+
+    await saveDeviceConfig({ privateKey, response: await deviceRes.json() });
+
+    // Show enrollment
+    if (!resp.user.enrolled) {
+      return { startResponse: resp, proxyUrl, cookie };
+    }
+
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+};
+
+const startMfaSetup = async (
+  proxyUrl: string,
+  cookie: string,
+  method: EnrollmentMfaMethod,
+): Promise<{ result?: MfaSetupStartResponse; error?: string }> => {
+  try {
+    const edgeHeaders = await getEdgeRequestHeaders();
+    const res = await fetch(`${proxyUrl}/enrollment/register-mfa/code/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
+      body: JSON.stringify({ method: enrollmentToMfaMethod(method) }),
+    });
+    if (!res.ok) {
+      const body = (await res.json()) as { error?: string };
+      return { error: body.error ?? `MFA setup start failed (${res.status})` };
+    }
+    return { result: (await res.json()) as MfaSetupStartResponse };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+};
+
+const finishMfaSetup = async (
+  proxyUrl: string,
+  cookie: string,
+  request: MfaSetupFinishRequest,
+): Promise<{ result?: MfaSetupFinishResponse; error?: string }> => {
+  try {
+    const edgeHeaders = await getEdgeRequestHeaders();
+    const res = await fetch(`${proxyUrl}/enrollment/register-mfa/code/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
+      body: JSON.stringify(request),
+    });
+    if (!res.ok) {
+      const body = (await res.json()) as { error?: string };
+      return { error: body.error ?? `MFA setup finish failed (${res.status})` };
+    }
+    return { result: (await res.json()) as MfaSetupFinishResponse };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+};
+
 export const api = {
   getEdgeRequestHeaders,
   // Instances
@@ -181,4 +307,8 @@ export const api = {
   swapToFullView,
   swapToTray,
   closeTrayWindow,
+  // Enrollment
+  addInstance,
+  startMfaSetup,
+  finishMfaSetup,
 };

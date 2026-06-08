@@ -30,9 +30,12 @@
     height: 100%;
     min-width: 100%;
     max-height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden auto;
     box-sizing: border-box;
     padding: var(--spacing-md) var(--spacing-sm);
+
+    > .scroll-container {
+      min-height: 100%;
+    }
   }
 }

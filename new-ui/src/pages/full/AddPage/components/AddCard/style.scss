@@ -1,6 +1,6 @@
 .add-card {
   --border: var(--border-action-disabled);
-  --shadow: box-shadow: 0 4px 12px 0 rgba(13, 47, 157, 0);
+  --shadow: box-shadow: 0 4px 12px 0 rgb(13 47 157 / 0%);
   --color: var(--fg-white-80);
 
   box-sizing: border-box;
@@ -15,7 +15,7 @@
 
   &:hover {
     --border: var(--border-default);
-    --shadow: box-shadow: 0 4px 12px 0 rgba(13, 47, 157, 0.14);
+    --shadow: box-shadow: 0 4px 12px 0 rgb(13 47 157 / 14%);
     --color: var(--fg-white-100);
   }
 

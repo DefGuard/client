@@ -14,6 +14,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
 import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as CompactIndexRouteImport } from './routes/compact/index'
+import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
+import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullAddIndexRouteImport } from './routes/full/add/index'
 import { Route as FullAddInstanceRouteImport } from './routes/full/add/instance'
 
@@ -42,6 +44,16 @@ const CompactIndexRoute = CompactIndexRouteImport.update({
   path: '/compact/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FullSessionTimeoutRoute = FullSessionTimeoutRouteImport.update({
+  id: '/full/session-timeout',
+  path: '/full/session-timeout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
+  id: '/full/enrollment',
+  path: '/full/enrollment',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FullAddIndexRoute = FullAddIndexRouteImport.update({
   id: '/full/add/',
   path: '/full/add/',
@@ -56,6 +68,8 @@ const FullAddInstanceRoute = FullAddInstanceRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/enrollment': typeof FullEnrollmentRoute
+  '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
@@ -65,6 +79,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/enrollment': typeof FullEnrollmentRoute
+  '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact': typeof CompactIndexRoute
   '/full': typeof FullIndexRoute
   '/playground': typeof PlaygroundIndexRoute
@@ -75,6 +91,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/enrollment': typeof FullEnrollmentRoute
+  '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
@@ -86,6 +104,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/empty'
+    | '/full/enrollment'
+    | '/full/session-timeout'
     | '/compact/'
     | '/full/'
     | '/playground/'
@@ -95,6 +115,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/empty'
+    | '/full/enrollment'
+    | '/full/session-timeout'
     | '/compact'
     | '/full'
     | '/playground'
@@ -104,6 +126,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/empty'
+    | '/full/enrollment'
+    | '/full/session-timeout'
     | '/compact/'
     | '/full/'
     | '/playground/'
@@ -114,6 +138,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmptyRoute: typeof EmptyRoute
+  FullEnrollmentRoute: typeof FullEnrollmentRoute
+  FullSessionTimeoutRoute: typeof FullSessionTimeoutRoute
   CompactIndexRoute: typeof CompactIndexRoute
   FullIndexRoute: typeof FullIndexRoute
   PlaygroundIndexRoute: typeof PlaygroundIndexRoute
@@ -158,6 +184,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompactIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/full/session-timeout': {
+      id: '/full/session-timeout'
+      path: '/full/session-timeout'
+      fullPath: '/full/session-timeout'
+      preLoaderRoute: typeof FullSessionTimeoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/full/enrollment': {
+      id: '/full/enrollment'
+      path: '/full/enrollment'
+      fullPath: '/full/enrollment'
+      preLoaderRoute: typeof FullEnrollmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/full/add/': {
       id: '/full/add/'
       path: '/full/add'
@@ -178,6 +218,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmptyRoute: EmptyRoute,
+  FullEnrollmentRoute: FullEnrollmentRoute,
+  FullSessionTimeoutRoute: FullSessionTimeoutRoute,
   CompactIndexRoute: CompactIndexRoute,
   FullIndexRoute: FullIndexRoute,
   PlaygroundIndexRoute: PlaygroundIndexRoute,

@@ -1,0 +1,101 @@
+.wizard-page {
+  --page-content-limit: 536px;
+
+  height: 100dvh;
+  overflow-y: auto;
+
+  > .page-grid {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    height: 100%;
+
+    & > .side {
+      box-sizing: border-box;
+      padding: var(--spacing-md) var(--spacing-lg);
+      border-right: 1px solid var(--border-disabled);
+      user-select: none;
+
+      > .title {
+        font: var(--t-body-xs-500);
+        color: var(--fg-white-100);
+      }
+    }
+
+    & > .main {
+      display: flex;
+      flex-flow: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      box-sizing: border-box;
+      padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+
+      > .step-content {
+        display: contents;
+
+        > header {
+          h1 {
+            font: var(--t-primary-500);
+            color: var(--c-white-100);
+          }
+
+          p {
+            font: var(--t-body-sm-400);
+            color: var(--fg-white-70);
+          }
+        }
+
+        .input.spacer {
+          width: 100%;
+        }
+
+        form {
+          display: contents;
+        }
+      }
+
+      > .wizard-step-badge {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        justify-content: flex-start;
+        flex-grow: 0;
+        flex-shrink: 1;
+        user-select: none;
+        box-sizing: border-box;
+        border: 1px solid var(--border-default);
+        background: transparent;
+        border-radius: 100px;
+        min-height: 24px;
+        padding: 0 var(--spacing-md);
+
+        p,
+        span {
+          font: var(--t-body-xxs-500);
+          color: var(--fg-white-100);
+        }
+      }
+    }
+
+    .layout-grid {
+      padding-top: var(--spacing-4xl);
+    }
+
+    .layout-grid > .side {
+      .title {
+        font: var(--t-title-h3);
+        color: var(--fg-default);
+      }
+
+      .description {
+        font: var(--t-body-sm-400);
+        color: var(--fg-muted);
+      }
+    }
+  }
+}
+
+.wizard-page .main .controls {
+  margin-top: auto;
+  width: 100%;
+}

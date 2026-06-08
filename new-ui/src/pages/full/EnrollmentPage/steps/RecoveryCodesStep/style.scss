@@ -1,0 +1,25 @@
+#recovery-codes-step {
+  .codes {
+    display: grid;
+    background: var(--bg-white-5);
+    border-radius: 12px;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--spacing-4xl);
+    box-sizing: border-box;
+    padding: var(--spacing-md);
+
+    p {
+      font: var(--t-small-400);
+      color: var(--fg-white-100);
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    row-gap: var(--spacing-md);
+  }
+}

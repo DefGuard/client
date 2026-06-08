@@ -1,7 +1,20 @@
 #add-instance-view .page-content {
+  > .scroll-container {
+    display: flex;
+    flex-flow: column;
+  }
+
   .page-description {
     font: var(--t-body-sm-400);
     color: var(--fg-white-70);
     padding-bottom: var(--spacing-3xl);
+  }
+
+  form {
+    display: contents;
+  }
+
+  .controls {
+    margin-top: auto;
   }
 }

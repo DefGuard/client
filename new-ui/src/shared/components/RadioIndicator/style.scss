@@ -1,0 +1,55 @@
+.radio-indicator {
+  display: inline-flex;
+  flex-flow: row;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.radio-indicator svg {
+  &.icon-default {
+    circle {
+      stroke: var(--fg-white-100);
+      fill: transparent;
+    }
+  }
+
+  &.icon-hover {
+    circle {
+      stroke: var(--fg-white-100);
+      fill: transparent;
+    }
+  }
+
+  &.icon-disabled {
+    circle {
+      stroke: var(--border-disabled);
+      fill: var(--bg-white-5);
+    }
+  }
+
+  &.icon-selected {
+    circle {
+      &:nth-child(1) {
+        fill: var(--fg-white-100);
+      }
+
+      &:nth-child(2) {
+        fill: var(--fg-action);
+      }
+    }
+  }
+
+  &.icon-selected-disabled {
+    circle {
+      &:nth-child(1) {
+        fill: var(--bg-white-10);
+      }
+
+      &:nth-child(2) {
+        fill: var(--bg-white-60);
+      }
+    }
+  }
+}
