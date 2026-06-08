@@ -1,5 +1,8 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: this cannot be shown without those store values */
+import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 import {
   Icon,
   IconKind,
@@ -7,15 +10,33 @@ import {
 } from '../../../../../shared/components/Icon';
 import { RadioIndicator } from '../../../../../shared/components/RadioIndicator/RadioIndicator';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
+import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const MfaChoiceStep = () => {
+  const [proxyUrl, cookie] = useEnrollmentStore(
+    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
+  );
   const [mfa, setMfa] = useState<MfaMethodValue>(
     useEnrollmentStore.getState().userMfaChoice,
   );
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => api.startMfaSetup(proxyUrl, cookie, mfa),
+    onSuccess: (resp) => {
+      if (resp.result?.totp_secret) {
+        const secret = resp.result.totp_secret;
+        useEnrollmentStore.setState({
+          userMfaChoice: mfa,
+          userTotpSecret: secret,
+        });
+        useEnrollmentStore.getState().next();
+      }
+    },
+  });
 
   return (
     <div id="mfa-choice-step">
@@ -48,15 +69,11 @@ export const MfaChoiceStep = () => {
         />
       </div>
       <EnrollmentControls
-        onBack={() => {
-          useEnrollmentStore.getState().back();
-        }}
+        disableBack
         onNext={() => {
-          useEnrollmentStore.setState({
-            userMfaChoice: mfa,
-          });
-          useEnrollmentStore.getState().next();
+          mutate();
         }}
+        loading={isPending}
       />
     </div>
   );

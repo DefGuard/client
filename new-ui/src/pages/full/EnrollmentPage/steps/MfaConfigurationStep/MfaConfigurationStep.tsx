@@ -1,10 +1,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import './style.scss';
+import { useMutation } from '@tanstack/react-query';
+import { useShallow } from 'zustand/shallow';
 import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
 import { CopyField } from '../../../../../shared/components/CopyField/CopyField';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { QrCard } from '../../../../../shared/components/QrCard/QrCard';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
+import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
@@ -15,12 +18,32 @@ export const MfaConfigurationStep = () => {
   const method = useEnrollmentStore((s) => s.userMfaChoice);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [proxyUrl, cookie] = useEnrollmentStore(
+    // biome-ignore lint/style/noNonNullAssertion: safe
+    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
+  );
+
+  const { mutate, isPending } = useMutation({
+    // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
+    mutationFn: () => api.finishMfaSetup(proxyUrl, cookie, { code: code!, method }),
+    onError: () => {},
+    onSuccess: (resp) => {
+      if (resp.result) {
+        useEnrollmentStore.setState({
+          userRecoveryCodes: resp.result.recovery_codes,
+          deadline: null,
+        });
+        useEnrollmentStore.getState().next();
+      }
+    },
+  });
 
   const handleSubmit = useCallback(() => {
-    if (code?.length !== 6) {
+    if (code?.trim().length !== 6) {
       setError('');
     }
-  }, [code]);
+    mutate();
+  }, [code, mutate]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code
   useEffect(() => {
@@ -52,7 +75,13 @@ export const MfaConfigurationStep = () => {
         }}
         error={error}
       />
-      <EnrollmentControls onNext={handleSubmit} />
+      <EnrollmentControls
+        onBack={() => {
+          useEnrollmentStore.getState().back();
+        }}
+        onNext={handleSubmit}
+        loading={isPending}
+      />
     </div>
   );
 };

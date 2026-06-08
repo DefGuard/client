@@ -398,15 +398,17 @@ export type AddInstanceResult = {
   error?: string;
 };
 
-export type EnrollmentMfaMethod =
-  | 'Totp'
-  | 'Email'
-  | 'Oidc'
-  | 'Biometric'
-  | 'MobileApprove';
-
-export type MfaSetupStartRequest = { method: EnrollmentMfaMethod };
+export type MfaSetupStartRequest = { method: MfaMethodValue };
 export type MfaSetupStartResponse = { totp_secret?: string };
 
-export type MfaSetupFinishRequest = { code: string; method: EnrollmentMfaMethod };
+export type MfaSetupFinishRequest = { code: string; method: MfaMethodValue };
 export type MfaSetupFinishResponse = { recovery_codes: string[] };
+
+export type ActivateUserRequest = {
+  password: string;
+  phone_number: string;
+};
+
+export type ActivateUserResponse = {
+  token: string;
+};

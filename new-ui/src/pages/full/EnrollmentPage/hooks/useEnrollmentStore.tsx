@@ -19,10 +19,12 @@ type StoreValues = {
   userTotpSecret: string | null;
   userRecoveryCodes: string[] | null;
   userMfaChoice: MfaMethodValue;
+  sessionCookie: string | null;
 };
 
 const defaults: StoreValues = {
   activeStep: EnrollmentStep.Welcome,
+  sessionCookie: null,
   proxyUrl: null,
   userRecoveryCodes: null,
   startResponse: null,
@@ -36,7 +38,12 @@ const defaults: StoreValues = {
 } as const;
 
 interface Store extends StoreValues {
-  start: (response: EnrollmentStartResponse, url: string, totpSecret?: string) => void;
+  start: (
+    response: EnrollmentStartResponse,
+    url: string,
+    cookie: string,
+    totpSecret?: string,
+  ) => void;
   next: () => void;
   back: () => void;
 }
@@ -45,14 +52,17 @@ export const useEnrollmentStore = create<Store>()(
   persist(
     (set, get) => ({
       ...defaults,
-      start: (response, url, secret) => {
+      start: (response, url, cookie, secret) => {
         set({
           ...defaults,
           proxyUrl: url,
           activeStep: EnrollmentStep.Welcome,
           startResponse: response,
+          sessionCookie: cookie,
           // if smtp is not present then it's not possible to choose.
-          skipMfaChoice: !response.settings.smtp_configured,
+          skipMfaChoice:
+            !response.settings.smtp_configured || !response.settings.mfa_required,
+          skipMfa: !response.settings.mfa_required,
           deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
           userTotpSecret: secret ?? null,
         });

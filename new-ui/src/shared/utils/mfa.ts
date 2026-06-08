@@ -1,33 +1,16 @@
-import type { EnrollmentMfaMethod, MfaMethodValue } from '../rust-api/types';
+import type { MfaMethodValue } from '../rust-api/types';
 
-export const mfaMethodToEnrollment = (method: number): EnrollmentMfaMethod => {
+export const enrollmentToMfaMethod = (method: MfaMethodValue): number => {
   switch (method) {
-    case 0:
-      return 'Totp';
-    case 1:
-      return 'Email';
-    case 2:
-      return 'Oidc';
-    case 3:
-      return 'Biometric';
-    case 4:
-      return 'MobileApprove';
-    default:
-      throw new Error(`Unknown MfaMethod value: ${method}`);
-  }
-};
-
-export const enrollmentToMfaMethod = (method: EnrollmentMfaMethod): number => {
-  switch (method) {
-    case 'Totp':
+    case 'totp':
       return 0;
-    case 'Email':
+    case 'email':
       return 1;
-    case 'Oidc':
+    case 'oidc':
       return 2;
-    case 'Biometric':
+    case 'biometric':
       return 3;
-    case 'MobileApprove':
+    case 'mobileapprove':
       return 4;
   }
 };

@@ -1,12 +1,16 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: ensured by wizard page */
 import './style.scss';
 import { useStore } from '@tanstack/react-form';
+import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useCallback } from 'react';
 import z from 'zod';
+import { useShallow } from 'zustand/shallow';
 import { Icon, type IconKindValue } from '../../../../../shared/components/Icon';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { useAppForm, withForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
+import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
@@ -49,6 +53,20 @@ const defaultValues: FormFields = {
 };
 
 export const PasswordStep = () => {
+  const [proxyUrl, cookie] = useEnrollmentStore(
+    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
+  );
+
+  const { mutateAsync } = useMutation({
+    mutationFn: (password: string) =>
+      api.activateUser(proxyUrl, cookie, {
+        password,
+      }),
+    onSuccess: () => {
+      useEnrollmentStore.getState().next();
+    },
+  });
+
   const form = useAppForm({
     defaultValues,
     validationLogic: formChangeLogic,
@@ -56,11 +74,8 @@ export const PasswordStep = () => {
       onSubmit: formSchema,
       onChange: formSchema,
     },
-    onSubmit: ({ value }) => {
-      useEnrollmentStore.setState({
-        userPassword: value.password,
-      });
-      useEnrollmentStore.getState().next();
+    onSubmit: async ({ value }) => {
+      await mutateAsync(value.password);
     },
   });
 
@@ -110,11 +125,16 @@ export const PasswordStep = () => {
           </form.AppField>
           <SizedBox height={ThemeSpacing.Xl2} />
           <CheckList form={form} />
-          <EnrollmentControls
-            onNext={() => {
-              form.handleSubmit();
-            }}
-          />
+          <form.Subscribe selector={(s) => s.isSubmitting}>
+            {(loading) => (
+              <EnrollmentControls
+                onNext={() => {
+                  form.handleSubmit();
+                }}
+                loading={loading}
+              />
+            )}
+          </form.Subscribe>
         </form.AppForm>
       </form>
     </div>

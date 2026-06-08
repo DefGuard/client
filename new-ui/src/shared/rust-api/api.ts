@@ -5,6 +5,8 @@ import { fetch } from '@tauri-apps/plugin-http';
 import { generateWGKeys } from '../utils/generateWGKeys';
 import { enrollmentToMfaMethod } from '../utils/mfa';
 import type {
+  ActivateUserRequest,
+  ActivateUserResponse,
   ActiveConnectionSummary,
   AddInstanceRequest,
   AddInstanceResult,
@@ -13,13 +15,13 @@ import type {
   Connection,
   ConnectionArgs,
   EdgeRequestHeaders,
-  EnrollmentMfaMethod,
   EnrollmentStartResponse,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaMethodValue,
   MfaSetupFinishRequest,
   MfaSetupFinishResponse,
   MfaSetupStartResponse,
@@ -222,7 +224,7 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
 const startMfaSetup = async (
   proxyUrl: string,
   cookie: string,
-  method: EnrollmentMfaMethod,
+  method: MfaMethodValue,
 ): Promise<{ result?: MfaSetupStartResponse; error?: string }> => {
   try {
     const edgeHeaders = await getEdgeRequestHeaders();
@@ -236,6 +238,28 @@ const startMfaSetup = async (
       return { error: body.error ?? `MFA setup start failed (${res.status})` };
     }
     return { result: (await res.json()) as MfaSetupStartResponse };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+};
+
+const activateUser = async (
+  proxyUrl: string,
+  cookie: string,
+  request: Omit<ActivateUserRequest, 'phone_number'>,
+): Promise<{ result?: ActivateUserResponse; error?: string }> => {
+  try {
+    const edgeHeaders = await getEdgeRequestHeaders();
+    const res = await fetch(`${proxyUrl}/enrollment/activate_user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
+      body: JSON.stringify({ ...request, phone_number: '' }),
+    });
+    if (!res.ok) {
+      const body = (await res.json()) as { error?: string };
+      return { error: body.error ?? `activate_user failed (${res.status})` };
+    }
+    return { result: (await res.json()) as ActivateUserResponse };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -309,6 +333,7 @@ export const api = {
   closeTrayWindow,
   // Enrollment
   addInstance,
+  activateUser,
   startMfaSetup,
   finishMfaSetup,
 };
