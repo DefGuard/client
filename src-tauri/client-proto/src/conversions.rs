@@ -138,4 +138,47 @@ mod tests {
 
         assert_eq!(base_peer, converted_peer);
     }
+
+    fn sample_peer() -> Peer {
+        let secret = EphemeralSecret::random();
+        let peer_key: Key = PublicKey::from(&secret).as_ref().try_into().unwrap();
+        let mut peer = Peer::new(peer_key);
+        peer.allowed_ips
+            .push(IpAddrMask::from_str("10.20.30.2/32").unwrap());
+        peer.endpoint = Some("127.0.0.1:8080".parse().unwrap());
+        peer.persistent_keepalive_interval = Some(25);
+        peer
+    }
+
+    #[test]
+    fn test_host_to_interface_data() {
+        let secret = EphemeralSecret::random();
+        let host_key: Key = PublicKey::from(&secret).as_ref().try_into().unwrap();
+        let mut host = Host::new(51820, host_key);
+        let peer = sample_peer();
+        host.peers.insert(peer.public_key.clone(), peer.clone());
+
+        let data: InterfaceData = host.into();
+
+        assert_eq!(data.listen_port, 51820);
+        assert_eq!(data.peers.len(), 1);
+        assert_eq!(data.peers[0].public_key, peer.public_key.to_lower_hex());
+    }
+
+    #[test]
+    fn test_proto_peer_to_peer_roundtrip() {
+        let peer = sample_peer();
+        let proto: ProtoPeer = peer.clone().into();
+        let converted: Peer = proto.into();
+        assert_eq!(peer, converted);
+    }
+
+    #[test]
+    fn test_keepalive_overflow_maps_to_none() {
+        let mut proto: ProtoPeer = sample_peer().into();
+        // A value exceeding u16::MAX can't be represented as a keepalive interval.
+        proto.persistent_keepalive_interval = Some(u32::from(u16::MAX) + 1);
+        let converted: Peer = proto.into();
+        assert_eq!(converted.persistent_keepalive_interval, None);
+    }
 }
