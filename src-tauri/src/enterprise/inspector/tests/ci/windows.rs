@@ -1,5 +1,8 @@
+use super::super::super::{
+    anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
+    security_update_age_days,
+};
 use std::process::Command;
-use super::super::super::{disk_encryption_status, os_name, os_version};
 
 // fn expected_os_version() -> String {
 //     if let Ok(os_release) = std::fs::read_to_string("/etc/os-release") {
@@ -45,6 +48,25 @@ fn test_os_name() {
 fn test_os_version() {
     assert_eq!(os_version().unwrap(), "11");
 }
+
+#[test]
+#[ignore = "CI posture testing only"]
+fn test_anti_virus_status() {
+    assert_eq!(anti_virus_status().unwrap(), false);
+}
+
+#[test]
+#[ignore = "CI posture testing only"]
+fn test_part_of_domain() {
+    assert_eq!(part_of_domain().unwrap(), false);
+}
+
+#[test]
+#[ignore = "CI posture testing only"]
+fn test_security_update_age_days() {
+    assert_eq!(security_update_age_days().unwrap(), 60);
+}
+
 
 #[test]
 #[ignore = "CI posture testing only"]

@@ -39,11 +39,12 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
 
   test-windows-postures-unencrypted:
-    if: false
+    if: true
     name: Windows postures - unencrypted
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
-      - windows-latest
+      # - windows-latest
+      - build1-win
     steps:
       - name: Enable long paths
         shell: powershell
@@ -85,6 +86,8 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_anti_virus_status -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_part_of_domain -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_unencrypted -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_name -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_version -- --ignored --exact
