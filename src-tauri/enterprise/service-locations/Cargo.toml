@@ -4,6 +4,7 @@ description = "Service location management for the Defguard client daemon"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
+license = "LicenseRef-Proprietary"
 license-file = "../LICENSE.md"
 rust-version.workspace = true
 version.workspace = true

@@ -148,16 +148,16 @@ exceptions = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-dg" },
     { allow = [
-        "AGPL-3.0-or-later",
+        "LicenseRef-Proprietary",
     ], crate = "defguard-client-posture" },
     { allow = [
-        "AGPL-3.0-or-later",
+        "LicenseRef-Proprietary",
     ], crate = "defguard-client-provisioning" },
     { allow = [
-        "AGPL-3.0-or-later",
+        "LicenseRef-Proprietary",
     ], crate = "defguard-client-config-sync" },
     { allow = [
-        "AGPL-3.0-or-later",
+        "LicenseRef-Proprietary",
     ], crate = "defguard-client-service-locations" },
 ]
 
