@@ -234,7 +234,6 @@ jobs:
 
       - name: Run basic tests
         working-directory: src-tauri/
-        shell: cmd
         run: |
           cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_device_integrity -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_disk_encryption_status_unencrypted -- --ignored --exact
