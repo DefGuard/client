@@ -161,6 +161,7 @@ in
       mkdir -p $out/bin
       install -Dm755 "$targetDir/${pname}"         $out/bin/${pname}
       install -Dm755 "$targetDir/defguard-service" $out/bin/defguard-service
+      install -Dm755 "$targetDir/defguard-cli"     $out/bin/defguard-cli
       install -Dm755 "$targetDir/dg"               $out/bin/dg
 
       mkdir -p $out/lib/${pname}
