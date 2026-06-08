@@ -160,3 +160,108 @@ impl From<Connection<Id>> for CommonConnection<Id> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+
+    use super::*;
+    use crate::database::models::{
+        instance::{ClientTrafficPolicy, Instance},
+        location::{Location, LocationMfaMode, ServiceLocationMode},
+    };
+
+    async fn seed_location(pool: &SqlitePool) -> (Id, Id) {
+        let instance = Instance {
+            id: NoId,
+            name: "instance".into(),
+            uuid: "uuid-1".into(),
+            url: "https://core.example".into(),
+            proxy_url: "https://proxy.example".into(),
+            username: "alice".into(),
+            token: None,
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: false,
+            openid_display_name: None,
+        }
+        .save(pool)
+        .await
+        .unwrap();
+
+        let location = Location {
+            id: NoId,
+            instance_id: instance.id,
+            network_id: 1,
+            name: "loc".into(),
+            address: "10.0.0.2/24".into(),
+            pubkey: "pk".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: LocationMfaMode::Disabled,
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+        }
+        .save(pool)
+        .await
+        .unwrap();
+
+        (instance.id, location.id)
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_connection_round_trip(pool: SqlitePool) {
+        let (_instance_id, location_id) = seed_location(&pool).await;
+        let now = Utc::now().naive_utc();
+
+        Connection {
+            id: NoId,
+            location_id,
+            start: now,
+            end: now,
+        }
+        .save(&pool)
+        .await
+        .unwrap();
+
+        let latest = Connection::latest_by_location_id(&pool, location_id)
+            .await
+            .unwrap()
+            .expect("connection should exist");
+        assert_eq!(latest.location_id, location_id);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_delete_instance_cascades_to_location_and_connection(pool: SqlitePool) {
+        let (instance_id, location_id) = seed_location(&pool).await;
+        let now = Utc::now().naive_utc();
+        Connection {
+            id: NoId,
+            location_id,
+            start: now,
+            end: now,
+        }
+        .save(&pool)
+        .await
+        .unwrap();
+
+        // Deleting the parent instance must cascade through location to its connections.
+        let instance = Instance::find_by_id(&pool, instance_id)
+            .await
+            .unwrap()
+            .unwrap();
+        instance.delete(&pool).await.unwrap();
+
+        assert!(Location::find_by_id(&pool, location_id)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(Connection::latest_by_location_id(&pool, location_id)
+            .await
+            .unwrap()
+            .is_none());
+    }
+}

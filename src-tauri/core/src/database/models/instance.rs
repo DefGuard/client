@@ -280,7 +280,51 @@ impl From<i64> for ClientTrafficPolicy {
 
 #[cfg(test)]
 mod tests {
+    use sqlx::SqlitePool;
+
     use super::*;
+
+    fn new_instance() -> Instance<NoId> {
+        Instance {
+            id: NoId,
+            name: "instance".into(),
+            uuid: "uuid-1".into(),
+            url: "https://core.example".into(),
+            proxy_url: "https://proxy.example".into(),
+            username: "alice".into(),
+            token: Some("token".into()),
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: false,
+            openid_display_name: None,
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_instance_crud_round_trip(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+
+        let found = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+        assert_eq!(found.uuid, "uuid-1");
+        assert_eq!(found.name, "instance");
+
+        let all = Instance::all(&pool).await.unwrap();
+        assert_eq!(all.len(), 1);
+
+        let by_name = Instance::find_by_name(&pool, "instance")
+            .await
+            .unwrap()
+            .expect("instance should be found by name");
+        assert_eq!(by_name.id, instance.id);
+
+        instance.delete(&pool).await.unwrap();
+        assert!(Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .is_none());
+    }
 
     #[test]
     fn test_client_traffic_policy_from_i32() {

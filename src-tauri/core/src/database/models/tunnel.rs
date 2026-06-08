@@ -677,4 +677,43 @@ mod tests {
         let count = TunnelStats::<Id>::count(&pool).await.unwrap();
         assert_eq!(count, 2);
     }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnel_crud_round_trip(pool: SqlitePool) {
+        let tunnel = Tunnel::new(
+            "test".into(),
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            None,
+            None,
+            String::new(),
+            None,
+            0,
+            false,
+            None,
+            None,
+            None,
+            None,
+        )
+        .save(&pool)
+        .await
+        .unwrap();
+
+        let found = Tunnel::find_by_id(&pool, tunnel.id)
+            .await
+            .unwrap()
+            .expect("tunnel should exist");
+        assert_eq!(found.name, "test");
+
+        let all = Tunnel::all(&pool).await.unwrap();
+        assert_eq!(all.len(), 1);
+
+        tunnel.delete(&pool).await.unwrap();
+        assert!(Tunnel::find_by_id(&pool, tunnel.id)
+            .await
+            .unwrap()
+            .is_none());
+    }
 }
