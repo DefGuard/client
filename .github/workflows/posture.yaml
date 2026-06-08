@@ -171,6 +171,7 @@ jobs:
     #   - macOS
     runs-on:
       - macos-26
+      # - codebuild-defguard-posture-macos-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -231,6 +232,9 @@ jobs:
       #     xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
       #     # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
       #     # xcrun stapler staple defguard-client.pkg
+
+      - name: Install protoc
+        run: brew install protobuf
 
       - name: Run basic tests
         working-directory: src-tauri/
