@@ -295,3 +295,92 @@ fn check_min_version(
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use defguard_client_core::database::models::instance::ClientTrafficPolicy;
+
+    use super::*;
+
+    fn instance_with_token(token: Option<&str>) -> Instance<Id> {
+        Instance {
+            id: 1,
+            name: "inst".into(),
+            uuid: "uuid".into(),
+            url: "https://core".into(),
+            proxy_url: "https://proxy".into(),
+            username: "alice".into(),
+            token: token.map(str::to_string),
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: false,
+            openid_display_name: None,
+        }
+    }
+
+    fn response_with_headers(headers: &[(&str, &str)]) -> reqwest::Response {
+        let mut builder = http::Response::builder();
+        for (key, value) in headers {
+            builder = builder.header(*key, *value);
+        }
+        reqwest::Response::from(builder.body(String::new()).unwrap())
+    }
+
+    #[test]
+    fn test_build_request_no_token_errors() {
+        let instance = instance_with_token(None);
+        assert!(matches!(build_request(&instance), Err(Error::NoToken)));
+    }
+
+    #[test]
+    fn test_build_request_includes_token() {
+        let instance = instance_with_token(Some("tok"));
+        let request = build_request(&instance).unwrap();
+        assert_eq!(request.token, "tok");
+    }
+
+    #[test]
+    fn test_check_min_version_compatible_returns_none() {
+        let response = response_with_headers(&[
+            (CORE_VERSION_HEADER, "1.6.0"),
+            (PROXY_VERSION_HEADER, "1.6.0"),
+        ]);
+        let instance = instance_with_token(Some("tok"));
+        assert!(check_min_version(&response, &instance).is_none());
+    }
+
+    #[test]
+    fn test_check_min_version_incompatible_core() {
+        let response = response_with_headers(&[
+            (CORE_VERSION_HEADER, "1.0.0"),
+            (PROXY_VERSION_HEADER, "1.6.0"),
+        ]);
+        let instance = instance_with_token(Some("tok"));
+        let payload = check_min_version(&response, &instance).expect("mismatch expected");
+        assert!(!payload.core_compatible);
+        assert!(payload.proxy_compatible);
+        assert_eq!(payload.core_version, "1.0.0");
+    }
+
+    #[test]
+    fn test_check_min_version_missing_headers_returns_mismatch() {
+        let response = response_with_headers(&[]);
+        let instance = instance_with_token(Some("tok"));
+        let payload = check_min_version(&response, &instance).expect("mismatch expected");
+        assert!(!payload.core_compatible);
+        assert!(!payload.proxy_compatible);
+        assert_eq!(payload.core_version, "unknown");
+        assert_eq!(payload.proxy_version, "unknown");
+    }
+
+    #[test]
+    fn test_check_min_version_core_not_connected_suppresses() {
+        // Core reports it is not connected, so an incompatible version is not flagged.
+        let response = response_with_headers(&[
+            (CORE_CONNECTED_HEADER, "false"),
+            (CORE_VERSION_HEADER, "1.0.0"),
+            (PROXY_VERSION_HEADER, "1.6.0"),
+        ]);
+        let instance = instance_with_token(Some("tok"));
+        assert!(check_min_version(&response, &instance).is_none());
+    }
+}

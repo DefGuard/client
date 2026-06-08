@@ -30,6 +30,7 @@ tonic-prost-build = "0.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tempfile = "3"
+http = "1"
 
 [workspace.package]
 authors = ["Defguard"]

@@ -20,5 +20,8 @@ serde_json.workspace = true
 sqlx.workspace = true
 tokio = { version = "1", features = ["time"] }
 
+[dev-dependencies]
+http.workspace = true
+
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tonic = { workspace = true }

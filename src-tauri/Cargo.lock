@@ -1489,6 +1489,7 @@ dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
  "defguard-client-service-locations",
+ "http",
  "log",
  "reqwest 0.13.4",
  "semver",
@@ -1577,6 +1578,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
