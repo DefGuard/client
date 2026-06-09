@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{location::Location, Id, NoId, PURGE_DURATION};
-use crate::{error::Error, CommonLocationStats, ConnectionType, DateTimeAggregation};
+use crate::{CommonLocationStats, ConnectionType, DateTimeAggregation};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {
@@ -40,7 +40,7 @@ pub async fn peer_to_location_stats<'e, E>(
     peer: &Peer,
     listen_port: u32,
     executor: E,
-) -> Result<LocationStats<NoId>, Error>
+) -> sqlx::Result<LocationStats<NoId>>
 where
     E: SqliteExecutor<'e>,
 {
@@ -61,7 +61,7 @@ where
 impl LocationStats {
     // Although not used on macOS, allow dead code for `sqlx prepare`.
     #[cfg_attr(target_os = "macos", allow(dead_code))]
-    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, sqlx::Error>
+    pub async fn get_name<'e, E>(&self, executor: E) -> sqlx::Result<String>
     where
         E: SqliteExecutor<'e>,
     {
@@ -93,7 +93,7 @@ impl LocationStats<NoId> {
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<LocationStats<Id>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -133,7 +133,7 @@ impl LocationStats<Id> {
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
         limit: Option<i32>,
-    ) -> Result<Vec<Self>, Error>
+    ) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -171,7 +171,7 @@ impl LocationStats<Id> {
     pub async fn latest_by_download_change<'e, E>(
         executor: E,
         location_id: Id,
-    ) -> Result<Option<Self>, Error>
+    ) -> sqlx::Result<Option<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -206,7 +206,7 @@ impl LocationStats<Id> {
     }
 
     /// Purge old statistics.
-    pub async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    pub async fn purge<'e, E>(executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {

@@ -51,6 +51,7 @@ pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 extern crate log;
 
 /// Converts a tauri emit result into our error type.
+#[must_use]
 pub fn tauri_err_to_app_err(e: tauri::Error) -> defguard_client_core::error::Error {
     defguard_client_core::error::Error::Tauri(e.to_string())
 }
