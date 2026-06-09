@@ -1,7 +1,7 @@
 use std::process::Command;
 use super::super::super::{disk_encryption_status, linux_kernel_version, os_name, os_version};
 
-fn uname() -> String {
+fn expected_kernel_version() -> String {
     let output = Command::new("uname")
         .arg("-r")
         .output()
@@ -62,7 +62,7 @@ fn test_linux_os_version() {
 #[test]
 #[ignore = "CI posture testing only"]
 fn test_linux_kernel_version() {
-    assert_eq!(linux_kernel_version().unwrap(), uname());
+    assert_eq!(linux_kernel_version().unwrap(), expected_kernel_version());
 }
 
 #[test]

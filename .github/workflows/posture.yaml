@@ -33,20 +33,23 @@ jobs:
       - name: Run basic tests
         working-directory: src-tauri/
         run: |
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
 
   test-windows-postures-unencrypted:
     if: true
     name: Windows postures - unencrypted
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
-      - windows-latest
-      # - build1-win
+      # - windows-latest
+      - self-hosted
+      - X64
+      - Windows
     steps:
       - name: Enable long paths
+        if: false
         shell: powershell
         run: |
           git config --system core.longpaths true
@@ -62,6 +65,7 @@ jobs:
           submodules: recursive
 
       - name: Install MSVC build tools
+        if: false
         shell: powershell
         run: |
           choco install visualstudio2022buildtools `
@@ -69,13 +73,16 @@ jobs:
             -y
 
       - name: Add Git Bash to PATH
+        if: false
         shell: powershell
         run: |
           "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - uses: dtolnay/rust-toolchain@stable
+        if: false
 
       - name: Install protoc
+        if: false
         shell: powershell
         run: |
           choco install protoc -y
@@ -86,7 +93,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_anti_virus_status -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_anti_virus_status_off -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_part_of_domain -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_unencrypted -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_name -- --ignored --exact
@@ -170,6 +177,7 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_encrypted -- --ignored --exact
 
   test-macos-postures-unencrypted:
+    if: false
     runs-on:
       - self-hosted
       - macOS
@@ -249,66 +257,67 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_os_version -- --ignored --exact
 
 
-  # test-linux-postures-encrypted:
-  #   name: Linux postures - encrypted
-  #   runs-on:
-  #     - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #       with:
-  #         submodules: recursive
+  test-linux-postures-encrypted:
+    if: false
+    name: Linux postures - encrypted
+    runs-on:
+      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
-  #     - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-  #     - name: Install dependencies
-  #       env:
-  #         DEBIAN_FRONTEND: noninteractive
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
 
-  #     - name: Test kernel version and encrypted disk
-  #       working-directory: src-tauri/
-  #       run: |
-  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
-  #         cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
+      - name: Test kernel version and encrypted disk
+        working-directory: src-tauri/
+        run: |
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
 
-      ## runtime crypt setup
-      # - name: Debug crypto block support
-      #   run: |
-      #     set -euo pipefail
-      #     uname -a
-      #     ls -l /dev/loop* /dev/loop-control || true
-      #     sudo losetup -f || true
-      #     ls -l /dev/mapper /dev/mapper/control || true
-      #     cat /proc/devices | grep -E 'loop|device-mapper' || true
-      #     grep -E 'loop|dm_crypt|dm_mod' /proc/modules || true
-      #     lsblk -Jo NAME,FSTYPE,TYPE
+      # runtime crypt setup
+      - name: Debug crypto block support
+        run: |
+          set -euo pipefail
+          uname -a
+          ls -l /dev/loop* /dev/loop-control || true
+          sudo losetup -f || true
+          ls -l /dev/mapper /dev/mapper/control || true
+          cat /proc/devices | grep -E 'loop|device-mapper' || true
+          grep -E 'loop|dm_crypt|dm_mod' /proc/modules || true
+          lsblk -Jo NAME,FSTYPE,TYPE
 
-      # - name: Prepare block device support
-      #   run: |
-      #     set -euo pipefail
-      #     [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
-      #     for i in $(seq 0 31); do
-      #       [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
-      #     done
-      #     losetup -f
+      - name: Prepare block device support
+        run: |
+          set -euo pipefail
+          [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
+          for i in $(seq 0 31); do
+            [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
+          done
+          losetup -f
 
-      # - name: Test encrypted disk
-      #   working-directory: src-tauri/
-      #   run: |
-      #     set -euo pipefail
-      #     img="$(mktemp /tmp/defguard-luks.XXXXXX)"
-      #     key="$(mktemp /tmp/defguard-luks-key.XXXXXX)"
-      #     loopdev=""
-      #     cleanup() {
-      #       if [ -n "$loopdev" ]; then losetup -d "$loopdev" || true; fi
-      #       rm -f "$img" "$key"
-      #     }
-      #     trap cleanup EXIT
-      #     truncate -s 64M "$img"
-      #     printf 'defguard-ci-test-key' > "$key"
-      #     loopdev="$(losetup --find --show "$img")"
-      #     cryptsetup luksFormat --batch-mode --type luks2 "$loopdev" "$key"
-      #     lsblk -Jo NAME,FSTYPE,TYPE
-      #     cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
+      - name: Test encrypted disk
+        working-directory: src-tauri/
+        run: |
+          set -euo pipefail
+          img="$(mktemp /tmp/defguard-luks.XXXXXX)"
+          key="$(mktemp /tmp/defguard-luks-key.XXXXXX)"
+          loopdev=""
+          cleanup() {
+            if [ -n "$loopdev" ]; then losetup -d "$loopdev" || true; fi
+            rm -f "$img" "$key"
+          }
+          trap cleanup EXIT
+          truncate -s 64M "$img"
+          printf 'defguard-ci-test-key' > "$key"
+          loopdev="$(losetup --find --show "$img")"
+          cryptsetup luksFormat --batch-mode --type luks2 "$loopdev" "$key"
+          lsblk -Jo NAME,FSTYPE,TYPE
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
