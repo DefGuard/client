@@ -740,13 +740,11 @@ pub(crate) async fn disconnect_interface(
             #[cfg(target_os = "macos")]
             {
                 let result = location.stop_vpn_tunnel();
-                error!(
-                    "stop_tunnel() for location {} returned {result:?}",
-                    location.name
-                );
                 if !result {
+                    error!("stop_tunnel() for location {} failed", location.name);
                     return Err(Error::InternalError("Error from tunnel".into()));
                 }
+                debug!("stop_tunnel() for location {} succeeded", location.name);
             }
 
             #[cfg(not(target_os = "macos"))]
@@ -816,13 +814,11 @@ pub(crate) async fn disconnect_interface(
             #[cfg(target_os = "macos")]
             {
                 let result = tunnel.stop_vpn_tunnel();
-                error!(
-                    "stop_tunnel() for tunnel {} returned {result:?}",
-                    tunnel.name
-                );
                 if !result {
+                    error!("stop_tunnel() for tunnel {} failed", tunnel.name);
                     return Err(Error::InternalError("Error from tunnel".into()));
                 }
+                debug!("stop_tunnel() for tunnel {} succeeded", tunnel.name);
             }
 
             #[cfg(not(target_os = "macos"))]
