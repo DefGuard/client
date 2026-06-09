@@ -1,4 +1,10 @@
-use sqlx::Row as _;
+use std::collections::HashMap;
+
+use defguard_core::database::models::{
+    instance::Instance,
+    location::{Location, LocationMfaMethod},
+    Id,
+};
 
 use crate::{
     output,
@@ -7,75 +13,84 @@ use crate::{
 };
 
 pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
-    let rows = sqlx::query(
-        "SELECT l.name, l.address, l.endpoint, l.location_mfa_mode, i.name AS instance_name, \
-         l.mfa_method, l.route_all_traffic \
-         FROM location l JOIN instance i ON l.instance_id = i.id ORDER BY l.name ASC",
-    )
-    .fetch_all(&state.pool)
-    .await?;
+    let locations = Location::all(&state.pool, false).await?;
+
+    // Build instance-id → name cache.
+    let instance_names: HashMap<Id, String> = {
+        let mut map = HashMap::new();
+        for loc in &locations {
+            if let std::collections::hash_map::Entry::Vacant(e) = map.entry(loc.instance_id) {
+                if let Some(inst) = Instance::find_by_id(&state.pool, loc.instance_id).await? {
+                    e.insert(inst.name);
+                }
+            }
+        }
+        map
+    };
 
     if json {
-        let locations: Vec<serde_json::Value> = rows
+        let entries: Vec<serde_json::Value> = locations
             .iter()
-            .map(|r| {
+            .map(|l| {
                 serde_json::json!({
-                    "name": r.get::<String, _>("name"),
-                    "address": r.get::<String, _>("address"),
-                    "endpoint": r.get::<String, _>("endpoint"),
-                    "instance": r.get::<String, _>("instance_name"),
-                    "mfa_method": mfa_label(r.get::<Option<i32>, _>("mfa_method")),
-                    "route_all_traffic": r.get::<bool, _>("route_all_traffic"),
+                    "name": l.name,
+                    "address": l.address,
+                    "endpoint": l.endpoint,
+                    "instance": instance_names.get(&l.instance_id).map(|n| n.as_str()).unwrap_or("?"),
+                    "mfa_method": mfa_label(l.mfa_method),
+                    "route_all_traffic": l.route_all_traffic,
                 })
             })
             .collect();
-        output::emit(&serde_json::json!({ "locations": locations }), json);
+        output::emit(&serde_json::json!({ "locations": entries }), json);
     } else {
-        if rows.is_empty() {
+        if locations.is_empty() {
             println!("No locations configured.");
             return Ok(());
         }
 
         // Compute column widths.
-        let name_w = rows
+        let name_w = locations
             .iter()
-            .map(|r| r.get::<String, _>("name").len())
+            .map(|l| l.name.len())
             .max()
             .unwrap_or(4)
-            .max(8); // "LOCATION"
-        let endpoint_w = rows
+            .max(8);
+        let endpoint_w = locations
             .iter()
-            .map(|r| r.get::<String, _>("endpoint").len())
+            .map(|l| l.endpoint.len())
             .max()
             .unwrap_or(8)
-            .max(8); // "ENDPOINT"
-        let inst_w = rows
+            .max(8);
+        let inst_w = locations
             .iter()
-            .map(|r| r.get::<String, _>("instance_name").len())
+            .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
             .max()
             .unwrap_or(8)
-            .max(8); // "INSTANCE"
+            .max(8);
 
         println!(
             "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:<11}",
             "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
         );
 
-        for row in &rows {
-            let name: String = row.get("name");
-            let address: String = row.get("address");
-            let endpoint: String = row.get("endpoint");
-            let instance: String = row.get("instance_name");
-            let mfa: Option<i32> = row.get("mfa_method");
-            let route: bool = row.get("route_all_traffic");
+        for loc in &locations {
+            let inst = instance_names
+                .get(&loc.instance_id)
+                .map(|n| n.as_str())
+                .unwrap_or("?");
             println!(
                 "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>11}",
-                name,
-                address,
-                endpoint,
-                instance,
-                mfa_label(mfa),
-                if route { "All-traffic" } else { "Predefined" }
+                loc.name,
+                loc.address,
+                loc.endpoint,
+                inst,
+                mfa_label(loc.mfa_method),
+                if loc.route_all_traffic {
+                    "All-traffic"
+                } else {
+                    "Predefined"
+                }
             );
         }
     }
@@ -102,44 +117,26 @@ pub async fn handle_set(
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
     let location_id = match &target {
         ResolvedTarget::Location(loc) => loc.id,
-        _ => return Err(CliError::NotFound(format!("Location '{name}' not found"))),
+        _ => {
+            return Err(CliError::NotFound(format!("Location '{name}' not found")));
+        }
     };
 
     let mut changed = Vec::new();
 
-    // Update MFA method.
-    if let Some(method) = mfa_method {
-        let mfa_val = match method.to_lowercase().as_str() {
-            "totp" => "Totp",
-            "email" => "Email",
-            "oidc" => "Oidc",
-            "mobile" | "mobile_approve" => "MobileApprove",
-            _ => {
-                return Err(CliError::Usage(format!(
-                    "Invalid MFA method '{method}'. Valid: totp, email, oidc, mobile."
-                )));
-            }
-        };
-        sqlx::query("UPDATE location SET mfa_method = $1 WHERE id = $2")
-            .bind(mfa_val)
-            .bind(location_id)
-            .execute(&state.pool)
-            .await?;
-        changed.push(format!("MFA method → {method}"));
+    // Update MFA method via the core setter (clamps against location_mfa_mode).
+    if let Some(method_str) = mfa_method {
+        let method = parse_mfa_method(method_str)?;
+        Location::set_mfa_method(&state.pool, location_id, method).await?;
+        changed.push(format!("MFA method → {method_str}"));
     }
 
-    // Update route-all-traffic.
-    if route_all_traffic == Some(true) {
-        sqlx::query("UPDATE location SET route_all_traffic = 1 WHERE id = $1")
-            .bind(location_id)
-            .execute(&state.pool)
-            .await?;
+    // Update routing via the core setter (rejects when policy forbids).
+    if let Some(true) = route_all_traffic {
+        Location::update_routing(&state.pool, location_id, true).await?;
         changed.push("route-all-traffic → on".to_string());
     } else if no_route_all_traffic {
-        sqlx::query("UPDATE location SET route_all_traffic = 0 WHERE id = $1")
-            .bind(location_id)
-            .execute(&state.pool)
-            .await?;
+        Location::update_routing(&state.pool, location_id, false).await?;
         changed.push("route-all-traffic → off".to_string());
     }
 
@@ -183,7 +180,9 @@ pub async fn handle_show(
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
     let location = match &target {
         ResolvedTarget::Location(loc) => loc,
-        _ => return Err(CliError::NotFound(format!("Location '{name}' not found"))),
+        _ => {
+            return Err(CliError::NotFound(format!("Location '{name}' not found")));
+        }
     };
 
     if json {
@@ -195,7 +194,7 @@ pub async fn handle_show(
                 "pubkey": location.pubkey,
                 "allowed_ips": location.allowed_ips,
                 "dns": location.dns,
-                "mfa_method": location.mfa_method.as_ref().map(|m| format!("{m:?}")),
+                "mfa_method": mfa_label(location.mfa_method),
                 "route_all_traffic": location.route_all_traffic,
                 "keepalive_interval": location.keepalive_interval,
             }),
@@ -210,14 +209,7 @@ pub async fn handle_show(
         if let Some(dns) = &location.dns {
             println!("DNS:               {dns}");
         }
-        println!(
-            "MFA method:        {}",
-            location
-                .mfa_method
-                .as_ref()
-                .map(|m| format!("{m:?}"))
-                .unwrap_or_else(|| "none".to_string())
-        );
+        println!("MFA method:        {}", mfa_label(location.mfa_method));
         println!("Route all traffic: {}", location.route_all_traffic);
         println!("Keepalive:         {}s", location.keepalive_interval);
     }
@@ -225,13 +217,32 @@ pub async fn handle_show(
     Ok(())
 }
 
-fn mfa_label(v: Option<i32>) -> &'static str {
-    match v {
-        Some(0) => "totp",
-        Some(1) => "email",
-        Some(2) => "oidc",
-        Some(3) => "biometric",
-        Some(4) => "mobile",
-        _ => "none",
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Parse a user-facing MFA method string into the model enum.
+fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
+    match raw.to_lowercase().as_str() {
+        "totp" => Ok(LocationMfaMethod::Totp),
+        "email" => Ok(LocationMfaMethod::Email),
+        "oidc" => Ok(LocationMfaMethod::Oidc),
+        "biometric" => Ok(LocationMfaMethod::Biometric),
+        "mobile" | "mobile_approve" => Ok(LocationMfaMethod::MobileApprove),
+        _ => Err(CliError::Usage(format!(
+            "Invalid MFA method '{raw}'. Valid: totp, email, oidc, biometric, mobile."
+        ))),
+    }
+}
+
+/// Human label for an optional MFA method.
+fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
+    match method {
+        Some(LocationMfaMethod::Totp) => "totp",
+        Some(LocationMfaMethod::Email) => "email",
+        Some(LocationMfaMethod::Oidc) => "oidc",
+        Some(LocationMfaMethod::Biometric) => "biometric",
+        Some(LocationMfaMethod::MobileApprove) => "mobile",
+        None => "none",
     }
 }

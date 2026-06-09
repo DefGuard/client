@@ -1,4 +1,6 @@
-use sqlx::Row;
+use std::collections::HashMap;
+
+use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
 
 use crate::{
     output,
@@ -6,156 +8,119 @@ use crate::{
 };
 
 pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
-    // Query instances.
-    let instance_rows = sqlx::query("SELECT id, name, url FROM instance ORDER BY name ASC")
-        .fetch_all(&state.pool)
-        .await?;
+    let instances = Instance::all(&state.pool).await?;
+    let locations = Location::all(&state.pool, false).await?;
+    let tunnels = Tunnel::all(&state.pool).await?;
 
-    // Query locations.
-    let loc_rows = sqlx::query(
-        "SELECT l.name, l.address, l.endpoint, l.location_mfa_mode, l.route_all_traffic, \
-         i.name AS instance_name \
-         FROM location l JOIN instance i ON l.instance_id = i.id \
-         ORDER BY l.name ASC",
-    )
-    .fetch_all(&state.pool)
-    .await?;
-
-    // Query tunnels.
-    let tun_rows = sqlx::query("SELECT name, address, endpoint FROM tunnel ORDER BY name ASC")
-        .fetch_all(&state.pool)
-        .await?;
+    // Build instance-id → name lookup.
+    let instance_names: HashMap<Id, String> =
+        instances.iter().map(|i| (i.id, i.name.clone())).collect();
 
     if json {
-        let instances: Vec<serde_json::Value> = instance_rows
+        let inst_json: Vec<serde_json::Value> = instances
             .iter()
-            .map(|r| {
+            .map(|i| serde_json::json!({ "name": i.name, "url": i.url }))
+            .collect();
+
+        let loc_json: Vec<serde_json::Value> = locations
+            .iter()
+            .map(|l| {
                 serde_json::json!({
-                    "name": r.get::<String, _>("name"),
-                    "url": r.get::<String, _>("url"),
+                    "name": l.name,
+                    "instance": instance_names.get(&l.instance_id).map(|n| n.as_str()).unwrap_or("?"),
+                    "address": l.address,
+                    "endpoint": l.endpoint,
+                    "mfa_enabled": l.mfa_enabled(),
+                    "route_all_traffic": l.route_all_traffic,
                 })
             })
             .collect();
 
-        let locations: Vec<serde_json::Value> = loc_rows
+        let tun_json: Vec<serde_json::Value> = tunnels
             .iter()
-            .map(|r| {
-                let mfa_mode: i64 = r.get("location_mfa_mode");
-                serde_json::json!({
-                    "name": r.get::<String, _>("name"),
-                    "instance": r.get::<String, _>("instance_name"),
-                    "address": r.get::<String, _>("address"),
-                    "endpoint": r.get::<String, _>("endpoint"),
-                    "mfa_enabled": mfa_mode != 1,
-                    "route_all_traffic": r.get::<bool, _>("route_all_traffic"),
-                })
-            })
-            .collect();
-
-        let tunnels: Vec<serde_json::Value> = tun_rows
-            .iter()
-            .map(|r| {
-                serde_json::json!({
-                    "name": r.get::<String, _>("name"),
-                    "address": r.get::<String, _>("address"),
-                    "endpoint": r.get::<String, _>("endpoint"),
-                })
+            .map(|t| {
+                serde_json::json!({ "name": t.name, "address": t.address, "endpoint": t.endpoint })
             })
             .collect();
 
         output::emit(
-            &serde_json::json!({ "instances": instances, "locations": locations, "tunnels": tunnels }),
+            &serde_json::json!({ "instances": inst_json, "locations": loc_json, "tunnels": tun_json }),
             json,
         );
     } else {
-        // Human-readable table.
-        if instance_rows.is_empty() {
+        if instances.is_empty() {
             println!("No instances enrolled. Use the desktop app or 'enroll' to get started.");
             return Ok(());
         }
 
-        // Gather instance→location mapping.
-        let mut inst_locs: std::collections::HashMap<String, Vec<&sqlx::sqlite::SqliteRow>> =
-            std::collections::HashMap::new();
-        for row in &loc_rows {
-            let inst_name: String = row.get("instance_name");
-            inst_locs.entry(inst_name).or_default().push(row);
+        // Group locations by instance.
+        let mut inst_locs: HashMap<Id, Vec<&Location<Id>>> = HashMap::new();
+        for loc in &locations {
+            inst_locs.entry(loc.instance_id).or_default().push(loc);
         }
 
-        // Compute column widths (header vs data).
-        let loc_name_w = loc_rows
+        // Compute column widths.
+        let loc_name_w = locations
             .iter()
-            .map(|r| r.get::<String, _>("name").len())
+            .map(|l| l.name.len())
             .max()
             .unwrap_or(4)
-            .max(8); // "LOCATION"
-        let endpoint_w = loc_rows
+            .max(8);
+        let endpoint_w = locations
             .iter()
-            .map(|r| r.get::<String, _>("endpoint").len())
+            .map(|l| l.endpoint.len())
             .max()
             .unwrap_or(8)
-            .max(8); // "ENDPOINT"
+            .max(8);
 
-        for inst_row in &instance_rows {
-            let inst_name: String = inst_row.get("name");
-            let inst_url: String = inst_row.get("url");
-
-            let locations = inst_locs.get(&inst_name);
-
-            if let Some(locs) = locations {
-                println!("\n{inst_name} ({inst_url})");
+        for inst in &instances {
+            println!("\n{} ({})", inst.name, inst.url);
+            if let Some(locs) = inst_locs.get(&inst.id) {
                 println!(
                     "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {:>3}  {:<11}",
                     "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
                 );
-
                 for loc in locs.iter() {
-                    let name: String = loc.get("name");
-                    let address: String = loc.get("address");
-                    let endpoint: String = loc.get("endpoint");
-                    let mfa_mode: i64 = loc.get("location_mfa_mode");
-                    let mfa = if mfa_mode == 1 { "no" } else { "yes" };
-                    let route: bool = loc.get("route_all_traffic");
-                    let route_label = if route { "All-traffic" } else { "Predefined" };
-
+                    let mfa = if loc.mfa_enabled() { "yes" } else { "no" };
+                    let route_label = if loc.route_all_traffic {
+                        "All-traffic"
+                    } else {
+                        "Predefined"
+                    };
                     println!(
                         "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {mfa:>3}  {route_label:<11}",
-                        name, address, endpoint
+                        loc.name, loc.address, loc.endpoint
                     );
                 }
             } else {
-                println!("\n{inst_name} ({inst_url})");
                 println!("  (no locations)");
             }
         }
 
         // Tunnels.
-        if !tun_rows.is_empty() {
-            let tun_name_w = tun_rows
+        if !tunnels.is_empty() {
+            let tun_name_w = tunnels
                 .iter()
-                .map(|r| r.get::<String, _>("name").len())
+                .map(|t| t.name.len())
                 .max()
                 .unwrap_or(4)
-                .max(loc_name_w); // align with location column
-            let tun_endpoint_w = tun_rows
+                .max(loc_name_w);
+            let tun_endpoint_w = tunnels
                 .iter()
-                .map(|r| r.get::<String, _>("endpoint").len())
+                .map(|t| t.endpoint.len())
                 .max()
                 .unwrap_or(8)
-                .max(endpoint_w); // align with location column
+                .max(endpoint_w);
 
             println!("\nTunnels");
             println!(
                 "  {:<tun_name_w$}  {:<15}  {:<tun_endpoint_w$}",
                 "NAME", "ADDRESS", "ENDPOINT"
             );
-            for tun in &tun_rows {
-                let name: String = tun.get("name");
-                let address: String = tun.get("address");
-                let endpoint: String = tun.get("endpoint");
+            for tun in &tunnels {
                 println!(
                     "  {:<tun_name_w$}  {:<15}  {:<tun_endpoint_w$}",
-                    name, address, endpoint
+                    tun.name, tun.address, tun.endpoint
                 );
             }
         }
