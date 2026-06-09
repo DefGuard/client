@@ -15,8 +15,8 @@ use crate::{
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
-            instance::{ClientTrafficPolicy, Instance, InstanceInfo},
-            location::{infer_mfa_method, Location, LocationMfaMethod, LocationMfaMode},
+            instance::{Instance, InstanceInfo},
+            location::{Location, LocationMfaMethod, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -805,50 +805,12 @@ pub async fn update_location_routing(
 
     match connection_type {
         ConnectionType::Location => {
-            if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-                let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
-                    .await?
-                    .ok_or(Error::NotFound)?;
-                // Check if the instance has route_all_traffic disabled
-                if (instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic)
-                    && route_all_traffic
-                {
-                    error!(
-                        "Couldn't update location routing: instance with id {} has \
-                        route_all_traffic disabled.",
-                        instance.id
-                    );
-                    return Err(Error::InternalError(
-                        "Instance has route_all_traffic disabled".into(),
-                    ));
-                }
-                // Check if the instance has route_all_traffic enforced
-                if (instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic)
-                    && !route_all_traffic
-                {
-                    error!(
-                        "Couldn't update location routing: instance with id {} has \
-                        route_all_traffic enforced.",
-                        instance.id
-                    );
-                    return Err(Error::InternalError(
-                        "Instance has route_all_traffic enforced".into(),
-                    ));
-                }
-
-                location.route_all_traffic = route_all_traffic;
-                location.save(&*DB_POOL).await?;
-                debug!("Location routing updated for location {name}(ID: {location_id})");
-                handle
-                    .emit(EventKey::LocationUpdate.into(), ())
-                    .map_err(crate::tauri_err_to_app_err)?;
-                Ok(())
-            } else {
-                error!(
-                    "Couldn't update location routing: location with id {location_id} not found."
-                );
-                Err(Error::NotFound)
-            }
+            Location::update_routing(&*DB_POOL, location_id, route_all_traffic).await?;
+            debug!("Location routing updated for location {name}(ID: {location_id})");
+            handle
+                .emit(EventKey::LocationUpdate.into(), ())
+                .map_err(crate::tauri_err_to_app_err)?;
+            Ok(())
         }
         ConnectionType::Tunnel => {
             if let Some(mut tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
@@ -874,26 +836,12 @@ pub async fn set_location_mfa_method(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received command to set MFA method for location {location_id}");
-    if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-        let inferred = infer_mfa_method(location.location_mfa_mode, Some(mfa_method));
-        debug!(
-            "Setting MFA method for location {}(ID: {location_id}) to {inferred:?}",
-            location.name,
-        );
-        location.mfa_method = inferred;
-        location.save(&*DB_POOL).await?;
-        debug!(
-            "MFA method updated for location {}(ID: {location_id})",
-            location.name,
-        );
-        handle
-            .emit(EventKey::LocationUpdate.into(), ())
-            .map_err(crate::tauri_err_to_app_err)?;
-        Ok(())
-    } else {
-        error!("Location with ID {location_id} not found, cannot set MFA method");
-        Err(Error::NotFound)
-    }
+    Location::set_mfa_method(&*DB_POOL, location_id, mfa_method).await?;
+    debug!("MFA method updated for location (ID: {location_id})");
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]

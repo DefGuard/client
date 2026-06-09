@@ -10,12 +10,15 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
+use crate::database::DbPool;
 use crate::error::Error;
 use crate::proto::client_types::{
     LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
 };
 #[cfg(not(target_os = "macos"))]
-use crate::{database::DbPool, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
+use crate::DEFAULT_ROUTE_IPV4;
+#[cfg(not(target_os = "macos"))]
+use crate::DEFAULT_ROUTE_IPV6;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
@@ -389,6 +392,69 @@ impl Location<Id> {
         };
 
         Ok(interface_config)
+    }
+
+    /// Persist a per-location MFA method override, clamped via [`infer_mfa_method`]
+    /// against the location's MFA mode (`location_mfa_mode`).
+    ///
+    /// * `executor` - any SQLite executor.
+    /// * `location_id` - the target location.
+    /// * `method` - the desired method.  Will be clamped to TOTP when the mode is
+    ///   Internal and the stored method is None/OIDC, or to OIDC when the mode is
+    ///   External.
+    pub async fn set_mfa_method(
+        pool: &DbPool,
+        location_id: Id,
+        method: LocationMfaMethod,
+    ) -> Result<(), Error> {
+        let mut location = Self::find_by_id(pool, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let inferred = infer_mfa_method(location.location_mfa_mode, Some(method));
+        location.mfa_method = inferred;
+        location.save(pool).await?;
+        Ok(())
+    }
+
+    /// Persist the route-all-traffic flag for a location, rejecting the update if
+    /// the owning instance's [`ClientTrafficPolicy`] forbids the requested value.
+    ///
+    /// * `executor` - any SQLite executor.
+    /// * `location_id` - the target location.
+    /// * `route_all_traffic` - the desired setting.
+    pub async fn update_routing(
+        pool: &DbPool,
+        location_id: Id,
+        route_all_traffic: bool,
+    ) -> Result<(), Error> {
+        use crate::database::models::instance::{ClientTrafficPolicy, Instance};
+
+        let mut location = Self::find_by_id(pool, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        let instance = Instance::find_by_id(pool, location.instance_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        if instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic
+            && route_all_traffic
+        {
+            return Err(Error::InternalError(
+                "Instance has route_all_traffic disabled.".into(),
+            ));
+        }
+        if instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic
+            && !route_all_traffic
+        {
+            return Err(Error::InternalError(
+                "Instance has route_all_traffic enforced.".into(),
+            ));
+        }
+
+        location.route_all_traffic = route_all_traffic;
+        location.save(pool).await?;
+        Ok(())
     }
 
     /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?`
