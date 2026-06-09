@@ -11,6 +11,7 @@ import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { useAppForm, withForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
 import { api } from '../../../../../shared/rust-api/api';
+import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
@@ -57,14 +58,15 @@ export const PasswordStep = () => {
     useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
   );
 
-  const { mutateAsync } = useMutation({
+  const { mutateAsync: activateUser } = useMutation({
     mutationFn: (password: string) =>
       api.activateUser(proxyUrl, cookie, {
         password,
       }),
-    onSuccess: () => {
-      useEnrollmentStore.getState().next();
-    },
+  });
+
+  const { mutateAsync: startMfa } = useMutation({
+    mutationFn: () => api.startMfaSetup(proxyUrl, cookie, MfaMethod.Totp),
   });
 
   const form = useAppForm({
@@ -75,7 +77,19 @@ export const PasswordStep = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value }) => {
-      await mutateAsync(value.password);
+      const { skipMfaChoice } = useEnrollmentStore.getState();
+      await activateUser(value.password);
+      if (!skipMfaChoice) {
+        const mfaResponse = await startMfa();
+        if (mfaResponse.result) {
+          useEnrollmentStore.setState({
+            userTotpSecret: mfaResponse.result.totp_secret ?? null,
+          });
+          useEnrollmentStore.getState().next();
+        }
+      } else {
+        useEnrollmentStore.getState().next();
+      }
     },
   });
 
@@ -128,6 +142,9 @@ export const PasswordStep = () => {
           <form.Subscribe selector={(s) => s.isSubmitting}>
             {(loading) => (
               <EnrollmentControls
+                onBack={() => {
+                  useEnrollmentStore.getState().back();
+                }}
                 onNext={() => {
                   form.handleSubmit();
                 }}

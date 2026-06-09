@@ -50,6 +50,7 @@ export const Button = ({
 
   return (
     <button
+      type="button"
       {...containerProps}
       data-variant={variant}
       data-testid={testId}

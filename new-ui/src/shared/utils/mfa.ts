@@ -1,6 +1,6 @@
 import type { MfaMethodValue } from '../rust-api/types';
 
-export const enrollmentToMfaMethod = (method: MfaMethodValue): number => {
+export const mfaToNumber = (method: MfaMethodValue): number => {
   switch (method) {
     case 'totp':
       return 0;

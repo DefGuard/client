@@ -99,7 +99,6 @@ export const AddInstancePage = () => {
           replace: true,
         });
       }
-      // result.error and result.needsEnrollment available for follow-up handling
     },
   });
 

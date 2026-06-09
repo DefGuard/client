@@ -28,8 +28,6 @@ export const EnrollmentControls = ({
 }: Props) => {
   const deadline = useEnrollmentStore((s) => s.deadline);
 
-  console.log(deadline);
-
   return (
     <Fragment>
       <SizedBox height={ThemeSpacing.Xl3} />

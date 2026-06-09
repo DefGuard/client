@@ -3,7 +3,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { fetch } from '@tauri-apps/plugin-http';
 import { generateWGKeys } from '../utils/generateWGKeys';
-import { enrollmentToMfaMethod } from '../utils/mfa';
+import { mfaToNumber } from '../utils/mfa';
 import type {
   ActivateUserRequest,
   ActivateUserResponse,
@@ -173,7 +173,6 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
     if (!cookie) return { error: 'Auth cookie missing from enrollment response' };
 
     const resp = (await startRes.json()) as EnrollmentStartResponse;
-    console.log({ resp });
 
     const instances = await getInstances();
     const existing = instances.find((i) => i.uuid === resp.instance.id);
@@ -187,9 +186,14 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
         },
         body: JSON.stringify({ pubkey: existing.pubkey }),
       });
-      if (!netRes.ok) return { error: `network_info failed (${netRes.status})` };
-      await updateInstance({ instanceId: existing.id, response: await netRes.json() });
-      return {};
+      // device no longer exists core side, clean it up
+      if (netRes.status === 404) {
+        await deleteInstance(existing.id);
+      } else {
+        if (!netRes.ok) return { error: `network_info failed (${netRes.status})` };
+        await updateInstance({ instanceId: existing.id, response: await netRes.json() });
+        return {};
+      }
     }
 
     const { publicKey, privateKey } = generateWGKeys();
@@ -210,7 +214,6 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
 
     await saveDeviceConfig({ privateKey, response: await deviceRes.json() });
 
-    // Show enrollment
     if (!resp.user.enrolled) {
       return { startResponse: resp, proxyUrl, cookie };
     }
@@ -227,11 +230,12 @@ const startMfaSetup = async (
   method: MfaMethodValue,
 ): Promise<{ result?: MfaSetupStartResponse; error?: string }> => {
   try {
+    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
     const edgeHeaders = await getEdgeRequestHeaders();
     const res = await fetch(`${proxyUrl}/enrollment/register-mfa/code/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
-      body: JSON.stringify({ method: enrollmentToMfaMethod(method) }),
+      body: JSON.stringify({ method: mfaToNumber(method) }),
     });
     if (!res.ok) {
       const body = (await res.json()) as { error?: string };
@@ -249,6 +253,7 @@ const activateUser = async (
   request: Omit<ActivateUserRequest, 'phone_number'>,
 ): Promise<{ result?: ActivateUserResponse; error?: string }> => {
   try {
+    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
     const edgeHeaders = await getEdgeRequestHeaders();
     const res = await fetch(`${proxyUrl}/enrollment/activate_user`, {
       method: 'POST',
@@ -271,6 +276,7 @@ const finishMfaSetup = async (
   request: MfaSetupFinishRequest,
 ): Promise<{ result?: MfaSetupFinishResponse; error?: string }> => {
   try {
+    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
     const edgeHeaders = await getEdgeRequestHeaders();
     const res = await fetch(`${proxyUrl}/enrollment/register-mfa/code/finish`, {
       method: 'POST',

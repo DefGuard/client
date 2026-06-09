@@ -29,6 +29,11 @@ body {
   overflow: hidden;
 }
 
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {
   appearance: none;

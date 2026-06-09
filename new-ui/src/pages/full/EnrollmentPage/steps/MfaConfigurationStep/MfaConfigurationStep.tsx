@@ -102,7 +102,7 @@ export const TotpSetup = () => {
       <p className="scan-hint">
         {`Can't scan QR code?  Enter code manually in the app.`}
       </p>
-      <CopyField copyTooltip="Code copied to clipboard" text="Test secret" />
+      <CopyField copyTooltip="Code copied to clipboard" text={secret ?? ''} />
       <Divider spacing={ThemeSpacing.Xl2} />
     </Fragment>
   );
