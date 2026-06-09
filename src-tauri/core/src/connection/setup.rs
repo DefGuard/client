@@ -1,4 +1,4 @@
-/// Non-macOS connection setup helpers.
+/// Connection setup helpers.
 use std::str::FromStr;
 
 use std::process::Command;
@@ -8,8 +8,11 @@ use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
+#[cfg(not(target_os = "macos"))]
 use tonic::Code;
 
+#[cfg(not(target_os = "macos"))]
+use crate::database::DbPool;
 use crate::{
     connection::daemon_client::DAEMON_CLIENT,
     database::{
@@ -19,12 +22,13 @@ use crate::{
             tunnel::{Tunnel, TunnelConnection},
             Id,
         },
-        DbPool, DB_POOL,
+        DB_POOL,
     },
     error::Error,
     ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 
+#[cfg(not(target_os = "macos"))]
 pub async fn setup_interface(
     location: &Location<Id>,
     name: &str,
