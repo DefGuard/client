@@ -57,4 +57,5 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check compilation
+        shell: bash
         run: cargo check --workspace
