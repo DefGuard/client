@@ -4,6 +4,9 @@ use std::str::FromStr;
 use std::process::Command;
 
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
+use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use tonic::Code;
 
@@ -21,7 +24,6 @@ use crate::{
     error::Error,
     ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
-use defguard_client_proto::defguard::client::v1::{CreateInterfaceRequest, RemoveInterfaceRequest};
 
 pub async fn setup_interface(
     location: &Location<Id>,
