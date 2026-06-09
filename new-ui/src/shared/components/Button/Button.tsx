@@ -20,6 +20,7 @@ export const Button = ({
   variant = ButtonVariant.Primary,
   disabled = false,
   loading = false,
+  ref,
 }: ButtonProps) => {
   const isLoading = loading && !disabled;
   const [swapDirection, setSwapDirection] = useState<'to-loading' | 'to-content' | null>(
@@ -51,6 +52,7 @@ export const Button = ({
   return (
     <button
       type="button"
+      ref={ref}
       {...containerProps}
       data-variant={variant}
       data-testid={testId}

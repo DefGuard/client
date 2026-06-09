@@ -17,6 +17,7 @@ export const RecoveryCodesStep = () => {
   const codesActionValue = useMemo(() => codes.join('\n'), [codes]);
   const [confirmed, setConfirmed] = useState(false);
   const clipboardSub = useRef(new Subject<void>());
+  const downloadSub = useRef(new Subject<void>());
 
   const handleCopy = useCallback(async () => {
     writeText(codesActionValue).then(() => {
@@ -25,7 +26,9 @@ export const RecoveryCodesStep = () => {
   }, [codesActionValue]);
 
   const handleDownload = useCallback(() => {
-    downloadText(codesActionValue, `recovery`, 'txt');
+    downloadText(codesActionValue, `recovery`, 'txt').then(() => {
+      downloadSub.current.next();
+    });
   }, [codesActionValue]);
 
   return (
@@ -43,6 +46,7 @@ export const RecoveryCodesStep = () => {
       <SizedBox height={ThemeSpacing.Lg} />
       <div className="actions">
         <TooltipButton
+          tooltipTrigger={downloadSub.current}
           tooltipText="Codes downloaded"
           buttonProps={{
             variant: ButtonVariant.Outlined,

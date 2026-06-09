@@ -11,7 +11,6 @@ import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
 import { api } from '../../../shared/rust-api/api';
-import { MfaMethod } from '../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
@@ -70,25 +69,10 @@ export const AddInstancePage = () => {
         }
         return;
       }
-      let totpSecret: string | null = null;
-      if (
-        result.startResponse &&
-        !result.startResponse.settings.smtp_configured &&
-        result.startResponse.settings.mfa_required &&
-        result.proxyUrl &&
-        result.cookie
-      ) {
-        const mfaStart = await api.startMfaSetup(
-          result.proxyUrl,
-          result.cookie,
-          MfaMethod.Totp,
-        );
-        totpSecret = mfaStart.result?.totp_secret ?? null;
-      }
       if (result.startResponse && !result.startResponse.user.enrolled && result.cookie) {
         useEnrollmentStore
           .getState()
-          .start(result.startResponse, value.url, result.cookie, totpSecret ?? undefined);
+          .start(result.startResponse, value.url, result.cookie, undefined);
         navigate({
           to: '/full/enrollment',
           replace: true,

@@ -3,7 +3,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { fetch } from '@tauri-apps/plugin-http';
 import { generateWGKeys } from '../utils/generateWGKeys';
-import { mfaToNumber } from '../utils/mfa';
+import { mfaToApi } from '../utils/mfa';
 import type {
   ActivateUserRequest,
   ActivateUserResponse,
@@ -148,11 +148,14 @@ const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
 
+const buildProxyUrl = (url: string): string => {
+  const base = url.endsWith('/') ? url.slice(0, -1) : url;
+  return `${base}/api/v1`;
+};
+
 const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
   try {
-    let proxyUrl = values.url;
-    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
-    proxyUrl = `${proxyUrl}/api/v1`;
+    const proxyUrl = buildProxyUrl(values.url);
 
     const edgeHeaders = await getEdgeRequestHeaders();
 
@@ -230,12 +233,12 @@ const startMfaSetup = async (
   method: MfaMethodValue,
 ): Promise<{ result?: MfaSetupStartResponse; error?: string }> => {
   try {
-    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
+    const base = buildProxyUrl(proxyUrl);
     const edgeHeaders = await getEdgeRequestHeaders();
-    const res = await fetch(`${proxyUrl}/enrollment/register-mfa/code/start`, {
+    const res = await fetch(`${base}/enrollment/register-mfa/code/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
-      body: JSON.stringify({ method: mfaToNumber(method) }),
+      body: JSON.stringify({ method: mfaToApi(method) }),
     });
     if (!res.ok) {
       const body = (await res.json()) as { error?: string };
@@ -253,12 +256,12 @@ const activateUser = async (
   request: Omit<ActivateUserRequest, 'phone_number'>,
 ): Promise<{ result?: ActivateUserResponse; error?: string }> => {
   try {
-    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
+    const base = buildProxyUrl(proxyUrl);
     const edgeHeaders = await getEdgeRequestHeaders();
-    const res = await fetch(`${proxyUrl}/enrollment/activate_user`, {
+    const res = await fetch(`${base}/enrollment/activate_user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
-      body: JSON.stringify({ ...request, phone_number: '' }),
+      body: JSON.stringify({ ...request }),
     });
     if (!res.ok) {
       const body = (await res.json()) as { error?: string };
@@ -276,12 +279,15 @@ const finishMfaSetup = async (
   request: MfaSetupFinishRequest,
 ): Promise<{ result?: MfaSetupFinishResponse; error?: string }> => {
   try {
-    if (proxyUrl.endsWith('/')) proxyUrl = proxyUrl.slice(0, -1);
+    const base = buildProxyUrl(proxyUrl);
     const edgeHeaders = await getEdgeRequestHeaders();
-    const res = await fetch(`${proxyUrl}/enrollment/register-mfa/code/finish`, {
+    const res = await fetch(`${base}/enrollment/register-mfa/code/finish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie, ...edgeHeaders },
-      body: JSON.stringify(request),
+      body: JSON.stringify({
+        code: request.code,
+        method: mfaToApi(request.method),
+      }),
     });
     if (!res.ok) {
       const body = (await res.json()) as { error?: string };

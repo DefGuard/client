@@ -23,7 +23,11 @@ import {
 
 const formSchema = z
   .object({
-    password: z.string().trim().min(1, 'Field is required'),
+    password: z
+      .string()
+      .trim()
+      .min(1, 'Field is required')
+      .regex(/^\S+$/, 'Password cannot contain spaces'),
     repeat: z.string().trim(),
   })
   .superRefine(({ password, repeat }, ctx) => {
@@ -57,14 +61,6 @@ export const PasswordStep = () => {
   const [proxyUrl, cookie] = useEnrollmentStore(
     useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
   );
-
-  const { mutateAsync: activateUser } = useMutation({
-    mutationFn: (password: string) =>
-      api.activateUser(proxyUrl, cookie, {
-        password,
-      }),
-  });
-
   const { mutateAsync: startMfa } = useMutation({
     mutationFn: () => api.startMfaSetup(proxyUrl, cookie, MfaMethod.Totp),
   });
@@ -77,19 +73,28 @@ export const PasswordStep = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value }) => {
-      const { skipMfaChoice } = useEnrollmentStore.getState();
-      await activateUser(value.password);
-      if (!skipMfaChoice) {
+      const { skipMfaChoice, skipMfa } = useEnrollmentStore.getState();
+      if (skipMfaChoice) {
         const mfaResponse = await startMfa();
         if (mfaResponse.result) {
           useEnrollmentStore.setState({
             userTotpSecret: mfaResponse.result.totp_secret ?? null,
           });
-          useEnrollmentStore.getState().next();
+        } else {
+          console.error(mfaResponse);
+          return;
         }
-      } else {
-        useEnrollmentStore.getState().next();
       }
+      if (skipMfa) {
+        await api.activateUser(proxyUrl, cookie, {
+          password: value.password,
+        });
+      } else {
+        useEnrollmentStore.setState({
+          userPassword: value.password.trim(),
+        });
+      }
+      useEnrollmentStore.getState().next();
     },
   });
 

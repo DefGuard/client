@@ -18,14 +18,20 @@ export const MfaConfigurationStep = () => {
   const method = useEnrollmentStore((s) => s.userMfaChoice);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [proxyUrl, cookie] = useEnrollmentStore(
+  const [proxyUrl, cookie, password] = useEnrollmentStore(
     // biome-ignore lint/style/noNonNullAssertion: safe
-    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
+    useShallow((s) => [s.proxyUrl!, s.sessionCookie!, s.userPassword!]),
   );
 
   const { mutate, isPending } = useMutation({
-    // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
-    mutationFn: () => api.finishMfaSetup(proxyUrl, cookie, { code: code!, method }),
+    mutationFn: async () => {
+      // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
+      const resp = await api.finishMfaSetup(proxyUrl, cookie, { code: code!, method });
+      await api.activateUser(proxyUrl, cookie, {
+        password,
+      });
+      return resp;
+    },
     onError: () => {},
     onSuccess: (resp) => {
       if (resp.result) {
@@ -34,6 +40,9 @@ export const MfaConfigurationStep = () => {
           deadline: null,
         });
         useEnrollmentStore.getState().next();
+      }
+      if (resp.error) {
+        setError('Enter a valid code');
       }
     },
   });
@@ -90,7 +99,6 @@ export const TotpSetup = () => {
   const secret = useEnrollmentStore((s) => s.userTotpSecret);
 
   const qrData = useMemo(() => {
-    if (!secret) return 'Test secret';
     return `otpauth://totp/Defguard?secret=${secret}`;
   }, [secret]);
 

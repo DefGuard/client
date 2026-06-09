@@ -27,14 +27,16 @@ export const MfaChoiceStep = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: () => api.startMfaSetup(proxyUrl, cookie, mfa),
     onSuccess: (resp) => {
-      if (resp.result?.totp_secret) {
-        const secret = resp.result.totp_secret;
+      if (mfa === MfaMethod.Totp) {
+        const secret = resp.result?.totp_secret;
         useEnrollmentStore.setState({
           userMfaChoice: mfa,
           userTotpSecret: secret,
         });
-        useEnrollmentStore.getState().next();
+      } else {
+        useEnrollmentStore.setState({ userMfaChoice: mfa });
       }
+      useEnrollmentStore.getState().next();
     },
   });
 

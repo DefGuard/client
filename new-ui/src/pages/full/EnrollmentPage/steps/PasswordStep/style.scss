@@ -1,5 +1,7 @@
 #password-step {
   .checklist {
+    user-select: none;
+
     > p {
       font: var(--t-body-xs-600);
       color: var(--fg-white-100);
