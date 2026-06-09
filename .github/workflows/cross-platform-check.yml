@@ -48,7 +48,7 @@ jobs:
           submodules: recursive
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Install protoc
         uses: arduino/setup-protoc@v3
