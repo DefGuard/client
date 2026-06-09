@@ -74,13 +74,13 @@ impl From<ProtoPeer> for Peer {
     fn from(peer: ProtoPeer) -> Self {
         Self {
             public_key: Key::decode(peer.public_key).expect("Failed to parse public key"),
-            preshared_key: peer
-                .preshared_key
-                .map(|key| Key::decode(key).expect("Failed to parse preshared key: {key}")),
+            preshared_key: peer.preshared_key.map(|key| {
+                Key::decode(&key).unwrap_or_else(|_| panic!("Failed to parse preshared key: {key}"))
+            }),
             protocol_version: peer.protocol_version,
             endpoint: peer.endpoint.map(|addr| {
                 addr.parse()
-                    .expect("Failed to parse endpoint address: {addr}")
+                    .unwrap_or_else(|_| panic!("Failed to parse endpoint address: {addr}"))
             }),
             last_handshake: peer
                 .last_handshake
@@ -93,7 +93,10 @@ impl From<ProtoPeer> for Peer {
             allowed_ips: peer
                 .allowed_ips
                 .into_iter()
-                .map(|addr| addr.parse().expect("Failed to parse allowed IP: {addr}"))
+                .map(|addr| {
+                    addr.parse()
+                        .unwrap_or_else(|_| panic!("Failed to parse allowed IP: {addr}"))
+                })
                 .collect(),
         }
     }
