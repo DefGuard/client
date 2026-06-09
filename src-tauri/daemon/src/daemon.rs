@@ -30,7 +30,7 @@ use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 use nix::unistd::{chown, Group};
 #[cfg(unix)]
 use tokio::net::UnixListener;

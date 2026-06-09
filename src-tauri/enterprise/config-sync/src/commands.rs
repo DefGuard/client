@@ -1,24 +1,25 @@
 use std::collections::HashSet;
 
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::{
+    connection::daemon_client::DAEMON_CLIENT, database::models::wireguard_keys::WireguardKeys,
+};
 use defguard_client_core::{
     database::models::{
         instance::{ClientTrafficPolicy, Instance},
         location::{infer_mfa_method, Location},
-        wireguard_keys::WireguardKeys,
         Id, NoId,
     },
     error::Error,
     into_location,
 };
-use defguard_client_proto::defguard::{
-    client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
-    client_types::DeviceConfigResponse,
-};
-use sqlx::{Sqlite, SqliteExecutor, Transaction};
-
 #[cfg(not(target_os = "macos"))]
-use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::client_types::DeviceConfigResponse;
 use defguard_client_service_locations::to_service_location;
+use sqlx::{Sqlite, SqliteExecutor, Transaction};
 
 pub async fn locations_changed(
     transaction: &mut Transaction<'_, Sqlite>,

@@ -6,6 +6,16 @@ use std::{env, path::Path, process::Command};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
+#[cfg(windows)]
+use defguard_client_core::connection::active_connections::find_connection;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::{
+    connection::daemon_client::DAEMON_CLIENT, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use sqlx::query;
@@ -45,16 +55,7 @@ use crate::{
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     ConnectionType,
 };
-#[cfg(windows)]
-use defguard_client_core::connection::active_connections::find_connection;
-use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-#[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::{
-    CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest,
-};
 
-pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
-pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]
 static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
