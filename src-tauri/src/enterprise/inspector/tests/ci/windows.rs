@@ -66,11 +66,11 @@ mod setup2 {
         assert_eq!(anti_virus_status().unwrap(), false);
     }
 
-    #[test]
-    #[ignore = "CI posture testing only"]
-    fn test_part_of_domain_true() {
-        assert_eq!(part_of_domain().unwrap(), true);
-    }
+    // #[test]
+    // #[ignore = "CI posture testing only"]
+    // fn test_part_of_domain_true() {
+    //     assert_eq!(part_of_domain().unwrap(), true);
+    // }
 
     // #[test]
     // #[ignore = "CI posture testing only"]

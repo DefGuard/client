@@ -38,15 +38,16 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
 
-  test-windows-postures-unencrypted:
+  test-windows-postures-setup1:
     if: true
-    name: Windows postures - unencrypted
+    name: Windows postures - setup1
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
       # - windows-latest
       - self-hosted
       - X64
       - Windows
+      - noad
     steps:
       - name: Install Git
         shell: cmd
@@ -109,18 +110,29 @@ jobs:
         working-directory: src-tauri/
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup1 -- --ignored
 
-  test-windows-postures-encrypted:
-    if: false
-    name: Windows postures - encrypted
+  test-windows-postures-setup2:
+    if: true
+    name: Windows postures - setup2
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
-      - windows-latest
-      # - build1-win
+      # - windows-latest
+      - self-hosted
+      - X64
+      - Windows
+      - ad
     steps:
+      - name: Install Git
+        shell: cmd
+        run: |
+          choco install git -y --no-progress
+          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
+          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
+          "C:\Program Files\Git\cmd\git.exe" --version
+
       - name: Enable long paths
+        if: false
         shell: powershell
         run: |
           git config --system core.longpaths true
@@ -136,6 +148,7 @@ jobs:
           submodules: recursive
 
       - name: Install MSVC build tools
+        if: false
         shell: powershell
         run: |
           choco install visualstudio2022buildtools `
@@ -143,51 +156,36 @@ jobs:
             -y
 
       - name: Add Git Bash to PATH
-        shell: powershell
+        if: false
+        shell: cmd
         run: |
           "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install protoc
-        shell: powershell
+        shell: cmd
         run: |
           choco install protoc -y
           protoc --version
 
-      - name: Enable BitLocker on system drive
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          whoami
-          net session
-          Get-Tpm
-          Get-BitLockerVolume -MountPoint "C:"
-          $volume = Get-BitLockerVolume -MountPoint "C:"
-          if ($volume.ProtectionStatus -ne "On") {
-            Enable-BitLocker `
-              -MountPoint "C:" `
-              -EncryptionMethod XtsAes256 `
-              -UsedSpaceOnly `
-              -TpmProtector `
-              -SkipHardwareTest
-          }
-          $deadline = (Get-Date).AddMinutes(5)
-          do {
-            Start-Sleep -Seconds 10
-            $volume = Get-BitLockerVolume -MountPoint "C:"
-            $volume | Format-List
-          } while ($volume.ProtectionStatus -ne "On" -and (Get-Date) -lt $deadline)
-          if ($volume.ProtectionStatus -ne "On") {
-            throw "BitLocker protection did not turn on before timeout"
-          }
+      - name: Cache Cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            windows-cargo-
 
       - name: Run basic tests
         working-directory: src-tauri/
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_encrypted -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup2 -- --ignored
+
 
   test-macos-postures-unencrypted:
     if: false
