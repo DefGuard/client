@@ -1,9 +1,9 @@
-use super::super::super::{
-    anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
-    security_update_age_days,
-};
-
 mod setup1 {
+    use super::super::super::super::{
+        anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
+        security_update_age_days,
+    };
+
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_os_name() {
@@ -43,6 +43,11 @@ mod setup1 {
 }
 
 mod setup2 {
+    use super::super::super::super::{
+        anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
+        security_update_age_days,
+    };
+
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_os_name() {
