@@ -31,10 +31,9 @@ use crate::{
         DB_POOL,
     },
     error::Error,
+    DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 
-const DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
-const DEFAULT_ROUTE_IPV6: &str = "::/0";
 pub const LOCATION_ID: &str = "locationId";
 pub const TUNNEL_ID: &str = "tunnelId";
 

@@ -2,6 +2,18 @@ use core::fmt;
 use std::{collections::HashMap, env, str::FromStr};
 
 use chrono::{DateTime, Duration, Utc};
+use defguard_client_core::connection::active_connections::{
+    find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
+};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::{
+    client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
+};
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -47,16 +59,6 @@ use crate::{
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-use defguard_client_core::connection::active_connections::{
-    find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
-};
-use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-#[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::{
-    DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-};
-use defguard_client_proto::defguard::client_types::DeviceConfigResponse;
-use defguard_client_proto::defguard::enterprise::posture::v2::DevicePostureData;
 
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]
