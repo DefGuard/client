@@ -48,6 +48,14 @@ jobs:
       - X64
       - Windows
     steps:
+      - name: Install Git
+        shell: powershell
+        run: |
+          choco install git -y --no-progress
+          "$env:ProgramFiles\Git\cmd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "$env:ProgramFiles\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          git --version
+
       - name: Enable long paths
         if: false
         shell: powershell
