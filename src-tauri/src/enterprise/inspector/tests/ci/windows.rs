@@ -2,7 +2,6 @@ use super::super::super::{
     anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
     security_update_age_days,
 };
-use std::process::Command;
 
 #[test]
 #[ignore = "CI posture testing only"]
@@ -30,8 +29,14 @@ fn test_anti_virus_status_on() {
 
 #[test]
 #[ignore = "CI posture testing only"]
-fn test_part_of_domain() {
+fn test_part_of_domain_false() {
     assert_eq!(part_of_domain().unwrap(), false);
+}
+
+#[test]
+#[ignore = "CI posture testing only"]
+fn test_part_of_domain_true() {
+    assert_eq!(part_of_domain().unwrap(), true);
 }
 
 #[test]
