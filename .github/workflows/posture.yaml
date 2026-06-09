@@ -49,7 +49,6 @@ jobs:
       - Windows
     steps:
       - name: Install Git
-        if: false
         shell: cmd
         run: |
           choco install git -y --no-progress
