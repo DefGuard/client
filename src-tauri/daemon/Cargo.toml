@@ -4,7 +4,7 @@ description = "Defguard client daemon service"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license = "AGPL-3.0"
+license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
