@@ -123,7 +123,6 @@ impl fmt::Display for Location<NoId> {
 
 impl Location<Id> {
     /// Ignores service locations
-    #[cfg(any(windows, target_os = "macos"))]
     pub async fn all<'e, E>(executor: E, include_service_locations: bool) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
@@ -145,7 +144,6 @@ impl Location<Id> {
         .await
     }
 
-    #[cfg(any(windows, target_os = "macos"))]
     pub async fn exist<'e, E>(executor: E, include_service_locations: bool) -> sqlx::Result<bool>
     where
         E: SqliteExecutor<'e>,
