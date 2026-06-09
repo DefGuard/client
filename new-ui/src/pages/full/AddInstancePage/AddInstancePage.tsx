@@ -8,9 +8,9 @@ import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
+import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
-import { api } from '../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
@@ -47,7 +47,7 @@ export const AddInstancePage = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value, formApi }) => {
-      const result = await api.addInstance(value);
+      const result = await edgeApi.addInstance(value);
       if (result.error) {
         if (result.error.toLowerCase().includes('name')) {
           formApi.setErrorMap({

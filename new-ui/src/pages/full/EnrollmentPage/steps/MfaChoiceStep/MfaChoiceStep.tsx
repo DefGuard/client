@@ -10,7 +10,7 @@ import {
 } from '../../../../../shared/components/Icon';
 import { RadioIndicator } from '../../../../../shared/components/RadioIndicator/RadioIndicator';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { api } from '../../../../../shared/rust-api/api';
+import { edgeApi } from '../../../../../shared/edge-api/api';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
@@ -25,7 +25,7 @@ export const MfaChoiceStep = () => {
   );
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => api.startMfaSetup(proxyUrl, cookie, mfa),
+    mutationFn: () => edgeApi.startMfaSetup(proxyUrl, cookie, mfa),
     onSuccess: (resp) => {
       if (mfa === MfaMethod.Totp) {
         const secret = resp.result?.totp_secret;

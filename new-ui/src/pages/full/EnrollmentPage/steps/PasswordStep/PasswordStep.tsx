@@ -8,9 +8,9 @@ import z from 'zod';
 import { useShallow } from 'zustand/shallow';
 import { Icon, type IconKindValue } from '../../../../../shared/components/Icon';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
+import { edgeApi } from '../../../../../shared/edge-api/api';
 import { useAppForm, withForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
-import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
@@ -62,7 +62,7 @@ export const PasswordStep = () => {
     useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
   );
   const { mutateAsync: startMfa } = useMutation({
-    mutationFn: () => api.startMfaSetup(proxyUrl, cookie, MfaMethod.Totp),
+    mutationFn: () => edgeApi.startMfaSetup(proxyUrl, cookie, MfaMethod.Totp),
   });
 
   const form = useAppForm({
@@ -86,7 +86,7 @@ export const PasswordStep = () => {
         }
       }
       if (skipMfa) {
-        await api.activateUser(proxyUrl, cookie, {
+        await edgeApi.activateUser(proxyUrl, cookie, {
           password: value.password,
         });
       } else {

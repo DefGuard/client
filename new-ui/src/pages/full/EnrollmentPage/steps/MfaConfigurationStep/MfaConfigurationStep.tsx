@@ -7,7 +7,7 @@ import { CopyField } from '../../../../../shared/components/CopyField/CopyField'
 import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { QrCard } from '../../../../../shared/components/QrCard/QrCard';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { api } from '../../../../../shared/rust-api/api';
+import { edgeApi } from '../../../../../shared/edge-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
@@ -25,9 +25,12 @@ export const MfaConfigurationStep = () => {
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
-      const resp = await api.finishMfaSetup(proxyUrl, cookie, { code: code!, method });
-      await api.activateUser(proxyUrl, cookie, {
+      const resp = await edgeApi.finishMfaSetup(proxyUrl, cookie, {
+        // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
+        code: code!,
+        method,
+      });
+      await edgeApi.activateUser(proxyUrl, cookie, {
         password,
       });
       return resp;

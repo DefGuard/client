@@ -1,10 +1,8 @@
 import dayjs from 'dayjs';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type {
-  EnrollmentStartResponse,
-  MfaMethodValue,
-} from '../../../../shared/rust-api/types';
+import type { EnrollmentStartResponse } from '../../../../shared/edge-api/types';
+import type { MfaMethodValue } from '../../../../shared/rust-api/types';
 import { EnrollmentStep, type EnrollmentStepValue } from '../types';
 
 type StoreValues = {
