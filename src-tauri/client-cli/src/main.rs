@@ -48,9 +48,9 @@ async fn main() -> ExitCode {
             instance,
             code,
             code_command,
-            mfa_method: _mfa_method,
-            all_traffic: _all_traffic,
-            no_all_traffic: _no_all_traffic,
+            mfa_method,
+            all_traffic,
+            no_all_traffic,
         } => {
             connect::handle(
                 &state,
@@ -61,9 +61,9 @@ async fn main() -> ExitCode {
                 instance.as_deref(),
                 code.as_deref(),
                 code_command.as_deref(),
-                None,
-                false,
-                false,
+                mfa_method.as_deref(),
+                all_traffic,
+                no_all_traffic,
             )
             .await
         }

@@ -18,10 +18,17 @@ pub async fn handle(
     instance: Option<&str>,
     code: Option<&str>,
     code_command: Option<&str>,
-    _mfa_method: Option<&str>,
-    _all_traffic: bool,
-    _no_all_traffic: bool,
+    mfa_method: Option<&str>,
+    all_traffic: bool,
+    no_all_traffic: bool,
 ) -> Result<(), CliError> {
+    // Per-call routing overrides are not yet supported.
+    if all_traffic || no_all_traffic {
+        return Err(CliError::Usage(
+            "--all-traffic / --no-all-traffic per-call override is not yet supported.".into(),
+        ));
+    }
+
     let spec = TargetSpec {
         name: name.map(String::from),
         tunnel,
@@ -79,7 +86,7 @@ pub async fn handle(
                         CliError::Other(format!("Instance {} not found", loc.instance_id))
                     })?;
 
-                let psk = mfa::authorize(loc, &source, &inst).await?;
+                let psk = mfa::authorize(loc, &source, &inst, mfa_method).await?;
                 (loc.name.clone(), Some(psk), None)
             } else if loc.posture_check_required {
                 // Posture only (no MFA).

@@ -24,12 +24,15 @@ use crate::{
 /// * `location` — the target location.
 /// * `source`  — how to obtain the code.
 /// * `instance` — the instance this location belongs to (for proxy URL + pubkey).
+/// * `method_override` — optional `--mfa-method` flag; if set, uses this instead of the
+///   location's stored preference.
 ///
 /// Returns the WireGuard preshared key that must be passed to `bring_up`.
 pub async fn authorize(
     location: &Location<Id>,
     source: &CodeSource,
     instance: &Instance<Id>,
+    method_override: Option<&str>,
 ) -> Result<String, CliError> {
     let wireguard_keys =
         WireguardKeys::find_by_instance_id(&*defguard_core::database::DB_POOL, instance.id)
@@ -42,7 +45,11 @@ pub async fn authorize(
                 ))
             })?;
 
-    let method = infer_method(location);
+    let method = if let Some(raw) = method_override {
+        parse_method(raw)?
+    } else {
+        infer_method(location)
+    };
 
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
@@ -132,6 +139,20 @@ async fn handle_mfa_error(response: reqwest::Response) -> CliError {
         }
         _ if status.is_client_error() => CliError::MfaFailed(format!("MFA error: {message}")),
         _ => CliError::Other(format!("Proxy error (HTTP {status}): {message}")),
+    }
+}
+
+/// Parse a `--mfa-method` flag string into the proto [`MfaMethod`] enum.
+fn parse_method(raw: &str) -> Result<MfaMethod, CliError> {
+    match raw.to_lowercase().as_str() {
+        "totp" => Ok(MfaMethod::Totp),
+        "email" => Ok(MfaMethod::Email),
+        "oidc" => Ok(MfaMethod::Oidc),
+        "biometric" => Ok(MfaMethod::Biometric),
+        "mobile" | "mobile_approve" => Ok(MfaMethod::MobileApprove),
+        _ => Err(CliError::Usage(format!(
+            "Invalid --mfa-method '{raw}'. Valid: totp, email, oidc, biometric, mobile."
+        ))),
     }
 }
 
