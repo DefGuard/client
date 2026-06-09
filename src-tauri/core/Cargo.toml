@@ -4,7 +4,7 @@ description = "Shared business logic for the Defguard desktop client (Tauri-free
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license-file = "../../LICENSE.md"
+license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
 

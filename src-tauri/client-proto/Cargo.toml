@@ -4,7 +4,7 @@ description = "Protobuf definitions for the Defguard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license-file = "../../LICENSE.md"
+license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
