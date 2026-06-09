@@ -54,7 +54,7 @@ jobs:
           choco install git -y --no-progress
           echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
           echo C:\Program Files\Git\bin>>%GITHUB_PATH%
-          git --version
+          "C:\Program Files\Git\cmd\git.exe" --version
 
       - name: Enable long paths
         if: false
