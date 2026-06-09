@@ -10,11 +10,16 @@ use tonic::Code;
 use crate::{
     connection::daemon_client::DAEMON_CLIENT,
     database::{
-        models::{connection::ActiveConnection, location::Location, tunnel::Tunnel, Id},
+        models::{
+            connection::{ActiveConnection, Connection},
+            location::Location,
+            tunnel::{Tunnel, TunnelConnection},
+            Id,
+        },
         DbPool, DB_POOL,
     },
     error::Error,
-    DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+    ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 use defguard_client_proto::defguard::client::v1::{CreateInterfaceRequest, RemoveInterfaceRequest};
 
@@ -235,43 +240,149 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
     let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
-    let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
-        error!(
-            "Error while disconnecting interface {interface_name}, location with ID \
-            {location_id} not found"
-        );
-        return Err(Error::NotFound);
-    };
+    match active_connection.connection_type {
+        ConnectionType::Location => {
+            let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
+                error!(
+                    "Error while disconnecting interface {interface_name}, location with ID \
+                    {location_id} not found"
+                );
+                return Err(Error::NotFound);
+            };
 
-    let request = RemoveInterfaceRequest {
-        interface_name,
-        endpoint: location.endpoint.clone(),
-    };
-    debug!(
-        "Sending request to the background service to remove interface {} for location {}...",
-        active_connection.interface_name, location.name
-    );
-    if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-        let msg = if error.code() == Code::Unavailable {
-            format!(
-                "Couldn't remove interface {}. Background service is unavailable. \
-                Please make sure the service is running. Error: {error}.",
+            #[cfg(target_os = "macos")]
+            {
+                let result = location.stop_vpn_tunnel();
+                error!(
+                    "stop_tunnel() for location {} returned {result:?}",
+                    location.name
+                );
+                if !result {
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: location.endpoint.clone(),
+                };
+                debug!(
+                    "Sending request to the background service to remove interface {} for \
+                    location {}...",
+                    active_connection.interface_name, location.name
+                );
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    let msg = if error.code() == Code::Unavailable {
+                        format!(
+                            "Couldn't remove interface {}. Background service is unavailable. \
+                            Please make sure the service is running. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    } else {
+                        format!(
+                            "Failed to send a request to the background service to remove \
+                            interface {}. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    };
+                    error!("{msg}");
+                }
+            }
+
+            let connection: Connection = active_connection.into();
+            let connection = connection.save(&*DB_POOL).await?;
+            debug!(
+                "Saved location {} new connection status in the database",
+                location.name
+            );
+            trace!("Saved connection: {connection:?}");
+            info!(
+                "Network interface {} for location {location} has been removed",
                 active_connection.interface_name
-            )
-        } else {
-            format!(
-                "Failed to send a request to the background service to remove interface \
-                {}. Error: {error}.",
+            );
+            debug!("Finished disconnecting from location {}", location.name);
+        }
+        ConnectionType::Tunnel => {
+            let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? else {
+                error!(
+                    "Error while disconnecting interface {interface_name}, tunnel with ID \
+                    {location_id} not found"
+                );
+                return Err(Error::NotFound);
+            };
+            if let Some(pre_down) = &tunnel.pre_down {
+                debug!(
+                    "Executing defined PreDown command before setting up the interface {} for \
+                    the tunnel {tunnel}: {pre_down}",
+                    active_connection.interface_name
+                );
+                let _ = execute_command(pre_down);
+                info!(
+                    "Executed defined PreDown command before setting up the interface {} for \
+                    the tunnel {tunnel}: {pre_down}",
+                    active_connection.interface_name
+                );
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                let result = tunnel.stop_vpn_tunnel();
+                error!(
+                    "stop_tunnel() for tunnel {} returned {result:?}",
+                    tunnel.name
+                );
+                if !result {
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: tunnel.endpoint.clone(),
+                };
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    error!(
+                        "Error while removing interface {}, error details: {error:?}",
+                        active_connection.interface_name
+                    );
+                    return Err(Error::InternalError(format!(
+                        "Failed to remove interface, error message: {}",
+                        error.message()
+                    )));
+                }
+            }
+            if let Some(post_down) = &tunnel.post_down {
+                debug!(
+                    "Executing defined PostDown command after removing the interface {} for \
+                    the tunnel {tunnel}: {post_down}",
+                    active_connection.interface_name
+                );
+                let _ = execute_command(post_down);
+                info!(
+                    "Executed defined PostDown command after removing the interface {} for \
+                    the tunnel {tunnel}: {post_down}",
+                    active_connection.interface_name
+                );
+            }
+            let connection: TunnelConnection = active_connection.into();
+            let connection = connection.save(&*DB_POOL).await?;
+            debug!(
+                "Saved new tunnel {} connection status in the database",
+                tunnel.name
+            );
+            trace!("Saved connection: {connection:#?}");
+            info!(
+                "Network interface {} for tunnel {tunnel} has been removed",
                 active_connection.interface_name
-            )
-        };
-        error!("{msg}");
+            );
+            debug!("Finished disconnecting from tunnel {}", tunnel.name);
+        }
     }
 
-    info!(
-        "Interface {} for location {} disconnected.",
-        active_connection.interface_name, location.name
-    );
     Ok(())
 }
 

@@ -11,7 +11,6 @@ use crate::{
     ConnectionType,
 };
 
-#[cfg(not(target_os = "macos"))]
 use crate::connection::disconnect_interface;
 
 pub static ACTIVE_CONNECTIONS: LazyLock<Mutex<Vec<ActiveConnection>>> =
@@ -44,7 +43,6 @@ pub async fn close_all_connections() -> Result<(), Error> {
         );
         trace!("Connection: {connection:#?}");
         debug!("Removing interface {}", connection.interface_name);
-        #[cfg(not(target_os = "macos"))]
         disconnect_interface(connection).await?;
     }
     if active_connections_count > 0 {
