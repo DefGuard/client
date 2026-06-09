@@ -4,11 +4,11 @@ use chrono::{NaiveDateTime, Utc};
 use defguard_wireguard_rs::peer::Peer;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
-use sqlx::{query, query_as, query_scalar, Error as SqlxError, SqliteExecutor};
+use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{connection::ActiveConnection, Id, NoId, PURGE_DURATION};
 use crate::{
-    error::Error, CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
     DateTimeAggregation,
 };
 
@@ -57,7 +57,7 @@ impl fmt::Display for Tunnel<NoId> {
 }
 
 impl Tunnel<Id> {
-    pub async fn save<'e, E>(&mut self, executor: E) -> Result<(), SqlxError>
+    pub async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -90,7 +90,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn delete<'e, E>(&self, executor: E) -> Result<(), Error>
+    pub async fn delete<'e, E>(&self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -98,7 +98,7 @@ impl Tunnel<Id> {
         Ok(())
     }
 
-    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: Id) -> Result<Option<Self>, SqlxError>
+    pub async fn find_by_id<'e, E>(executor: E, tunnel_id: Id) -> sqlx::Result<Option<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -113,7 +113,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, SqlxError>
+    pub async fn all<'e, E>(executor: E) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -129,10 +129,7 @@ impl Tunnel<Id> {
         Ok(tunnels)
     }
 
-    pub async fn find_by_server_public_key<'e, E>(
-        executor: E,
-        pubkey: &str,
-    ) -> Result<Self, SqlxError>
+    pub async fn find_by_server_public_key<'e, E>(executor: E, pubkey: &str) -> sqlx::Result<Self>
     where
         E: SqliteExecutor<'e>,
     {
@@ -148,7 +145,7 @@ impl Tunnel<Id> {
         .await
     }
 
-    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> Result<(), Error>
+    pub async fn delete_by_id<'e, E>(executor: E, id: Id) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -200,7 +197,7 @@ impl Tunnel<NoId> {
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<Tunnel<Id>, SqlxError>
+    pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<Tunnel<Id>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -262,7 +259,7 @@ pub struct TunnelStats<I = NoId> {
 }
 
 impl TunnelStats {
-    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, SqlxError>
+    pub async fn get_name<'e, E>(&self, executor: E) -> sqlx::Result<String>
     where
         E: SqliteExecutor<'e>,
     {
@@ -295,7 +292,7 @@ impl TunnelStats<NoId> {
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<TunnelStats<Id>, SqlxError>
+    pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<TunnelStats<Id>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -333,7 +330,7 @@ impl TunnelStats<Id> {
         tunnel_id: Id,
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
-    ) -> Result<Vec<Self>, SqlxError>
+    ) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -366,7 +363,7 @@ impl TunnelStats<Id> {
     pub async fn latest_by_download_change<'e, E>(
         executor: E,
         tunnel_id: Id,
-    ) -> Result<Option<Self>, Error>
+    ) -> sqlx::Result<Option<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -401,7 +398,7 @@ impl TunnelStats<Id> {
     }
 
     /// Purge old statistics.
-    pub async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    pub async fn purge<'e, E>(executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -420,7 +417,7 @@ pub async fn peer_to_tunnel_stats<'e, E>(
     peer: &Peer,
     listen_port: u32,
     executor: E,
-) -> Result<TunnelStats<NoId>, Error>
+) -> sqlx::Result<TunnelStats<NoId>>
 where
     E: SqliteExecutor<'e>,
 {
@@ -465,7 +462,7 @@ impl TunnelConnection<Id> {
     pub async fn all_by_tunnel_id<'e, E>(
         executor: E,
         tunnel_id: Id,
-    ) -> Result<Vec<TunnelConnection<Id>>, Error>
+    ) -> sqlx::Result<Vec<TunnelConnection<Id>>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -483,7 +480,7 @@ impl TunnelConnection<Id> {
     pub async fn latest_by_tunnel_id<'e, E>(
         executor: E,
         tunnel_id: Id,
-    ) -> Result<Option<TunnelConnection<Id>>, Error>
+    ) -> sqlx::Result<Option<TunnelConnection<Id>>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -501,7 +498,7 @@ impl TunnelConnection<Id> {
 }
 
 impl TunnelConnection<NoId> {
-    pub async fn save<'e, E>(self, executor: E) -> Result<TunnelConnection<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<TunnelConnection<Id>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -536,7 +533,7 @@ pub struct TunnelConnectionInfo {
 }
 
 impl TunnelConnectionInfo {
-    pub async fn all_by_tunnel_id<'e, E>(executor: E, tunnel_id: Id) -> Result<Vec<Self>, Error>
+    pub async fn all_by_tunnel_id<'e, E>(executor: E, tunnel_id: Id) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -618,7 +615,7 @@ mod tests {
     use super::*;
 
     impl TunnelStats<Id> {
-        async fn count<'e, E>(executor: E) -> Result<i64, Error>
+        async fn count<'e, E>(executor: E) -> sqlx::Result<i64>
         where
             E: SqliteExecutor<'e>,
         {
