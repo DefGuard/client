@@ -94,16 +94,23 @@ jobs:
           choco install protoc -y
           protoc --version
 
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            windows-cargo-
+
       - name: Run basic tests
         working-directory: src-tauri/
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_anti_virus_status_on -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_part_of_domain_false -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_disk_encryption_status_unencrypted -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_name -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::test_os_version -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup1 -- --ignored
 
   test-windows-postures-encrypted:
     if: false
