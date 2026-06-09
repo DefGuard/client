@@ -49,6 +49,7 @@ jobs:
       - Windows
     steps:
       - name: Install Git
+        if: false
         shell: cmd
         run: |
           choco install git -y --no-progress
@@ -82,16 +83,14 @@ jobs:
 
       - name: Add Git Bash to PATH
         if: false
-        shell: powershell
+        shell: cmd
         run: |
           "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - uses: dtolnay/rust-toolchain@stable
-        if: false
 
       - name: Install protoc
-        if: false
-        shell: powershell
+        shell: cmd
         run: |
           choco install protoc -y
           protoc --version
