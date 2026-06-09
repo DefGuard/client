@@ -51,6 +51,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Install protoc
+        if: matrix.os != 'Windows'
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
