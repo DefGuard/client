@@ -5,9 +5,9 @@ use chrono::{DateTime, Duration, Utc};
 use defguard_client_core::connection::active_connections::{
     find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
 };
-use defguard_client_core::connection::disconnect_interface;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_core::connection::disconnect_interface;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
@@ -54,8 +54,8 @@ use crate::{
     proxy::construct_platform_header,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        get_location_interface_details, get_tunnel_interface_details,
-        get_tunnel_or_location_name, handle_connection_for_location, handle_connection_for_tunnel,
+        get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
+        handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,

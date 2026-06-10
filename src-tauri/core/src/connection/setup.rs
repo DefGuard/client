@@ -129,7 +129,7 @@ pub async fn setup_interface_tunnel(
     } else {
         let msg = match &tunnel.allowed_ips {
             Some(ips) => format!("Using predefined location traffic for tunnel {tunnel}: {ips}"),
-            None => "No allowed IP addresses found in tunnel {tunnel} configuration".to_string(),
+            None => format!("No allowed IP addresses found in tunnel {tunnel} configuration"),
         };
         debug!("{msg}");
         tunnel

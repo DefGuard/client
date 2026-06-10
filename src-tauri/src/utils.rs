@@ -39,13 +39,7 @@ use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
     database::{
-        models::{
-            connection::Connection,
-            location::Location,
-            tunnel::{Tunnel, TunnelConnection},
-            wireguard_keys::WireguardKeys,
-            Id,
-        },
+        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
         DbPool, DB_POOL,
     },
     error::Error,
