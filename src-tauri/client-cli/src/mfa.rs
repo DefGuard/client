@@ -106,9 +106,10 @@ pub async fn authorize(
     let code = obtain_code(source, &ctx)?;
 
     // Step 3: Finish the MFA session.
+    use secrecy::ExposeSecret;
     let finish_req = ClientMfaFinishRequest {
         token,
-        code: Some(code),
+        code: Some(code.expose_secret().to_string()),
         auth_pub_key: None,
     };
 
