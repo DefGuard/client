@@ -63,10 +63,6 @@ pub async fn resolve_disconnect_target(
     resolve_connect_target(spec, pool).await
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
 async fn resolve_named(
     name: &str,
     tunnel_only: bool,
@@ -142,5 +138,338 @@ async fn resolve_sole_location(pool: &DbPool) -> Result<ResolvedTarget, CliError
         _ => Err(CliError::NotFound(
             "Multiple locations available. Specify a name.".into(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use defguard_core::database::models::{
+        instance::{ClientTrafficPolicy, Instance},
+        location::{Location, LocationMfaMode, ServiceLocationMode},
+        tunnel::Tunnel,
+        Id, NoId,
+    };
+
+    use super::*;
+
+    fn sample_instance(name: &str) -> Instance<NoId> {
+        Instance {
+            id: NoId,
+            name: name.into(),
+            uuid: format!("uuid-{name}"),
+            url: format!("https://{name}.example"),
+            proxy_url: format!("https://proxy.{name}.example"),
+            username: "alice".into(),
+            token: None,
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: false,
+            openid_display_name: None,
+        }
+    }
+
+    fn sample_location(name: &str, instance_id: Id) -> Location<NoId> {
+        Location {
+            id: NoId,
+            instance_id,
+            network_id: 1,
+            name: name.into(),
+            address: "10.0.0.2/24".into(),
+            pubkey: format!("pk-loc-{name}"),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: LocationMfaMode::Disabled,
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+        }
+    }
+
+    fn sample_tunnel(name: &str) -> Tunnel<NoId> {
+        Tunnel {
+            id: NoId,
+            name: name.into(),
+            pubkey: format!("pk-tun-{name}"),
+            prvkey: format!("prvk-tun-{name}"),
+            address: "10.1.0.2/24".into(),
+            server_pubkey: format!("spk-tun-{name}"),
+            preshared_key: None,
+            allowed_ips: Some("0.0.0.0/0".into()),
+            endpoint: "5.6.7.8:51820".into(),
+            dns: None,
+            persistent_keep_alive: 25,
+            route_all_traffic: false,
+            pre_up: None,
+            post_up: None,
+            pre_down: None,
+            post_down: None,
+        }
+    }
+
+    /// Unwrap helper: avoids the `Debug` bound on `ResolvedTarget`.
+    fn expect_ok(result: Result<ResolvedTarget, CliError>) -> ResolvedTarget {
+        match result {
+            Ok(r) => r,
+            Err(e) => panic!("expected Ok, got Err: {e}"),
+        }
+    }
+
+    fn expect_err(result: Result<ResolvedTarget, CliError>) -> CliError {
+        match result {
+            Ok(_) => panic!("expected Err, got Ok"),
+            Err(e) => e,
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_unique_location_by_name(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        sample_location("office", i.id).save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Location(l) => {
+                assert_eq!(l.name, "office");
+                assert_eq!(l.instance_id, i.id);
+            }
+            _ => panic!("expected Location"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_unique_tunnel_by_name(pool: DbPool) {
+        sample_tunnel("gateway").save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: Some("gateway".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Tunnel(t) => assert_eq!(t.name, "gateway"),
+            _ => panic!("expected Tunnel"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnel_by_name_with_tunnel_flag(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        sample_location("office", i.id).save(&pool).await.unwrap();
+        sample_tunnel("office").save(&pool).await.unwrap();
+
+        // Without --tunnel, the name clash produces an error.
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotFound(_)));
+        assert!(err.to_string().contains("--tunnel"));
+
+        // With --tunnel, the tunnel is resolved.
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: true,
+            id: None,
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Tunnel(t) => assert_eq!(t.name, "office"),
+            _ => panic!("expected Tunnel"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_cross_instance_name_collision(pool: DbPool) {
+        let i1 = sample_instance("acme").save(&pool).await.unwrap();
+        let i2 = sample_instance("global").save(&pool).await.unwrap();
+        sample_location("office", i1.id).save(&pool).await.unwrap();
+        sample_location("office", i2.id).save(&pool).await.unwrap();
+
+        // Without --instance, ambiguous.
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotFound(_)));
+        assert!(err.to_string().contains("--instance"));
+
+        // With --instance, resolves to the correct one.
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: Some("acme".into()),
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Location(l) => assert_eq!(l.instance_id, i1.id),
+            _ => panic!("expected Location"),
+        }
+
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: Some("global".into()),
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Location(l) => assert_eq!(l.instance_id, i2.id),
+            _ => panic!("expected Location"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_id_fast_path_location(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        let saved = sample_location("office", i.id).save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: Some(saved.id),
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Location(l) => assert_eq!(l.id, saved.id),
+            _ => panic!("expected Location"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_id_fast_path_tunnel(pool: DbPool) {
+        let t = sample_tunnel("gateway").save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: Some(t.id),
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Tunnel(tun) => assert_eq!(tun.id, t.id),
+            _ => panic!("expected Tunnel"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_id_fast_path_reject_tunnel_flag_on_location(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        let saved = sample_location("office", i.id).save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: true,
+            id: Some(saved.id),
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::Usage(_)));
+        assert!(err.to_string().contains("Cannot use --tunnel"));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_id_not_found(pool: DbPool) {
+        let spec = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: Some(9999),
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotFound(_)));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_sole_location_no_arg(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        sample_location("office", i.id).save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Location(l) => assert_eq!(l.name, "office"),
+            _ => panic!("expected Location"),
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_no_arg_with_tunnels_only(pool: DbPool) {
+        // Tunnels are ignored by the no-arg path (only locations considered).
+        sample_tunnel("gateway").save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotEnrolled(_)));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_multiple_locations_no_arg(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        sample_location("office", i.id).save(&pool).await.unwrap();
+        sample_location("home", i.id).save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotFound(_)));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_name_not_found(pool: DbPool) {
+        let spec = TargetSpec {
+            name: Some("nope".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotFound(_)));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_instance_not_found(pool: DbPool) {
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: Some("ghost".into()),
+        };
+        let err = expect_err(resolve_connect_target(&spec, &pool).await);
+        assert!(matches!(err, CliError::NotFound(_)));
+        assert!(err.to_string().contains("ghost"));
     }
 }

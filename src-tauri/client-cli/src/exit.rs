@@ -22,3 +22,30 @@ pub fn exit_code_for(err: &CliError) -> u8 {
         CliError::Other(_) => 1,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exit_code_mapping() {
+        let cases: &[(&CliError, u8)] = &[
+            (&CliError::Usage("bad flag".into()), 2),
+            (&CliError::NotFound("no such location".into()), 3),
+            (&CliError::DaemonUnavailable("daemon down".into()), 4),
+            (&CliError::MfaFailed("wrong code".into()), 5),
+            (&CliError::MfaInputRequired("no TTY".into()), 5),
+            (&CliError::NotEnrolled("no instances".into()), 6),
+            (&CliError::Database("bad schema".into()), 1),
+            (&CliError::Other("something broke".into()), 1),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(
+                exit_code_for(err),
+                *expected,
+                "{:?} should map to {expected}",
+                err
+            );
+        }
+    }
+}

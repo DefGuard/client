@@ -107,3 +107,76 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use secrecy::ExposeSecret;
+
+    fn ctx() -> MfaContext {
+        MfaContext {
+            instance: "test-inst".into(),
+            location: "test-loc".into(),
+        }
+    }
+
+    #[test]
+    fn test_literal_code_returns_trimmed_secret() {
+        let source = CodeSource::Literal("  123456  ".into());
+        let secret = obtain_code(&source, &ctx()).unwrap();
+        assert_eq!(secret.expose_secret(), "123456");
+    }
+
+    #[test]
+    fn test_command_produces_stdout() {
+        let source = CodeSource::Command("echo -n 654321".into());
+        let secret = obtain_code(&source, &ctx()).unwrap();
+        assert_eq!(secret.expose_secret(), "654321");
+    }
+
+    #[test]
+    fn test_command_failure_is_mfa_failed() {
+        let source = CodeSource::Command("exit 2".into());
+        let err = obtain_code(&source, &ctx()).unwrap_err();
+        assert!(matches!(err, CliError::MfaFailed(_)));
+        assert!(err.to_string().contains("exited"));
+    }
+
+    #[test]
+    fn test_command_empty_output_is_mfa_failed() {
+        let source = CodeSource::Command("true".into()); // produces no stdout
+        let err = obtain_code(&source, &ctx()).unwrap_err();
+        assert!(matches!(err, CliError::MfaFailed(_)));
+        assert!(err.to_string().contains("no output"));
+    }
+
+    #[test]
+    fn test_command_receives_env_vars() {
+        // Print the env vars to stdout so we can assert they're set.
+        let source = CodeSource::Command("echo -n $DG_INSTANCE/$DG_LOCATION".into());
+        let secret = obtain_code(&source, &ctx()).unwrap();
+        assert_eq!(secret.expose_secret(), "test-inst/test-loc");
+    }
+
+    #[test]
+    fn test_literal_is_redacted_in_debug() {
+        let source = CodeSource::Literal("secret123".into());
+        let debug = format!("{source:?}");
+        assert!(!debug.contains("secret123"));
+        assert!(debug.contains("<redacted>"));
+    }
+
+    #[test]
+    fn test_command_is_not_redacted_in_debug() {
+        let source = CodeSource::Command("echo code".into());
+        let debug = format!("{source:?}");
+        assert!(debug.contains("echo code"));
+    }
+
+    #[test]
+    fn test_interactive_shows_in_debug() {
+        let source = CodeSource::Interactive;
+        let debug = format!("{source:?}");
+        assert!(debug.contains("Interactive"));
+    }
+}

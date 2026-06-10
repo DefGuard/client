@@ -809,7 +809,7 @@ pub async fn update_location_routing(
 
     match connection_type {
         ConnectionType::Location => {
-            Location::update_routing(&*DB_POOL, location_id, route_all_traffic).await?;
+            Location::update_routing(&DB_POOL, location_id, route_all_traffic).await?;
             debug!("Location routing updated for location {name}(ID: {location_id})");
             handle
                 .emit(EventKey::LocationUpdate.into(), ())
@@ -840,7 +840,7 @@ pub async fn set_location_mfa_method(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received command to set MFA method for location {location_id}");
-    Location::set_mfa_method(&*DB_POOL, location_id, mfa_method).await?;
+    Location::set_mfa_method(&DB_POOL, location_id, mfa_method).await?;
     debug!("MFA method updated for location (ID: {location_id})");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
