@@ -1,5 +1,4 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
-use defguard_core::ConnectionType;
 
 use crate::{
     output,
@@ -132,18 +131,7 @@ pub async fn handle(
 
         tracing::info!("Disconnecting {target_name} on interface {ifname}...");
 
-        let conn_info = defguard_core::connection::active_state::ActiveConnectionInfo {
-            connection_type: match &target {
-                ResolvedTarget::Location(_) => ConnectionType::Location,
-                ResolvedTarget::Tunnel(_) => ConnectionType::Tunnel,
-            },
-            target_id,
-            name: target_name.clone(),
-            interface_name: ifname.clone(),
-            stats: None,
-        };
-
-        tear_down(&conn_info, &state.pool).await?;
+        tear_down(connection, &state.pool).await?;
 
         output::emit(
             &serde_json::json!({

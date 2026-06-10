@@ -18,9 +18,9 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
     let instance_names: HashMap<Id, String> = {
         let mut map = HashMap::new();
         for loc in &locations {
-            if !map.contains_key(&loc.instance_id) {
+            if let std::collections::hash_map::Entry::Vacant(e) = map.entry(loc.instance_id) {
                 if let Some(inst) = Instance::find_by_id(&state.pool, loc.instance_id).await? {
-                    map.insert(loc.instance_id, inst.name);
+                    e.insert(inst.name);
                 }
             }
         }

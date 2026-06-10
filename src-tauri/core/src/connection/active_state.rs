@@ -182,13 +182,8 @@ use base64::Engine as _;
 
 /// Convert a hex-encoded public key to base64, matching the database format.
 #[cfg(not(target_os = "macos"))]
-fn hex_to_base64(hex: &str) -> Result<String, Error> {
-    let bytes: Vec<u8> = (0..hex.len())
-        .step_by(2)
-        .map(|i| {
-            u8::from_str_radix(&hex[i..std::cmp::min(i + 2, hex.len())], 16)
-                .map_err(|_| Error::ConversionError(format!("Invalid hex pubkey: {hex}")))
-        })
-        .collect::<Result<_, _>>()?;
+fn hex_to_base64(hex_str: &str) -> Result<String, Error> {
+    let bytes = hex::decode(hex_str)
+        .map_err(|e| Error::ConversionError(format!("Invalid hex pubkey: {e}")))?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }

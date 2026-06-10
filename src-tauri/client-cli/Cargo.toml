@@ -12,8 +12,8 @@ version.workspace = true
 name = "defguard-cli"
 
 [dependencies]
-atty = "0.2"
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
+
 common = { package = "defguard-client-common", path = "../common" }
 defguard_core = { package = "defguard-client-core", path = "../core" }
 defguard_client_posture = { package = "defguard-client-posture", path = "../enterprise/posture" }

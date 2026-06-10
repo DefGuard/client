@@ -8,7 +8,7 @@
 
 use std::{
     fmt,
-    io::{self, Write},
+    io::{self, IsTerminal, Write},
     process::Command,
 };
 
@@ -87,7 +87,7 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
             Ok(SecretString::from(code.as_str()))
         }
         CodeSource::Interactive => {
-            if !atty::is(atty::Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 return Err(CliError::MfaInputRequired(
                     "No TTY available for interactive MFA code entry. Provide --code or --code-command."
                         .into(),

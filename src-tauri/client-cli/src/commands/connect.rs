@@ -1,3 +1,5 @@
+use std::io::IsTerminal;
+
 use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
 
 use crate::{
@@ -64,7 +66,7 @@ pub async fn handle(
 
                 let source = if let Some(s) = code_source {
                     s
-                } else if atty::is(atty::Stream::Stdin) {
+                } else if std::io::stdin().is_terminal() {
                     CodeSource::Interactive
                 } else {
                     return Err(CliError::MfaInputRequired(format!(
