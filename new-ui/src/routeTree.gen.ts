@@ -16,8 +16,9 @@ import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as CompactIndexRouteImport } from './routes/compact/index'
 import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
-import { Route as FullAddIndexRouteImport } from './routes/full/add/index'
-import { Route as FullAddInstanceRouteImport } from './routes/full/add/instance'
+import { Route as FullDefaultRouteImport } from './routes/full/_default'
+import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
+import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
 
 const EmptyRoute = EmptyRouteImport.update({
   id: '/empty',
@@ -54,56 +55,64 @@ const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
   path: '/full/enrollment',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FullAddIndexRoute = FullAddIndexRouteImport.update({
-  id: '/full/add/',
-  path: '/full/add/',
+const FullDefaultRoute = FullDefaultRouteImport.update({
+  id: '/full/_default',
+  path: '/full',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FullAddInstanceRoute = FullAddInstanceRouteImport.update({
-  id: '/full/add/instance',
-  path: '/full/add/instance',
-  getParentRoute: () => rootRouteImport,
+const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
+  id: '/add/',
+  path: '/add/',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultAddInstanceRoute = FullDefaultAddInstanceRouteImport.update({
+  id: '/add/instance',
+  path: '/add/instance',
+  getParentRoute: () => FullDefaultRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full': typeof FullDefaultRouteWithChildren
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
-  '/full/add/instance': typeof FullAddInstanceRoute
-  '/full/add/': typeof FullAddIndexRoute
+  '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add/': typeof FullDefaultAddIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full': typeof FullIndexRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact': typeof CompactIndexRoute
-  '/full': typeof FullIndexRoute
   '/playground': typeof PlaygroundIndexRoute
-  '/full/add/instance': typeof FullAddInstanceRoute
-  '/full/add': typeof FullAddIndexRoute
+  '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add': typeof FullDefaultAddIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full/_default': typeof FullDefaultRouteWithChildren
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
-  '/full/add/instance': typeof FullAddInstanceRoute
-  '/full/add/': typeof FullAddIndexRoute
+  '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/_default/add/': typeof FullDefaultAddIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/empty'
+    | '/full'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/compact/'
@@ -115,10 +124,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/empty'
+    | '/full'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/compact'
-    | '/full'
     | '/playground'
     | '/full/add/instance'
     | '/full/add'
@@ -126,25 +135,25 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/empty'
+    | '/full/_default'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/compact/'
     | '/full/'
     | '/playground/'
-    | '/full/add/instance'
-    | '/full/add/'
+    | '/full/_default/add/instance'
+    | '/full/_default/add/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmptyRoute: typeof EmptyRoute
+  FullDefaultRoute: typeof FullDefaultRouteWithChildren
   FullEnrollmentRoute: typeof FullEnrollmentRoute
   FullSessionTimeoutRoute: typeof FullSessionTimeoutRoute
   CompactIndexRoute: typeof CompactIndexRoute
   FullIndexRoute: typeof FullIndexRoute
   PlaygroundIndexRoute: typeof PlaygroundIndexRoute
-  FullAddInstanceRoute: typeof FullAddInstanceRoute
-  FullAddIndexRoute: typeof FullAddIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -198,33 +207,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullEnrollmentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/full/add/': {
-      id: '/full/add/'
-      path: '/full/add'
-      fullPath: '/full/add/'
-      preLoaderRoute: typeof FullAddIndexRouteImport
+    '/full/_default': {
+      id: '/full/_default'
+      path: '/full'
+      fullPath: '/full'
+      preLoaderRoute: typeof FullDefaultRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/full/add/instance': {
-      id: '/full/add/instance'
-      path: '/full/add/instance'
+    '/full/_default/add/': {
+      id: '/full/_default/add/'
+      path: '/add'
+      fullPath: '/full/add/'
+      preLoaderRoute: typeof FullDefaultAddIndexRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/add/instance': {
+      id: '/full/_default/add/instance'
+      path: '/add/instance'
       fullPath: '/full/add/instance'
-      preLoaderRoute: typeof FullAddInstanceRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof FullDefaultAddInstanceRouteImport
+      parentRoute: typeof FullDefaultRoute
     }
   }
 }
 
+interface FullDefaultRouteChildren {
+  FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
+  FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
+}
+
+const FullDefaultRouteChildren: FullDefaultRouteChildren = {
+  FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
+  FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
+}
+
+const FullDefaultRouteWithChildren = FullDefaultRoute._addFileChildren(
+  FullDefaultRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmptyRoute: EmptyRoute,
+  FullDefaultRoute: FullDefaultRouteWithChildren,
   FullEnrollmentRoute: FullEnrollmentRoute,
   FullSessionTimeoutRoute: FullSessionTimeoutRoute,
   CompactIndexRoute: CompactIndexRoute,
   FullIndexRoute: FullIndexRoute,
   PlaygroundIndexRoute: PlaygroundIndexRoute,
-  FullAddInstanceRoute: FullAddInstanceRoute,
-  FullAddIndexRoute: FullAddIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

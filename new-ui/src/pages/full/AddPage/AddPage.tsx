@@ -1,8 +1,8 @@
 import './style.scss';
 import { useNavigate } from '@tanstack/react-router';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
+import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { ThemeSpacing } from '../../../shared/types';
-import { FullPage } from '../FullPage/FullPage';
 import { AddCard } from './components/AddCard/AddCard';
 
 export const AddPage = () => {

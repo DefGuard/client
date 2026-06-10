@@ -1,4 +1,4 @@
-.full-page {
+.full-page-layout {
   display: grid;
   grid-template-columns: 52px 1fr;
   grid-template-rows: 50px 1fr;
@@ -9,19 +9,9 @@
     grid-column: 1 / 3;
   }
 
-  .navigation {
+  #navigation {
     grid-column: 1 / 2;
     grid-row: 2;
-    box-sizing: border-box;
-    padding: var(--spacing-md) var(--spacing-sm);
-    border-right: 1px solid var(--border-disabled);
-    max-width: 52px;
-    height: 100%;
-
-    p {
-      text-orientation: upright;
-      writing-mode: vertical-lr;
-    }
   }
 
   > .page-content {

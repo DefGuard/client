@@ -11,10 +11,10 @@ import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
+import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
-import { FullPage } from '../FullPage/FullPage';
 
 const formSchema = z.object({
   token: z.string().min(1, 'Required'),
@@ -26,8 +26,8 @@ type FormFields = z.infer<typeof formSchema>;
 
 export const AddInstancePage = () => {
   const navigate = useNavigate();
-  const { deviceName } = useLoaderData({ from: '/full/add/instance' });
-  const searchValues = useSearch({ from: '/full/add/instance' });
+  const { deviceName } = useLoaderData({ from: '/full/_default/add/instance' });
+  const searchValues = useSearch({ from: '/full/_default/add/instance' });
 
   const hasInitialValues = isPresent(searchValues.token) && isPresent(searchValues.url);
 
@@ -49,7 +49,7 @@ export const AddInstancePage = () => {
     onSubmit: async ({ value, formApi }) => {
       const result = await edgeApi.addInstance(value);
       if (result.error) {
-        if (result.error.toLowerCase().includes('name')) {
+        if (result.error.toLowerCase().includes('Device name')) {
           formApi.setErrorMap({
             onSubmit: {
               fields: {
@@ -57,6 +57,7 @@ export const AddInstancePage = () => {
               },
             },
           });
+          return;
         } else {
           formApi.setErrorMap({
             onSubmit: {
@@ -70,6 +71,7 @@ export const AddInstancePage = () => {
         return;
       }
       if (result.startResponse && !result.startResponse.user.enrolled && result.cookie) {
+        await edgeApi.createDevice(value.url, result.cookie, value.name.trim());
         useEnrollmentStore
           .getState()
           .start(result.startResponse, value.url, result.cookie, undefined);

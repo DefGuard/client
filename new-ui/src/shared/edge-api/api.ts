@@ -49,6 +49,32 @@ const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
   };
 };
 
+const createDevice = async (
+  proxyUrl: string,
+  cookie: string,
+  name: string,
+): Promise<{ error?: string }> => {
+  const edgeHeaders = await getEdgeRequestHeaders();
+  const { publicKey, privateKey } = generateWGKeys();
+  const deviceRes = await fetch(`${proxyUrl}/enrollment/create_device`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+      ...edgeHeaders,
+    },
+    body: JSON.stringify({ name, pubkey: publicKey }),
+  });
+
+  if (!deviceRes.ok) {
+    const body = (await deviceRes.json()) as { error?: string };
+    return { error: body.error ?? `create_device failed (${deviceRes.status})` };
+  }
+
+  await saveDeviceConfig({ privateKey, response: await deviceRes.json() });
+  return {};
+};
+
 const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
   try {
     const proxyUrl = buildProxyUrl(values.url);
@@ -95,23 +121,10 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
       }
     }
 
-    const { publicKey, privateKey } = generateWGKeys();
-    const deviceRes = await fetch(`${proxyUrl}/enrollment/create_device`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: cookie,
-        ...edgeHeaders,
-      },
-      body: JSON.stringify({ name: values.name, pubkey: publicKey }),
-    });
-
-    if (!deviceRes.ok) {
-      const body = (await deviceRes.json()) as { error?: string };
-      return { error: body.error ?? `create_device failed (${deviceRes.status})` };
+    const normalizedName = values.name.trim().toLowerCase();
+    if (resp.user.device_names.some((n) => n.trim().toLowerCase() === normalizedName)) {
+      return { error: `Device name '${values.name}' is already in use` };
     }
-
-    await saveDeviceConfig({ privateKey, response: await deviceRes.json() });
 
     if (!resp.user.enrolled) {
       return { startResponse: resp, proxyUrl, cookie };
@@ -197,6 +210,7 @@ const finishMfaSetup = async (
 
 export const edgeApi = {
   getEdgeRequestHeaders,
+  createDevice,
   addInstance,
   startMfaSetup,
   activateUser,
