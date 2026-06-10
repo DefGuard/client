@@ -11,7 +11,10 @@ use defguard_client_proto::defguard::{
     enterprise::posture::v2::DevicePostureData,
 };
 use defguard_core::{
-    database::models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
+    database::{
+        models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
+        DbPool,
+    },
     proxy::post_with_headers,
 };
 use reqwest::{StatusCode, Url};
@@ -39,17 +42,17 @@ pub async fn authorize(
     instance: &Instance<Id>,
     method_override: Option<&str>,
     posture_data: Option<DevicePostureData>,
+    pool: &DbPool,
 ) -> Result<String, CliError> {
-    let wireguard_keys =
-        WireguardKeys::find_by_instance_id(&*defguard_core::database::DB_POOL, instance.id)
-            .await
-            .map_err(|e| CliError::Other(e.to_string()))?
-            .ok_or_else(|| {
-                CliError::Other(format!(
-                    "WireGuard keys not found for instance {}",
-                    instance.name
-                ))
-            })?;
+    let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
+        .await
+        .map_err(|e| CliError::Other(e.to_string()))?
+        .ok_or_else(|| {
+            CliError::Other(format!(
+                "WireGuard keys not found for instance {}",
+                instance.name
+            ))
+        })?;
 
     let method = if let Some(raw) = method_override {
         parse_method(raw)?

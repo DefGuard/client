@@ -62,7 +62,7 @@ pub async fn handle(
                     .map(|c| CodeSource::Literal(c.to_string()))
                     .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
 
-                use defguard_core::database::{models::instance::Instance, DB_POOL};
+                use defguard_core::database::models::instance::Instance;
 
                 let source = if let Some(s) = code_source {
                     s
@@ -75,7 +75,7 @@ pub async fn handle(
                     )));
                 };
 
-                let inst = Instance::find_by_id(&*DB_POOL, loc.instance_id)
+                let inst = Instance::find_by_id(&state.pool, loc.instance_id)
                     .await
                     .map_err(|e| CliError::Other(format!("Failed to load instance: {e}")))?
                     .ok_or_else(|| {
@@ -94,7 +94,9 @@ pub async fn handle(
                     None
                 };
 
-                let psk = mfa::authorize(loc, &source, &inst, mfa_method, posture_data).await?;
+                let psk =
+                    mfa::authorize(loc, &source, &inst, mfa_method, posture_data, &state.pool)
+                        .await?;
                 (loc.name.clone(), Some(psk), state.app_config.mtu())
             } else if loc.posture_check_required {
                 // Posture only (no MFA).

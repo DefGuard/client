@@ -11,6 +11,8 @@ mod mfa_code;
 mod output;
 mod resolve;
 mod state;
+#[cfg(test)]
+mod tests_proxy;
 
 use cli::{Cli, LocationCommand};
 
