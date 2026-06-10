@@ -16,9 +16,11 @@ struct Win32EncryptableVolume {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AntiVirusProduct {
-    product_state: u32,
+#[serde(rename = "MSFT_MpComputerStatus")]
+#[serde(rename_all = "PascalCase")]
+struct MpComputerStatus {
+    antivirus_enabled: bool,
+    real_time_protection_enabled: bool,
 }
 
 #[derive(Deserialize)]
@@ -99,13 +101,14 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     Err(UnavailableReason::DetectionFailed)
 }
 
-#[derive(Deserialize)]
-#[serde(rename = "MSFT_MpComputerStatus")]
-#[serde(rename_all = "PascalCase")]
-struct MpComputerStatus {
-    antivirus_enabled: bool,
-    real_time_protection_enabled: bool,
-}
+/// Determine whether Microsoft Defender antivirus is actively protecting the device.
+///
+/// `SecurityCenter2` reports whether an antivirus provider is registered/enabled, but it can stay
+/// active even when real-time scanning is disabled. For posture checks we require both Defender AV
+/// and real-time protection to be enabled.
+///
+/// Equivalent to PowerShell command:
+/// `Get-CimInstance -Namespace root\Microsoft\Windows\Defender -ClassName MSFT_MpComputerStatus`
 pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::with_namespace_path("root\\Microsoft\\Windows\\Defender")?;
     let statuses: Vec<MpComputerStatus> = conn.query()?;
@@ -115,21 +118,6 @@ pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
         .ok_or(UnavailableReason::DetectionFailed)?;
     Ok(status.antivirus_enabled && status.real_time_protection_enabled)
 }
-
-// /// Determine AntiVirus status.
-// ///
-// /// Check manually in PowerShell:
-// /// `Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct`
-// ///
-// /// Equivalent to PowerShell command:
-// /// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
-// pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
-//     let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
-//     let products: Vec<AntiVirusProduct> = conn.query()?;
-//     Ok(products
-//         .iter()
-//         .any(|product| (product.product_state & 0x0000_F000) == 0x0000_1000))
-// }
 
 /// Check if this machine is part of an Active Directory domain.
 ///

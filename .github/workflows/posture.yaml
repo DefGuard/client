@@ -15,7 +15,6 @@ env:
 jobs:
 
   test-linux-postures-unencrypted:
-    if: false
     name: Linux postures - unencrypted
     runs-on:
       - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
@@ -33,93 +32,32 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
 
-      - name: Run basic tests
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_name -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_os_version -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::linux -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
   test-windows-postures-setup1:
-    if: true
     name: Windows postures - setup1
     runs-on:
-      # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
-      # - windows-latest
       - self-hosted
       - X64
       - Windows
       - noad
     steps:
-      - name: Install Git
-        if: false
-        shell: cmd
-        run: |
-          choco install git -y --no-progress
-          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
-          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
-          "C:\Program Files\Git\cmd\git.exe" --version
-
-      - name: Enable long paths
-        if: false
-        shell: powershell
-        run: |
-          git config --system core.longpaths true
-          New-ItemProperty `
-            -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
-            -Name "LongPathsEnabled" `
-            -Value 1 `
-            -PropertyType DWORD `
-            -Force
 
       - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - name: Install MSVC build tools
-        if: false
-        shell: powershell
-        run: |
-          choco install visualstudio2022buildtools `
-            --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait --norestart" `
-            -y
-
-      # - name: Add Git Bash to PATH
-      #   shell: cmd
-      #   run: |
-      #     "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Add Git Bash to PATH
-        if: false
-        shell: cmd
-        run: |
-          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
-          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
-
       - uses: dtolnay/rust-toolchain@stable
-        if: true
-
-      - name: Install protoc
-        if: false
-        shell: cmd
-        run: |
-          choco install protoc -y
-          protoc --version
 
       - uses: mozilla-actions/sccache-action@v0.0.10
-
-      - name: Cache Cargo
-        if: false
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: |
-            windows-cargo-
 
       - name: Run tests
         working-directory: src-tauri/
@@ -131,84 +69,21 @@ jobs:
         run: sccache --show-stats
 
   test-windows-postures-setup2:
-    if: true
     name: Windows postures - setup2
     runs-on:
-      # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
-      # - windows-latest
       - self-hosted
       - X64
       - Windows
       - ad
     steps:
-      - name: Install Git
-        if: false
-        shell: cmd
-        run: |
-          choco install git -y --no-progress
-          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
-          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
-          "C:\Program Files\Git\cmd\git.exe" --version
-
-      - name: Enable long paths
-        if: false
-        shell: powershell
-        run: |
-          git config --system core.longpaths true
-          New-ItemProperty `
-            -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
-            -Name "LongPathsEnabled" `
-            -Value 1 `
-            -PropertyType DWORD `
-            -Force
 
       - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - name: Install MSVC build tools
-        if: false
-        shell: powershell
-        run: |
-          choco install visualstudio2022buildtools `
-            --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait --norestart" `
-            -y
-
-      # - name: Add Git Bash to PATH
-      #   shell: cmd
-      #   run: |
-      #     "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      #
-      - name: Add Git Bash to PATH
-        if: false
-        shell: cmd
-        run: |
-          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
-          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
-
       - uses: dtolnay/rust-toolchain@stable
-        if: true
-
-      - name: Install protoc
-        if: false
-        shell: cmd
-        run: |
-          choco install protoc -y
-          protoc --version
 
       - uses: mozilla-actions/sccache-action@v0.0.10
-
-      - name: Cache Cargo
-        if: false
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: |
-            windows-cargo-
 
       - name: Run tests
         working-directory: src-tauri/
@@ -221,148 +96,25 @@ jobs:
 
 
   test-macos-postures-unencrypted:
-    if: false
     runs-on:
       - self-hosted
       - macOS
-    # runs-on:
-    #   - macos-26
-    #   # - codebuild-defguard-posture-macos-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      # - uses: actions/setup-node@v6
-      #   with:
-      #     node-version: 26
-
-      # - uses: pnpm/action-setup@v6
-      #   with:
-      #     cache: true
-      #     version: 11
-
-      # # Change to '--frozen-lockfile' once this gets fixed:
-      # # https://github.com/pnpm/action-setup/issues/40
-      # - name: Install Node dependencies
-      #   run: pnpm install --no-frozen-lockfile
-
-      # - name: Install Node dependencies for New UI
-      #   run: |
-      #     cd new-ui
-      #     pnpm install --no-frozen-lockfile
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      # - name: Set build number
-      #   run: |
-      #     sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
-      #     sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
+      - uses: mozilla-actions/sccache-action@v0.0.10
 
-      # - name: Unlock keychain
-      #   run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-
-      # - name: Build new UI
-      #   run: |
-      #     cd new-ui
-      #     pnpm build
-
-      # - name: Build old UI
-      #   run: |
-      #     pnpm build
-
-      # - name: Build app
-      #   uses: tauri-apps/tauri-action@v0
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     args: --target universal-apple-darwin
-
-      # - name: Build installation package
-      #   run: |
-      #     security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-      #     xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" /Applications defguard-client.pkg
-      #     xcrun altool --upload-app --type macos --file defguard-client.pkg --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }}
-      #     # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
-      #     # xcrun stapler staple defguard-client.pkg
-
-      - name: Install protoc
-        run: brew install protobuf
-
-      - name: Run basic tests
+      - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_disk_encryption_status_unencrypted -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_os_name -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_device_integrity -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::macos::test_os_version -- --ignored --exact
+          cargo test --locked --lib enterprise::inspector::tests::ci::macos -- --ignored
 
-
-  test-linux-postures-encrypted:
-    if: false
-    name: Linux postures - encrypted
-    runs-on:
-      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: false
-
-      - name: Install dependencies
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
-
-      - name: Test kernel version and encrypted disk
-        working-directory: src-tauri/
-        run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_linux_kernel_version -- --ignored --exact
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
-
-      # runtime crypt setup
-      - name: Debug crypto block support
-        run: |
-          set -euo pipefail
-          uname -a
-          ls -l /dev/loop* /dev/loop-control || true
-          sudo losetup -f || true
-          ls -l /dev/mapper /dev/mapper/control || true
-          cat /proc/devices | grep -E 'loop|device-mapper' || true
-          grep -E 'loop|dm_crypt|dm_mod' /proc/modules || true
-          lsblk -Jo NAME,FSTYPE,TYPE
-
-      - name: Prepare block device support
-        run: |
-          set -euo pipefail
-          [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
-          for i in $(seq 0 31); do
-            [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i"
-          done
-          losetup -f
-
-      - name: Test encrypted disk
-        working-directory: src-tauri/
-        run: |
-          set -euo pipefail
-          img="$(mktemp /tmp/defguard-luks.XXXXXX)"
-          key="$(mktemp /tmp/defguard-luks-key.XXXXXX)"
-          loopdev=""
-          cleanup() {
-            if [ -n "$loopdev" ]; then losetup -d "$loopdev" || true; fi
-            rm -f "$img" "$key"
-          }
-          trap cleanup EXIT
-          truncate -s 64M "$img"
-          printf 'defguard-ci-test-key' > "$key"
-          loopdev="$(losetup --find --show "$img")"
-          cryptsetup luksFormat --batch-mode --type luks2 "$loopdev" "$key"
-          lsblk -Jo NAME,FSTYPE,TYPE
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_encrypted -- --ignored --exact
+      - name: Show sccache stats
+        run: sccache --show-stats
