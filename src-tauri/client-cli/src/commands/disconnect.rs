@@ -21,11 +21,10 @@ pub async fn handle(
         let active = active_state(&state.pool).await?;
 
         if active.is_empty() {
-            if json {
-                output::emit(&serde_json::json!({ "disconnected": [] }), json);
-            } else {
-                println!("No active connections.");
-            }
+            output::emit(
+                &serde_json::json!({ "disconnected": [], "message": "No active connections." }),
+                json,
+            );
             return Ok(());
         }
 
@@ -51,19 +50,13 @@ pub async fn handle(
             }
         }
 
-        if json {
-            output::emit(
-                &serde_json::json!({ "disconnected": disconnected, "errors": errors }),
-                json,
-            );
-        } else {
-            for name in &disconnected {
-                println!("Disconnected from {name}");
-            }
-            for err in &errors {
-                eprintln!("Error: {err}");
-            }
-        }
+        output::emit(
+            &serde_json::json!({
+                "disconnected": disconnected,
+                "errors": errors,
+            }),
+            json,
+        );
 
         if errors.is_empty() {
             Ok(())
@@ -77,14 +70,10 @@ pub async fn handle(
 
             match active.len() {
                 0 => {
-                    if json {
-                        output::emit(
-                            &serde_json::json!({ "disconnected": null, "message": "no active connections" }),
-                            json,
-                        );
-                    } else {
-                        println!("No active connections.");
-                    }
+                    output::emit(
+                        &serde_json::json!({ "disconnected": null, "message": "No active connections." }),
+                        json,
+                    );
                     return Ok(());
                 }
                 1 => {
@@ -95,14 +84,14 @@ pub async fn handle(
                         "Disconnecting sole active connection {name} on interface {ifname}..."
                     );
                     tear_down(conn, &state.pool).await?;
-                    if json {
-                        output::emit(
-                            &serde_json::json!({ "disconnected": name, "interface": ifname }),
-                            json,
-                        );
-                    } else {
-                        println!("Disconnected from {name} ({ifname})");
-                    }
+                    output::emit(
+                        &serde_json::json!({
+                            "disconnected": name,
+                            "interface": ifname,
+                            "message": format!("Disconnected from {name} ({ifname})"),
+                        }),
+                        json,
+                    );
                     return Ok(());
                 }
                 _ => {
@@ -156,14 +145,14 @@ pub async fn handle(
 
         tear_down(&conn_info, &state.pool).await?;
 
-        if json {
-            output::emit(
-                &serde_json::json!({ "disconnected": target_name, "interface": ifname }),
-                json,
-            );
-        } else {
-            println!("Disconnected from {target_name} ({ifname})");
-        }
+        output::emit(
+            &serde_json::json!({
+                "disconnected": target_name,
+                "interface": ifname,
+                "message": format!("Disconnected from {target_name} ({ifname})"),
+            }),
+            json,
+        );
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use defguard_core::connection::active_state::active_state;
+use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
 
 use crate::{
     output,
@@ -8,55 +8,58 @@ use crate::{
 pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
     let connections = active_state(&state.pool).await?;
 
-    if connections.is_empty() {
-        if json {
-            output::emit(&serde_json::json!({ "active": [] }), json);
-        } else {
-            println!("No active connections.");
-        }
-        return Ok(());
-    }
-
-    if json {
-        let entries: Vec<serde_json::Value> = connections
-            .iter()
-            .map(|c| {
-                serde_json::json!({
-                    "connection_type": c.connection_type.to_string(),
-                    "name": c.name,
-                    "interface": c.interface_name,
-                    "listen_port": c.stats.as_ref().map(|s| s.listen_port),
-                    "tx_bytes": c.stats.as_ref().map(|s| s.tx_bytes),
-                    "rx_bytes": c.stats.as_ref().map(|s| s.rx_bytes),
-                    "last_handshake_secs": c.stats.as_ref().and_then(|s| s.last_handshake),
-                })
+    // Build JSON entries.
+    let entries: Vec<serde_json::Value> = connections
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "connection_type": c.connection_type.to_string(),
+                "name": c.name,
+                "interface": c.interface_name,
+                "listen_port": c.stats.as_ref().map(|s| s.listen_port),
+                "tx_bytes": c.stats.as_ref().map(|s| s.tx_bytes),
+                "rx_bytes": c.stats.as_ref().map(|s| s.rx_bytes),
+                "last_handshake_secs": c.stats.as_ref().and_then(|s| s.last_handshake),
             })
-            .collect();
-        output::emit(&serde_json::json!({ "active": entries }), json);
-        return Ok(());
-    }
+        })
+        .collect();
 
-    // Human-readable table.
+    let message = if connections.is_empty() {
+        "No active connections.".to_string()
+    } else {
+        format_status_table(&connections)
+    };
+
+    output::emit(
+        &serde_json::json!({ "active": entries, "message": message }),
+        json,
+    );
+
+    Ok(())
+}
+
+/// Build a human-readable status table string.
+fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
     let name_w = connections
         .iter()
         .map(|c| c.name.len())
         .max()
         .unwrap_or(4)
-        .max(4); // "NAME"
+        .max(4);
     let iface_w = connections
         .iter()
         .map(|c| c.interface_name.len())
         .max()
         .unwrap_or(9)
-        .max(9); // "INTERFACE"
+        .max(9);
 
-    println!("\nActive Connections");
-    println!(
+    let mut lines = vec![format!("\nActive Connections")];
+    lines.push(format!(
         "  {:<name_w$}  TYPE       {:<iface_w$}  TX          RX          {:<9}",
         "NAME", "INTERFACE", "HANDSHAKE"
-    );
+    ));
 
-    for conn in &connections {
+    for conn in connections {
         let tx = conn
             .stats
             .as_ref()
@@ -75,20 +78,19 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
             .map(format_handshake)
             .unwrap_or_else(|| "never".to_string());
 
-        println!(
+        lines.push(format!(
             "  {:<name_w$}  {:<10}  {:<iface_w$}  {:<10}  {:<10}  {handshake:<9}",
             conn.name,
             conn.connection_type.to_string(),
             conn.interface_name,
             tx,
             rx
-        );
+        ));
     }
 
-    Ok(())
+    lines.join("\n")
 }
 
-/// Format bytes in human-readable form.
 fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
@@ -104,7 +106,6 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
-/// Format a Unix timestamp (seconds since epoch) as a relative duration.
 fn format_handshake(secs: u64) -> String {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

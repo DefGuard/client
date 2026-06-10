@@ -45,14 +45,10 @@ pub async fn handle(
     };
     let active = active_state(&state.pool).await?;
     if active.iter().any(|c| c.target_id == target_id) {
-        if json {
-            output::emit(
-                &serde_json::json!({ "connected": target_name, "already": true }),
-                json,
-            );
-        } else {
-            println!("Already connected to {target_name}");
-        }
+        output::emit(
+            &serde_json::json!({ "connected": target_name, "already": true, "message": format!("Already connected to {target_name}") }),
+            json,
+        );
         return Ok(());
     }
 
@@ -122,11 +118,10 @@ pub async fn handle(
     };
     bring_up(conn_target, psk, mtu, &state.pool).await?;
 
-    if json {
-        output::emit(&serde_json::json!({ "connected": target_name }), json);
-    } else {
-        println!("Connected to {target_name}");
-    }
+    output::emit(
+        &serde_json::json!({ "connected": target_name, "message": format!("Connected to {target_name}") }),
+        json,
+    );
 
     Ok(())
 }

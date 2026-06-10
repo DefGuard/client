@@ -15,41 +15,35 @@ use crate::{
 pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
     let locations = Location::all(&state.pool, false).await?;
 
-    // Build instance-id → name cache.
     let instance_names: HashMap<Id, String> = {
         let mut map = HashMap::new();
         for loc in &locations {
-            if let std::collections::hash_map::Entry::Vacant(e) = map.entry(loc.instance_id) {
+            if !map.contains_key(&loc.instance_id) {
                 if let Some(inst) = Instance::find_by_id(&state.pool, loc.instance_id).await? {
-                    e.insert(inst.name);
+                    map.insert(loc.instance_id, inst.name);
                 }
             }
         }
         map
     };
 
-    if json {
-        let entries: Vec<serde_json::Value> = locations
-            .iter()
-            .map(|l| {
-                serde_json::json!({
-                    "name": l.name,
-                    "address": l.address,
-                    "endpoint": l.endpoint,
-                    "instance": instance_names.get(&l.instance_id).map(|n| n.as_str()).unwrap_or("?"),
-                    "mfa_method": mfa_label(l.mfa_method),
-                    "route_all_traffic": l.route_all_traffic,
-                })
+    let entries: Vec<serde_json::Value> = locations
+        .iter()
+        .map(|l| {
+            serde_json::json!({
+                "name": l.name,
+                "address": l.address,
+                "endpoint": l.endpoint,
+                "instance": instance_names.get(&l.instance_id).map(|n| n.as_str()).unwrap_or("?"),
+                "mfa_method": mfa_label(l.mfa_method),
+                "route_all_traffic": l.route_all_traffic,
             })
-            .collect();
-        output::emit(&serde_json::json!({ "locations": entries }), json);
-    } else {
-        if locations.is_empty() {
-            println!("No locations configured.");
-            return Ok(());
-        }
+        })
+        .collect();
 
-        // Compute column widths.
+    let message = if locations.is_empty() {
+        "No locations configured.".to_string()
+    } else {
         let name_w = locations
             .iter()
             .map(|l| l.name.len())
@@ -69,17 +63,16 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
             .unwrap_or(8)
             .max(8);
 
-        println!(
+        let mut lines = vec![format!(
             "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:<11}",
             "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
-        );
-
+        )];
         for loc in &locations {
             let inst = instance_names
                 .get(&loc.instance_id)
                 .map(|n| n.as_str())
                 .unwrap_or("?");
-            println!(
+            lines.push(format!(
                 "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>11}",
                 loc.name,
                 loc.address,
@@ -91,9 +84,15 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
                 } else {
                     "Predefined"
                 }
-            );
+            ));
         }
-    }
+        lines.join("\n")
+    };
+
+    output::emit(
+        &serde_json::json!({ "locations": entries, "message": message }),
+        json,
+    );
 
     Ok(())
 }
@@ -124,14 +123,12 @@ pub async fn handle_set(
 
     let mut changed = Vec::new();
 
-    // Update MFA method via the core setter (clamps against location_mfa_mode).
     if let Some(method_str) = mfa_method {
         let method = parse_mfa_method(method_str)?;
         Location::set_mfa_method(&state.pool, location_id, method).await?;
         changed.push(format!("MFA method → {method_str}"));
     }
 
-    // Update routing via the core setter (rejects when policy forbids).
     if let Some(true) = route_all_traffic {
         Location::update_routing(&state.pool, location_id, true).await?;
         changed.push("route-all-traffic → on".to_string());
@@ -140,26 +137,16 @@ pub async fn handle_set(
         changed.push("route-all-traffic → off".to_string());
     }
 
-    if changed.is_empty() {
-        if json {
-            output::emit(
-                &serde_json::json!({ "location": name, "message": "no changes" }),
-                json,
-            );
-        } else {
-            println!("No changes for location '{name}'.");
-        }
-        return Ok(());
-    }
-
-    if json {
-        output::emit(
-            &serde_json::json!({ "location": name, "changes": changed }),
-            json,
-        );
+    let message = if changed.is_empty() {
+        format!("No changes for location '{name}'.")
     } else {
-        println!("Updated location '{name}': {}", changed.join(", "));
-    }
+        format!("Updated location '{name}': {}", changed.join(", "))
+    };
+
+    output::emit(
+        &serde_json::json!({ "location": name, "changes": changed, "message": message }),
+        json,
+    );
 
     Ok(())
 }
@@ -185,34 +172,42 @@ pub async fn handle_show(
         }
     };
 
-    if json {
-        output::emit(
-            &serde_json::json!({
-                "name": location.name,
-                "address": location.address,
-                "endpoint": location.endpoint,
-                "pubkey": location.pubkey,
-                "allowed_ips": location.allowed_ips,
-                "dns": location.dns,
-                "mfa_method": mfa_label(location.mfa_method),
-                "route_all_traffic": location.route_all_traffic,
-                "keepalive_interval": location.keepalive_interval,
-            }),
-            json,
-        );
-    } else {
-        println!("Name:              {}", location.name);
-        println!("Address:           {}", location.address);
-        println!("Endpoint:          {}", location.endpoint);
-        println!("Pubkey:            {}", location.pubkey);
-        println!("Allowed IPs:       {}", location.allowed_ips);
+    let mfa = mfa_label(location.mfa_method);
+
+    let message = {
+        let mut lines = Vec::new();
+        lines.push(format!("Name:              {}", location.name));
+        lines.push(format!("Address:           {}", location.address));
+        lines.push(format!("Endpoint:          {}", location.endpoint));
+        lines.push(format!("Pubkey:            {}", location.pubkey));
+        lines.push(format!("Allowed IPs:       {}", location.allowed_ips));
         if let Some(dns) = &location.dns {
-            println!("DNS:               {dns}");
+            lines.push(format!("DNS:               {dns}"));
         }
-        println!("MFA method:        {}", mfa_label(location.mfa_method));
-        println!("Route all traffic: {}", location.route_all_traffic);
-        println!("Keepalive:         {}s", location.keepalive_interval);
-    }
+        lines.push(format!("MFA method:        {mfa}"));
+        lines.push(format!("Route all traffic: {}", location.route_all_traffic));
+        lines.push(format!(
+            "Keepalive:         {}s",
+            location.keepalive_interval
+        ));
+        lines.join("\n")
+    };
+
+    output::emit(
+        &serde_json::json!({
+            "name": location.name,
+            "address": location.address,
+            "endpoint": location.endpoint,
+            "pubkey": location.pubkey,
+            "allowed_ips": location.allowed_ips,
+            "dns": location.dns,
+            "mfa_method": mfa,
+            "route_all_traffic": location.route_all_traffic,
+            "keepalive_interval": location.keepalive_interval,
+            "message": message,
+        }),
+        json,
+    );
 
     Ok(())
 }
@@ -221,7 +216,6 @@ pub async fn handle_show(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Parse a user-facing MFA method string into the model enum.
 fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
     match raw.to_lowercase().as_str() {
         "totp" => Ok(LocationMfaMethod::Totp),
@@ -235,7 +229,6 @@ fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
     }
 }
 
-/// Human label for an optional MFA method.
 fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
     match method {
         Some(LocationMfaMethod::Totp) => "totp",
