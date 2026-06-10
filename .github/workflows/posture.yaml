@@ -5,14 +5,7 @@ on:
       - main
       - dev
       - 'release/**'
-    paths-ignore:
-      - '*.md'
-      - 'LICENSE'
-  pull_request:
-    branches:
-      - main
-      - dev
-      - 'release/**'
+      - "stable/**"
     paths-ignore:
       - '*.md'
       - 'LICENSE'
