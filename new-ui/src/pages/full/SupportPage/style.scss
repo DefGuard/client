@@ -4,8 +4,8 @@
       display: flex;
       gap: var(--spacing-lg);
 
-      > div > .icon path {
-        fill: var(--fg-white-60);
+      .icon {
+        --icon-color: var(--fg-white-60);
       }
 
       .content {

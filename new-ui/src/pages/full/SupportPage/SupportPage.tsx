@@ -2,6 +2,7 @@ import './style.scss';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { ReactNode } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
+import type { ButtonProps } from '../../../shared/components/Button/types';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
@@ -15,7 +16,7 @@ type SupportSectionProps = {
   icon: IconKindValue;
   title: string;
   description: ReactNode;
-  action?: ReactNode;
+  action?: ButtonProps;
   divider?: boolean;
 };
 
@@ -37,7 +38,7 @@ const SupportSection = ({
       {action && (
         <>
           <SizedBox height={ThemeSpacing.Xl} />
-          {action}
+          <Button {...action} />
         </>
       )}
       {divider && <Divider spacing={ThemeSpacing.Xl} />}
@@ -54,47 +55,39 @@ export const SupportPage = () => {
           icon={IconKind.Question}
           title="Have questions? Check our documentation first."
           description="Before contacting or submitting any issues to GitHub please get familiar with Defguard documentation available."
-          action={
-            <Button
-              text={'Go to documentation'}
-              iconRight={IconKind.OpenInNewWindow}
-              onClick={() => openUrl('https://docs.defguard.net/')}
-            />
-          }
+          action={{
+            text: 'Go to documentation',
+            iconRight: IconKind.OpenInNewWindow,
+            onClick: () => openUrl('https://docs.defguard.net/'),
+          }}
         />
         <SupportSection
           icon={IconKind.Bug}
           title="Report a bug"
           description="We aim to respond to all bug reports as quickly as possible and prioritize them based on severity before adding them to our development backlog. To give us more context, you can optionally download the support data and/or log file and attach it to your bug report."
-          action={
-            <Button
-              text={'Report on Github'}
-              iconLeft={IconKind.Github}
-              variant={ButtonVariant.Secondary}
-              onClick={() =>
-                openUrl(
-                  'https://github.com/DefGuard/client/issues/new?template=02-bug.yml',
-                )
-              }
-            />
-          }
+          action={{
+            text: 'Report on Github',
+            iconLeft: IconKind.Github,
+            variant: ButtonVariant.Secondary,
+            onClick: () =>
+              openUrl(
+                'https://github.com/DefGuard/client/issues/new?template=02-bug.yml',
+              ),
+          }}
         />
         <SupportSection
           icon={IconKind.Request}
           title="Request feature"
           description="We grow with the help of our community. If you have an idea or a missing feature to suggest, please share it - we'll review it."
-          action={
-            <Button
-              text={'Submit on Github'}
-              iconLeft={IconKind.Github}
-              variant={ButtonVariant.Secondary}
-              onClick={() =>
-                openUrl(
-                  'https://github.com/DefGuard/client/issues/new?template=01-feature-request.yml',
-                )
-              }
-            />
-          }
+          action={{
+            text: 'Submit on Github',
+            iconLeft: IconKind.Github,
+            variant: ButtonVariant.Secondary,
+            onClick: () =>
+              openUrl(
+                'https://github.com/DefGuard/client/issues/new?template=01-feature-request.yml',
+              ),
+          }}
         />
         <SupportSection
           icon={IconKind.Mail}
