@@ -1,10 +1,21 @@
 name: "Test posture checks gathering"
 on:
   push:
-    # tags:
-    #   - v*.*.*
     branches:
-      - posture-checks-ci
+      - main
+      - dev
+      - 'release/**'
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+  pull_request:
+    branches:
+      - main
+      - dev
+      - 'release/**'
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
 
 env:
   CARGO_TERM_COLOR: always
@@ -94,8 +105,8 @@ jobs:
       - name: Show sccache stats
         run: sccache --show-stats
 
-
   test-macos-postures-unencrypted:
+    name: MacOS postures - unencrypted
     runs-on:
       - self-hosted
       - macOS
