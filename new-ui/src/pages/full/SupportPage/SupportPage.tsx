@@ -17,16 +17,6 @@ import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { IconButtonVariant } from '../../../shared/components/IconButton/types';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 
-const getDebugInfo = async (): Promise<string> => {
-  const appVersion = await getVersion();
-  return [
-    `Application version: ${appVersion}`,
-    `Operating system: ${platform()}`,
-    `OS version: ${version()}`,
-    `Architecture: ${arch()}`,
-  ].join('\n');
-};
-
 type SupportSectionProps = {
   icon: IconKindValue;
   title: string;
