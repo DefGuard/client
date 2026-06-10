@@ -48,7 +48,7 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::linux -- --ignored
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux -- --ignored
 
       - name: Show sccache stats
         run: sccache --show-stats
@@ -74,7 +74,7 @@ jobs:
         working-directory: src-tauri/
         shell: cmd
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup1 -- --ignored
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup1 -- --ignored
 
       - name: Show sccache stats
         run: sccache --show-stats
@@ -100,7 +100,7 @@ jobs:
         working-directory: src-tauri/
         shell: cmd
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup2 -- --ignored
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup2 -- --ignored
 
       - name: Show sccache stats
         run: sccache --show-stats
@@ -125,7 +125,7 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test --locked --lib enterprise::inspector::tests::ci::macos -- --ignored
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos -- --ignored
 
       - name: Show sccache stats
         run: sccache --show-stats
