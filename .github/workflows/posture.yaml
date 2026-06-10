@@ -91,12 +91,14 @@ jobs:
       #     "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Add Git Bash to PATH
+        if: false
         shell: cmd
         run: |
           echo C:\Program Files\Git\bin>>%GITHUB_PATH%
           echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
 
       - uses: dtolnay/rust-toolchain@stable
+        if: false
 
       - name: Install protoc
         if: false
@@ -105,7 +107,7 @@ jobs:
           choco install protoc -y
           protoc --version
 
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Cache Cargo
         if: false
@@ -124,6 +126,9 @@ jobs:
         shell: cmd
         run: |
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup1 -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
   test-windows-postures-setup2:
     if: true
@@ -175,12 +180,14 @@ jobs:
       #     "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       #
       - name: Add Git Bash to PATH
+        if: false
         shell: cmd
         run: |
           echo C:\Program Files\Git\bin>>%GITHUB_PATH%
           echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
 
       - uses: dtolnay/rust-toolchain@stable
+        if: false
 
       - name: Install protoc
         if: false
@@ -189,7 +196,7 @@ jobs:
           choco install protoc -y
           protoc --version
 
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Cache Cargo
         if: false
@@ -208,6 +215,9 @@ jobs:
         shell: cmd
         run: |
           cargo test --locked --lib enterprise::inspector::tests::ci::windows::setup2 -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
 
   test-macos-postures-unencrypted:
@@ -302,6 +312,7 @@ jobs:
           submodules: recursive
 
       - uses: dtolnay/rust-toolchain@stable
+        if: false
 
       - name: Install dependencies
         env:

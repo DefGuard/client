@@ -1,3 +1,32 @@
+use std::process::Command;
+
+fn expected_security_update_age_days() -> i32 {
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            r#"
+            $today = (Get-Date).ToUniversalTime().Date
+            Get-CimInstance Win32_QuickFixEngineering |
+              Where-Object { $_.InstalledOn } |
+              ForEach-Object { ($today - ([datetime]$_.InstalledOn).Date).Days } |
+              Sort-Object |
+              Select-Object -First 1
+            "#,
+        ])
+        .output()
+        .expect("failed to query Windows security updates");
+    assert!(
+        output.status.success(),
+        "PowerShell query failed: {output:?}"
+    );
+    String::from_utf8(output.stdout)
+        .expect("PowerShell returned non-UTF8 output")
+        .trim()
+        .parse()
+        .expect("PowerShell did not return an integer update age")
+}
+
 mod setup1 {
     use super::super::super::super::{
         anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
@@ -28,12 +57,14 @@ mod setup1 {
         assert_eq!(part_of_domain().unwrap(), false);
     }
 
-    // #[test]
-    // #[ignore = "CI posture testing only"]
-    // fn test_security_update_age_days() {
-    //     assert_eq!(security_update_age_days().unwrap(), 60);
-    // }
-
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_security_update_age_days() {
+        assert_eq!(
+            security_update_age_days().unwrap(),
+            expected_security_update_age_days()
+        );
+    }
 
     #[test]
     #[ignore = "CI posture testing only"]
@@ -72,16 +103,18 @@ mod setup2 {
         assert_eq!(part_of_domain().unwrap(), true);
     }
 
-    // #[test]
-    // #[ignore = "CI posture testing only"]
-    // fn test_security_update_age_days() {
-    //     assert_eq!(security_update_age_days().unwrap(), 60);
-    // }
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_security_update_age_days() {
+        assert_eq!(
+            security_update_age_days().unwrap(),
+            expected_security_update_age_days()
+        );
+    }
 
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_encrypted() {
         assert_eq!(disk_encryption_status().unwrap(), true);
     }
-
 }
