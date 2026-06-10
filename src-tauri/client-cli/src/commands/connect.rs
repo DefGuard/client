@@ -60,12 +60,12 @@ pub async fn handle(
 
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(loc) => {
-            // Determine the MFA code source from CLI flags.
-            let code_source = code
-                .map(|c| CodeSource::Literal(c.to_string()))
-                .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
-
             if loc.mfa_enabled() {
+                // Determine the MFA code source from CLI flags.
+                let code_source = code
+                    .map(|c| CodeSource::Literal(c.to_string()))
+                    .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
+
                 use defguard_core::database::{models::instance::Instance, DB_POOL};
 
                 let source = if let Some(s) = code_source {
@@ -86,14 +86,26 @@ pub async fn handle(
                         CliError::Other(format!("Instance {} not found", loc.instance_id))
                     })?;
 
-                let psk = mfa::authorize(loc, &source, &inst, mfa_method).await?;
-                (loc.name.clone(), Some(psk), None)
+                // When posture is also required, collect posture data and pass it
+                // into the MFA start request so the server can validate both together.
+                let posture_data = if loc.posture_check_required {
+                    Some(
+                        defguard_client_posture::get_posture_data()
+                            .await
+                            .map_err(|e| CliError::Other(e.to_string()))?,
+                    )
+                } else {
+                    None
+                };
+
+                let psk = mfa::authorize(loc, &source, &inst, mfa_method, posture_data).await?;
+                (loc.name.clone(), Some(psk), state.app_config.mtu())
             } else if loc.posture_check_required {
                 // Posture only (no MFA).
                 let psk = defguard_client_posture::authorize_posture_session(loc)
                     .await
                     .map_err(|e| CliError::Other(e.to_string()))?;
-                (loc.name.clone(), Some(psk), None)
+                (loc.name.clone(), Some(psk), state.app_config.mtu())
             } else {
                 (loc.name.clone(), None, state.app_config.mtu())
             }

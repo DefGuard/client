@@ -3,9 +3,12 @@
 //! Flow: `start` → `obtain_code` → `finish` → preshared_key.
 //! Supports TOTP and email methods.  OIDC and mobile-approve are Phase 6.
 
-use defguard_client_proto::defguard::client_types::{
-    ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest, ClientMfaStartResponse,
-    MfaMethod,
+use defguard_client_proto::defguard::{
+    client_types::{
+        ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        ClientMfaStartResponse, MfaMethod,
+    },
+    enterprise::posture::v2::DevicePostureData,
 };
 use defguard_core::{
     database::models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
@@ -26,6 +29,8 @@ use crate::{
 /// * `instance` — the instance this location belongs to (for proxy URL + pubkey).
 /// * `method_override` — optional `--mfa-method` flag; if set, uses this instead of the
 ///   location's stored preference.
+/// * `posture_data` — device posture data; must be provided when the location also
+///   requires posture checks.
 ///
 /// Returns the WireGuard preshared key that must be passed to `bring_up`.
 pub async fn authorize(
@@ -33,6 +38,7 @@ pub async fn authorize(
     source: &CodeSource,
     instance: &Instance<Id>,
     method_override: Option<&str>,
+    posture_data: Option<DevicePostureData>,
 ) -> Result<String, CliError> {
     let wireguard_keys =
         WireguardKeys::find_by_instance_id(&*defguard_core::database::DB_POOL, instance.id)
@@ -51,12 +57,23 @@ pub async fn authorize(
         infer_method(location)
     };
 
+    // Reject methods not yet supported by the CLI.
+    match method {
+        MfaMethod::Oidc | MfaMethod::Biometric | MfaMethod::MobileApprove => {
+            return Err(CliError::MfaFailed(format!(
+                "MFA method {:?} is not yet supported by the CLI. Use the desktop client.",
+                method
+            )));
+        }
+        _ => {}
+    }
+
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: wireguard_keys.pubkey.clone(),
         method: method as i32,
-        posture_data: None, // Phase 6: wire posture data into MFA start when both required.
+        posture_data,
     };
 
     let proxy_url = Url::parse(&instance.proxy_url)
