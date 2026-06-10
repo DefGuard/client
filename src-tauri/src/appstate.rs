@@ -7,13 +7,13 @@ use tauri::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    active_connections::ACTIVE_CONNECTIONS,
     app_config::AppConfig,
     database::models::{connection::ActiveConnection, Id},
     enterprise::provisioning::ProvisioningConfig,
     utils::stats_handler,
     ConnectionType,
 };
+use defguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
 
 pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,

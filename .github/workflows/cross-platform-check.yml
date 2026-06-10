@@ -1,0 +1,63 @@
+name: Cross-platform check
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+  pull_request:
+    branches:
+      - main
+      - dev
+      - "release/**"
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macOS
+          - Windows
+
+    runs-on:
+      - self-hosted
+      - ${{ matrix.os }}
+
+    defaults:
+      run:
+        working-directory: ./src-tauri
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install protoc
+        if: matrix.os != 'Windows'
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check compilation
+        run: cargo check --workspace

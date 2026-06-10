@@ -1,8 +1,7 @@
 {
   pkgs,
   lib,
-  stdenv,
-  rustPlatform,
+  craneLib,
   rustc,
   cargo,
   makeDesktopItem,
@@ -10,7 +9,6 @@
   fetchPnpmDeps,
 }: let
   pname = "defguard-client";
-  # Automatically read version from Cargo.toml
   version = (fromTOML (builtins.readFile ../src-tauri/Cargo.toml)).workspace.package.version;
 
   desktopItem = makeDesktopItem {
@@ -43,60 +41,113 @@
     libayatana-indicator
     ayatana-ido
     libdbusmenu-gtk3
-    desktop-file-utils
-    iproute2
-    lsb-release
-    openresolv
   ];
 
-  nativeBuildInputs = [
+  # Rust/cargo inputs shared by buildDepsOnly and the main build.
+  cargoNativeBuildInputs = [
     rustc
     cargo
     pkgs.pkg-config
     pkgs.gobject-introspection
     pkgs.cargo-tauri
-    pkgs.nodejs_24
     pkgs.protobuf
-    pnpm
-    # configures pnpm to use pre-fetched dependencies
-    pnpmConfigHook
-    # configures cargo to use pre-fetched dependencies
-    rustPlatform.cargoSetupHook
-    # helper to add runtime binary & library deps paths
-    pkgs.makeWrapper
-    pkgs.wrapGAppsHook3
   ];
+
+  # Source filter for buildDepsOnly: Cargo files plus extras needed by build.rs
+  # (proto files, tauri configs, capabilities, sqlx offline cache).
+  depsSourceFilter = path: type:
+    (craneLib.filterCargoSources path type)
+    || (lib.hasSuffix ".proto" path)
+    || (lib.hasSuffix "tauri.conf.json" path)
+    || (lib.hasInfix "/capabilities/" path)
+    || (lib.hasInfix "/.sqlx/" path)
+    || (lib.hasSuffix ".sql" path);
+
+  depsSrc = lib.cleanSourceWith {
+    src = craneLib.path ../src-tauri;
+    filter = depsSourceFilter;
+  };
+
+  cargoVendorDir = craneLib.vendorCargoDeps {
+    src = craneLib.path ../src-tauri;
+  };
+
+  # Pre-compile cargo dependencies; cached as long as Cargo.lock is unchanged.
+  # Features must match the main build.
+  cargoArtifacts = craneLib.buildDepsOnly {
+    inherit pname;
+    inherit version buildInputs cargoVendorDir;
+    src = depsSrc;
+    nativeBuildInputs = cargoNativeBuildInputs;
+    cargoExtraArgs = "--features custom-protocol";
+    VERGEN_IDEMPOTENT = "true";
+    SQLX_OFFLINE = "true";
+  };
+
+  # Prefetch pnpm dependencies.
+  # Explicit pnpm_10 keeps fetchPnpmDeps and pnpmConfigHook on the same major version.
+  pnpmDeps = fetchPnpmDeps {
+    inherit pname version pnpm;
+    src = ../.;
+    fetcherVersion = 3;
+    hash = "sha256-7B5+C3q+jVQ2taKcfZkfTvH37OBDIPDM/4LLRqWPE+I=";
+  };
 in
-  stdenv.mkDerivation (finalAttrs: rec {
-    inherit pname version buildInputs nativeBuildInputs;
+  craneLib.mkCargoDerivation {
+    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps;
 
     src = ../.;
 
-    # prefetch cargo dependencies
-    cargoRoot = "src-tauri";
-    buildAndTestSubdir = "src-tauri";
+    nativeBuildInputs =
+      cargoNativeBuildInputs
+      ++ [
+        pkgs.makeWrapper
+        pkgs.wrapGAppsHook3
+        pkgs.nodejs_24
+        pnpm
+        pnpmConfigHook
+      ];
 
-    cargoDeps = rustPlatform.importCargoLock {
-      lockFile = ../src-tauri/Cargo.lock;
-    };
+    # Pin CARGO_TARGET_DIR before crane's inheritCargoArtifacts hook runs so
+    # extraction and tauri's cargo invocation both land in src-tauri/target.
+    postUnpack = ''
+      export CARGO_TARGET_DIR="$NIX_BUILD_TOP/$sourceRoot/src-tauri/target"
+    '';
 
-    # prefetch pnpm dependencies
-    pnpmDeps = fetchPnpmDeps {
-      inherit
-        (finalAttrs)
-        pname
-        version
-        src
-        ;
+    # Required by mkCargoDerivation even when buildPhase is fully overridden.
+    buildPhaseCargoCommand = "";
 
-      fetcherVersion = 2;
-      hash = "sha256-vDLgpFaO+48s+tj1/2m2fgNJpCfnNkFJpQkC4Xah59E=";
-    };
+    preBuild = ''
+      # Workspace-member build scripts were compiled in buildDepsOnly's source
+      # tree (/build/source/) with that path baked in; remove them so cargo
+      # recompiles them against the current tree.  Dep .rlib/.rmeta are kept.
+      rm -rf src-tauri/target/release/build/defguard*
+      rm -rf src-tauri/target/release/build/common*
+      rm -rf src-tauri/target/release/.fingerprint/defguard*
+      rm -rf src-tauri/target/release/.fingerprint/common*
+
+      # tauri_build::build() reads OUT_DIR metadata written by tauri's own
+      # build script during buildDepsOnly (pointing to /build/source/).
+      # Remove tauri's build outputs and build-script-run fingerprints so
+      # cargo re-runs the build script and refreshes OUT_DIR to the current
+      # path.  libtauri*.rlib in deps/ is untouched.
+      rm -rf src-tauri/target/release/build/tauri-*
+      find src-tauri/target/release/.fingerprint \
+        -maxdepth 1 -type d \( -name 'tauri-*' -o -name 'tauri_*' \) \
+        -exec rm -f '{}/build-script-run' \;
+    '';
 
     buildPhase = ''
       runHook preBuild
 
-      pnpm tauri build --verbose
+      # Build the frontend first; tauri's beforeBuildCommand is suppressed
+      # below to avoid running pnpm build a second time.
+      pnpm build
+
+      # --config replaces the build section from tauri.linux.conf.json.
+      pnpm tauri build \
+        --config '{"build":{"beforeBuildCommand":""}}' \
+        --bundles deb
 
       runHook postBuild
     '';
@@ -104,54 +155,44 @@ in
     installPhase = ''
       runHook preInstall
 
+      # tauri always writes to src-tauri/target regardless of $CARGO_TARGET_DIR.
+      local targetDir="src-tauri/target/release"
+
       mkdir -p $out/bin
+      install -Dm755 "$targetDir/${pname}"         $out/bin/${pname}
+      install -Dm755 "$targetDir/defguard-service" $out/bin/defguard-service
+      install -Dm755 "$targetDir/dg"               $out/bin/dg
 
-      # copy client binary
-      install -Dm755 src-tauri/target/release/${pname} $out/bin/${pname}
-
-      # copy background service binary
-      install -Dm755 src-tauri/target/release/defguard-service $out/bin/defguard-service
-
-      # copy CLI binary
-      install -Dm755 src-tauri/target/release/dg $out/bin/dg
-
-      # Copy resources directory (for tray icons, etc.)
       mkdir -p $out/lib/${pname}
       cp -r src-tauri/resources $out/lib/${pname}/
 
-      # install desktop entry
       mkdir -p $out/share/applications
       cp ${desktopItem}/share/applications/* $out/share/applications/
 
-      # install icon files
       mkdir -p $out/share/icons/hicolor/{32x32,128x128}/apps
-      install -Dm644 src-tauri/icons/32x32.png $out/share/icons/hicolor/32x32/apps/${pname}.png
+      install -Dm644 src-tauri/icons/32x32.png  $out/share/icons/hicolor/32x32/apps/${pname}.png
       install -Dm644 src-tauri/icons/128x128.png $out/share/icons/hicolor/128x128/apps/${pname}.png
 
       runHook postInstall
     '';
 
-    # add extra args to wrapGAppsHook3 wrapper
     preFixup = ''
       gappsWrapperArgs+=(
-        --prefix PATH : ${
-        lib.makeBinPath [
-          # `defguard-service` needs `ip` to manage WireGuard
-          pkgs.iproute2
-          # `defguard-service` needs `resolvconf` to manage DNS
-          pkgs.openresolv
-          # `defguard-client` needs `update-desktop-database` and `lsb_release`
-          pkgs.desktop-file-utils
-          pkgs.lsb-release
-        ]
-      }
-        --prefix LD_LIBRARY_PATH : ${
-        lib.makeLibraryPath [
-          pkgs.libayatana-appindicator
-        ]
-      }
+        --prefix PATH : ${lib.makeBinPath [pkgs.iproute2 pkgs.desktop-file-utils pkgs.lsb-release]}
+        --suffix PATH : ${lib.makeBinPath [pkgs.openresolv]}
+        --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [pkgs.libayatana-appindicator]}
       )
     '';
+
+    VERGEN_IDEMPOTENT = "true";
+    SQLX_OFFLINE = "true";
+    doInstallCargoArtifacts = false;
+
+    # passthru attrs are ignored by the build but addressable by external tools:
+    # pnpmDeps — referenced by the update-pnpm-hash.yaml CI workflow
+    passthru = {
+      inherit pnpmDeps;
+    };
 
     meta = with lib; {
       description = "Defguard VPN Client";
@@ -160,4 +201,4 @@ in
       maintainers = with maintainers; [wojcik91];
       platforms = platforms.linux;
     };
-  })
+  }
