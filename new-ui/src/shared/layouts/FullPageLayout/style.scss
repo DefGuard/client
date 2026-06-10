@@ -18,11 +18,11 @@
     grid-row: 2;
     grid-column: 2 / 3;
     height: 100%;
-    min-width: 100%;
+    min-width: 0;
     max-height: 100%;
     overflow: hidden auto;
     box-sizing: border-box;
-    padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
 
     > .scroll-container {
       min-height: 100%;

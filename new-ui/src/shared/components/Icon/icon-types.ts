@@ -137,6 +137,8 @@ export const IconKind = {
   AuthorisedApp: 'authorised-app',
   Play: 'play',
   PlayFilled: 'play-filled',
+  Question: 'question',
+  Report: 'report',
 } as const;
 
 export type IconKindValue = (typeof IconKind)[keyof typeof IconKind];

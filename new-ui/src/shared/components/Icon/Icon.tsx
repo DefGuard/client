@@ -100,7 +100,9 @@ import { IconPlus } from './icons/IconPlus';
 import { IconPlusCircle } from './icons/IconPlusCircle';
 import { IconProfile } from './icons/IconProfile';
 import { IconProtection } from './icons/IconProtection';
+import { IconQuestion } from './icons/IconQuestion';
 import { IconRefresh } from './icons/IconRefresh';
+import { IconReport } from './icons/IconReport';
 import { IconRequest } from './icons/IconRequest';
 import { IconRules } from './icons/IconRules';
 import { IconSearch } from './icons/IconSearch';
@@ -435,6 +437,8 @@ export const Icon = <T extends IconKindValue>({
         return IconChat;
       case 'request':
         return IconRequest;
+      case 'question':
+        return IconQuestion;
       case 'calendar':
         return IconCalendar;
       case 'light-bulb':
@@ -451,6 +455,8 @@ export const Icon = <T extends IconKindValue>({
         return IconPlayFilled;
       case 'disconnect-all':
         return IconDisconnectAll;
+      case 'report':
+        return IconReport;
     }
   }, [iconKind]);
 
