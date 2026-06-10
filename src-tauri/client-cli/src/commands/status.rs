@@ -6,9 +6,7 @@ use crate::{
 };
 
 pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
-    let connections = active_state(&state.pool)
-        .await
-        .map_err(|err| CliError::Other(format!("Failed to query active state: {err}")))?;
+    let connections = active_state(&state.pool).await?;
 
     if connections.is_empty() {
         if json {

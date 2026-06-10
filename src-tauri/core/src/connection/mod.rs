@@ -119,7 +119,7 @@ pub async fn tear_down(conn: &ActiveConnectionInfo, pool: &DbPool) -> Result<(),
 
         if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
             if error.code() == Code::Unavailable {
-                Err(Error::InternalError(
+                Err(Error::BackendUnavailable(
                     "Background service is unavailable. Make sure the service is running.".into(),
                 ))
             } else {

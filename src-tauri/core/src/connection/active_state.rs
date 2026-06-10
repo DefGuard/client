@@ -72,10 +72,10 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
         .list_interfaces(request)
         .await
         .map_err(|err| {
-            if err.code() == Code::Unavailable {
-                log::error!("Daemon unavailable: {err}");
-                Error::InternalError(
-                    "Background service is unavailable. Make sure the service is running.".into(),
+            if err.code() == Code::Unavailable || err.code() == Code::Unimplemented {
+                log::error!("Daemon unavailable or outdated: {err}");
+                Error::BackendUnavailable(
+                    "Background service is unavailable or outdated. Start or update the background service.".into(),
                 )
             } else {
                 log::error!("Failed to call ListInterfaces: {err}");

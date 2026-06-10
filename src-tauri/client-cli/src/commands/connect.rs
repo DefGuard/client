@@ -43,9 +43,7 @@ pub async fn handle(
         ResolvedTarget::Location(loc) => (loc.id, loc.name.as_str()),
         ResolvedTarget::Tunnel(tun) => (tun.id, tun.name.as_str()),
     };
-    let active = active_state(&state.pool)
-        .await
-        .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
+    let active = active_state(&state.pool).await?;
     if active.iter().any(|c| c.target_id == target_id) {
         if json {
             output::emit(
@@ -122,9 +120,7 @@ pub async fn handle(
         ResolvedTarget::Location(loc) => ConnectionTarget::Location(loc),
         ResolvedTarget::Tunnel(tun) => ConnectionTarget::Tunnel(tun),
     };
-    bring_up(conn_target, psk, mtu, &state.pool)
-        .await
-        .map_err(|e| CliError::Other(format!("Failed to connect: {e}")))?;
+    bring_up(conn_target, psk, mtu, &state.pool).await?;
 
     if json {
         output::emit(&serde_json::json!({ "connected": target_name }), json);

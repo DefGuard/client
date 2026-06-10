@@ -55,7 +55,7 @@ pub async fn setup_interface(
                 "Failed to set up connection for location {location}; background service is \
                 unavailable. Make sure the service is running. Error: {error}"
             );
-            Err(Error::InternalError(
+            Err(Error::BackendUnavailable(
                 "Background service is unavailable. Make sure the service is running.".into(),
             ))
         } else {

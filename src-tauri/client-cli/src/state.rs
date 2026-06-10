@@ -28,7 +28,6 @@ pub enum CliError {
     NotFound(String),
 
     #[error("daemon unavailable: {0}")]
-    #[allow(dead_code)]
     DaemonUnavailable(String),
 
     #[error("MFA failed: {0}")]
@@ -52,6 +51,7 @@ impl From<CoreError> for CliError {
         match &err {
             CoreError::NotFound => CliError::NotFound(err.to_string()),
             CoreError::Database(_) => CliError::Database(err.to_string()),
+            CoreError::BackendUnavailable(_) => CliError::DaemonUnavailable(err.to_string()),
             _ => CliError::Other(err.to_string()),
         }
     }

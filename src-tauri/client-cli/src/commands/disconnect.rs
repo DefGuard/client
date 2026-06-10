@@ -18,9 +18,7 @@ pub async fn handle(
 ) -> Result<(), CliError> {
     if all {
         // Disconnect all currently-active connections.
-        let active = active_state(&state.pool)
-            .await
-            .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
+        let active = active_state(&state.pool).await?;
 
         if active.is_empty() {
             if json {
@@ -75,9 +73,7 @@ pub async fn handle(
     } else {
         // No-arg disconnect: if exactly one connection is active, disconnect it.
         if name.is_none() && !tunnel && id.is_none() && instance.is_none() {
-            let active = active_state(&state.pool)
-                .await
-                .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
+            let active = active_state(&state.pool).await?;
 
             match active.len() {
                 0 => {
@@ -98,9 +94,7 @@ pub async fn handle(
                     tracing::info!(
                         "Disconnecting sole active connection {name} on interface {ifname}..."
                     );
-                    tear_down(conn, &state.pool)
-                        .await
-                        .map_err(|e| CliError::Other(format!("Failed to disconnect: {e}")))?;
+                    tear_down(conn, &state.pool).await?;
                     if json {
                         output::emit(
                             &serde_json::json!({ "disconnected": name, "interface": ifname }),
@@ -136,9 +130,7 @@ pub async fn handle(
         };
 
         // Look up the actual interface name from active_state.
-        let active = active_state(&state.pool)
-            .await
-            .map_err(|e| CliError::Other(format!("Failed to query active connections: {e}")))?;
+        let active = active_state(&state.pool).await?;
 
         let connection = active
             .iter()
@@ -162,9 +154,7 @@ pub async fn handle(
             stats: None,
         };
 
-        tear_down(&conn_info, &state.pool)
-            .await
-            .map_err(|e| CliError::Other(format!("Failed to disconnect: {e}")))?;
+        tear_down(&conn_info, &state.pool).await?;
 
         if json {
             output::emit(
