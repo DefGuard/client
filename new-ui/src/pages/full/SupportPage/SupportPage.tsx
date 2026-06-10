@@ -99,7 +99,7 @@ export const SupportPage = () => {
         <SupportSection
           icon={IconKind.Mail}
           title="Have questions? Check our documentation first."
-          description="Before contacting or submitting any issues to GitHub please get familiar with Defguard documentation available."
+          description="You can contact us for any other requests at support@defguard.net."
           divider={false}
         />
       </div>
