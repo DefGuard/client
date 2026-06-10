@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
-use wmi::{AuthLevel, WMIConnection, WMIError};
+use wmi::{AuthLevel, WMIConnection};
 
 use super::UnavailableReason;
 
@@ -49,17 +49,6 @@ struct Win32QuickFixEngineering {
     #[serde(with = "wmidate::option", default)]
     installed_on: Option<Date>,
     //description: Option<String>, // "Update" or "Security Update"
-}
-
-/// Convert `WMIError` to `UnavailableReason`.
-impl From<WMIError> for UnavailableReason {
-    fn from(err: WMIError) -> Self {
-        if let WMIError::HResultError { .. } = err {
-            UnavailableReason::InsufficientPermissions
-        } else {
-            UnavailableReason::DetectionFailed
-        }
-    }
 }
 
 /// Determine system drive letter.

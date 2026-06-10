@@ -4,7 +4,7 @@ description = "Zero-touch provisioning for the Defguard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license-file = "../LICENSE.md"
+license = "LicenseRef-Proprietary"
 rust-version.workspace = true
 version.workspace = true
 
@@ -13,3 +13,6 @@ defguard-client-core = { path = "../../core" }
 log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -2,14 +2,28 @@ use core::fmt;
 use std::{collections::HashMap, env, str::FromStr};
 
 use chrono::{DateTime, Duration, Utc};
+use defguard_client_core::connection::active_connections::{
+    find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
+};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_core::connection::disconnect_interface;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::{
+    client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
+};
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(not(target_os = "macos"))]
+use crate::utils::execute_command;
 use crate::{
-    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
@@ -37,24 +51,14 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::defguard::client_types::DeviceConfigResponse,
     proxy::construct_platform_header,
-    service::proto::defguard::enterprise::posture::v2::DevicePostureData,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        disconnect_interface, get_location_interface_details, get_tunnel_interface_details,
-        get_tunnel_or_location_name, handle_connection_for_location, handle_connection_for_tunnel,
+        get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
+        handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
-};
-#[cfg(not(target_os = "macos"))]
-use crate::{
-    service::{
-        client::DAEMON_CLIENT,
-        proto::defguard::client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
-    },
-    utils::execute_command,
 };
 
 #[derive(Debug, Serialize, thiserror::Error)]
@@ -805,7 +809,7 @@ pub async fn update_location_routing(
 
     match connection_type {
         ConnectionType::Location => {
-            Location::update_routing(&DB_POOL, location_id, route_all_traffic).await?;
+            Location::update_routing(&*DB_POOL, location_id, route_all_traffic).await?;
             debug!("Location routing updated for location {name}(ID: {location_id})");
             handle
                 .emit(EventKey::LocationUpdate.into(), ())
@@ -836,7 +840,7 @@ pub async fn set_location_mfa_method(
     handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received command to set MFA method for location {location_id}");
-    Location::set_mfa_method(&DB_POOL, location_id, mfa_method).await?;
+    Location::set_mfa_method(&*DB_POOL, location_id, mfa_method).await?;
     debug!("MFA method updated for location (ID: {location_id})");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
@@ -919,15 +923,22 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             .await
         {
             debug!("Found active connection for location {location}, closing...");
-            use defguard_client_core::connection::{active_state::ActiveConnectionInfo, tear_down};
-            let conn_info = ActiveConnectionInfo {
-                connection_type: ConnectionType::Location,
-                target_id: location.id,
-                name: location.name.clone(),
+            let request = RemoveInterfaceRequest {
                 interface_name: connection.interface_name.clone(),
-                stats: None,
+                endpoint: location.endpoint.clone(),
             };
-            tear_down(&conn_info, &defguard_client_core::database::DB_POOL).await?;
+            client.remove_interface(request).await.map_err(|status| {
+                error!(
+                    "Error occurred while removing interface {} for location {location}, \
+                    status: {status}",
+                    connection.interface_name
+                );
+                Error::InternalError(format!(
+                    "There was an error while removing interface for location {location}, \
+                    error message: {}. Check logs for more details.",
+                    status.message()
+                ))
+            })?;
             info!(
                 "The connection to location {location} has been closed, as it was associated \
                 with the instance {instance} that is being deleted."
@@ -1091,15 +1102,27 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                     connection.interface_name
                 );
             }
-            use defguard_client_core::connection::{active_state::ActiveConnectionInfo, tear_down};
-            let conn_info = ActiveConnectionInfo {
-                connection_type: ConnectionType::Tunnel,
-                target_id: tunnel.id,
-                name: tunnel.name.clone(),
+            let request = RemoveInterfaceRequest {
                 interface_name: connection.interface_name.clone(),
-                stats: None,
+                endpoint: tunnel.endpoint.clone(),
             };
-            tear_down(&conn_info, &defguard_client_core::database::DB_POOL).await?;
+            DAEMON_CLIENT
+                .clone()
+                .remove_interface(request)
+                .await
+                .map_err(|status| {
+                    error!(
+                        "An error occurred while removing interface {} for tunnel {tunnel}, \
+                        status: {status}",
+                        connection.interface_name
+                    );
+                    Error::InternalError(format!(
+                        "An error occurred while removing interface {} for tunnel {tunnel}, error \
+                        message: {}. Check logs for more details.",
+                        connection.interface_name,
+                        status.message()
+                    ))
+                })?;
             info!(
             "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
@@ -1146,17 +1169,8 @@ pub struct AppVersionInfo {
 
 const PRODUCT_NAME: &str = "defguard-client";
 
-fn select_reported_app_version(
-    package_version: &str,
-    build_version_override: Option<&str>,
-) -> String {
-    build_version_override
-        .filter(|version| !version.trim().is_empty())
-        .map_or_else(|| package_version.to_owned(), str::to_owned)
-}
-
 fn reported_app_version(handle: &AppHandle) -> String {
-    select_reported_app_version(
+    defguard_client_core::version::select_reported_app_version(
         &handle.package_info().version.to_string(),
         option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
     )
@@ -1298,27 +1312,4 @@ pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Er
     }
     debug!("Returning {} active connections.", result.len());
     Ok(result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::select_reported_app_version;
-
-    #[test]
-    fn reported_app_version_uses_override_when_present() {
-        assert_eq!(
-            select_reported_app_version("1.6.8", Some("1.6.8-beta1")),
-            "1.6.8-beta1"
-        );
-    }
-
-    #[test]
-    fn reported_app_version_falls_back_to_package_version_without_override() {
-        assert_eq!(select_reported_app_version("1.6.8", None), "1.6.8");
-    }
-
-    #[test]
-    fn reported_app_version_ignores_empty_override() {
-        assert_eq!(select_reported_app_version("1.6.8", Some("   ")), "1.6.8");
-    }
 }

@@ -55,6 +55,9 @@ in {
         NoNewPrivileges = true;
         PrivateTmp = true;
         ProtectControlGroups = true;
+        # Requires WireGuard to be built into the kernel or pre-loaded via
+        # boot.kernelModules. If WireGuard is a loadable module, auto-loading
+        # will be blocked by ProtectKernelModules.
         ProtectKernelModules = true;
         RestrictRealtime = true;
         LockPersonality = true;

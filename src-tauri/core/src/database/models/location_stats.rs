@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{location::Location, Id, NoId, PURGE_DURATION};
-use crate::{error::Error, CommonLocationStats, ConnectionType, DateTimeAggregation};
+use crate::{CommonLocationStats, ConnectionType, DateTimeAggregation};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocationStats<I = NoId> {
@@ -40,7 +40,7 @@ pub async fn peer_to_location_stats<'e, E>(
     peer: &Peer,
     listen_port: u32,
     executor: E,
-) -> Result<LocationStats<NoId>, Error>
+) -> sqlx::Result<LocationStats<NoId>>
 where
     E: SqliteExecutor<'e>,
 {
@@ -61,7 +61,7 @@ where
 impl LocationStats {
     // Although not used on macOS, allow dead code for `sqlx prepare`.
     #[cfg_attr(target_os = "macos", allow(dead_code))]
-    pub async fn get_name<'e, E>(&self, executor: E) -> Result<String, sqlx::Error>
+    pub async fn get_name<'e, E>(&self, executor: E) -> sqlx::Result<String>
     where
         E: SqliteExecutor<'e>,
     {
@@ -93,7 +93,7 @@ impl LocationStats<NoId> {
         }
     }
 
-    pub async fn save<'e, E>(self, executor: E) -> Result<LocationStats<Id>, Error>
+    pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<LocationStats<Id>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -133,7 +133,7 @@ impl LocationStats<Id> {
         from: &NaiveDateTime,
         aggregation: &DateTimeAggregation,
         limit: Option<i32>,
-    ) -> Result<Vec<Self>, Error>
+    ) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -171,7 +171,7 @@ impl LocationStats<Id> {
     pub async fn latest_by_download_change<'e, E>(
         executor: E,
         location_id: Id,
-    ) -> Result<Option<Self>, Error>
+    ) -> sqlx::Result<Option<Self>>
     where
         E: SqliteExecutor<'e>,
     {
@@ -206,7 +206,7 @@ impl LocationStats<Id> {
     }
 
     /// Purge old statistics.
-    pub async fn purge<'e, E>(executor: E) -> Result<(), Error>
+    pub async fn purge<'e, E>(executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
     {
@@ -218,5 +218,70 @@ impl LocationStats<Id> {
             .await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+
+    use super::*;
+    use crate::database::models::{
+        instance::{ClientTrafficPolicy, Instance},
+        location::{LocationMfaMode, ServiceLocationMode},
+    };
+
+    async fn seed_location(pool: &SqlitePool) -> Id {
+        let instance = Instance {
+            id: NoId,
+            name: "instance".into(),
+            uuid: "uuid-1".into(),
+            url: "https://core.example".into(),
+            proxy_url: "https://proxy.example".into(),
+            username: "alice".into(),
+            token: None,
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: false,
+            openid_display_name: None,
+        }
+        .save(pool)
+        .await
+        .unwrap();
+
+        Location {
+            id: NoId,
+            instance_id: instance.id,
+            network_id: 1,
+            name: "loc".into(),
+            address: "10.0.0.2/24".into(),
+            pubkey: "pk".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: LocationMfaMode::Disabled,
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+        }
+        .save(pool)
+        .await
+        .unwrap()
+        .id
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_location_stats_save_round_trip(pool: SqlitePool) {
+        let location_id = seed_location(&pool).await;
+
+        let stats = LocationStats::new(location_id, 100, 200, 1_700_000_000, 51820, Some(25))
+            .save(&pool)
+            .await
+            .unwrap();
+
+        // A real row id is returned on insert.
+        assert!(stats.id > 0);
+        assert_eq!(stats.location_id, location_id);
     }
 }

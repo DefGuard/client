@@ -3,28 +3,27 @@
 use std::{
     collections::HashMap,
     hint::spin_loop,
-    net::IpAddr,
     ptr::NonNull,
-    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, channel, Receiver, RecvTimeoutError, Sender},
+        mpsc::{self, Receiver, RecvTimeoutError, Sender},
         Arc, LazyLock, Mutex,
     },
     time::Duration,
 };
 
 use block2::RcBlock;
-use defguard_client_common::dns_owned;
-use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
-use objc2::{
-    rc::Retained,
-    runtime::{AnyObject, ProtocolObject},
+use defguard_client_core::{
+    connection::active_connections::find_connection,
+    database::models::tunnel_configuration::{
+        id_from_manager, manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID,
+        TUNNEL_ID,
+    },
 };
+use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNotification, NSNotificationCenter, NSNumber, NSObjectProtocol, NSOperationQueue, NSRunLoop,
-    NSString,
+    ns_string, NSArray, NSData, NSDate, NSError, NSNotification, NSNotificationCenter,
+    NSObjectProtocol, NSOperationQueue, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNConnection,
@@ -35,38 +34,18 @@ use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
 
 use crate::{
-    active_connections::find_connection,
     appstate::AppState,
     database::{
-        models::{
-            instance::{ClientTrafficPolicy, Instance},
-            location::Location,
-            tunnel::Tunnel,
-            wireguard_keys::WireguardKeys,
-            Id,
-        },
+        models::{location::Location, tunnel::Tunnel, Id},
         DB_POOL,
     },
-    error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     tray::{configure_tray_icon, reload_tray_menu, show_main_window},
-    utils::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6},
     ConnectionType,
 };
 
-const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 const SYSTEM_SYNC_DELAY: Duration = Duration::from_millis(500);
-const LOCATION_ID: &str = "locationId";
-const TUNNEL_ID: &str = "tunnelId";
-
-type ObserverSender = Mutex<Sender<(&'static str, Id)>>;
-type ObserverReceiver = Mutex<Option<Receiver<(&'static str, Id)>>>;
-
-static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::new(|| {
-    let (tx, rx) = mpsc::channel();
-    (Mutex::new(tx), Mutex::new(Some(rx)))
-});
 
 type VpnStateSender = Mutex<Sender<()>>;
 type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
@@ -469,15 +448,45 @@ pub fn get_managers_for_tunnels_and_locations(
     managers
 }
 
-/// Try to get `Id` out of manager. ID is embedded in configuration dictionary under `key`.
-fn id_from_manager(manager: &NETunnelProviderManager, key: &NSString) -> Option<Id> {
+/// Retrieve VPN tunnel statistics from VPNExtension.
+pub(crate) fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
+    let new_stats = Arc::new(Mutex::new(None));
     let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
+
+    let new_stats_clone = Arc::clone(&new_stats);
+
+    let finished = Arc::new(AtomicBool::new(false));
+    let finished_clone = Arc::clone(&finished);
+
+    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
+        if let Some(data) = unsafe { data_ptr.as_ref() } {
+            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
+                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
+                    *new_stats_locked = Some(stats);
+                }
+            } else {
+                warn!("Failed to deserialize tunnel stats");
+            }
+        } else {
+            debug!("No data received in tunnel stats response, skipping");
+        }
+        finished_clone.store(true, Ordering::Release);
+    });
+
+    let manager = manager_for_key_and_value(
+        match connection_type {
+            ConnectionType::Location => LOCATION_ID,
+            ConnectionType::Tunnel => TUNNEL_ID,
+        },
+        id,
+    )?;
 
     let vpn_protocol = (unsafe { manager.protocolConfiguration() })?;
     let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>() else {
         error!("Failed to downcast to NETunnelProviderProtocol");
         return None;
     };
+
     // Sometimes all managers from all apps come through, so filter by bundle ID.
     if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
         if &*bundle_id != plugin_bundle_id {
@@ -485,25 +494,82 @@ fn id_from_manager(manager: &NETunnelProviderManager, key: &NSString) -> Option<
         }
     }
 
-    if let Some(config_dict) = unsafe { tunnel_protocol.providerConfiguration() } {
-        if let Some(any_object) = config_dict.objectForKey(key) {
-            let Ok(id) = any_object.downcast::<NSNumber>() else {
-                warn!("Failed to downcast ID to NSNumber");
-                return None;
-            };
-            return Some(id.as_i64());
-        }
+    let Ok(session) = unsafe { manager.connection() }.downcast::<NETunnelProviderSession>() else {
+        error!("Failed to downcast to NETunnelProviderSession");
+        return None;
+    };
+
+    let message_data = NSData::new();
+    if unsafe {
+        session.sendProviderMessage_returnError_responseHandler(
+            &message_data,
+            None,
+            Some(&response_handler),
+        )
+    } {
+        debug!("Message sent to NETunnelProviderSession");
+    } else {
+        error!("Failed to send to NETunnelProviderSession while requesting stats");
     }
 
-    None
+    // Wait for all handlers to complete.
+    while !finished.load(Ordering::Acquire) {
+        spin_loop();
+    }
+
+    let stats = new_stats
+        .lock()
+        .map_or(None, |mut new_stats_locked| new_stats_locked.take());
+
+    stats
 }
 
-/// Try to find [`NETunnelProviderManager`] in system settings that matches key and value.
-/// Key is usually `locationId` or `tunnelId`.
-fn manager_for_key_and_value(key: &str, value: Id) -> Option<Retained<NETunnelProviderManager>> {
-    let key_string = NSString::from_str(key);
-    let (tx, rx) = channel();
+/// Synchronize locations and tunnels with system settings.
+pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Error> {
+    // Update location settings.
+    let all_locations = Location::all(&*DB_POOL, false).await?;
+    for location in &all_locations {
+        // For syncing, set `preshred_key` to `None`.
+        let Ok(tunnel_config) = location.tunnel_configuration(None, mtu).await else {
+            error!(
+                "Failed to convert location {} to tunnel configuration.",
+                location.name
+            );
+            continue;
+        };
+        tunnel_config.save();
+    }
 
+    // Update tunnel settings.
+    let all_tunnels = Tunnel::all(&*DB_POOL).await?;
+    for tunnel in &all_tunnels {
+        let Ok(tunnel_config) = tunnel.tunnel_configuration(mtu) else {
+            error!(
+                "Failed to convert tunnel {} to tunnel configuration.",
+                tunnel.name
+            );
+            continue;
+        };
+        tunnel_config.save();
+    }
+
+    debug!("Saved all configurations with system settings.");
+
+    // Convert to Vec<Id>.
+    let mut all_location_ids = all_locations
+        .into_iter()
+        .map(|entry| entry.id)
+        .collect::<Vec<_>>();
+    let mut all_tunnel_ids = all_tunnels
+        .into_iter()
+        .map(|entry| entry.id)
+        .collect::<Vec<_>>();
+    // For faster lookup using binary search (see below).
+    all_location_ids.sort_unstable();
+    all_tunnel_ids.sort_unstable();
+
+    let spinlock = Arc::new(AtomicBool::new(false));
+    let spinlock_clone = Arc::clone(&spinlock);
     let handler = RcBlock::new(
         move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
             if !error_ptr.is_null() {
@@ -516,22 +582,36 @@ fn manager_for_key_and_value(key: &str, value: Id) -> Option<Retained<NETunnelPr
                 return;
             };
 
+            let location_key = NSString::from_str(LOCATION_ID);
+            let tunnel_key = NSString::from_str(TUNNEL_ID);
             for manager in managers {
-                if let Some(id) = id_from_manager(&manager, &key_string) {
-                    if id == value {
-                        // This is the manager we were looking for.
-                        tx.send(Some(manager)).expect("Sender is dead");
-                        return;
+                if let Some(id) = id_from_manager(&manager, &location_key) {
+                    if all_location_ids.binary_search(&id).is_ok() {
+                        // Known location - skip.
+                        continue;
                     }
                 }
+                if let Some(id) = id_from_manager(&manager, &tunnel_key) {
+                    if all_tunnel_ids.binary_search(&id).is_ok() {
+                        // Known tunnel - skip.
+                        continue;
+                    }
+                }
+                unsafe { manager.removeFromPreferencesWithCompletionHandler(None) };
             }
 
-            tx.send(None).expect("Sender is dead");
+            spinlock_clone.store(true, Ordering::Release);
         },
     );
     unsafe {
         NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
     }
 
-    rx.recv().expect("Receiver is dead")
+    while !spinlock.load(Ordering::Acquire) {
+        spin_loop();
+    }
+
+    debug!("Removed unknown configurations from system settings.");
+
+    Ok(())
 }

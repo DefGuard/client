@@ -70,7 +70,6 @@ feature-depth = 1
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
-    { id = "RUSTSEC-2024-0429", reason = "https://github.com/tauri-apps/tauri/issues/12048" },
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained netlink dependency" },
     # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
@@ -86,7 +85,6 @@ ignore = [
     { id = "RUSTSEC-2024-0419", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
     { id = "RUSTSEC-2024-0420", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0052", reason = "Discontinued, but dark-light v2.0.0 needs it" },
-    { id = "RUSTSEC-2025-0057", reason = "Tauri needs it" },
     { id = "RUSTSEC-2025-0075", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0080", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0081", reason = "Tauri v2 dependency (unmaintained)" },
@@ -133,7 +131,7 @@ confidence-threshold = 0.8
 exceptions = [
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "common" },
+    ], crate = "defguard-client-common" },
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client" },
@@ -142,22 +140,25 @@ exceptions = [
     ], crate = "defguard-client-core" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-service" },
+    ], crate = "defguard-client-service" },
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client-proto" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-posture" },
+    ], crate = "defguard-dg" },
     { allow = [
-        "AGPL-3.0-or-later",
-    ], crate = "defguard-provisioning" },
+        "LicenseRef-Proprietary",
+    ], crate = "defguard-client-posture" },
     { allow = [
-        "AGPL-3.0-or-later",
-    ], crate = "defguard-config-sync" },
+        "LicenseRef-Proprietary",
+    ], crate = "defguard-client-provisioning" },
     { allow = [
-        "AGPL-3.0-or-later",
-    ], crate = "defguard-service-locations" },
+        "LicenseRef-Proprietary",
+    ], crate = "defguard-client-config-sync" },
+    { allow = [
+        "LicenseRef-Proprietary",
+    ], crate = "defguard-client-service-locations" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

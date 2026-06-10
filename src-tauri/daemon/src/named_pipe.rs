@@ -11,6 +11,7 @@ use tokio::{
     net::windows::named_pipe::NamedPipeServer,
 };
 use tonic::transport::server::Connected;
+use tracing::{debug, error, info};
 use windows_sys::Win32::{
     Foundation::{LocalFree, HANDLE, INVALID_HANDLE_VALUE},
     Security::{

@@ -7,6 +7,7 @@ use std::{
 
 use clap::Parser;
 use tokio::{runtime::Runtime, time::sleep};
+use tracing::{error, info, warn};
 use windows_service::{
     define_windows_service,
     service::{

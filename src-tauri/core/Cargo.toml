@@ -4,7 +4,7 @@ description = "Shared business logic for the Defguard desktop client (Tauri-free
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license-file = "../../LICENSE.md"
+license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
@@ -32,12 +32,16 @@ thiserror.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tower = "0.5"
+tracing = { workspace = true }
 x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
 
 hyper-util = "0.1"
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", features = ["user", "fs", "net"] }
+nix = { version = "0.31", features = ["user", "fs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation"] }

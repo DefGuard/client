@@ -9,6 +9,11 @@ use std::{
     os::unix::fs::PermissionsExt,
 };
 
+use database::models::location::{
+    infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode,
+};
+use defguard_client_proto::defguard::client_types::DeviceConfig;
+
 pub mod app_config;
 pub mod connection;
 pub mod database;
@@ -143,11 +148,6 @@ pub fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, error
     Ok(aggregation)
 }
 
-use database::models::location::{
-    infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode,
-};
-use defguard_client_proto::defguard::client_types::DeviceConfig;
-
 #[must_use]
 pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId> {
     use LocationMfaMode as MfaMode;
@@ -187,5 +187,92 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         service_location_mode,
         mfa_method: infer_mfa_method(location_mfa_mode, None),
         posture_check_required: dev_config.posture_check_required.unwrap_or_default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{Duration, Utc};
+    use defguard_client_proto::defguard::client_types::DeviceConfig;
+
+    use super::{get_aggregation, into_location, DateTimeAggregation};
+    use crate::database::models::location::{LocationMfaMethod, LocationMfaMode};
+
+    #[test]
+    fn test_get_aggregation_hour() {
+        // 8 hours or older aggregates per hour.
+        let from = Utc::now().naive_utc() - Duration::hours(9);
+        assert!(matches!(
+            get_aggregation(from).unwrap(),
+            DateTimeAggregation::Hour
+        ));
+    }
+
+    #[test]
+    fn test_get_aggregation_second() {
+        // Recent ranges aggregate per second.
+        let from = Utc::now().naive_utc() - Duration::minutes(1);
+        assert!(matches!(
+            get_aggregation(from).unwrap(),
+            DateTimeAggregation::Second
+        ));
+    }
+
+    #[test]
+    fn test_get_aggregation_future_errors() {
+        // A timestamp in the future yields a negative duration and is rejected.
+        let from = Utc::now().naive_utc() + Duration::hours(1);
+        assert!(get_aggregation(from).is_err());
+    }
+
+    fn base_dev_config() -> DeviceConfig {
+        DeviceConfig {
+            network_id: 7,
+            network_name: "net".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            assigned_ip: "10.6.0.2".into(),
+            pubkey: "pk".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            keepalive_interval: 25,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_into_location_maps_fields() {
+        let location = into_location(base_dev_config(), 3);
+        assert_eq!(location.instance_id, 3);
+        assert_eq!(location.network_id, 7);
+        assert_eq!(location.name, "net");
+        assert_eq!(location.address, "10.6.0.2");
+        assert_eq!(location.endpoint, "1.2.3.4:51820");
+        assert_eq!(location.allowed_ips, "0.0.0.0/0");
+        assert_eq!(location.keepalive_interval, 25);
+        assert!(!location.route_all_traffic);
+        assert!(!location.posture_check_required);
+    }
+
+    #[test]
+    fn test_into_location_mfa_mode_from_deprecated_flag() {
+        // With no explicit mode, the deprecated mfa_enabled flag drives the mode.
+        let mut cfg = base_dev_config();
+        #[allow(deprecated)]
+        {
+            cfg.mfa_enabled = true;
+        }
+        let location = into_location(cfg, 1);
+        assert_eq!(location.location_mfa_mode, LocationMfaMode::Internal);
+        // Internal mode with no configured method resolves to Totp.
+        assert_eq!(location.mfa_method, Some(LocationMfaMethod::Totp));
+    }
+
+    #[test]
+    fn test_into_location_explicit_mfa_mode() {
+        let mut cfg = base_dev_config();
+        cfg.location_mfa_mode = Some(crate::proto::client_types::LocationMfaMode::External as i32);
+        let location = into_location(cfg, 1);
+        assert_eq!(location.location_mfa_mode, LocationMfaMode::External);
+        // External mode always resolves to OIDC.
+        assert_eq!(location.mfa_method, Some(LocationMfaMethod::Oidc));
     }
 }

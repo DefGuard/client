@@ -6,12 +6,14 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime,
 };
 
+use defguard_client_core::connection::active_connections::{
+    get_connection_id_by_type, ACTIVE_CONNECTIONS,
+};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
 #[cfg(not(target_os = "linux"))]
 use crate::window_manager::WindowManager;
 use crate::{
-    active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},

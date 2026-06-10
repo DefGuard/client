@@ -4,7 +4,7 @@ description = "Device posture checks for the Defguard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license-file = "../LICENSE.md"
+license = "LicenseRef-Proprietary"
 rust-version.workspace = true
 version.workspace = true
 
@@ -15,6 +15,7 @@ log.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tonic.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
@@ -24,3 +25,5 @@ sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
+wmi = { version = "0.18", default-features = false }

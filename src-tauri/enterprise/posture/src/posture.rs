@@ -15,6 +15,7 @@ use defguard_client_proto::defguard::enterprise::posture::v2::{
     DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
 };
 
+#[cfg(not(windows))]
 use crate::inspector::device_posture_data;
 
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";

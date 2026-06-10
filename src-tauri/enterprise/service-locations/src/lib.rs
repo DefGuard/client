@@ -1,12 +1,17 @@
 use std::{collections::HashMap, fmt};
 
-use defguard_client_core::database::models::{
-    location::{Location, ServiceLocationMode},
-    Id,
+use defguard_client_core::{
+    database::models::{
+        location::{Location, ServiceLocationMode},
+        Id,
+    },
+    error::Error as CoreError,
 };
-use defguard_client_core::error::Error as CoreError;
-use defguard_client_proto::defguard::client::v1::ServiceLocation;
+use defguard_client_proto::defguard::client::v1::{
+    ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
+};
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
@@ -83,9 +88,7 @@ impl fmt::Debug for SingleServiceLocationData {
 
 pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, CoreError> {
     if !location.is_service_location() {
-        log::warn!(
-            "Location {location} is not a service location, so it can't be converted to one."
-        );
+        warn!("Location {location} is not a service location, so it can't be converted to one.");
         return Err(CoreError::ConversionError(format!(
             "Failed to convert location {location} to a service location as it's either not marked \
             as one or has MFA enabled."
@@ -94,7 +97,7 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
 
     let mode = match location.service_location_mode {
         ServiceLocationMode::Disabled => {
-            log::warn!(
+            warn!(
             "Location {location} has an invalid service location mode, so it can't be converted to \
             one."
         );
@@ -104,8 +107,8 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
                 location.service_location_mode
             )));
         }
-        ServiceLocationMode::PreLogon => 0,
-        ServiceLocationMode::AlwaysOn => 1,
+        ServiceLocationMode::PreLogon => ProtoServiceLocationMode::PreLogon as i32,
+        ServiceLocationMode::AlwaysOn => ProtoServiceLocationMode::AlwaysOn as i32,
     };
 
     Ok(ServiceLocation {

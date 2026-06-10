@@ -1,24 +1,34 @@
-// Non-macOS connection setup helpers.
-
+/// Connection setup helpers.
 use std::str::FromStr;
 
 use std::process::Command;
 
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
+use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
+#[cfg(not(target_os = "macos"))]
 use tonic::Code;
 
+#[cfg(not(target_os = "macos"))]
+use crate::database::DbPool;
 use crate::{
     connection::daemon_client::DAEMON_CLIENT,
     database::{
-        models::{connection::ActiveConnection, location::Location, tunnel::Tunnel, Id},
-        DbPool, DB_POOL,
+        models::{
+            connection::{ActiveConnection, Connection},
+            location::Location,
+            tunnel::{Tunnel, TunnelConnection},
+            Id,
+        },
+        DB_POOL,
     },
     error::Error,
-    DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+    ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
-use defguard_client_proto::defguard::client::v1::{CreateInterfaceRequest, RemoveInterfaceRequest};
 
+#[cfg(not(target_os = "macos"))]
 pub async fn setup_interface(
     location: &Location<Id>,
     name: &str,
@@ -26,32 +36,30 @@ pub async fn setup_interface(
     mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
-    log::debug!("Setting up interface for location: {location}");
+    debug!("Setting up interface for location: {location}");
     let interface_name = get_interface_name(name);
 
-    log::debug!("Looking for a free port for interface {interface_name}.");
+    debug!("Looking for a free port for interface {interface_name}.");
     let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port during interface {interface_name} setup for location {location}"
         );
-        log::error!("{msg}");
+        error!("{msg}");
         return Err(Error::InternalError(msg));
     };
-    log::debug!("Found free port: {port} for interface {interface_name}.");
+    debug!("Found free port: {port} for interface {interface_name}.");
 
     let interface_config = location
         .interface_configuration(pool, interface_name.clone(), preshared_key, mtu)
         .await?;
-    log::debug!(
-        "Creating interface for location {location} with configuration {interface_config:?}"
-    );
+    debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
         dns: location.dns.clone(),
     };
     if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
         if error.code() == Code::Unavailable {
-            log::error!(
+            error!(
                 "Failed to set up connection for location {location}; background service is \
                 unavailable. Make sure the service is running. Error: {error}"
             );
@@ -59,7 +67,7 @@ pub async fn setup_interface(
                 "Background service is unavailable. Make sure the service is running.".into(),
             ))
         } else {
-            log::error!(
+            error!(
                 "Failed to send a request to the background service to create an interface for \
                 location {location}. Error: {error}"
             );
@@ -69,7 +77,7 @@ pub async fn setup_interface(
             )))
         }
     } else {
-        log::info!(
+        info!(
             "The interface for location {location} has been created successfully, interface \
             name: {}.",
             interface_config.name
@@ -83,18 +91,18 @@ pub async fn setup_interface_tunnel(
     name: &str,
     mtu: Option<u32>,
 ) -> Result<String, Error> {
-    log::debug!("Setting up interface for tunnel {tunnel}");
+    debug!("Setting up interface for tunnel {tunnel}");
     let interface_name = get_interface_name(name);
 
-    log::debug!(
+    debug!(
         "Decoding tunnel {tunnel} public key: {}.",
         tunnel.server_pubkey
     );
     let peer_key = Key::from_str(&tunnel.server_pubkey)?;
-    log::debug!("Tunnel {tunnel} public key decoded.");
+    debug!("Tunnel {tunnel} public key decoded.");
     let mut peer = Peer::new(peer_key);
 
-    log::debug!("Parsing tunnel {tunnel} endpoint: {}", tunnel.endpoint);
+    debug!("Parsing tunnel {tunnel} endpoint: {}", tunnel.endpoint);
     peer.set_endpoint(&tunnel.endpoint)?;
     peer.persistent_keepalive_interval = Some(
         tunnel
@@ -102,28 +110,28 @@ pub async fn setup_interface_tunnel(
             .try_into()
             .expect("Failed to parse persistent keep alive"),
     );
-    log::debug!("Parsed tunnel {tunnel} endpoint: {}", tunnel.endpoint);
+    debug!("Parsed tunnel {tunnel} endpoint: {}", tunnel.endpoint);
 
     if let Some(psk) = &tunnel.preshared_key {
-        log::debug!("Decoding tunnel {tunnel} preshared key.");
+        debug!("Decoding tunnel {tunnel} preshared key.");
         let peer_psk = Key::from_str(psk)?;
-        log::debug!("Preshared key for tunnel {tunnel} decoded.");
+        debug!("Preshared key for tunnel {tunnel} decoded.");
         peer.preshared_key = Some(peer_psk);
     }
 
-    log::debug!(
+    debug!(
         "Parsing tunnel {tunnel} allowed ips: {:?}",
         tunnel.allowed_ips
     );
     let allowed_ips = if tunnel.route_all_traffic {
-        log::debug!("Using all traffic routing for tunnel {tunnel}");
+        debug!("Using all traffic routing for tunnel {tunnel}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {
         let msg = match &tunnel.allowed_ips {
             Some(ips) => format!("Using predefined location traffic for tunnel {tunnel}: {ips}"),
-            None => "No allowed IP addresses found in tunnel {tunnel} configuration".to_string(),
+            None => format!("No allowed IP addresses found in tunnel {tunnel} configuration"),
         };
-        log::debug!("{msg}");
+        debug!("{msg}");
         tunnel
             .allowed_ips
             .as_ref()
@@ -136,22 +144,22 @@ pub async fn setup_interface_tunnel(
                 peer.allowed_ips.push(addr);
             }
             Err(err) => {
-                log::error!("Error parsing IP address {allowed_ip}: {err}");
+                error!("Error parsing IP address {allowed_ip}: {err}");
             }
         }
     }
-    log::debug!("Parsed tunnel {tunnel} allowed IPs: {:?}", peer.allowed_ips);
+    debug!("Parsed tunnel {tunnel} allowed IPs: {:?}", peer.allowed_ips);
 
-    log::debug!("Looking for a free port for interface {interface_name}.");
+    debug!("Looking for a free port for interface {interface_name}.");
     let Some(port) = find_free_tcp_port() else {
         let msg = format!(
             "Couldn't find free port for interface {interface_name} while setting up tunnel \
             {tunnel}"
         );
-        log::error!("{msg}");
+        error!("{msg}");
         return Err(Error::InternalError(msg));
     };
-    log::debug!("Found free port: {port} for interface {interface_name}.");
+    debug!("Found free port: {port} for interface {interface_name}.");
 
     let addresses = tunnel
         .address
@@ -161,7 +169,7 @@ pub async fn setup_interface_tunnel(
         .collect::<Result<_, _>>()
         .map_err(|err| {
             let msg = format!("Failed to parse IP addresses '{}': {err}", tunnel.address);
-            log::error!("{msg}");
+            error!("{msg}");
             Error::InternalError(msg)
         })?;
     let interface_config = InterfaceConfiguration {
@@ -174,26 +182,26 @@ pub async fn setup_interface_tunnel(
         fwmark: None,
     };
 
-    log::debug!("Creating interface {interface_config:?}");
+    debug!("Creating interface {interface_config:?}");
     let request = CreateInterfaceRequest {
         config: Some(interface_config.clone().into()),
         dns: tunnel.dns.clone(),
     };
     if let Some(pre_up) = &tunnel.pre_up {
-        log::debug!(
+        debug!(
             "Executing defined PreUp command before setting up the interface {} for the tunnel \
             {tunnel}: {pre_up}",
             interface_config.name
         );
         let _ = execute_command(pre_up);
-        log::info!(
+        info!(
             "Executed defined PreUp command before setting up the interface {} for the tunnel \
             {tunnel}: {pre_up}",
             interface_config.name
         );
     }
     if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-        log::error!(
+        error!(
             "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
             interface_config.name
         );
@@ -205,24 +213,24 @@ pub async fn setup_interface_tunnel(
         )));
     }
 
-    log::info!(
+    info!(
         "Network interface {} for tunnel {tunnel} created successfully.",
         interface_config.name
     );
     if let Some(post_up) = &tunnel.post_up {
-        log::debug!(
+        debug!(
             "Executing defined PostUp command after setting up the interface {} for the tunnel \
             {tunnel}: {post_up}",
             interface_config.name
         );
         let _ = execute_command(post_up);
-        log::info!(
+        info!(
             "Executed defined PostUp command after setting up the interface {} for the tunnel \
             {tunnel}: {post_up}",
             interface_config.name
         );
     }
-    log::debug!(
+    debug!(
         "Created interface {} with config: {interface_config:?}",
         interface_config.name
     );
@@ -231,57 +239,157 @@ pub async fn setup_interface_tunnel(
 }
 
 pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Result<(), Error> {
-    log::debug!(
+    debug!(
         "Disconnecting interface {}.",
         active_connection.interface_name
     );
     let location_id = active_connection.location_id;
     let interface_name = active_connection.interface_name.clone();
 
-    let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
-        log::error!(
-            "Error while disconnecting interface {interface_name}, location with ID \
-            {location_id} not found"
-        );
-        return Err(Error::NotFound);
-    };
+    match active_connection.connection_type {
+        ConnectionType::Location => {
+            let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
+                error!(
+                    "Error while disconnecting interface {interface_name}, location with ID \
+                    {location_id} not found"
+                );
+                return Err(Error::NotFound);
+            };
 
-    let request = RemoveInterfaceRequest {
-        interface_name,
-        endpoint: location.endpoint.clone(),
-    };
-    log::debug!(
-        "Sending request to the background service to remove interface {} for location {}...",
-        active_connection.interface_name,
-        location.name
-    );
-    if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-        let msg = if error.code() == Code::Unavailable {
-            format!(
-                "Couldn't remove interface {}. Background service is unavailable. \
-                Please make sure the service is running. Error: {error}.",
+            #[cfg(target_os = "macos")]
+            {
+                let result = location.stop_vpn_tunnel();
+                if !result {
+                    error!("stop_tunnel() for location {} failed", location.name);
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
+                debug!("stop_tunnel() for location {} succeeded", location.name);
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: location.endpoint.clone(),
+                };
+                debug!(
+                    "Sending request to the background service to remove interface {} for \
+                    location {}...",
+                    active_connection.interface_name, location.name
+                );
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    let msg = if error.code() == Code::Unavailable {
+                        format!(
+                            "Couldn't remove interface {}. Background service is unavailable. \
+                            Please make sure the service is running. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    } else {
+                        format!(
+                            "Failed to send a request to the background service to remove \
+                            interface {}. Error: {error}.",
+                            active_connection.interface_name
+                        )
+                    };
+                    error!("{msg}");
+                }
+            }
+
+            let connection: Connection = active_connection.into();
+            let connection = connection.save(&*DB_POOL).await?;
+            debug!(
+                "Saved location {} new connection status in the database",
+                location.name
+            );
+            trace!("Saved connection: {connection:?}");
+            info!(
+                "Network interface {} for location {location} has been removed",
                 active_connection.interface_name
-            )
-        } else {
-            format!(
-                "Failed to send a request to the background service to remove interface \
-                {}. Error: {error}.",
+            );
+            debug!("Finished disconnecting from location {}", location.name);
+        }
+        ConnectionType::Tunnel => {
+            let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? else {
+                error!(
+                    "Error while disconnecting interface {interface_name}, tunnel with ID \
+                    {location_id} not found"
+                );
+                return Err(Error::NotFound);
+            };
+            if let Some(pre_down) = &tunnel.pre_down {
+                debug!(
+                    "Executing defined PreDown command before setting up the interface {} for \
+                    the tunnel {tunnel}: {pre_down}",
+                    active_connection.interface_name
+                );
+                let _ = execute_command(pre_down);
+                info!(
+                    "Executed defined PreDown command before setting up the interface {} for \
+                    the tunnel {tunnel}: {pre_down}",
+                    active_connection.interface_name
+                );
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                let result = tunnel.stop_vpn_tunnel();
+                if !result {
+                    error!("stop_tunnel() for tunnel {} failed", tunnel.name);
+                    return Err(Error::InternalError("Error from tunnel".into()));
+                }
+                debug!("stop_tunnel() for tunnel {} succeeded", tunnel.name);
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let request = RemoveInterfaceRequest {
+                    interface_name,
+                    endpoint: tunnel.endpoint.clone(),
+                };
+                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+                    error!(
+                        "Error while removing interface {}, error details: {error:?}",
+                        active_connection.interface_name
+                    );
+                    return Err(Error::InternalError(format!(
+                        "Failed to remove interface, error message: {}",
+                        error.message()
+                    )));
+                }
+            }
+            if let Some(post_down) = &tunnel.post_down {
+                debug!(
+                    "Executing defined PostDown command after removing the interface {} for \
+                    the tunnel {tunnel}: {post_down}",
+                    active_connection.interface_name
+                );
+                let _ = execute_command(post_down);
+                info!(
+                    "Executed defined PostDown command after removing the interface {} for \
+                    the tunnel {tunnel}: {post_down}",
+                    active_connection.interface_name
+                );
+            }
+            let connection: TunnelConnection = active_connection.into();
+            let connection = connection.save(&*DB_POOL).await?;
+            debug!(
+                "Saved new tunnel {} connection status in the database",
+                tunnel.name
+            );
+            trace!("Saved connection: {connection:#?}");
+            info!(
+                "Network interface {} for tunnel {tunnel} has been removed",
                 active_connection.interface_name
-            )
-        };
-        log::error!("{msg}");
+            );
+            debug!("Finished disconnecting from tunnel {}", tunnel.name);
+        }
     }
 
-    log::info!(
-        "Interface {} for location {} disconnected.",
-        active_connection.interface_name,
-        location.name
-    );
     Ok(())
 }
 
 pub fn execute_command(command: &str) -> Result<(), Error> {
-    log::debug!("Executing command: {command}");
+    debug!("Executing command: {command}");
     let mut command_parts = command.split_whitespace();
 
     if let Some(command) = command_parts.next() {
@@ -290,13 +398,13 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            log::debug!("Command {command} executed successfully. Stdout: {stdout}");
+            debug!("Command {command} executed successfully. Stdout: {stdout}");
             if !stderr.is_empty() {
-                log::error!("Command produced the following output on stderr: {stderr}");
+                error!("Command produced the following output on stderr: {stderr}");
             }
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            log::error!("Error while executing command: {command}. Stderr: {stderr}");
+            error!("Error while executing command: {command}. Stderr: {stderr}");
         }
     }
     Ok(())

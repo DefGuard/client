@@ -394,12 +394,6 @@ impl Location<Id> {
 
     /// Persist a per-location MFA method override, clamped via [`infer_mfa_method`]
     /// against the location's MFA mode (`location_mfa_mode`).
-    ///
-    /// * `executor` - any SQLite executor.
-    /// * `location_id` - the target location.
-    /// * `method` - the desired method.  Will be clamped to TOTP when the mode is
-    ///   Internal and the stored method is None/OIDC, or to OIDC when the mode is
-    ///   External.
     pub async fn set_mfa_method(
         pool: &DbPool,
         location_id: Id,
@@ -416,10 +410,6 @@ impl Location<Id> {
 
     /// Persist the route-all-traffic flag for a location, rejecting the update if
     /// the owning instance's [`ClientTrafficPolicy`] forbids the requested value.
-    ///
-    /// * `executor` - any SQLite executor.
-    /// * `location_id` - the target location.
-    /// * `route_all_traffic` - the desired setting.
     pub async fn update_routing(
         pool: &DbPool,
         location_id: Id,
@@ -543,5 +533,128 @@ impl From<Location<Id>> for Location {
             mfa_method: location.mfa_method,
             posture_check_required: location.posture_check_required,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+
+    use super::*;
+    use crate::database::models::instance::{ClientTrafficPolicy, Instance};
+
+    fn new_instance() -> Instance<NoId> {
+        Instance {
+            id: NoId,
+            name: "instance".into(),
+            uuid: "uuid-1".into(),
+            url: "https://core.example".into(),
+            proxy_url: "https://proxy.example".into(),
+            username: "alice".into(),
+            token: None,
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: false,
+            openid_display_name: None,
+        }
+    }
+
+    fn new_location(instance_id: Id) -> Location<NoId> {
+        Location {
+            id: NoId,
+            instance_id,
+            network_id: 1,
+            name: "loc".into(),
+            address: "10.0.0.2/24".into(),
+            pubkey: "pk".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: LocationMfaMode::Disabled,
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_location_crud_round_trip(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let location = new_location(instance.id).save(&pool).await.unwrap();
+
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert_eq!(found.name, "loc");
+        assert_eq!(found.instance_id, instance.id);
+
+        location.delete(&pool).await.unwrap();
+        assert!(Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_infer_mfa_method() {
+        use LocationMfaMethod::{Biometric, Email, Oidc, Totp};
+        use LocationMfaMode::{Disabled, External, Internal};
+
+        // Disabled mode passes the configured method through unchanged.
+        assert_eq!(infer_mfa_method(Disabled, None), None);
+        assert_eq!(infer_mfa_method(Disabled, Some(Totp)), Some(Totp));
+
+        // Internal mode forces Totp when no method or OIDC is configured.
+        assert_eq!(infer_mfa_method(Internal, None), Some(Totp));
+        assert_eq!(infer_mfa_method(Internal, Some(Oidc)), Some(Totp));
+        // Internal mode keeps any other explicit method.
+        assert_eq!(infer_mfa_method(Internal, Some(Email)), Some(Email));
+        assert_eq!(infer_mfa_method(Internal, Some(Biometric)), Some(Biometric));
+
+        // External mode always resolves to OIDC, ignoring the configured method.
+        assert_eq!(infer_mfa_method(External, None), Some(Oidc));
+        assert_eq!(infer_mfa_method(External, Some(Totp)), Some(Oidc));
+    }
+
+    #[test]
+    fn test_location_mfa_mode_from_proto() {
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::Unspecified),
+            LocationMfaMode::Disabled
+        );
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::Disabled),
+            LocationMfaMode::Disabled
+        );
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::Internal),
+            LocationMfaMode::Internal
+        );
+        assert_eq!(
+            LocationMfaMode::from(ProtoLocationMfaMode::External),
+            LocationMfaMode::External
+        );
+    }
+
+    #[test]
+    fn test_service_location_mode_from_proto() {
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Unspecified),
+            ServiceLocationMode::Disabled
+        );
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Disabled),
+            ServiceLocationMode::Disabled
+        );
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Prelogon),
+            ServiceLocationMode::PreLogon
+        );
+        assert_eq!(
+            ServiceLocationMode::from(ProtoServiceLocationMode::Alwayson),
+            ServiceLocationMode::AlwaysOn
+        );
     }
 }

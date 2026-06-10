@@ -20,7 +20,7 @@ const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 const PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 
 pub static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> = LazyLock::new(|| {
-    log::debug!("Setting up gRPC client");
+    debug!("Setting up gRPC client");
     let endpoint = Endpoint::from_static("http://localhost");
     let channel;
     #[cfg(unix)]
@@ -29,7 +29,7 @@ pub static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> = LazyLo
             let stream = match UnixStream::connect(DAEMON_SOCKET_PATH).await {
                 Ok(stream) => stream,
                 Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
-                    log::error!(
+                    error!(
                         "Permission denied for UNIX domain socket; please refer to \
                             https://docs.defguard.net/support-1/troubleshooting#\
                             unix-socket-permission-errors-when-desktop-client-attempts-to-connect-\
@@ -38,11 +38,11 @@ pub static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> = LazyLo
                     return Err(err);
                 }
                 Err(err) => {
-                    log::error!("Problem connecting to UNIX domain socket: {err}");
+                    error!("Problem connecting to UNIX domain socket: {err}");
                     return Err(err);
                 }
             };
-            log::info!("Created unix gRPC client");
+            info!("Created unix gRPC client");
             Ok::<_, std::io::Error>(TokioIo::new(stream))
         }));
     };
@@ -54,12 +54,12 @@ pub static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> = LazyLo
                     Ok(client) => break client,
                     Err(err) if err.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
                     Err(err) => {
-                        log::error!("Problem connecting to named pipe: {err}");
+                        error!("Problem connecting to named pipe: {err}");
                         return Err(err);
                     }
                 }
             };
-            log::info!("Created windows gRPC client");
+            info!("Created windows gRPC client");
             Ok::<_, std::io::Error>(TokioIo::new(client))
         }));
     }

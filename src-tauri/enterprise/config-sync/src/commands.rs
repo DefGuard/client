@@ -1,24 +1,25 @@
 use std::collections::HashSet;
 
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::{
+    connection::daemon_client::DAEMON_CLIENT, database::models::wireguard_keys::WireguardKeys,
+};
 use defguard_client_core::{
     database::models::{
         instance::{ClientTrafficPolicy, Instance},
         location::{infer_mfa_method, Location},
-        wireguard_keys::WireguardKeys,
         Id, NoId,
     },
     error::Error,
     into_location,
 };
-use defguard_client_proto::defguard::{
-    client::v1::{DeleteServiceLocationsRequest, SaveServiceLocationsRequest},
-    client_types::DeviceConfigResponse,
-};
-use sqlx::{Sqlite, SqliteExecutor, Transaction};
-
 #[cfg(not(target_os = "macos"))]
-use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::client_types::DeviceConfigResponse;
 use defguard_client_service_locations::to_service_location;
+use sqlx::{Sqlite, SqliteExecutor, Transaction};
 
 pub async fn locations_changed(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -49,7 +50,7 @@ pub async fn do_update_instance(
     instance: &mut Instance<Id>,
     response: DeviceConfigResponse,
 ) -> Result<(), Error> {
-    log::debug!("Updating instance {instance}");
+    debug!("Updating instance {instance}");
     let locations_changed_val = locations_changed(transaction, instance, &response).await?;
     let instance_info = response
         .instance
@@ -61,34 +62,33 @@ pub async fn do_update_instance(
     let policy = instance_info.client_traffic_policy.into();
     if instance.client_traffic_policy != policy && policy == ClientTrafficPolicy::DisableAllTraffic
     {
-        log::debug!("Disabling all traffic for all locations of instance {instance}");
+        debug!("Disabling all traffic for all locations of instance {instance}");
         Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-        log::debug!("Disabled all traffic for all locations of instance {instance}");
+        debug!("Disabled all traffic for all locations of instance {instance}");
     }
     instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
     instance.uuid = instance_info.id;
     if response.token.is_some() {
         instance.token = response.token;
-        log::debug!("Set polling token for instance {}", instance.name);
+        debug!("Set polling token for instance {}", instance.name);
     } else {
-        log::debug!(
+        debug!(
             "No polling token received for instance {}, not updating",
             instance.name
         );
     }
     instance.save(transaction.as_mut()).await?;
-    log::debug!(
+    debug!(
         "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
     let mut service_locations = Vec::new();
 
     if locations_changed_val {
-        log::debug!(
+        debug!(
             "Updating locations for instance {}({}).",
-            instance.name,
-            instance.id
+            instance.name, instance.id
         );
         let mut current_locations =
             Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
@@ -100,12 +100,9 @@ pub async fn do_update_instance(
                 .position(|loc| loc.network_id == new_location.network_id)
             {
                 let mut current_location = current_locations.remove(position);
-                log::debug!(
+                debug!(
                     "Updating existing location {}({}) for instance {}({}).",
-                    current_location.name,
-                    current_location.id,
-                    instance.name,
-                    instance.id,
+                    current_location.name, current_location.id, instance.name, instance.id,
                 );
                 current_location.name = new_location.name;
                 current_location.address = new_location.address;
@@ -122,46 +119,40 @@ pub async fn do_update_instance(
                 );
                 current_location.posture_check_required = new_location.posture_check_required;
                 current_location.save(transaction.as_mut()).await?;
-                log::info!(
-                    "Location {current_location} configuration updated for instance {instance}"
-                );
+                info!("Location {current_location} configuration updated for instance {instance}");
                 current_location
             } else {
-                log::debug!("Creating new location {new_location} for instance {instance}");
+                debug!("Creating new location {new_location} for instance {instance}");
                 let new_location = new_location.save(transaction.as_mut()).await?;
-                log::info!("New location {new_location} created for instance {instance}");
+                info!("New location {new_location} created for instance {instance}");
                 new_location
             };
 
             if saved_location.is_service_location() {
-                log::debug!(
+                debug!(
                     "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
-                    saved_location.name,
-                    saved_location.id,
-                    instance.name,
-                    instance.id,
+                    saved_location.name, saved_location.id, instance.name, instance.id,
                 );
                 service_locations.push(to_service_location(&saved_location)?);
             }
         }
 
-        log::debug!("Removing locations for instance {instance}");
+        debug!("Removing locations for instance {instance}");
         for removed_location in current_locations {
             removed_location.delete(transaction.as_mut()).await?;
-            log::info!(
+            info!(
                 "Removed location {removed_location} for instance {instance} during instance update"
             );
         }
-        log::debug!("Finished updating locations for instance {instance}");
+        debug!("Finished updating locations for instance {instance}");
     } else {
-        log::info!("Locations for instance {instance} didn't change. Not updating them.");
+        info!("Locations for instance {instance} didn't change. Not updating them.");
     }
 
     if service_locations.is_empty() {
-        log::debug!(
+        debug!(
             "No service locations for instance {}({}), removing all existing service locations.",
-            instance.name,
-            instance.id
+            instance.name, instance.id
         );
 
         #[cfg(not(target_os = "macos"))]
@@ -174,22 +165,20 @@ pub async fn do_update_instance(
                 .delete_service_locations(delete_request)
                 .await
                 .map_err(|err| {
-                    log::error!(
+                    error!(
                         "Error while deleting service locations from the daemon for instance {}({ \
                         }): {err}",
-                        instance.name,
-                        instance.id,
+                        instance.name, instance.id,
                     );
                     Error::InternalError(err.to_string())
                 })?;
-            log::debug!(
+            debug!(
                 "Successfully removed all service locations from daemon for instance {}({})",
-                instance.name,
-                instance.id
+                instance.name, instance.id
             );
         }
     } else {
-        log::debug!(
+        debug!(
             "Processing {} service location(s) for instance {}({})",
             service_locations.len(),
             instance.name,
@@ -209,7 +198,7 @@ pub async fn do_update_instance(
                 private_key,
             };
 
-            log::debug!(
+            debug!(
                 "Sending request to daemon to save {} service location(s) for instance {}({})",
                 save_request.service_locations.len(),
                 instance.name,
@@ -221,26 +210,24 @@ pub async fn do_update_instance(
                 .save_service_locations(save_request)
                 .await
                 .map_err(|err| {
-                    log::error!(
+                    error!(
                         "Error while saving service locations to the daemon for instance {}({}): \
                         {err}",
-                        instance.name,
-                        instance.id,
+                        instance.name, instance.id,
                     );
                     Error::InternalError(err.to_string())
                 })?;
 
-            log::info!(
+            info!(
                 "Successfully saved {} service location(s) to daemon for instance {}({})",
                 service_locations.len(),
                 instance.name,
                 instance.id
             );
 
-            log::debug!(
+            debug!(
                 "Completed processing all service locations for instance {}({})",
-                instance.name,
-                instance.id
+                instance.name, instance.id
             );
         }
     }
@@ -255,17 +242,15 @@ pub async fn disable_enterprise_features<'e, E>(
 where
     E: SqliteExecutor<'e>,
 {
-    log::debug!(
+    debug!(
         "Disabling enterprise features for instance {}({})",
-        instance.name,
-        instance.id
+        instance.name, instance.id
     );
     instance.client_traffic_policy = ClientTrafficPolicy::None;
     instance.save(executor).await?;
-    log::debug!(
+    debug!(
         "Disabled enterprise features for instance {}({})",
-        instance.name,
-        instance.id
+        instance.name, instance.id
     );
     Ok(())
 }

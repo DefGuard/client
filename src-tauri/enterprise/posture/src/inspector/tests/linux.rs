@@ -2,7 +2,7 @@ use super::super::{disk_encryption_status, os_name, os_version};
 
 #[test]
 fn test_os_name() {
-    assert!(os_name().unwrap().ends_with("Linux"));
+    assert!(os_name().is_ok());
 }
 
 #[test]

@@ -93,4 +93,80 @@ mod tests {
         let port = find_free_tcp_port().unwrap();
         assert_ne!(port, 0);
     }
+
+    fn ip(addr: &str) -> IpAddr {
+        addr.parse().unwrap()
+    }
+
+    #[test]
+    fn test_dns_owned_none_and_empty() {
+        assert_eq!(dns_owned(&None), (vec![], vec![]));
+        assert_eq!(dns_owned(&Some(String::new())), (vec![], vec![]));
+    }
+
+    #[test]
+    fn test_dns_owned_ipv4_only() {
+        let (ips, domains) = dns_owned(&Some("10.0.0.2".to_string()));
+        assert_eq!(ips, vec![ip("10.0.0.2")]);
+        assert!(domains.is_empty());
+    }
+
+    #[test]
+    fn test_dns_owned_ipv6_only() {
+        let (ips, domains) = dns_owned(&Some("fd00::1".to_string()));
+        assert_eq!(ips, vec![ip("fd00::1")]);
+        assert!(domains.is_empty());
+    }
+
+    #[test]
+    fn test_dns_owned_domains_only() {
+        let (ips, domains) = dns_owned(&Some("tnt,teonite.net".to_string()));
+        assert!(ips.is_empty());
+        assert_eq!(domains, vec!["tnt".to_string(), "teonite.net".to_string()]);
+    }
+
+    #[test]
+    fn test_dns_owned_mixed_with_whitespace() {
+        // Entries are trimmed; parseable ones become resolver IPs, the rest search domains.
+        let (ips, domains) = dns_owned(&Some("10.0.0.2, tnt , teonite.net".to_string()));
+        assert_eq!(ips, vec![ip("10.0.0.2")]);
+        assert_eq!(domains, vec!["tnt".to_string(), "teonite.net".to_string()]);
+    }
+
+    #[test]
+    fn test_dns_owned_trailing_comma_yields_empty_domains() {
+        // Pins current behavior: empty entries between commas are treated as (empty) domains.
+        let (ips, domains) = dns_owned(&Some("10.0.0.2,,".to_string()));
+        assert_eq!(ips, vec![ip("10.0.0.2")]);
+        assert_eq!(domains, vec![String::new(), String::new()]);
+    }
+
+    #[test]
+    fn test_dns_borrow_mixed_with_whitespace() {
+        let config = Some("10.0.0.2, tnt , teonite.net".to_string());
+        let (ips, domains) = dns_borrow(&config);
+        assert_eq!(ips, vec![ip("10.0.0.2")]);
+        assert_eq!(domains, vec!["tnt", "teonite.net"]);
+    }
+
+    #[test]
+    fn test_dns_borrow_none() {
+        let (ips, domains) = dns_borrow(&None);
+        assert!(ips.is_empty());
+        assert!(domains.is_empty());
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    #[test]
+    fn test_interface_name_strips_non_alphanumeric() {
+        assert_eq!(get_interface_name("My Loc-ation!"), "MyLocation");
+        assert_eq!(get_interface_name("wg0"), "wg0");
+    }
+
+    #[cfg(not(any(windows, target_os = "macos")))]
+    #[test]
+    fn test_interface_name_returns_wg_prefixed() {
+        // The Linux variant searches for the next free `wgN` interface, ignoring the input name.
+        assert!(get_interface_name("ignored").starts_with("wg"));
+    }
 }

@@ -4,7 +4,7 @@ description = "Real-time configuration sync for the Defguard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-license-file = "../LICENSE.md"
+license = "LicenseRef-Proprietary"
 rust-version.workspace = true
 version.workspace = true
 
@@ -19,6 +19,9 @@ serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
 tokio = { version = "1", features = ["time"] }
+
+[dev-dependencies]
+http.workspace = true
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tonic = { workspace = true }
