@@ -1,0 +1,11 @@
+#overview-page {
+  padding-bottom: 0;
+  padding-top: 0;
+
+  .page-grid {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    height: 100%;
+    width: 100%;
+  }
+}
