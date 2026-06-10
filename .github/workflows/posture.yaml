@@ -167,7 +167,6 @@ jobs:
           "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - uses: dtolnay/rust-toolchain@stable
-        if: false
 
       - name: Install protoc
         if: false
