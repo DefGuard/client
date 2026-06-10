@@ -53,6 +53,7 @@ jobs:
       - noad
     steps:
       - name: Install Git
+        if: false
         shell: cmd
         run: |
           choco install git -y --no-progress
@@ -85,7 +86,6 @@ jobs:
             -y
 
       - name: Add Git Bash to PATH
-        if: false
         shell: cmd
         run: |
           "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
@@ -99,7 +99,10 @@ jobs:
           choco install protoc -y
           protoc --version
 
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
       - name: Cache Cargo
+        if: false
         uses: actions/cache@v5
         with:
           path: |
@@ -110,7 +113,7 @@ jobs:
           restore-keys: |
             windows-cargo-
 
-      - name: Run basic tests
+      - name: Run tests
         working-directory: src-tauri/
         shell: cmd
         run: |
@@ -161,7 +164,6 @@ jobs:
             -y
 
       - name: Add Git Bash to PATH
-        if: false
         shell: cmd
         run: |
           "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
@@ -189,7 +191,7 @@ jobs:
           restore-keys: |
             windows-cargo-
 
-      - name: Run basic tests
+      - name: Run tests
         working-directory: src-tauri/
         shell: cmd
         run: |
