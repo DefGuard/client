@@ -15,6 +15,7 @@ import { IconAddRule } from './icons/IconAddRule';
 import { IconAddToken } from './icons/IconAddToken';
 import { IconAddUser } from './icons/IconAddUser';
 import { IconAliases } from './icons/IconAliases';
+import { IconAnalytics } from './icons/IconAnalytics';
 import { IconAndroid } from './icons/IconAndroid';
 import { IconApple } from './icons/IconApple';
 import { IconAppStore } from './icons/IconAppstore';
@@ -305,7 +306,7 @@ export const Icon = <T extends IconKindValue>({
       case 'add-user':
         return IconAddUser;
       case 'analytics':
-        return EmptyIcon;
+        return IconAnalytics;
       case 'archive':
         return EmptyIcon;
       case 'attention-outlined':

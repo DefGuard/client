@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { InstanceInfo, LocationInfo } from '../../../../shared/rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../rust-api/types';
 
 export type CompactViewSelection =
   | { kind: 'instance'; data: InstanceInfo }
@@ -13,14 +13,14 @@ interface StoreValues {
 
 interface Store extends StoreValues {}
 
-export const useCompactLocationStore = create<Store>()(
+export const useAppStore = create<Store>()(
   persist(
     (_) => ({
       compactViewSelection: null,
       expandedLocation: null,
     }),
     {
-      name: 'compact-locations-store',
+      name: 'app-store',
       storage: createJSONStorage(() => localStorage),
       version: 3,
     },

@@ -1,12 +1,12 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { CompactLocationsPage } from '../../pages/compact/CompactLocationsPage/CompactLocationsPage';
-import { useCompactLocationStore } from '../../pages/compact/CompactLocationsPage/hooks/useCompactLocationsStore';
 import {
   getInstancesQueryOptions,
   getLocationsQueryOptions,
   getTunnelsQueryOptions,
 } from '../../shared/rust-api/query';
 import type { LocationInfo } from '../../shared/rust-api/types';
+import { useAppStore } from '../../shared/store/useAppStore';
 
 export const Route = createFileRoute('/compact/')({
   loader: async ({ context }) => {
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/compact/')({
       throw redirect({ to: '/empty' });
     }
 
-    const stored = useCompactLocationStore.getState().compactViewSelection;
+    const stored = useAppStore.getState().compactViewSelection;
 
     let storedIsValid: boolean;
     if (stored === null) {
@@ -40,7 +40,7 @@ export const Route = createFileRoute('/compact/')({
     }
 
     if (!storedIsValid) {
-      useCompactLocationStore.setState({ compactViewSelection: selected });
+      useAppStore.setState({ compactViewSelection: selected });
     }
 
     let locations: LocationInfo[];
