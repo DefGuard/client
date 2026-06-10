@@ -15,17 +15,17 @@ import {
   getInstancesQueryOptions,
   getLocationsQueryOptions,
 } from '../../../shared/rust-api/query';
+import { useAppStore } from '../../../shared/store/useAppStore';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
-import { useCompactLocationStore } from './hooks/useCompactLocationsStore';
 
 const isWindows = platform() === 'windows';
 
 export const CompactLocationsPage = () => {
-  const selection = useCompactLocationStore((s) => s.compactViewSelection);
-  const openLocation = useCompactLocationStore((s) => s.expandedLocation);
+  const selection = useAppStore((s) => s.compactViewSelection);
+  const openLocation = useAppStore((s) => s.expandedLocation);
 
   const routeData = useLoaderData({ from: '/compact/' });
 
@@ -56,7 +56,7 @@ export const CompactLocationsPage = () => {
 
   useEffect(() => {
     if (selection === null || instanceInfo === undefined) {
-      useCompactLocationStore.setState({
+      useAppStore.setState({
         compactViewSelection: { kind: 'instance', data: routeData.instances[0] },
       });
     }
@@ -89,9 +89,9 @@ export const CompactLocationsPage = () => {
                   isOpen={isOpen}
                   onOpen={() => {
                     if (isOpen) {
-                      useCompactLocationStore.setState({ expandedLocation: null });
+                      useAppStore.setState({ expandedLocation: null });
                     } else {
-                      useCompactLocationStore.setState({ expandedLocation: location.id });
+                      useAppStore.setState({ expandedLocation: location.id });
                     }
                   }}
                 />
