@@ -1,4 +1,7 @@
+use std::path::Path;
+
 use defguard_core::{
+    app_config::AppConfig,
     database::{handle_db_migrations, DbPool, DB_POOL},
     error::Error as CoreError,
 };
@@ -12,6 +15,8 @@ pub struct State {
     /// resolved data directory
     #[allow(dead_code)]
     pub data_dir: String,
+    /// loaded application configuration (theme, log level, MTU, etc.)
+    pub app_config: AppConfig,
 }
 
 #[derive(Debug, Error)]
@@ -80,6 +85,9 @@ impl State {
 
         debug!("Using data directory: {data_dir}");
 
+        // Load application configuration (theme, MTU, log level, etc.).
+        let app_config = AppConfig::new(Path::new(&data_dir));
+
         // Access the pool to trigger lazy initialization.
         let pool = DB_POOL.clone();
 
@@ -88,6 +96,10 @@ impl State {
 
         info!("CLI state initialized");
 
-        Ok(State { pool, data_dir })
+        Ok(State {
+            pool,
+            data_dir,
+            app_config,
+        })
     }
 }

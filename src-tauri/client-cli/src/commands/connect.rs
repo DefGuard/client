@@ -95,10 +95,14 @@ pub async fn handle(
                     .map_err(|e| CliError::Other(e.to_string()))?;
                 (loc.name.clone(), Some(psk), None)
             } else {
-                (loc.name.clone(), None, None)
+                (loc.name.clone(), None, state.app_config.mtu())
             }
         }
-        ResolvedTarget::Tunnel(tun) => (tun.name.clone(), tun.preshared_key.clone(), None),
+        ResolvedTarget::Tunnel(tun) => (
+            tun.name.clone(),
+            tun.preshared_key.clone(),
+            state.app_config.mtu(),
+        ),
     };
 
     tracing::info!("Connecting to {target_name}...");
