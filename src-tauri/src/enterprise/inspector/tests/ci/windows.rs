@@ -32,6 +32,7 @@ mod setup1 {
         anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
         security_update_age_days,
     };
+    use super::expected_security_update_age_days;
 
     #[test]
     #[ignore = "CI posture testing only"]
@@ -78,6 +79,7 @@ mod setup2 {
         anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
         security_update_age_days,
     };
+    use super::expected_security_update_age_days;
 
     #[test]
     #[ignore = "CI posture testing only"]
