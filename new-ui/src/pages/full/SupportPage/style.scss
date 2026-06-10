@@ -1,24 +1,24 @@
 #support-page-view {
-	.sections {
-		.section {
-			display: flex;
-			gap: var(--spacing-lg);
+  .sections {
+    .section {
+      display: flex;
+      gap: var(--spacing-lg);
 
-			> div > .icon path {
-				fill: var(--fg-white-60);
-			}
+      > div > .icon path {
+        fill: var(--fg-white-60);
+      }
 
-			.content {
-				flex: 1;
-			}
+      .content {
+        flex: 1;
+      }
 
-			.title {
-				font: var(--t-body-sm-500);
-			}
+      .title {
+        font: var(--t-body-sm-500);
+      }
 
-			.description {
-				font: var(--t-body-xs-400);
-			}
-		}
-	}
+      .description {
+        font: var(--t-body-xs-400);
+      }
+    }
+  }
 }

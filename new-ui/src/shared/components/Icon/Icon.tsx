@@ -100,7 +100,9 @@ import { IconPlus } from './icons/IconPlus';
 import { IconPlusCircle } from './icons/IconPlusCircle';
 import { IconProfile } from './icons/IconProfile';
 import { IconProtection } from './icons/IconProtection';
+import { IconQuestion } from './icons/IconQuestion';
 import { IconRefresh } from './icons/IconRefresh';
+import { IconReport } from './icons/IconReport';
 import { IconRequest } from './icons/IconRequest';
 import { IconRules } from './icons/IconRules';
 import { IconSearch } from './icons/IconSearch';
@@ -128,8 +130,6 @@ import { IconWarningFilled } from './icons/IconWarningFilled';
 import { IconWarningOutlined } from './icons/IconWarningOutlined';
 import { IconWebhooks } from './icons/IconWebhooks';
 import { IconWindows } from './icons/IconWindows';
-import { IconQuestion } from './icons/IconQuestion';
-import { IconReport } from './icons/IconReport';
 
 type Props<T extends IconKindValue = IconKindValue> = {
   icon: T;

@@ -1,21 +1,15 @@
 import './style.scss';
-import type { ReactNode } from 'react';
-import { getVersion } from '@tauri-apps/api/app';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { arch, platform, version } from '@tauri-apps/plugin-os';
+import type { ReactNode } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
+import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { Icon, IconKind } from '../../../shared/components/Icon';
 import type { IconKindValue } from '../../../shared/components/Icon/icon-types';
-import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
-import { api } from '../../../shared/rust-api/api';
-import { ThemeSpacing } from '../../../shared/types';
-import { downloadText } from '../../../shared/utils/download';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
-import { IconButtonVariant } from '../../../shared/components/IconButton/types';
-import { ButtonVariant } from '../../../shared/components/Button/types';
+import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
+import { ThemeSpacing } from '../../../shared/types';
 
 type SupportSectionProps = {
   icon: IconKindValue;
