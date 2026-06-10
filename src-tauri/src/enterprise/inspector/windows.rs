@@ -99,20 +99,37 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     Err(UnavailableReason::DetectionFailed)
 }
 
-/// Determine AntiVirus status.
-///
-/// Check manually in PowerShell:
-/// `Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct`
-///
-/// Equivalent to PowerShell command:
-/// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
-pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
-    let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
-    let products: Vec<AntiVirusProduct> = conn.query()?;
-    Ok(products
-        .iter()
-        .any(|product| (product.product_state & 0x0000_F000) == 0x0000_1000))
+#[derive(Deserialize)]
+#[serde(rename = "MSFT_MpComputerStatus")]
+#[serde(rename_all = "PascalCase")]
+struct MpComputerStatus {
+    antivirus_enabled: bool,
+    real_time_protection_enabled: bool,
 }
+pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
+    let conn = WMIConnection::with_namespace_path("root\\Microsoft\\Windows\\Defender")?;
+    let statuses: Vec<MpComputerStatus> = conn.query()?;
+    let status = statuses
+        .into_iter()
+        .next()
+        .ok_or(UnavailableReason::DetectionFailed)?;
+    Ok(status.antivirus_enabled && status.real_time_protection_enabled)
+}
+
+// /// Determine AntiVirus status.
+// ///
+// /// Check manually in PowerShell:
+// /// `Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct`
+// ///
+// /// Equivalent to PowerShell command:
+// /// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
+// pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
+//     let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
+//     let products: Vec<AntiVirusProduct> = conn.query()?;
+//     Ok(products
+//         .iter()
+//         .any(|product| (product.product_state & 0x0000_F000) == 0x0000_1000))
+// }
 
 /// Check if this machine is part of an Active Directory domain.
 ///

@@ -42,7 +42,7 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
 
   test-windows-postures-setup1:
-    if: false
+    if: true
     name: Windows postures - setup1
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
