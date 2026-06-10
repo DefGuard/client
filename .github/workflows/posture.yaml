@@ -53,7 +53,7 @@ jobs:
       - noad
     steps:
       - name: Install Git
-        if: false
+        if: true
         shell: cmd
         run: |
           choco install git -y --no-progress
@@ -131,7 +131,7 @@ jobs:
       - ad
     steps:
       - name: Install Git
-        if: false
+        if: true
         shell: cmd
         run: |
           choco install git -y --no-progress
