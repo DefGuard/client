@@ -127,6 +127,8 @@ import { IconWarningFilled } from './icons/IconWarningFilled';
 import { IconWarningOutlined } from './icons/IconWarningOutlined';
 import { IconWebhooks } from './icons/IconWebhooks';
 import { IconWindows } from './icons/IconWindows';
+import { IconQuestion } from './icons/IconQuestion';
+import { IconReport } from './icons/IconReport';
 
 type Props<T extends IconKindValue = IconKindValue> = {
   icon: T;
@@ -434,6 +436,8 @@ export const Icon = <T extends IconKindValue>({
         return IconChat;
       case 'request':
         return IconRequest;
+      case 'question':
+        return IconQuestion;
       case 'calendar':
         return IconCalendar;
       case 'light-bulb':
@@ -450,6 +454,8 @@ export const Icon = <T extends IconKindValue>({
         return IconPlayFilled;
       case 'disconnect-all':
         return IconDisconnectAll;
+      case 'report':
+        return IconReport;
     }
   }, [iconKind]);
 

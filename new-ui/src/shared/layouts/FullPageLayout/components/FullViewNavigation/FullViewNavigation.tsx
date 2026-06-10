@@ -14,7 +14,12 @@ const TOP_LINKS: NavItemDef[] = [
   },
 ];
 
-const BOTTOM_LINKS: NavItemDef[] = [];
+const BOTTOM_LINKS: NavItemDef[] = [
+  {
+    icon: IconKind.Report,
+    to: '/full/support',
+  },
+];
 
 export const FullViewNavigation = () => {
   return (
