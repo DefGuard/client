@@ -1,0 +1,27 @@
+[package]
+name = "defguard-client-config-sync"
+description = "Real-time configuration sync for the Defguard desktop client"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license = "LicenseRef-Proprietary"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+defguard-client-core = { path = "../../core" }
+defguard-client-proto = { path = "../../client-proto" }
+defguard-client-service-locations = { path = "../service-locations" }
+log.workspace = true
+reqwest.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio = { version = "1", features = ["time"] }
+
+[dev-dependencies]
+http.workspace = true
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+tonic = { workspace = true }

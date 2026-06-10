@@ -1,0 +1,53 @@
+[package]
+name = "defguard-client-core"
+description = "Shared business logic for the Defguard desktop client (Tauri-free)"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+base64.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+defguard-client-common = { path = "../common" }
+defguard-client-proto = { path = "../client-proto" }
+defguard_wireguard_rs.workspace = true
+dirs-next.workspace = true
+log.workspace = true
+os_info = { version = "3.14", default-features = false }
+prost.workspace = true
+reqwest.workspace = true
+rust-ini = "0.21"
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_with.workspace = true
+sqlx.workspace = true
+strum = { version = "0.28", features = ["derive"] }
+struct-patch = "0.12"
+thiserror.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tower = "0.5"
+tracing = { workspace = true }
+x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
+
+hyper-util = "0.1"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", features = ["user", "fs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
+objc2-network-extension = "0.3"

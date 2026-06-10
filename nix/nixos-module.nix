@@ -1,61 +1,69 @@
-{
+{mkCraneLib}: {
   config,
   lib,
   pkgs,
   ...
-}:
-with lib; let
-  defguard-client = pkgs.callPackage ./package.nix {};
+}: let
+  craneLib = mkCraneLib pkgs;
+  defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
   cfg = config.programs.defguard-client;
 in {
   options.programs.defguard-client = {
-    enable = mkEnableOption "Defguard VPN client and service";
+    enable = lib.mkEnableOption "Defguard VPN client and service";
 
-    package = mkOption {
-      type = types.package;
+    package = lib.mkOption {
+      type = lib.types.package;
       default = defguard-client;
       description = "defguard-client package to use";
     };
 
-    logLevel = mkOption {
-      type = types.str;
+    logLevel = lib.mkOption {
+      type = lib.types.str;
       default = "info";
       description = "Log level for defguard-service";
     };
 
-    statsPeriod = mkOption {
-      type = types.int;
+    statsPeriod = lib.mkOption {
+      type = lib.types.int;
       default = 30;
       description = "Interval in seconds for interface statistics updates";
     };
   };
 
-  config = mkIf cfg.enable {
-    # Add client package
+  config = lib.mkIf cfg.enable {
     environment.systemPackages = [cfg.package];
 
-    # Setup systemd service for the intrerface management daemon
     systemd.services.defguard-service = {
       description = "Defguard VPN Service";
+      documentation = ["https://docs.defguard.net"];
       wantedBy = ["multi-user.target"];
       wants = ["network-online.target"];
       after = ["network-online.target"];
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/defguard-service --log-level ${cfg.logLevel} --stats-period ${toString cfg.statsPeriod}";
-        ExecReload = "/bin/kill -HUP $MAINPID";
         Group = "defguard";
-        Restart = "on-failure";
-        RestartSec = 2;
+        ExecStart = "${cfg.package}/bin/defguard-service --log-level ${cfg.logLevel} --stats-period ${toString cfg.statsPeriod}";
+        ExecReload = "kill -HUP $MAINPID";
         KillMode = "process";
         KillSignal = "SIGINT";
         LimitNOFILE = 65536;
         LimitNPROC = "infinity";
+        Restart = "on-failure";
+        RestartSec = 2;
         TasksMax = "infinity";
         OOMScoreAdjust = -1000;
+        # Security hardening
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectControlGroups = true;
+        # Requires WireGuard to be built into the kernel or pre-loaded via
+        # boot.kernelModules. If WireGuard is a loadable module, auto-loading
+        # will be blocked by ProtectKernelModules.
+        ProtectKernelModules = true;
+        RestrictRealtime = true;
+        LockPersonality = true;
       };
     };
 
-    # Make sure the defguard group exists
     users.groups.defguard = {};
   };
 }

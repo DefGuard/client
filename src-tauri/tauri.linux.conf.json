@@ -1,10 +1,5 @@
 {
   "productName": "defguard-client",
-  "build": {
-    "features": [
-      "service"
-    ]
-  },
   "bundle": {
     "longDescription": "IMPORTANT: Reboot or Re-login Required\nOn initial install the user is added to the defguard group.\nA reboot or logging out and back in is required for group membership changes to take effect.\nThis is not required on subsequent updates."
   }
