@@ -53,7 +53,7 @@ jobs:
       - noad
     steps:
       - name: Install Git
-        if: true
+        if: false
         shell: cmd
         run: |
           choco install git -y --no-progress
@@ -85,10 +85,16 @@ jobs:
             --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait --norestart" `
             -y
 
+      # - name: Add Git Bash to PATH
+      #   shell: cmd
+      #   run: |
+      #     "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Add Git Bash to PATH
         shell: cmd
         run: |
-          "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
+          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -131,7 +137,7 @@ jobs:
       - ad
     steps:
       - name: Install Git
-        if: true
+        if: false
         shell: cmd
         run: |
           choco install git -y --no-progress
@@ -163,10 +169,16 @@ jobs:
             --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait --norestart" `
             -y
 
+      # - name: Add Git Bash to PATH
+      #   shell: cmd
+      #   run: |
+      #     "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      #
       - name: Add Git Bash to PATH
         shell: cmd
         run: |
-          "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo C:\Program Files\Git\bin>>%GITHUB_PATH%
+          echo C:\Program Files\Git\cmd>>%GITHUB_PATH%
 
       - uses: dtolnay/rust-toolchain@stable
 
