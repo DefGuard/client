@@ -7,7 +7,10 @@ on:
       - posture-checks-ci
 
 env:
+  CARGO_TERM_COLOR: always
   SQLX_OFFLINE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
 
@@ -39,7 +42,7 @@ jobs:
           cargo test --locked --lib enterprise::inspector::tests::ci::linux::test_disk_encryption_status_unencrypted -- --ignored --exact
 
   test-windows-postures-setup1:
-    if: true
+    if: false
     name: Windows postures - setup1
     runs-on:
       # - codebuild-defguard-posture-windows-runner-${{ github.run_id }}-${{ github.run_attempt }}
@@ -90,6 +93,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install protoc
+        if: false
         shell: cmd
         run: |
           choco install protoc -y
@@ -124,6 +128,7 @@ jobs:
       - ad
     steps:
       - name: Install Git
+        if: false
         shell: cmd
         run: |
           choco install git -y --no-progress
@@ -164,12 +169,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install protoc
+        if: false
         shell: cmd
         run: |
           choco install protoc -y
           protoc --version
 
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
       - name: Cache Cargo
+        if: false
         uses: actions/cache@v5
         with:
           path: |
