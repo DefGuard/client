@@ -68,13 +68,13 @@ jobs:
       - name: Check format
         run: |
           rustup component add rustfmt
-          cargo fmt -- --check
+          cargo fmt --all -- --check
 
       - name: Run clippy linter
         run: |
           mkdir ../dist
           rustup component add clippy
-          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Install cargo extensions
         uses: taiki-e/install-action@v2
@@ -86,4 +86,4 @@ jobs:
         run: cargo deny check
 
       - name: Run tests
-        run: cargo test --locked --no-fail-fast
+        run: cargo test --workspace --locked --no-fail-fast
