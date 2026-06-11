@@ -31,3 +31,8 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 # Dummy feature to let tauri build the release.
 [features]
 custom-protocol = []
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio-stream = "0.1"
+tonic.workspace = true
