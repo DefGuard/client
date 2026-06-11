@@ -129,6 +129,23 @@ impl Tunnel<Id> {
         Ok(tunnels)
     }
 
+    /// Find tunnels by name.
+    pub async fn find_by_name<'e, E>(executor: E, name: &str) -> sqlx::Result<Vec<Self>>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        query_as!(
+            Self,
+            "SELECT id \"id: _\", name, pubkey, prvkey, address, server_pubkey, preshared_key, \
+            allowed_ips, endpoint, dns, persistent_keep_alive, route_all_traffic, pre_up, \
+            post_up, pre_down, post_down \
+            FROM tunnel WHERE name = $1 ORDER BY name ASC",
+            name,
+        )
+        .fetch_all(executor)
+        .await
+    }
+
     pub async fn find_by_server_public_key<'e, E>(executor: E, pubkey: &str) -> sqlx::Result<Self>
     where
         E: SqliteExecutor<'e>,

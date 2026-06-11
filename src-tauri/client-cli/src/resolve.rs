@@ -70,41 +70,32 @@ async fn resolve_named(
     pool: &DbPool,
 ) -> Result<ResolvedTarget, CliError> {
     if tunnel_only {
-        let tunnels = Tunnel::all(pool).await?;
-        let matches: Vec<_> = tunnels.into_iter().filter(|t| t.name == name).collect();
-        return match matches.len() {
+        let tunnels = Tunnel::find_by_name(pool, name).await?;
+        return match tunnels.len() {
             0 => Err(CliError::NotFound(format!("Tunnel '{name}' not found"))),
-            1 => Ok(ResolvedTarget::Tunnel(matches.into_iter().next().unwrap())),
+            1 => Ok(ResolvedTarget::Tunnel(tunnels.into_iter().next().unwrap())),
             _ => Err(CliError::NotFound(format!(
                 "Multiple tunnels named '{name}'"
             ))),
         };
     }
 
-    // Resolve instance filter and fetch matching locations.
+    // Fetch matching locations by name.  Instance filter is applied in Rust
+    // since cross-instance ambiguity is a business rule, not a query concern.
     let loc_matches: Vec<Location<Id>> = if let Some(inst_name) = instance_filter {
         let inst = Instance::find_by_name(pool, inst_name)
             .await?
             .ok_or_else(|| CliError::NotFound(format!("Instance '{inst_name}' not found")))?;
-        Location::find_by_instance_id(pool, inst.id, false)
+        Location::find_by_name(pool, name)
             .await?
             .into_iter()
-            .filter(|l| l.name == name)
+            .filter(|l| l.instance_id == inst.id)
             .collect()
     } else {
-        Location::all(pool, false)
-            .await?
-            .into_iter()
-            .filter(|l| l.name == name)
-            .collect()
+        Location::find_by_name(pool, name).await?
     };
 
-    // Fetch all tunnels and filter by name.
-    let tun_matches: Vec<_> = Tunnel::all(pool)
-        .await?
-        .into_iter()
-        .filter(|t| t.name == name)
-        .collect();
+    let tun_matches = Tunnel::find_by_name(pool, name).await?;
 
     match (loc_matches.len(), tun_matches.len()) {
         (0, 0) => Err(CliError::NotFound(format!("'{name}' not found"))),

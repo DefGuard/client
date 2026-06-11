@@ -160,6 +160,28 @@ impl Location<Id> {
         Ok(result != 0)
     }
 
+    /// Find locations by name (excluding service locations).
+    /// Returns all matches — callers must handle cross-instance ambiguity.
+    pub async fn find_by_name<'e, E>(executor: E, name: &str) -> sqlx::Result<Vec<Self>>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let max = Self::get_service_location_mode_filter(false);
+        query_as!(
+            Self,
+            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
+            network_id, route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
+            service_location_mode \"service_location_mode: ServiceLocationMode\", \
+            mfa_method \"mfa_method: _\", posture_check_required \
+            FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
+            name,
+            max,
+        )
+        .fetch_all(executor)
+        .await
+    }
+
     pub async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,
