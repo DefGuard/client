@@ -10,7 +10,12 @@ type NavItemDef = LinkProps & {
   hidden?: boolean;
 };
 
-const BOTTOM_LINKS: NavItemDef[] = [];
+const BOTTOM_LINKS: NavItemDef[] = [
+  {
+    icon: IconKind.Report,
+    to: '/full/support',
+  },
+];
 
 export const FullViewNavigation = () => {
   const { isEmpty } = useAppData();

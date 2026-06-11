@@ -100,7 +100,7 @@ impl WindowManager {
             let _ = window.unminimize();
             window
         } else {
-            Self::build_full_window(app)?
+            Self::build_full_view_window(app)?
         };
         #[cfg(target_os = "macos")]
         let _ = app.set_dock_visibility(true);

@@ -18,6 +18,7 @@ import { Route as CompactIndexRouteImport } from './routes/compact/index'
 import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
+import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
@@ -66,6 +67,11 @@ const FullDefaultRoute = FullDefaultRouteImport.update({
   id: '/_default',
   getParentRoute: () => FullRoute,
 } as any)
+const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
   '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/support': typeof FullDefaultSupportRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/add/': typeof FullDefaultAddIndexRoute
 }
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
   '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/support': typeof FullDefaultSupportRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/add': typeof FullDefaultAddIndexRoute
 }
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
   '/full/_default/overview': typeof FullDefaultOverviewRoute
+  '/full/_default/support': typeof FullDefaultSupportRoute
   '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/_default/add/': typeof FullDefaultAddIndexRoute
 }
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/full/'
     | '/playground/'
     | '/full/overview'
+    | '/full/support'
     | '/full/add/instance'
     | '/full/add/'
   fileRoutesByTo: FileRoutesByTo
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/compact'
     | '/playground'
     | '/full/overview'
+    | '/full/support'
     | '/full/add/instance'
     | '/full/add'
   id:
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/full/'
     | '/playground/'
     | '/full/_default/overview'
+    | '/full/_default/support'
     | '/full/_default/add/instance'
     | '/full/_default/add/'
   fileRoutesById: FileRoutesById
@@ -237,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultRouteImport
       parentRoute: typeof FullRoute
     }
+    '/full/_default/support': {
+      id: '/full/_default/support'
+      path: '/support'
+      fullPath: '/full/support'
+      preLoaderRoute: typeof FullDefaultSupportRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/overview': {
       id: '/full/_default/overview'
       path: '/overview'
@@ -263,12 +282,14 @@ declare module '@tanstack/react-router' {
 
 interface FullDefaultRouteChildren {
   FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
+  FullDefaultSupportRoute: typeof FullDefaultSupportRoute
   FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
   FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
 }
 
 const FullDefaultRouteChildren: FullDefaultRouteChildren = {
   FullDefaultOverviewRoute: FullDefaultOverviewRoute,
+  FullDefaultSupportRoute: FullDefaultSupportRoute,
   FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
   FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
 }
