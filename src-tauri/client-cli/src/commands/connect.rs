@@ -7,7 +7,7 @@ use defguard_core::connection::{active_state::active_state, bring_up, Connection
 use crate::{
     mfa,
     mfa_code::CodeSource,
-    output::{self, ConnectOutput},
+    output::CommandOutput,
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
@@ -15,7 +15,6 @@ use crate::{
 #[allow(clippy::too_many_arguments)]
 pub async fn handle(
     state: &State,
-    json: bool,
     name: Option<&str>,
     tunnel: bool,
     id: Option<i64>,
@@ -25,7 +24,7 @@ pub async fn handle(
     mfa_method: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
-) -> Result<(), CliError> {
+) -> Result<ConnectResult, CliError> {
     #[cfg(target_os = "macos")]
     {
         return Err(CliError::Other(
@@ -61,15 +60,9 @@ pub async fn handle(
     };
     let active = active_state(&state.pool).await?;
     if active.iter().any(|c| c.target_id == target_id) {
-        output::emit(
-            &ConnectOutput {
-                connected: target_name.to_string(),
-                already: Some(true),
-                message: format!("Already connected to {target_name}"),
-            },
-            json,
-        );
-        return Ok(());
+        return Ok(ConnectResult::AlreadyConnected {
+            name: target_name.to_string(),
+        });
     }
 
     let (target_name, psk, mtu) = match &target {
@@ -144,14 +137,93 @@ pub async fn handle(
     };
     bring_up(conn_target, psk, mtu, &state.pool, routing_override).await?;
 
-    output::emit(
-        &ConnectOutput {
-            connected: target_name.clone(),
-            already: None,
-            message: format!("Connected to {target_name}"),
-        },
-        json,
-    );
+    Ok(ConnectResult::Connected { name: target_name })
+}
 
-    Ok(())
+pub enum ConnectResult {
+    /// A new connection was established.
+    Connected { name: String },
+    /// The target was already connected (idempotent).
+    AlreadyConnected { name: String },
+}
+
+impl CommandOutput for ConnectResult {
+    fn human(&self) -> String {
+        match self {
+            ConnectResult::Connected { name } => format!("Connected to {name}"),
+            ConnectResult::AlreadyConnected { name } => {
+                format!("Already connected to {name}")
+            }
+        }
+    }
+
+    fn json(&self) -> serde_json::Value {
+        match self {
+            ConnectResult::Connected { name } => serde_json::json!({
+                "connected": name,
+            }),
+            ConnectResult::AlreadyConnected { name } => serde_json::json!({
+                "connected": name,
+                "already": true,
+            }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_connected_human() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        assert_eq!(result.human(), "Connected to office");
+    }
+
+    #[test]
+    fn test_already_connected_human() {
+        let result = ConnectResult::AlreadyConnected {
+            name: "office".to_string(),
+        };
+        assert_eq!(result.human(), "Already connected to office");
+    }
+
+    #[test]
+    fn test_connected_json() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        let json = result.json();
+        assert_eq!(json["connected"], "office");
+        assert!(json["already"].is_null());
+    }
+
+    #[test]
+    fn test_already_connected_json() {
+        let result = ConnectResult::AlreadyConnected {
+            name: "office".to_string(),
+        };
+        let json = result.json();
+        assert_eq!(json["connected"], "office");
+        assert_eq!(json["already"], true);
+    }
+
+    #[test]
+    fn test_json_no_message_field() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        let json = result.json();
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_exit_code_zero() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        assert_eq!(result.exit_code(), 0);
+    }
 }

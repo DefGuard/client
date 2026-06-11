@@ -55,10 +55,9 @@ async fn main() -> ExitCode {
             mfa_method,
             all_traffic,
             predefined_traffic,
-        } => output::finish_legacy(
+        } => output::finish(
             connect::handle(
                 &state,
-                cli.json,
                 name.as_deref(),
                 tunnel,
                 id,

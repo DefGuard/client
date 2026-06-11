@@ -68,21 +68,6 @@ pub fn emit_error(err: &CliError, json: bool) {
     }
 }
 
-/// Output for the `connect` command.
-#[derive(Serialize)]
-pub struct ConnectOutput {
-    pub connected: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub already: Option<bool>,
-    pub message: String,
-}
-
-impl HumanRender for ConnectOutput {
-    fn render(&self) -> String {
-        self.message.clone()
-    }
-}
-
 /// Output for the `disconnect` command.
 #[derive(Serialize)]
 pub struct DisconnectOutput {
