@@ -14,6 +14,8 @@ use std::{
     time::Duration,
 };
 
+const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
+
 use block2::RcBlock;
 use defguard_client_common::dns_owned;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
