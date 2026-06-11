@@ -1,0 +1,33 @@
+.overview-location-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-lg) var(--spacing-md);
+  background: var(--c-saturated-dark-blue-20);
+  border-radius: 12px;
+
+  > * {
+    width: 100%;
+  }
+
+  > .header {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-md);
+
+    > .right {
+      margin-left: auto;
+    }
+
+    button {
+      min-height: 36px;
+    }
+  }
+
+  > .controls {
+    display: flex;
+    flex-flow: row nowrap;
+    column-gap: var(--spacing-5xl);
+  }
+}
