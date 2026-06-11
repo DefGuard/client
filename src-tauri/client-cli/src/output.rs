@@ -4,12 +4,6 @@ use serde::Serialize;
 
 use crate::{exit, state::CliError};
 
-/// Types that can render themselves for human-readable terminal output.
-pub trait HumanRender {
-    /// Produce a human-readable string (no trailing newline required).
-    fn render(&self) -> String;
-}
-
 /// Typed command output that owns both human and JSON representations.
 pub trait CommandOutput {
     /// Produce a human-readable string (no trailing newline required).
@@ -22,20 +16,8 @@ pub trait CommandOutput {
     }
 }
 
-/// Render a typed result as either JSON or human-readable output.
-pub fn emit<T: Serialize + HumanRender>(value: &T, json: bool) {
-    if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(value).unwrap_or_else(|e| format!("{{error: \"{e}\"}}"))
-        );
-    } else {
-        println!("{}", value.render());
-    }
-}
-
 /// Render a `CommandOutput` value as either JSON or human-readable output.
-pub fn emit_typed<T: CommandOutput>(value: &T, json: bool) {
+pub fn emit<T: CommandOutput>(value: &T, json: bool) {
     if json {
         println!(
             "{}",
@@ -128,23 +110,9 @@ pub fn finish<T: CommandOutput>(result: Result<T, CliError>, json: bool) -> Exit
     match result {
         Ok(output) => {
             let code = output.exit_code();
-            emit_typed(&output, json);
+            emit(&output, json);
             ExitCode::from(code)
         }
-        Err(err) => {
-            let code = exit::exit_code_for(&err);
-            emit_error(&err, json);
-            ExitCode::from(code)
-        }
-    }
-}
-
-/// Finalize a legacy `Result<(), CliError>`, emit errors if needed, and return
-/// the exit code.  Used for commands that have not yet been migrated to
-/// `CommandOutput`.
-pub fn finish_legacy(result: Result<(), CliError>, json: bool) -> ExitCode {
-    match result {
-        Ok(()) => ExitCode::from(0),
         Err(err) => {
             let code = exit::exit_code_for(&err);
             emit_error(&err, json);
