@@ -18,7 +18,16 @@ struct Win32EncryptableVolume {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AntiVirusProduct {
+    display_name: String,
     product_state: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename = "MSFT_MpComputerStatus")]
+#[serde(rename_all = "PascalCase")]
+struct MpComputerStatus {
+    antivirus_enabled: bool,
+    real_time_protection_enabled: bool,
 }
 
 #[derive(Deserialize)]
@@ -88,6 +97,21 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     Err(UnavailableReason::DetectionFailed)
 }
 
+fn antivirus_product_active(product_state: u32) -> bool {
+    (product_state & 0x0000_F000) == 0x0000_1000
+}
+
+fn defender_realtime_enabled() -> Result<bool, UnavailableReason> {
+    let conn = WMIConnection::with_namespace_path("root\\Microsoft\\Windows\\Defender")?;
+    let statuses: Vec<MpComputerStatus> = conn.query()?;
+    let status = statuses
+        .into_iter()
+        .next()
+        .ok_or(UnavailableReason::DetectionFailed)?;
+
+    Ok(status.antivirus_enabled && status.real_time_protection_enabled)
+}
+
 /// Determine AntiVirus status.
 ///
 /// Check manually in PowerShell:
@@ -95,12 +119,29 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
 ///
 /// Equivalent to PowerShell command:
 /// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
+///
+/// For third-party products, SecurityCenter2's `productState` indicates whether protection is
+/// active. Windows Defender can keep reporting an active product state even when real-time
+/// protection is disabled, so Defender is verified with `MSFT_MpComputerStatus`.
 pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
     let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
     let products: Vec<AntiVirusProduct> = conn.query()?;
-    Ok(products
-        .iter()
-        .any(|product| (product.product_state & 0x0000_F000) == 0x0000_1000))
+
+    for product in products {
+        if !antivirus_product_active(product.product_state) {
+            continue;
+        }
+
+        if product.display_name == "Windows Defender" {
+            if defender_realtime_enabled()? {
+                return Ok(true);
+            }
+        } else {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// Check if this machine is part of an Active Directory domain.
