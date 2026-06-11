@@ -5,5 +5,5 @@ export const Route = createFileRoute('/full/')({
 });
 
 function RouteComponent() {
-  return <Navigate to="/full/add" />;
+  return <Navigate to="/full/overview" />;
 }

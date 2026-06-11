@@ -23,7 +23,7 @@ export const FinishStep = () => {
             variant={ButtonVariant.Primary}
             text="Got it"
             onClick={() => {
-              navigate({ to: '/full/add', replace: true });
+              navigate({ to: '/full/overview', replace: true });
             }}
           />
         </div>
