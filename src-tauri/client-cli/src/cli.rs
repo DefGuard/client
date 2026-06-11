@@ -66,12 +66,12 @@ pub enum Commands {
         mfa_method: Option<String>,
 
         /// Override route-all-traffic for this connection only.
-        #[arg(long, overrides_with = "no_all_traffic")]
+        #[arg(long, overrides_with = "predefined_traffic")]
         all_traffic: bool,
 
         /// Do not route all traffic (overrides location default).
         #[arg(long, overrides_with = "all_traffic")]
-        no_all_traffic: bool,
+        predefined_traffic: bool,
     },
 
     /// Disconnect from a location or tunnel.

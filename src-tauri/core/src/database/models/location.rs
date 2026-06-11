@@ -296,6 +296,7 @@ impl Location<Id> {
         interface_name: String,
         preshared_key: Option<String>,
         mtu: Option<u32>,
+        route_all_traffic: Option<bool>,
     ) -> Result<InterfaceConfiguration, Error> {
         use crate::database::models::instance::{ClientTrafficPolicy, Instance};
 
@@ -337,7 +338,7 @@ impl Location<Id> {
         let route_all_traffic = match instance.client_traffic_policy {
             ClientTrafficPolicy::ForceAllTraffic => true,
             ClientTrafficPolicy::DisableAllTraffic => false,
-            ClientTrafficPolicy::None => self.route_all_traffic,
+            ClientTrafficPolicy::None => route_all_traffic.unwrap_or(self.route_all_traffic),
         };
         let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");

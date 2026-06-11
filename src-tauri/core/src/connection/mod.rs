@@ -35,22 +35,23 @@ pub async fn bring_up(
     psk: Option<String>,
     mtu: Option<u32>,
     pool: &DbPool,
+    route_all_traffic: Option<bool>,
 ) -> Result<String, Error> {
     #[cfg(not(target_os = "macos"))]
     {
         match target {
             ConnectionTarget::Location(loc) => {
-                setup::setup_interface(loc, &loc.name, psk, mtu, pool).await
+                setup::setup_interface(loc, &loc.name, psk, mtu, pool, route_all_traffic).await
             }
             ConnectionTarget::Tunnel(tun) => {
-                setup::setup_interface_tunnel(tun, &tun.name, mtu).await
+                setup::setup_interface_tunnel(tun, &tun.name, mtu, route_all_traffic).await
             }
         }
     }
 
     #[cfg(target_os = "macos")]
     {
-        let _ = (target, psk, mtu, pool);
+        let _ = (target, psk, mtu, pool, route_all_traffic);
         Err(Error::BackendUnavailable(
             "VPN connection management is not yet supported on macOS from the CLI. \
              Use the desktop client."

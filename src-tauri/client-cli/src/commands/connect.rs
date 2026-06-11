@@ -24,7 +24,7 @@ pub async fn handle(
     code_command: Option<&str>,
     mfa_method: Option<&str>,
     all_traffic: bool,
-    no_all_traffic: bool,
+    predefined_traffic: bool,
 ) -> Result<(), CliError> {
     #[cfg(target_os = "macos")]
     {
@@ -35,12 +35,15 @@ pub async fn handle(
         ));
     }
 
-    // Per-call routing overrides are not yet supported.
-    if all_traffic || no_all_traffic {
-        return Err(CliError::Usage(
-            "--all-traffic / --no-all-traffic per-call override is not yet supported.".into(),
-        ));
-    }
+    // Per-call routing override: --all-traffic = true, --predefined-traffic = false,
+    // neither = None (use the location/tunnel default).
+    let routing_override: Option<bool> = if all_traffic {
+        Some(true)
+    } else if predefined_traffic {
+        Some(false)
+    } else {
+        None
+    };
 
     let spec = TargetSpec {
         name: name.map(String::from),
@@ -139,7 +142,7 @@ pub async fn handle(
         ResolvedTarget::Location(loc) => ConnectionTarget::Location(loc),
         ResolvedTarget::Tunnel(tun) => ConnectionTarget::Tunnel(tun),
     };
-    bring_up(conn_target, psk, mtu, &state.pool).await?;
+    bring_up(conn_target, psk, mtu, &state.pool, routing_override).await?;
 
     output::emit(
         &ConnectOutput {

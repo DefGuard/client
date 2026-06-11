@@ -61,7 +61,7 @@ pub(crate) async fn setup_interface(
     mtu: Option<u32>,
     pool: &DbPool,
 ) -> Result<String, Error> {
-    crate::connection::setup::setup_interface(location, name, preshared_key, mtu, pool).await
+    crate::connection::setup::setup_interface(location, name, preshared_key, mtu, pool, None).await
 }
 
 #[cfg(target_os = "macos")]
