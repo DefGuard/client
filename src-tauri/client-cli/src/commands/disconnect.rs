@@ -15,6 +15,15 @@ pub async fn handle(
     instance: Option<&str>,
     all: bool,
 ) -> Result<(), CliError> {
+    #[cfg(target_os = "macos")]
+    {
+        return Err(CliError::Other(
+            "VPN connection management is not yet supported on macOS from the CLI. \
+             Use the desktop client."
+                .into(),
+        ));
+    }
+
     if all {
         // Disconnect all currently-active connections.
         let active = active_state(&state.pool).await?;

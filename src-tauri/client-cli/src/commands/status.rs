@@ -6,6 +6,20 @@ use crate::{
 };
 
 pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
+    #[cfg(target_os = "macos")]
+    {
+        output::emit(
+            &StatusOutput {
+                active: vec![],
+                message: "Connection status is not yet supported on macOS from the CLI. \
+                     Use the desktop client."
+                    .into(),
+            },
+            json,
+        );
+        return Ok(());
+    }
+
     let connections = active_state(&state.pool).await?;
 
     // Build typed entries.

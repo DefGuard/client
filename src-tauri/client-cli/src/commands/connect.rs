@@ -26,6 +26,15 @@ pub async fn handle(
     all_traffic: bool,
     no_all_traffic: bool,
 ) -> Result<(), CliError> {
+    #[cfg(target_os = "macos")]
+    {
+        return Err(CliError::Other(
+            "VPN connection management is not yet supported on macOS from the CLI. \
+             Use the desktop client."
+                .into(),
+        ));
+    }
+
     // Per-call routing overrides are not yet supported.
     if all_traffic || no_all_traffic {
         return Err(CliError::Usage(
