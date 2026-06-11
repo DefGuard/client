@@ -83,19 +83,6 @@ impl HumanRender for ListOutput {
     }
 }
 
-/// Output for the `status` command.
-#[derive(Serialize)]
-pub struct StatusOutput {
-    pub active: Vec<ActiveEntry>,
-    pub message: String,
-}
-
-impl HumanRender for StatusOutput {
-    fn render(&self) -> String {
-        self.message.clone()
-    }
-}
-
 /// Output for the `connect` command.
 #[derive(Serialize)]
 pub struct ConnectOutput {

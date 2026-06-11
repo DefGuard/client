@@ -44,7 +44,7 @@ async fn main() -> ExitCode {
     // Dispatch command.
     match cli.command {
         Commands::List => output::finish_legacy(list::handle(&state, cli.json).await, cli.json),
-        Commands::Status => output::finish_legacy(status::handle(&state, cli.json).await, cli.json),
+        Commands::Status => output::finish(status::handle(&state).await, cli.json),
         Commands::Connect {
             name,
             tunnel,

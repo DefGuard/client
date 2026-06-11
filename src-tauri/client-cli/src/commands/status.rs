@@ -1,56 +1,60 @@
 use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
 
 use crate::{
-    output::{self, ActiveEntry, StatusOutput},
+    output::{ActiveEntry, CommandOutput},
     state::{CliError, State},
 };
 
-pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
+pub async fn handle(state: &State) -> Result<StatusResult, CliError> {
     #[cfg(target_os = "macos")]
     {
-        output::emit(
-            &StatusOutput {
-                active: vec![],
-                message: "Connection status is not yet supported on macOS from the CLI. \
-                     Use the desktop client."
-                    .into(),
-            },
-            json,
-        );
-        return Ok(());
+        return Ok(StatusResult {
+            connections: vec![],
+        });
     }
 
     let connections = active_state(&state.pool).await?;
+    Ok(StatusResult { connections })
+}
 
-    // Build typed entries.
-    let entries: Vec<ActiveEntry> = connections
-        .iter()
-        .map(|c| ActiveEntry {
-            connection_type: c.connection_type.to_string(),
-            name: c.name.clone(),
-            interface: c.interface_name.clone(),
-            listen_port: c.stats.as_ref().map(|s| s.listen_port),
-            tx_bytes: c.stats.as_ref().map(|s| s.tx_bytes),
-            rx_bytes: c.stats.as_ref().map(|s| s.rx_bytes),
-            last_handshake_secs: c.stats.as_ref().and_then(|s| s.last_handshake),
-        })
-        .collect();
+pub struct StatusResult {
+    pub connections: Vec<ActiveConnectionInfo>,
+}
 
-    let message = if connections.is_empty() {
-        "No active connections.".to_string()
-    } else {
-        format_status_table(&connections)
-    };
+impl CommandOutput for StatusResult {
+    fn human(&self) -> String {
+        #[cfg(target_os = "macos")]
+        {
+            return "Connection status is not yet supported on macOS from the CLI. \
+                    Use the desktop client."
+                .to_string();
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            if self.connections.is_empty() {
+                "No active connections.".to_string()
+            } else {
+                format_status_table(&self.connections)
+            }
+        }
+    }
 
-    output::emit(
-        &StatusOutput {
-            active: entries,
-            message,
-        },
-        json,
-    );
-
-    Ok(())
+    fn json(&self) -> serde_json::Value {
+        let active: Vec<ActiveEntry> = self
+            .connections
+            .iter()
+            .map(|c| ActiveEntry {
+                connection_type: c.connection_type.to_string(),
+                name: c.name.clone(),
+                interface: c.interface_name.clone(),
+                listen_port: c.stats.as_ref().map(|s| s.listen_port),
+                tx_bytes: c.stats.as_ref().map(|s| s.tx_bytes),
+                rx_bytes: c.stats.as_ref().map(|s| s.rx_bytes),
+                last_handshake_secs: c.stats.as_ref().and_then(|s| s.last_handshake),
+            })
+            .collect();
+        serde_json::json!({ "active": active })
+    }
 }
 
 /// Build a human-readable status table string.
@@ -140,5 +144,125 @@ fn format_handshake(secs: u64) -> String {
         format!("{}h ago", secs / 3600)
     } else {
         format!("{}d ago", secs / 86400)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use defguard_core::{connection::active_state::InterfaceStats, ConnectionType};
+
+    fn make_conn(
+        name: &str,
+        iface: &str,
+        stats: Option<InterfaceStats>,
+        conn_type: ConnectionType,
+    ) -> ActiveConnectionInfo {
+        ActiveConnectionInfo {
+            connection_type: conn_type,
+            target_id: 1,
+            name: name.to_string(),
+            interface_name: iface.to_string(),
+            stats,
+        }
+    }
+
+    #[test]
+    fn test_human_empty() {
+        let result = StatusResult {
+            connections: vec![],
+        };
+        let s = result.human();
+        if cfg!(target_os = "macos") {
+            assert!(s.contains("not yet supported on macOS"));
+        } else {
+            assert!(s.contains("No active connections"));
+        }
+    }
+
+    #[test]
+    fn test_human_with_connections() {
+        let result = StatusResult {
+            connections: vec![make_conn(
+                "office",
+                "wg0",
+                Some(InterfaceStats {
+                    listen_port: 51820,
+                    tx_bytes: 1024,
+                    rx_bytes: 2048,
+                    last_handshake: Some(1700000000),
+                }),
+                ConnectionType::Location,
+            )],
+        };
+        let s = result.human();
+        if !cfg!(target_os = "macos") {
+            assert!(s.contains("office"));
+            assert!(s.contains("wg0"));
+            assert!(s.contains("1.0 KiB"));
+            assert!(s.contains("2.0 KiB"));
+        }
+    }
+
+    #[test]
+    fn test_json_empty() {
+        let result = StatusResult {
+            connections: vec![],
+        };
+        let json = result.json();
+        assert_eq!(json["active"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_json_with_connections() {
+        let result = StatusResult {
+            connections: vec![
+                make_conn(
+                    "office",
+                    "wg0",
+                    Some(InterfaceStats {
+                        listen_port: 51820,
+                        tx_bytes: 1024,
+                        rx_bytes: 2048,
+                        last_handshake: Some(1700000000),
+                    }),
+                    ConnectionType::Location,
+                ),
+                make_conn("data-center", "wg1", None, ConnectionType::Tunnel),
+            ],
+        };
+        let json = result.json();
+        let active = json["active"].as_array().unwrap();
+        assert_eq!(active.len(), 2);
+
+        assert_eq!(active[0]["name"], "office");
+        assert_eq!(active[0]["connection_type"], "location");
+        assert_eq!(active[0]["interface"], "wg0");
+        assert_eq!(active[0]["listen_port"], 51820);
+        assert_eq!(active[0]["tx_bytes"], 1024);
+        assert_eq!(active[0]["rx_bytes"], 2048);
+        assert_eq!(active[0]["last_handshake_secs"], 1700000000);
+
+        assert_eq!(active[1]["name"], "data-center");
+        assert_eq!(active[1]["connection_type"], "tunnel");
+        assert_eq!(active[1]["interface"], "wg1");
+        assert!(active[1]["listen_port"].is_null());
+    }
+
+    #[test]
+    fn test_json_no_message_field() {
+        let result = StatusResult {
+            connections: vec![],
+        };
+        let json = result.json();
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_exit_code_zero() {
+        let result = StatusResult {
+            connections: vec![],
+        };
+        assert_eq!(result.exit_code(), 0);
     }
 }
