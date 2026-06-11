@@ -531,17 +531,20 @@ impl DesktopDaemonService for DaemonService {
         };
         let interfaces: Vec<ManagedInterfaceData> = wgapis_map
             .iter()
-            .filter_map(|(ifname, wgapi)| match wgapi.read_interface_data() {
+            .map(|(ifname, wgapi)| match wgapi.read_interface_data() {
                 Ok(host) => {
                     debug!("ListInterfaces: returning data for {ifname}");
-                    Some(ManagedInterfaceData {
+                    ManagedInterfaceData {
                         interface_name: ifname.clone(),
                         data: Some(host.into()),
-                    })
+                    }
                 }
                 Err(err) => {
                     error!("ListInterfaces: failed to read data for {ifname}: {err}");
-                    None
+                    ManagedInterfaceData {
+                        interface_name: ifname.clone(),
+                        data: None,
+                    }
                 }
             })
             .collect();

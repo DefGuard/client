@@ -17,11 +17,17 @@ use defguard_client_proto::defguard::client::v1::desktop_daemon_service_client::
 #[cfg(unix)]
 const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 
-/// Returns the daemon socket path, respecting the `DEFGUARD_DAEMON_SOCKET`
-/// environment variable override (useful for testing).
+/// Returns the daemon socket path.  In test/debug builds the
+/// `DEFGUARD_DAEMON_SOCKET` environment variable can override the default
+/// (useful for integration tests).  In release builds the override is
+/// disabled to prevent an undocumented channel-redirection surface.
 #[cfg(unix)]
 pub fn daemon_socket_path() -> String {
-    std::env::var("DEFGUARD_DAEMON_SOCKET").unwrap_or_else(|_| DAEMON_SOCKET_PATH.to_string())
+    #[cfg(any(test, debug_assertions))]
+    if let Ok(path) = std::env::var("DEFGUARD_DAEMON_SOCKET") {
+        return path;
+    }
+    DAEMON_SOCKET_PATH.to_string()
 }
 #[cfg(windows)]
 const PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";

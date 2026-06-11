@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
 
 use crate::{
-    output,
+    output::{self, InstanceEntry, ListOutput, LocationEntry, TunnelEntry},
     state::{CliError, State},
 };
 
@@ -16,31 +16,35 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
     let instance_names: HashMap<Id, String> =
         instances.iter().map(|i| (i.id, i.name.clone())).collect();
 
-    // --- JSON entries ---
-    let inst_json: Vec<serde_json::Value> = instances
+    // --- Typed entries ---
+    let inst_entries: Vec<InstanceEntry> = instances
         .iter()
-        .map(|i| serde_json::json!({ "name": i.name, "url": i.url }))
-        .collect();
-
-    let loc_json: Vec<serde_json::Value> = locations
-        .iter()
-        .map(|l| {
-            serde_json::json!({
-                "name": l.name,
-                "instance": instance_names.get(&l.instance_id).map(|n| n.as_str()).unwrap_or("?"),
-                "address": l.address,
-                "endpoint": l.endpoint,
-                "mfa_enabled": l.mfa_enabled(),
-                "route_all_traffic": l.route_all_traffic,
-            })
+        .map(|i| InstanceEntry {
+            name: i.name.clone(),
+            url: i.url.clone(),
         })
         .collect();
 
-    let tun_json: Vec<serde_json::Value> = tunnels
+    let loc_entries: Vec<LocationEntry> = locations
         .iter()
-        .map(
-            |t| serde_json::json!({ "name": t.name, "address": t.address, "endpoint": t.endpoint }),
-        )
+        .map(|l| LocationEntry {
+            name: l.name.clone(),
+            instance: instance_names.get(&l.instance_id).cloned(),
+            address: l.address.clone(),
+            endpoint: l.endpoint.clone(),
+            mfa_enabled: Some(l.mfa_enabled()),
+            mfa_method: None,
+            route_all_traffic: Some(l.route_all_traffic),
+        })
+        .collect();
+
+    let tun_entries: Vec<TunnelEntry> = tunnels
+        .iter()
+        .map(|t| TunnelEntry {
+            name: t.name.clone(),
+            address: t.address.clone(),
+            endpoint: t.endpoint.clone(),
+        })
         .collect();
 
     // --- Human message ---
@@ -51,12 +55,12 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
     };
 
     output::emit(
-        &serde_json::json!({
-            "instances": inst_json,
-            "locations": loc_json,
-            "tunnels": tun_json,
-            "message": message,
-        }),
+        &ListOutput {
+            instances: inst_entries,
+            locations: loc_entries,
+            tunnels: tun_entries,
+            message,
+        },
         json,
     );
 

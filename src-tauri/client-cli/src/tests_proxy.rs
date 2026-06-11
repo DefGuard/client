@@ -6,6 +6,8 @@
 
 use std::net::SocketAddr;
 
+use secrecy::ExposeSecret;
+
 use defguard_core::database::models::{Id, NoId};
 
 use crate::{mfa, mfa_code::CodeSource, state::CliError};
@@ -155,7 +157,7 @@ async fn test_mfa_success_returns_psk(pool: DbPool) {
     let psk = mfa::authorize(&loc, &source, &inst, None, None, &pool)
         .await
         .unwrap();
-    assert_eq!(psk, "secret-psk");
+    assert_eq!(psk.expose_secret(), "secret-psk");
 }
 
 #[sqlx::test(migrations = "../migrations")]

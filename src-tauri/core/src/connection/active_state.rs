@@ -54,6 +54,7 @@ pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Er
 
     #[cfg(target_os = "macos")]
     {
+        log::warn!("active_state: macOS Network Extension enumeration not yet implemented; returning empty list");
         // Stub: NE-based enumeration pending the macOS spike.
         let _ = pool;
         Ok(Vec::new())

@@ -7,7 +7,7 @@ use defguard_core::database::models::{
 };
 
 use crate::{
-    output,
+    output::{self, LocationEntry, LocationListOutput, LocationSetOutput, LocationShowOutput},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
@@ -27,17 +27,16 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
         map
     };
 
-    let entries: Vec<serde_json::Value> = locations
+    let entries: Vec<LocationEntry> = locations
         .iter()
-        .map(|l| {
-            serde_json::json!({
-                "name": l.name,
-                "address": l.address,
-                "endpoint": l.endpoint,
-                "instance": instance_names.get(&l.instance_id).map(|n| n.as_str()).unwrap_or("?"),
-                "mfa_method": mfa_label(l.mfa_method),
-                "route_all_traffic": l.route_all_traffic,
-            })
+        .map(|l| LocationEntry {
+            name: l.name.clone(),
+            instance: instance_names.get(&l.instance_id).cloned(),
+            address: l.address.clone(),
+            endpoint: l.endpoint.clone(),
+            mfa_enabled: None,
+            mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+            route_all_traffic: Some(l.route_all_traffic),
         })
         .collect();
 
@@ -90,7 +89,10 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
     };
 
     output::emit(
-        &serde_json::json!({ "locations": entries, "message": message }),
+        &LocationListOutput {
+            locations: entries,
+            message,
+        },
         json,
     );
 
@@ -144,7 +146,11 @@ pub async fn handle_set(
     };
 
     output::emit(
-        &serde_json::json!({ "location": name, "changes": changed, "message": message }),
+        &LocationSetOutput {
+            location: name.to_string(),
+            changes: changed,
+            message,
+        },
         json,
     );
 
@@ -194,18 +200,18 @@ pub async fn handle_show(
     };
 
     output::emit(
-        &serde_json::json!({
-            "name": location.name,
-            "address": location.address,
-            "endpoint": location.endpoint,
-            "pubkey": location.pubkey,
-            "allowed_ips": location.allowed_ips,
-            "dns": location.dns,
-            "mfa_method": mfa,
-            "route_all_traffic": location.route_all_traffic,
-            "keepalive_interval": location.keepalive_interval,
-            "message": message,
-        }),
+        &LocationShowOutput {
+            name: location.name.clone(),
+            address: location.address.clone(),
+            endpoint: location.endpoint.clone(),
+            pubkey: location.pubkey.clone(),
+            allowed_ips: location.allowed_ips.clone(),
+            dns: location.dns.clone(),
+            mfa_method: mfa.to_string(),
+            route_all_traffic: location.route_all_traffic,
+            keepalive_interval: location.keepalive_interval,
+            message,
+        },
         json,
     );
 

@@ -1,7 +1,7 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
 
 use crate::{
-    output,
+    output::{self, DisconnectOutput, DisconnectedResult},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
@@ -21,7 +21,12 @@ pub async fn handle(
 
         if active.is_empty() {
             output::emit(
-                &serde_json::json!({ "disconnected": [], "message": "No active connections." }),
+                &DisconnectOutput {
+                    disconnected: Some(DisconnectedResult::List(vec![])),
+                    interface: None,
+                    errors: vec![],
+                    message: Some("No active connections.".into()),
+                },
                 json,
             );
             return Ok(());
@@ -50,18 +55,19 @@ pub async fn handle(
         }
 
         output::emit(
-            &serde_json::json!({
-                "disconnected": disconnected,
-                "errors": errors,
-            }),
+            &DisconnectOutput {
+                disconnected: Some(DisconnectedResult::List(disconnected)),
+                interface: None,
+                errors,
+                message: None,
+            },
             json,
         );
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(CliError::Other(errors.join("; ")))
-        }
+        // Always Ok: the emitted JSON already contains per-item success/error
+        // details. Returning Err would cause a second JSON error doc on stdout
+        // when --json is active, breaking single-document consumers.
+        Ok(())
     } else {
         // No-arg disconnect: if exactly one connection is active, disconnect it.
         if name.is_none() && !tunnel && id.is_none() && instance.is_none() {
@@ -70,7 +76,12 @@ pub async fn handle(
             match active.len() {
                 0 => {
                     output::emit(
-                        &serde_json::json!({ "disconnected": null, "message": "No active connections." }),
+                        &DisconnectOutput {
+                            disconnected: None,
+                            interface: None,
+                            errors: vec![],
+                            message: Some("No active connections.".into()),
+                        },
                         json,
                     );
                     return Ok(());
@@ -84,11 +95,12 @@ pub async fn handle(
                     );
                     tear_down(conn, &state.pool).await?;
                     output::emit(
-                        &serde_json::json!({
-                            "disconnected": name,
-                            "interface": ifname,
-                            "message": format!("Disconnected from {name} ({ifname})"),
-                        }),
+                        &DisconnectOutput {
+                            disconnected: Some(DisconnectedResult::Single(name.clone())),
+                            interface: Some(ifname.clone()),
+                            errors: vec![],
+                            message: Some(format!("Disconnected from {name} ({ifname})")),
+                        },
                         json,
                     );
                     return Ok(());
@@ -134,11 +146,12 @@ pub async fn handle(
         tear_down(connection, &state.pool).await?;
 
         output::emit(
-            &serde_json::json!({
-                "disconnected": target_name,
-                "interface": ifname,
-                "message": format!("Disconnected from {target_name} ({ifname})"),
-            }),
+            &DisconnectOutput {
+                disconnected: Some(DisconnectedResult::Single(target_name.clone())),
+                interface: Some(ifname.clone()),
+                errors: vec![],
+                message: Some(format!("Disconnected from {target_name} ({ifname})")),
+            },
             json,
         );
 

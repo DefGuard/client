@@ -3,6 +3,11 @@ pub mod active_state;
 pub mod daemon_client;
 pub mod setup;
 
+#[cfg(target_os = "macos")]
+pub mod apple;
+
+#[cfg(target_os = "macos")]
+pub use apple::sync_locations_and_tunnels;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]
 pub use setup::{setup_interface, setup_interface_tunnel};

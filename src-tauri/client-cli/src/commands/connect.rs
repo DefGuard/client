@@ -1,11 +1,13 @@
 use std::io::IsTerminal;
 
+use secrecy::ExposeSecret;
+
 use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
 
 use crate::{
     mfa,
     mfa_code::CodeSource,
-    output,
+    output::{self, ConnectOutput},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
@@ -48,7 +50,11 @@ pub async fn handle(
     let active = active_state(&state.pool).await?;
     if active.iter().any(|c| c.target_id == target_id) {
         output::emit(
-            &serde_json::json!({ "connected": target_name, "already": true, "message": format!("Already connected to {target_name}") }),
+            &ConnectOutput {
+                connected: target_name.to_string(),
+                already: Some(true),
+                message: format!("Already connected to {target_name}"),
+            },
             json,
         );
         return Ok(());
@@ -97,7 +103,11 @@ pub async fn handle(
                 let psk =
                     mfa::authorize(loc, &source, &inst, mfa_method, posture_data, &state.pool)
                         .await?;
-                (loc.name.clone(), Some(psk), state.app_config.mtu())
+                (
+                    loc.name.clone(),
+                    Some(psk.expose_secret().to_string()),
+                    state.app_config.mtu(),
+                )
             } else if loc.posture_check_required {
                 // Posture only (no MFA).
                 let psk = defguard_client_posture::authorize_posture_session(loc)
@@ -123,7 +133,11 @@ pub async fn handle(
     bring_up(conn_target, psk, mtu, &state.pool).await?;
 
     output::emit(
-        &serde_json::json!({ "connected": target_name, "message": format!("Connected to {target_name}") }),
+        &ConnectOutput {
+            connected: target_name.clone(),
+            already: None,
+            message: format!("Connected to {target_name}"),
+        },
         json,
     );
 

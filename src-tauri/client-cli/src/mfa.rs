@@ -12,12 +12,18 @@ use defguard_client_proto::defguard::{
 };
 use defguard_core::{
     database::{
-        models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
+        models::{
+            instance::Instance,
+            location::{infer_mfa_method, Location, LocationMfaMethod},
+            wireguard_keys::WireguardKeys,
+            Id,
+        },
         DbPool,
     },
     proxy::post_with_headers,
 };
 use reqwest::{StatusCode, Url};
+use secrecy::SecretString;
 use serde::Deserialize;
 
 use crate::{
@@ -35,7 +41,8 @@ use crate::{
 /// * `posture_data` — device posture data; must be provided when the location also
 ///   requires posture checks.
 ///
-/// Returns the WireGuard preshared key that must be passed to `bring_up`.
+/// Returns the WireGuard preshared key (as a [`SecretString`]) that must
+/// be passed to `bring_up`.
 pub async fn authorize(
     location: &Location<Id>,
     source: &CodeSource,
@@ -43,7 +50,7 @@ pub async fn authorize(
     method_override: Option<&str>,
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
-) -> Result<String, CliError> {
+) -> Result<SecretString, CliError> {
     let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?
@@ -136,7 +143,7 @@ pub async fn authorize(
         .map_err(|e| CliError::Other(format!("Invalid MFA finish response: {e}")))?;
 
     tracing::info!("MFA session completed, preshared key obtained");
-    Ok(finish_resp.preshared_key)
+    Ok(SecretString::from(finish_resp.preshared_key))
 }
 
 /// Map a non-2xx MFA response to a `CliError`.
@@ -178,21 +185,23 @@ fn parse_method(raw: &str) -> Result<MfaMethod, CliError> {
 }
 
 /// Determine the MFA method to use for a location.
+///
+/// Delegates to the core's [`infer_mfa_method`] so that
+/// [`LocationMfaMode`] is respected - an External-mode location always
+/// uses OIDC, while an Internal-mode location respects the stored
+/// preference (defaulting to TOTP when unset).
 fn infer_method(location: &Location<Id>) -> MfaMethod {
-    match location.mfa_method {
-        Some(defguard_core::database::models::location::LocationMfaMethod::Totp) => MfaMethod::Totp,
-        Some(defguard_core::database::models::location::LocationMfaMethod::Email) => {
-            MfaMethod::Email
-        }
-        Some(defguard_core::database::models::location::LocationMfaMethod::Oidc) => MfaMethod::Oidc,
-        Some(defguard_core::database::models::location::LocationMfaMethod::Biometric) => {
-            MfaMethod::Biometric
-        }
-        Some(defguard_core::database::models::location::LocationMfaMethod::MobileApprove) => {
-            MfaMethod::MobileApprove
-        }
+    let method = infer_mfa_method(location.location_mfa_mode, location.mfa_method);
+    match method {
+        Some(LocationMfaMethod::Totp) => MfaMethod::Totp,
+        Some(LocationMfaMethod::Email) => MfaMethod::Email,
+        Some(LocationMfaMethod::Oidc) => MfaMethod::Oidc,
+        Some(LocationMfaMethod::Biometric) => MfaMethod::Biometric,
+        Some(LocationMfaMethod::MobileApprove) => MfaMethod::MobileApprove,
         None => {
-            // Default: if MFA is enabled but no method is stored, assume TOTP.
+            // `infer_mfa_method` only returns None for Disabled mode, but
+            // this function is only called when `mfa_enabled()` is true.
+            // Default to TOTP as a safe fallback.
             MfaMethod::Totp
         }
     }

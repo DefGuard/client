@@ -1,26 +1,24 @@
 use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
 
 use crate::{
-    output,
+    output::{self, ActiveEntry, StatusOutput},
     state::{CliError, State},
 };
 
 pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
     let connections = active_state(&state.pool).await?;
 
-    // Build JSON entries.
-    let entries: Vec<serde_json::Value> = connections
+    // Build typed entries.
+    let entries: Vec<ActiveEntry> = connections
         .iter()
-        .map(|c| {
-            serde_json::json!({
-                "connection_type": c.connection_type.to_string(),
-                "name": c.name,
-                "interface": c.interface_name,
-                "listen_port": c.stats.as_ref().map(|s| s.listen_port),
-                "tx_bytes": c.stats.as_ref().map(|s| s.tx_bytes),
-                "rx_bytes": c.stats.as_ref().map(|s| s.rx_bytes),
-                "last_handshake_secs": c.stats.as_ref().and_then(|s| s.last_handshake),
-            })
+        .map(|c| ActiveEntry {
+            connection_type: c.connection_type.to_string(),
+            name: c.name.clone(),
+            interface: c.interface_name.clone(),
+            listen_port: c.stats.as_ref().map(|s| s.listen_port),
+            tx_bytes: c.stats.as_ref().map(|s| s.tx_bytes),
+            rx_bytes: c.stats.as_ref().map(|s| s.rx_bytes),
+            last_handshake_secs: c.stats.as_ref().and_then(|s| s.last_handshake),
         })
         .collect();
 
@@ -31,7 +29,10 @@ pub async fn handle(state: &State, json: bool) -> Result<(), CliError> {
     };
 
     output::emit(
-        &serde_json::json!({ "active": entries, "message": message }),
+        &StatusOutput {
+            active: entries,
+            message,
+        },
         json,
     );
 

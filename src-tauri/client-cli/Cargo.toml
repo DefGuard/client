@@ -19,7 +19,7 @@ defguard_core = { package = "defguard-client-core", path = "../core" }
 defguard_client_posture = { package = "defguard-client-posture", path = "../enterprise/posture" }
 defguard_client_proto = { package = "defguard-client-proto", path = "../client-proto" }
 reqwest.workspace = true
-secrecy = "0.10"
+secrecy.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 sqlx.workspace = true

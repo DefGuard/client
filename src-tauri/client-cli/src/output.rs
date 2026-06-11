@@ -41,136 +41,182 @@ pub fn emit_error(err: &CliError, json: bool) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// HumanRender impl for serde_json::Value — handles all the ad-hoc
-// json!({ ... }) structs the commands currently build.
-// ---------------------------------------------------------------------------
+/// Output for the `list` command.
+#[derive(Serialize)]
+pub struct ListOutput {
+    pub instances: Vec<InstanceEntry>,
+    pub locations: Vec<LocationEntry>,
+    pub tunnels: Vec<TunnelEntry>,
+    pub message: String,
+}
 
-impl HumanRender for serde_json::Value {
+impl HumanRender for ListOutput {
     fn render(&self) -> String {
-        match self {
-            // Top-level object with a single "message" key: just the message.
-            serde_json::Value::Object(map) if map.len() == 1 && map.contains_key("message") => {
-                map["message"].to_string().trim_matches('"').to_string()
-            }
-            other => render_value(other, 0),
-        }
+        self.message.clone()
     }
 }
 
-/// Recursive renderer with indentation for nested objects/arrays.
-fn render_value(value: &serde_json::Value, indent: usize) -> String {
-    let prefix = " ".repeat(indent);
-    match value {
-        serde_json::Value::Null => format!("{prefix}null"),
-        serde_json::Value::Bool(b) => format!("{prefix}{b}"),
-        serde_json::Value::Number(n) => format!("{prefix}{n}"),
-        serde_json::Value::String(s) => format!("{prefix}{s}"),
-        serde_json::Value::Array(arr) => {
-            if arr.is_empty() {
-                return String::new();
-            }
-            // If all items are strings, join them.
-            if arr.iter().all(|v| v.is_string()) {
-                return arr
-                    .iter()
-                    .map(|v| v.as_str().unwrap_or(""))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-            }
-            // Otherwise render each item.
-            let inner: Vec<_> = arr.iter().map(|v| render_value(v, indent)).collect();
-            inner.join("\n")
-        }
-        serde_json::Value::Object(map) => {
-            let mut lines = Vec::new();
-            for (key, val) in map {
-                match val {
-                    serde_json::Value::Array(items) if !items.is_empty() => {
-                        if let Some(table) = render_table(key, items) {
-                            lines.push(table);
-                            continue;
-                        }
-                    }
-                    _ => {}
-                }
-                if val.is_object() {
-                    lines.push(render_value(val, indent));
-                } else if !val.is_array() {
-                    lines.push(format!(
-                        "{prefix}{}: {}",
-                        key,
-                        render_value(val, indent + key.len() + 2).trim_start()
-                    ));
-                }
-            }
-            lines.join("\n")
-        }
+/// Output for the `status` command.
+#[derive(Serialize)]
+pub struct StatusOutput {
+    pub active: Vec<ActiveEntry>,
+    pub message: String,
+}
+
+impl HumanRender for StatusOutput {
+    fn render(&self) -> String {
+        self.message.clone()
     }
 }
 
-/// Attempt to render a homogeneous array of objects as a compact table.
-/// Returns `None` if the items aren't all objects with consistent keys.
-fn render_table(label: &str, items: &[serde_json::Value]) -> Option<String> {
-    let rows: Vec<&serde_json::Map<String, serde_json::Value>> =
-        items.iter().filter_map(|v| v.as_object()).collect();
-    if rows.len() != items.len() || rows.is_empty() {
-        return None;
+/// Output for the `connect` command.
+#[derive(Serialize)]
+pub struct ConnectOutput {
+    pub connected: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub already: Option<bool>,
+    pub message: String,
+}
+
+impl HumanRender for ConnectOutput {
+    fn render(&self) -> String {
+        self.message.clone()
     }
+}
 
-    // Collect column keys from the first row.
-    let keys: Vec<&String> = rows[0].keys().collect();
+/// Output for the `disconnect` command.
+#[derive(Serialize)]
+pub struct DisconnectOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disconnected: Option<DisconnectedResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interface: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
 
-    // Compute column widths.
-    let widths: Vec<usize> = keys
-        .iter()
-        .map(|k| {
-            let header = k.len();
-            let data_max = rows
-                .iter()
-                .map(|r| {
-                    r.get(*k)
-                        .map(|v| match v {
-                            serde_json::Value::String(s) => s.len(),
-                            serde_json::Value::Bool(_) => 5,
-                            serde_json::Value::Number(n) => n.to_string().len(),
-                            _ => 8,
-                        })
-                        .unwrap_or(0)
-                })
-                .max()
-                .unwrap_or(0);
-            header.max(data_max)
-        })
-        .collect();
-
-    // Pad header columns.
-    let header: Vec<String> = keys
-        .iter()
-        .enumerate()
-        .map(|(i, k)| format!("{:>w$}", k.to_uppercase(), w = widths[i]))
-        .collect();
-
-    let mut out = Vec::new();
-    out.push(format!("{}:", label.to_uppercase()));
-    out.push(format!("  {}", header.join("  ")));
-
-    for row in &rows {
-        let cells: Vec<String> = keys
-            .iter()
-            .enumerate()
-            .map(|(i, k)| {
-                let val = row
-                    .get(*k)
-                    .map(|v| v.to_string().trim_matches('"').to_string())
-                    .unwrap_or_default();
-                format!("{:>w$}", val, w = widths[i])
-            })
-            .collect();
-        out.push(format!("  {}", cells.join("  ")));
+impl HumanRender for DisconnectOutput {
+    fn render(&self) -> String {
+        if let Some(ref msg) = self.message {
+            return msg.clone();
+        }
+        // Fallback for --all without message.
+        let mut parts = Vec::new();
+        match &self.disconnected {
+            Some(DisconnectedResult::Single(name)) => {
+                parts.push(format!("disconnected: {name}"));
+            }
+            Some(DisconnectedResult::List(names)) => {
+                parts.push(format!("disconnected: {}", names.join(", ")));
+            }
+            None => {}
+        }
+        if !self.errors.is_empty() {
+            parts.push(format!("errors: {}", self.errors.join(", ")));
+        }
+        parts.join("\n")
     }
+}
 
-    Some(out.join("\n"))
+/// The `disconnected` field value - either a single name, a list, or absent.
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum DisconnectedResult {
+    Single(String),
+    List(Vec<String>),
+}
+
+/// Output for the `location list` command.
+#[derive(Serialize)]
+pub struct LocationListOutput {
+    pub locations: Vec<LocationEntry>,
+    pub message: String,
+}
+
+impl HumanRender for LocationListOutput {
+    fn render(&self) -> String {
+        self.message.clone()
+    }
+}
+
+/// Output for the `location set` command.
+#[derive(Serialize)]
+pub struct LocationSetOutput {
+    pub location: String,
+    pub changes: Vec<String>,
+    pub message: String,
+}
+
+impl HumanRender for LocationSetOutput {
+    fn render(&self) -> String {
+        self.message.clone()
+    }
+}
+
+/// Output for the `location show` command.
+#[derive(Serialize)]
+pub struct LocationShowOutput {
+    pub name: String,
+    pub address: String,
+    pub endpoint: String,
+    pub pubkey: String,
+    pub allowed_ips: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns: Option<String>,
+    pub mfa_method: String,
+    pub route_all_traffic: bool,
+    pub keepalive_interval: i64,
+    pub message: String,
+}
+
+impl HumanRender for LocationShowOutput {
+    fn render(&self) -> String {
+        self.message.clone()
+    }
+}
+
+#[derive(Serialize)]
+pub struct InstanceEntry {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Serialize)]
+pub struct LocationEntry {
+    pub name: String,
+    pub instance: Option<String>,
+    pub address: String,
+    pub endpoint: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mfa_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mfa_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_all_traffic: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub struct TunnelEntry {
+    pub name: String,
+    pub address: String,
+    pub endpoint: String,
+}
+
+#[derive(Serialize)]
+pub struct ActiveEntry {
+    pub connection_type: String,
+    pub name: String,
+    pub interface: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub listen_port: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rx_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_handshake_secs: Option<u64>,
 }
 
 fn error_kind(err: &CliError) -> String {
