@@ -1,5 +1,4 @@
-use super::super::{disk_encryption_status, linux_kernel_version, os_name, os_version};
-use std::process::Command;
+use super::super::{disk_encryption_status, os_name, os_version};
 
 #[test]
 fn test_os_name() {
