@@ -592,7 +592,7 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     let all_locations = Location::all(&*DB_POOL, false).await?;
     for location in &all_locations {
         // For syncing, set `preshred_key` to `None`.
-        let Ok(tunnel_config) = location.tunnel_configurarion(None, mtu).await else {
+        let Ok(tunnel_config) = location.tunnel_configuration(None, mtu).await else {
             error!(
                 "Failed to convert location {} to tunnel configuration.",
                 location.name
@@ -605,7 +605,7 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     // Update tunnel settings.
     let all_tunnels = Tunnel::all(&*DB_POOL).await?;
     for tunnel in &all_tunnels {
-        let Ok(tunnel_config) = tunnel.tunnel_configurarion(mtu) else {
+        let Ok(tunnel_config) = tunnel.tunnel_configuration(mtu) else {
             error!(
                 "Failed to convert tunnel {} to tunnel configuration.",
                 tunnel.name
@@ -680,7 +680,7 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
 
 impl Location<Id> {
     /// Build [`TunnelConfiguration`] from [`Location`].
-    pub(crate) async fn tunnel_configurarion(
+    pub(crate) async fn tunnel_configuration(
         &self,
         preshared_key: Option<String>,
         mtu: Option<u32>,
@@ -835,7 +835,7 @@ impl Location<Id> {
 
 impl Tunnel<Id> {
     /// Build [`TunnelConfiguration`] from [`Tunnel`].
-    pub(crate) fn tunnel_configurarion(
+    pub(crate) fn tunnel_configuration(
         &self,
         mtu: Option<u32>,
     ) -> Result<TunnelConfiguration, Error> {
