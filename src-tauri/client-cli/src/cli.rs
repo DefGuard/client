@@ -149,12 +149,12 @@ pub enum LocationCommand {
         mfa_method: Option<String>,
 
         /// Always route all traffic through this location.
-        #[arg(long, overrides_with = "no_route_all_traffic")]
+        #[arg(long, overrides_with = "predefined_traffic")]
         route_all_traffic: bool,
 
         /// Never route all traffic through this location.
         #[arg(long, overrides_with = "route_all_traffic")]
-        no_route_all_traffic: bool,
+        predefined_traffic: bool,
     },
 }
 

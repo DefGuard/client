@@ -15,17 +15,11 @@ use crate::{
 pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
 
-    let instance_names: HashMap<Id, String> = {
-        let mut map = HashMap::new();
-        for loc in &locations {
-            if let std::collections::hash_map::Entry::Vacant(e) = map.entry(loc.instance_id) {
-                if let Some(inst) = Instance::find_by_id(&state.pool, loc.instance_id).await? {
-                    e.insert(inst.name);
-                }
-            }
-        }
-        map
-    };
+    let instance_names: HashMap<Id, String> = Instance::all(&state.pool)
+        .await?
+        .into_iter()
+        .map(|inst| (inst.id, inst.name))
+        .collect();
 
     Ok(LocationListResult {
         locations,
@@ -39,7 +33,7 @@ pub async fn handle_set(
     instance: Option<&str>,
     mfa_method: Option<&str>,
     route_all_traffic: Option<bool>,
-    no_route_all_traffic: bool,
+    predefined_traffic: bool,
 ) -> Result<LocationSetResult, CliError> {
     let spec = TargetSpec {
         name: Some(name.to_string()),
@@ -67,7 +61,7 @@ pub async fn handle_set(
     if let Some(true) = route_all_traffic {
         Location::update_routing(&state.pool, location_id, true).await?;
         changed.push("route-all-traffic → on".to_string());
-    } else if no_route_all_traffic {
+    } else if predefined_traffic {
         Location::update_routing(&state.pool, location_id, false).await?;
         changed.push("route-all-traffic → off".to_string());
     }

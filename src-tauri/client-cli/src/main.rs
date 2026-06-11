@@ -96,7 +96,7 @@ async fn main() -> ExitCode {
                 instance,
                 mfa_method,
                 route_all_traffic,
-                no_route_all_traffic,
+                predefined_traffic,
             } => output::finish(
                 location::handle_set(
                     &state,
@@ -104,7 +104,7 @@ async fn main() -> ExitCode {
                     instance.as_deref(),
                     mfa_method.as_deref(),
                     if route_all_traffic { Some(true) } else { None },
-                    no_route_all_traffic,
+                    predefined_traffic,
                 )
                 .await,
                 cli.json,

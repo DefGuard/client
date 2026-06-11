@@ -73,7 +73,12 @@ async fn resolve_named(
         let tunnels = Tunnel::find_by_name(pool, name).await?;
         return match tunnels.len() {
             0 => Err(CliError::NotFound(format!("Tunnel '{name}' not found"))),
-            1 => Ok(ResolvedTarget::Tunnel(tunnels.into_iter().next().unwrap())),
+            1 => Ok(ResolvedTarget::Tunnel(
+                tunnels
+                    .into_iter()
+                    .next()
+                    .expect("exactly one tunnel expected after length check"),
+            )),
             _ => Err(CliError::NotFound(format!(
                 "Multiple tunnels named '{name}'"
             ))),
@@ -100,10 +105,16 @@ async fn resolve_named(
     match (loc_matches.len(), tun_matches.len()) {
         (0, 0) => Err(CliError::NotFound(format!("'{name}' not found"))),
         (1, 0) => Ok(ResolvedTarget::Location(
-            loc_matches.into_iter().next().unwrap(),
+            loc_matches
+                .into_iter()
+                .next()
+                .expect("exactly one location expected after length check"),
         )),
         (0, 1) => Ok(ResolvedTarget::Tunnel(
-            tun_matches.into_iter().next().unwrap(),
+            tun_matches
+                .into_iter()
+                .next()
+                .expect("exactly one tunnel expected after length check"),
         )),
         (1, 1) => Err(CliError::NotFound(format!(
             "'{name}' matches both a location and a tunnel. Use --tunnel."
@@ -124,7 +135,10 @@ async fn resolve_sole_location(pool: &DbPool) -> Result<ResolvedTarget, CliError
             "No locations configured. Enroll an instance first.".into(),
         )),
         1 => Ok(ResolvedTarget::Location(
-            locations.into_iter().next().unwrap(),
+            locations
+                .into_iter()
+                .next()
+                .expect("exactly one location expected after length check"),
         )),
         _ => Err(CliError::NotFound(
             "Multiple locations available. Specify a name.".into(),
