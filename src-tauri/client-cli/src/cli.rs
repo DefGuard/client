@@ -31,9 +31,11 @@ pub enum Commands {
     List,
 
     /// Show currently-active VPN connections (live state from the daemon).
+    #[command(alias = "s")]
     Status,
 
     /// Connect to a location or tunnel.
+    #[command(alias = "c")]
     Connect {
         /// Location or tunnel name.  If omitted, connects to the sole configured
         /// location (error if ambiguous).
@@ -75,6 +77,7 @@ pub enum Commands {
     },
 
     /// Disconnect from a location or tunnel.
+    #[command(alias = "d")]
     Disconnect {
         /// Location or tunnel name.  If omitted, disconnects the sole active
         /// connection (error if ambiguous).
@@ -98,7 +101,7 @@ pub enum Commands {
     },
 
     /// Manage locations (view settings, set MFA method, routing).
-    #[command(subcommand)]
+    #[command(subcommand, alias = "l")]
     Location(LocationCommand),
 
     /// Manage instances.
