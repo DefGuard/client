@@ -16,11 +16,9 @@ struct Win32EncryptableVolume {
 }
 
 #[derive(Deserialize)]
-#[serde(rename = "MSFT_MpComputerStatus")]
-#[serde(rename_all = "PascalCase")]
-struct MpComputerStatus {
-    antivirus_enabled: bool,
-    real_time_protection_enabled: bool,
+#[serde(rename_all = "camelCase")]
+struct AntiVirusProduct {
+    product_state: u32,
 }
 
 #[derive(Deserialize)]
