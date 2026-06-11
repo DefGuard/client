@@ -7,7 +7,7 @@ use defguard_core::database::models::{
 };
 
 use crate::{
-    output::{self, CommandOutput, LocationEntry, LocationSetOutput},
+    output::{CommandOutput, LocationEntry},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
@@ -35,13 +35,12 @@ pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> 
 
 pub async fn handle_set(
     state: &State,
-    json: bool,
     name: &str,
     instance: Option<&str>,
     mfa_method: Option<&str>,
     route_all_traffic: Option<bool>,
     no_route_all_traffic: bool,
-) -> Result<(), CliError> {
+) -> Result<LocationSetResult, CliError> {
     let spec = TargetSpec {
         name: Some(name.to_string()),
         tunnel: false,
@@ -73,22 +72,10 @@ pub async fn handle_set(
         changed.push("route-all-traffic → off".to_string());
     }
 
-    let message = if changed.is_empty() {
-        format!("No changes for location '{name}'.")
-    } else {
-        format!("Updated location '{name}': {}", changed.join(", "))
-    };
-
-    output::emit(
-        &LocationSetOutput {
-            location: name.to_string(),
-            changes: changed,
-            message,
-        },
-        json,
-    );
-
-    Ok(())
+    Ok(LocationSetResult {
+        name: name.to_string(),
+        changes: changed,
+    })
 }
 
 pub async fn handle_show(
@@ -273,6 +260,32 @@ impl CommandOutput for LocationShowResult {
             json["dns"] = serde_json::json!(dns);
         }
         json
+    }
+}
+
+pub struct LocationSetResult {
+    pub name: String,
+    pub changes: Vec<String>,
+}
+
+impl CommandOutput for LocationSetResult {
+    fn human(&self) -> String {
+        if self.changes.is_empty() {
+            format!("No changes for location '{}'.", self.name)
+        } else {
+            format!(
+                "Updated location '{}': {}",
+                self.name,
+                self.changes.join(", ")
+            )
+        }
+    }
+
+    fn json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "location": self.name,
+            "changes": self.changes,
+        })
     }
 }
 
@@ -463,5 +476,60 @@ mod tests {
             .exit_code(),
             0
         );
+        assert_eq!(
+            LocationSetResult {
+                name: "x".to_string(),
+                changes: vec![],
+            }
+            .exit_code(),
+            0
+        );
+    }
+
+    #[test]
+    fn test_set_human_no_changes() {
+        let result = LocationSetResult {
+            name: "office".to_string(),
+            changes: vec![],
+        };
+        assert_eq!(result.human(), "No changes for location 'office'.");
+    }
+
+    #[test]
+    fn test_set_human_with_changes() {
+        let result = LocationSetResult {
+            name: "office".to_string(),
+            changes: vec![
+                "MFA method → totp".to_string(),
+                "route-all-traffic → on".to_string(),
+            ],
+        };
+        let s = result.human();
+        assert!(s.contains("Updated location 'office'"));
+        assert!(s.contains("MFA method → totp"));
+        assert!(s.contains("route-all-traffic → on"));
+    }
+
+    #[test]
+    fn test_set_json() {
+        let result = LocationSetResult {
+            name: "office".to_string(),
+            changes: vec!["MFA method → totp".to_string()],
+        };
+        let json = result.json();
+        assert_eq!(json["location"], "office");
+        assert_eq!(json["changes"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_set_json_empty_changes() {
+        let result = LocationSetResult {
+            name: "office".to_string(),
+            changes: vec![],
+        };
+        let json = result.json();
+        assert_eq!(json["location"], "office");
+        assert_eq!(json["changes"].as_array().unwrap().len(), 0);
+        assert!(json["message"].is_null());
     }
 }

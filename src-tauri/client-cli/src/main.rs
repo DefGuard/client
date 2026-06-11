@@ -97,10 +97,9 @@ async fn main() -> ExitCode {
                 mfa_method,
                 route_all_traffic,
                 no_route_all_traffic,
-            } => output::finish_legacy(
+            } => output::finish(
                 location::handle_set(
                     &state,
-                    cli.json,
                     &name,
                     instance.as_deref(),
                     mfa_method.as_deref(),

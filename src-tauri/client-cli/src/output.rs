@@ -68,20 +68,6 @@ pub fn emit_error(err: &CliError, json: bool) {
     }
 }
 
-/// Output for the `location set` command.
-#[derive(Serialize)]
-pub struct LocationSetOutput {
-    pub location: String,
-    pub changes: Vec<String>,
-    pub message: String,
-}
-
-impl HumanRender for LocationSetOutput {
-    fn render(&self) -> String {
-        self.message.clone()
-    }
-}
-
 #[derive(Serialize)]
 pub struct InstanceEntry {
     pub name: String,
