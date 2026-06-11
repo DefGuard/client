@@ -68,19 +68,6 @@ pub fn emit_error(err: &CliError, json: bool) {
     }
 }
 
-/// Output for the `location list` command.
-#[derive(Serialize)]
-pub struct LocationListOutput {
-    pub locations: Vec<LocationEntry>,
-    pub message: String,
-}
-
-impl HumanRender for LocationListOutput {
-    fn render(&self) -> String {
-        self.message.clone()
-    }
-}
-
 /// Output for the `location set` command.
 #[derive(Serialize)]
 pub struct LocationSetOutput {
@@ -90,28 +77,6 @@ pub struct LocationSetOutput {
 }
 
 impl HumanRender for LocationSetOutput {
-    fn render(&self) -> String {
-        self.message.clone()
-    }
-}
-
-/// Output for the `location show` command.
-#[derive(Serialize)]
-pub struct LocationShowOutput {
-    pub name: String,
-    pub address: String,
-    pub endpoint: String,
-    pub pubkey: String,
-    pub allowed_ips: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dns: Option<String>,
-    pub mfa_method: String,
-    pub route_all_traffic: bool,
-    pub keepalive_interval: i64,
-    pub message: String,
-}
-
-impl HumanRender for LocationShowOutput {
     fn render(&self) -> String {
         self.message.clone()
     }

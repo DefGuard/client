@@ -7,12 +7,12 @@ use defguard_core::database::models::{
 };
 
 use crate::{
-    output::{self, LocationEntry, LocationListOutput, LocationSetOutput, LocationShowOutput},
+    output::{self, CommandOutput, LocationEntry, LocationSetOutput},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 
-pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
+pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
 
     let instance_names: HashMap<Id, String> = {
@@ -27,76 +27,10 @@ pub async fn handle_list(state: &State, json: bool) -> Result<(), CliError> {
         map
     };
 
-    let entries: Vec<LocationEntry> = locations
-        .iter()
-        .map(|l| LocationEntry {
-            name: l.name.clone(),
-            instance: instance_names.get(&l.instance_id).cloned(),
-            address: l.address.clone(),
-            endpoint: l.endpoint.clone(),
-            mfa_enabled: None,
-            mfa_method: Some(mfa_label(l.mfa_method).to_string()),
-            route_all_traffic: Some(l.route_all_traffic),
-        })
-        .collect();
-
-    let message = if locations.is_empty() {
-        "No locations configured.".to_string()
-    } else {
-        let name_w = locations
-            .iter()
-            .map(|l| l.name.len())
-            .max()
-            .unwrap_or(4)
-            .max(8);
-        let endpoint_w = locations
-            .iter()
-            .map(|l| l.endpoint.len())
-            .max()
-            .unwrap_or(8)
-            .max(8);
-        let inst_w = locations
-            .iter()
-            .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
-            .max()
-            .unwrap_or(8)
-            .max(8);
-
-        let mut lines = vec![format!(
-            "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:<11}",
-            "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
-        )];
-        for loc in &locations {
-            let inst = instance_names
-                .get(&loc.instance_id)
-                .map(|n| n.as_str())
-                .unwrap_or("?");
-            lines.push(format!(
-                "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>11}",
-                loc.name,
-                loc.address,
-                loc.endpoint,
-                inst,
-                mfa_label(loc.mfa_method),
-                if loc.route_all_traffic {
-                    "All-traffic"
-                } else {
-                    "Predefined"
-                }
-            ));
-        }
-        lines.join("\n")
-    };
-
-    output::emit(
-        &LocationListOutput {
-            locations: entries,
-            message,
-        },
-        json,
-    );
-
-    Ok(())
+    Ok(LocationListResult {
+        locations,
+        instance_names,
+    })
 }
 
 pub async fn handle_set(
@@ -159,10 +93,9 @@ pub async fn handle_set(
 
 pub async fn handle_show(
     state: &State,
-    json: bool,
     name: &str,
     instance: Option<&str>,
-) -> Result<(), CliError> {
+) -> Result<LocationShowResult, CliError> {
     let spec = TargetSpec {
         name: Some(name.to_string()),
         tunnel: false,
@@ -178,49 +111,18 @@ pub async fn handle_show(
         }
     };
 
-    let mfa = mfa_label(location.mfa_method);
-
-    let message = {
-        let mut lines = Vec::new();
-        lines.push(format!("Name:              {}", location.name));
-        lines.push(format!("Address:           {}", location.address));
-        lines.push(format!("Endpoint:          {}", location.endpoint));
-        lines.push(format!("Pubkey:            {}", location.pubkey));
-        lines.push(format!("Allowed IPs:       {}", location.allowed_ips));
-        if let Some(dns) = &location.dns {
-            lines.push(format!("DNS:               {dns}"));
-        }
-        lines.push(format!("MFA method:        {mfa}"));
-        lines.push(format!("Route all traffic: {}", location.route_all_traffic));
-        lines.push(format!(
-            "Keepalive:         {}s",
-            location.keepalive_interval
-        ));
-        lines.join("\n")
-    };
-
-    output::emit(
-        &LocationShowOutput {
-            name: location.name.clone(),
-            address: location.address.clone(),
-            endpoint: location.endpoint.clone(),
-            pubkey: location.pubkey.clone(),
-            allowed_ips: location.allowed_ips.clone(),
-            dns: location.dns.clone(),
-            mfa_method: mfa.to_string(),
-            route_all_traffic: location.route_all_traffic,
-            keepalive_interval: location.keepalive_interval,
-            message,
-        },
-        json,
-    );
-
-    Ok(())
+    Ok(LocationShowResult {
+        name: location.name.clone(),
+        address: location.address.clone(),
+        endpoint: location.endpoint.clone(),
+        pubkey: location.pubkey.clone(),
+        allowed_ips: location.allowed_ips.clone(),
+        dns: location.dns.clone(),
+        mfa_method: mfa_label(location.mfa_method).to_string(),
+        route_all_traffic: location.route_all_traffic,
+        keepalive_interval: location.keepalive_interval,
+    })
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
     match raw.to_lowercase().as_str() {
@@ -243,5 +145,323 @@ fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
         Some(LocationMfaMethod::Biometric) => "biometric",
         Some(LocationMfaMethod::MobileApprove) => "mobile",
         None => "none",
+    }
+}
+
+pub struct LocationListResult {
+    pub locations: Vec<Location<Id>>,
+    pub instance_names: HashMap<Id, String>,
+}
+
+impl CommandOutput for LocationListResult {
+    fn human(&self) -> String {
+        if self.locations.is_empty() {
+            "No locations configured.".to_string()
+        } else {
+            format_location_list_table(&self.locations, &self.instance_names)
+        }
+    }
+
+    fn json(&self) -> serde_json::Value {
+        let locations: Vec<LocationEntry> = self
+            .locations
+            .iter()
+            .map(|l| LocationEntry {
+                name: l.name.clone(),
+                instance: self.instance_names.get(&l.instance_id).cloned(),
+                address: l.address.clone(),
+                endpoint: l.endpoint.clone(),
+                mfa_enabled: None,
+                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                route_all_traffic: Some(l.route_all_traffic),
+            })
+            .collect();
+        serde_json::json!({ "locations": locations })
+    }
+}
+
+fn format_location_list_table(
+    locations: &[Location<Id>],
+    instance_names: &HashMap<Id, String>,
+) -> String {
+    let name_w = locations
+        .iter()
+        .map(|l| l.name.len())
+        .max()
+        .unwrap_or(4)
+        .max(8);
+    let endpoint_w = locations
+        .iter()
+        .map(|l| l.endpoint.len())
+        .max()
+        .unwrap_or(8)
+        .max(8);
+    let inst_w = locations
+        .iter()
+        .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
+        .max()
+        .unwrap_or(8)
+        .max(8);
+
+    let mut lines = vec![format!(
+        "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:<11}",
+        "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
+    )];
+    for loc in locations {
+        let inst = instance_names
+            .get(&loc.instance_id)
+            .map(|n| n.as_str())
+            .unwrap_or("?");
+        lines.push(format!(
+            "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>11}",
+            loc.name,
+            loc.address,
+            loc.endpoint,
+            inst,
+            mfa_label(loc.mfa_method),
+            if loc.route_all_traffic {
+                "All-traffic"
+            } else {
+                "Predefined"
+            }
+        ));
+    }
+    lines.join("\n")
+}
+
+pub struct LocationShowResult {
+    pub name: String,
+    pub address: String,
+    pub endpoint: String,
+    pub pubkey: String,
+    pub allowed_ips: String,
+    pub dns: Option<String>,
+    pub mfa_method: String,
+    pub route_all_traffic: bool,
+    pub keepalive_interval: i64,
+}
+
+impl CommandOutput for LocationShowResult {
+    fn human(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("Name:              {}", self.name));
+        lines.push(format!("Address:           {}", self.address));
+        lines.push(format!("Endpoint:          {}", self.endpoint));
+        lines.push(format!("Pubkey:            {}", self.pubkey));
+        lines.push(format!("Allowed IPs:       {}", self.allowed_ips));
+        if let Some(dns) = &self.dns {
+            lines.push(format!("DNS:               {dns}"));
+        }
+        lines.push(format!("MFA method:        {}", self.mfa_method));
+        lines.push(format!("Route all traffic: {}", self.route_all_traffic));
+        lines.push(format!("Keepalive:         {}s", self.keepalive_interval));
+        lines.join("\n")
+    }
+
+    fn json(&self) -> serde_json::Value {
+        let mut json = serde_json::json!({
+            "name": self.name,
+            "address": self.address,
+            "endpoint": self.endpoint,
+            "pubkey": self.pubkey,
+            "allowed_ips": self.allowed_ips,
+            "mfa_method": self.mfa_method,
+            "route_all_traffic": self.route_all_traffic,
+            "keepalive_interval": self.keepalive_interval,
+        });
+        if let Some(dns) = &self.dns {
+            json["dns"] = serde_json::json!(dns);
+        }
+        json
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use defguard_core::database::models::location::{LocationMfaMode, ServiceLocationMode};
+
+    use super::*;
+
+    fn make_location(
+        id: Id,
+        instance_id: Id,
+        name: &str,
+        endpoint: &str,
+        mfa: bool,
+    ) -> Location<Id> {
+        Location {
+            id,
+            instance_id,
+            network_id: 1,
+            name: name.to_string(),
+            address: "10.0.0.0/24".to_string(),
+            pubkey: "pk".to_string(),
+            endpoint: endpoint.to_string(),
+            allowed_ips: "0.0.0.0/0".to_string(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: if mfa {
+                LocationMfaMode::Internal
+            } else {
+                LocationMfaMode::Disabled
+            },
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+        }
+    }
+
+    #[test]
+    fn test_list_human_empty() {
+        let result = LocationListResult {
+            locations: vec![],
+            instance_names: HashMap::new(),
+        };
+        assert_eq!(result.human(), "No locations configured.");
+    }
+
+    #[test]
+    fn test_list_human_with_data() {
+        let loc = make_location(1, 10, "office", "1.2.3.4:51820", false);
+        let mut names = HashMap::new();
+        names.insert(10, "acme".to_string());
+        let result = LocationListResult {
+            locations: vec![loc],
+            instance_names: names,
+        };
+        let s = result.human();
+        assert!(s.contains("office"));
+        assert!(s.contains("acme"));
+        assert!(s.contains("1.2.3.4:51820"));
+    }
+
+    #[test]
+    fn test_list_json_empty() {
+        let result = LocationListResult {
+            locations: vec![],
+            instance_names: HashMap::new(),
+        };
+        let json = result.json();
+        assert_eq!(json["locations"].as_array().unwrap().len(), 0);
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_list_json_with_data() {
+        let loc = make_location(1, 10, "office", "1.2.3.4:51820", false);
+        let mut names = HashMap::new();
+        names.insert(10, "acme".to_string());
+        let result = LocationListResult {
+            locations: vec![loc],
+            instance_names: names,
+        };
+        let json = result.json();
+        let locations = json["locations"].as_array().unwrap();
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0]["name"], "office");
+        assert_eq!(locations[0]["instance"], "acme");
+    }
+
+    #[test]
+    fn test_show_human() {
+        let result = LocationShowResult {
+            name: "office".to_string(),
+            address: "10.0.0.0/24".to_string(),
+            endpoint: "1.2.3.4:51820".to_string(),
+            pubkey: "pk".to_string(),
+            allowed_ips: "0.0.0.0/0".to_string(),
+            dns: Some("8.8.8.8".to_string()),
+            mfa_method: "totp".to_string(),
+            route_all_traffic: false,
+            keepalive_interval: 25,
+        };
+        let s = result.human();
+        assert!(s.contains("Name:              office"));
+        assert!(s.contains("Address:           10.0.0.0/24"));
+        assert!(s.contains("DNS:               8.8.8.8"));
+        assert!(s.contains("MFA method:        totp"));
+    }
+
+    #[test]
+    fn test_show_human_without_dns() {
+        let result = LocationShowResult {
+            name: "office".to_string(),
+            address: "10.0.0.0/24".to_string(),
+            endpoint: "1.2.3.4:51820".to_string(),
+            pubkey: "pk".to_string(),
+            allowed_ips: "0.0.0.0/0".to_string(),
+            dns: None,
+            mfa_method: "none".to_string(),
+            route_all_traffic: true,
+            keepalive_interval: 30,
+        };
+        let s = result.human();
+        assert!(!s.contains("DNS"));
+        assert!(s.contains("Route all traffic: true"));
+    }
+
+    #[test]
+    fn test_show_json() {
+        let result = LocationShowResult {
+            name: "office".to_string(),
+            address: "10.0.0.0/24".to_string(),
+            endpoint: "1.2.3.4:51820".to_string(),
+            pubkey: "pk".to_string(),
+            allowed_ips: "0.0.0.0/0".to_string(),
+            dns: Some("8.8.8.8".to_string()),
+            mfa_method: "totp".to_string(),
+            route_all_traffic: false,
+            keepalive_interval: 25,
+        };
+        let json = result.json();
+        assert_eq!(json["name"], "office");
+        assert_eq!(json["dns"], "8.8.8.8");
+        assert_eq!(json["mfa_method"], "totp");
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_show_json_without_dns() {
+        let result = LocationShowResult {
+            name: "office".to_string(),
+            address: "10.0.0.0/24".to_string(),
+            endpoint: "1.2.3.4:51820".to_string(),
+            pubkey: "pk".to_string(),
+            allowed_ips: "0.0.0.0/0".to_string(),
+            dns: None,
+            mfa_method: "none".to_string(),
+            route_all_traffic: true,
+            keepalive_interval: 30,
+        };
+        let json = result.json();
+        assert!(json["dns"].is_null());
+    }
+
+    #[test]
+    fn test_exit_code_zero() {
+        assert_eq!(
+            LocationListResult {
+                locations: vec![],
+                instance_names: HashMap::new(),
+            }
+            .exit_code(),
+            0
+        );
+        assert_eq!(
+            LocationShowResult {
+                name: "x".to_string(),
+                address: "a".to_string(),
+                endpoint: "e".to_string(),
+                pubkey: "p".to_string(),
+                allowed_ips: "0.0.0.0/0".to_string(),
+                dns: None,
+                mfa_method: "n".to_string(),
+                route_all_traffic: false,
+                keepalive_interval: 25,
+            }
+            .exit_code(),
+            0
+        );
     }
 }

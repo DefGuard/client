@@ -90,9 +90,7 @@ async fn main() -> ExitCode {
             cli.json,
         ),
         Commands::Location(sub) => match sub {
-            LocationCommand::List => {
-                output::finish_legacy(location::handle_list(&state, cli.json).await, cli.json)
-            }
+            LocationCommand::List => output::finish(location::handle_list(&state).await, cli.json),
             LocationCommand::Set {
                 name,
                 instance,
@@ -112,8 +110,8 @@ async fn main() -> ExitCode {
                 .await,
                 cli.json,
             ),
-            LocationCommand::Show { name, instance } => output::finish_legacy(
-                location::handle_show(&state, cli.json, &name, instance.as_deref()).await,
+            LocationCommand::Show { name, instance } => output::finish(
+                location::handle_show(&state, &name, instance.as_deref()).await,
                 cli.json,
             ),
         },
