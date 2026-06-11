@@ -16,11 +16,11 @@ mod tests_daemon;
 #[cfg(test)]
 mod tests_proxy;
 
-use cli::{Cli, LocationCommand};
+use cli::{Cli, InstanceCommand, LocationCommand, TunnelCommand};
 
 use crate::{
     cli::Commands,
-    commands::{connect, disconnect, list, location, status},
+    commands::{connect, disconnect, instance, list, location, status, tunnel},
     state::State,
 };
 
@@ -114,7 +114,19 @@ async fn main() -> ExitCode {
                 cli.json,
             ),
         },
-        Commands::Instance { .. } | Commands::Tunnel { .. } | Commands::Enroll { .. } => {
+        Commands::Instance(sub) => match sub {
+            InstanceCommand::List => output::finish(instance::handle_list(&state).await, cli.json),
+            InstanceCommand::Show { name } => {
+                output::finish(instance::handle_show(&state, &name).await, cli.json)
+            }
+        },
+        Commands::Tunnel(sub) => match sub {
+            TunnelCommand::List => output::finish(tunnel::handle_list(&state).await, cli.json),
+            TunnelCommand::Show { name } => {
+                output::finish(tunnel::handle_show(&state, &name).await, cli.json)
+            }
+        },
+        Commands::Enroll { .. } => {
             let err = state::CliError::Usage("command not yet implemented".into());
             let code = exit::exit_code_for(&err);
             output::emit_error(&err, cli.json);
