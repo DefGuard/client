@@ -68,21 +68,6 @@ pub fn emit_error(err: &CliError, json: bool) {
     }
 }
 
-/// Output for the `list` command.
-#[derive(Serialize)]
-pub struct ListOutput {
-    pub instances: Vec<InstanceEntry>,
-    pub locations: Vec<LocationEntry>,
-    pub tunnels: Vec<TunnelEntry>,
-    pub message: String,
-}
-
-impl HumanRender for ListOutput {
-    fn render(&self) -> String {
-        self.message.clone()
-    }
-}
-
 /// Output for the `connect` command.
 #[derive(Serialize)]
 pub struct ConnectOutput {
