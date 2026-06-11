@@ -42,9 +42,9 @@ async fn main() -> ExitCode {
     };
 
     // Dispatch command.
-    let result = match cli.command {
-        Commands::List => list::handle(&state, cli.json).await,
-        Commands::Status => status::handle(&state, cli.json).await,
+    match cli.command {
+        Commands::List => output::finish_legacy(list::handle(&state, cli.json).await, cli.json),
+        Commands::Status => output::finish_legacy(status::handle(&state, cli.json).await, cli.json),
         Commands::Connect {
             name,
             tunnel,
@@ -55,7 +55,7 @@ async fn main() -> ExitCode {
             mfa_method,
             all_traffic,
             predefined_traffic,
-        } => {
+        } => output::finish_legacy(
             connect::handle(
                 &state,
                 cli.json,
@@ -69,15 +69,16 @@ async fn main() -> ExitCode {
                 all_traffic,
                 predefined_traffic,
             )
-            .await
-        }
+            .await,
+            cli.json,
+        ),
         Commands::Disconnect {
             name,
             tunnel,
             id,
             instance,
             all,
-        } => {
+        } => output::finish_legacy(
             disconnect::handle(
                 &state,
                 cli.json,
@@ -87,17 +88,20 @@ async fn main() -> ExitCode {
                 instance.as_deref(),
                 all,
             )
-            .await
-        }
+            .await,
+            cli.json,
+        ),
         Commands::Location(sub) => match sub {
-            LocationCommand::List => location::handle_list(&state, cli.json).await,
+            LocationCommand::List => {
+                output::finish_legacy(location::handle_list(&state, cli.json).await, cli.json)
+            }
             LocationCommand::Set {
                 name,
                 instance,
                 mfa_method,
                 route_all_traffic,
                 no_route_all_traffic,
-            } => {
+            } => output::finish_legacy(
                 location::handle_set(
                     &state,
                     cli.json,
@@ -107,22 +111,16 @@ async fn main() -> ExitCode {
                     if route_all_traffic { Some(true) } else { None },
                     no_route_all_traffic,
                 )
-                .await
-            }
-            LocationCommand::Show { name, instance } => {
-                location::handle_show(&state, cli.json, &name, instance.as_deref()).await
-            }
+                .await,
+                cli.json,
+            ),
+            LocationCommand::Show { name, instance } => output::finish_legacy(
+                location::handle_show(&state, cli.json, &name, instance.as_deref()).await,
+                cli.json,
+            ),
         },
         Commands::Instance { .. } | Commands::Tunnel { .. } | Commands::Enroll { .. } => {
             let err = state::CliError::Usage("command not yet implemented".into());
-            output::emit_error(&err, cli.json);
-            return ExitCode::from(exit::exit_code_for(&err));
-        }
-    };
-
-    match result {
-        Ok(()) => ExitCode::from(0),
-        Err(err) => {
             let code = exit::exit_code_for(&err);
             output::emit_error(&err, cli.json);
             ExitCode::from(code)

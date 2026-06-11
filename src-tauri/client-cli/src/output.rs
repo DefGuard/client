@@ -1,11 +1,25 @@
+use std::process::ExitCode;
+
 use serde::Serialize;
 
-use crate::state::CliError;
+use crate::{exit, state::CliError};
 
 /// Types that can render themselves for human-readable terminal output.
 pub trait HumanRender {
     /// Produce a human-readable string (no trailing newline required).
     fn render(&self) -> String;
+}
+
+/// Typed command output that owns both human and JSON representations.
+pub trait CommandOutput {
+    /// Produce a human-readable string (no trailing newline required).
+    fn human(&self) -> String;
+    /// Produce a structured JSON value.
+    fn json(&self) -> serde_json::Value;
+    /// Exit code override; defaults to 0 (success).
+    fn exit_code(&self) -> u8 {
+        0
+    }
 }
 
 /// Render a typed result as either JSON or human-readable output.
@@ -17,6 +31,19 @@ pub fn emit<T: Serialize + HumanRender>(value: &T, json: bool) {
         );
     } else {
         println!("{}", value.render());
+    }
+}
+
+/// Render a `CommandOutput` value as either JSON or human-readable output.
+pub fn emit_typed<T: CommandOutput>(value: &T, json: bool) {
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&value.json())
+                .unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}"))
+        );
+    } else {
+        println!("{}", value.human());
     }
 }
 
@@ -32,7 +59,7 @@ pub fn emit_error(err: &CliError, json: bool) {
             kind: error_kind(err),
             message: err.to_string(),
         };
-        println!(
+        eprintln!(
             "{}",
             serde_json::to_string(&je).unwrap_or_else(|e| format!("{{error: \"{e}\"}}"))
         );
@@ -229,5 +256,35 @@ fn error_kind(err: &CliError) -> String {
         CliError::NotEnrolled(_) => "notEnrolled".into(),
         CliError::Database(_) => "database".into(),
         CliError::Other(_) => "other".into(),
+    }
+}
+
+/// Finalize a `CommandOutput` result, emit output, and return the exit code.
+pub fn finish<T: CommandOutput>(result: Result<T, CliError>, json: bool) -> ExitCode {
+    match result {
+        Ok(output) => {
+            let code = output.exit_code();
+            emit_typed(&output, json);
+            ExitCode::from(code)
+        }
+        Err(err) => {
+            let code = exit::exit_code_for(&err);
+            emit_error(&err, json);
+            ExitCode::from(code)
+        }
+    }
+}
+
+/// Finalize a legacy `Result<(), CliError>`, emit errors if needed, and return
+/// the exit code.  Used for commands that have not yet been migrated to
+/// `CommandOutput`.
+pub fn finish_legacy(result: Result<(), CliError>, json: bool) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::from(0),
+        Err(err) => {
+            let code = exit::exit_code_for(&err);
+            emit_error(&err, json);
+            ExitCode::from(code)
+        }
     }
 }
