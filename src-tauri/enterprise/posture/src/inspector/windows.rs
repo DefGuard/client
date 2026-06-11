@@ -90,22 +90,19 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     Err(UnavailableReason::DetectionFailed)
 }
 
-/// Determine whether Microsoft Defender antivirus is actively protecting the device.
+/// Determine AntiVirus status.
 ///
-/// `SecurityCenter2` reports whether an antivirus provider is registered/enabled, but it can stay
-/// active even when real-time scanning is disabled. For posture checks we require both Defender AV
-/// and real-time protection to be enabled.
+/// Check manually in PowerShell:
+/// `Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct`
 ///
 /// Equivalent to PowerShell command:
-/// `Get-CimInstance -Namespace root\Microsoft\Windows\Defender -ClassName MSFT_MpComputerStatus`
+/// `Get-WmiObject -Namespace  "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct"`
 pub(super) fn anti_virus_status() -> Result<bool, UnavailableReason> {
-    let conn = WMIConnection::with_namespace_path("root\\Microsoft\\Windows\\Defender")?;
-    let statuses: Vec<MpComputerStatus> = conn.query()?;
-    let status = statuses
-        .into_iter()
-        .next()
-        .ok_or(UnavailableReason::DetectionFailed)?;
-    Ok(status.antivirus_enabled && status.real_time_protection_enabled)
+    let conn = WMIConnection::with_namespace_path("root\\SecurityCenter2")?;
+    let products: Vec<AntiVirusProduct> = conn.query()?;
+    Ok(products
+        .iter()
+        .any(|product| (product.product_state & 0x0000_F000) == 0x0000_1000))
 }
 
 /// Check if this machine is part of an Active Directory domain.
