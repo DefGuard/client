@@ -1,4 +1,5 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
+use defguard_core::ConnectionType;
 
 use crate::{
     output::CommandOutput,
@@ -98,9 +99,9 @@ pub async fn handle(
 
         let target = resolve::resolve_disconnect_target(&spec, &state.pool).await?;
 
-        let (target_id, target_name) = match &target {
-            ResolvedTarget::Location(loc) => (loc.id, loc.name.clone()),
-            ResolvedTarget::Tunnel(tun) => (tun.id, tun.name.clone()),
+        let (target_id, target_connection_type, target_name) = match &target {
+            ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.clone()),
+            ResolvedTarget::Tunnel(tun) => (tun.id, ConnectionType::Tunnel, tun.name.clone()),
         };
 
         // Look up the actual interface name from active_state.
@@ -108,7 +109,7 @@ pub async fn handle(
 
         let connection = active
             .iter()
-            .find(|c| c.target_id == target_id)
+            .find(|c| c.connection_type == target_connection_type && c.target_id == target_id)
             .ok_or_else(|| {
                 CliError::NotFound(format!("'{target_name}' is not currently connected"))
             })?;
