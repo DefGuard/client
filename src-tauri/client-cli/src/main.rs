@@ -77,10 +77,9 @@ async fn main() -> ExitCode {
             id,
             instance,
             all,
-        } => output::finish_legacy(
+        } => output::finish(
             disconnect::handle(
                 &state,
-                cli.json,
                 name.as_deref(),
                 tunnel,
                 id,

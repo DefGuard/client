@@ -1,20 +1,19 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
 
 use crate::{
-    output::{self, DisconnectOutput, DisconnectedResult},
+    output::CommandOutput,
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 
 pub async fn handle(
     state: &State,
-    json: bool,
     name: Option<&str>,
     tunnel: bool,
     id: Option<i64>,
     instance: Option<&str>,
     all: bool,
-) -> Result<(), CliError> {
+) -> Result<DisconnectResult, CliError> {
     #[cfg(target_os = "macos")]
     {
         return Err(CliError::Other(
@@ -29,16 +28,7 @@ pub async fn handle(
         let active = active_state(&state.pool).await?;
 
         if active.is_empty() {
-            output::emit(
-                &DisconnectOutput {
-                    disconnected: Some(DisconnectedResult::List(vec![])),
-                    interface: None,
-                    errors: vec![],
-                    message: Some("No active connections.".into()),
-                },
-                json,
-            );
-            return Ok(());
+            return Ok(DisconnectResult::NoneActive);
         }
 
         let mut disconnected = Vec::with_capacity(active.len());
@@ -63,20 +53,10 @@ pub async fn handle(
             }
         }
 
-        output::emit(
-            &DisconnectOutput {
-                disconnected: Some(DisconnectedResult::List(disconnected)),
-                interface: None,
-                errors,
-                message: None,
-            },
-            json,
-        );
-
-        // Always Ok: the emitted JSON already contains per-item success/error
-        // details. Returning Err would cause a second JSON error doc on stdout
-        // when --json is active, breaking single-document consumers.
-        Ok(())
+        Ok(DisconnectResult::All {
+            disconnected,
+            errors,
+        })
     } else {
         // No-arg disconnect: if exactly one connection is active, disconnect it.
         if name.is_none() && !tunnel && id.is_none() && instance.is_none() {
@@ -84,16 +64,7 @@ pub async fn handle(
 
             match active.len() {
                 0 => {
-                    output::emit(
-                        &DisconnectOutput {
-                            disconnected: None,
-                            interface: None,
-                            errors: vec![],
-                            message: Some("No active connections.".into()),
-                        },
-                        json,
-                    );
-                    return Ok(());
+                    return Ok(DisconnectResult::NoneActive);
                 }
                 1 => {
                     let conn = &active[0];
@@ -103,16 +74,10 @@ pub async fn handle(
                         "Disconnecting sole active connection {name} on interface {ifname}..."
                     );
                     tear_down(conn, &state.pool).await?;
-                    output::emit(
-                        &DisconnectOutput {
-                            disconnected: Some(DisconnectedResult::Single(name.clone())),
-                            interface: Some(ifname.clone()),
-                            errors: vec![],
-                            message: Some(format!("Disconnected from {name} ({ifname})")),
-                        },
-                        json,
-                    );
-                    return Ok(());
+                    return Ok(DisconnectResult::Single {
+                        name,
+                        interface: ifname,
+                    });
                 }
                 _ => {
                     let names: Vec<_> = active.iter().map(|c| c.name.as_str()).collect();
@@ -154,16 +119,177 @@ pub async fn handle(
 
         tear_down(connection, &state.pool).await?;
 
-        output::emit(
-            &DisconnectOutput {
-                disconnected: Some(DisconnectedResult::Single(target_name.clone())),
-                interface: Some(ifname.clone()),
-                errors: vec![],
-                message: Some(format!("Disconnected from {target_name} ({ifname})")),
-            },
-            json,
-        );
+        Ok(DisconnectResult::Single {
+            name: target_name,
+            interface: ifname,
+        })
+    }
+}
 
-        Ok(())
+pub enum DisconnectResult {
+    Single {
+        name: String,
+        interface: String,
+    },
+    All {
+        disconnected: Vec<String>,
+        errors: Vec<String>,
+    },
+    NoneActive,
+}
+
+impl CommandOutput for DisconnectResult {
+    fn human(&self) -> String {
+        match self {
+            DisconnectResult::Single { name, interface } => {
+                format!("Disconnected from {name} ({interface})")
+            }
+            DisconnectResult::All {
+                disconnected,
+                errors,
+            } => {
+                let mut parts: Vec<String> = Vec::new();
+                if !disconnected.is_empty() {
+                    parts.push(format!("disconnected: {}", disconnected.join(", ")));
+                }
+                if !errors.is_empty() {
+                    parts.push(format!("errors: {}", errors.join(", ")));
+                }
+                if parts.is_empty() {
+                    "No active connections.".to_string()
+                } else {
+                    parts.join("\n")
+                }
+            }
+            DisconnectResult::NoneActive => "No active connections.".to_string(),
+        }
+    }
+
+    fn json(&self) -> serde_json::Value {
+        match self {
+            DisconnectResult::Single { name, interface } => serde_json::json!({
+                "disconnected": name,
+                "interface": interface,
+            }),
+            DisconnectResult::All {
+                disconnected,
+                errors,
+            } => serde_json::json!({
+                "disconnected": disconnected,
+                "errors": errors,
+            }),
+            DisconnectResult::NoneActive => serde_json::json!({}),
+        }
+    }
+
+    fn exit_code(&self) -> u8 {
+        match self {
+            DisconnectResult::All { errors, .. } if !errors.is_empty() => 1,
+            _ => 0,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_single_human() {
+        let result = DisconnectResult::Single {
+            name: "office".to_string(),
+            interface: "wg0".to_string(),
+        };
+        assert_eq!(result.human(), "Disconnected from office (wg0)");
+    }
+
+    #[test]
+    fn test_none_active_human() {
+        let result = DisconnectResult::NoneActive;
+        assert_eq!(result.human(), "No active connections.");
+    }
+
+    #[test]
+    fn test_all_success_human() {
+        let result = DisconnectResult::All {
+            disconnected: vec!["office".to_string(), "home".to_string()],
+            errors: vec![],
+        };
+        assert_eq!(result.human(), "disconnected: office, home");
+    }
+
+    #[test]
+    fn test_all_with_errors_human() {
+        let result = DisconnectResult::All {
+            disconnected: vec!["office".to_string()],
+            errors: vec!["Failed to disconnect home: timeout".to_string()],
+        };
+        let s = result.human();
+        assert!(s.contains("disconnected: office"));
+        assert!(s.contains("errors: Failed to disconnect home: timeout"));
+    }
+
+    #[test]
+    fn test_single_json() {
+        let result = DisconnectResult::Single {
+            name: "office".to_string(),
+            interface: "wg0".to_string(),
+        };
+        let json = result.json();
+        assert_eq!(json["disconnected"], "office");
+        assert_eq!(json["interface"], "wg0");
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_all_json() {
+        let result = DisconnectResult::All {
+            disconnected: vec!["office".to_string()],
+            errors: vec!["err".to_string()],
+        };
+        let json = result.json();
+        assert_eq!(json["disconnected"].as_array().unwrap().len(), 1);
+        assert_eq!(json["errors"].as_array().unwrap().len(), 1);
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_none_active_json() {
+        let result = DisconnectResult::NoneActive;
+        let json = result.json();
+        assert_eq!(json, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_exit_code_zero_on_success() {
+        assert_eq!(
+            DisconnectResult::Single {
+                name: "x".to_string(),
+                interface: "y".to_string(),
+            }
+            .exit_code(),
+            0
+        );
+        assert_eq!(
+            DisconnectResult::All {
+                disconnected: vec!["x".to_string()],
+                errors: vec![],
+            }
+            .exit_code(),
+            0
+        );
+        assert_eq!(DisconnectResult::NoneActive.exit_code(), 0);
+    }
+
+    #[test]
+    fn test_exit_code_one_on_partial_failure() {
+        assert_eq!(
+            DisconnectResult::All {
+                disconnected: vec!["x".to_string()],
+                errors: vec!["e".to_string()],
+            }
+            .exit_code(),
+            1
+        );
     }
 }

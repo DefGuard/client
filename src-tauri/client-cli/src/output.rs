@@ -68,50 +68,6 @@ pub fn emit_error(err: &CliError, json: bool) {
     }
 }
 
-/// Output for the `disconnect` command.
-#[derive(Serialize)]
-pub struct DisconnectOutput {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disconnected: Option<DisconnectedResult>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub interface: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub errors: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
-
-impl HumanRender for DisconnectOutput {
-    fn render(&self) -> String {
-        if let Some(ref msg) = self.message {
-            return msg.clone();
-        }
-        // Fallback for --all without message.
-        let mut parts = Vec::new();
-        match &self.disconnected {
-            Some(DisconnectedResult::Single(name)) => {
-                parts.push(format!("disconnected: {name}"));
-            }
-            Some(DisconnectedResult::List(names)) => {
-                parts.push(format!("disconnected: {}", names.join(", ")));
-            }
-            None => {}
-        }
-        if !self.errors.is_empty() {
-            parts.push(format!("errors: {}", self.errors.join(", ")));
-        }
-        parts.join("\n")
-    }
-}
-
-/// The `disconnected` field value - either a single name, a list, or absent.
-#[derive(Serialize)]
-#[serde(untagged)]
-pub enum DisconnectedResult {
-    Single(String),
-    List(Vec<String>),
-}
-
 /// Output for the `location list` command.
 #[derive(Serialize)]
 pub struct LocationListOutput {
