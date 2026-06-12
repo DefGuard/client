@@ -1,6 +1,6 @@
 [package]
 name = "defguard-cli"
-description = "Command-line client for Defguard VPN — connect, disconnect, status"
+description = "Command-line client for Defguard VPN - connect, disconnect, status"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true

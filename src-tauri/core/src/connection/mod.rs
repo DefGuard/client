@@ -72,7 +72,7 @@ pub async fn bring_up(
 
 /// Tear down a WireGuard interface identified by `ActiveConnectionInfo`.
 ///
-/// On macOS this returns [`Error::BackendUnavailable`] — see [`bring_up`].
+/// On macOS this returns [`Error::BackendUnavailable`] - see [`bring_up`].
 pub async fn tear_down(conn: &ActiveConnectionInfo) -> Result<(), Error> {
     #[cfg(not(target_os = "macos"))]
     {

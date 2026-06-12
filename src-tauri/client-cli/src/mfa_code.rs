@@ -43,9 +43,9 @@ impl fmt::Debug for CodeSource {
 
 /// Context passed to `--code-command` via environment variables.
 pub struct MfaContext {
-    /// `DG_INSTANCE` — the instance name.
+    /// `DG_INSTANCE` - the instance name.
     pub instance: String,
-    /// `DG_LOCATION` — the location name.
+    /// `DG_LOCATION` - the location name.
     pub location: String,
 }
 
@@ -95,7 +95,7 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
                 ));
             }
 
-            // N.B. stderr — stdout is reserved for data.
+            // N.B. stderr - stdout is reserved for data.
             eprint!("Enter MFA code for {}: ", ctx.location);
             io::stderr().flush().ok();
 

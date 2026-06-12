@@ -34,12 +34,12 @@ use crate::{
 
 /// Run the VPN MFA handshake for a location.
 ///
-/// * `location` — the target location.
-/// * `source`  — how to obtain the code.
-/// * `instance` — the instance this location belongs to (for proxy URL + pubkey).
-/// * `method_override` — optional `--mfa-method` flag; if set, uses this instead of the
+/// * `location` - the target location.
+/// * `source`  - how to obtain the code.
+/// * `instance` - the instance this location belongs to (for proxy URL + pubkey).
+/// * `method_override` - optional `--mfa-method` flag; if set, uses this instead of the
 ///   location's stored preference.
-/// * `posture_data` — device posture data; must be provided when the location also
+/// * `posture_data` - device posture data; must be provided when the location also
 ///   requires posture checks.
 ///
 /// Returns the WireGuard preshared key (as a [`SecretString`]) that must

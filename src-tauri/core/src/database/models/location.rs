@@ -161,7 +161,7 @@ impl Location<Id> {
     }
 
     /// Find locations by name (excluding service locations).
-    /// Returns all matches — callers must handle cross-instance ambiguity.
+    /// Returns all matches - callers must handle cross-instance ambiguity.
     pub async fn find_by_name<'e, E>(executor: E, name: &str) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
