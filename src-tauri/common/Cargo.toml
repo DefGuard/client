@@ -9,5 +9,8 @@ version.workspace = true
 
 [dependencies]
 
+[build-dependencies]
+vergen-git2.workspace = true
+
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["net"] }

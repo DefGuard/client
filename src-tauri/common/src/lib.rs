@@ -3,6 +3,28 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 /// Package version from the workspace (shared across all binaries).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Build a `--version` output string for a given binary name.
+///
+/// Uses the `DEFGUARD_CLIENT_BUILD_VERSION` environment variable when set (CI pre-release
+/// builds), falling back to `CARGO_PKG_VERSION` + short commit hash.
+#[must_use]
+pub fn version_string(binary_name: &str) -> String {
+    let version = option_env!("DEFGUARD_CLIENT_BUILD_VERSION")
+        .filter(|v| !v.trim().is_empty())
+        .map(|v| format!("{v} ({})", env!("VERGEN_GIT_SHA")))
+        .unwrap_or_else(|| format!("{} ({})", env!("CARGO_PKG_VERSION"), env!("VERGEN_GIT_SHA")));
+    format!("{binary_name} {version}")
+}
+
+/// Check for `--version` / `-V` in command-line arguments and exit with the version
+/// string if found. Call this early in `main()` before argument parsing.
+pub fn check_version_flag(binary_name: &str) {
+    if std::env::args().any(|a| a == "--version" || a == "-V") {
+        println!("{}", version_string(binary_name));
+        std::process::exit(0);
+    }
+}
+
 /// Obtain a free TCP port on localhost.
 #[must_use]
 pub fn find_free_tcp_port() -> Option<u16> {

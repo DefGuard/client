@@ -31,6 +31,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tempfile = "3"
 http = "1"
+vergen-git2 = { version = "9.1", features = ["build"] }
 
 [workspace.package]
 authors = ["Defguard"]
@@ -58,7 +59,7 @@ name = "defguard-client"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-vergen-git2 = { version = "9.1", features = ["build"] }
+vergen-git2.workspace = true
 
 [dependencies]
 anyhow = "1.0"
