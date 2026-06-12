@@ -4,6 +4,7 @@ use defguard_core::database::models::{instance::Instance, location::Location, tu
 use serde_json::json;
 
 use crate::{
+    commands::location::mfa_label,
     output::{CommandOutput, InstanceEntry, LocationEntry, TunnelEntry},
     state::{CliError, State},
 };
@@ -63,7 +64,7 @@ impl CommandOutput for ListResult {
                 address: l.address.clone(),
                 endpoint: l.endpoint.clone(),
                 mfa_enabled: Some(l.mfa_enabled()),
-                mfa_method: None,
+                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
                 route_all_traffic: Some(l.route_all_traffic),
             })
             .collect();
@@ -92,11 +93,11 @@ fn format_list_table(
     tunnels: &[Tunnel<Id>],
 ) -> String {
     let mut instance_locations: HashMap<Id, Vec<&Location<Id>>> = HashMap::new();
-    for locaction in locations {
+    for location in locations {
         instance_locations
-            .entry(locaction.instance_id)
+            .entry(location.instance_id)
             .or_default()
-            .push(locaction);
+            .push(location);
     }
 
     let location_name_col_width = locations

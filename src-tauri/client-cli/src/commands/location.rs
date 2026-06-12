@@ -123,7 +123,7 @@ fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
     }
 }
 
-fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
+pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
     match method {
         Some(LocationMfaMethod::Totp) => "totp",
         Some(LocationMfaMethod::Email) => "email",
