@@ -525,29 +525,47 @@ impl DesktopDaemonService for DaemonService {
         _request: tonic::Request<()>,
     ) -> Result<Response<ListInterfacesResponse>, Status> {
         debug!("Received ListInterfaces request");
-        let Ok(wgapis_map) = self.wgapis.read() else {
-            error!("Failed to acquire read lock for WGApis");
-            return Err(Status::new(Code::Internal, "read lock error"));
+
+        // Collect interface names under a brief lock.
+        let ifnames: Vec<String> = {
+            let Ok(wgapis_map) = self.wgapis.read() else {
+                error!("Failed to acquire read lock for WGApis");
+                return Err(Status::new(Code::Internal, "read lock error"));
+            };
+            wgapis_map.keys().cloned().collect()
         };
-        let interfaces: Vec<ManagedInterfaceData> = wgapis_map
-            .iter()
-            .map(|(ifname, wgapi)| match wgapi.read_interface_data() {
-                Ok(host) => {
-                    debug!("ListInterfaces: returning data for {ifname}");
-                    ManagedInterfaceData {
-                        interface_name: ifname.clone(),
-                        data: Some(host.into()),
+
+        // Read each interface's data, acquiring and releasing the lock per interface
+        // so that write operations (create/remove) can interleave.
+        let mut interfaces = Vec::with_capacity(ifnames.len());
+        for ifname in &ifnames {
+            let data = {
+                let Ok(wgapis_map) = self.wgapis.read() else {
+                    error!("Failed to acquire read lock for WGApis");
+                    return Err(Status::new(Code::Internal, "read lock error"));
+                };
+                match wgapis_map.get(ifname) {
+                    Some(wgapi) => match wgapi.read_interface_data() {
+                        Ok(host) => {
+                            debug!("ListInterfaces: returning data for {ifname}");
+                            Some(host.into())
+                        }
+                        Err(err) => {
+                            error!("ListInterfaces: failed to read data for {ifname}: {err}");
+                            None
+                        }
+                    },
+                    None => {
+                        debug!("ListInterfaces: interface {ifname} removed since snapshot");
+                        None
                     }
                 }
-                Err(err) => {
-                    error!("ListInterfaces: failed to read data for {ifname}: {err}");
-                    ManagedInterfaceData {
-                        interface_name: ifname.clone(),
-                        data: None,
-                    }
-                }
-            })
-            .collect();
+            };
+            interfaces.push(ManagedInterfaceData {
+                interface_name: ifname.clone(),
+                data,
+            });
+        }
         debug!(
             "ListInterfaces: returning {} managed interface(s)",
             interfaces.len()
