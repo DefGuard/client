@@ -25,7 +25,7 @@ use defguard_core::{
 use reqwest::{StatusCode, Url};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::{
     mfa_code::{obtain_code, CodeSource, MfaContext},
@@ -79,6 +79,19 @@ pub async fn authorize(
         _ => {}
     }
 
+    // Parse the proxy base URL once and reuse it for both MFA requests.
+    let proxy_base = Url::parse(&instance.proxy_url)
+        .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
+
+    // The one-time MFA code and the returned preshared key are sensitive; warn (but do
+    // not block) if the proxy is not using HTTPS, since they would travel in cleartext.
+    if proxy_base.scheme() != "https" {
+        warn!(
+            "Proxy URL '{}' is not HTTPS; the MFA code and preshared key will be sent in cleartext.",
+            instance.proxy_url
+        );
+    }
+
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
@@ -87,13 +100,12 @@ pub async fn authorize(
         posture_data,
     };
 
-    let proxy_url = Url::parse(&instance.proxy_url)
-        .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?
+    let start_url = proxy_base
         .join("api/v1/client-mfa/start")
         .map_err(|e| CliError::Other(format!("Failed to build MFA start URL: {e}")))?;
 
-    debug!("Starting MFA session at {proxy_url}");
-    let response = post_with_headers(proxy_url, &start_req)
+    debug!("Starting MFA session at {start_url}");
+    let response = post_with_headers(start_url, &start_req)
         .await
         .map_err(|e| CliError::Other(format!("Failed to reach proxy: {e}")))?;
 
@@ -123,8 +135,7 @@ pub async fn authorize(
         auth_pub_key: None,
     };
 
-    let finish_url = Url::parse(&instance.proxy_url)
-        .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?
+    let finish_url = proxy_base
         .join("api/v1/client-mfa/finish")
         .map_err(|e| CliError::Other(format!("Failed to build MFA finish URL: {e}")))?;
 
