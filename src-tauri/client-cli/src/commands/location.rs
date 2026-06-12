@@ -5,12 +5,17 @@ use defguard_core::database::models::{
     location::{Location, LocationMfaMethod},
     Id,
 };
+use serde_json::json;
 
 use crate::{
     output::{CommandOutput, LocationEntry},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
+
+const MIN_NAME: usize = 8;
+const MIN_ENDPOINT: usize = 8;
+const MIN_INST: usize = 8;
 
 pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
@@ -157,7 +162,7 @@ impl CommandOutput for LocationListResult {
                 route_all_traffic: Some(l.route_all_traffic),
             })
             .collect();
-        serde_json::json!({ "locations": locations })
+        json!({ "locations": locations })
     }
 }
 
@@ -165,42 +170,42 @@ fn format_location_list_table(
     locations: &[Location<Id>],
     instance_names: &HashMap<Id, String>,
 ) -> String {
-    let name_w = locations
+    let name_col_width = locations
         .iter()
         .map(|l| l.name.len())
         .max()
-        .unwrap_or(4)
-        .max(8);
-    let endpoint_w = locations
+        .unwrap_or(MIN_NAME)
+        .max(MIN_NAME);
+    let endpoint_col_width = locations
         .iter()
         .map(|l| l.endpoint.len())
         .max()
-        .unwrap_or(8)
-        .max(8);
-    let inst_w = locations
+        .unwrap_or(MIN_ENDPOINT)
+        .max(MIN_ENDPOINT);
+    let inst_col_width = locations
         .iter()
         .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
         .max()
-        .unwrap_or(8)
-        .max(8);
+        .unwrap_or(MIN_INST)
+        .max(MIN_INST);
 
     let mut lines = vec![format!(
-        "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:<11}",
+        "  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:<11}",
         "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
     )];
-    for loc in locations {
-        let inst = instance_names
-            .get(&loc.instance_id)
+    for location in locations {
+        let instance = instance_names
+            .get(&location.instance_id)
             .map(|n| n.as_str())
             .unwrap_or("?");
         lines.push(format!(
-            "  {:<name_w$}  {:<15}  {:<endpoint_w$}  {:<inst_w$}  {:>3}  {:>11}",
-            loc.name,
-            loc.address,
-            loc.endpoint,
-            inst,
-            mfa_label(loc.mfa_method),
-            if loc.route_all_traffic {
+            "  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
+            location.name,
+            location.address,
+            location.endpoint,
+            instance,
+            mfa_label(location.mfa_method),
+            if location.route_all_traffic {
                 "All-traffic"
             } else {
                 "Predefined"
@@ -240,7 +245,7 @@ impl CommandOutput for LocationShowResult {
     }
 
     fn json(&self) -> serde_json::Value {
-        let mut json = serde_json::json!({
+        let mut json = json!({
             "name": self.name,
             "address": self.address,
             "endpoint": self.endpoint,
@@ -251,7 +256,7 @@ impl CommandOutput for LocationShowResult {
             "keepalive_interval": self.keepalive_interval,
         });
         if let Some(dns) = &self.dns {
-            json["dns"] = serde_json::json!(dns);
+            json["dns"] = json!(dns);
         }
         json
     }
@@ -276,7 +281,7 @@ impl CommandOutput for LocationSetResult {
     }
 
     fn json(&self) -> serde_json::Value {
-        serde_json::json!({
+        json!({
             "location": self.name,
             "changes": self.changes,
         })
@@ -322,7 +327,7 @@ mod tests {
     #[test]
     fn test_list_human_empty() {
         let result = LocationListResult {
-            locations: vec![],
+            locations: Vec::new(),
             instance_names: HashMap::new(),
         };
         assert_eq!(result.human(), "No locations configured.");
@@ -346,7 +351,7 @@ mod tests {
     #[test]
     fn test_list_json_empty() {
         let result = LocationListResult {
-            locations: vec![],
+            locations: Vec::new(),
             instance_names: HashMap::new(),
         };
         let json = result.json();
@@ -449,7 +454,7 @@ mod tests {
     fn test_exit_code_zero() {
         assert_eq!(
             LocationListResult {
-                locations: vec![],
+                locations: Vec::new(),
                 instance_names: HashMap::new(),
             }
             .exit_code(),
@@ -473,7 +478,7 @@ mod tests {
         assert_eq!(
             LocationSetResult {
                 name: "x".to_string(),
-                changes: vec![],
+                changes: Vec::new(),
             }
             .exit_code(),
             0
@@ -484,7 +489,7 @@ mod tests {
     fn test_set_human_no_changes() {
         let result = LocationSetResult {
             name: "office".to_string(),
-            changes: vec![],
+            changes: Vec::new(),
         };
         assert_eq!(result.human(), "No changes for location 'office'.");
     }
@@ -519,7 +524,7 @@ mod tests {
     fn test_set_json_empty_changes() {
         let result = LocationSetResult {
             name: "office".to_string(),
-            changes: vec![],
+            changes: Vec::new(),
         };
         let json = result.json();
         assert_eq!(json["location"], "office");

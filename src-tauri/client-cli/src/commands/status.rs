@@ -1,15 +1,19 @@
 use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
+use serde_json::json;
 
 use crate::{
     output::{ActiveEntry, CommandOutput},
     state::{CliError, State},
 };
 
+const MIN_NAME_COL_WIDTH: usize = 4;
+const MIN_IFACE_COL_WIDTH: usize = 9;
+
 pub async fn handle(state: &State) -> Result<StatusResult, CliError> {
     #[cfg(target_os = "macos")]
     {
         return Ok(StatusResult {
-            connections: vec![],
+            connections: Vec::new(),
         });
     }
 
@@ -53,43 +57,43 @@ impl CommandOutput for StatusResult {
                 last_handshake_secs: c.stats.as_ref().and_then(|s| s.last_handshake),
             })
             .collect();
-        serde_json::json!({ "active": active })
+        json!({ "active": active })
     }
 }
 
 /// Build a human-readable status table string.
 fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
-    let name_w = connections
+    let name_col_width = connections
         .iter()
         .map(|c| c.name.len())
         .max()
-        .unwrap_or(4)
-        .max(4);
-    let iface_w = connections
+        .unwrap_or(MIN_NAME_COL_WIDTH)
+        .max(MIN_NAME_COL_WIDTH);
+    let iface_col_width = connections
         .iter()
         .map(|c| c.interface_name.len())
         .max()
-        .unwrap_or(9)
-        .max(9);
+        .unwrap_or(MIN_IFACE_COL_WIDTH)
+        .max(MIN_IFACE_COL_WIDTH);
 
     let mut lines = vec![format!("\nActive Connections")];
     lines.push(format!(
-        "  {:<name_w$}  TYPE       {:<iface_w$}  TX          RX          {:<9}",
+        "  {:<name_col_width$}  TYPE       {:<iface_col_width$}  TX          RX          {:<9}",
         "NAME", "INTERFACE", "HANDSHAKE"
     ));
 
-    for conn in connections {
-        let tx = conn
+    for connection in connections {
+        let tx = connection
             .stats
             .as_ref()
             .map(|s| format_bytes(s.tx_bytes))
             .unwrap_or_else(|| "-".to_string());
-        let rx = conn
+        let rx = connection
             .stats
             .as_ref()
             .map(|s| format_bytes(s.rx_bytes))
             .unwrap_or_else(|| "-".to_string());
-        let handshake = conn
+        let handshake = connection
             .stats
             .as_ref()
             .and_then(|s| s.last_handshake)
@@ -98,10 +102,10 @@ fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
             .unwrap_or_else(|| "never".to_string());
 
         lines.push(format!(
-            "  {:<name_w$}  {:<10}  {:<iface_w$}  {:<10}  {:<10}  {handshake:<9}",
-            conn.name,
-            conn.connection_type.to_string(),
-            conn.interface_name,
+            "  {:<name_col_width$}  {:<10}  {:<iface_col_width$}  {:<10}  {:<10}  {handshake:<9}",
+            connection.name,
+            connection.connection_type.to_string(),
+            connection.interface_name,
             tx,
             rx
         ));
@@ -170,7 +174,7 @@ mod tests {
     #[test]
     fn test_human_empty() {
         let result = StatusResult {
-            connections: vec![],
+            connections: Vec::new(),
         };
         let s = result.human();
         if cfg!(target_os = "macos") {
@@ -207,7 +211,7 @@ mod tests {
     #[test]
     fn test_json_empty() {
         let result = StatusResult {
-            connections: vec![],
+            connections: Vec::new(),
         };
         let json = result.json();
         assert_eq!(json["active"].as_array().unwrap().len(), 0);
@@ -252,7 +256,7 @@ mod tests {
     #[test]
     fn test_json_no_message_field() {
         let result = StatusResult {
-            connections: vec![],
+            connections: Vec::new(),
         };
         let json = result.json();
         assert!(json["message"].is_null());
@@ -261,7 +265,7 @@ mod tests {
     #[test]
     fn test_exit_code_zero() {
         let result = StatusResult {
-            connections: vec![],
+            connections: Vec::new(),
         };
         assert_eq!(result.exit_code(), 0);
     }

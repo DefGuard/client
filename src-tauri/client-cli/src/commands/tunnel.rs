@@ -1,9 +1,14 @@
 use defguard_core::database::models::{tunnel::Tunnel, Id};
+use serde_json::json;
 
 use crate::{
     output::CommandOutput,
     state::{CliError, State},
 };
+
+const MIN_NAME_COL_WIDTH: usize = 4;
+const MIN_ADDR_COL_WIDTH: usize = 7;
+const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 
 pub async fn handle_list(state: &State) -> Result<TunnelListResult, CliError> {
     let tunnels = Tunnel::all(&state.pool).await?;
@@ -47,7 +52,7 @@ impl CommandOutput for TunnelListResult {
             .tunnels
             .iter()
             .map(|t| {
-                serde_json::json!({
+                json!({
                     "name": t.name,
                     "address": t.address,
                     "endpoint": t.endpoint,
@@ -55,41 +60,41 @@ impl CommandOutput for TunnelListResult {
                 })
             })
             .collect();
-        serde_json::json!({ "tunnels": tunnels })
+        json!({ "tunnels": tunnels })
     }
 }
 
 fn format_tunnel_list_table(tunnels: &[Tunnel<Id>]) -> String {
-    let name_w = tunnels
+    let name_col_width = tunnels
         .iter()
         .map(|t| t.name.len())
         .max()
-        .unwrap_or(4)
-        .max(4);
-    let addr_w = tunnels
+        .unwrap_or(MIN_NAME_COL_WIDTH)
+        .max(MIN_NAME_COL_WIDTH);
+    let addr_col_width = tunnels
         .iter()
         .map(|t| t.address.len())
         .max()
-        .unwrap_or(7)
-        .max(7);
-    let endpoint_w = tunnels
+        .unwrap_or(MIN_ADDR_COL_WIDTH)
+        .max(MIN_ADDR_COL_WIDTH);
+    let endpoint_col_width = tunnels
         .iter()
         .map(|t| t.endpoint.len())
         .max()
-        .unwrap_or(8)
-        .max(8);
+        .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
+        .max(MIN_ENDPOINT_COL_WIDTH);
 
     let mut lines = vec![format!(
-        "  {:<name_w$}  {:<addr_w$}  {:<endpoint_w$}  {:>11}",
+        "  {:<name_col_width$}  {:<addr_col_width$}  {:<endpoint_col_width$}  {:>11}",
         "NAME", "ADDRESS", "ENDPOINT", "Routing"
     )];
-    for tun in tunnels {
+    for tunnel in tunnels {
         lines.push(format!(
-            "  {:<name_w$}  {:<addr_w$}  {:<endpoint_w$}  {:>11}",
-            tun.name,
-            tun.address,
-            tun.endpoint,
-            if tun.route_all_traffic {
+            "  {:<name_col_width$}  {:<addr_col_width$}  {:<endpoint_col_width$}  {:>11}",
+            tunnel.name,
+            tunnel.address,
+            tunnel.endpoint,
+            if tunnel.route_all_traffic {
                 "All-traffic"
             } else {
                 "Predefined"
@@ -144,7 +149,7 @@ impl CommandOutput for TunnelShowResult {
     }
 
     fn json(&self) -> serde_json::Value {
-        serde_json::json!({
+        json!({
             "name": self.tunnel.name,
             "address": self.tunnel.address,
             "endpoint": self.tunnel.endpoint,
@@ -189,7 +194,9 @@ mod tests {
 
     #[test]
     fn test_list_human_empty() {
-        let result = TunnelListResult { tunnels: vec![] };
+        let result = TunnelListResult {
+            tunnels: Vec::new(),
+        };
         assert_eq!(result.human(), "No tunnels configured.");
     }
 
@@ -229,7 +236,13 @@ mod tests {
 
     #[test]
     fn test_exit_code_zero() {
-        assert_eq!(TunnelListResult { tunnels: vec![] }.exit_code(), 0);
+        assert_eq!(
+            TunnelListResult {
+                tunnels: Vec::new()
+            }
+            .exit_code(),
+            0
+        );
         assert_eq!(
             TunnelShowResult {
                 tunnel: make_tunnel("x"),

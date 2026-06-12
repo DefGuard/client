@@ -1,5 +1,6 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
 use defguard_core::ConnectionType;
+use serde_json::json;
 use tracing::info;
 
 use crate::resolve::resolve_disconnect_target;
@@ -168,18 +169,18 @@ impl CommandOutput for DisconnectResult {
 
     fn json(&self) -> serde_json::Value {
         match self {
-            DisconnectResult::Single { name, interface } => serde_json::json!({
+            DisconnectResult::Single { name, interface } => json!({
                 "disconnected": name,
                 "interface": interface,
             }),
             DisconnectResult::All {
                 disconnected,
                 errors,
-            } => serde_json::json!({
+            } => json!({
                 "disconnected": disconnected,
                 "errors": errors,
             }),
-            DisconnectResult::NoneActive => serde_json::json!({}),
+            DisconnectResult::NoneActive => json!({}),
         }
     }
 
@@ -214,7 +215,7 @@ mod tests {
     fn test_all_success_human() {
         let result = DisconnectResult::All {
             disconnected: vec!["office".to_string(), "home".to_string()],
-            errors: vec![],
+            errors: Vec::new(),
         };
         assert_eq!(result.human(), "disconnected: office, home");
     }
@@ -274,7 +275,7 @@ mod tests {
         assert_eq!(
             DisconnectResult::All {
                 disconnected: vec!["x".to_string()],
-                errors: vec![],
+                errors: Vec::new(),
             }
             .exit_code(),
             0

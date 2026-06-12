@@ -59,7 +59,6 @@ pub async fn resolve_disconnect_target(
     spec: &TargetSpec,
     pool: &DbPool,
 ) -> Result<ResolvedTarget, CliError> {
-    // TODO: Phase 4.3 -- use active_state for no-arg / --all
     resolve_connect_target(spec, pool).await
 }
 

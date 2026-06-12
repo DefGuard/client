@@ -1,9 +1,14 @@
 use defguard_core::database::models::{instance::Instance, Id};
+use serde_json::json;
 
 use crate::{
     output::CommandOutput,
     state::{CliError, State},
 };
+
+const MIN_NAME_COL_WIDTH: usize = 4;
+const MIN_URL_COL_WIDTH: usize = 3;
+const MIN_USER_COL_WIDTH: usize = 8;
 
 pub async fn handle_list(state: &State) -> Result<InstanceListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
@@ -11,10 +16,10 @@ pub async fn handle_list(state: &State) -> Result<InstanceListResult, CliError> 
 }
 
 pub async fn handle_show(state: &State, name: &str) -> Result<InstanceShowResult, CliError> {
-    let inst = Instance::find_by_name(&state.pool, name)
+    let instance = Instance::find_by_name(&state.pool, name)
         .await?
         .ok_or_else(|| CliError::NotFound(format!("Instance '{name}' not found")))?;
-    Ok(InstanceShowResult { inst })
+    Ok(InstanceShowResult { instance })
 }
 
 pub struct InstanceListResult {
@@ -35,7 +40,7 @@ impl CommandOutput for InstanceListResult {
             .instances
             .iter()
             .map(|inst| {
-                serde_json::json!({
+                json!({
                     "name": inst.name,
                     "url": inst.url,
                     "username": inst.username,
@@ -43,83 +48,85 @@ impl CommandOutput for InstanceListResult {
                 })
             })
             .collect();
-        serde_json::json!({ "instances": instances })
+        json!({ "instances": instances })
     }
 }
 
 fn format_instance_list_table(instances: &[Instance<Id>]) -> String {
-    let name_w = instances
+    let name_col_width = instances
         .iter()
         .map(|i| i.name.len())
         .max()
-        .unwrap_or(4)
-        .max(4);
-    let url_w = instances
+        .unwrap_or(MIN_NAME_COL_WIDTH)
+        .max(MIN_NAME_COL_WIDTH);
+    let url_col_width = instances
         .iter()
         .map(|i| i.url.len())
         .max()
-        .unwrap_or(3)
-        .max(3);
-    let user_w = instances
+        .unwrap_or(MIN_URL_COL_WIDTH)
+        .max(MIN_URL_COL_WIDTH);
+    let user_col_width = instances
         .iter()
         .map(|i| i.username.len())
         .max()
-        .unwrap_or(8)
-        .max(8);
+        .unwrap_or(MIN_USER_COL_WIDTH)
+        .max(MIN_USER_COL_WIDTH);
 
     let mut lines = vec![format!(
-        "  {:<name_w$}  {:<url_w$}  {:<user_w$}  {:<15}",
+        "  {:<name_col_width$}  {:<url_col_width$}  {:<user_col_width$}  {:<15}",
         "NAME", "URL", "USERNAME", "TRAFFIC POLICY"
     )];
-    for inst in instances {
+    for instance in instances {
         lines.push(format!(
-            "  {:<name_w$}  {:<url_w$}  {:<user_w$}  {:<15}",
-            inst.name,
-            inst.url,
-            inst.username,
-            format!("{:?}", inst.client_traffic_policy),
+            "  {:<name_col_width$}  {:<url_col_width$}  {:<user_col_width$}  {:<15}",
+            instance.name,
+            instance.url,
+            instance.username,
+            format!("{:?}", instance.client_traffic_policy),
         ));
     }
     lines.join("\n")
 }
 
 pub struct InstanceShowResult {
-    pub inst: Instance<Id>,
+    pub instance: Instance<Id>,
 }
 
 impl CommandOutput for InstanceShowResult {
     fn human(&self) -> String {
         let mut lines = Vec::new();
-        lines.push(format!("Name:           {}", self.inst.name));
-        lines.push(format!("UUID:           {}", self.inst.uuid));
-        lines.push(format!("URL:            {}", self.inst.url));
-        lines.push(format!("Proxy URL:      {}", self.inst.proxy_url));
-        lines.push(format!("Username:       {}", self.inst.username));
+        lines.push(format!("Name:           {}", self.instance.name));
+        lines.push(format!("UUID:           {}", self.instance.uuid));
+        lines.push(format!("URL:            {}", self.instance.url));
+        lines.push(format!("Proxy URL:      {}", self.instance.proxy_url));
+        lines.push(format!("Username:       {}", self.instance.username));
         lines.push(format!(
             "Traffic policy: {:?}",
-            self.inst.client_traffic_policy
+            self.instance.client_traffic_policy
         ));
-        if let Some(ref display_name) = self.inst.openid_display_name {
+        if let Some(ref display_name) = self.instance.openid_display_name {
             lines.push(format!("OIDC display:   {display_name}"));
         }
         lines.join("\n")
     }
 
     fn json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "name": self.inst.name,
-            "uuid": self.inst.uuid,
-            "url": self.inst.url,
-            "proxy_url": self.inst.proxy_url,
-            "username": self.inst.username,
-            "traffic_policy": format!("{:?}", self.inst.client_traffic_policy),
-            "openid_display_name": self.inst.openid_display_name,
+        json!({
+            "name": self.instance.name,
+            "uuid": self.instance.uuid,
+            "url": self.instance.url,
+            "proxy_url": self.instance.proxy_url,
+            "username": self.instance.username,
+            "traffic_policy": format!("{:?}", self.instance.client_traffic_policy),
+            "openid_display_name": self.instance.openid_display_name,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use defguard_core::database::models::instance::ClientTrafficPolicy;
+
     use super::*;
 
     fn make_instance(name: &str) -> Instance<Id> {
@@ -131,8 +138,7 @@ mod tests {
             proxy_url: "https://proxy.example.com".to_string(),
             username: "admin".to_string(),
             token: None,
-            client_traffic_policy:
-                defguard_core::database::models::instance::ClientTrafficPolicy::None,
+            client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
             openid_display_name: None,
         }
@@ -140,7 +146,9 @@ mod tests {
 
     #[test]
     fn test_list_human_empty() {
-        let result = InstanceListResult { instances: vec![] };
+        let result = InstanceListResult {
+            instances: Vec::new(),
+        };
         assert_eq!(result.human(), "No instances configured.");
     }
 
@@ -158,7 +166,7 @@ mod tests {
     #[test]
     fn test_show_human() {
         let result = InstanceShowResult {
-            inst: make_instance("acme"),
+            instance: make_instance("acme"),
         };
         let s = result.human();
         assert!(s.contains("Name:           acme"));
@@ -168,10 +176,16 @@ mod tests {
 
     #[test]
     fn test_exit_code_zero() {
-        assert_eq!(InstanceListResult { instances: vec![] }.exit_code(), 0);
+        assert_eq!(
+            InstanceListResult {
+                instances: Vec::new()
+            }
+            .exit_code(),
+            0
+        );
         assert_eq!(
             InstanceShowResult {
-                inst: make_instance("x"),
+                instance: make_instance("x"),
             }
             .exit_code(),
             0

@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 
 use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
+use serde_json::json;
 
 use crate::{
     output::{CommandOutput, InstanceEntry, LocationEntry, TunnelEntry},
     state::{CliError, State},
 };
+
+const MIN_LOCATION_NAME: usize = 8;
+const MIN_ENDPOINT: usize = 8;
+const MIN_TUNNEL_NAME: usize = 4;
 
 pub async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
@@ -73,7 +78,7 @@ impl CommandOutput for ListResult {
             })
             .collect();
 
-        serde_json::json!({
+        json!({
             "instances": instances,
             "locations": locations,
             "tunnels": tunnels,
@@ -86,43 +91,46 @@ fn format_list_table(
     locations: &[Location<Id>],
     tunnels: &[Tunnel<Id>],
 ) -> String {
-    let mut inst_locs: HashMap<Id, Vec<&Location<Id>>> = HashMap::new();
-    for loc in locations {
-        inst_locs.entry(loc.instance_id).or_default().push(loc);
+    let mut instance_locations: HashMap<Id, Vec<&Location<Id>>> = HashMap::new();
+    for locaction in locations {
+        instance_locations
+            .entry(locaction.instance_id)
+            .or_default()
+            .push(locaction);
     }
 
-    let loc_name_w = locations
+    let location_name_col_width = locations
         .iter()
         .map(|l| l.name.len())
         .max()
-        .unwrap_or(4)
-        .max(8);
-    let endpoint_w = locations
+        .unwrap_or(MIN_LOCATION_NAME)
+        .max(MIN_LOCATION_NAME);
+    let endpoint_col_width = locations
         .iter()
         .map(|l| l.endpoint.len())
         .max()
-        .unwrap_or(8)
-        .max(8);
+        .unwrap_or(MIN_ENDPOINT)
+        .max(MIN_ENDPOINT);
 
     let mut lines = Vec::new();
 
-    for inst in instances {
-        lines.push(format!("\n{} ({})", inst.name, inst.url));
-        if let Some(locs) = inst_locs.get(&inst.id) {
+    for instance in instances {
+        lines.push(format!("\n{} ({})", instance.name, instance.url));
+        if let Some(locations) = instance_locations.get(&instance.id) {
             lines.push(format!(
-                "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {:>3}  {:<11}",
+                "  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:>3}  {:<11}",
                 "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
             ));
-            for loc in locs.iter() {
-                let mfa = if loc.mfa_enabled() { "yes" } else { "no" };
-                let route_label = if loc.route_all_traffic {
+            for location in locations.iter() {
+                let mfa = if location.mfa_enabled() { "yes" } else { "no" };
+                let route_label = if location.route_all_traffic {
                     "All-traffic"
                 } else {
                     "Predefined"
                 };
                 lines.push(format!(
-                    "  {:<loc_name_w$}  {:<15}  {:<endpoint_w$}  {mfa:>3}  {route_label:<11}",
-                    loc.name, loc.address, loc.endpoint
+                    "  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {mfa:>3}  {route_label:<11}",
+                    location.name, location.address, location.endpoint
                 ));
             }
         } else {
@@ -131,28 +139,28 @@ fn format_list_table(
     }
 
     if !tunnels.is_empty() {
-        let tun_name_w = tunnels
+        let tunnel_name_col_width = tunnels
             .iter()
             .map(|t| t.name.len())
             .max()
-            .unwrap_or(4)
-            .max(loc_name_w);
-        let tun_endpoint_w = tunnels
+            .unwrap_or(MIN_TUNNEL_NAME)
+            .max(location_name_col_width);
+        let tunnel_endpoint_col_width = tunnels
             .iter()
             .map(|t| t.endpoint.len())
             .max()
-            .unwrap_or(8)
-            .max(endpoint_w);
+            .unwrap_or(MIN_ENDPOINT)
+            .max(endpoint_col_width);
 
         lines.push("\nTunnels".to_string());
         lines.push(format!(
-            "  {:<tun_name_w$}  {:<15}  {:<tun_endpoint_w$}",
+            "  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
             "NAME", "ADDRESS", "ENDPOINT"
         ));
-        for tun in tunnels {
+        for tunnel in tunnels {
             lines.push(format!(
-                "  {:<tun_name_w$}  {:<15}  {:<tun_endpoint_w$}",
-                tun.name, tun.address, tun.endpoint
+                "  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
+                tunnel.name, tunnel.address, tunnel.endpoint
             ));
         }
     }
@@ -230,9 +238,9 @@ mod tests {
     #[test]
     fn test_human_empty() {
         let result = ListResult {
-            instances: vec![],
-            locations: vec![],
-            tunnels: vec![],
+            instances: Vec::new(),
+            locations: Vec::new(),
+            tunnels: Vec::new(),
         };
         let s = result.human();
         assert!(s.contains("No instances enrolled"));
@@ -259,9 +267,9 @@ mod tests {
     #[test]
     fn test_json_empty() {
         let result = ListResult {
-            instances: vec![],
-            locations: vec![],
-            tunnels: vec![],
+            instances: Vec::new(),
+            locations: Vec::new(),
+            tunnels: Vec::new(),
         };
         let json = result.json();
         assert_eq!(json["instances"].as_array().unwrap().len(), 0);
@@ -303,9 +311,9 @@ mod tests {
     #[test]
     fn test_json_no_message_field() {
         let result = ListResult {
-            instances: vec![],
-            locations: vec![],
-            tunnels: vec![],
+            instances: Vec::new(),
+            locations: Vec::new(),
+            tunnels: Vec::new(),
         };
         let json = result.json();
         assert!(json["message"].is_null());
@@ -314,9 +322,9 @@ mod tests {
     #[test]
     fn test_exit_code_zero() {
         let result = ListResult {
-            instances: vec![],
-            locations: vec![],
-            tunnels: vec![],
+            instances: Vec::new(),
+            locations: Vec::new(),
+            tunnels: Vec::new(),
         };
         assert_eq!(result.exit_code(), 0);
     }
