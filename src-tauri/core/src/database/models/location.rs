@@ -451,14 +451,14 @@ impl Location<Id> {
         if instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic
             && route_all_traffic
         {
-            return Err(Error::InternalError(
+            return Err(Error::InvalidInput(
                 "Instance has route_all_traffic disabled.".into(),
             ));
         }
         if instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic
             && !route_all_traffic
         {
-            return Err(Error::InternalError(
+            return Err(Error::InvalidInput(
                 "Instance has route_all_traffic enforced.".into(),
             ));
         }

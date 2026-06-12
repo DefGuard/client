@@ -36,6 +36,9 @@ pub enum CliError {
     #[error("not enrolled: {0}")]
     NotEnrolled(String),
 
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+
     #[error("{0}")]
     Other(String),
 
@@ -49,6 +52,7 @@ impl From<CoreError> for CliError {
             CoreError::NotFound => CliError::NotFound(err.to_string()),
             CoreError::Database(_) => CliError::Database(err.to_string()),
             CoreError::BackendUnavailable(_) => CliError::DaemonUnavailable(err.to_string()),
+            CoreError::InvalidInput(_) => CliError::InvalidInput(err.to_string()),
             _ => CliError::Other(err.to_string()),
         }
     }
