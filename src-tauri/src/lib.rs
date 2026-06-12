@@ -46,6 +46,7 @@ pub use defguard_client_core::set_perms;
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub use defguard_client_common::{check_version_flag, version_string};
 
 #[macro_use]
 extern crate log;

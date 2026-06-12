@@ -8,7 +8,7 @@ import { devtools } from '@tanstack/devtools-vite';
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async ({ command }) => ({
+export default defineConfig(async () => ({
   plugins: [devtools(), tanstackRouter(), react()],
   clearScreen: false,
   server: {
@@ -17,10 +17,10 @@ export default defineConfig(async ({ command }) => ({
     host: host || false,
     hmr: host
       ? {
-          protocol: 'ws',
-          host,
-          port: 1421,
-        }
+        protocol: 'ws',
+        host,
+        port: 1421,
+      }
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
@@ -43,9 +43,9 @@ export default defineConfig(async ({ command }) => ({
     },
   },
   envPrefix: ['VITE_', 'TAURI_'],
-  base: command === 'build' ? '/new-ui/' : './',
+  base: '/',
   build: {
-    outDir: '../dist/new-ui',
+    outDir: '../dist',
     emptyOutDir: true,
   },
 }));
