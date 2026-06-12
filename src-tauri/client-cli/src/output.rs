@@ -1,6 +1,7 @@
 use std::process::ExitCode;
 
 use serde::Serialize;
+use serde_json::json;
 
 use crate::{exit, state::CliError};
 
@@ -22,7 +23,7 @@ pub fn emit<T: CommandOutput>(value: &T, json: bool) {
         println!(
             "{}",
             serde_json::to_string_pretty(&value.json())
-                .unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}"))
+                .unwrap_or_else(|e| json!({ "error": e.to_string() }).to_string())
         );
     } else {
         println!("{}", value.human());
@@ -43,7 +44,8 @@ pub fn emit_error(err: &CliError, json: bool) {
         };
         eprintln!(
             "{}",
-            serde_json::to_string(&je).unwrap_or_else(|e| format!("{{error: \"{e}\"}}"))
+            serde_json::to_string(&je)
+                .unwrap_or_else(|e| json!({ "error": e.to_string() }).to_string())
         );
     } else {
         eprintln!("Error: {err}");
