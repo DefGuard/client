@@ -1,15 +1,19 @@
-use std::io::IsTerminal;
+use std::io::{stdin, IsTerminal};
 
+use defguard_client_posture::{authorize_posture_session, get_posture_data};
+use defguard_core::database::models::instance::Instance;
 use secrecy::ExposeSecret;
 
 use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
 use defguard_core::ConnectionType;
+use serde_json::json;
+use tracing::info;
 
 use crate::{
     mfa,
     mfa_code::CodeSource,
     output::CommandOutput,
-    resolve::{self, ResolvedTarget, TargetSpec},
+    resolve::{resolve_connect_target, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 
@@ -52,7 +56,7 @@ pub async fn handle(
         instance: instance.map(String::from),
     };
 
-    let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
+    let target = resolve_connect_target(&spec, &state.pool).await?;
 
     // Idempotency: if the target is already connected, report and exit 0.
     let (target_id, target_connection_type, target_name) = match &target {
@@ -70,38 +74,36 @@ pub async fn handle(
     }
 
     let (target_name, psk, mtu) = match &target {
-        ResolvedTarget::Location(loc) => {
-            if loc.mfa_enabled() {
+        ResolvedTarget::Location(location) => {
+            if location.mfa_enabled() {
                 // Determine the MFA code source from CLI flags.
                 let code_source = code
                     .map(|c| CodeSource::Literal(c.to_string()))
                     .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
 
-                use defguard_core::database::models::instance::Instance;
-
-                let source = if let Some(s) = code_source {
-                    s
-                } else if std::io::stdin().is_terminal() {
+                let source = if let Some(code_source) = code_source {
+                    code_source
+                } else if stdin().is_terminal() {
                     CodeSource::Interactive
                 } else {
                     return Err(CliError::MfaInputRequired(format!(
                         "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
-                        loc.name
+                        location.name
                     )));
                 };
 
-                let inst = Instance::find_by_id(&state.pool, loc.instance_id)
+                let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
                     .map_err(|e| CliError::Other(format!("Failed to load instance: {e}")))?
                     .ok_or_else(|| {
-                        CliError::Other(format!("Instance {} not found", loc.instance_id))
+                        CliError::Other(format!("Instance {} not found", location.instance_id))
                     })?;
 
                 // When posture is also required, collect posture data and pass it
                 // into the MFA start request so the server can validate both together.
-                let posture_data = if loc.posture_check_required {
+                let posture_data = if location.posture_check_required {
                     Some(
-                        defguard_client_posture::get_posture_data()
+                        get_posture_data()
                             .await
                             .map_err(|e| CliError::Other(e.to_string()))?,
                     )
@@ -109,22 +111,28 @@ pub async fn handle(
                     None
                 };
 
-                let psk =
-                    mfa::authorize(loc, &source, &inst, mfa_method, posture_data, &state.pool)
-                        .await?;
+                let psk = mfa::authorize(
+                    location,
+                    &source,
+                    &instance,
+                    mfa_method,
+                    posture_data,
+                    &state.pool,
+                )
+                .await?;
                 (
-                    loc.name.clone(),
+                    location.name.clone(),
                     Some(psk.expose_secret().to_string()),
                     state.app_config.mtu(),
                 )
-            } else if loc.posture_check_required {
+            } else if location.posture_check_required {
                 // Posture only (no MFA).
-                let psk = defguard_client_posture::authorize_posture_session(loc)
+                let psk = authorize_posture_session(location)
                     .await
                     .map_err(|e| CliError::Other(e.to_string()))?;
-                (loc.name.clone(), Some(psk), state.app_config.mtu())
+                (location.name.clone(), Some(psk), state.app_config.mtu())
             } else {
-                (loc.name.clone(), None, state.app_config.mtu())
+                (location.name.clone(), None, state.app_config.mtu())
             }
         }
         ResolvedTarget::Tunnel(tun) => (
@@ -134,7 +142,7 @@ pub async fn handle(
         ),
     };
 
-    tracing::info!("Connecting to {target_name}...");
+    info!("Connecting to {target_name}...");
     let conn_target = match &target {
         ResolvedTarget::Location(loc) => ConnectionTarget::Location(loc),
         ResolvedTarget::Tunnel(tun) => ConnectionTarget::Tunnel(tun),
@@ -163,10 +171,10 @@ impl CommandOutput for ConnectResult {
 
     fn json(&self) -> serde_json::Value {
         match self {
-            ConnectResult::Connected { name } => serde_json::json!({
+            ConnectResult::Connected { name } => json!({
                 "connected": name,
             }),
-            ConnectResult::AlreadyConnected { name } => serde_json::json!({
+            ConnectResult::AlreadyConnected { name } => json!({
                 "connected": name,
                 "already": true,
             }),
