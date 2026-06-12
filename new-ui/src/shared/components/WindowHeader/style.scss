@@ -8,6 +8,21 @@
       column-gap: var(--spacing-lg);
       padding-bottom: var(--spacing-lg);
     }
+
+    &-desktop {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-lg);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-bottom: 1px solid var(--border-disabled);
+      background: var(--bg-white-10);
+
+      .right {
+        margin-left: auto;
+      }
+    }
   }
 
   > .info {
@@ -20,6 +35,11 @@
       font: var(--t-body-sm-500);
       color: var(--fg-white-100);
       text-align: left;
+    }
+
+    > .version {
+      font: var(--t-body-xxs-400);
+      color: var(--fg-white-60);
     }
   }
 }

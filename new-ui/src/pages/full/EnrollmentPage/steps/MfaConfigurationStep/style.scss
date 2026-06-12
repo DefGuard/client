@@ -1,0 +1,30 @@
+#mfa-configuration-step {
+  .qr-track {
+    width: 100%;
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    padding-top: var(--spacing-2xl);
+    padding-bottom: var(--spacing-xl);
+  }
+
+  .scan-hint {
+    width: 100%;
+    text-align: center;
+    font: var(--t-body-xs-400);
+    color: var(--c-white-60);
+    user-select: none;
+    padding-bottom: var(--spacing-md);
+  }
+
+  .copy-field {
+    width: 100%;
+  }
+
+  .code-label {
+    padding-bottom: var(--spacing-lg);
+    font: var(--t-body-sm-500);
+    user-select: none;
+  }
+}

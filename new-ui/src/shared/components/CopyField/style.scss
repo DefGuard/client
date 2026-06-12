@@ -1,0 +1,55 @@
+.copy-field {
+  & > .inner {
+    width: 100%;
+
+    .label-track {
+      padding-bottom: var(--spacing-xs);
+      user-select: none;
+
+      p {
+        font: var(--t-input-title);
+        color: var(--fg-neutral);
+      }
+    }
+
+    .track {
+      width: 100%;
+      border: 1px solid var(--border-default);
+      box-sizing: border-box;
+      padding: var(--input-spacing-sm) var(--input-spacing-lg);
+      display: grid;
+      grid-template-columns: auto 20px;
+      grid-template-rows: 1fr;
+      column-gap: var(--input-spacing-sm);
+      align-items: center;
+      overflow: hidden;
+      border-radius: var(--input-border-radius);
+      background-color: var(--fg-white-10);
+
+      p {
+        font: var(--t-input-text-primary);
+        color: var(--fg-white-50);
+        max-width: 100%;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      button {
+        padding: 0;
+        margin: 0;
+        border: none;
+        background-color: transparent;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        user-select: none;
+
+        .icon[data-kind='check-filled'] {
+          --icon-color: var(--fg-success);
+        }
+      }
+    }
+  }
+}

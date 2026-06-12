@@ -9,10 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as FullRouteImport } from './routes/full'
 import { Route as EmptyRouteImport } from './routes/empty'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
+import { Route as FullIndexRouteImport } from './routes/full/index'
+import { Route as CompactIndexRouteImport } from './routes/compact/index'
+import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
+import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
+import { Route as FullDefaultRouteImport } from './routes/full/_default'
+import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
+import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
+import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
+import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
 
+const FullRoute = FullRouteImport.update({
+  id: '/full',
+  path: '/full',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmptyRoute = EmptyRouteImport.update({
   id: '/empty',
   path: '/empty',
@@ -28,39 +43,156 @@ const PlaygroundIndexRoute = PlaygroundIndexRouteImport.update({
   path: '/playground/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FullIndexRoute = FullIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FullRoute,
+} as any)
+const CompactIndexRoute = CompactIndexRouteImport.update({
+  id: '/compact/',
+  path: '/compact/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FullSessionTimeoutRoute = FullSessionTimeoutRouteImport.update({
+  id: '/session-timeout',
+  path: '/session-timeout',
+  getParentRoute: () => FullRoute,
+} as any)
+const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
+  id: '/enrollment',
+  path: '/enrollment',
+  getParentRoute: () => FullRoute,
+} as any)
+const FullDefaultRoute = FullDefaultRouteImport.update({
+  id: '/_default',
+  getParentRoute: () => FullRoute,
+} as any)
+const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
+  id: '/add/',
+  path: '/add/',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultAddInstanceRoute = FullDefaultAddInstanceRouteImport.update({
+  id: '/add/instance',
+  path: '/add/instance',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full': typeof FullRouteWithChildren
+  '/full/enrollment': typeof FullEnrollmentRoute
+  '/full/session-timeout': typeof FullSessionTimeoutRoute
+  '/compact/': typeof CompactIndexRoute
+  '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/support': typeof FullDefaultSupportRoute
+  '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add/': typeof FullDefaultAddIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full': typeof FullIndexRoute
+  '/full/enrollment': typeof FullEnrollmentRoute
+  '/full/session-timeout': typeof FullSessionTimeoutRoute
+  '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
+  '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/support': typeof FullDefaultSupportRoute
+  '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add': typeof FullDefaultAddIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/full': typeof FullRouteWithChildren
+  '/full/_default': typeof FullDefaultRouteWithChildren
+  '/full/enrollment': typeof FullEnrollmentRoute
+  '/full/session-timeout': typeof FullSessionTimeoutRoute
+  '/compact/': typeof CompactIndexRoute
+  '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/_default/overview': typeof FullDefaultOverviewRoute
+  '/full/_default/support': typeof FullDefaultSupportRoute
+  '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/_default/add/': typeof FullDefaultAddIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/empty' | '/playground/'
+  fullPaths:
+    | '/'
+    | '/empty'
+    | '/full'
+    | '/full/enrollment'
+    | '/full/session-timeout'
+    | '/compact/'
+    | '/full/'
+    | '/playground/'
+    | '/full/overview'
+    | '/full/support'
+    | '/full/add/instance'
+    | '/full/add/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/empty' | '/playground'
-  id: '__root__' | '/' | '/empty' | '/playground/'
+  to:
+    | '/'
+    | '/empty'
+    | '/full'
+    | '/full/enrollment'
+    | '/full/session-timeout'
+    | '/compact'
+    | '/playground'
+    | '/full/overview'
+    | '/full/support'
+    | '/full/add/instance'
+    | '/full/add'
+  id:
+    | '__root__'
+    | '/'
+    | '/empty'
+    | '/full'
+    | '/full/_default'
+    | '/full/enrollment'
+    | '/full/session-timeout'
+    | '/compact/'
+    | '/full/'
+    | '/playground/'
+    | '/full/_default/overview'
+    | '/full/_default/support'
+    | '/full/_default/add/instance'
+    | '/full/_default/add/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmptyRoute: typeof EmptyRoute
+  FullRoute: typeof FullRouteWithChildren
+  CompactIndexRoute: typeof CompactIndexRoute
   PlaygroundIndexRoute: typeof PlaygroundIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/full': {
+      id: '/full'
+      path: '/full'
+      fullPath: '/full'
+      preLoaderRoute: typeof FullRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/empty': {
       id: '/empty'
       path: '/empty'
@@ -82,12 +214,111 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaygroundIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/full/': {
+      id: '/full/'
+      path: '/'
+      fullPath: '/full/'
+      preLoaderRoute: typeof FullIndexRouteImport
+      parentRoute: typeof FullRoute
+    }
+    '/compact/': {
+      id: '/compact/'
+      path: '/compact'
+      fullPath: '/compact/'
+      preLoaderRoute: typeof CompactIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/full/session-timeout': {
+      id: '/full/session-timeout'
+      path: '/session-timeout'
+      fullPath: '/full/session-timeout'
+      preLoaderRoute: typeof FullSessionTimeoutRouteImport
+      parentRoute: typeof FullRoute
+    }
+    '/full/enrollment': {
+      id: '/full/enrollment'
+      path: '/enrollment'
+      fullPath: '/full/enrollment'
+      preLoaderRoute: typeof FullEnrollmentRouteImport
+      parentRoute: typeof FullRoute
+    }
+    '/full/_default': {
+      id: '/full/_default'
+      path: ''
+      fullPath: '/full'
+      preLoaderRoute: typeof FullDefaultRouteImport
+      parentRoute: typeof FullRoute
+    }
+    '/full/_default/support': {
+      id: '/full/_default/support'
+      path: '/support'
+      fullPath: '/full/support'
+      preLoaderRoute: typeof FullDefaultSupportRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/overview': {
+      id: '/full/_default/overview'
+      path: '/overview'
+      fullPath: '/full/overview'
+      preLoaderRoute: typeof FullDefaultOverviewRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/add/': {
+      id: '/full/_default/add/'
+      path: '/add'
+      fullPath: '/full/add/'
+      preLoaderRoute: typeof FullDefaultAddIndexRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/add/instance': {
+      id: '/full/_default/add/instance'
+      path: '/add/instance'
+      fullPath: '/full/add/instance'
+      preLoaderRoute: typeof FullDefaultAddInstanceRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
   }
 }
+
+interface FullDefaultRouteChildren {
+  FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
+  FullDefaultSupportRoute: typeof FullDefaultSupportRoute
+  FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
+  FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
+}
+
+const FullDefaultRouteChildren: FullDefaultRouteChildren = {
+  FullDefaultOverviewRoute: FullDefaultOverviewRoute,
+  FullDefaultSupportRoute: FullDefaultSupportRoute,
+  FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
+  FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
+}
+
+const FullDefaultRouteWithChildren = FullDefaultRoute._addFileChildren(
+  FullDefaultRouteChildren,
+)
+
+interface FullRouteChildren {
+  FullDefaultRoute: typeof FullDefaultRouteWithChildren
+  FullEnrollmentRoute: typeof FullEnrollmentRoute
+  FullSessionTimeoutRoute: typeof FullSessionTimeoutRoute
+  FullIndexRoute: typeof FullIndexRoute
+}
+
+const FullRouteChildren: FullRouteChildren = {
+  FullDefaultRoute: FullDefaultRouteWithChildren,
+  FullEnrollmentRoute: FullEnrollmentRoute,
+  FullSessionTimeoutRoute: FullSessionTimeoutRoute,
+  FullIndexRoute: FullIndexRoute,
+}
+
+const FullRouteWithChildren = FullRoute._addFileChildren(FullRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmptyRoute: EmptyRoute,
+  FullRoute: FullRouteWithChildren,
+  CompactIndexRoute: CompactIndexRoute,
   PlaygroundIndexRoute: PlaygroundIndexRoute,
 }
 export const routeTree = rootRouteImport

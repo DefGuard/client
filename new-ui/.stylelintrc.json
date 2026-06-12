@@ -5,6 +5,7 @@
     "at-rule-no-unknown": null,
     "scss/at-rule-no-unknown": true,
     "custom-property-empty-line-before": null,
-    "value-keyword-case": null
+    "value-keyword-case": null,
+    "selector-class-pattern": null
   }
 }

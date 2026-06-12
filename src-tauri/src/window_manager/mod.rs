@@ -11,31 +11,31 @@ pub async fn has_non_service_locations() -> bool {
     Location::exist(&*DB_POOL, false).await.unwrap_or_default()
 }
 
-pub const NEW_UI_WINDOW_ID: &str = "new-ui";
-pub const OLD_UI_WINDOW_ID: &str = "old-ui";
-pub const NEW_UI_WIDTH: f64 = 380.0;
-pub const NEW_UI_HEIGHT: f64 = 640.0;
-pub const OLD_UI_WIDTH: f64 = 1280.0;
-pub const OLD_UI_HEIGHT: f64 = 920.0;
+pub const COMPACT_WINDOW_ID: &str = "compact-view";
+pub const FULL_VIEW_WINDOW_ID: &str = "full-view";
+pub const COMPACT_WINDOW_WIDTH: f64 = 380.0;
+pub const COMPACT_WINDOW_HEIGHT: f64 = 640.0;
+pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
+pub const FULL_VIEW_WINDOW_HEIGHT: f64 = 700.0;
 #[cfg(not(target_os = "linux"))]
 const WINDOW_GAP: f64 = 20.0;
 const WINDOW_TITLE: &str = "Defguard";
 
 #[must_use]
-pub fn new_ui_url() -> WebviewUrl {
+pub fn compact_view_ui_url() -> WebviewUrl {
     if cfg!(any(defguard_client_dev)) {
-        WebviewUrl::External("http://localhost:5072".parse().unwrap())
+        WebviewUrl::External("http://localhost:5072/compact/".parse().unwrap())
     } else {
-        WebviewUrl::App("new-ui/".into())
+        WebviewUrl::App("new-ui/compact/".into())
     }
 }
 
 #[must_use]
-pub fn old_ui_url() -> WebviewUrl {
+pub fn full_view_ui_url() -> WebviewUrl {
     if cfg!(any(defguard_client_dev)) {
-        WebviewUrl::External("http://localhost:5071".parse().unwrap())
+        WebviewUrl::External("http://localhost:5072/full/".parse().unwrap())
     } else {
-        WebviewUrl::App("old-ui/index.html".into())
+        WebviewUrl::App("new-ui/full/".into())
     }
 }
 
@@ -43,9 +43,9 @@ pub struct WindowManager;
 
 impl WindowManager {
     pub fn build_tray_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        let window = WebviewWindowBuilder::new(app, NEW_UI_WINDOW_ID, new_ui_url())
+        let window = WebviewWindowBuilder::new(app, COMPACT_WINDOW_ID, compact_view_ui_url())
             .title(WINDOW_TITLE)
-            .inner_size(NEW_UI_WIDTH, NEW_UI_HEIGHT)
+            .inner_size(COMPACT_WINDOW_WIDTH, COMPACT_WINDOW_HEIGHT)
             .resizable(false)
             .decorations(false)
             .visible(false)
@@ -64,10 +64,11 @@ impl WindowManager {
         Ok(window)
     }
 
-    pub fn build_full_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        WebviewWindowBuilder::new(app, OLD_UI_WINDOW_ID, old_ui_url())
+    pub fn build_full_view_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+        WebviewWindowBuilder::new(app, FULL_VIEW_WINDOW_ID, full_view_ui_url())
             .title(WINDOW_TITLE)
-            .inner_size(OLD_UI_WIDTH, OLD_UI_HEIGHT)
+            .inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
+            .min_inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
             .decorations(true)
             .visible(false)
             .build()
@@ -77,7 +78,7 @@ impl WindowManager {
 #[cfg(not(windows))]
 impl WindowManager {
     pub fn open_tray(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        let window = if let Some(window) = app.get_webview_window(NEW_UI_WINDOW_ID) {
+        let window = if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
             let _ = window.unminimize();
             window
         } else {
@@ -95,11 +96,11 @@ impl WindowManager {
     }
 
     pub fn open_full_view(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        let window = if let Some(window) = app.get_webview_window(OLD_UI_WINDOW_ID) {
+        let window = if let Some(window) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
             let _ = window.unminimize();
             window
         } else {
-            Self::build_full_window(app)?
+            Self::build_full_view_window(app)?
         };
         #[cfg(target_os = "macos")]
         let _ = app.set_dock_visibility(true);
@@ -119,27 +120,27 @@ pub mod macos;
 
 // Export tauri commands so they can be registered in main.rs
 #[cfg_attr(target_os = "linux", allow(unused_variables))]
-pub(crate) fn show_new_ui_window(app: &AppHandle) {
+pub(crate) fn show_tray_window(app: &AppHandle) {
     #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_tray(app);
 }
 
 #[tauri::command]
-pub fn open_new_ui_window(app: AppHandle) {
-    show_new_ui_window(&app);
+pub fn open_tray_window(app: AppHandle) {
+    show_tray_window(&app);
 }
 
 #[cfg_attr(target_os = "linux", allow(unused_variables))]
 #[tauri::command]
-pub fn open_old_ui_window(app: AppHandle) {
+pub fn open_full_view_window(app: AppHandle) {
     #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_full_view(&app);
 }
 
 #[tauri::command]
-pub fn swap_to_old_ui(app: AppHandle) {
+pub fn swap_to_full_view(app: AppHandle) {
     tracing::info!("swap_to_old_ui called");
-    if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+    if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
         if let Err(err) = window.hide() {
             tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
         }
@@ -156,7 +157,7 @@ pub fn swap_to_old_ui(app: AppHandle) {
 pub fn close_tray_window(app: AppHandle) {
     tracing::info!("close_tray_window called");
 
-    if let Some(window) = tauri::Manager::get_webview_window(&app, NEW_UI_WINDOW_ID) {
+    if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
         tracing::info!("close_tray_window task: Hiding new-ui window");
         if let Err(err) = window.hide() {
             tracing::error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
@@ -167,10 +168,10 @@ pub fn close_tray_window(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn swap_to_new_ui(app: AppHandle) {
+pub fn swap_to_tray(app: AppHandle) {
     tracing::info!("swap_to_new_ui called");
-    show_new_ui_window(&app);
-    if let Some(window) = tauri::Manager::get_webview_window(&app, OLD_UI_WINDOW_ID) {
+    show_tray_window(&app);
+    if let Some(window) = tauri::Manager::get_webview_window(&app, FULL_VIEW_WINDOW_ID) {
         if let Err(err) = window.hide() {
             tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
         }

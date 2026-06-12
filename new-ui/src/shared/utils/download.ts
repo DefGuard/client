@@ -1,25 +1,29 @@
-export const downloadText = (
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+
+export const downloadText = async (
   content: string,
   filename: string,
   extension: 'txt' | 'pub' | 'conf' = 'txt',
-) => {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  downloadFile(blob, filename, extension);
+): Promise<void> => {
+  const path = await save({
+    defaultPath: `${filename}.${extension}`,
+    filters: [{ name: 'Text files', extensions: [extension] }],
+  });
+  if (path === null) return;
+  await writeTextFile(path, content);
 };
 
-export const downloadFile = (blob: Blob, filename: string, extension: string) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.style = 'visibility: hidden;';
-  link.download = `${filename}.${extension}`;
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 5_000);
+export const downloadFile = async (
+  blob: Blob,
+  filename: string,
+  extension: string,
+): Promise<void> => {
+  const path = await save({
+    defaultPath: `${filename}.${extension}`,
+    filters: [{ name: 'Files', extensions: [extension] }],
+  });
+  if (path === null) return;
+  const buffer = await blob.arrayBuffer();
+  await writeFile(path, new Uint8Array(buffer));
 };

@@ -1,0 +1,123 @@
+name: "Test posture checks gathering"
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'release/**'
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
+jobs:
+
+  test-linux-postures-unencrypted:
+    name: Linux postures - unencrypted
+    runs-on:
+      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
+
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Run tests
+        working-directory: src-tauri/
+        run: |
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+  test-windows-postures-setup1:
+    name: Windows postures - setup1
+    runs-on:
+      - self-hosted
+      - X64
+      - Windows
+      - noad
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Run tests
+        working-directory: src-tauri/
+        shell: cmd
+        run: |
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup1 -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+  test-windows-postures-setup2:
+    name: Windows postures - setup2
+    runs-on:
+      - self-hosted
+      - X64
+      - Windows
+      - ad
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Run tests
+        working-directory: src-tauri/
+        shell: cmd
+        run: |
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup2 -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+  test-macos-postures-unencrypted:
+    name: MacOS postures - unencrypted
+    runs-on:
+      - self-hosted
+      - macOS
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Run tests
+        working-directory: src-tauri/
+        run: |
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats

@@ -29,6 +29,11 @@ body {
   overflow: hidden;
 }
 
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {
   appearance: none;
@@ -37,6 +42,14 @@ input[type='number']::-webkit-inner-spin-button {
 
 input[type='number'] {
   appearance: textfield;
+}
+
+*:focus {
+  outline: none;
+}
+
+*:-moz-focus-inner {
+  border: 0;
 }
 
 p,
@@ -89,4 +102,12 @@ ol {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--fg-white-50) transparent;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  transition: background-color 8553600s;
+  -webkit-text-fill-color: #fff !important;
 }

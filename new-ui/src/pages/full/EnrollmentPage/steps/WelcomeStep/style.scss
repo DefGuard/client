@@ -1,0 +1,32 @@
+#welcome-step {
+  > ul {
+    font: var(--t-body-sm-400);
+    margin-left: var(--spacing-lg);
+
+    li:not(:last-child) {
+      margin-bottom: var(--spacing-md);
+    }
+
+    ::marker {
+      color: var(--fg-white-100);
+    }
+  }
+
+  .admin-info {
+    display: flex;
+    flex-flow: column;
+    row-gap: 1ch;
+    flex-grow: 0;
+
+    p,
+    a {
+      font: var(--t-body-xs-400);
+      color: var(--fg-white-100);
+    }
+
+    a {
+      cursor: pointer;
+      text-decoration: none;
+    }
+  }
+}

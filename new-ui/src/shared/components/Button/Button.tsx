@@ -20,6 +20,7 @@ export const Button = ({
   variant = ButtonVariant.Primary,
   disabled = false,
   loading = false,
+  ref,
 }: ButtonProps) => {
   const isLoading = loading && !disabled;
   const [swapDirection, setSwapDirection] = useState<'to-loading' | 'to-content' | null>(
@@ -49,55 +50,55 @@ export const Button = ({
   };
 
   return (
-    <div className={clsx('btn-wrap', `size-${size}`)}>
-      <button
-        {...containerProps}
-        data-variant={variant}
-        data-testid={testId}
-        disabled={disabled || loading}
-        onClick={(e) => {
-          if (!disabled && !loading) {
-            onClick?.(e);
-          }
-        }}
-        className={clsx(
-          'btn',
-          `size-${size}`,
-          `variant-${variant}`,
-          containerProps?.className,
-          {
-            disabled,
-            loading: isLoading,
-            'icon-left': isPresent(iconLeft) && !isPresent(iconRight),
-            'icon-right': isPresent(iconRight) && !isPresent(iconLeft),
-            'icon-both': isPresent(iconLeft) && isPresent(iconRight),
-          },
-        )}
+    <button
+      type="button"
+      ref={ref}
+      {...containerProps}
+      data-variant={variant}
+      data-testid={testId}
+      disabled={disabled || loading}
+      onClick={(e) => {
+        if (!disabled && !loading) {
+          onClick?.(e);
+        }
+      }}
+      className={clsx(
+        'btn',
+        `size-${size}`,
+        `variant-${variant}`,
+        containerProps?.className,
+        {
+          disabled,
+          loading: isLoading,
+          'icon-left': isPresent(iconLeft) && !isPresent(iconRight),
+          'icon-right': isPresent(iconRight) && !isPresent(iconLeft),
+          'icon-both': isPresent(iconLeft) && isPresent(iconRight),
+        },
+      )}
+    >
+      <motion.div
+        className="btn-content"
+        aria-hidden={isLoading}
+        initial={false}
+        animate={{ opacity: isLoading ? 0 : 1 }}
+        transition={contentTransition}
       >
-        <motion.div
-          className="btn-content"
-          aria-hidden={isLoading}
-          initial={false}
-          animate={{ opacity: isLoading ? 0 : 1 }}
-          transition={contentTransition}
-        >
-          {isPresent(iconLeft) && <Icon icon={iconLeft} size={20} />}
-          <span className="text">{text}</span>
-          {isPresent(iconRight) && (
-            <Icon icon={iconRight} size={20} rotationDirection={iconRightRotation} />
-          )}
-        </motion.div>
+        {isPresent(iconLeft) && <Icon icon={iconLeft} size={20} />}
+        <span className="text">{text}</span>
+        {isPresent(iconRight) && (
+          <Icon icon={iconRight} size={20} rotationDirection={iconRightRotation} />
+        )}
+      </motion.div>
 
-        <motion.div
-          className="loader-overlay"
-          aria-hidden={!isLoading}
-          initial={false}
-          animate={{ opacity: isLoading ? 1 : 0 }}
-          transition={loaderTransition}
-        >
-          <LoaderSpinner variant="primary" />
-        </motion.div>
-      </button>
-    </div>
+      <motion.div
+        className="loader-overlay"
+        aria-hidden={!isLoading}
+        initial={false}
+        animate={{ opacity: isLoading ? 1 : 0 }}
+        transition={loaderTransition}
+      >
+        <LoaderSpinner variant="primary" />
+      </motion.div>
+    </button>
   );
 };

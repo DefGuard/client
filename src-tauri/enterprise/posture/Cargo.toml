@@ -25,5 +25,5 @@ sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
-time = { version = "0.3", features = ["formatting", "macros"] }
+time = { version = "0.3", features = ["formatting", "macros", "serde"] }
 wmi = { version = "0.18", default-features = false }

@@ -1,4 +1,4 @@
-import type { HTMLAttributes, MouseEventHandler } from 'react';
+import type { HTMLAttributes, MouseEventHandler, Ref } from 'react';
 import type { DirectionValue } from '../../types';
 import type { IconKindValue } from '../Icon/icon-types';
 
@@ -29,4 +29,5 @@ export type ButtonProps = {
   loading?: boolean;
   containerProps?: Omit<HTMLAttributes<HTMLButtonElement>, 'onClick'>;
   onClick?: MouseEventHandler<HTMLButtonElement>;
+  ref?: Ref<HTMLButtonElement>;
 };

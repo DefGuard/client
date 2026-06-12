@@ -1,0 +1,23 @@
+#finish-step {
+  > .content-pad {
+    box-sizing: border-box;
+    padding: 0 var(--spacing-md);
+
+    > img {
+      padding-bottom: var(--spacing-3xl);
+    }
+
+    > .top {
+      :nth-child(1) {
+        font: var(--t-h4);
+        color: var(--fg-white-100);
+        padding-bottom: var(--spacing-sm);
+      }
+
+      :nth-child(2) {
+        font: var(--t-body-sm-400);
+        color: var(--fg-white-70);
+      }
+    }
+  }
+}

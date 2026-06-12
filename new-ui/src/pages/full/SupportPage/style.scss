@@ -1,0 +1,24 @@
+#support-page-view {
+  .sections {
+    .section {
+      display: flex;
+      gap: var(--spacing-lg);
+
+      .icon {
+        --icon-color: var(--fg-white-60);
+      }
+
+      .content {
+        flex: 1;
+      }
+
+      .title {
+        font: var(--t-body-sm-500);
+      }
+
+      .description {
+        font: var(--t-body-xs-400);
+      }
+    }
+  }
+}

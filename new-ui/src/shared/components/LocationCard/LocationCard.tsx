@@ -1,17 +1,13 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import {
-  ConnectionType,
-  type InstanceInfo,
-  type LocationInfo,
-} from '../../rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
 import { Direction } from '../../types';
 import { Fold } from '../Fold/Fold';
 import { IconKind } from '../Icon';
 import { IconButton } from '../IconButton/IconButton';
 import { IconButtonVariant } from '../IconButton/types';
-import { LocationCardIcon } from './components/LocationCardIcon';
+import { LocationCardHeaderInfo } from './components/LocationCardHeaderInfo/LocationCardHeaderInfo';
 import { LocationCardProvider, useLocationCardContext } from './context/context';
 import { LocationCardViews, type LocationCardViewsValue } from './context/types';
 import { ConnectedView } from './views/ConnectedView/ConnectedView';
@@ -64,24 +60,7 @@ const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
         })}
         onClick={onOpen}
       >
-        <div className="left">
-          <LocationCardIcon />
-          <div className="info">
-            <p className="label">
-              {location.connection_type === ConnectionType.Location
-                ? 'Location'
-                : 'Tunnel'}
-            </p>
-            <div className="bottom">
-              <p className="location-name">{location.name}</p>
-              {location.active && (
-                <div className="online-badge">
-                  <p>Online</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <LocationCardHeaderInfo location={location} />
         <div className="right">
           {!disableOpen && (
             <IconButton

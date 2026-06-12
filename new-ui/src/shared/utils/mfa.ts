@@ -1,16 +1,21 @@
-import type { MfaMethodValue } from '../rust-api/types';
+import { MfaMethod, type MfaMethodValue } from '../rust-api/types';
 
-export const mfaToText = (factor: MfaMethodValue): string => {
-  switch (factor) {
-    case 'email':
-      return 'Email';
-    case 'mobileapprove':
-      return 'Mobile Client';
-    case 'oidc':
-      return 'OpenID';
-    case 'totp':
-      return 'Authenticator app';
-    case 'biometric':
-      return 'Biometric';
-  }
+const mfaMethodLabels: Record<MfaMethodValue, string> = {
+  [MfaMethod.Email]: 'Email',
+  [MfaMethod.MobileApprove]: 'Mobile Client',
+  [MfaMethod.Oidc]: 'OpenID',
+  [MfaMethod.Totp]: 'Authenticator app',
+  [MfaMethod.Biometric]: 'Biometric',
 };
+
+export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
+
+const mfaMethodApiValues: Record<MfaMethodValue, string> = {
+  [MfaMethod.Email]: 'Email',
+  [MfaMethod.MobileApprove]: 'MobileApprove',
+  [MfaMethod.Oidc]: 'Oidc',
+  [MfaMethod.Totp]: 'Totp',
+  [MfaMethod.Biometric]: 'Biometric',
+};
+
+export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];

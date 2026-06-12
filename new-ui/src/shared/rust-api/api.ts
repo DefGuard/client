@@ -1,14 +1,10 @@
-import { getVersion } from '@tauri-apps/api/app';
-
 import { invoke } from '@tauri-apps/api/core';
-
 import type {
   ActiveConnectionSummary,
   AppConfig,
   AppConfigPatch,
   Connection,
   ConnectionArgs,
-  EdgeRequestHeaders,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
@@ -120,23 +116,15 @@ const getAllActiveConnections = (): Promise<ActiveConnectionSummary[]> =>
 const disconnectLocations = (locationIds: number[]): Promise<void> =>
   invoke(TauriCommand.DisconnectLocations, { locationIds });
 
-const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
-  const platform = await getPlatformHeader();
-  const version = await getVersion().catch(() => 'unknown');
-  return {
-    'defguard-client-platform': platform,
-    'defguard-client-version': version,
-  };
-};
-
 const getPostureData = async (): Promise<unknown> => invoke(TauriCommand.GetPostureData);
 
-const swapToOldUi = async () => invoke(TauriCommand.SwapToOldUi);
+const swapToFullView = async () => invoke(TauriCommand.SwapToFullView);
+
+const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
 
 export const api = {
-  getEdgeRequestHeaders,
   // Instances
   getInstances,
   deleteInstance,
@@ -176,6 +164,7 @@ export const api = {
   disconnectLocations,
   getPostureData,
   // Window
-  swapToOldUi,
+  swapToFullView,
+  swapToTray,
   closeTrayWindow,
 };
