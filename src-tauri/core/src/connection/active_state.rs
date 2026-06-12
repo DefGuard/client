@@ -1,15 +1,23 @@
 //! Reconstruct currently-active WireGuard connections by querying the platform backend.
 //!
 //! The daemon (Linux/Windows) and Network Extension managers (macOS) are the shared
-//! source of truth for interface state.  `active_state` calls the daemon's `ListInterfaces`
-//! RPC for an unfiltered snapshot of all managed interfaces, then matches each peer's
-//! public key to a `Location` or `Tunnel` in the database.
+//! source of truth for interface state.
 
 use crate::{
     database::{models::Id, DbPool},
     error::Error,
     ConnectionType,
 };
+
+#[cfg(not(target_os = "macos"))]
+use crate::database::models::{location::Location, tunnel::Tunnel};
+
+#[cfg(not(target_os = "macos"))]
+use crate::connection::daemon_client::DAEMON_CLIENT;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{InterfaceData, Peer};
+#[cfg(not(target_os = "macos"))]
+use tonic::Code;
 
 /// Describes a currently-active WireGuard connection.
 #[derive(Clone, Debug)]
@@ -51,7 +59,7 @@ pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Er
 
     #[cfg(target_os = "macos")]
     {
-        log::warn!("active_state: macOS Network Extension enumeration not yet implemented; returning empty list");
+        warn!("active_state: macOS Network Extension enumeration not yet implemented; returning empty list");
         // Stub: NE-based enumeration pending the macOS spike.
         let _ = pool;
         Ok(Vec::new())
@@ -60,12 +68,6 @@ pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Er
 
 #[cfg(not(target_os = "macos"))]
 async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
-    use tonic::Code;
-
-    use crate::database::models::{location::Location, tunnel::Tunnel};
-
-    use crate::connection::daemon_client::DAEMON_CLIENT;
-
     let request = tonic::Request::new(());
     let response = DAEMON_CLIENT
         .clone()
@@ -73,18 +75,18 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
         .await
         .map_err(|err| {
             if err.code() == Code::Unavailable || err.code() == Code::Unimplemented {
-                log::error!("Daemon unavailable or outdated: {err}");
+                error!("Daemon unavailable or outdated: {err}");
                 Error::BackendUnavailable(
                     "Background service is unavailable or outdated. Start or update the background service.".into(),
                 )
             } else {
-                log::error!("Failed to call ListInterfaces: {err}");
+                error!("Failed to call ListInterfaces: {err}");
                 Error::InternalError(format!("ListInterfaces failed: {err}"))
             }
         })?;
     let inner = response.into_inner();
 
-    log::info!(
+    info!(
         "ListInterfaces returned {} managed interface(s)",
         inner.interfaces.len()
     );
@@ -103,7 +105,7 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
             let public_key_b64 = match hex_to_base64(public_key_hex) {
                 Ok(k) => k,
                 Err(e) => {
-                    log::warn!("Failed to convert hex pubkey to base64: {e}");
+                    warn!("Failed to convert hex pubkey to base64: {e}");
                     continue;
                 }
             };
@@ -111,10 +113,9 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
             // Try matching the peer to a Location first.
             match Location::find_by_public_key(pool, &public_key_b64).await {
                 Ok(location) => {
-                    log::info!(
+                    info!(
                         "Matched peer to location {} (id={})",
-                        location.name,
-                        location.id
+                        location.name, location.id
                     );
                     results.push(ActiveConnectionInfo {
                         connection_type: ConnectionType::Location,
@@ -129,7 +130,7 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
                     // Not a Location, try Tunnel below.
                 }
                 Err(err) => {
-                    log::warn!("DB error looking up public key: {err}");
+                    warn!("DB error looking up public key: {err}");
                     continue;
                 }
             }
@@ -137,7 +138,7 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
             // Then try matching to a Tunnel.
             match Tunnel::find_by_server_public_key(pool, &public_key_b64).await {
                 Ok(tunnel) => {
-                    log::info!("Matched peer to tunnel {} (id={})", tunnel.name, tunnel.id);
+                    info!("Matched peer to tunnel {} (id={})", tunnel.name, tunnel.id);
                     results.push(ActiveConnectionInfo {
                         connection_type: ConnectionType::Tunnel,
                         target_id: tunnel.id,
@@ -151,25 +152,22 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
                     // Not a Tunnel either.
                 }
                 Err(err) => {
-                    log::warn!("DB error looking up server public key: {err}");
+                    warn!("DB error looking up server public key: {err}");
                     continue;
                 }
             }
 
-            log::debug!("Peer does not match any Location or Tunnel, skipping");
+            debug!("Peer does not match any Location or Tunnel, skipping");
         }
     }
 
-    log::info!("active_state: found {} active connection(s)", results.len());
+    info!("active_state: found {} active connection(s)", results.len());
     Ok(results)
 }
 
 /// Extract per-peer stats from an `InterfaceData` response.
 #[cfg(not(target_os = "macos"))]
-fn peer_stats(
-    iface: &defguard_client_proto::defguard::client::v1::InterfaceData,
-    peer: &defguard_client_proto::defguard::client::v1::Peer,
-) -> Option<InterfaceStats> {
+fn peer_stats(iface: &InterfaceData, peer: &Peer) -> Option<InterfaceStats> {
     Some(InterfaceStats {
         listen_port: iface.listen_port,
         tx_bytes: peer.tx_bytes,

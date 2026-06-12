@@ -2,8 +2,7 @@ use clap::{Parser, Subcommand};
 
 /// Command-line client for the Defguard VPN.
 ///
-/// Shares the same database as the desktop client.  Requires an already-enrolled
-/// instance (use the desktop app for enrollment, or the `enroll` subcommand).
+/// Shares the same database as the desktop client.
 #[derive(Parser)]
 #[command(name = "defguard-cli", version, about)]
 pub struct Cli {

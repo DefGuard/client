@@ -13,6 +13,7 @@ use std::{
 };
 
 use secrecy::SecretString;
+use tracing::debug;
 
 use crate::state::CliError;
 
@@ -56,11 +57,11 @@ pub struct MfaContext {
 pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString, CliError> {
     match source {
         CodeSource::Literal(code) => {
-            tracing::debug!("Using --code value");
+            debug!("Using --code value");
             Ok(SecretString::from(code.trim()))
         }
         CodeSource::Command(cmd) => {
-            tracing::debug!("Running --code-command");
+            debug!("Running --code-command");
             let output = Command::new("sh")
                 .arg("-c")
                 .arg(cmd)

@@ -1,7 +1,7 @@
 //! Connect-time VPN MFA over `core::proxy` (HTTP).
 //!
 //! Flow: `start` → `obtain_code` → `finish` → preshared_key.
-//! Supports TOTP and email methods.  OIDC and mobile-approve are Phase 6.
+//! Supports TOTP and email methods.  OIDC and mobile-approve are WIP.
 
 use defguard_client_proto::defguard::{
     client_types::{
@@ -23,8 +23,9 @@ use defguard_core::{
     proxy::post_with_headers,
 };
 use reqwest::{StatusCode, Url};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
+use tracing::{debug, info};
 
 use crate::{
     mfa_code::{obtain_code, CodeSource, MfaContext},
@@ -91,7 +92,7 @@ pub async fn authorize(
         .join("api/v1/client-mfa/start")
         .map_err(|e| CliError::Other(format!("Failed to build MFA start URL: {e}")))?;
 
-    tracing::debug!("Starting MFA session at {proxy_url}");
+    debug!("Starting MFA session at {proxy_url}");
     let response = post_with_headers(proxy_url, &start_req)
         .await
         .map_err(|e| CliError::Other(format!("Failed to reach proxy: {e}")))?;
@@ -106,7 +107,7 @@ pub async fn authorize(
         .map_err(|e| CliError::Other(format!("Invalid MFA start response: {e}")))?;
 
     let token = start_resp.token.clone();
-    tracing::debug!("MFA session started, token obtained");
+    debug!("MFA session started, token obtained");
 
     // Step 2: Obtain the code.
     let ctx = MfaContext {
@@ -116,7 +117,6 @@ pub async fn authorize(
     let code = obtain_code(source, &ctx)?;
 
     // Step 3: Finish the MFA session.
-    use secrecy::ExposeSecret;
     let finish_req = ClientMfaFinishRequest {
         token,
         code: Some(code.expose_secret().to_string()),
@@ -128,7 +128,7 @@ pub async fn authorize(
         .join("api/v1/client-mfa/finish")
         .map_err(|e| CliError::Other(format!("Failed to build MFA finish URL: {e}")))?;
 
-    tracing::debug!("Finishing MFA session at {finish_url}");
+    debug!("Finishing MFA session at {finish_url}");
     let response = post_with_headers(finish_url, &finish_req)
         .await
         .map_err(|e| CliError::Other(format!("Failed to reach proxy: {e}")))?;
@@ -142,7 +142,7 @@ pub async fn authorize(
         .await
         .map_err(|e| CliError::Other(format!("Invalid MFA finish response: {e}")))?;
 
-    tracing::info!("MFA session completed, preshared key obtained");
+    info!("MFA session completed, preshared key obtained");
     Ok(SecretString::from(finish_resp.preshared_key))
 }
 

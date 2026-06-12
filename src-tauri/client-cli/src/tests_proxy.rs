@@ -4,7 +4,12 @@
 //! `mfa::authorize` can make real HTTP calls against it.  The database is
 //! seeded via `#[sqlx::test]`.
 
-use std::net::SocketAddr;
+use std::{
+    io::{Read, Write},
+    net::{SocketAddr, TcpListener, TcpStream},
+    thread::{sleep, spawn},
+    time::Duration,
+};
 
 use secrecy::ExposeSecret;
 
@@ -20,6 +25,10 @@ use defguard_core::database::{
     DbPool,
 };
 
+const READ_TIMEOUT: Duration = Duration::from_secs(5);
+const CONNECT_TIMEOUT: Duration = Duration::from_millis(50);
+const WAIT_TIMEOUT: Duration = Duration::from_millis(10);
+
 /// Response template for the mock proxy.
 #[derive(Clone)]
 struct MockResponse {
@@ -34,17 +43,14 @@ struct MockProxy {
 
 impl MockProxy {
     fn new(start_response: MockResponse, finish_response: MockResponse) -> Self {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(false).ok();
         let addr = listener.local_addr().unwrap();
         // Spawn the accept loop.
-        std::thread::spawn(move || {
+        spawn(move || {
             for stream in listener.incoming().flatten() {
-                stream
-                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
-                    .ok();
+                stream.set_read_timeout(Some(READ_TIMEOUT)).ok();
                 let mut buf = [0u8; 4096];
-                use std::io::{Read, Write};
                 let mut s = stream;
                 let _ = s.read(&mut buf);
                 let request = String::from_utf8_lossy(&buf);
@@ -72,15 +78,10 @@ impl MockProxy {
     /// Wait until the proxy is accepting connections.
     fn wait_ready(&self) {
         for _ in 0..50 {
-            if std::net::TcpStream::connect_timeout(
-                &self.addr,
-                std::time::Duration::from_millis(50),
-            )
-            .is_ok()
-            {
+            if TcpStream::connect_timeout(&self.addr, CONNECT_TIMEOUT).is_ok() {
                 return;
             }
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            sleep(WAIT_TIMEOUT);
         }
         panic!("MockProxy not ready after 500 ms");
     }
