@@ -1,9 +1,11 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
 use defguard_core::ConnectionType;
+use tracing::info;
 
+use crate::resolve::resolve_disconnect_target;
 use crate::{
     output::CommandOutput,
-    resolve::{self, ResolvedTarget, TargetSpec},
+    resolve::{ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 
@@ -35,15 +37,15 @@ pub async fn handle(
         let mut disconnected = Vec::with_capacity(active.len());
         let mut errors = Vec::new();
 
-        for conn in &active {
-            let name = conn.name.clone();
-            tracing::info!(
+        for connection in &active {
+            let name = connection.name.clone();
+            info!(
                 "Disconnecting {name} on interface {}...",
-                conn.interface_name
+                connection.interface_name
             );
-            match tear_down(conn, &state.pool).await {
+            match tear_down(connection, &state.pool).await {
                 Ok(()) => {
-                    tracing::info!("Disconnected {name} ({})", conn.interface_name);
+                    tracing::info!("Disconnected {name} ({})", connection.interface_name);
                     disconnected.push(name);
                 }
                 Err(e) => {
@@ -68,13 +70,11 @@ pub async fn handle(
                     return Ok(DisconnectResult::NoneActive);
                 }
                 1 => {
-                    let conn = &active[0];
-                    let ifname = conn.interface_name.clone();
-                    let name = conn.name.clone();
-                    tracing::info!(
-                        "Disconnecting sole active connection {name} on interface {ifname}..."
-                    );
-                    tear_down(conn, &state.pool).await?;
+                    let connection = &active[0];
+                    let ifname = connection.interface_name.clone();
+                    let name = connection.name.clone();
+                    info!("Disconnecting sole active connection {name} on interface {ifname}...");
+                    tear_down(connection, &state.pool).await?;
                     return Ok(DisconnectResult::Single {
                         name,
                         interface: ifname,
@@ -97,7 +97,7 @@ pub async fn handle(
             instance: instance.map(String::from),
         };
 
-        let target = resolve::resolve_disconnect_target(&spec, &state.pool).await?;
+        let target = resolve_disconnect_target(&spec, &state.pool).await?;
 
         let (target_id, target_connection_type, target_name) = match &target {
             ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.clone()),
@@ -116,7 +116,7 @@ pub async fn handle(
 
         let ifname = connection.interface_name.clone();
 
-        tracing::info!("Disconnecting {target_name} on interface {ifname}...");
+        info!("Disconnecting {target_name} on interface {ifname}...");
 
         tear_down(connection, &state.pool).await?;
 
