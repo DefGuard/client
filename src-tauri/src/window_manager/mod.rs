@@ -2,11 +2,9 @@
 use tauri::Manager;
 use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-#[cfg(not(target_os = "linux"))]
 use crate::database::{models::location::Location, DB_POOL};
 
 /// Returns `true` if there are any non-service locations in the database.
-#[cfg(not(target_os = "linux"))]
 pub async fn has_non_service_locations() -> bool {
     Location::exist(&*DB_POOL, false).await.unwrap_or_default()
 }
@@ -119,9 +117,7 @@ pub mod windows;
 pub mod macos;
 
 // Export tauri commands so they can be registered in main.rs
-#[cfg_attr(target_os = "linux", allow(unused_variables))]
 pub(crate) fn show_tray_window(app: &AppHandle) {
-    #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_tray(app);
 }
 
@@ -130,10 +126,8 @@ pub fn open_tray_window(app: AppHandle) {
     show_tray_window(&app);
 }
 
-#[cfg_attr(target_os = "linux", allow(unused_variables))]
 #[tauri::command]
 pub fn open_full_view_window(app: AppHandle) {
-    #[cfg(not(target_os = "linux"))]
     let _ = WindowManager::open_full_view(&app);
 }
 
@@ -145,11 +139,8 @@ pub fn swap_to_full_view(app: AppHandle) {
             tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
         }
     }
-    #[cfg(not(target_os = "linux"))]
-    {
-        if let Err(err) = WindowManager::open_full_view(&app) {
-            tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
-        }
+    if let Err(err) = WindowManager::open_full_view(&app) {
+        tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
     }
 }
 
