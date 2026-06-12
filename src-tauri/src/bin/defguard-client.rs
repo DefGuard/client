@@ -166,6 +166,9 @@ fn open_appropriate_window(app_handle: &AppHandle) {
 }
 
 fn main() {
+    // Handle --version / -V before starting the GUI.
+    defguard_client::check_version_flag("defguard-client");
+
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,

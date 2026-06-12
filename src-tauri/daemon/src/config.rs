@@ -7,7 +7,7 @@ pub const DEFAULT_LOG_DIR: &str = "/var/log/defguard-service";
 
 #[derive(Debug, Parser, Clone)]
 #[clap(about = "Defguard VPN client interface management service")]
-#[command(version)]
+#[command(name = "defguard-service", version)]
 pub struct Config {
     /// Configures log level of defguard service logs
     #[arg(long, env = "DEFGUARD_LOG_LEVEL", default_value = "info")]
