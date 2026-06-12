@@ -6,10 +6,7 @@
 //! public key to a `Location` or `Tunnel` in the database.
 
 use crate::{
-    database::{
-        models::{location::Location, tunnel::Tunnel, Id},
-        DbPool,
-    },
+    database::{models::Id, DbPool},
     error::Error,
     ConnectionType,
 };
@@ -64,6 +61,8 @@ pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Er
 #[cfg(not(target_os = "macos"))]
 async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
     use tonic::Code;
+
+    use crate::database::models::{location::Location, tunnel::Tunnel};
 
     use crate::connection::daemon_client::DAEMON_CLIENT;
 
@@ -179,6 +178,7 @@ fn peer_stats(
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 use base64::Engine as _;
 
 /// Convert a hex-encoded public key to base64, matching the database format.
