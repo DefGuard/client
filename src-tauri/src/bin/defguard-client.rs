@@ -15,7 +15,6 @@ use defguard_client::set_perms;
 #[cfg(windows)]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
-    active_connections::close_all_connections,
     app_config::AppConfig,
     appstate::AppState,
     commands::*,
@@ -33,6 +32,7 @@ use defguard_client::{
     window_manager::*,
     LOG_FILENAME, VERSION,
 };
+use defguard_client_core::connection::active_connections::close_all_connections;
 use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -305,7 +305,11 @@ fn main() {
             }
 
             // Prepare `AppConfig`.
-            let config = AppConfig::new(app_handle);
+            let config_dir = app_handle
+                .path()
+                .app_data_dir()
+                .expect("Failed to access app data");
+            let config = AppConfig::new(&config_dir);
 
             // Setup logging.
 

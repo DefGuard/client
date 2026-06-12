@@ -1,11 +1,9 @@
 import './style.scss';
-import { useQuery } from '@tanstack/react-query';
 import { BarElement, CategoryScale, Chart as ChartJS, LinearScale } from 'chart.js';
 import { sum } from 'radashi';
 import { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
-import { getLocationStatsQueryOptions } from '../../../../rust-api/query';
-import type { ConnectionType } from '../../../../rust-api/types';
+import type { LocationStats } from '../../../../rust-api/types';
 import { BoxIcon } from '../../../BoxIcon/BoxIcon';
 import { Icon, IconKind } from '../../../Icon';
 import { TransferText } from '../../../TransferText/TransferText';
@@ -16,15 +14,10 @@ const UPLOAD_COLOR = 'rgba(255, 255, 255, 0.20)';
 const DOWNLOAD_COLOR = 'rgba(255, 255, 255, 1.0)';
 
 interface Props {
-  locationId: number;
-  connectionType: ConnectionType;
+  stats: LocationStats[];
 }
 
-export const ConnectionChart = ({ locationId, connectionType }: Props) => {
-  const { data: stats } = useQuery(
-    getLocationStatsQueryOptions({ locationId, connectionType }),
-  );
-
+export const ConnectionChart = ({ stats }: Props) => {
   const statsSum = useMemo(
     () => ({
       download: sum(stats ?? [], (s) => s.download),

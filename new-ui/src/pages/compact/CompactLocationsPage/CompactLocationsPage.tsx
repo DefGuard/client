@@ -1,14 +1,13 @@
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { useLoaderData } from '@tanstack/react-router';
-import { platform } from '@tauri-apps/plugin-os';
-import clsx from 'clsx';
 import { useEffect, useMemo } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { LocationCard } from '../../../shared/components/LocationCard/LocationCard';
+import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { WindowHeader } from '../../../shared/components/WindowHeader/WindowHeader';
 import { api } from '../../../shared/rust-api/api';
 import {
@@ -20,8 +19,6 @@ import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
-
-const isWindows = platform() === 'windows';
 
 export const CompactLocationsPage = () => {
   const selection = useAppStore((s) => s.compactViewSelection);
@@ -69,11 +66,7 @@ export const CompactLocationsPage = () => {
       }}
     >
       <WindowHeader variant="compact" />
-      <div
-        className={clsx('scroll-wrap', {
-          windows: isWindows,
-        })}
-      >
+      <ScrollContainer>
         <InstanceSwitcher />
         <div className="locations">
           {isPresent(instanceInfo) &&
@@ -98,7 +91,7 @@ export const CompactLocationsPage = () => {
               );
             })}
         </div>
-      </div>
+      </ScrollContainer>
       <div className="compact-footer">
         <Divider spacing={ThemeSpacing.Md} />
         <Controls>

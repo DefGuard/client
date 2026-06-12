@@ -1,20 +1,29 @@
 use core::fmt;
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-    str::FromStr,
-};
+use std::{collections::HashMap, env, str::FromStr};
 
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
+use defguard_client_core::connection::active_connections::{
+    find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
+};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_core::connection::disconnect_interface;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+};
+use defguard_client_proto::defguard::{
+    client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(not(target_os = "macos"))]
+use crate::utils::execute_command;
 use crate::{
-    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
@@ -30,35 +39,26 @@ use crate::{
         DB_POOL,
     },
     enterprise::{
-        self, periodic::config::poll_instance, posture::authorize_posture_session,
+        self,
+        periodic::config::{do_update_instance, poll_instance},
+        posture::authorize_posture_session,
         provisioning::ProvisioningConfig,
     },
     error::Error,
     events::EventKey,
+    into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::defguard::client_types::DeviceConfigResponse,
-    service::proto::defguard::enterprise::posture::v2::DevicePostureData,
+    proxy::construct_platform_header,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        construct_platform_header, disconnect_interface, get_location_interface_details,
-        get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
-        handle_connection_for_tunnel,
+        get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
+        handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
-};
-#[cfg(not(target_os = "macos"))]
-use crate::{
-    service::{
-        client::DAEMON_CLIENT,
-        proto::defguard::client::v1::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-        },
-    },
-    utils::execute_command,
 };
 
 #[derive(Debug, Serialize, thiserror::Error)]
@@ -172,7 +172,9 @@ pub async fn disconnect(
             "Emitting the event informing the frontend about the disconnection from \
             {connection_type} {name}({location_id})"
         );
-        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        handle
+            .emit(EventKey::ConnectionChanged.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
         reload_tray_menu(&handle).await;
@@ -282,7 +284,9 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
     }
 
     if any_disconnected {
-        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        handle
+            .emit(EventKey::ConnectionChanged.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         reload_tray_menu(&handle).await;
         configure_tray_icon(&handle).await?;
     }
@@ -308,7 +312,9 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     };
     poll_instance(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -380,7 +386,7 @@ pub async fn save_device_config(
         keys.pubkey, instance.name, instance.id
     );
     for dev_config in response.configs {
-        let new_location = dev_config.into_location(instance.id);
+        let new_location = into_location(dev_config, instance.id);
         debug!(
             "Saving location {} for instance {}({})",
             new_location.name, instance.name, instance.id
@@ -397,7 +403,9 @@ pub async fn save_device_config(
 
     let locations = push_service_locations(&instance, keys).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     let res = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -433,7 +441,9 @@ async fn push_service_locations(
                 "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
                 saved_location.name, saved_location.id, instance.name, instance.id,
             );
-            service_locations.push(saved_location.to_service_location()?);
+            service_locations.push(crate::enterprise::service_locations::to_service_location(
+                saved_location,
+            )?);
         }
     }
 
@@ -653,244 +663,15 @@ pub async fn update_instance(
         do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        app_handle.emit(EventKey::InstanceUpdate.into(), ())?;
+        app_handle
+            .emit(EventKey::InstanceUpdate.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
         error!("Instance to update with id {instance_id} was not found, aborting update");
         Err(Error::NotFound)
     }
-}
-
-/// Returns true if configuration in instance_info differs from current configuration
-pub(crate) async fn locations_changed(
-    transaction: &mut Transaction<'_, Sqlite>,
-    instance: &Instance<Id>,
-    device_config: &DeviceConfigResponse,
-) -> Result<bool, Error> {
-    let db_locations = Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
-        .await?
-        .into_iter()
-        .map(|location| {
-            let mut new_location = Location::<NoId>::from(location);
-            // Ignore `route_all_traffic` flag as Defguard core does not have it.
-            new_location.route_all_traffic = false;
-            // Canonicalize mfa_method so a user-set value doesn't falsely trigger a
-            // config-change detection when the mode hasn't actually changed.
-            new_location.mfa_method = infer_mfa_method(new_location.location_mfa_mode, None);
-            new_location
-        })
-        .collect::<HashSet<_>>();
-    let core_locations: HashSet<Location> = device_config
-        .configs
-        .iter()
-        .map(|config| config.clone().into_location(instance.id))
-        .collect::<HashSet<_>>();
-
-    Ok(db_locations != core_locations)
-}
-
-pub(crate) async fn do_update_instance(
-    transaction: &mut Transaction<'_, Sqlite>,
-    instance: &mut Instance<Id>,
-    response: DeviceConfigResponse,
-) -> Result<(), Error> {
-    // update instance
-    debug!("Updating instance {instance}");
-    let locations_changed = locations_changed(transaction, instance, &response).await?;
-    let instance_info = response
-        .instance
-        .expect("Missing instance info in device config response");
-    instance.name = instance_info.name;
-    instance.url = instance_info.url;
-    instance.proxy_url = instance_info.proxy_url;
-    instance.username = instance_info.username;
-    // Make sure to update the locations too if we are disabling all traffic
-    let policy = instance_info.client_traffic_policy.into();
-    if instance.client_traffic_policy != policy && policy == ClientTrafficPolicy::DisableAllTraffic
-    {
-        debug!("Disabling all traffic for all locations of instance {instance}");
-        Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-        debug!("Disabled all traffic for all locations of instance {instance}");
-    }
-    instance.client_traffic_policy = instance_info.client_traffic_policy.into();
-    instance.openid_display_name = instance_info.openid_display_name;
-    instance.uuid = instance_info.id;
-    // Token may be empty if it was not issued
-    // This happens during polling, as core doesn't issue a new token for polling request
-    if response.token.is_some() {
-        instance.token = response.token;
-        debug!("Set polling token for instance {}", instance.name);
-    } else {
-        debug!(
-            "No polling token received for instance {}, not updating",
-            instance.name
-        );
-    }
-    instance.save(transaction.as_mut()).await?;
-    debug!(
-        "A new base configuration has been applied to instance {instance}, even if nothing changed"
-    );
-
-    let mut service_locations = Vec::new();
-
-    // check if locations have changed
-    if locations_changed {
-        // process locations received in response
-        debug!(
-            "Updating locations for instance {}({}).",
-            instance.name, instance.id
-        );
-        // Fetch existing locations for a given instance.
-        let mut current_locations =
-            Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
-        for dev_config in response.configs {
-            // parse device config
-            let new_location = dev_config.into_location(instance.id);
-
-            // check if location is already present in current locations
-            let saved_location = if let Some(position) = current_locations
-                .iter()
-                .position(|loc| loc.network_id == new_location.network_id)
-            {
-                // remove from list of existing locations
-                let mut current_location = current_locations.remove(position);
-                debug!(
-                    "Updating existing location {}({}) for instance {}({}).",
-                    current_location.name, current_location.id, instance.name, instance.id,
-                );
-                // update existing location
-                current_location.name = new_location.name;
-                current_location.address = new_location.address;
-                current_location.pubkey = new_location.pubkey;
-                current_location.endpoint = new_location.endpoint;
-                current_location.allowed_ips = new_location.allowed_ips;
-                current_location.keepalive_interval = new_location.keepalive_interval;
-                current_location.dns = new_location.dns;
-                current_location.location_mfa_mode = new_location.location_mfa_mode;
-                current_location.service_location_mode = new_location.service_location_mode;
-                // Correct mfa_method to remain consistent with the (possibly updated) mfa_mode.
-                current_location.mfa_method = infer_mfa_method(
-                    current_location.location_mfa_mode,
-                    current_location.mfa_method,
-                );
-                current_location.posture_check_required = new_location.posture_check_required;
-                current_location.save(transaction.as_mut()).await?;
-                info!("Location {current_location} configuration updated for instance {instance}");
-                current_location
-            } else {
-                // create new location
-                debug!("Creating new location {new_location} for instance instance {instance}");
-                let new_location = new_location.save(transaction.as_mut()).await?;
-                info!("New location {new_location} created for instance {instance}");
-                new_location
-            };
-
-            if saved_location.is_service_location() {
-                debug!(
-                    "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
-                    saved_location.name, saved_location.id, instance.name, instance.id,
-                );
-                service_locations.push(saved_location.to_service_location()?);
-            }
-        }
-
-        // remove locations which were present in current locations
-        // but no longer found in core response
-        debug!("Removing locations for instance {instance}");
-        for removed_location in current_locations {
-            removed_location.delete(transaction.as_mut()).await?;
-            info!(
-                "Removed location {removed_location} for instance {instance} during instance update"
-            );
-        }
-        debug!("Finished updating locations for instance {instance}");
-    } else {
-        info!("Locations for instance {instance} didn't change. Not updating them.");
-    }
-
-    if service_locations.is_empty() {
-        debug!(
-            "No service locations for instance {}({}), removing all existing service locations connections if there are any.",
-            instance.name, instance.id
-        );
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            let delete_request = DeleteServiceLocationsRequest {
-                instance_id: instance.uuid.clone(),
-            };
-            DAEMON_CLIENT
-            .clone()
-            .delete_service_locations(delete_request)
-            .await
-            .map_err(|err| {
-                error!(
-                    "Error while deleting service locations from the daemon for instance {}({}): {err}",
-                    instance.name, instance.id,
-                );
-                Error::InternalError(err.to_string())
-            })?;
-            debug!(
-                "Successfully removed all service locations from daemon for instance {}({})",
-                instance.name, instance.id
-            );
-        }
-    } else {
-        debug!(
-            "Processing {} service location(s) for instance {}({})",
-            service_locations.len(),
-            instance.name,
-            instance.id
-        );
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
-                .await?
-                .ok_or(Error::NotFound)?
-                .prvkey;
-
-            let save_request = SaveServiceLocationsRequest {
-                service_locations: service_locations.clone(),
-                instance_id: instance.uuid.clone(),
-                private_key,
-            };
-
-            debug!(
-                "Sending request to daemon to save {} service location(s) for instance {}({})",
-                save_request.service_locations.len(),
-                instance.name,
-                instance.id
-            );
-
-            DAEMON_CLIENT
-                .clone()
-                .save_service_locations(save_request)
-                .await
-                .map_err(|err| {
-                    error!(
-                    "Error while saving service locations to the daemon for instance {}({}): {err}",
-                    instance.name, instance.id,
-                );
-                    Error::InternalError(err.to_string())
-                })?;
-
-            info!(
-                "Successfully saved {} service location(s) to daemon for instance {}({})",
-                service_locations.len(),
-                instance.name,
-                instance.id
-            );
-
-            debug!(
-                "Completed processing all service locations for instance {}({})",
-                instance.name, instance.id
-            );
-        }
-    }
-
-    Ok(())
 }
 
 /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
@@ -901,35 +682,6 @@ pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Err
     })
 }
 
-pub(crate) enum DateTimeAggregation {
-    Hour,
-    Second,
-}
-
-impl DateTimeAggregation {
-    /// Returns database format string for a given aggregation variant.
-    #[must_use]
-    pub(crate) fn fstring(&self) -> &'static str {
-        match self {
-            Self::Hour => "%Y-%m-%d %H:00:00",
-            Self::Second => "%Y-%m-%d %H:%M:%S",
-        }
-    }
-}
-
-pub(crate) fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
-    // Use hourly aggregation for longer periods
-    let aggregation = match Utc::now().naive_utc() - from {
-        duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
-        duration if duration < Duration::zero() => Err(Error::InternalError(format!(
-            "Negative duration between dates: now ({}) and {from}",
-            Utc::now().naive_utc(),
-        ))),
-        _ => Ok(DateTimeAggregation::Second),
-    }?;
-    Ok(aggregation)
-}
-
 #[tauri::command(async)]
 pub async fn location_stats(
     location_id: Id,
@@ -938,7 +690,7 @@ pub async fn location_stats(
 ) -> Result<Vec<CommonLocationStats<Id>>, Error> {
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
-    let aggregation = get_aggregation(from)?;
+    let aggregation = crate::get_aggregation(from)?;
     let stats = match connection_type {
         ConnectionType::Location => {
             LocationStats::all_by_location_id(&*DB_POOL, location_id, &from, &aggregation, None)
@@ -1091,7 +843,9 @@ pub async fn update_location_routing(
                 location.route_all_traffic = route_all_traffic;
                 location.save(&*DB_POOL).await?;
                 debug!("Location routing updated for location {name}(ID: {location_id})");
-                handle.emit(EventKey::LocationUpdate.into(), ())?;
+                handle
+                    .emit(EventKey::LocationUpdate.into(), ())
+                    .map_err(crate::tauri_err_to_app_err)?;
                 Ok(())
             } else {
                 error!(
@@ -1105,7 +859,9 @@ pub async fn update_location_routing(
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&*DB_POOL).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
-                handle.emit(EventKey::LocationUpdate.into(), ())?;
+                handle
+                    .emit(EventKey::LocationUpdate.into(), ())
+                    .map_err(crate::tauri_err_to_app_err)?;
                 Ok(())
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
@@ -1134,7 +890,9 @@ pub async fn set_location_mfa_method(
             "MFA method updated for location {}(ID: {location_id})",
             location.name,
         );
-        handle.emit(EventKey::LocationUpdate.into(), ())?;
+        handle
+            .emit(EventKey::LocationUpdate.into(), ())
+            .map_err(crate::tauri_err_to_app_err)?;
         Ok(())
     } else {
         error!("Location with ID {location_id} not found, cannot set MFA method");
@@ -1183,7 +941,9 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     configure_tray_icon(&handle).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -1258,7 +1018,9 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     configure_tray_icon(&handle).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -1279,7 +1041,9 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
     debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
-    handle.emit(EventKey::LocationUpdate.into(), ())?;
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -1288,7 +1052,9 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
-    handle.emit(EventKey::LocationUpdate.into(), ())?;
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -1455,17 +1221,8 @@ pub struct AppVersionInfo {
 
 const PRODUCT_NAME: &str = "defguard-client";
 
-fn select_reported_app_version(
-    package_version: &str,
-    build_version_override: Option<&str>,
-) -> String {
-    build_version_override
-        .filter(|version| !version.trim().is_empty())
-        .map_or_else(|| package_version.to_owned(), str::to_owned)
-}
-
 fn reported_app_version(handle: &AppHandle) -> String {
-    select_reported_app_version(
+    defguard_client_core::version::select_reported_app_version(
         &handle.package_info().version.to_string(),
         option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
     )
@@ -1530,7 +1287,11 @@ pub async fn command_set_app_config(
     let res = {
         let mut app_config = app_state.app_config.lock().unwrap();
         app_config.apply(config_patch);
-        app_config.save(&app_handle);
+        let config_dir = app_handle
+            .path()
+            .app_data_dir()
+            .expect("Failed to access app data");
+        app_config.save(&config_dir);
         app_config.clone()
     };
     info!("Config changed successfully");
@@ -1603,27 +1364,4 @@ pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Er
     }
     debug!("Returning {} active connections.", result.len());
     Ok(result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::select_reported_app_version;
-
-    #[test]
-    fn reported_app_version_uses_override_when_present() {
-        assert_eq!(
-            select_reported_app_version("1.6.8", Some("1.6.8-beta1")),
-            "1.6.8-beta1"
-        );
-    }
-
-    #[test]
-    fn reported_app_version_falls_back_to_package_version_without_override() {
-        assert_eq!(select_reported_app_version("1.6.8", None), "1.6.8");
-    }
-
-    #[test]
-    fn reported_app_version_ignores_empty_override() {
-        assert_eq!(select_reported_app_version("1.6.8", Some("   ")), "1.6.8");
-    }
 }

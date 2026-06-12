@@ -1,81 +1,12 @@
-use std::{fmt, fs, path::Path};
+pub use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
 
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::database::{models::instance::Instance, DB_POOL};
-
-const CONFIG_FILE_NAME: &str = "provisioning.json";
-
-#[derive(Clone, Deserialize, Serialize)]
-pub struct ProvisioningConfig {
-    pub enrollment_url: String,
-    pub enrollment_token: String,
-}
-
-impl fmt::Debug for ProvisioningConfig {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            enrollment_url,
-            enrollment_token: _,
-        } = self;
-
-        f.debug_struct("ProvisioningConfig")
-            .field("enrollment_url", enrollment_url)
-            .field("enrollment_token", &"***")
-            .finish()
-    }
-}
-
-impl ProvisioningConfig {
-    /// Load configuration from a file at `path`.
-    fn load(path: &Path) -> Option<Self> {
-        // read content to string first to handle Windows encoding issues
-        let file_content = match fs::read_to_string(path) {
-            Ok(content) => content,
-            Err(err) => {
-                warn!(
-                    "Failed to open provisioning configuration file at {}. Error details: \
-                    {err}",
-                    path.display()
-                );
-                return None;
-            }
-        };
-
-        // strip Windows BOM manually
-        let file_content = file_content.trim_start_matches('\u{FEFF}');
-
-        match serde_json::from_str::<Self>(file_content) {
-            Ok(config) => Some(config),
-            Err(err) => {
-                warn!(
-                    "Failed to parse provisioning configuration file at {}. Error details: \
-                    {err}",
-                    path.display()
-                );
-                None
-            }
-        }
-    }
-}
-
-#[must_use]
-pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningConfig> {
-    debug!(
-        "Trying to find provisioning config in {}",
-        app_data_dir.display()
-    );
-
-    let config_file_path = app_data_dir.join(CONFIG_FILE_NAME);
-    ProvisioningConfig::load(&config_file_path)
-}
+use defguard_client_core::database::{models::instance::Instance, DB_POOL};
 
 /// Checks if the client has already been initialized
 /// and tries to load provisioning config from file if necessary
 pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<ProvisioningConfig> {
-    // check if client has already been initialized
-    // we assume that if any instances exist the client has been initialized
     match Instance::all(&*DB_POOL).await {
         Ok(instances) => {
             if instances.is_empty() {

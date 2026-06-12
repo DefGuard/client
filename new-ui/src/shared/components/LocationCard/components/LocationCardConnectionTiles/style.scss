@@ -1,0 +1,56 @@
+.location-card-connection-tiles {
+  &.variant- {
+    &compact {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      column-gap: var(--spacing-md);
+
+      .tile {
+        border-radius: 8px;
+        padding: var(--spacing-sm) var(--spacing-md);
+
+        > .box-icon {
+          margin-bottom: 13px;
+        }
+
+        > .label {
+          padding-bottom: var(--spacing-xs);
+        }
+      }
+    }
+
+    &full {
+      display: flex;
+      flex-flow: row nowrap;
+      column-gap: var(--spacing-md);
+      align-items: center;
+      justify-content: flex-start;
+
+      .tile {
+        display: inline-flex;
+        flex-flow: row nowrap;
+        column-gap: var(--spacing-sm);
+        padding: var(--spacing-sm);
+        border-radius: 12px;
+
+        > .label {
+          display: none;
+        }
+      }
+    }
+  }
+
+  .tile {
+    background: var(--bg-white-5);
+    box-sizing: border-box;
+
+    > .label {
+      font: var(--t-body-xxs-400);
+      color: var(--fg-white-50);
+    }
+
+    > .label-value {
+      font: var(--t-body-xs-500);
+    }
+  }
+}

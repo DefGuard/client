@@ -1,5 +1,5 @@
 [package]
-name = "common"
+name = "defguard-client-common"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true

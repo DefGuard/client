@@ -1,0 +1,56 @@
+.location-card-mfa-edit {
+  &.variant- {
+    &full {
+      display: inline-flex;
+      flex-flow: row nowrap;
+      flex-grow: 0;
+      align-items: center;
+      justify-content: flex-start;
+
+      .mfa-badge {
+        margin-right: var(--spacing-sm);
+      }
+
+      .name {
+        margin-right: var(--spacing-md);
+      }
+    }
+
+    &compact {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) 24px;
+      grid-template-rows: 1fr;
+      align-items: center;
+      column-gap: var(--spacing-md);
+      user-select: none;
+    }
+  }
+
+  > .name {
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-100);
+  }
+
+  .mfa-badge {
+    border-radius: 4px;
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    min-height: 20px;
+    width: 36px;
+    background-color: transparent;
+    border: 1px solid var(--bg-white-60);
+
+    p {
+      font: var(--font-family-body);
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 16px;
+      letter-spacing: 0.11px;
+      color: var(--fg-white-60);
+    }
+  }
+}

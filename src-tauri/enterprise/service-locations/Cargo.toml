@@ -1,0 +1,28 @@
+[package]
+name = "defguard-client-service-locations"
+description = "Service location management for the Defguard client daemon"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license = "LicenseRef-Proprietary"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+defguard-client-common = { path = "../../common" }
+defguard-client-core = { path = "../../core" }
+defguard-client-proto = { path = "../../client-proto" }
+defguard_wireguard_rs = { workspace = true }
+base64.workspace = true
+log.workspace = true
+prost = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+known-folders = "1.4"
+windows = "0.62"
+windows-acl = "0.3"
+windows-service = "0.8"
+windows-sys = "0.61"
