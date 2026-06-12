@@ -8,9 +8,9 @@ use crate::{
     state::{CliError, State},
 };
 
-const MIN_LOCATION_NAME: usize = 8;
-const MIN_ENDPOINT: usize = 8;
-const MIN_TUNNEL_NAME: usize = 4;
+const MIN_LOCATION_NAME_COL_WIDTH: usize = 8;
+const MIN_ENDPOINT_COL_WIDTH: usize = 8;
+const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 
 pub async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
@@ -103,14 +103,14 @@ fn format_list_table(
         .iter()
         .map(|l| l.name.len())
         .max()
-        .unwrap_or(MIN_LOCATION_NAME)
-        .max(MIN_LOCATION_NAME);
+        .unwrap_or(MIN_LOCATION_NAME_COL_WIDTH)
+        .max(MIN_LOCATION_NAME_COL_WIDTH);
     let endpoint_col_width = locations
         .iter()
         .map(|l| l.endpoint.len())
         .max()
-        .unwrap_or(MIN_ENDPOINT)
-        .max(MIN_ENDPOINT);
+        .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
+        .max(MIN_ENDPOINT_COL_WIDTH);
 
     let mut lines = Vec::new();
 
@@ -143,13 +143,13 @@ fn format_list_table(
             .iter()
             .map(|t| t.name.len())
             .max()
-            .unwrap_or(MIN_TUNNEL_NAME)
+            .unwrap_or(MIN_TUNNEL_NAME_COL_WIDTH)
             .max(location_name_col_width);
         let tunnel_endpoint_col_width = tunnels
             .iter()
             .map(|t| t.endpoint.len())
             .max()
-            .unwrap_or(MIN_ENDPOINT)
+            .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
             .max(endpoint_col_width);
 
         lines.push("\nTunnels".to_string());

@@ -13,9 +13,9 @@ use crate::{
     state::{CliError, State},
 };
 
-const MIN_NAME: usize = 8;
-const MIN_ENDPOINT: usize = 8;
-const MIN_INST: usize = 8;
+const MIN_NAME_COL_WIDTH: usize = 8;
+const MIN_ENDPOINT_COL_WIDTH: usize = 8;
+const MIN_INST_COL_WIDTH: usize = 8;
 
 pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
@@ -174,20 +174,20 @@ fn format_location_list_table(
         .iter()
         .map(|l| l.name.len())
         .max()
-        .unwrap_or(MIN_NAME)
-        .max(MIN_NAME);
+        .unwrap_or(MIN_NAME_COL_WIDTH)
+        .max(MIN_NAME_COL_WIDTH);
     let endpoint_col_width = locations
         .iter()
         .map(|l| l.endpoint.len())
         .max()
-        .unwrap_or(MIN_ENDPOINT)
-        .max(MIN_ENDPOINT);
+        .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
+        .max(MIN_ENDPOINT_COL_WIDTH);
     let inst_col_width = locations
         .iter()
         .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
         .max()
-        .unwrap_or(MIN_INST)
-        .max(MIN_INST);
+        .unwrap_or(MIN_INST_COL_WIDTH)
+        .max(MIN_INST_COL_WIDTH);
 
     let mut lines = vec![format!(
         "  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:<11}",
