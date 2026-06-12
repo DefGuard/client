@@ -26,7 +26,7 @@ pub fn compact_view_ui_url() -> WebviewUrl {
     if cfg!(any(defguard_client_dev)) {
         WebviewUrl::External("http://localhost:5072/compact/".parse().unwrap())
     } else {
-        WebviewUrl::App("new-ui/compact/".into())
+        WebviewUrl::App("compact/".into())
     }
 }
 
@@ -35,7 +35,7 @@ pub fn full_view_ui_url() -> WebviewUrl {
     if cfg!(any(defguard_client_dev)) {
         WebviewUrl::External("http://localhost:5072/full/".parse().unwrap())
     } else {
-        WebviewUrl::App("new-ui/full/".into())
+        WebviewUrl::App("full/".into())
     }
 }
 
