@@ -166,14 +166,21 @@ async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>,
 }
 
 /// Extract per-peer stats from an `InterfaceData` response.
+///
+/// `ListInterfaces` returns an unfiltered snapshot that includes peers which have never
+/// completed a handshake. Such a peer is not actually connected, so return `None` for it -
+/// keeping the `Option<InterfaceStats>` contract meaningful for callers.
 #[cfg(not(target_os = "macos"))]
 fn peer_stats(iface: &InterfaceData, peer: &Peer) -> Option<InterfaceStats> {
-    Some(InterfaceStats {
-        listen_port: iface.listen_port,
-        tx_bytes: peer.tx_bytes,
-        rx_bytes: peer.rx_bytes,
-        last_handshake: peer.last_handshake,
-    })
+    match peer.last_handshake {
+        Some(ts) if ts > 0 => Some(InterfaceStats {
+            listen_port: iface.listen_port,
+            tx_bytes: peer.tx_bytes,
+            rx_bytes: peer.rx_bytes,
+            last_handshake: peer.last_handshake,
+        }),
+        _ => None,
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
