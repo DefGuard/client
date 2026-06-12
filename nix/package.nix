@@ -222,10 +222,14 @@ in
     SQLX_OFFLINE = "true";
     doInstallCargoArtifacts = false;
 
-    # passthru attrs are ignored by the build but addressable by external tools:
-    # pnpmDeps — referenced by the update-pnpm-hash.yaml CI workflow
+    # passthru attrs are ignored by the build but addressable by external tools.
+    # There are TWO pnpm lockfiles, each with its own pinned hash that must be kept
+    # current when the corresponding lockfile changes:
+    #   pnpmDeps       - root pnpm project (../pnpm-lock.yaml)
+    #   newUiPnpmDeps  - new-ui pnpm project (../new-ui/pnpm-lock.yaml)
+    # Any hash-refresh automation (e.g. an update-pnpm-hash workflow) must update both.
     passthru = {
-      inherit pnpmDeps;
+      inherit pnpmDeps newUiPnpmDeps;
     };
 
     meta = with lib; {
