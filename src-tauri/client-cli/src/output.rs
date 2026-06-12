@@ -100,6 +100,7 @@ fn error_kind(err: &CliError) -> String {
         CliError::MfaFailed(_) => "mfaFailed".into(),
         CliError::MfaInputRequired(_) => "mfaInputRequired".into(),
         CliError::NotEnrolled(_) => "notEnrolled".into(),
+        CliError::InvalidInput(_) => "invalidInput".into(),
         CliError::Database(_) => "database".into(),
         CliError::Other(_) => "other".into(),
     }
