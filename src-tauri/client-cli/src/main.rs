@@ -31,8 +31,8 @@ async fn main() -> ExitCode {
     // Init logging to stderr so stdout stays data-only.
     logging::init(cli.verbose);
 
-    // Resolve state (data-dir, DB pool, migrations).
-    let state = match State::init(cli.data_dir.as_deref()).await {
+    // Resolve state (DB pool, migrations, app config).
+    let state = match State::init().await {
         Ok(s) => s,
         Err(err) => {
             let code = exit::exit_code_for(&err);

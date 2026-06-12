@@ -16,11 +16,6 @@ pub struct Cli {
     #[arg(short = 'v', long, action = clap::ArgAction::Count, global = true)]
     pub verbose: u8,
 
-    /// Override the data directory.  Defaults to $DG_DATA_DIR or the platform
-    /// standard application-data directory.
-    #[arg(long = "data-dir", env = "DG_DATA_DIR", global = true)]
-    pub data_dir: Option<String>,
-
     #[command(subcommand)]
     pub command: Commands,
 }

@@ -12,9 +12,6 @@ use tracing::{debug, info, warn};
 pub struct State {
     /// shared SQLite pool
     pub pool: DbPool,
-    /// resolved data directory
-    #[allow(dead_code)]
-    pub data_dir: String,
     /// loaded application configuration (theme, log level, MTU, etc.)
     pub app_config: AppConfig,
 }
@@ -66,18 +63,9 @@ impl From<sqlx::Error> for CliError {
 impl State {
     /// Initialize the CLI runtime state: resolve data directory, open the
     /// shared SQLite pool, and run migrations.
-    pub async fn init(data_dir_override: Option<&str>) -> Result<State, CliError> {
-        // If a data directory override is provided, set DATABASE_URL so that
-        // DB_POOL's lazy initializer uses it.  Must happen before first access.
-        if let Some(dir) = data_dir_override {
-            let db_path = format!("{dir}/defguard.db");
-            std::env::set_var("DATABASE_URL", format!("sqlite://{db_path}"));
-            info!("Using custom data directory: {dir}");
-        }
-
-        let data_dir = data_dir_override
-            .map(String::from)
-            .or_else(|| defguard_core::app_data_dir().map(|p| p.to_string_lossy().to_string()))
+    pub async fn init() -> Result<State, CliError> {
+        let data_dir = defguard_core::app_data_dir()
+            .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| {
                 warn!("No app data directory found, using current directory");
                 ".".to_string()
@@ -96,10 +84,6 @@ impl State {
 
         info!("CLI state initialized");
 
-        Ok(State {
-            pool,
-            data_dir,
-            app_config,
-        })
+        Ok(State { pool, app_config })
     }
 }
