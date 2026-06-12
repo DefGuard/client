@@ -30,6 +30,7 @@ in
       rustToolchain
       trunk
       sqlx-cli
+      cargo-nextest
       vtsls
       trivy
     ];

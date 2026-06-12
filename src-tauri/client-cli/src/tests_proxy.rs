@@ -5,9 +5,13 @@
 //! seeded via `#[sqlx::test]`.
 
 use std::{
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    thread::{sleep, spawn},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::{sleep, spawn, JoinHandle},
     time::Duration,
 };
 
@@ -39,21 +43,48 @@ struct MockResponse {
 /// A tiny HTTP server that responds to MFA start/finish requests.
 struct MockProxy {
     addr: SocketAddr,
+    shutdown: Arc<AtomicBool>,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl MockProxy {
     fn new(start_response: MockResponse, finish_response: MockResponse) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        listener.set_nonblocking(false).ok();
+        // Non-blocking accept so the loop can observe the shutdown flag and exit cleanly.
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
-        // Spawn the accept loop.
-        spawn(move || {
-            for stream in listener.incoming().flatten() {
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_thread = shutdown.clone();
+        let handle = spawn(move || {
+            while !shutdown_thread.load(Ordering::Relaxed) {
+                let mut stream = match listener.accept() {
+                    Ok((stream, _)) => stream,
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                        sleep(WAIT_TIMEOUT);
+                        continue;
+                    }
+                    Err(_) => break,
+                };
+                stream.set_nonblocking(false).ok();
                 stream.set_read_timeout(Some(READ_TIMEOUT)).ok();
+
+                // Read the full request head rather than assuming one read captures it.
+                let mut data = Vec::new();
                 let mut buf = [0u8; 4096];
-                let mut s = stream;
-                let _ = s.read(&mut buf);
-                let request = String::from_utf8_lossy(&buf);
+                loop {
+                    match stream.read(&mut buf) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            data.extend_from_slice(&buf[..n]);
+                            if data.windows(4).any(|w| w == b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+
+                let request = String::from_utf8_lossy(&data);
                 let response = if request.contains("/api/v1/client-mfa/start") {
                     &start_response
                 } else {
@@ -65,10 +96,14 @@ impl MockProxy {
                     response.body.len(),
                     response.body,
                 );
-                let _ = s.write_all(body.as_bytes());
+                let _ = stream.write_all(body.as_bytes());
             }
         });
-        MockProxy { addr }
+        MockProxy {
+            addr,
+            shutdown,
+            handle: Some(handle),
+        }
     }
 
     fn url(&self) -> String {
@@ -84,6 +119,15 @@ impl MockProxy {
             sleep(WAIT_TIMEOUT);
         }
         panic!("MockProxy not ready after 500 ms");
+    }
+}
+
+impl Drop for MockProxy {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
     }
 }
 

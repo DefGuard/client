@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     env::set_var,
     fs::remove_file,
+    os::unix::net::UnixStream,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
@@ -33,7 +34,8 @@ use tokio::{net::UnixListener, sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::{ReceiverStream, UnixListenerStream};
 use tonic::{transport::Server, Request, Response, Status};
 
-const MOCK_SETUP_DELAY: Duration = Duration::from_millis(100);
+const READY_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const READY_POLL_ATTEMPTS: u32 = 50;
 
 type StreamItem = Result<InterfaceData, Status>;
 
@@ -146,8 +148,13 @@ fn spawn_mock() -> (MockDaemonState, JoinHandle<()>, TempDir) {
             .ok();
     });
     set_var("DEFGUARD_DAEMON_SOCKET", socket_path.to_str().unwrap());
-    // Give the server a moment to start accepting.
-    sleep(MOCK_SETUP_DELAY);
+    // Poll until the socket accepts connections instead of sleeping a fixed amount.
+    for _ in 0..READY_POLL_ATTEMPTS {
+        if UnixStream::connect(&socket_path).is_ok() {
+            break;
+        }
+        sleep(READY_POLL_INTERVAL);
+    }
     (state, handle, dir)
 }
 

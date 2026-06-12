@@ -79,11 +79,11 @@ jobs:
       - name: Install cargo extensions
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny
+          tool: cargo-deny,cargo-nextest
 
       - name: Run cargo deny
         working-directory: ./src-tauri
         run: cargo deny check
 
       - name: Run tests
-        run: cargo test --workspace --locked --no-fail-fast
+        run: cargo nextest run --workspace --locked --no-fail-fast
