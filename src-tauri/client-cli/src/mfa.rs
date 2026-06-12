@@ -52,23 +52,13 @@ pub async fn authorize(
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<SecretString, CliError> {
-    let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
-        .await
-        .map_err(|e| CliError::Other(e.to_string()))?
-        .ok_or_else(|| {
-            CliError::Other(format!(
-                "WireGuard keys not found for instance {}",
-                instance.name
-            ))
-        })?;
-
     let method = if let Some(raw) = method_override {
         parse_method(raw)?
     } else {
         infer_method(location)
     };
 
-    // Reject methods not yet supported by the CLI.
+    // Reject methods not yet supported by the CLI before doing any I/O.
     match method {
         MfaMethod::Oidc | MfaMethod::Biometric | MfaMethod::MobileApprove => {
             return Err(CliError::MfaFailed(format!(
@@ -78,6 +68,16 @@ pub async fn authorize(
         }
         _ => {}
     }
+
+    let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
+        .await
+        .map_err(|e| CliError::Other(e.to_string()))?
+        .ok_or_else(|| {
+            CliError::Other(format!(
+                "WireGuard keys not found for instance {}",
+                instance.name
+            ))
+        })?;
 
     // Parse the proxy base URL once and reuse it for both MFA requests.
     let proxy_base = Url::parse(&instance.proxy_url)
