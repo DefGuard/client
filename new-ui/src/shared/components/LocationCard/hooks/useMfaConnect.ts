@@ -2,9 +2,9 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetch } from '@tauri-apps/plugin-http';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { EdgeRequestHeaders } from '../../../edge-api/types';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { EdgeRequestHeaders } from '../../../rust-api/types';
 import {
   CLIENT_MFA_ENDPOINT,
   type MfaStartMethod,

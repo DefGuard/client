@@ -198,10 +198,10 @@ fn main() {
             get_platform_header,
             get_posture_data,
             set_location_mfa_method,
-            open_new_ui_window,
-            open_old_ui_window,
-            swap_to_new_ui,
-            swap_to_old_ui,
+            open_tray_window,
+            open_full_view_window,
+            swap_to_tray,
+            swap_to_full_view,
             close_tray_window,
             all_active_connections,
             disconnect_locations,
@@ -209,7 +209,7 @@ fn main() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
-                if label == NEW_UI_WINDOW_ID || label == OLD_UI_WINDOW_ID {
+                if label == COMPACT_WINDOW_ID || label == FULL_VIEW_WINDOW_ID {
                     #[cfg(not(target_os = "macos"))]
                     let _ = window.hide();
 
@@ -392,7 +392,7 @@ fn main() {
             if let Err(e) = WindowManager::build_tray_window(app_handle) {
                 warn!("Failed to pre-build tray window: {e}");
             }
-            if let Err(e) = WindowManager::build_full_window(app_handle) {
+            if let Err(e) = WindowManager::build_full_view_window(app_handle) {
                 warn!("Failed to pre-build full window: {e}");
             }
 

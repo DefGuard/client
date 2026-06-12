@@ -1,0 +1,40 @@
+.details-fold {
+  display: flex;
+  flex-flow: column;
+  row-gap: var(--spacing-3xl);
+
+  > .group {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-sm);
+
+    > .card {
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid var(--border-disabled);
+      padding: var(--spacing-md);
+
+      > .row {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        justify-content: space-between;
+        column-gap: var(--spacing-2xl);
+
+        :nth-child(1) {
+          user-select: none;
+          font: var(--t-body-xs-400);
+          color: var(--fg-white-80);
+          text-align: left;
+        }
+
+        :nth-child(2) {
+          font: var(--t-body-xs-400);
+          color: var(--fg-white-100);
+          text-align: right;
+          max-width: 365px;
+        }
+      }
+    }
+  }
+}

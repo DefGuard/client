@@ -8,8 +8,8 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 
 use crate::window_manager::{
-    WindowManager, NEW_UI_HEIGHT, NEW_UI_WIDTH, NEW_UI_WINDOW_ID, OLD_UI_HEIGHT, OLD_UI_WIDTH,
-    OLD_UI_WINDOW_ID, WINDOW_GAP,
+    WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID, COMPACT_WINDOW_WIDTH,
+    FULL_VIEW_WINDOW_HEIGHT, FULL_VIEW_WINDOW_ID, FULL_VIEW_WINDOW_WIDTH, WINDOW_GAP,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -145,16 +145,16 @@ impl WindowManager {
             .find(|m| m.is_primary)
             .unwrap_or(&monitors[0]);
 
-        let window = if let Some(window) = tauri::Manager::get_webview_window(app, NEW_UI_WINDOW_ID)
-        {
-            let _ = window.unminimize();
-            window
-        } else {
-            Self::build_tray_window(app)?
-        };
+        let window =
+            if let Some(window) = tauri::Manager::get_webview_window(app, COMPACT_WINDOW_ID) {
+                let _ = window.unminimize();
+                window
+            } else {
+                Self::build_tray_window(app)?
+            };
 
-        let logical_width = NEW_UI_WIDTH;
-        let logical_height = NEW_UI_HEIGHT;
+        let logical_width = COMPACT_WINDOW_WIDTH;
+        let logical_height = COMPACT_WINDOW_HEIGHT;
 
         let physical_width = (logical_width * primary.scale_factor) as i32;
         let physical_height = (logical_height * primary.scale_factor) as i32;
@@ -249,29 +249,29 @@ impl WindowManager {
         );
 
         log::info!("open_full_view: Checking if old-ui window exists");
-        let window = if let Some(window) = tauri::Manager::get_webview_window(app, OLD_UI_WINDOW_ID)
-        {
-            log::info!("open_full_view: old-ui window exists, unminimizing");
-            let _ = window.unminimize();
-            window
-        } else {
-            log::info!("open_full_view: old-ui window does not exist, building it");
-            let win = Self::build_full_window(app)?;
-            log::info!("open_full_view: old-ui window built successfully");
-            win
-        };
+        let window =
+            if let Some(window) = tauri::Manager::get_webview_window(app, FULL_VIEW_WINDOW_ID) {
+                log::info!("open_full_view: old-ui window exists, unminimizing");
+                let _ = window.unminimize();
+                window
+            } else {
+                log::info!("open_full_view: old-ui window does not exist, building it");
+                let win = Self::build_full_view_window(app)?;
+                log::info!("open_full_view: old-ui window built successfully");
+                win
+            };
 
         log::info!("open_full_view: Querying outer_size");
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
-            width: (OLD_UI_WIDTH * primary.scale_factor) as u32,
-            height: (OLD_UI_HEIGHT * primary.scale_factor) as u32,
+            width: (FULL_VIEW_WINDOW_WIDTH * primary.scale_factor) as u32,
+            height: (FULL_VIEW_WINDOW_HEIGHT * primary.scale_factor) as u32,
         });
         log::info!("open_full_view: outer_size = {outer_size:?}");
 
         log::info!("open_full_view: Querying inner_size");
         let inner_size = window.inner_size().unwrap_or(tauri::PhysicalSize {
-            width: (OLD_UI_WIDTH * primary.scale_factor) as u32,
-            height: (OLD_UI_HEIGHT * primary.scale_factor) as u32,
+            width: (FULL_VIEW_WINDOW_WIDTH * primary.scale_factor) as u32,
+            height: (FULL_VIEW_WINDOW_HEIGHT * primary.scale_factor) as u32,
         });
         log::info!("open_full_view: inner_size = {inner_size:?}");
 

@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Fragment, type PropsWithChildren, useEffect } from 'react';
-
+import { WindowId } from '../consts';
 import {
   type AddInstanceEventPayload,
   type DeadConnectionDroppedPayload,
@@ -10,10 +12,24 @@ import {
 } from '../rust-api/types';
 
 export const TauriEventProvider = ({ children }: PropsWithChildren) => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const unlisteners = Promise.all([
+      listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
+        const windowLabel = getCurrentWindow().label;
+        if (windowLabel === WindowId.FullView) {
+          const { token, url } = event.payload;
+          navigate({
+            to: '/full/add/instance',
+            search: {
+              token,
+              url,
+            },
+          });
+        }
+      }),
       listen(TauriEvent.ConnectionChanged, () => {
         void queryClient.invalidateQueries({ queryKey: ['alive-connection'] });
         void queryClient.invalidateQueries({ queryKey: ['active-connection'] });
@@ -79,7 +95,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
     return () => {
       void unlisteners.then((fns) => fns.forEach((fn) => void fn()));
     };
-  }, [queryClient]);
+  }, [queryClient, navigate]);
 
   return <Fragment>{children}</Fragment>;
 };

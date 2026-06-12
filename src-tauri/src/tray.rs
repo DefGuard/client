@@ -19,7 +19,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window_manager::{show_new_ui_window, NEW_UI_WINDOW_ID, OLD_UI_WINDOW_ID},
+    window_manager::{show_tray_window, COMPACT_WINDOW_ID, FULL_VIEW_WINDOW_ID},
     ConnectionType,
 };
 
@@ -171,23 +171,23 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
                 #[cfg(not(target_os = "linux"))]
                 {
                     let main_visible = app
-                        .get_webview_window(OLD_UI_WINDOW_ID)
+                        .get_webview_window(FULL_VIEW_WINDOW_ID)
                         .and_then(|w| w.is_visible().ok())
                         .unwrap_or(false);
 
                     if main_visible {
-                        if let Some(w) = app.get_webview_window(OLD_UI_WINDOW_ID) {
+                        if let Some(w) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
                             let _ = w.hide();
                         }
                     }
 
                     let tray_visible = app
-                        .get_webview_window(NEW_UI_WINDOW_ID)
+                        .get_webview_window(COMPACT_WINDOW_ID)
                         .and_then(|w| w.is_visible().ok())
                         .unwrap_or(false);
 
                     if tray_visible {
-                        if let Some(w) = app.get_webview_window(NEW_UI_WINDOW_ID) {
+                        if let Some(w) = app.get_webview_window(COMPACT_WINDOW_ID) {
                             let _ = w.hide();
                         }
                     } else {
@@ -195,10 +195,10 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
                             crate::window_manager::has_non_service_locations(),
                         );
                         if has_locations {
-                            if let Some(old_ui) = app.get_webview_window(OLD_UI_WINDOW_ID) {
+                            if let Some(old_ui) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
                                 let _ = old_ui.hide();
                             }
-                            show_new_ui_window(app);
+                            show_tray_window(app);
                         } else {
                             let _ = WindowManager::open_full_view(app);
                         }
@@ -243,8 +243,8 @@ fn hide_visible_windows(app: &AppHandle) {
 
 pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app
-        .get_webview_window(NEW_UI_WINDOW_ID)
-        .or_else(|| app.get_webview_window(OLD_UI_WINDOW_ID))
+        .get_webview_window(COMPACT_WINDOW_ID)
+        .or_else(|| app.get_webview_window(FULL_VIEW_WINDOW_ID))
     {
         if let Err(err) = window.unminimize() {
             warn!("Failed to unminimize main window: {err}");
@@ -268,7 +268,7 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
             info!("Received QUIT request. Initiating shutdown...");
             handle.exit(0);
         }
-        TRAY_EVENT_SHOW => show_new_ui_window(app),
+        TRAY_EVENT_SHOW => show_tray_window(app),
         TRAY_EVENT_HIDE => hide_visible_windows(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);

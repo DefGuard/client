@@ -1,0 +1,20 @@
+.tooltip {
+  --background: var(--bg-white-100);
+  --border: 1px solid var(--background);
+
+  box-sizing: border-box;
+  padding: var(--spacing-sm) var(--spacing-md);
+  z-index: 5;
+  background-color: var(--background);
+  max-width: 250px;
+  box-shadow: var(--menu-shadow);
+  border: var(--border);
+  border-radius: 8px;
+
+  span,
+  p,
+  a {
+    font: var(--t-body-xs-400);
+    color: var(--fg-black);
+  }
+}

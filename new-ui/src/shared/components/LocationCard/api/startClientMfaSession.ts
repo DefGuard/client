@@ -1,10 +1,8 @@
 import { fetch } from '@tauri-apps/plugin-http';
+import { edgeApi } from '../../../edge-api/api';
+import type { EdgeRequestHeaders } from '../../../edge-api/types';
 import { api } from '../../../rust-api/api';
-import type {
-  EdgeRequestHeaders,
-  InstanceInfo,
-  LocationInfo,
-} from '../../../rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 
 export const CLIENT_MFA_ENDPOINT = 'api/v1/client-mfa';
 
@@ -68,7 +66,7 @@ export const startClientMfaSession = async ({
 }: StartClientMfaSessionParams): Promise<StartClientMfaSessionResult> => {
   let headers: EdgeRequestHeaders;
   try {
-    headers = await api.getEdgeRequestHeaders();
+    headers = await edgeApi.getEdgeRequestHeaders();
   } catch {
     throw new MfaStartError('Failed to load request headers');
   }

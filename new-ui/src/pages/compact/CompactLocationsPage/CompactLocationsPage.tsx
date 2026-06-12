@@ -1,33 +1,30 @@
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { useLoaderData } from '@tanstack/react-router';
-import { platform } from '@tauri-apps/plugin-os';
-import clsx from 'clsx';
 import { useEffect, useMemo } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { LocationCard } from '../../../shared/components/LocationCard/LocationCard';
+import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { WindowHeader } from '../../../shared/components/WindowHeader/WindowHeader';
 import { api } from '../../../shared/rust-api/api';
 import {
   getInstancesQueryOptions,
   getLocationsQueryOptions,
 } from '../../../shared/rust-api/query';
+import { useAppStore } from '../../../shared/store/useAppStore';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
-import { useCompactLocationStore } from './hooks/useCompactLocationsStore';
-
-const isWindows = platform() === 'windows';
 
 export const CompactLocationsPage = () => {
-  const selection = useCompactLocationStore((s) => s.compactViewSelection);
-  const openLocation = useCompactLocationStore((s) => s.expandedLocation);
+  const selection = useAppStore((s) => s.compactViewSelection);
+  const openLocation = useAppStore((s) => s.expandedLocation);
 
-  const routeData = useLoaderData({ from: '/' });
+  const routeData = useLoaderData({ from: '/compact/' });
 
   const queryInstanceId = useMemo(() => {
     if (!isPresent(selection)) return routeData.instances[0].id;
@@ -56,7 +53,7 @@ export const CompactLocationsPage = () => {
 
   useEffect(() => {
     if (selection === null || instanceInfo === undefined) {
-      useCompactLocationStore.setState({
+      useAppStore.setState({
         compactViewSelection: { kind: 'instance', data: routeData.instances[0] },
       });
     }
@@ -69,11 +66,7 @@ export const CompactLocationsPage = () => {
       }}
     >
       <WindowHeader variant="compact" />
-      <div
-        className={clsx('scroll-wrap', {
-          windows: isWindows,
-        })}
-      >
+      <ScrollContainer>
         <InstanceSwitcher />
         <div className="locations">
           {isPresent(instanceInfo) &&
@@ -89,16 +82,16 @@ export const CompactLocationsPage = () => {
                   isOpen={isOpen}
                   onOpen={() => {
                     if (isOpen) {
-                      useCompactLocationStore.setState({ expandedLocation: null });
+                      useAppStore.setState({ expandedLocation: null });
                     } else {
-                      useCompactLocationStore.setState({ expandedLocation: location.id });
+                      useAppStore.setState({ expandedLocation: location.id });
                     }
                   }}
                 />
               );
             })}
         </div>
-      </div>
+      </ScrollContainer>
       <div className="compact-footer">
         <Divider spacing={ThemeSpacing.Md} />
         <Controls>
@@ -107,7 +100,7 @@ export const CompactLocationsPage = () => {
             size="primary"
             text="Open Defguard"
             onClick={() => {
-              void api.swapToOldUi();
+              void api.swapToFullView();
             }}
           />
         </Controls>

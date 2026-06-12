@@ -15,6 +15,7 @@ interface Props {
   value: string | null;
   error?: string | null;
   onChange: (value: string) => void;
+  onSuccessPaste?: (value: string) => void;
 }
 
 const toDigits = (value: string | null, length: number): string[] => {
@@ -26,7 +27,13 @@ const toDigits = (value: string | null, length: number): string[] => {
   return arr;
 };
 
-export const CodeInput = ({ onChange, value, error, length = 6 }: Props) => {
+export const CodeInput = ({
+  onChange,
+  value,
+  error,
+  onSuccessPaste,
+  length = 6,
+}: Props) => {
   const [digits, setDigits] = useState<string[]>(() => toDigits(value, length));
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -95,6 +102,7 @@ export const CodeInput = ({ onChange, value, error, length = 6 }: Props) => {
       const newDigits = cleaned.split('');
       setDigits(newDigits);
       onChange(cleaned);
+      onSuccessPaste?.(cleaned);
       focus(length - 1);
     }
   };

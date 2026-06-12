@@ -9,14 +9,14 @@ import {
   getInstancesQueryOptions,
   getTunnelsQueryOptions,
 } from '../../../../shared/rust-api/query';
-import { isPresent } from '../../../../shared/utils/isPresent';
 import {
   type CompactViewSelection,
-  useCompactLocationStore,
-} from '../hooks/useCompactLocationsStore';
+  useAppStore,
+} from '../../../../shared/store/useAppStore';
+import { isPresent } from '../../../../shared/utils/isPresent';
 
 export const InstanceSwitcher = () => {
-  const selectedInstance = useCompactLocationStore((s) => s.compactViewSelection);
+  const selectedInstance = useAppStore((s) => s.compactViewSelection);
 
   const { data: tunnels } = useQuery(getTunnelsQueryOptions);
   const { data: instances } = useQuery(getInstancesQueryOptions);
@@ -77,7 +77,7 @@ export const InstanceSwitcher = () => {
       groups={groups}
       value={selectedOption as never}
       onChange={(option) => {
-        useCompactLocationStore.setState({ compactViewSelection: option.value });
+        useAppStore.setState({ compactViewSelection: option.value });
       }}
     />
   );

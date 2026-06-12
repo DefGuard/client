@@ -1,0 +1,69 @@
+.overview-selection {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-md) var(--spacing-sm);
+  border-right: 1px solid var(--border-disabled);
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: flex-start;
+  row-gap: var(--spacing-4xl);
+
+  .group {
+    display: flex;
+    flex-flow: column;
+    width: 100%;
+    row-gap: var(--spacing-md);
+    user-select: none;
+
+    > .label {
+      font: var(--t-body-xs-500);
+      color: var(--fg-white-70);
+    }
+
+    > .items {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-sm);
+
+      button {
+        --bg: transparent;
+        --color: var(--fg-white-80);
+
+        box-sizing: border-box;
+        border-radius: 8px;
+        padding: 0 var(--spacing-md);
+        height: 32px;
+        width: 100%;
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        justify-content: flex-start;
+        color: var(--color);
+        background: var(--bg);
+        border: 0;
+        cursor: pointer;
+
+        @include animate(color, background);
+
+        span {
+          font: var(--t-body-sm-400);
+          color: inherit;
+        }
+
+        &:not(.selected) {
+          :hover {
+            --bg: var(--bg-white-5);
+            --color: var(--fg-white-100);
+          }
+        }
+
+        &.selected {
+          --bg: var(--bg-white-10);
+          --color: var(--fg-white-100);
+        }
+      }
+    }
+  }
+}
