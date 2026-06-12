@@ -1,7 +1,7 @@
 use defguard_core::connection::{active_state::active_state, tear_down};
 use defguard_core::ConnectionType;
 use serde_json::json;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::resolve::resolve_disconnect_target;
 use crate::{
@@ -46,12 +46,12 @@ pub async fn handle(
             );
             match tear_down(connection).await {
                 Ok(()) => {
-                    tracing::info!("Disconnected {name} ({})", connection.interface_name);
+                    info!("Disconnected {name} ({})", connection.interface_name);
                     disconnected.push(name);
                 }
                 Err(e) => {
                     let msg = format!("Failed to disconnect {name}: {e}");
-                    tracing::error!("{msg}");
+                    error!("{msg}");
                     errors.push(msg);
                 }
             }

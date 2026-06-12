@@ -46,7 +46,7 @@ pub fn app_data_dir() -> Option<PathBuf> {
 pub fn set_perms(path: &std::path::Path) {
     let perms = if path.is_dir() { 0o700 } else { 0o600 };
     if let Err(err) = set_permissions(path, Permissions::from_mode(perms)) {
-        log::warn!(
+        warn!(
             "Failed to set permissions on path {}: {err}",
             path.display()
         );

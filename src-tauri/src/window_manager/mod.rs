@@ -56,7 +56,7 @@ impl WindowManager {
 
         #[cfg(target_os = "macos")]
         if let Err(err) = macos::enable_rounded_corners(&window) {
-            tracing::warn!("Failed to enable rounded corners on tray window: {err}");
+            warn!("Failed to enable rounded corners on tray window: {err}");
         }
 
         Ok(window)
@@ -133,38 +133,38 @@ pub fn open_full_view_window(app: AppHandle) {
 
 #[tauri::command]
 pub fn swap_to_full_view(app: AppHandle) {
-    tracing::info!("swap_to_old_ui called");
+    info!("swap_to_old_ui called");
     if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
         if let Err(err) = window.hide() {
-            tracing::error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
+            error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
         }
     }
     if let Err(err) = WindowManager::open_full_view(&app) {
-        tracing::error!("swap_to_old_ui task: Failed to open full view: {err:?}");
+        error!("swap_to_old_ui task: Failed to open full view: {err:?}");
     }
 }
 
 #[tauri::command]
 pub fn close_tray_window(app: AppHandle) {
-    tracing::info!("close_tray_window called");
+    info!("close_tray_window called");
 
     if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
-        tracing::info!("close_tray_window task: Hiding new-ui window");
+        info!("close_tray_window task: Hiding new-ui window");
         if let Err(err) = window.hide() {
-            tracing::error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
+            error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
         }
     } else {
-        tracing::warn!("close_tray_window task: new-ui window not found");
+        warn!("close_tray_window task: new-ui window not found");
     }
 }
 
 #[tauri::command]
 pub fn swap_to_tray(app: AppHandle) {
-    tracing::info!("swap_to_new_ui called");
+    info!("swap_to_new_ui called");
     show_tray_window(&app);
     if let Some(window) = tauri::Manager::get_webview_window(&app, FULL_VIEW_WINDOW_ID) {
         if let Err(err) = window.hide() {
-            tracing::error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
+            error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
         }
     }
 }

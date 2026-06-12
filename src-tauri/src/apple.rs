@@ -523,6 +523,3 @@ pub(crate) fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<S
 
     stats
 }
-
-// sync_locations_and_tunnels is now in defguard_client_core::connection;
-// re-exported via core/src/connection/mod.rs.

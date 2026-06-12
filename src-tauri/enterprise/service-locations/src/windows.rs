@@ -133,7 +133,7 @@ pub fn watch_for_login_logoff(
 fn setup_wgapi(ifname: &str) -> Result<WGApi, ServiceLocationError> {
     WGApi::new(ifname).map_err(|err| {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
-        log::error!("{msg}");
+        error!("{msg}");
         ServiceLocationError::InterfaceError(msg)
     })
 }

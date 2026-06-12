@@ -10,7 +10,7 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
     match Instance::all(&*DB_POOL).await {
         Ok(instances) => {
             if instances.is_empty() {
-                log::debug!(
+                debug!(
                     "Client has not been initialized yet. Checking if provisioning config exists"
                 );
                 let data_dir = app_handle
@@ -19,14 +19,14 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
                     .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
                 match try_get_provisioning_config(&data_dir) {
                     Some(config) => {
-                        log::info!(
+                        info!(
                             "Provisioning config found in {}: {config:?}",
                             data_dir.display()
                         );
                         return Some(config);
                     }
                     None => {
-                        log::debug!(
+                        debug!(
                             "Provisioning config not found in {}. Proceeding with normal startup.",
                             data_dir.display()
                         );
@@ -35,7 +35,7 @@ pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<Prov
             }
         }
         Err(err) => {
-            log::error!("Failed to verify if the client has already been initialized: {err}");
+            error!("Failed to verify if the client has already been initialized: {err}");
         }
     }
 
