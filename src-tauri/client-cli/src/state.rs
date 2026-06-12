@@ -1,3 +1,5 @@
+//! CLI runtime state and error types.
+
 use std::path::Path;
 
 use defguard_core::{
@@ -6,7 +8,7 @@ use defguard_core::{
     error::Error as CoreError,
 };
 use thiserror::Error;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Resolved CLI runtime state
 pub struct State {
@@ -70,10 +72,13 @@ impl State {
     pub async fn init() -> Result<State, CliError> {
         let data_dir = defguard_core::app_data_dir()
             .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| {
-                warn!("No app data directory found, using current directory");
-                ".".to_string()
-            });
+            .ok_or_else(|| {
+                CliError::Other(
+                    "Could not determine the application data directory. Ensure a home/data \
+                     directory is configured for the current user."
+                        .into(),
+                )
+            })?;
 
         debug!("Using data directory: {data_dir}");
 
