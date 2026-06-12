@@ -8,7 +8,7 @@ import { devtools } from '@tanstack/devtools-vite';
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [devtools(), tanstackRouter(), react()],
   clearScreen: false,
   server: {
@@ -43,7 +43,7 @@ export default defineConfig(async () => ({
     },
   },
   envPrefix: ['VITE_', 'TAURI_'],
-  base: '/',
+  base: command === 'build' ? '/new-ui/' : '/',
   build: {
     outDir: '../dist',
     emptyOutDir: true,
