@@ -16,14 +16,13 @@ use block2::RcBlock;
 use defguard_client_core::{
     connection::active_connections::find_connection,
     database::models::tunnel_configuration::{
-        id_from_manager, manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID,
-        TUNNEL_ID,
+        manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID, TUNNEL_ID,
     },
 };
 use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSData, NSDate, NSError, NSNotification, NSNotificationCenter,
-    NSObjectProtocol, NSOperationQueue, NSRunLoop, NSString,
+    ns_string, NSData, NSDate, NSNotification, NSNotificationCenter, NSObjectProtocol,
+    NSOperationQueue, NSRunLoop,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNConnection,

@@ -3,7 +3,6 @@
 use std::{
     collections::HashMap,
     hint::spin_loop,
-    net::IpAddr,
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -16,13 +15,10 @@ use std::{
 const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
 
 use block2::RcBlock;
-use objc2::{
-    rc::Retained,
-    runtime::{AnyObject, ProtocolObject},
-};
+use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSDate, NSDictionary, NSError, NSNotification, NSNotificationCenter,
-    NSNumber, NSObjectProtocol, NSOperationQueue, NSRunLoop, NSString,
+    ns_string, NSArray, NSDate, NSError, NSNotification, NSNotificationCenter, NSNumber,
+    NSObjectProtocol, NSOperationQueue, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NEVPNConnection,

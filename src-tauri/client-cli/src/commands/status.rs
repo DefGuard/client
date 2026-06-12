@@ -6,9 +6,12 @@ use crate::{
     state::{CliError, State},
 };
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 const MIN_NAME_COL_WIDTH: usize = 4;
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 const MIN_IFACE_COL_WIDTH: usize = 9;
 
+#[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
 pub async fn handle(state: &State) -> Result<StatusResult, CliError> {
     #[cfg(target_os = "macos")]
     {
@@ -62,6 +65,7 @@ impl CommandOutput for StatusResult {
 }
 
 /// Build a human-readable status table string.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
     let name_col_width = connections
         .iter()
@@ -114,6 +118,7 @@ fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
     lines.join("\n")
 }
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
@@ -129,6 +134,7 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn format_handshake(secs: u64) -> String {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

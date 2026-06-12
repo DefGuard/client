@@ -31,6 +31,7 @@ pub enum ConnectionTarget<'a> {
 }
 
 /// Bring a WireGuard interface up for the given target.
+#[cfg_attr(target_os = "macos", allow(unused_variables))]
 pub async fn bring_up(
     target: ConnectionTarget<'_>,
     psk: Option<String>,
