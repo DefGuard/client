@@ -1,6 +1,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
+use common::check_version_flag;
 
 mod cli;
 mod commands;
@@ -26,6 +27,9 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // Handle --version / -V before any other work.
+    check_version_flag("defguard-cli");
+
     let cli = Cli::parse();
 
     // Init logging to stderr so stdout stays data-only.
