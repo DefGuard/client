@@ -5,7 +5,6 @@ use std::{
     hint::spin_loop,
     net::IpAddr,
     ptr::NonNull,
-    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{self, channel, Receiver, RecvTimeoutError, Sender},
@@ -17,40 +16,25 @@ use std::{
 const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
 
 use block2::RcBlock;
-use defguard_client_common::dns_owned;
-use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
 use objc2::{
     rc::Retained,
     runtime::{AnyObject, ProtocolObject},
 };
 use objc2_foundation::{
-    ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSMutableArray, NSMutableDictionary,
-    NSNotification, NSNotificationCenter, NSNumber, NSObjectProtocol, NSOperationQueue, NSRunLoop,
-    NSString,
+    ns_string, NSArray, NSData, NSDate, NSDictionary, NSError, NSNotification,
+    NSNotificationCenter, NSNumber, NSObjectProtocol, NSOperationQueue, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
     NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNConnection,
-    NEVPNStatus, NEVPNStatusDidChangeNotification,
+    NEVPNStatusDidChangeNotification,
 };
-use serde::Deserialize;
 
-use crate::{
-    database::{
-        models::{
-            instance::{ClientTrafficPolicy, Instance},
-            location::Location,
-            tunnel::Tunnel,
-            wireguard_keys::WireguardKeys,
-            Id,
-        },
-        DB_POOL,
-    },
-    error::Error,
-    ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+use crate::database::{
+    models::{location::Location, tunnel::Tunnel, Id},
+    DB_POOL,
 };
 
 const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
-const SYSTEM_SYNC_DELAY: Duration = Duration::from_millis(500);
 const LOCATION_ID: &str = "locationId";
 const TUNNEL_ID: &str = "tunnelId";
 
@@ -152,17 +136,6 @@ pub fn observer_thread(
 }
 
 /// Tunnel statistics shared with VPNExtension (written in Swift).
-#[derive(Deserialize)]
-#[repr(C)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Stats {
-    pub(crate) location_id: Option<Id>,
-    pub(crate) tunnel_id: Option<Id>,
-    pub(crate) tx_bytes: u64,
-    pub(crate) rx_bytes: u64,
-    pub(crate) last_handshake: u64,
-}
-
 /// Run [`NSRunLoop`] until semaphore becomes `true`.
 pub fn spawn_runloop_and_wait_for(semaphore: &Arc<AtomicBool>) {
     const ONE_SECOND: f64 = 1.;
@@ -295,294 +268,6 @@ fn manager_for_key_and_value(key: &str, value: Id) -> Option<Retained<NETunnelPr
     }
 
     rx.recv().expect("Receiver is dead")
-}
-
-/// Tunnel configuration shared with VPNExtension (written in Swift).
-pub(crate) struct TunnelConfiguration {
-    location_id: Option<Id>,
-    tunnel_id: Option<Id>,
-    name: String,
-    private_key: String,
-    addresses: Vec<IpAddrMask>,
-    listen_port: Option<u16>,
-    peers: Vec<Peer>,
-    mtu: Option<u32>,
-    dns: Vec<IpAddr>,
-    dns_search: Vec<String>,
-}
-
-impl TunnelConfiguration {
-    /// Convert to [`NSDictionary`].
-    fn as_nsdict(&self) -> Retained<NSDictionary<NSString, AnyObject>> {
-        let dict = NSMutableDictionary::new();
-
-        if let Some(location_id) = self.location_id {
-            dict.insert(
-                ns_string!(LOCATION_ID),
-                NSNumber::new_i64(location_id).as_ref(),
-            );
-        }
-
-        if let Some(tunnel_id) = self.tunnel_id {
-            dict.insert(ns_string!(TUNNEL_ID), NSNumber::new_i64(tunnel_id).as_ref());
-        }
-
-        dict.insert(ns_string!("name"), NSString::from_str(&self.name).as_ref());
-
-        dict.insert(
-            ns_string!("privateKey"),
-            NSString::from_str(&self.private_key).as_ref(),
-        );
-
-        // IpAddrMask
-        let addresses = NSMutableArray::<NSDictionary<NSString, AnyObject>>::new();
-        for addr in &self.addresses {
-            let addr_dict = NSMutableDictionary::<NSString, AnyObject>::new();
-            addr_dict.insert(
-                ns_string!("address"),
-                NSString::from_str(&addr.address.to_string()).as_ref(),
-            );
-            addr_dict.insert(ns_string!("cidr"), NSNumber::new_u8(addr.cidr).as_ref());
-            addresses.addObject(addr_dict.into_super().as_ref());
-        }
-        dict.insert(ns_string!("addresses"), addresses.as_ref());
-
-        if let Some(listen_port) = self.listen_port {
-            dict.insert(
-                ns_string!("listenPort"),
-                NSNumber::new_u16(listen_port).as_ref(),
-            );
-        }
-
-        // Peer
-        let peers = NSMutableArray::<NSDictionary<NSString, AnyObject>>::new();
-        for peer in &self.peers {
-            let peer_dict = NSMutableDictionary::<NSString, AnyObject>::new();
-            peer_dict.insert(
-                ns_string!("publicKey"),
-                NSString::from_str(&peer.public_key.to_string()).as_ref(),
-            );
-
-            if let Some(preshared_key) = &peer.preshared_key {
-                peer_dict.insert(
-                    ns_string!("preSharedKey"),
-                    NSString::from_str(&preshared_key.to_string()).as_ref(),
-                );
-            }
-
-            if let Some(endpoint) = &peer.endpoint {
-                peer_dict.insert(
-                    ns_string!("endpoint"),
-                    NSString::from_str(&endpoint.to_string()).as_ref(),
-                );
-            }
-
-            // Skipping: lastHandshake, txBytes, rxBytes.
-
-            if let Some(persistent_keep_alive) = peer.persistent_keepalive_interval {
-                peer_dict.insert(
-                    ns_string!("persistentKeepAlive"),
-                    NSNumber::new_u16(persistent_keep_alive).as_ref(),
-                );
-            }
-
-            // IpAddrMask
-            let allowed_ips = NSMutableArray::<NSDictionary<NSString, AnyObject>>::new();
-            for addr in &peer.allowed_ips {
-                let addr_dict = NSMutableDictionary::<NSString, AnyObject>::new();
-                addr_dict.insert(
-                    ns_string!("address"),
-                    NSString::from_str(&addr.address.to_string()).as_ref(),
-                );
-                addr_dict.insert(ns_string!("cidr"), NSNumber::new_u8(addr.cidr).as_ref());
-                allowed_ips.addObject(addr_dict.into_super().as_ref());
-            }
-            peer_dict.insert(ns_string!("allowedIPs"), allowed_ips.as_ref());
-
-            peers.addObject(peer_dict.into_super().as_ref());
-        }
-        dict.insert(ns_string!("peers"), peers.into_super().as_ref());
-
-        if let Some(mtu) = self.mtu {
-            dict.insert(ns_string!("mtu"), NSNumber::new_u32(mtu).as_ref());
-        }
-
-        let dns = NSMutableArray::<NSString>::new();
-        for entry in &self.dns {
-            dns.addObject(NSString::from_str(&entry.to_string()).as_ref());
-        }
-        dict.insert(ns_string!("dns"), dns.as_ref());
-
-        let dns_search = NSMutableArray::<NSString>::new();
-        for entry in &self.dns_search {
-            dns_search.addObject(NSString::from_str(entry).as_ref());
-        }
-        dict.insert(ns_string!("dnsSearch"), dns_search.as_ref());
-
-        dict.into_super()
-    }
-
-    /// Try to find `NETunnelProviderManager` for this configuration, based on location ID or
-    /// tunnel ID.
-    pub(crate) fn tunnel_provider_manager(&self) -> Option<Retained<NETunnelProviderManager>> {
-        let (key, value) = match (self.location_id, self.tunnel_id) {
-            (Some(location_id), None) => (LOCATION_ID, location_id),
-            (None, Some(tunnel_id)) => (TUNNEL_ID, tunnel_id),
-            _ => return None,
-        };
-
-        manager_for_key_and_value(key, value)
-    }
-
-    /// Create or update system VPN settings with this configuration.
-    pub(crate) fn save(&self) {
-        let spinlock = Arc::new(AtomicBool::new(false));
-        let spinlock_clone = Arc::clone(&spinlock);
-        let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
-
-        let provider_manager = self
-            .tunnel_provider_manager()
-            .unwrap_or_else(|| unsafe { NETunnelProviderManager::new() });
-
-        unsafe {
-            let tunnel_protocol = NETunnelProviderProtocol::new();
-            tunnel_protocol.setProviderBundleIdentifier(Some(plugin_bundle_id));
-            let server_address = self.peers.first().map_or(String::new(), |peer| {
-                peer.endpoint.map_or(String::new(), |sa| sa.to_string())
-            });
-            let server_address = NSString::from_str(&server_address);
-            // `serverAddress` must have a non-nil string value for the protocol configuration to be
-            // valid.
-            tunnel_protocol.setServerAddress(Some(&server_address));
-
-            let provider_config = self.as_nsdict();
-            tunnel_protocol.setProviderConfiguration(Some(&*provider_config));
-
-            provider_manager.setProtocolConfiguration(Some(&tunnel_protocol));
-            let name = NSString::from_str(&self.name);
-            provider_manager.setLocalizedDescription(Some(&name));
-            provider_manager.setEnabled(true);
-
-            // Save to system settings.
-            let handler = RcBlock::new(move |error_ptr: *mut NSError| {
-                if error_ptr.is_null() {
-                    debug!("Saved tunnel configuration for {name} to system settings");
-                } else {
-                    error!("Failed to save tunnel configuration for: {name} to system settings");
-                }
-                spinlock_clone.store(true, Ordering::Release);
-            });
-            provider_manager.saveToPreferencesWithCompletionHandler(Some(&*handler));
-        }
-
-        while !spinlock.load(Ordering::Acquire) {
-            spin_loop();
-        }
-    }
-
-    /// Start tunnel for this configuration.
-    pub(crate) fn start_tunnel(&self) {
-        if let Some(provider_manager) = self.tunnel_provider_manager() {
-            if let Err(err) =
-                unsafe { provider_manager.connection().startVPNTunnelAndReturnError() }
-            {
-                error!("Failed to start VPN: {err}");
-            } else {
-                OBSERVER_COMMS
-                    .0
-                    .lock()
-                    .expect("Failed to lock observer sender")
-                    .send((
-                        self.location_id
-                            .map_or_else(|| TUNNEL_ID, |_location_id| LOCATION_ID),
-                        self.location_id.or(self.tunnel_id).unwrap(),
-                    ))
-                    .expect("Failed to send to observer channel");
-                info!("VPN started");
-            }
-        } else {
-            debug!(
-                "Couldn't find configuration from system settings for {}",
-                self.name
-            );
-        }
-    }
-}
-
-/// Retrieve VPN tunnel statistics from VPNExtension.
-pub(crate) fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
-    let new_stats = Arc::new(Mutex::new(None));
-    let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
-
-    let new_stats_clone = Arc::clone(&new_stats);
-
-    let finished = Arc::new(AtomicBool::new(false));
-    let finished_clone = Arc::clone(&finished);
-
-    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
-        if let Some(data) = unsafe { data_ptr.as_ref() } {
-            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
-                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
-                    *new_stats_locked = Some(stats);
-                }
-            } else {
-                warn!("Failed to deserialize tunnel stats");
-            }
-        } else {
-            debug!("No data received in tunnel stats response, skipping");
-        }
-        finished_clone.store(true, Ordering::Release);
-    });
-
-    let manager = manager_for_key_and_value(
-        match connection_type {
-            ConnectionType::Location => LOCATION_ID,
-            ConnectionType::Tunnel => TUNNEL_ID,
-        },
-        id,
-    )?;
-
-    let vpn_protocol = (unsafe { manager.protocolConfiguration() })?;
-    let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>() else {
-        error!("Failed to downcast to NETunnelProviderProtocol");
-        return None;
-    };
-
-    // Sometimes all managers from all apps come through, so filter by bundle ID.
-    if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
-        if &*bundle_id != plugin_bundle_id {
-            return None;
-        }
-    }
-
-    let Ok(session) = unsafe { manager.connection() }.downcast::<NETunnelProviderSession>() else {
-        error!("Failed to downcast to NETunnelProviderSession");
-        return None;
-    };
-
-    let message_data = NSData::new();
-    if unsafe {
-        session.sendProviderMessage_returnError_responseHandler(
-            &message_data,
-            None,
-            Some(&response_handler),
-        )
-    } {
-        debug!("Message sent to NETunnelProviderSession");
-    } else {
-        error!("Failed to send to NETunnelProviderSession while requesting stats");
-    }
-
-    // Wait for all handlers to complete.
-    while !finished.load(Ordering::Acquire) {
-        spin_loop();
-    }
-
-    let stats = new_stats
-        .lock()
-        .map_or(None, |mut new_stats_locked| new_stats_locked.take());
-
-    stats
 }
 
 /// Synchronize locations and tunnels with system settings.

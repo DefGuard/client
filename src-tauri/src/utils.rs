@@ -8,10 +8,10 @@ use std::{env, path::Path, process::Command};
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
 #[cfg(windows)]
 use defguard_client_core::connection::active_connections::find_connection;
+use defguard_client_core::connection::{bring_up, ConnectionTarget};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::{
-    connection::{bring_up, daemon_client::DAEMON_CLIENT, ConnectionTarget},
-    DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+    connection::daemon_client::DAEMON_CLIENT, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
