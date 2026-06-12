@@ -156,7 +156,6 @@ async fn startup(app_handle: &AppHandle) {
 }
 
 /// Open the appropriate window, either the old or the new UI, depending if there are locations.
-#[cfg(not(target_os = "linux"))]
 fn open_appropriate_window(app_handle: &AppHandle) {
     let has_locations = async_runtime::block_on(has_non_service_locations());
     if has_locations {
@@ -227,13 +226,7 @@ fn main() {
             let is_deep_link = argv.iter().any(|a| a.starts_with("defguard://"));
             // User tried to spawn second instance, mirror tray left click path.
             if !is_deep_link {
-                #[cfg(target_os = "linux")]
-                let _ = WindowManager::open_full_view(app);
-
-                #[cfg(not(target_os = "linux"))]
-                {
-                    open_appropriate_window(app);
-                }
+                open_appropriate_window(app);
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
@@ -397,27 +390,20 @@ fn main() {
                 warn!("Failed to pre-build full window: {e}");
             }
 
-            // Decide which window to show based on platform and available locations.
-            #[cfg(target_os = "linux")]
-            {
+            // Decide which window to show based on available locations.
+            // If the app was cold-launched by a deep-link, the full view must open, not the
+            // tray.
+            let launched_by_deep_link = app_handle
+                .deep_link()
+                .get_current()
+                .ok()
+                .flatten()
+                .is_some();
+            if launched_by_deep_link {
+                info!("App launched via deep link, opening full view directly.");
                 let _ = WindowManager::open_full_view(app_handle);
-            }
-            #[cfg(not(target_os = "linux"))]
-            {
-                // If the app was cold-launched by a deep-link, the full view must open, not the
-                // tray.
-                let launched_by_deep_link = app_handle
-                    .deep_link()
-                    .get_current()
-                    .ok()
-                    .flatten()
-                    .is_some();
-                if launched_by_deep_link {
-                    info!("App launched via deep link, opening full view directly.");
-                    let _ = WindowManager::open_full_view(app_handle);
-                } else {
-                    open_appropriate_window(app_handle);
-                }
+            } else {
+                open_appropriate_window(app_handle);
             }
 
             info!("App setup completed, log level: {log_level}");
