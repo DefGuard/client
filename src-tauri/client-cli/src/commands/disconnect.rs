@@ -44,7 +44,7 @@ pub async fn handle(
                 "Disconnecting {name} on interface {}...",
                 connection.interface_name
             );
-            match tear_down(connection, &state.pool).await {
+            match tear_down(connection).await {
                 Ok(()) => {
                     tracing::info!("Disconnected {name} ({})", connection.interface_name);
                     disconnected.push(name);
@@ -75,7 +75,7 @@ pub async fn handle(
                     let ifname = connection.interface_name.clone();
                     let name = connection.name.clone();
                     info!("Disconnecting sole active connection {name} on interface {ifname}...");
-                    tear_down(connection, &state.pool).await?;
+                    tear_down(connection).await?;
                     return Ok(DisconnectResult::Single {
                         name,
                         interface: ifname,
@@ -119,7 +119,7 @@ pub async fn handle(
 
         info!("Disconnecting {target_name} on interface {ifname}...");
 
-        tear_down(connection, &state.pool).await?;
+        tear_down(connection).await?;
 
         Ok(DisconnectResult::Single {
             name: target_name,

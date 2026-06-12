@@ -10,7 +10,8 @@ use defguard_client_common::{find_free_tcp_port, get_interface_name};
 use defguard_client_core::connection::active_connections::find_connection;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::{
-    connection::daemon_client::DAEMON_CLIENT, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+    connection::{bring_up, daemon_client::DAEMON_CLIENT, ConnectionTarget},
+    DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
@@ -51,36 +52,6 @@ use crate::{
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]
 static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
-
-/// Setup client interface for `Instance`.
-#[cfg(not(target_os = "macos"))]
-pub(crate) async fn setup_interface(
-    location: &Location<Id>,
-    name: &str,
-    preshared_key: Option<String>,
-    mtu: Option<u32>,
-    pool: &DbPool,
-) -> Result<String, Error> {
-    crate::connection::setup::setup_interface(location, name, preshared_key, mtu, pool, None).await
-}
-
-#[cfg(target_os = "macos")]
-pub(crate) async fn setup_interface(
-    location: &Location<Id>,
-    _name: &str,
-    preshared_key: Option<String>,
-    mtu: Option<u32>,
-    _pool: &DbPool,
-) -> Result<String, Error> {
-    let tunnel_config = location.tunnel_configuration(preshared_key, mtu).await?;
-
-    tunnel_config.save();
-    tokio::time::sleep(TUNNEL_START_DELAY).await;
-    tunnel_config.start_tunnel();
-
-    // FIXME: not really useful nor true.
-    Ok(String::new())
-}
 
 #[cfg(target_os = "macos")]
 pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
@@ -619,8 +590,14 @@ pub(crate) async fn handle_connection_for_location(
         .lock()
         .expect("failed to lock app state")
         .mtu();
-    let interface_name =
-        setup_interface(location, &location.name, preshared_key, mtu, &DB_POOL).await?;
+    let interface_name = bring_up(
+        ConnectionTarget::Location(location),
+        preshared_key,
+        mtu,
+        &DB_POOL,
+        None,
+    )
+    .await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
@@ -658,7 +635,14 @@ pub(crate) async fn handle_connection_for_tunnel(
         .lock()
         .expect("failed to lock app state")
         .mtu();
-    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name, mtu).await?;
+    let interface_name = bring_up(
+        ConnectionTarget::Tunnel(tunnel),
+        tunnel.preshared_key.clone(),
+        mtu,
+        &DB_POOL,
+        None,
+    )
+    .await?;
     state
         .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
         .await;
