@@ -31,6 +31,10 @@ export const FullViewNavigation = () => {
         icon: IconKind.PlusCircle,
         to: '/full/add',
       },
+      {
+        icon: IconKind.Settings,
+        to: '/full/settings',
+      },
     ],
     [isEmpty],
   );

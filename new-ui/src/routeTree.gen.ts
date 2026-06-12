@@ -19,6 +19,7 @@ import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-ti
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
 import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
+import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/settings'
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
@@ -72,6 +73,11 @@ const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
   path: '/support',
   getParentRoute: () => FullDefaultRoute,
 } as any)
+const FullDefaultSettingsRoute = FullDefaultSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
   '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/settings': typeof FullDefaultSettingsRoute
   '/full/support': typeof FullDefaultSupportRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/add/': typeof FullDefaultAddIndexRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
   '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/settings': typeof FullDefaultSettingsRoute
   '/full/support': typeof FullDefaultSupportRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/add': typeof FullDefaultAddIndexRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
   '/full/_default/overview': typeof FullDefaultOverviewRoute
+  '/full/_default/settings': typeof FullDefaultSettingsRoute
   '/full/_default/support': typeof FullDefaultSupportRoute
   '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/_default/add/': typeof FullDefaultAddIndexRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/full/'
     | '/playground/'
     | '/full/overview'
+    | '/full/settings'
     | '/full/support'
     | '/full/add/instance'
     | '/full/add/'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/compact'
     | '/playground'
     | '/full/overview'
+    | '/full/settings'
     | '/full/support'
     | '/full/add/instance'
     | '/full/add'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/full/'
     | '/playground/'
     | '/full/_default/overview'
+    | '/full/_default/settings'
     | '/full/_default/support'
     | '/full/_default/add/instance'
     | '/full/_default/add/'
@@ -256,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultSupportRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/settings': {
+      id: '/full/_default/settings'
+      path: '/settings'
+      fullPath: '/full/settings'
+      preLoaderRoute: typeof FullDefaultSettingsRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/overview': {
       id: '/full/_default/overview'
       path: '/overview'
@@ -282,6 +301,7 @@ declare module '@tanstack/react-router' {
 
 interface FullDefaultRouteChildren {
   FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
+  FullDefaultSettingsRoute: typeof FullDefaultSettingsRoute
   FullDefaultSupportRoute: typeof FullDefaultSupportRoute
   FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
   FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
@@ -289,6 +309,7 @@ interface FullDefaultRouteChildren {
 
 const FullDefaultRouteChildren: FullDefaultRouteChildren = {
   FullDefaultOverviewRoute: FullDefaultOverviewRoute,
+  FullDefaultSettingsRoute: FullDefaultSettingsRoute,
   FullDefaultSupportRoute: FullDefaultSupportRoute,
   FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
   FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
