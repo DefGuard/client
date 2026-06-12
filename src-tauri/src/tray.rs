@@ -154,6 +154,12 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
+        // NOTE: on Linux this click handler never fires. The `tray-icon` appindicator
+        // backend (libayatana-appindicator) does not emit tray click events - only the
+        // context menu works (`show_menu_on_left_click` is likewise a no-op on Linux).
+        // So left-click cannot open/toggle the window on Linux; users interact via the
+        // right-click menu's Show/Hide items (handled in `handle_tray_menu_event`).
+        // This is an upstream limitation, not a bug here. Documented in known-issues.
         .on_tray_icon_event(|icon, event| {
             store_tray_click_position(icon.app_handle(), &event);
             if let TrayIconEvent::Click {
