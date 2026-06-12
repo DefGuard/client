@@ -92,9 +92,34 @@
     fetcherVersion = 3;
     hash = "sha256-7B5+C3q+jVQ2taKcfZkfTvH37OBDIPDM/4LLRqWPE+I=";
   };
+
+  # Prefetch pnpm dependencies for the new UI (separate pnpm project).
+  newUiPnpmDeps = fetchPnpmDeps {
+    pname = "defguard-client-new-ui";
+    inherit version pnpm;
+    src = ../new-ui;
+    fetcherVersion = 3;
+    hash = "sha256-Gpi1TiMaYBSRFZofa3AMgt6/+qXe86/oMkg9HmNsYZw=";
+  };
+
+  # Pre-build the new UI frontend so Tauri can serve it at /new-ui/.
+  newUiDist = pkgs.stdenv.mkDerivation {
+    pname = "defguard-client-new-ui";
+    inherit version;
+    src = ../new-ui;
+    nativeBuildInputs = [pkgs.nodejs_24 pnpm pnpmConfigHook];
+    pnpmDeps = newUiPnpmDeps;
+    buildPhase = ''
+      runHook preBuild
+      pnpm tsc -b
+      pnpm vite build --outDir "$out/new-ui"
+      runHook postBuild
+    '';
+    installPhase = "true";
+  };
 in
   craneLib.mkCargoDerivation {
-    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps;
+    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps newUiDist;
 
     src = ../.;
 
@@ -140,9 +165,17 @@ in
     buildPhase = ''
       runHook preBuild
 
-      # Build the frontend first; tauri's beforeBuildCommand is suppressed
-      # below to avoid running pnpm build a second time.
+      # Build the old frontend and copy in the pre-built new UI.
       pnpm build
+      cp -r ${newUiDist}/new-ui dist/
+      chmod -R u+w dist/new-ui
+
+      # Tauri loads new-ui as WebviewUrl::App("new-ui/full/") and
+      # "new-ui/compact/".  Create index.html entry points for each so
+      # TanStack Router (basepath /new-ui/) can take over from there.
+      mkdir -p dist/new-ui/full dist/new-ui/compact
+      cp dist/new-ui/index.html dist/new-ui/full/
+      cp dist/new-ui/index.html dist/new-ui/compact/
 
       # --config replaces the build section from tauri.linux.conf.json.
       pnpm tauri build \
