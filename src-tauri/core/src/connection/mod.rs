@@ -31,9 +31,6 @@ pub enum ConnectionTarget<'a> {
 }
 
 /// Bring a WireGuard interface up for the given target.
-///
-/// On macOS this returns [`Error::BackendUnavailable`] — the CLI does not
-/// yet support connection management on macOS.  Use the desktop client.
 pub async fn bring_up(
     target: ConnectionTarget<'_>,
     psk: Option<String>,
@@ -55,12 +52,20 @@ pub async fn bring_up(
 
     #[cfg(target_os = "macos")]
     {
-        let _ = (target, psk, mtu, pool, route_all_traffic);
-        Err(Error::BackendUnavailable(
-            "VPN connection management is not yet supported on macOS from the CLI. \
-             Use the desktop client."
-                .into(),
-        ))
+        // Work-around MFA propagation delay.
+        const TUNNEL_START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+
+        let tunnel_config = match target {
+            ConnectionTarget::Location(loc) => loc.tunnel_configuration(psk, mtu).await,
+            ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu),
+        }?;
+
+        tunnel_config.save();
+        tokio::time::sleep(TUNNEL_START_DELAY).await;
+        tunnel_config.start_tunnel();
+
+        // On macOS the interface name is managed by the system.
+        Ok(String::new())
     }
 }
 
