@@ -11,7 +11,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn version_string(binary_name: &str) -> String {
     let version = option_env!("DEFGUARD_CLIENT_BUILD_VERSION")
         .filter(|v| !v.trim().is_empty())
-        .map(|v| format!("{} ({})", v, env!("VERGEN_GIT_SHA")))
+        .map(|v| format!("{v} ({})", env!("VERGEN_GIT_SHA")))
         .unwrap_or_else(|| format!("{} ({})", env!("CARGO_PKG_VERSION"), env!("VERGEN_GIT_SHA")));
     format!("{binary_name} {version}")
 }
