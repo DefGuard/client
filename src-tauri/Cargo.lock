@@ -1480,6 +1480,7 @@ name = "defguard-client-common"
 version = "2.1.0"
 dependencies = [
  "nix",
+ "vergen-git2",
 ]
 
 [[package]]
