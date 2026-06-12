@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 52px 1fr;
   grid-template-rows: 50px 1fr;
-  min-height: 100dvh;
+  height: 100dvh;
 
   #window-header {
     grid-row: 1;

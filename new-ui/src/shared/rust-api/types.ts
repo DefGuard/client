@@ -25,6 +25,26 @@ export const LogLevel = {
 
 export type LogLevel = (typeof LogLevel)[keyof typeof LogLevel];
 
+export const LogSource = {
+  All: 'All',
+  Client: 'Client',
+  Vpn: 'VPN',
+} as const;
+
+export type LogSource = (typeof LogSource)[keyof typeof LogSource];
+
+export type LogItem = {
+  // datetime UTC
+  timestamp: string;
+  level: LogLevel;
+  target: string;
+  fields: {
+    message: string;
+    interface_name?: string;
+  };
+  source: LogSource;
+};
+
 export const ClientTrafficPolicy = {
   None: 'none',
   DisableAllTraffic: 'disable_all_traffic',
@@ -121,6 +141,7 @@ export const TauriEvent = {
   MfaTrigger: 'mfa-trigger',
   VersionMismatch: 'version-mismatch',
   UuidMismatch: 'uuid-mismatch',
+  GlobalLogUpdate: 'log-update-global',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];
