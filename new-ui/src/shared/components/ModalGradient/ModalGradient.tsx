@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export const MainBackground = () => {
+export const ModalGradient = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -9,16 +9,10 @@ export const MainBackground = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const handleResize = () => {
-      // Get parent dimensions
-      // biome-ignore lint/style/noNonNullAssertion: Always have parent
-      const { clientWidth: w, clientHeight: h } = canvas.parentElement!;
-
-      // Update internal resolution
+    const draw = (w: number, h: number) => {
       canvas.width = w;
       canvas.height = h;
 
-      // Draw Gradient (134deg)
       const angle = (134 * Math.PI) / 180;
       const length = Math.sqrt(w ** 2 + h ** 2);
 
@@ -35,11 +29,17 @@ export const MainBackground = () => {
       ctx.fillRect(0, 0, w, h);
     };
 
-    // Initial draw
-    handleResize();
+    // biome-ignore lint/style/noNonNullAssertion: Always have parent
+    const parent = canvas.parentElement!;
+    draw(parent.clientWidth, parent.clientHeight);
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const observer = new ResizeObserver(([entry]) => {
+      const { inlineSize: w, blockSize: h } = entry.contentBoxSize[0];
+      draw(w, h);
+    });
+
+    observer.observe(parent);
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -47,7 +47,7 @@ export const MainBackground = () => {
       ref={canvasRef}
       style={{
         display: 'block',
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
         width: '100%',
         height: '100%',

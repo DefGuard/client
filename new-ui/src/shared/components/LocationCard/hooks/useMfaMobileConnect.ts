@@ -1,24 +1,32 @@
 import { encode } from '@stablelib/base64';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
+import { getInstancesQueryOptions } from '../../../rust-api/query';
+import type { LocationInfo } from '../../../rust-api/types';
 import {
   CLIENT_MFA_ENDPOINT,
   MfaStartMethod,
+  shouldShowPostureError,
   startClientMfaSession,
 } from '../api/startClientMfaSession';
-import { useLocationCardContext } from '../context/context';
-import { LocationCardViews } from '../context/types';
-import { handleMfaStartError } from './handleMfaStartError';
 
 type TokenData = {
   token: string;
   challenge: string;
 };
 
-export const useMfaMobileConnect = () => {
-  const { location, instance, setPostureError, setView } = useLocationCardContext();
+type Options = {
+  onConnected?: () => void;
+  onPostureError?: (message?: string) => void;
+};
+
+export const useMfaMobileConnect = (location: LocationInfo, options?: Options) => {
+  const { onConnected, onPostureError } = options ?? {};
+
+  const { data: instances } = useQuery(getInstancesQueryOptions);
+  const instance = instances?.find((i) => i.id === location.instance_id);
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -32,7 +40,7 @@ export const useMfaMobileConnect = () => {
   const { mutate: connectMutate } = useMutation({
     mutationFn: api.connect,
     onSuccess: () => {
-      setView(LocationCardViews.Connected);
+      onConnected?.();
     },
     onError: (err) => {
       error(`Connect command failed after successful mobile MFA\n${err}`);
@@ -42,7 +50,7 @@ export const useMfaMobileConnect = () => {
 
   // Open WebSocket when tokenData is available
   useEffect(() => {
-    if (!tokenData) return;
+    if (!tokenData || !instance) return;
 
     const wsUrl = `${instance.proxy_url
       .replace(/^http:/, 'ws:')
@@ -122,16 +130,21 @@ export const useMfaMobileConnect = () => {
   }, []);
 
   const qrValue = useMemo(() => {
-    if (!tokenData) return null;
+    if (!tokenData || !instance) return null;
     const json = JSON.stringify({
       token: tokenData.token,
       challenge: tokenData.challenge,
       instance_id: instance.uuid,
     });
     return encode(new TextEncoder().encode(json));
-  }, [tokenData, instance.uuid]);
+  }, [tokenData, instance]);
 
   const start = useCallback(async () => {
+    if (!instance) {
+      setStartError('Instance not found');
+      return;
+    }
+
     setIsStarting(true);
     setStartError(null);
     setConnectionError(null);
@@ -151,7 +164,8 @@ export const useMfaMobileConnect = () => {
 
       setTokenData({ token: response.token, challenge: response.challenge });
     } catch (e) {
-      if (handleMfaStartError({ err: e, location, setPostureError, setView })) {
+      if (shouldShowPostureError(e, location)) {
+        onPostureError?.(e instanceof Error ? e.message : undefined);
         return;
       }
       setStartError(
@@ -161,7 +175,7 @@ export const useMfaMobileConnect = () => {
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, setPostureError, setView]);
+  }, [instance, location, onPostureError]);
 
   const reset = useCallback(() => {
     if (wsRef.current) {
