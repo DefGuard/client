@@ -91,7 +91,7 @@ jobs:
           APP_ID: "6754601166"
         run: |
           UPLOAD_DIR=$(mktemp -d)
-          mkdir -p "${UPLOAD_DIR}/beta-${APPLE_ID}/upload/MACOS"
+          mkdir -p "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS"
           git log -1 --pretty='"whatsNew" = "%B";' > "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS/en-US.txt"
           xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} --apple-id ${APP_ID} --bundle-version ${{ github.run_number }} --bundle-short-version-string ${{ env.VERSION }} --platform macos --beta-app-store-text "${UPLOAD_DIR}" --upload
           rm -f -r "${UPLOAD_DIR}"
