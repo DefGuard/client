@@ -90,11 +90,40 @@
     inherit pname version pnpm;
     src = ../.;
     fetcherVersion = 3;
-    hash = "sha256-7B5+C3q+jVQ2taKcfZkfTvH37OBDIPDM/4LLRqWPE+I=";
+    hash = "sha256-WjcZeKfEEjcry5dJ12yL+dz+/v5CmKSg0iHfYcoOtag=";
+  };
+
+  # Prefetch pnpm dependencies for the new UI (separate pnpm project).
+  newUiPnpmDeps = fetchPnpmDeps {
+    pname = "defguard-client-new-ui";
+    inherit version pnpm;
+    src = ../new-ui;
+    fetcherVersion = 3;
+    hash = "sha256-77eqX4iJs6zxEjguTG0Nf1k2tK+lYJ084sEsbdkl678=";
+  };
+
+  # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
+  newUiDist = pkgs.stdenv.mkDerivation {
+    pname = "defguard-client-new-ui";
+    inherit version;
+    src = ../new-ui;
+    nativeBuildInputs = [pkgs.nodejs_24 pnpm pnpmConfigHook];
+    pnpmDeps = newUiPnpmDeps;
+    buildPhase = ''
+      runHook preBuild
+      pnpm tsc -b
+      pnpm vite build --outDir "$out"
+      # Create entry points for compact and full view windows.
+      mkdir -p "$out"/compact "$out"/full
+      cp "$out"/index.html "$out"/compact/
+      cp "$out"/index.html "$out"/full/
+      runHook postBuild
+    '';
+    installPhase = "true";
   };
 in
   craneLib.mkCargoDerivation {
-    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps;
+    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps newUiDist;
 
     src = ../.;
 
@@ -140,9 +169,10 @@ in
     buildPhase = ''
       runHook preBuild
 
-      # Build the frontend first; tauri's beforeBuildCommand is suppressed
-      # below to avoid running pnpm build a second time.
+      # Build the old frontend and copy in the pre-built new UI.
       pnpm build
+      cp -r ${newUiDist}/* dist/
+      chmod -R u+w dist/
 
       # --config replaces the build section from tauri.linux.conf.json.
       pnpm tauri build \
@@ -161,6 +191,7 @@ in
       mkdir -p $out/bin
       install -Dm755 "$targetDir/${pname}"         $out/bin/${pname}
       install -Dm755 "$targetDir/defguard-service" $out/bin/defguard-service
+      install -Dm755 "$targetDir/defguard-cli"     $out/bin/defguard-cli
       install -Dm755 "$targetDir/dg"               $out/bin/dg
 
       mkdir -p $out/lib/${pname}
@@ -188,10 +219,14 @@ in
     SQLX_OFFLINE = "true";
     doInstallCargoArtifacts = false;
 
-    # passthru attrs are ignored by the build but addressable by external tools:
-    # pnpmDeps — referenced by the update-pnpm-hash.yaml CI workflow
+    # passthru attrs are ignored by the build but addressable by external tools.
+    # There are TWO pnpm lockfiles, each with its own pinned hash that must be kept
+    # current when the corresponding lockfile changes:
+    #   pnpmDeps       - root pnpm project (../pnpm-lock.yaml)
+    #   newUiPnpmDeps  - new-ui pnpm project (../new-ui/pnpm-lock.yaml)
+    # Any hash-refresh automation (e.g. an update-pnpm-hash workflow) must update both.
     passthru = {
-      inherit pnpmDeps;
+      inherit pnpmDeps newUiPnpmDeps;
     };
 
     meta = with lib; {

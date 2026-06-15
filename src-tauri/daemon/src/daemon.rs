@@ -16,7 +16,8 @@ use defguard_client_proto::defguard::{
     client::v1::{
         desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
         CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
-        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
+        RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -517,6 +518,58 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::ReadInterfaceDataStream
         ))
+    }
+
+    async fn list_interfaces(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<ListInterfacesResponse>, Status> {
+        debug!("Received ListInterfaces request");
+
+        // Collect interface names under a brief lock.
+        let ifnames: Vec<String> = {
+            let Ok(wgapis_map) = self.wgapis.read() else {
+                error!("Failed to acquire read lock for WGApis");
+                return Err(Status::new(Code::Internal, "read lock error"));
+            };
+            wgapis_map.keys().cloned().collect()
+        };
+
+        // Read each interface's data, acquiring and releasing the lock per interface
+        // so that write operations (create/remove) can interleave.
+        let mut interfaces = Vec::with_capacity(ifnames.len());
+        for ifname in &ifnames {
+            let data = {
+                let Ok(wgapis_map) = self.wgapis.read() else {
+                    error!("Failed to acquire read lock for WGApis");
+                    return Err(Status::new(Code::Internal, "read lock error"));
+                };
+                if let Some(wgapi) = wgapis_map.get(ifname) {
+                    match wgapi.read_interface_data() {
+                        Ok(host) => {
+                            debug!("ListInterfaces: returning data for {ifname}");
+                            Some(host.into())
+                        }
+                        Err(err) => {
+                            error!("ListInterfaces: failed to read data for {ifname}: {err}");
+                            None
+                        }
+                    }
+                } else {
+                    debug!("ListInterfaces: interface {ifname} removed since snapshot");
+                    None
+                }
+            };
+            interfaces.push(ManagedInterfaceData {
+                interface_name: ifname.clone(),
+                data,
+            });
+        }
+        debug!(
+            "ListInterfaces: returning {} managed interface(s)",
+            interfaces.len()
+        );
+        Ok(Response::new(ListInterfacesResponse { interfaces }))
     }
 
     #[cfg(windows)]

@@ -25,7 +25,7 @@ pub fn construct_platform_header() -> String {
         architecture: Some(env::consts::ARCH.to_string()),
     };
 
-    log::debug!("Constructed platform info header: {platform_info:?}");
+    debug!("Constructed platform info header: {platform_info:?}");
 
     BASE64_STANDARD.encode(platform_info.encode_to_vec())
 }

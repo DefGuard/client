@@ -3,6 +3,7 @@ use std::{
     fs::{create_dir_all, File},
     str::FromStr,
     sync::LazyLock,
+    time::Duration,
 };
 
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqlitePool};
@@ -23,7 +24,8 @@ pub static DB_POOL: LazyLock<SqlitePool> = LazyLock::new(|| {
         .expect("Failed to set database connenction options.")
         .create_if_missing(true)
         .auto_vacuum(SqliteAutoVacuum::Incremental)
-        .journal_mode(SqliteJournalMode::Wal);
+        .journal_mode(SqliteJournalMode::Wal)
+        .busy_timeout(Duration::from_secs(5));
     debug!("Connecting to database: {db_url} with options: {opts:?}");
     SqlitePool::connect_lazy_with(opts)
 });

@@ -11,7 +11,6 @@ use defguard_client_core::connection::active_connections::{
 };
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
-#[cfg(not(target_os = "linux"))]
 use crate::window_manager::WindowManager;
 use crate::{
     appstate::AppState,
@@ -155,6 +154,12 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
+        // NOTE: on Linux this click handler never fires. The `tray-icon` appindicator
+        // backend (libayatana-appindicator) does not emit tray click events - only the
+        // context menu works (`show_menu_on_left_click` is likewise a no-op on Linux).
+        // So left-click cannot open/toggle the window on Linux; users interact via the
+        // right-click menu's Show/Hide items (handled in `handle_tray_menu_event`).
+        // This is an upstream limitation, not a bug here. Documented in known-issues.
         .on_tray_icon_event(|icon, event| {
             store_tray_click_position(icon.app_handle(), &event);
             if let TrayIconEvent::Click {
@@ -165,43 +170,37 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
             {
                 let app = icon.app_handle();
 
-                #[cfg(target_os = "linux")]
-                show_main_window(app);
+                let main_visible = app
+                    .get_webview_window(FULL_VIEW_WINDOW_ID)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
 
-                #[cfg(not(target_os = "linux"))]
-                {
-                    let main_visible = app
-                        .get_webview_window(FULL_VIEW_WINDOW_ID)
-                        .and_then(|w| w.is_visible().ok())
-                        .unwrap_or(false);
-
-                    if main_visible {
-                        if let Some(w) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
-                            let _ = w.hide();
-                        }
+                if main_visible {
+                    if let Some(w) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
+                        let _ = w.hide();
                     }
+                }
 
-                    let tray_visible = app
-                        .get_webview_window(COMPACT_WINDOW_ID)
-                        .and_then(|w| w.is_visible().ok())
-                        .unwrap_or(false);
+                let tray_visible = app
+                    .get_webview_window(COMPACT_WINDOW_ID)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
 
-                    if tray_visible {
-                        if let Some(w) = app.get_webview_window(COMPACT_WINDOW_ID) {
-                            let _ = w.hide();
+                if tray_visible {
+                    if let Some(w) = app.get_webview_window(COMPACT_WINDOW_ID) {
+                        let _ = w.hide();
+                    }
+                } else {
+                    let has_locations = tauri::async_runtime::block_on(
+                        crate::window_manager::has_non_service_locations(),
+                    );
+                    if has_locations {
+                        if let Some(old_ui) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
+                            let _ = old_ui.hide();
                         }
+                        show_tray_window(app);
                     } else {
-                        let has_locations = tauri::async_runtime::block_on(
-                            crate::window_manager::has_non_service_locations(),
-                        );
-                        if has_locations {
-                            if let Some(old_ui) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
-                                let _ = old_ui.hide();
-                            }
-                            show_tray_window(app);
-                        } else {
-                            let _ = WindowManager::open_full_view(app);
-                        }
+                        let _ = WindowManager::open_full_view(app);
                     }
                 }
             }

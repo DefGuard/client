@@ -19,7 +19,7 @@ use windows_sys::Win32::{
         PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
     },
     Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX},
-    System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE},
+    System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES},
 };
 
 // Named-pipe name used for IPC between defguard client and windows service.
@@ -91,8 +91,8 @@ fn str_to_wide_null_terminated(s: &str) -> Vec<u16> {
 }
 
 /// Create a secure Windows named pipe handle with appropriate ACL.
-/// Uses `FILE_FLAG_OVERLAPPED` for Tokio compatibility and sets `nMaxInstances = 2`
-/// (one client + one service instance).
+/// Uses `FILE_FLAG_OVERLAPPED` for Tokio compatibility and sets
+/// `nMaxInstances = PIPE_UNLIMITED_INSTANCES` (255).
 fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
     debug!("Creating secure named pipe {PIPE_NAME}");
 
@@ -128,8 +128,7 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
             name_wide.as_ptr(),
             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
             PIPE_TYPE_BYTE,
-            // 1 client + 1 service
-            2,
+            PIPE_UNLIMITED_INSTANCES,
             65536,
             65536,
             0,

@@ -16,6 +16,20 @@ use defguard_client_proto::defguard::client::v1::desktop_daemon_service_client::
 
 #[cfg(unix)]
 const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
+
+/// Returns the daemon socket path.  In test/debug builds the
+/// `DEFGUARD_DAEMON_SOCKET` environment variable can override the default
+/// (useful for integration tests).  In release builds the override is
+/// disabled to prevent an undocumented channel-redirection surface.
+#[cfg(unix)]
+#[must_use]
+pub fn daemon_socket_path() -> String {
+    #[cfg(any(test, debug_assertions))]
+    if let Ok(path) = std::env::var("DEFGUARD_DAEMON_SOCKET") {
+        return path;
+    }
+    DAEMON_SOCKET_PATH.to_string()
+}
 #[cfg(windows)]
 const PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
 
@@ -26,7 +40,7 @@ pub static DAEMON_CLIENT: LazyLock<DesktopDaemonServiceClient<Channel>> = LazyLo
     #[cfg(unix)]
     {
         channel = endpoint.connect_with_connector_lazy(service_fn(|_: Uri| async {
-            let stream = match UnixStream::connect(DAEMON_SOCKET_PATH).await {
+            let stream = match UnixStream::connect(daemon_socket_path()).await {
                 Ok(stream) => stream,
                 Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
                     error!(

@@ -10,12 +10,18 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
-use crate::error::Error;
-use crate::proto::client_types::{
-    LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+use crate::{
+    database::{
+        models::instance::{ClientTrafficPolicy, Instance},
+        DbPool,
+    },
+    error::Error,
+    proto::client_types::{
+        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+    },
 };
 #[cfg(not(target_os = "macos"))]
-use crate::{database::DbPool, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
+use crate::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
@@ -120,7 +126,6 @@ impl fmt::Display for Location<NoId> {
 
 impl Location<Id> {
     /// Ignores service locations
-    #[cfg(any(windows, target_os = "macos"))]
     pub async fn all<'e, E>(executor: E, include_service_locations: bool) -> sqlx::Result<Vec<Self>>
     where
         E: SqliteExecutor<'e>,
@@ -142,7 +147,6 @@ impl Location<Id> {
         .await
     }
 
-    #[cfg(any(windows, target_os = "macos"))]
     pub async fn exist<'e, E>(executor: E, include_service_locations: bool) -> sqlx::Result<bool>
     where
         E: SqliteExecutor<'e>,
@@ -157,6 +161,28 @@ impl Location<Id> {
         .await?;
 
         Ok(result != 0)
+    }
+
+    /// Find locations by name (excluding service locations).
+    /// Returns all matches - callers must handle cross-instance ambiguity.
+    pub async fn find_by_name<'e, E>(executor: E, name: &str) -> sqlx::Result<Vec<Self>>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let max = Self::get_service_location_mode_filter(false);
+        query_as!(
+            Self,
+            "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, \
+            network_id, route_all_traffic, keepalive_interval, \
+            location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
+            service_location_mode \"service_location_mode: ServiceLocationMode\", \
+            mfa_method \"mfa_method: _\", posture_check_required \
+            FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
+            name,
+            max,
+        )
+        .fetch_all(executor)
+        .await
     }
 
     pub async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
@@ -295,6 +321,7 @@ impl Location<Id> {
         interface_name: String,
         preshared_key: Option<String>,
         mtu: Option<u32>,
+        route_all_traffic: Option<bool>,
     ) -> Result<InterfaceConfiguration, Error> {
         use crate::database::models::instance::{ClientTrafficPolicy, Instance};
 
@@ -336,7 +363,7 @@ impl Location<Id> {
         let route_all_traffic = match instance.client_traffic_policy {
             ClientTrafficPolicy::ForceAllTraffic => true,
             ClientTrafficPolicy::DisableAllTraffic => false,
-            ClientTrafficPolicy::None => self.route_all_traffic,
+            ClientTrafficPolicy::None => route_all_traffic.unwrap_or(self.route_all_traffic),
         };
         let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
@@ -389,6 +416,57 @@ impl Location<Id> {
         };
 
         Ok(interface_config)
+    }
+
+    /// Persist a per-location MFA method override, clamped via [`infer_mfa_method`]
+    /// against the location's MFA mode (`location_mfa_mode`).
+    pub async fn set_mfa_method(
+        pool: &DbPool,
+        location_id: Id,
+        method: LocationMfaMethod,
+    ) -> Result<(), Error> {
+        let mut location = Self::find_by_id(pool, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let inferred = infer_mfa_method(location.location_mfa_mode, Some(method));
+        location.mfa_method = inferred;
+        location.save(pool).await?;
+        Ok(())
+    }
+
+    /// Persist the route-all-traffic flag for a location, rejecting the update if
+    /// the owning instance's [`ClientTrafficPolicy`] forbids the requested value.
+    pub async fn update_routing(
+        pool: &DbPool,
+        location_id: Id,
+        route_all_traffic: bool,
+    ) -> Result<(), Error> {
+        let mut location = Self::find_by_id(pool, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        let instance = Instance::find_by_id(pool, location.instance_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+
+        if instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic
+            && route_all_traffic
+        {
+            return Err(Error::InvalidInput(
+                "Instance has route_all_traffic disabled.".into(),
+            ));
+        }
+        if instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic
+            && !route_all_traffic
+        {
+            return Err(Error::InvalidInput(
+                "Instance has route_all_traffic enforced.".into(),
+            ));
+        }
+
+        location.route_all_traffic = route_all_traffic;
+        location.save(pool).await?;
+        Ok(())
     }
 
     /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?`

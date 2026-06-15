@@ -35,6 +35,7 @@ pub async fn setup_interface(
     preshared_key: Option<String>,
     mtu: Option<u32>,
     pool: &DbPool,
+    route_all_traffic: Option<bool>,
 ) -> Result<String, Error> {
     debug!("Setting up interface for location: {location}");
     let interface_name = get_interface_name(name);
@@ -50,7 +51,13 @@ pub async fn setup_interface(
     debug!("Found free port: {port} for interface {interface_name}.");
 
     let interface_config = location
-        .interface_configuration(pool, interface_name.clone(), preshared_key, mtu)
+        .interface_configuration(
+            pool,
+            interface_name.clone(),
+            preshared_key,
+            mtu,
+            route_all_traffic,
+        )
         .await?;
     debug!("Creating interface for location {location} with configuration {interface_config:?}");
     let request = CreateInterfaceRequest {
@@ -63,7 +70,7 @@ pub async fn setup_interface(
                 "Failed to set up connection for location {location}; background service is \
                 unavailable. Make sure the service is running. Error: {error}"
             );
-            Err(Error::InternalError(
+            Err(Error::BackendUnavailable(
                 "Background service is unavailable. Make sure the service is running.".into(),
             ))
         } else {
@@ -90,6 +97,7 @@ pub async fn setup_interface_tunnel(
     tunnel: &Tunnel<Id>,
     name: &str,
     mtu: Option<u32>,
+    route_all_traffic: Option<bool>,
 ) -> Result<String, Error> {
     debug!("Setting up interface for tunnel {tunnel}");
     let interface_name = get_interface_name(name);
@@ -123,7 +131,8 @@ pub async fn setup_interface_tunnel(
         "Parsing tunnel {tunnel} allowed ips: {:?}",
         tunnel.allowed_ips
     );
-    let allowed_ips = if tunnel.route_all_traffic {
+    let route_all_traffic = route_all_traffic.unwrap_or(tunnel.route_all_traffic);
+    let allowed_ips = if route_all_traffic {
         debug!("Using all traffic routing for tunnel {tunnel}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
     } else {

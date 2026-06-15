@@ -36,3 +36,5 @@ src-tauri/gen/
 
 # nix stuff
 result
+
+target

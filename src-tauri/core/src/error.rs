@@ -22,6 +22,10 @@ pub enum Error {
     AddrParse(#[from] AddrParseError),
     #[error("Internal error: {0}")]
     InternalError(String),
+    #[error("Backend service unavailable: {0}")]
+    BackendUnavailable(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
     #[error("Failed to parse timestamp")]
     Datetime,
     #[error("Object not found")]

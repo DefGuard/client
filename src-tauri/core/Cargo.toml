@@ -11,6 +11,7 @@ version.workspace = true
 [dependencies]
 base64.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
 defguard-client-common = { path = "../common" }
 defguard-client-proto = { path = "../client-proto" }
 defguard_wireguard_rs.workspace = true

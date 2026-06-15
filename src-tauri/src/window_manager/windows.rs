@@ -236,44 +236,44 @@ impl WindowManager {
     }
 
     pub fn open_full_view(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
-        log::info!("open_full_view: Getting monitors");
+        info!("open_full_view: Getting monitors");
         let monitors = Self::get_monitors();
-        log::info!("open_full_view: Found {} monitors", monitors.len());
+        info!("open_full_view: Found {} monitors", monitors.len());
         let primary = monitors
             .iter()
             .find(|m| m.is_primary)
             .unwrap_or(&monitors[0]);
-        log::info!(
+        info!(
             "open_full_view: Primary monitor scale factor: {}",
             primary.scale_factor
         );
 
-        log::info!("open_full_view: Checking if old-ui window exists");
+        info!("open_full_view: Checking if old-ui window exists");
         let window =
             if let Some(window) = tauri::Manager::get_webview_window(app, FULL_VIEW_WINDOW_ID) {
-                log::info!("open_full_view: old-ui window exists, unminimizing");
+                info!("open_full_view: old-ui window exists, unminimizing");
                 let _ = window.unminimize();
                 window
             } else {
-                log::info!("open_full_view: old-ui window does not exist, building it");
+                info!("open_full_view: old-ui window does not exist, building it");
                 let win = Self::build_full_view_window(app)?;
-                log::info!("open_full_view: old-ui window built successfully");
+                info!("open_full_view: old-ui window built successfully");
                 win
             };
 
-        log::info!("open_full_view: Querying outer_size");
+        info!("open_full_view: Querying outer_size");
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
             width: (FULL_VIEW_WINDOW_WIDTH * primary.scale_factor) as u32,
             height: (FULL_VIEW_WINDOW_HEIGHT * primary.scale_factor) as u32,
         });
-        log::info!("open_full_view: outer_size = {outer_size:?}");
+        info!("open_full_view: outer_size = {outer_size:?}");
 
-        log::info!("open_full_view: Querying inner_size");
+        info!("open_full_view: Querying inner_size");
         let inner_size = window.inner_size().unwrap_or(tauri::PhysicalSize {
             width: (FULL_VIEW_WINDOW_WIDTH * primary.scale_factor) as u32,
             height: (FULL_VIEW_WINDOW_HEIGHT * primary.scale_factor) as u32,
         });
-        log::info!("open_full_view: inner_size = {inner_size:?}");
+        info!("open_full_view: inner_size = {inner_size:?}");
 
         let physical_width = outer_size.width as i32;
         let physical_height = outer_size.height as i32;
@@ -324,11 +324,11 @@ impl WindowManager {
             _ => {}
         }
 
-        log::info!("open_full_view: Setting position to ({window_x}, {window_y})");
+        info!("open_full_view: Setting position to ({window_x}, {window_y})");
         window.set_position(tauri::PhysicalPosition::new(window_x, window_y))?;
-        log::info!("open_full_view: Position set, showing window");
+        info!("open_full_view: Position set, showing window");
         window.show()?;
-        log::info!("open_full_view: Window shown successfully");
+        info!("open_full_view: Window shown successfully");
         Ok(window)
     }
 }
