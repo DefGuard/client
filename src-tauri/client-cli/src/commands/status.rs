@@ -34,7 +34,7 @@ impl CommandOutput for StatusResult {
         {
             "Connection status is not yet supported on macOS from the CLI. \
                     Use the desktop client."
-                .to_string();
+                .to_string()
         }
         #[cfg(not(target_os = "macos"))]
         {
