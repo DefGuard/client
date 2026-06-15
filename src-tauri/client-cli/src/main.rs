@@ -3,6 +3,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use common::check_version_flag;
 
+mod brand;
 mod cli;
 mod commands;
 mod exit;
@@ -29,6 +30,10 @@ use crate::{
 async fn main() -> ExitCode {
     // Handle --version / -V before any other work.
     check_version_flag("defguard-cli");
+
+    // Brand banner: shown before clap's --help, and when invoked with
+    // zero arguments. NOT shown for --version (must stay grep-friendly).
+    show_banner_if_appropriate();
 
     let cli = Cli::parse();
 
@@ -136,5 +141,26 @@ async fn main() -> ExitCode {
             output::emit_error(&err, cli.json);
             ExitCode::from(code)
         }
+    }
+}
+
+/// Show the brand banner (logo + copyright + project version) on
+/// the two surfaces that need branding: `defguard-cli` with no args
+/// (clap prints help; we banner first), and `defguard-cli --help` /
+/// `-h`. Suppressed for `--version` / `-V` -- that surface must stay
+/// grep-friendly (`defguard-cli --version | head -1`).
+fn show_banner_if_appropriate() {
+    let args: Vec<String> = std::env::args().collect();
+    // Skip argv[0]. If user supplied any subcommand or flag other
+    // than --help / -h, do not print the banner.
+    let user_args = &args[1..];
+    let no_args = user_args.is_empty();
+    let asked_help = user_args.iter().any(|a| a == "--help" || a == "-h");
+    let asked_version = user_args.iter().any(|a| a == "--version" || a == "-V");
+    if asked_version {
+        return;
+    }
+    if no_args || asked_help {
+        brand::print_banner();
     }
 }

@@ -13,6 +13,7 @@ name = "defguard-cli"
 
 [dependencies]
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
+owo-colors = { version = "4", features = ["supports-colors"] }
 
 common = { package = "defguard-client-common", path = "../common" }
 defguard_core = { package = "defguard-client-core", path = "../core" }
