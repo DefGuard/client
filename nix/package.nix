@@ -102,7 +102,7 @@
     hash = "sha256-9PvWIkD+/1KLFqWvf5Kz6x3dABQILMooTC+MSqxDTlg=";
   };
 
-  # Pre-build the new UI frontend so Tauri can serve it at /new-ui/.
+  # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
   newUiDist = pkgs.stdenv.mkDerivation {
     pname = "defguard-client-new-ui";
     inherit version;
@@ -112,7 +112,11 @@
     buildPhase = ''
       runHook preBuild
       pnpm tsc -b
-      pnpm vite build --outDir "$out/new-ui"
+      pnpm vite build --outDir "$out"
+      # Create entry points for compact and full view windows.
+      mkdir -p "$out"/compact "$out"/full
+      cp "$out"/index.html "$out"/compact/
+      cp "$out"/index.html "$out"/full/
       runHook postBuild
     '';
     installPhase = "true";
@@ -167,15 +171,8 @@ in
 
       # Build the old frontend and copy in the pre-built new UI.
       pnpm build
-      cp -r ${newUiDist}/new-ui dist/
-      chmod -R u+w dist/new-ui
-
-      # Tauri loads new-ui as WebviewUrl::App("new-ui/full/") and
-      # "new-ui/compact/".  Create index.html entry points for each so
-      # TanStack Router (basepath /new-ui/) can take over from there.
-      mkdir -p dist/new-ui/full dist/new-ui/compact
-      cp dist/new-ui/index.html dist/new-ui/full/
-      cp dist/new-ui/index.html dist/new-ui/compact/
+      cp -r ${newUiDist}/* dist/
+      chmod -R u+w dist/
 
       # --config replaces the build section from tauri.linux.conf.json.
       pnpm tauri build \
