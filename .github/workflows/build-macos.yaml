@@ -82,7 +82,7 @@ jobs:
         run: |
           security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
           xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" /Applications defguard-client.pkg
-          xcrun altool --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }} --upload-app --type macos --file defguard-client.pkg
+          xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} --upload-app --platform macos --file defguard-client.pkg --wait
           # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
           # xcrun stapler staple defguard-client.pkg
 
@@ -93,5 +93,5 @@ jobs:
           UPLOAD_DIR=$(mktemp -d)
           mkdir -p "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS"
           git log -1 --pretty='"whatsNew" = "%B";' > "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS/en-US.txt"
-          xcrun altool --apiKey ${{ secrets.APPLE_API_KEY }} --apiIssuer ${{ secrets.APPLE_API_ISSUER }} --apple-id ${APP_ID} --bundle-version ${{ github.run_number }} --bundle-short-version-string ${VERSION} --type macos --beta-app-store-text ${UPLOAD_DIR} --download
+          xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} --apple-id ${APP_ID} --bundle-version ${{ github.run_number }} --bundle-short-version-string ${VERSION} --platform macos --beta-app-store-text ${UPLOAD_DIR} --upload
           rm -f -r "${UPLOAD_DIR}"
