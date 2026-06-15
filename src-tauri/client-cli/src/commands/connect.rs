@@ -16,6 +16,7 @@ use crate::{
     resolve::{resolve_connect_target, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
+use defguard_client_proto::defguard::client_types::MfaMethod;
 
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
@@ -30,6 +31,7 @@ pub async fn handle(
     mfa_method: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
+    json: bool,
 ) -> Result<ConnectResult, CliError> {
     #[cfg(target_os = "macos")]
     {
@@ -79,23 +81,7 @@ pub async fn handle(
             if location.mfa_enabled() {
                 // Resolve the effective MFA method before collecting code source
                 // so that OIDC (external) locations can skip the code prompt entirely.
-                let _method = mfa::resolve_method(location, mfa_method)?;
-
-                // Determine the MFA code source from CLI flags.
-                let code_source = code
-                    .map(|c| CodeSource::Literal(c.to_string()))
-                    .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
-
-                let source = if let Some(code_source) = code_source {
-                    code_source
-                } else if stdin().is_terminal() {
-                    CodeSource::Interactive
-                } else {
-                    return Err(CliError::MfaInputRequired(format!(
-                        "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
-                        location.name
-                    )));
-                };
+                let method = mfa::resolve_method(location, mfa_method)?;
 
                 let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
@@ -116,15 +102,38 @@ pub async fn handle(
                     None
                 };
 
-                let psk = mfa::authorize(
-                    location,
-                    &source,
-                    &instance,
-                    mfa_method,
-                    posture_data,
-                    &state.pool,
-                )
-                .await?;
+                let psk = if method == MfaMethod::Oidc {
+                    // External OIDC MFA: browser-based flow, no code prompt.
+                    mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
+                        .await?
+                } else {
+                    // Code-based MFA: TOTP, email, biometric, mobile-approve.
+                    // Determine the MFA code source from CLI flags.
+                    let code_source = code
+                        .map(|c| CodeSource::Literal(c.to_string()))
+                        .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
+
+                    let source = if let Some(code_source) = code_source {
+                        code_source
+                    } else if stdin().is_terminal() {
+                        CodeSource::Interactive
+                    } else {
+                        return Err(CliError::MfaInputRequired(format!(
+                            "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
+                            location.name
+                        )));
+                    };
+
+                    mfa::authorize(
+                        location,
+                        &source,
+                        &instance,
+                        mfa_method,
+                        posture_data,
+                        &state.pool,
+                    )
+                    .await?
+                };
                 (
                     location.name.clone(),
                     Some(psk.expose_secret().to_string()),

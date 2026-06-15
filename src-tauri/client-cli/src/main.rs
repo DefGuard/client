@@ -76,6 +76,7 @@ async fn main() -> ExitCode {
                 mfa_method.as_deref(),
                 all_traffic,
                 predefined_traffic,
+                cli.json,
             )
             .await,
             cli.json,

@@ -79,7 +79,7 @@ pub async fn authorize(
 
     // Reject methods not yet supported by the CLI before doing any I/O.
     match method {
-        MfaMethod::Oidc | MfaMethod::Biometric | MfaMethod::MobileApprove => {
+        MfaMethod::Biometric | MfaMethod::MobileApprove => {
             return Err(CliError::MfaFailed(format!(
                 "MFA method {:?} is not yet supported by the CLI. Use the desktop client.",
                 method
