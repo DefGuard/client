@@ -44,6 +44,10 @@ export const FullViewNavigation = () => {
         to: '/full/add',
       },
       {
+        icon: IconKind.Settings,
+        to: '/full/settings',
+      },
+      {
         icon: IconKind.ActivityNotes,
         to: '/full/log',
       },

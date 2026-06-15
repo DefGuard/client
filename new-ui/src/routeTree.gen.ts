@@ -20,6 +20,7 @@ import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
 import { Route as FullDefaultUpdateRouteImport } from './routes/full/_default/update'
 import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
+import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/settings'
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
 import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
@@ -79,6 +80,11 @@ const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
   path: '/support',
   getParentRoute: () => FullDefaultRoute,
 } as any)
+const FullDefaultSettingsRoute = FullDefaultSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/playground/': typeof PlaygroundIndexRoute
   '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/settings': typeof FullDefaultSettingsRoute
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/playground': typeof PlaygroundIndexRoute
   '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
+  '/full/settings': typeof FullDefaultSettingsRoute
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/playground/': typeof PlaygroundIndexRoute
   '/full/_default/log': typeof FullDefaultLogRoute
   '/full/_default/overview': typeof FullDefaultOverviewRoute
+  '/full/_default/settings': typeof FullDefaultSettingsRoute
   '/full/_default/support': typeof FullDefaultSupportRoute
   '/full/_default/update': typeof FullDefaultUpdateRoute
   '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/playground/'
     | '/full/log'
     | '/full/overview'
+    | '/full/settings'
     | '/full/support'
     | '/full/update'
     | '/full/add/instance'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/full/log'
     | '/full/overview'
+    | '/full/settings'
     | '/full/support'
     | '/full/update'
     | '/full/add/instance'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/playground/'
     | '/full/_default/log'
     | '/full/_default/overview'
+    | '/full/_default/settings'
     | '/full/_default/support'
     | '/full/_default/update'
     | '/full/_default/add/instance'
@@ -287,6 +299,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultSupportRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/settings': {
+      id: '/full/_default/settings'
+      path: '/settings'
+      fullPath: '/full/settings'
+      preLoaderRoute: typeof FullDefaultSettingsRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/overview': {
       id: '/full/_default/overview'
       path: '/overview'
@@ -321,6 +340,7 @@ declare module '@tanstack/react-router' {
 interface FullDefaultRouteChildren {
   FullDefaultLogRoute: typeof FullDefaultLogRoute
   FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
+  FullDefaultSettingsRoute: typeof FullDefaultSettingsRoute
   FullDefaultSupportRoute: typeof FullDefaultSupportRoute
   FullDefaultUpdateRoute: typeof FullDefaultUpdateRoute
   FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
@@ -330,6 +350,7 @@ interface FullDefaultRouteChildren {
 const FullDefaultRouteChildren: FullDefaultRouteChildren = {
   FullDefaultLogRoute: FullDefaultLogRoute,
   FullDefaultOverviewRoute: FullDefaultOverviewRoute,
+  FullDefaultSettingsRoute: FullDefaultSettingsRoute,
   FullDefaultSupportRoute: FullDefaultSupportRoute,
   FullDefaultUpdateRoute: FullDefaultUpdateRoute,
   FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
