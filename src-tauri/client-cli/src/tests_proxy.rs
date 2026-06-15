@@ -8,7 +8,7 @@ use std::{
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
     thread::{sleep, spawn, JoinHandle},
@@ -47,13 +47,34 @@ struct MockProxy {
 }
 
 impl MockProxy {
+    /// Single-shot finish: each finish request gets the same response.
     fn new(start_response: MockResponse, finish_response: MockResponse) -> Self {
+        Self::with_counter(start_response, finish_response, None)
+    }
+
+    /// OIDC polling: the first `fail_count` calls to `finish` return HTTP 428;
+    /// subsequent calls return `finish_response` (HTTP 200).
+    fn with_poll(
+        start_response: MockResponse,
+        finish_response: MockResponse,
+        fail_count: u32,
+    ) -> Self {
+        Self::with_counter(start_response, finish_response, Some(fail_count))
+    }
+
+    fn with_counter(
+        start_response: MockResponse,
+        finish_response: MockResponse,
+        fail_count: Option<u32>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         // Non-blocking accept so the loop can observe the shutdown flag and exit cleanly.
         listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
         let shutdown = Arc::new(AtomicBool::new(false));
         let shutdown_thread = shutdown.clone();
+        let finish_hits = Arc::new(AtomicU32::new(0));
+        let finish_hits_thread = finish_hits.clone();
         let handle = spawn(move || {
             while !shutdown_thread.load(Ordering::Relaxed) {
                 let mut stream = match listener.accept() {
@@ -86,6 +107,17 @@ impl MockProxy {
                 let request = String::from_utf8_lossy(&data);
                 let response = if request.contains("/api/v1/client-mfa/start") {
                     &start_response
+                } else if let Some(max) = fail_count {
+                    let current = finish_hits_thread.fetch_add(1, Ordering::Relaxed);
+                    if current < max {
+                        // 428: not yet authenticated
+                        &MockResponse {
+                            status: 428,
+                            body: r#"{"error":"OIDC authentication not completed yet"}"#.into(),
+                        }
+                    } else {
+                        &finish_response
+                    }
                 } else {
                     &finish_response
                 };
@@ -147,6 +179,14 @@ fn mfa_enabled_loc(name: &str, instance_id: Id) -> Location<NoId> {
         service_location_mode: ServiceLocationMode::Disabled,
         mfa_method: None,
         posture_check_required: false,
+    }
+}
+
+/// Build a location that requires **external** (OIDC) MFA.
+fn oidc_loc(name: &str, instance_id: Id) -> Location<NoId> {
+    Location {
+        location_mfa_mode: LocationMfaMode::External,
+        ..mfa_enabled_loc(name, instance_id)
     }
 }
 
@@ -245,4 +285,29 @@ async fn test_mfa_proxy_unreachable(pool: DbPool) {
         "expected CliError::Other, got {err:?}"
     );
     assert!(err.to_string().contains("Failed to reach proxy"));
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_oidc_mfa_success_returns_psk(pool: DbPool) {
+    let (mut inst, _loc) = seed_db(&pool).await;
+    let oidc_loc = oidc_loc("office-oidc", inst.id).save(&pool).await.unwrap();
+
+    let mock = MockProxy::with_poll(
+        MockResponse {
+            status: 200,
+            body: r#"{"token":"tok-oidc"}"#.into(),
+        },
+        MockResponse {
+            status: 200,
+            body: r#"{"preshared_key":"secret-oidc-psk"}"#.into(),
+        },
+        2, // first two finish calls return 428, third returns 200
+    );
+    mock.wait_ready();
+    inst.proxy_url = mock.url();
+
+    let psk = mfa::authorize_oidc(&oidc_loc, &inst, None, &pool, false)
+        .await
+        .unwrap();
+    assert_eq!(psk.expose_secret(), "secret-oidc-psk");
 }

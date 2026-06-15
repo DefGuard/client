@@ -261,12 +261,18 @@ fn open_url(_url: &str) {
     // no-op: tests must not spawn a browser
 }
 
-/// Fixed interval between OIDC MFA finish polls.
+/// Fixed interval between OIDC MFA finish polls (shortened for tests).
+#[cfg(not(test))]
 const OIDC_POLL_INTERVAL: Duration = Duration::from_secs(5);
+#[cfg(test)]
+const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 /// Total time the CLI will wait for the user to complete OIDC authentication
-/// before giving up.
+/// before giving up (shortened for tests).
+#[cfg(not(test))]
 const OIDC_POLL_TIMEOUT: Duration = Duration::from_secs(300);
+#[cfg(test)]
+const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
 
 /// Run the OIDC MFA handshake for an external-IdP location.
 ///
