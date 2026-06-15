@@ -73,6 +73,12 @@ pub async fn bring_up(
 /// Tear down a WireGuard interface identified by `ActiveConnectionInfo`.
 ///
 /// On macOS this returns [`Error::BackendUnavailable`] - see [`bring_up`].
+//
+// FIXME: This constructs an `ActiveConnection` with `start: Utc::now()`,
+// which records a zero-duration connection when saved. This impacts the
+// connection history overview (all entries appear instant). Connection
+// tracking should be refactored to carry the real start time from the
+// active-state record through to the history persistence path.
 pub async fn tear_down(conn: &ActiveConnectionInfo) -> Result<(), Error> {
     #[cfg(not(target_os = "macos"))]
     {
