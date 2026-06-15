@@ -17,8 +17,11 @@ import { useMfaMobileConnect } from '../../hooks/useMfaMobileConnect';
 type Screen = 'loading' | 'qr' | 'error';
 
 export const LocationCardMfaMobileView = () => {
-  const { setView, setPostureError } = useLocationCardContext();
-  const { start, startError, qrValue, connectionError } = useMfaMobileConnect();
+  const { setView, setPostureError, location } = useLocationCardContext();
+  const { start, startError, qrValue, connectionError } = useMfaMobileConnect(location, {
+    onConnected: () => setView(LocationCardViews.Connected),
+    onPostureError: (message) => setPostureError(message ?? null),
+  });
   const [screen, setScreen] = useState<Screen>('loading');
   const startedRef = useRef(false);
 

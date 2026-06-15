@@ -20,11 +20,18 @@ import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/Locati
 const MIN_POSTURE_LOADER_MS = 500;
 
 export const LocationCardMfaTotpView = () => {
-  const { setView, location } = useLocationCardContext();
+  const { setView, location, setPostureError } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
+    location,
     MfaStartMethod.Totp,
     {
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
+      onConnected: () => setView(LocationCardViews.Connected),
+      onSessionExpired: () => setView(LocationCardViews.Default),
+      onPostureError: (msg) => {
+        setPostureError(msg);
+        setView(LocationCardViews.PostureCheckFail);
+      },
     },
   );
 

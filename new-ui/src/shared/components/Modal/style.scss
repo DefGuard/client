@@ -1,0 +1,43 @@
+#modals-root .modal {
+  --max-width: var(--modal-size-md);
+
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: var(--max-width);
+  position: relative;
+  overflow: hidden;
+
+  &.size-small {
+    --max-width: var(--modal-size-sm);
+  }
+
+  &.size-primary {
+    --max-width: var(--modal-size-md);
+  }
+
+  & > .modal-header {
+    box-sizing: border-box;
+    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+    display: grid;
+    grid-template-columns: 1fr 24px;
+    grid-template-rows: 1fr;
+    user-select: none;
+    align-items: center;
+
+    .title {
+      font: var(--t-body-sm-500);
+      color: var(--fg-white-100);
+    }
+  }
+
+  & > .modal-content {
+    box-sizing: border-box;
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+
+    .controls {
+      padding-top: var(--spacing-3xl);
+    }
+  }
+}

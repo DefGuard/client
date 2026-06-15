@@ -1,0 +1,30 @@
+#modals-root {
+  position: relative;
+
+  .modal-root {
+    display: block;
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      display: block;
+      content: ' ';
+      width: 100%;
+      height: 100%;
+      z-index: 4;
+    }
+
+    .modal-positioner {
+      overflow: auto;
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      display: flex;
+      flex-flow: column;
+      align-items: safe center;
+      justify-content: safe center;
+      box-sizing: border-box;
+      padding: var(--spacing-xl);
+    }
+  }
+}

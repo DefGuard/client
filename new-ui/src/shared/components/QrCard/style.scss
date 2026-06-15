@@ -2,4 +2,8 @@
   background-color: var(--bg-white-100);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
+  flex-grow: 0;
+  display: flex;
+  flex-flow: row;
+  align-items: center;
 }
