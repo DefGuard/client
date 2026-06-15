@@ -30,14 +30,15 @@ pub fn emit<T: CommandOutput>(value: &T, json: bool) {
     }
 }
 
+#[derive(Serialize)]
+struct JsonError {
+    kind: String,
+    message: String,
+}
+
 /// Render an error.  Under `--json`, prints a `{ "kind", "message" }` object.
 pub fn emit_error(err: &CliError, json: bool) {
     if json {
-        #[derive(Serialize)]
-        struct JsonError {
-            kind: String,
-            message: String,
-        }
         let je = JsonError {
             kind: error_kind(err),
             message: err.to_string(),

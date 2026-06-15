@@ -45,24 +45,18 @@ pub enum CliError {
     Other(String),
 
     #[error("database error: {0}")]
-    Database(String),
+    Database(#[from] sqlx::Error),
 }
 
 impl From<CoreError> for CliError {
     fn from(err: CoreError) -> Self {
-        match &err {
+        match err {
             CoreError::NotFound => CliError::NotFound(err.to_string()),
-            CoreError::Database(_) => CliError::Database(err.to_string()),
+            CoreError::Database(inner_err) => CliError::Database(inner_err),
             CoreError::BackendUnavailable(_) => CliError::DaemonUnavailable(err.to_string()),
             CoreError::InvalidInput(_) => CliError::InvalidInput(err.to_string()),
             _ => CliError::Other(err.to_string()),
         }
-    }
-}
-
-impl From<sqlx::Error> for CliError {
-    fn from(err: sqlx::Error) -> Self {
-        CliError::Database(err.to_string())
     }
 }
 

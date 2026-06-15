@@ -13,14 +13,16 @@ pub fn version_string(binary_name: &str) -> String {
         .filter(|s| *s != "VERGEN_IDEMPOTENT_OUTPUT" && !s.trim().is_empty());
     let version = option_env!("DEFGUARD_CLIENT_BUILD_VERSION")
         .filter(|v| !v.trim().is_empty())
-        .map(|v| match sha {
-            Some(s) => format!("{v} ({s})"),
-            None => v.to_string(),
-        })
-        .unwrap_or_else(|| match sha {
-            Some(s) => format!("{} ({s})", env!("CARGO_PKG_VERSION")),
-            None => env!("CARGO_PKG_VERSION").to_string(),
-        });
+        .map_or_else(
+            || match sha {
+                Some(s) => format!("{} ({s})", env!("CARGO_PKG_VERSION")),
+                None => env!("CARGO_PKG_VERSION").to_string(),
+            },
+            |v| match sha {
+                Some(s) => format!("{v} ({s})"),
+                None => v.to_string(),
+            },
+        );
     format!("{binary_name} {version}")
 }
 

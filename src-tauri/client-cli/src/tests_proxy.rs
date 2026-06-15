@@ -17,14 +17,13 @@ use std::{
 
 use secrecy::ExposeSecret;
 
-use defguard_core::database::models::{Id, NoId};
-
 use crate::{mfa, mfa_code::CodeSource, state::CliError};
 
 use defguard_core::database::{
     models::{
         instance::{ClientTrafficPolicy, Instance},
         location::{Location, LocationMfaMode, ServiceLocationMode},
+        Id, NoId,
     },
     DbPool,
 };

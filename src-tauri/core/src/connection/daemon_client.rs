@@ -22,6 +22,7 @@ const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 /// (useful for integration tests).  In release builds the override is
 /// disabled to prevent an undocumented channel-redirection surface.
 #[cfg(unix)]
+#[must_use]
 pub fn daemon_socket_path() -> String {
     #[cfg(any(test, debug_assertions))]
     if let Ok(path) = std::env::var("DEFGUARD_DAEMON_SOCKET") {

@@ -10,15 +10,18 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
-use crate::database::DbPool;
-use crate::error::Error;
-use crate::proto::client_types::{
-    LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+use crate::{
+    database::{
+        models::instance::{ClientTrafficPolicy, Instance},
+        DbPool,
+    },
+    error::Error,
+    proto::client_types::{
+        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+    },
 };
 #[cfg(not(target_os = "macos"))]
-use crate::DEFAULT_ROUTE_IPV4;
-#[cfg(not(target_os = "macos"))]
-use crate::DEFAULT_ROUTE_IPV6;
+use crate::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
@@ -438,8 +441,6 @@ impl Location<Id> {
         location_id: Id,
         route_all_traffic: bool,
     ) -> Result<(), Error> {
-        use crate::database::models::instance::{ClientTrafficPolicy, Instance};
-
         let mut location = Self::find_by_id(pool, location_id)
             .await?
             .ok_or(Error::NotFound)?;

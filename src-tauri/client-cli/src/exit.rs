@@ -42,7 +42,10 @@ mod tests {
                 &CliError::InvalidInput("route_all_traffic enforced".into()),
                 7,
             ),
-            (&CliError::Database("bad schema".into()), 1),
+            (
+                &CliError::Database(sqlx::Error::Protocol("bad schema".into())),
+                1,
+            ),
             (&CliError::Other("something broke".into()), 1),
         ];
         for (err, expected) in cases {

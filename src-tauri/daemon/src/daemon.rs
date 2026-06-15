@@ -544,8 +544,8 @@ impl DesktopDaemonService for DaemonService {
                     error!("Failed to acquire read lock for WGApis");
                     return Err(Status::new(Code::Internal, "read lock error"));
                 };
-                match wgapis_map.get(ifname) {
-                    Some(wgapi) => match wgapi.read_interface_data() {
+                if let Some(wgapi) = wgapis_map.get(ifname) {
+                    match wgapi.read_interface_data() {
                         Ok(host) => {
                             debug!("ListInterfaces: returning data for {ifname}");
                             Some(host.into())
@@ -554,11 +554,10 @@ impl DesktopDaemonService for DaemonService {
                             error!("ListInterfaces: failed to read data for {ifname}: {err}");
                             None
                         }
-                    },
-                    None => {
-                        debug!("ListInterfaces: interface {ifname} removed since snapshot");
-                        None
                     }
+                } else {
+                    debug!("ListInterfaces: interface {ifname} removed since snapshot");
+                    None
                 }
             };
             interfaces.push(ManagedInterfaceData {

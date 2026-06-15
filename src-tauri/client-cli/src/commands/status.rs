@@ -32,7 +32,7 @@ impl CommandOutput for StatusResult {
     fn human(&self) -> String {
         #[cfg(target_os = "macos")]
         {
-            return "Connection status is not yet supported on macOS from the CLI. \
+            "Connection status is not yet supported on macOS from the CLI. \
                     Use the desktop client."
                 .to_string();
         }
@@ -90,20 +90,17 @@ fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
         let tx = connection
             .stats
             .as_ref()
-            .map(|s| format_bytes(s.tx_bytes))
-            .unwrap_or_else(|| "-".to_string());
+            .map_or_else(|| "-".to_string(), |s| format_bytes(s.tx_bytes));
         let rx = connection
             .stats
             .as_ref()
-            .map(|s| format_bytes(s.rx_bytes))
-            .unwrap_or_else(|| "-".to_string());
+            .map_or_else(|| "-".to_string(), |s| format_bytes(s.rx_bytes));
         let handshake = connection
             .stats
             .as_ref()
             .and_then(|s| s.last_handshake)
             .filter(|&s| s != 0)
-            .map(format_handshake)
-            .unwrap_or_else(|| "never".to_string());
+            .map_or_else(|| "never".to_string(), format_handshake);
 
         lines.push(format!(
             "  {:<name_col_width$}  {:<10}  {:<iface_col_width$}  {:<10}  {:<10}  {handshake:<9}",
@@ -140,9 +137,8 @@ fn format_handshake(secs: u64) -> String {
 
     let then = UNIX_EPOCH + Duration::from_secs(secs);
     let now = SystemTime::now();
-    let elapsed = match now.duration_since(then) {
-        Ok(d) => d,
-        Err(_) => return "now".to_string(),
+    let Ok(elapsed) = now.duration_since(then) else {
+        return "now".to_string();
     };
 
     let secs = elapsed.as_secs();

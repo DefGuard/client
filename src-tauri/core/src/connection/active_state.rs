@@ -15,6 +15,8 @@ use crate::database::models::{location::Location, tunnel::Tunnel};
 #[cfg(not(target_os = "macos"))]
 use crate::connection::daemon_client::DAEMON_CLIENT;
 #[cfg(not(target_os = "macos"))]
+use base64::Engine as _;
+#[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{InterfaceData, Peer};
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
@@ -182,9 +184,6 @@ fn peer_stats(iface: &InterfaceData, peer: &Peer) -> Option<InterfaceStats> {
         _ => None,
     }
 }
-
-#[cfg(not(target_os = "macos"))]
-use base64::Engine as _;
 
 /// Convert a hex-encoded public key to base64, matching the database format.
 #[cfg(not(target_os = "macos"))]

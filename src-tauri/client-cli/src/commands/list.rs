@@ -122,7 +122,7 @@ fn format_list_table(
                 "  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:>3}  {:<11}",
                 "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
             ));
-            for location in locations.iter() {
+            for location in locations {
                 let mfa = if location.mfa_enabled() { "yes" } else { "no" };
                 let route_label = if location.route_all_traffic {
                     "All-traffic"

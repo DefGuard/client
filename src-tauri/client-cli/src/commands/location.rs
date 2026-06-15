@@ -90,11 +90,8 @@ pub async fn handle_show(
     };
 
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
-    let location = match &target {
-        ResolvedTarget::Location(loc) => loc,
-        _ => {
-            return Err(CliError::NotFound(format!("Location '{name}' not found")));
-        }
+    let ResolvedTarget::Location(location) = &target else {
+        return Err(CliError::NotFound(format!("Location '{name}' not found")));
     };
 
     Ok(LocationShowResult {
@@ -196,8 +193,7 @@ fn format_location_list_table(
     for location in locations {
         let instance = instance_names
             .get(&location.instance_id)
-            .map(|n| n.as_str())
-            .unwrap_or("?");
+            .map_or("?", String::as_str);
         lines.push(format!(
             "  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
             location.name,

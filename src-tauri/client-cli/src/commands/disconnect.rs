@@ -1,11 +1,13 @@
-use defguard_core::connection::{active_state::active_state, tear_down};
-use defguard_core::ConnectionType;
+use defguard_core::{
+    connection::{active_state::active_state, tear_down},
+    ConnectionType,
+};
 use serde_json::json;
 use tracing::{error, info};
 
-use crate::resolve::resolve_disconnect_target;
 use crate::{
     output::CommandOutput,
+    resolve::resolve_disconnect_target,
     resolve::{ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
