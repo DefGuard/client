@@ -240,6 +240,9 @@ $jetbrains:
   --input-spacing-sm: var(--spacing-sm);
   --input-spacing-lg: var(--spacing-md);
 
+  // Log view
+  --t-log-line: normal 400 12px/20px #{$jetbrains};
+
   // Tooltip
   --t-tooltip: normal 400 12px / 16px #{$geist};
   --tooltip-letter-spacing: 0.3;
