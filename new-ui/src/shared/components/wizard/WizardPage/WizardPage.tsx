@@ -1,7 +1,7 @@
 import { type HTMLProps, type PropsWithChildren, Suspense, useMemo } from 'react';
 import './style.scss';
 import clsx from 'clsx';
-import { orderBy } from 'lodash-es';
+import { sort } from 'radashi';
 import Skeleton from 'react-loading-skeleton';
 import { ThemeSpacing } from '../../../types';
 import { SizedBox } from '../../SizedBox/SizedBox';
@@ -26,10 +26,9 @@ export const WizardPage = ({
 
   const visibleSteps = useMemo(
     () =>
-      orderBy(
+      sort(
         Object.values(steps).filter((step) => !step.hidden),
         (s) => s.order,
-        ['asc'],
       ),
     [steps],
   );

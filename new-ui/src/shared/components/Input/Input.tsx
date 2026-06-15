@@ -1,7 +1,7 @@
 import { type HTMLInputTypeAttribute, useId, useMemo, useRef, useState } from 'react';
 import './style.scss';
 import clsx from 'clsx';
-import { isNumber } from 'lodash-es';
+import { isNumber } from 'radashi';
 import { isPresent } from '../../utils/isPresent';
 import { mergeRefs } from '../../utils/mergeRefs';
 import { FieldBox } from '../FieldBox/FieldBox';
