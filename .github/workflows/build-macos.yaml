@@ -94,5 +94,6 @@ jobs:
           VERSION=$(jq -r '.version' package.json)
           mkdir -p "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS"
           git log -1 --pretty='"whatsNew" = "%B";' > "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS/en-US.txt"
+          sleep 10
           xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} --apple-id ${APP_ID} --bundle-version ${{ github.run_number }} --bundle-short-version-string ${VERSION} --platform macos --beta-app-store-text "${UPLOAD_DIR}" --upload
           rm -f -r "${UPLOAD_DIR}"
