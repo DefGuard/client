@@ -133,14 +133,14 @@ pub fn open_full_view_window(app: AppHandle) {
 
 #[tauri::command]
 pub fn swap_to_full_view(app: AppHandle) {
-    info!("swap_to_old_ui called");
+    info!("swap_to_full_view called");
     if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
         if let Err(err) = window.hide() {
-            error!("swap_to_old_ui task: Failed to hide new-ui window: {err:?}");
+            error!("swap_to_full_view task: Failed to hide new-ui window: {err:?}");
         }
     }
     if let Err(err) = WindowManager::open_full_view(&app) {
-        error!("swap_to_old_ui task: Failed to open full view: {err:?}");
+        error!("swap_to_full_view task: Failed to open full view: {err:?}");
     }
 }
 
@@ -160,11 +160,11 @@ pub fn close_tray_window(app: AppHandle) {
 
 #[tauri::command]
 pub fn swap_to_tray(app: AppHandle) {
-    info!("swap_to_new_ui called");
+    info!("swap_to_tray called");
     show_tray_window(&app);
     if let Some(window) = tauri::Manager::get_webview_window(&app, FULL_VIEW_WINDOW_ID) {
         if let Err(err) = window.hide() {
-            error!("swap_to_new_ui task: Failed to hide old-ui window: {err:?}");
+            error!("swap_to_tray task: Failed to hide full-view window: {err:?}");
         }
     }
 }
