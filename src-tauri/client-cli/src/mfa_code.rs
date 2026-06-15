@@ -8,7 +8,7 @@
 
 use std::{
     fmt,
-    io::{self, IsTerminal, Write},
+    io::{stderr, stdin, IsTerminal, Write},
     process::Command,
 };
 
@@ -50,10 +50,6 @@ pub struct MfaContext {
 }
 
 /// Obtain a TOTP/email code from the configured source.
-///
-/// The returned [`SecretString`] prevents accidental exposure through
-/// [`Debug`], logs, or error messages.  Callers that need the raw value
-/// must explicitly call `.expose_secret()`.
 pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString, CliError> {
     match source {
         CodeSource::Literal(code) => {
@@ -88,7 +84,7 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
             Ok(SecretString::from(code.as_str()))
         }
         CodeSource::Interactive => {
-            if !std::io::stdin().is_terminal() {
+            if !stdin().is_terminal() {
                 return Err(CliError::MfaInputRequired(
                     "No TTY available for interactive MFA code entry. Provide --code or --code-command."
                         .into(),
@@ -97,10 +93,10 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
 
             // N.B. stderr - stdout is reserved for data.
             eprint!("Enter MFA code for {}: ", ctx.location);
-            io::stderr().flush().ok();
+            stderr().flush().ok();
 
             let mut code = String::new();
-            io::stdin()
+            stdin()
                 .read_line(&mut code)
                 .map_err(|e| CliError::MfaFailed(format!("Failed to read code: {e}")))?;
 

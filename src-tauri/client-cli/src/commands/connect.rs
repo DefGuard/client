@@ -79,8 +79,7 @@ pub async fn handle(
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(location) => {
             if location.mfa_enabled() {
-                // Resolve the effective MFA method before collecting code source
-                // so that OIDC (external) locations can skip the code prompt entirely.
+                // Resolve the effective MFA method.
                 let method = mfa::resolve_method(location, mfa_method)?;
 
                 // OIDC MFA does not use codes; --code / --code-command are incompatible.
@@ -106,11 +105,9 @@ pub async fn handle(
                 };
 
                 let psk = if method == MfaMethod::Oidc {
-                    // External OIDC MFA: browser-based flow, no code prompt.
                     mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
                         .await?
                 } else {
-                    // Code-based MFA: TOTP, email, biometric, mobile-approve.
                     // Determine the MFA code source from CLI flags.
                     let code_source = code
                         .map(|c| CodeSource::Literal(c.to_string()))
@@ -200,9 +197,6 @@ impl CommandOutput for ConnectResult {
 }
 
 /// Fail-fast: `--code` / `--code-command` are incompatible with OIDC MFA.
-///
-/// Returns `InvalidInput` immediately (before any I/O) when the resolved
-/// method is OIDC and a code flag was supplied.
 fn check_oidc_code_conflict(
     method: &MfaMethod,
     code: Option<&str>,
@@ -273,8 +267,6 @@ mod tests {
         };
         assert_eq!(result.exit_code(), 0);
     }
-
-    // -- check_oidc_code_conflict --
 
     #[test]
     fn test_oidc_with_code_flag_fails() {
