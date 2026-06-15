@@ -1420,6 +1420,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "webbrowser",
 ]
 
 [[package]]

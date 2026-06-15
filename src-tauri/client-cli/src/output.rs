@@ -104,6 +104,7 @@ fn error_kind(err: &CliError) -> String {
         CliError::MfaInputRequired(_) => "mfaInputRequired".into(),
         CliError::NotEnrolled(_) => "notEnrolled".into(),
         CliError::InvalidInput(_) => "invalidInput".into(),
+        CliError::Cancelled(_) => "cancelled".into(),
         CliError::Database(_) => "database".into(),
         CliError::Other(_) => "other".into(),
     }

@@ -27,6 +27,7 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+webbrowser = "1.0"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # Dummy feature to let tauri build the release.
