@@ -36,6 +36,9 @@ export const SettingsPage = () => {
     onSuccess: (config) => {
       queryClient.setQueryData(getAppConfigQueryOptions.queryKey, config);
     },
+    onError: (error) => {
+      console.error(error);
+    },
   });
 
   const selectedLogLevel = useMemo(
