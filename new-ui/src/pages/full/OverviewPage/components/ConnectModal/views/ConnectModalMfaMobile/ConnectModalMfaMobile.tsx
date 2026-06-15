@@ -1,11 +1,9 @@
+import './style.scss';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
-import { IconKind } from '../../../../../../../shared/components/Icon';
-import { IconButton } from '../../../../../../../shared/components/IconButton/IconButton';
-import { IconButtonVariant } from '../../../../../../../shared/components/IconButton/types';
 import { useMfaMobileConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaMobileConnect';
 import { QrCard } from '../../../../../../../shared/components/QrCard/QrCard';
 import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
@@ -15,7 +13,7 @@ import { useConnectModal } from '../../hooks/useConnectModal';
 type Screen = 'loading' | 'qr' | 'error';
 
 export const ConnectModalMfaMobile = () => {
-  const [perviousView, location] = useConnectModal(
+  const [_perviousView, location] = useConnectModal(
     useShallow((s) => [s.perviousView, s.location]),
   );
 
@@ -55,19 +53,13 @@ export const ConnectModalMfaMobile = () => {
         {screen === 'qr' && 'Open your Defguard mobile app and scan the QR code below.'}
         {screen === 'error' && <span className="error">{errorMessage}</span>}
       </p>
-      {screen === 'qr' && qrValue && <QrCard value={qrValue} size={184} />}
+      {screen === 'qr' && qrValue && (
+        <div className="qr-track">
+          <QrCard value={qrValue} size={184} />
+        </div>
+      )}
       <Controls>
-        <IconButton
-          variant={IconButtonVariant.BigSelected}
-          icon={IconKind.ArrowBig}
-          iconRotation="left"
-          onClick={() =>
-            useConnectModal
-              .getState()
-              .setView(perviousView ?? ConnectModalView.MfaSettings)
-          }
-        />
-        <div className="right">
+        <div className="full">
           {screen === 'error' && (
             <Button text="Try again" variant={ButtonVariant.Primary} onClick={start} />
           )}

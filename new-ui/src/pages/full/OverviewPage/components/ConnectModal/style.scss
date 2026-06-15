@@ -4,4 +4,10 @@
     color: var(--fg-white-70);
     padding-bottom: var(--spacing-xl);
   }
+
+  .controls {
+    .full {
+      width: 100%;
+    }
+  }
 }

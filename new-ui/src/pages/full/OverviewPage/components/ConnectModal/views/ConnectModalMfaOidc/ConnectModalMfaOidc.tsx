@@ -3,9 +3,6 @@ import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
-import { IconKind } from '../../../../../../../shared/components/Icon';
-import { IconButton } from '../../../../../../../shared/components/IconButton/IconButton';
-import { IconButtonVariant } from '../../../../../../../shared/components/IconButton/types';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 import { useConnectModalMfaOidc } from '../../hooks/useConnectModalMfaOidc';
@@ -54,16 +51,6 @@ export const ConnectModalMfaOidc = () => {
       )}
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
       <Controls>
-        <IconButton
-          variant={IconButtonVariant.BigSelected}
-          icon={IconKind.ArrowBig}
-          iconRotation="left"
-          onClick={() =>
-            useConnectModal
-              .getState()
-              .setView(perviousView ?? ConnectModalView.MfaSettings)
-          }
-        />
         <div className="right">
           {screen !== 'error' && (
             <Button

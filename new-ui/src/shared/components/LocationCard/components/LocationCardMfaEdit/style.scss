@@ -1,4 +1,6 @@
 .location-card-mfa-edit {
+  user-select: none;
+
   &.variant- {
     &full {
       display: inline-flex;

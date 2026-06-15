@@ -30,11 +30,10 @@ export const useConnectModal = create<Store>((set, get) => ({
     set(defaults);
   },
   open: (init) => {
-    set({ ...init, visible: true });
+    set({ ...defaults, ...init, visible: true });
   },
   setView: (view, vals) => {
     const pervious = get().view ?? null;
-
     if (vals) {
       set({ ...vals, view, perviousView: pervious });
     } else {

@@ -4,7 +4,6 @@ import { platform } from '@tauri-apps/plugin-os';
 import clsx from 'clsx';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Fold } from '../../../shared/components/Fold/Fold';
-import { Icon, IconKind } from '../../../shared/components/Icon';
 import { OverviewLocationCard } from '../../../shared/components/OverviewLocationCard/OverviewLocationCard';
 import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
@@ -13,7 +12,7 @@ import { useAppData } from '../../../shared/providers/AppDataContext';
 import { getLocationsQueryOptions } from '../../../shared/rust-api/query';
 import type { InstanceInfo } from '../../../shared/rust-api/types';
 import { useAppStore } from '../../../shared/store/useAppStore';
-import { Direction, ThemeSpacing, ThemeVariable } from '../../../shared/types';
+import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { ConnectModal } from './components/ConnectModal/ConnectModal';
 import { DetailsFold } from './components/DetailsFold/DetailsFold';
@@ -61,7 +60,7 @@ export const OverviewPage = () => {
             <ScrollContainer>
               <div className="header">
                 <p>{`Locations (${displayedLocations.length})`}</p>
-                {selection?.kind === 'instance' && (
+                {/* {selection?.kind === 'instance' && (
                   <button
                     id="show-instance-details"
                     onClick={() => {
@@ -76,7 +75,7 @@ export const OverviewPage = () => {
                       staticColor={ThemeVariable.FgWhite80}
                     />
                   </button>
-                )}
+                )} */}
               </div>
               <div className="instance-details">
                 <Fold open={detailsOpen && selection?.kind === 'instance'}>

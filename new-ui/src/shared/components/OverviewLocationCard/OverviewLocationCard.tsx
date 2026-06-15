@@ -54,7 +54,12 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   const { mutate: disconnect } = useMutation({
     mutationFn: api.disconnect,
     meta: {
-      invalidate: ['locations'],
+      invalidate: [
+        ['locations'],
+        ['active-connection'],
+        ['connection-history'],
+        ['alive-connections'],
+      ],
     },
   });
 
@@ -127,6 +132,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
               useConnectModal.getState().open({
                 view: ConnectModalView.MfaSettings,
                 location: location,
+                perviousView: null,
               });
             }
           }}
