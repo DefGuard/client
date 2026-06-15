@@ -43,7 +43,7 @@ export default defineConfig(async ({ command }) => ({
     },
   },
   envPrefix: ['VITE_', 'TAURI_'],
-  base: command === 'build' ? '/new-ui/' : '/',
+  base: '/',
   build: {
     outDir: '../dist',
     emptyOutDir: true,
