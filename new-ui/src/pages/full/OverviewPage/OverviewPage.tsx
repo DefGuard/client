@@ -2,18 +2,19 @@ import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { platform } from '@tauri-apps/plugin-os';
 import clsx from 'clsx';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Fold } from '../../../shared/components/Fold/Fold';
-import { Icon, IconKind } from '../../../shared/components/Icon';
 import { OverviewLocationCard } from '../../../shared/components/OverviewLocationCard/OverviewLocationCard';
 import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { useAppData } from '../../../shared/providers/AppDataContext';
 import { getLocationsQueryOptions } from '../../../shared/rust-api/query';
+import type { InstanceInfo } from '../../../shared/rust-api/types';
 import { useAppStore } from '../../../shared/store/useAppStore';
-import { Direction, ThemeSpacing, ThemeVariable } from '../../../shared/types';
+import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
+import { ConnectModal } from './components/ConnectModal/ConnectModal';
 import { DetailsFold } from './components/DetailsFold/DetailsFold';
 import { OverviewSelection } from './components/OverviewSelection/OverviewSelection';
 
@@ -47,49 +48,64 @@ export const OverviewPage = () => {
   }, [selection?.kind]);
 
   return (
-    <FullPage id="overview-page" hideScrollContainer>
-      <div className="page-grid">
-        <OverviewSelection instances={instances} tunnels={tunnels} />
-        <div
-          className={clsx('overview-content', {
-            windows: isWindows,
-          })}
-        >
-          <ScrollContainer>
-            <div className="header">
-              <p>{`Locations (${displayedLocations.length})`}</p>
-              {selection?.kind === 'instance' && (
-                <button
-                  id="show-instance-details"
-                  onClick={() => {
-                    setDetailsOpen((s) => !s);
-                  }}
-                >
-                  <span>Show instance details</span>
-                  <Icon
-                    size={16}
-                    icon={IconKind.ArrowSmall}
-                    rotationDirection={detailsOpen ? Direction.DOWN : Direction.RIGHT}
-                    staticColor={ThemeVariable.FgWhite80}
-                  />
-                </button>
-              )}
-            </div>
-            <div className="instance-details">
-              <Fold open={detailsOpen && selection?.kind === 'instance'}>
-                <SizedBox height={ThemeSpacing.Xl} />
-                {selection?.kind === 'instance' && <DetailsFold data={selection.data} />}
-              </Fold>
-            </div>
-            <SizedBox height={ThemeSpacing.Xl} />
-            <div className="locations">
-              {displayedLocations.map((location) => (
-                <OverviewLocationCard key={location.id} location={location} />
-              ))}
-            </div>
-          </ScrollContainer>
+    <Fragment>
+      <FullPage id="overview-page" hideScrollContainer>
+        <div className="page-grid">
+          <OverviewSelection instances={instances} tunnels={tunnels} />
+          <div
+            className={clsx('overview-content', {
+              windows: isWindows,
+            })}
+          >
+            <ScrollContainer>
+              <div className="header">
+                <p>{`Locations (${displayedLocations.length})`}</p>
+                {/* {selection?.kind === 'instance' && (
+                  <button
+                    id="show-instance-details"
+                    onClick={() => {
+                      setDetailsOpen((s) => !s);
+                    }}
+                  >
+                    <span>Show instance details</span>
+                    <Icon
+                      size={16}
+                      icon={IconKind.ArrowSmall}
+                      rotationDirection={detailsOpen ? Direction.DOWN : Direction.RIGHT}
+                      staticColor={ThemeVariable.FgWhite80}
+                    />
+                  </button>
+                )} */}
+              </div>
+              <div className="instance-details">
+                <Fold open={detailsOpen && selection?.kind === 'instance'}>
+                  <SizedBox height={ThemeSpacing.Xl} />
+                  {selection?.kind === 'instance' && (
+                    <DetailsFold data={selection.data} />
+                  )}
+                </Fold>
+              </div>
+              <SizedBox height={ThemeSpacing.Xl} />
+              <div className="locations">
+                {displayedLocations.map((location) => {
+                  let instance: InstanceInfo | undefined;
+                  if (selection?.kind === 'instance') {
+                    instance = selection.data;
+                  }
+                  return (
+                    <OverviewLocationCard
+                      location={location}
+                      instance={instance}
+                      key={location.id}
+                    />
+                  );
+                })}
+              </div>
+            </ScrollContainer>
+          </div>
         </div>
-      </div>
-    </FullPage>
+      </FullPage>
+      <ConnectModal />
+    </Fragment>
   );
 };

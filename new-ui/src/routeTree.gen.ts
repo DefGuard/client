@@ -18,9 +18,11 @@ import { Route as CompactIndexRouteImport } from './routes/compact/index'
 import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
+import { Route as FullDefaultUpdateRouteImport } from './routes/full/_default/update'
 import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
 import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/settings'
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
+import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
 
@@ -68,6 +70,11 @@ const FullDefaultRoute = FullDefaultRouteImport.update({
   id: '/_default',
   getParentRoute: () => FullRoute,
 } as any)
+const FullDefaultUpdateRoute = FullDefaultUpdateRouteImport.update({
+  id: '/update',
+  path: '/update',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -81,6 +88,11 @@ const FullDefaultSettingsRoute = FullDefaultSettingsRouteImport.update({
 const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultLogRoute = FullDefaultLogRouteImport.update({
+  id: '/log',
+  path: '/log',
   getParentRoute: () => FullDefaultRoute,
 } as any)
 const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
@@ -103,9 +115,11 @@ export interface FileRoutesByFullPath {
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
   '/full/settings': typeof FullDefaultSettingsRoute
   '/full/support': typeof FullDefaultSupportRoute
+  '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/add/': typeof FullDefaultAddIndexRoute
 }
@@ -117,9 +131,11 @@ export interface FileRoutesByTo {
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
+  '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
   '/full/settings': typeof FullDefaultSettingsRoute
   '/full/support': typeof FullDefaultSupportRoute
+  '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/add': typeof FullDefaultAddIndexRoute
 }
@@ -134,9 +150,11 @@ export interface FileRoutesById {
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/_default/log': typeof FullDefaultLogRoute
   '/full/_default/overview': typeof FullDefaultOverviewRoute
   '/full/_default/settings': typeof FullDefaultSettingsRoute
   '/full/_default/support': typeof FullDefaultSupportRoute
+  '/full/_default/update': typeof FullDefaultUpdateRoute
   '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
   '/full/_default/add/': typeof FullDefaultAddIndexRoute
 }
@@ -151,9 +169,11 @@ export interface FileRouteTypes {
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/log'
     | '/full/overview'
     | '/full/settings'
     | '/full/support'
+    | '/full/update'
     | '/full/add/instance'
     | '/full/add/'
   fileRoutesByTo: FileRoutesByTo
@@ -165,9 +185,11 @@ export interface FileRouteTypes {
     | '/full/session-timeout'
     | '/compact'
     | '/playground'
+    | '/full/log'
     | '/full/overview'
     | '/full/settings'
     | '/full/support'
+    | '/full/update'
     | '/full/add/instance'
     | '/full/add'
   id:
@@ -181,9 +203,11 @@ export interface FileRouteTypes {
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/_default/log'
     | '/full/_default/overview'
     | '/full/_default/settings'
     | '/full/_default/support'
+    | '/full/_default/update'
     | '/full/_default/add/instance'
     | '/full/_default/add/'
   fileRoutesById: FileRoutesById
@@ -261,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultRouteImport
       parentRoute: typeof FullRoute
     }
+    '/full/_default/update': {
+      id: '/full/_default/update'
+      path: '/update'
+      fullPath: '/full/update'
+      preLoaderRoute: typeof FullDefaultUpdateRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/support': {
       id: '/full/_default/support'
       path: '/support'
@@ -282,6 +313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultOverviewRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/log': {
+      id: '/full/_default/log'
+      path: '/log'
+      fullPath: '/full/log'
+      preLoaderRoute: typeof FullDefaultLogRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/add/': {
       id: '/full/_default/add/'
       path: '/add'
@@ -300,17 +338,21 @@ declare module '@tanstack/react-router' {
 }
 
 interface FullDefaultRouteChildren {
+  FullDefaultLogRoute: typeof FullDefaultLogRoute
   FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
   FullDefaultSettingsRoute: typeof FullDefaultSettingsRoute
   FullDefaultSupportRoute: typeof FullDefaultSupportRoute
+  FullDefaultUpdateRoute: typeof FullDefaultUpdateRoute
   FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
   FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
 }
 
 const FullDefaultRouteChildren: FullDefaultRouteChildren = {
+  FullDefaultLogRoute: FullDefaultLogRoute,
   FullDefaultOverviewRoute: FullDefaultOverviewRoute,
   FullDefaultSettingsRoute: FullDefaultSettingsRoute,
   FullDefaultSupportRoute: FullDefaultSupportRoute,
+  FullDefaultUpdateRoute: FullDefaultUpdateRoute,
   FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
   FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
 }

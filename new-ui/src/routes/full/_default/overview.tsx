@@ -14,7 +14,7 @@ export const Route = createFileRoute('/full/_default/overview')({
     ]);
 
     if (instances.length === 0 && tunnels.length === 0) {
-      throw redirect({ to: '/full/add' });
+      throw redirect({ to: '/empty' });
     }
 
     const stored = useAppStore.getState().compactViewSelection;

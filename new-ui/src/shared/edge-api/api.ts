@@ -56,7 +56,8 @@ const createDevice = async (
 ): Promise<{ error?: string }> => {
   const edgeHeaders = await getEdgeRequestHeaders();
   const { publicKey, privateKey } = generateWGKeys();
-  const deviceRes = await fetch(`${proxyUrl}/enrollment/create_device`, {
+  const url = buildProxyUrl(proxyUrl);
+  const deviceRes = await fetch(`${url}/enrollment/create_device`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -126,11 +127,7 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
       return { error: `Device name '${values.name}' is already in use` };
     }
 
-    if (!resp.user.enrolled) {
-      return { startResponse: resp, proxyUrl, cookie };
-    }
-
-    return {};
+    return { startResponse: resp, proxyUrl, cookie };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

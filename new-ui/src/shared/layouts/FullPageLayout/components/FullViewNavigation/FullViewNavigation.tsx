@@ -1,24 +1,36 @@
 import { Link, type LinkProps } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { Icon, IconKind } from '../../../../components/Icon';
 import type { IconKindValue } from '../../../../components/Icon/icon-types';
+import { useUpdateAvailable } from '../../../../hooks/useUpdateAvailable';
 import { useAppData } from '../../../../providers/AppDataContext';
+import { NavBadge } from './components/NavBadge';
 import './style.scss';
 
 type NavItemDef = LinkProps & {
   icon: IconKindValue;
   hidden?: boolean;
+  badge?: ReactNode;
 };
-
-const BOTTOM_LINKS: NavItemDef[] = [
-  {
-    icon: IconKind.Report,
-    to: '/full/support',
-  },
-];
 
 export const FullViewNavigation = () => {
   const { isEmpty } = useAppData();
+  const updateAvailable = useUpdateAvailable();
+
+  const bottomLinks: NavItemDef[] = useMemo(
+    (): NavItemDef[] => [
+      {
+        icon: IconKind.Refresh,
+        to: '/full/update',
+        badge: updateAvailable ? <NavBadge /> : undefined,
+      },
+      {
+        icon: IconKind.Report,
+        to: '/full/support',
+      },
+    ],
+    [updateAvailable],
+  );
 
   const topLinks: NavItemDef[] = useMemo(
     (): NavItemDef[] => [
@@ -35,6 +47,10 @@ export const FullViewNavigation = () => {
         icon: IconKind.Settings,
         to: '/full/settings',
       },
+      {
+        icon: IconKind.ActivityNotes,
+        to: '/full/log',
+      },
     ],
     [isEmpty],
   );
@@ -50,7 +66,7 @@ export const FullViewNavigation = () => {
             ))}
         </div>
         <div className="bottom">
-          {BOTTOM_LINKS.map((item, i) => (
+          {bottomLinks.map((item, i) => (
             <NavItem key={i} {...item} />
           ))}
         </div>
@@ -61,11 +77,12 @@ export const FullViewNavigation = () => {
 
 type NavItemProps = NavItemDef;
 
-const NavItem = ({ icon, hidden, ...linkProps }: NavItemProps) => {
+const NavItem = ({ icon, hidden, badge, ...linkProps }: NavItemProps) => {
   if (hidden) return null;
   return (
     <Link {...linkProps}>
       <Icon icon={icon} size={20} />
+      {badge}
     </Link>
   );
 };

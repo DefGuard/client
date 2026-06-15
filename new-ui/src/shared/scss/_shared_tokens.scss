@@ -211,7 +211,7 @@ $jetbrains:
 
   --modal-title-size: 16px;
   --modal-size-md: 640px;
-  --modal-size-sm: 480px;
+  --modal-size-sm: 360px;
   --modal-spacing: var(--spacing-md);
   --modal-spacing-sides: var(--spacing-lg);
   --modal-border-radius: var(--radius-lg);
@@ -239,6 +239,9 @@ $jetbrains:
   --input-spacing-xs: var(--spacing-xs);
   --input-spacing-sm: var(--spacing-sm);
   --input-spacing-lg: var(--spacing-md);
+
+  // Log view
+  --t-log-line: normal 400 12px/20px #{$jetbrains};
 
   // Tooltip
   --t-tooltip: normal 400 12px / 16px #{$geist};

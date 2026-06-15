@@ -1,0 +1,36 @@
+#log-page-view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .page-description {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-60);
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+
+    .spacer {
+      flex: 1;
+    }
+  }
+
+  .log-container {
+    flex: 1;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-disabled);
+    background-color: var(--bg-white-5);
+    padding: var(--spacing-lg);
+    overflow: auto;
+
+    .log-line {
+      font: var(--t-log-line);
+      color: var(--fg-white-100);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  }
+}

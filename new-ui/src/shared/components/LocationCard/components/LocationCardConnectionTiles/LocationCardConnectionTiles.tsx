@@ -1,3 +1,4 @@
+import './style.scss';
 import clsx from 'clsx';
 import { type LocationInfo, LocationMfaMode } from '../../../../rust-api/types';
 import { mfaToText } from '../../../../utils/mfa';
