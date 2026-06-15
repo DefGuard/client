@@ -128,7 +128,7 @@ pub async fn handle(
                         location,
                         &source,
                         &instance,
-                        mfa_method,
+                        method,
                         posture_data,
                         &state.pool,
                     )

@@ -1,7 +1,8 @@
 //! Connect-time VPN MFA over `core::proxy` (HTTP).
 //!
 //! Flow: `start` → `obtain_code` → `finish` → preshared_key.
-//! Supports TOTP and email methods.  OIDC and mobile-approve are WIP.
+//! Supports TOTP, email, and OIDC methods.  Mobile-approve is
+//! not yet supported by the CLI.
 
 use std::time::Duration;
 
@@ -16,7 +17,7 @@ use defguard_core::{
     database::{
         models::{
             instance::Instance,
-            location::{infer_mfa_method, Location, LocationMfaMethod},
+            location::{infer_mfa_method, Location, LocationMfaMethod, LocationMfaMode},
             wireguard_keys::WireguardKeys,
             Id,
         },
@@ -49,7 +50,16 @@ pub(crate) fn resolve_method(
     method_override: Option<&str>,
 ) -> Result<MfaMethod, CliError> {
     if let Some(raw) = method_override {
-        parse_method(raw)
+        let method = parse_method(raw)?;
+        // OIDC override on an Internal-mode location will be rejected by the
+        // server.  Fail early to give the user a clear error before I/O.
+        if method == MfaMethod::Oidc && location.location_mfa_mode == LocationMfaMode::Internal {
+            return Err(CliError::InvalidInput(
+                "--mfa-method oidc is only valid for locations that use external (OIDC) MFA."
+                    .into(),
+            ));
+        }
+        Ok(method)
     } else {
         Ok(infer_method(location))
     }
@@ -60,8 +70,8 @@ pub(crate) fn resolve_method(
 /// * `location` - the target location.
 /// * `source`  - how to obtain the code.
 /// * `instance` - the instance this location belongs to (for proxy URL + pubkey).
-/// * `method_override` - optional `--mfa-method` flag; if set, uses this instead of the
-///   location's stored preference.
+/// * `method` - the resolved [`MfaMethod`] (use [`resolve_method`] to obtain it).
+///   **Must not be [`MfaMethod::Oidc`]**; OIDC uses [`authorize_oidc`] instead.
 /// * `posture_data` - device posture data; must be provided when the location also
 ///   requires posture checks.
 ///
@@ -71,19 +81,26 @@ pub async fn authorize(
     location: &Location<Id>,
     source: &CodeSource,
     instance: &Instance<Id>,
-    method_override: Option<&str>,
+    method: MfaMethod,
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<SecretString, CliError> {
-    let method = resolve_method(location, method_override)?;
-
     // Reject methods not yet supported by the CLI before doing any I/O.
+    // OIDC is not rejected as "not yet supported" because it IS supported -
+    // but it has its own dedicated code path (authorize_oidc).  If callers
+    // accidentally invoke authorize() with OIDC, this catch-all is a
+    // defense-in-depth barrier that emits a clear error.
     match method {
         MfaMethod::Biometric | MfaMethod::MobileApprove => {
             return Err(CliError::MfaFailed(format!(
                 "MFA method {:?} is not yet supported by the CLI. Use the desktop client.",
                 method
             )));
+        }
+        MfaMethod::Oidc => {
+            return Err(CliError::Other(
+                "Internal error: OIDC MFA must use authorize_oidc, not authorize".into(),
+            ));
         }
         _ => {}
     }
@@ -249,16 +266,22 @@ fn check_proxy_scheme(proxy_base: &Url, proxy_url: &str) {
 /// Open a URL in the system browser.
 ///
 /// Production: calls [`webbrowser::open`]; prints a hint to stderr on failure.
+/// When `json_mode` is true, the fallback message includes the URL itself since
+/// it wasn't already printed above.
 /// Tests: no-op (never spawn a browser).
 #[cfg(not(test))]
-fn open_url(url: &str) {
+fn open_url(url: &str, json_mode: bool) {
     if webbrowser::open(url).is_err() {
-        eprintln!("Could not open browser. Open the URL above manually.");
+        if json_mode {
+            eprintln!("Could not open browser. Open this URL manually: {url}");
+        } else {
+            eprintln!("Could not open browser. Open the URL above manually.");
+        }
     }
 }
 
 #[cfg(test)]
-fn open_url(_url: &str) {
+fn open_url(_url: &str, _json_mode: bool) {
     // no-op: tests must not spawn a browser
 }
 
@@ -332,16 +355,19 @@ pub(crate) async fn authorize_oidc(
 
     // Step 2: Open the browser for the user to authenticate.
     // Never log the token-bearing URL via tracing.
-    let browser_url = proxy_base
-        .join(&format!("openid/mfa?token={}", start_resp.token))
+    let mut browser_url = proxy_base
+        .join("openid/mfa")
         .map_err(|e| CliError::Other(format!("Failed to build OIDC MFA URL: {e}")))?;
+    browser_url
+        .query_pairs_mut()
+        .append_pair("token", &start_resp.token);
 
     if !json_mode {
         eprintln!("Open this URL to authenticate:");
         eprintln!("  {browser_url}");
-        eprintln!("Waiting for authentication… (Ctrl-C to cancel)");
+        eprintln!("Waiting for authentication... (Ctrl-C to cancel)");
     }
-    open_url(browser_url.as_ref());
+    open_url(browser_url.as_ref(), json_mode);
 
     // Step 3: Poll until the user completes authentication or the deadline expires.
     poll_finish(&proxy_base, &start_resp.token, json_mode).await
@@ -380,19 +406,8 @@ async fn poll_finish(
             return Err(CliError::MfaFailed("MFA login timed out".into()));
         }
 
-        // Wait the poll interval, yielding to Ctrl-C.
-        let sleep = sleep(OIDC_POLL_INTERVAL);
-        select! {
-            _ = ctrl_c() => {
-                if !json_mode {
-                    eprintln!("MFA login cancelled.");
-                }
-                return Err(CliError::Cancelled("MFA login cancelled.".into()));
-            }
-            () = sleep => {}
-        }
-
-        // Poll the proxy, yielding to Ctrl-C during the request.
+        // Poll the proxy (first iteration is immediate, subsequent ones wait
+        // the poll interval at the end of each loop body).
         let (status, body) = select! {
             _ = ctrl_c() => {
                 if !json_mode {
@@ -419,6 +434,18 @@ async fn poll_finish(
         // Non-OK, non-428: report the error.
         if status != StatusCode::PRECONDITION_REQUIRED {
             return Err(handle_mfa_error(body).await);
+        }
+
+        // 428: OIDC not complete yet.  Wait the poll interval, yielding to
+        // Ctrl-C, then loop around for another check.
+        select! {
+            _ = ctrl_c() => {
+                if !json_mode {
+                    eprintln!("MFA login cancelled.");
+                }
+                return Err(CliError::Cancelled("MFA login cancelled.".into()));
+            }
+            () = sleep(OIDC_POLL_INTERVAL) => {}
         }
     }
 }

@@ -17,6 +17,8 @@ use std::{
 
 use secrecy::ExposeSecret;
 
+use defguard_client_proto::defguard::client_types::MfaMethod;
+
 use crate::{mfa, mfa_code::CodeSource, state::CliError};
 
 use defguard_core::database::{
@@ -241,7 +243,7 @@ async fn test_mfa_success_returns_psk(pool: DbPool) {
     instance.proxy_url = mock.url();
 
     let source = CodeSource::Literal("123456".into());
-    let psk = mfa::authorize(&location, &source, &instance, None, None, &pool)
+    let psk = mfa::authorize(&location, &source, &instance, MfaMethod::Totp, None, &pool)
         .await
         .unwrap();
     assert_eq!(psk.expose_secret(), "secret-psk");
@@ -264,7 +266,7 @@ async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
     instance.proxy_url = mock.url();
 
     let source = CodeSource::Literal("000000".into());
-    let err = mfa::authorize(&location, &source, &instance, None, None, &pool)
+    let err = mfa::authorize(&location, &source, &instance, MfaMethod::Totp, None, &pool)
         .await
         .unwrap_err();
 
@@ -279,7 +281,7 @@ async fn test_mfa_proxy_unreachable(pool: DbPool) {
     instance.proxy_url = "http://127.0.0.1:19999/".into();
 
     let source = CodeSource::Literal("123456".into());
-    let err = mfa::authorize(&location, &source, &instance, None, None, &pool)
+    let err = mfa::authorize(&location, &source, &instance, MfaMethod::Totp, None, &pool)
         .await
         .unwrap_err();
 

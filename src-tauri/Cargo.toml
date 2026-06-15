@@ -30,6 +30,7 @@ tonic-prost = "0.14"
 tonic-prost-build = "0.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+webbrowser = "1.0"
 tempfile = "3"
 http = "1"
 vergen-git2 = { version = "9.1", features = ["build"] }
@@ -120,7 +121,7 @@ tower = "0.5"
 tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber.workspace = true
-webbrowser = "1.0"
+webbrowser.workspace = true
 x25519-dalek = { version = "2", features = [
     "getrandom",
     "serde",
