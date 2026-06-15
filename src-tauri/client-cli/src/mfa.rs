@@ -171,13 +171,14 @@ pub async fn authorize(
     Ok(SecretString::from(finish_resp.preshared_key))
 }
 
+#[derive(Deserialize)]
+struct ErrorBody {
+    error: Option<String>,
+}
+
 /// Map a non-2xx MFA response to a `CliError`.
 async fn handle_mfa_error(response: reqwest::Response) -> CliError {
     let status = response.status();
-    #[derive(Deserialize)]
-    struct ErrorBody {
-        error: Option<String>,
-    }
 
     let message = response
         .json::<ErrorBody>()
@@ -274,7 +275,7 @@ const OIDC_POLL_TIMEOUT: Duration = Duration::from_secs(300);
 #[cfg(test)]
 const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
 
-/// Run the OIDC MFA handshake for an external-IdP location.
+/// Run the OIDC MFA flow for an external-IdP location.
 ///
 /// Opens the system browser to `{proxy_url}openid/mfa?token=...` and polls
 /// the proxy until the user completes authentication with the external
@@ -350,8 +351,6 @@ pub(crate) async fn authorize_oidc(
 /// deadline expires.
 ///
 /// Returns the preshared key on success.
-///
-/// [`client-mfa/finish`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/428
 async fn poll_finish(
     proxy_base: &Url,
     token: &str,
@@ -421,7 +420,5 @@ async fn poll_finish(
         if status != StatusCode::PRECONDITION_REQUIRED {
             return Err(handle_mfa_error(body).await);
         }
-
-        // 428: OIDC not complete yet, loop around.
     }
 }
