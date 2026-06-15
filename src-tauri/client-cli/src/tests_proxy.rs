@@ -311,3 +311,31 @@ async fn test_oidc_mfa_success_returns_psk(pool: DbPool) {
         .unwrap();
     assert_eq!(psk.expose_secret(), "secret-oidc-psk");
 }
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_oidc_mfa_times_out_when_never_completed(pool: DbPool) {
+    let (mut inst, _loc) = seed_db(&pool).await;
+    let oidc_loc = oidc_loc("office-oidc", inst.id).save(&pool).await.unwrap();
+
+    // Proxy always returns 428 for finish: never authenticates.
+    let mock = MockProxy::with_poll(
+        MockResponse {
+            status: 200,
+            body: r#"{"token":"tok-timeout"}"#.into(),
+        },
+        MockResponse {
+            status: 200,
+            body: r#"{"preshared_key":"unreachable"}"#.into(),
+        },
+        u32::MAX, // never returns 200
+    );
+    mock.wait_ready();
+    inst.proxy_url = mock.url();
+
+    let err = mfa::authorize_oidc(&oidc_loc, &inst, None, &pool, false)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, CliError::MfaFailed(_)));
+    assert!(err.to_string().contains("timed out"));
+}
