@@ -13,6 +13,12 @@
     flex: 0 0 auto;
   }
 
+  .main-content {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-sm);
+  }
+
   .locations {
     display: flex;
     flex-flow: column;

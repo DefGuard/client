@@ -67,29 +67,31 @@ export const CompactLocationsPage = () => {
     >
       <WindowHeader variant="compact" />
       <ScrollContainer>
-        <InstanceSwitcher />
-        <div className="locations">
-          {isPresent(instanceInfo) &&
-            displayedLocations.map((location) => {
-              const isOpen =
-                location.id === openLocation || displayedLocations.length === 1;
-              return (
-                <LocationCard
-                  instance={instanceInfo}
-                  disableOpen={displayedLocations.length <= 1}
-                  location={location}
-                  key={`${location.instance_id}-${location.id}`}
-                  isOpen={isOpen}
-                  onOpen={() => {
-                    if (isOpen) {
-                      useAppStore.setState({ expandedLocation: null });
-                    } else {
-                      useAppStore.setState({ expandedLocation: location.id });
-                    }
-                  }}
-                />
-              );
-            })}
+        <div className="main-content">
+          <InstanceSwitcher />
+          <div className="locations">
+            {isPresent(instanceInfo) &&
+              displayedLocations.map((location) => {
+                const isOpen =
+                  location.id === openLocation || displayedLocations.length === 1;
+                return (
+                  <LocationCard
+                    instance={instanceInfo}
+                    disableOpen={displayedLocations.length <= 1}
+                    location={location}
+                    key={`${location.instance_id}-${location.id}`}
+                    isOpen={isOpen}
+                    onOpen={() => {
+                      if (isOpen) {
+                        useAppStore.setState({ expandedLocation: null });
+                      } else {
+                        useAppStore.setState({ expandedLocation: location.id });
+                      }
+                    }}
+                  />
+                );
+              })}
+          </div>
         </div>
       </ScrollContainer>
       <div className="compact-footer">
