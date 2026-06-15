@@ -5,14 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EdgeRequestHeaders } from '../../../edge-api/types';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
+import type { LocationInfo } from '../../../rust-api/types';
 import {
   CLIENT_MFA_ENDPOINT,
   type MfaStartMethod,
+  shouldShowPostureError,
   startClientMfaSession,
 } from '../api/startClientMfaSession';
-import { useLocationCardContext } from '../context/context';
-import { LocationCardViews } from '../context/types';
-import { handleMfaStartError } from './handleMfaStartError';
 
 type MfaFinishResponse = {
   preshared_key: string;
@@ -26,6 +25,9 @@ type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
+  onConnected?: () => void;
+  onSessionExpired?: () => void;
+  onPostureError?: (message: string) => void;
 };
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
@@ -36,11 +38,15 @@ const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
 };
 
 export const useMfaConnect = (
+  location: LocationInfo,
   method: CodeMfaStartMethod,
-  { debounceMs = 0 }: UseMfaConnectOptions = {},
+  {
+    debounceMs = 0,
+    onConnected,
+    onSessionExpired,
+    onPostureError,
+  }: UseMfaConnectOptions = {},
 ) => {
-  const { location, setPostureError, setView } = useLocationCardContext();
-
   const [token, setToken] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(debounceMs > 0);
   const [startError, setStartError] = useState<string | null>(null);
@@ -56,7 +62,7 @@ export const useMfaConnect = (
     mutationFn: api.connect,
     meta: { invalidate: ['locations'] },
     onSuccess: () => {
-      setView(LocationCardViews.Connected);
+      onConnected?.();
     },
     onError: (err) => {
       error(`Connect command failed after successful code verification\n${err}`);
@@ -87,7 +93,8 @@ export const useMfaConnect = (
         setToken(response.token);
       } catch (err) {
         await waitForMinimumDuration(startedAt, debounceMs);
-        if (handleMfaStartError({ err, location, setPostureError, setView })) {
+        if (shouldShowPostureError(err, location)) {
+          onPostureError?.(err.message);
           return;
         }
         setStartError(err instanceof Error ? err.message : 'Failed to start MFA');
@@ -132,7 +139,7 @@ export const useMfaConnect = (
             errorMessage === 'invalid token' ||
             errorMessage === 'login session not found'
           ) {
-            setView(LocationCardViews.Default);
+            onSessionExpired?.();
           } else {
             setVerifyError('Verification failed');
           }
@@ -143,7 +150,7 @@ export const useMfaConnect = (
         setIsVerifying(false);
       }
     },
-    [token, instance, requestHeaders, location, connectMutate, setView],
+    [token, instance, requestHeaders, location, connectMutate, onSessionExpired],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

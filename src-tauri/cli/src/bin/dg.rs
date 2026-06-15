@@ -559,12 +559,14 @@ async fn main() {
         .value_name("URL")
         .value_parser(value_parser!(Url));
 
+    // Handle --version / -V before clap parsing.
+    common::check_version_flag("dg");
+
     let matches = command!()
         .arg(config_opt)
         .arg(debug_opt)
         .arg(verbose_opt)
         .arg_required_else_help(false)
-        .propagate_version(true)
         .subcommand_required(false)
         .subcommand(
             Command::new("enroll")

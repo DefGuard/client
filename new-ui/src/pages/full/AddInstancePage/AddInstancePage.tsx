@@ -49,7 +49,7 @@ export const AddInstancePage = () => {
     onSubmit: async ({ value, formApi }) => {
       const result = await edgeApi.addInstance(value);
       if (result.error) {
-        if (result.error.toLowerCase().includes('Device name')) {
+        if (result.error.toLowerCase().includes('device name')) {
           formApi.setErrorMap({
             onSubmit: {
               fields: {
@@ -70,8 +70,10 @@ export const AddInstancePage = () => {
         }
         return;
       }
-      if (result.startResponse && !result.startResponse.user.enrolled && result.cookie) {
+      if (result.cookie) {
         await edgeApi.createDevice(value.url, result.cookie, value.name.trim());
+      }
+      if (result.startResponse && !result.startResponse.user.enrolled && result.cookie) {
         useEnrollmentStore
           .getState()
           .start(result.startResponse, value.url, result.cookie, undefined);
@@ -81,7 +83,7 @@ export const AddInstancePage = () => {
         });
       } else {
         navigate({
-          to: '/full/add',
+          to: '/full/overview',
           replace: true,
         });
       }

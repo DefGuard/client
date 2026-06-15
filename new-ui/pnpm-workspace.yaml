@@ -1,6 +1,7 @@
 allowBuilds:
   '@parcel/watcher': true
 minimumReleaseAgeExclude:
+  - '@napi-rs/wasm-runtime@1.1.5'
   - '@types/react@19.2.16'
   - react-dom@19.2.7
   - react@19.2.7
