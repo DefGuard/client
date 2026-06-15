@@ -77,6 +77,10 @@ pub async fn handle(
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(location) => {
             if location.mfa_enabled() {
+                // Resolve the effective MFA method before collecting code source
+                // so that OIDC (external) locations can skip the code prompt entirely.
+                let _method = mfa::resolve_method(location, mfa_method)?;
+
                 // Determine the MFA code source from CLI flags.
                 let code_source = code
                     .map(|c| CodeSource::Literal(c.to_string()))

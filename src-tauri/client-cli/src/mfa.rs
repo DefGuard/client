@@ -32,6 +32,22 @@ use crate::{
     state::CliError,
 };
 
+/// Resolve the effective MFA method for a location.
+///
+/// When `method_override` is `Some`, parses it into [`MfaMethod`]; otherwise
+/// delegates to [`infer_method`] which respects the location's
+/// [`LocationMfaMode`].
+pub(crate) fn resolve_method(
+    location: &Location<Id>,
+    method_override: Option<&str>,
+) -> Result<MfaMethod, CliError> {
+    if let Some(raw) = method_override {
+        parse_method(raw)
+    } else {
+        Ok(infer_method(location))
+    }
+}
+
 /// Run the VPN MFA handshake for a location.
 ///
 /// * `location` - the target location.
@@ -52,11 +68,7 @@ pub async fn authorize(
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<SecretString, CliError> {
-    let method = if let Some(raw) = method_override {
-        parse_method(raw)?
-    } else {
-        infer_method(location)
-    };
+    let method = resolve_method(location, method_override)?;
 
     // Reject methods not yet supported by the CLI before doing any I/O.
     match method {
