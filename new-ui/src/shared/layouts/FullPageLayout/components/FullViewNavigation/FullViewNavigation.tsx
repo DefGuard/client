@@ -43,6 +43,10 @@ export const FullViewNavigation = () => {
         icon: IconKind.PlusCircle,
         to: '/full/add',
       },
+      {
+        icon: IconKind.ActivityNotes,
+        to: '/full/log',
+      },
     ],
     [isEmpty],
   );

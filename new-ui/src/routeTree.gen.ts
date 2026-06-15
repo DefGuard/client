@@ -21,6 +21,7 @@ import { Route as FullDefaultRouteImport } from './routes/full/_default'
 import { Route as FullDefaultUpdateRouteImport } from './routes/full/_default/update'
 import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
+import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
 
@@ -83,6 +84,11 @@ const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => FullDefaultRoute,
 } as any)
+const FullDefaultLogRoute = FullDefaultLogRouteImport.update({
+  id: '/log',
+  path: '/log',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
   id: '/add/',
   path: '/add/',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
+  '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/_default/log': typeof FullDefaultLogRoute
   '/full/_default/overview': typeof FullDefaultOverviewRoute
   '/full/_default/support': typeof FullDefaultSupportRoute
   '/full/_default/update': typeof FullDefaultUpdateRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/log'
     | '/full/overview'
     | '/full/support'
     | '/full/update'
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/full/session-timeout'
     | '/compact'
     | '/playground'
+    | '/full/log'
     | '/full/overview'
     | '/full/support'
     | '/full/update'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/_default/log'
     | '/full/_default/overview'
     | '/full/_default/support'
     | '/full/_default/update'
@@ -282,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultOverviewRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/log': {
+      id: '/full/_default/log'
+      path: '/log'
+      fullPath: '/full/log'
+      preLoaderRoute: typeof FullDefaultLogRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/add/': {
       id: '/full/_default/add/'
       path: '/add'
@@ -300,6 +319,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface FullDefaultRouteChildren {
+  FullDefaultLogRoute: typeof FullDefaultLogRoute
   FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
   FullDefaultSupportRoute: typeof FullDefaultSupportRoute
   FullDefaultUpdateRoute: typeof FullDefaultUpdateRoute
@@ -308,6 +328,7 @@ interface FullDefaultRouteChildren {
 }
 
 const FullDefaultRouteChildren: FullDefaultRouteChildren = {
+  FullDefaultLogRoute: FullDefaultLogRoute,
   FullDefaultOverviewRoute: FullDefaultOverviewRoute,
   FullDefaultSupportRoute: FullDefaultSupportRoute,
   FullDefaultUpdateRoute: FullDefaultUpdateRoute,
