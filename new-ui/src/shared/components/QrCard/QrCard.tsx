@@ -8,7 +8,7 @@ interface Props {
 
 export const QrCard = ({ value, size = 200 }: Props) => {
   return (
-    <div className="qr-code-display">
+    <div className="qr-code-display" style={{ width: size, height: size }}>
       <QRCodeCanvas value={value} size={size} />
     </div>
   );

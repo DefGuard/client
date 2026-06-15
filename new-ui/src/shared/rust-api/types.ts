@@ -253,6 +253,7 @@ export type NewAppVersionInfo = {
   release_date: string;
   release_notes_url: string;
   update_url: string;
+  notes?: string | null;
 };
 
 export type ProvisioningConfig = {
