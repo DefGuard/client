@@ -26,12 +26,13 @@ pub async fn resolve_connect_target(
 ) -> Result<ResolvedTarget, CliError> {
     // --id fast path
     if let Some(id) = spec.id {
+        if spec.tunnel {
+            let tun = Tunnel::find_by_id(pool, id)
+                .await?
+                .ok_or_else(|| CliError::NotFound(format!("No tunnel with id {id}")))?;
+            return Ok(ResolvedTarget::Tunnel(tun));
+        }
         if let Some(loc) = Location::find_by_id(pool, id).await? {
-            if spec.tunnel {
-                return Err(CliError::Usage(
-                    "Cannot use --tunnel with --id pointing to a location".into(),
-                ));
-            }
             return Ok(ResolvedTarget::Location(loc));
         }
         if let Some(tun) = Tunnel::find_by_id(pool, id).await? {
@@ -376,7 +377,7 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
-    async fn test_id_fast_path_reject_tunnel_flag_on_location(pool: DbPool) {
+    async fn test_id_fast_path_tunnel_flag_skips_location(pool: DbPool) {
         let i = sample_instance("acme").save(&pool).await.unwrap();
         let saved = sample_location("office", i.id).save(&pool).await.unwrap();
 
@@ -386,9 +387,30 @@ mod tests {
             id: Some(saved.id),
             instance: None,
         };
+        // --tunnel skips Location lookup; the ID belongs to a Location so
+        // no Tunnel match is found.
         let err = expect_err(resolve_connect_target(&spec, &pool).await);
-        assert!(matches!(err, CliError::Usage(_)));
-        assert!(err.to_string().contains("Cannot use --tunnel"));
+        assert!(matches!(err, CliError::NotFound(_)));
+        assert!(err.to_string().contains("No tunnel with id"));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_id_fast_path_tunnel_flag_with_tunnel(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        sample_location("office", i.id).save(&pool).await.unwrap();
+        let t = sample_tunnel("gateway").save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: None,
+            tunnel: true,
+            id: Some(t.id),
+            instance: None,
+        };
+        let result = expect_ok(resolve_connect_target(&spec, &pool).await);
+        match result {
+            ResolvedTarget::Tunnel(tun) => assert_eq!(tun.id, t.id),
+            _ => panic!("expected Tunnel"),
+        }
     }
 
     #[sqlx::test(migrations = "../migrations")]
