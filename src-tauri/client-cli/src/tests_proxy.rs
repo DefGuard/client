@@ -162,7 +162,7 @@ impl Drop for MockProxy {
     }
 }
 
-fn mfa_enabled_loc(name: &str, instance_id: Id) -> Location<NoId> {
+fn mfa_enabled_location(name: &str, instance_id: Id) -> Location<NoId> {
     Location {
         id: NoId,
         instance_id,
@@ -183,10 +183,10 @@ fn mfa_enabled_loc(name: &str, instance_id: Id) -> Location<NoId> {
 }
 
 /// Build a location that requires **external** (OIDC) MFA.
-fn oidc_loc(name: &str, instance_id: Id) -> Location<NoId> {
+fn oidc_location(name: &str, instance_id: Id) -> Location<NoId> {
     Location {
         location_mfa_mode: LocationMfaMode::External,
-        ..mfa_enabled_loc(name, instance_id)
+        ..mfa_enabled_location(name, instance_id)
     }
 }
 
@@ -216,14 +216,17 @@ async fn seed_db(pool: &DbPool) -> (Instance<Id>, Location<Id>) {
         .await
         .unwrap();
 
-    let loc = mfa_enabled_loc("office", inst.id).save(pool).await.unwrap();
+    let loc = mfa_enabled_location("office", inst.id)
+        .save(pool)
+        .await
+        .unwrap();
 
     (inst, loc)
 }
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_mfa_success_returns_psk(pool: DbPool) {
-    let (mut inst, loc) = seed_db(&pool).await;
+    let (mut instance, location) = seed_db(&pool).await;
     let mock = MockProxy::new(
         MockResponse {
             status: 200,
@@ -235,10 +238,10 @@ async fn test_mfa_success_returns_psk(pool: DbPool) {
         },
     );
     mock.wait_ready();
-    inst.proxy_url = mock.url();
+    instance.proxy_url = mock.url();
 
     let source = CodeSource::Literal("123456".into());
-    let psk = mfa::authorize(&loc, &source, &inst, None, None, &pool)
+    let psk = mfa::authorize(&location, &source, &instance, None, None, &pool)
         .await
         .unwrap();
     assert_eq!(psk.expose_secret(), "secret-psk");
@@ -246,7 +249,7 @@ async fn test_mfa_success_returns_psk(pool: DbPool) {
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
-    let (mut inst, loc) = seed_db(&pool).await;
+    let (mut instance, location) = seed_db(&pool).await;
     let mock = MockProxy::new(
         MockResponse {
             status: 200,
@@ -258,10 +261,10 @@ async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
         },
     );
     mock.wait_ready();
-    inst.proxy_url = mock.url();
+    instance.proxy_url = mock.url();
 
     let source = CodeSource::Literal("000000".into());
-    let err = mfa::authorize(&loc, &source, &inst, None, None, &pool)
+    let err = mfa::authorize(&location, &source, &instance, None, None, &pool)
         .await
         .unwrap_err();
 
@@ -271,12 +274,12 @@ async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_mfa_proxy_unreachable(pool: DbPool) {
-    let (mut inst, loc) = seed_db(&pool).await;
+    let (mut instance, location) = seed_db(&pool).await;
     // Point at a port where nothing is listening.
-    inst.proxy_url = "http://127.0.0.1:19999/".into();
+    instance.proxy_url = "http://127.0.0.1:19999/".into();
 
     let source = CodeSource::Literal("123456".into());
-    let err = mfa::authorize(&loc, &source, &inst, None, None, &pool)
+    let err = mfa::authorize(&location, &source, &instance, None, None, &pool)
         .await
         .unwrap_err();
 
@@ -289,8 +292,11 @@ async fn test_mfa_proxy_unreachable(pool: DbPool) {
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_oidc_mfa_success_returns_psk(pool: DbPool) {
-    let (mut inst, _loc) = seed_db(&pool).await;
-    let oidc_loc = oidc_loc("office-oidc", inst.id).save(&pool).await.unwrap();
+    let (mut instance, _location) = seed_db(&pool).await;
+    let oidc_location = oidc_location("office-oidc", instance.id)
+        .save(&pool)
+        .await
+        .unwrap();
 
     let mock = MockProxy::with_poll(
         MockResponse {
@@ -304,9 +310,9 @@ async fn test_oidc_mfa_success_returns_psk(pool: DbPool) {
         2, // first two finish calls return 428, third returns 200
     );
     mock.wait_ready();
-    inst.proxy_url = mock.url();
+    instance.proxy_url = mock.url();
 
-    let psk = mfa::authorize_oidc(&oidc_loc, &inst, None, &pool, false)
+    let psk = mfa::authorize_oidc(&oidc_location, &instance, None, &pool, false)
         .await
         .unwrap();
     assert_eq!(psk.expose_secret(), "secret-oidc-psk");
@@ -314,8 +320,11 @@ async fn test_oidc_mfa_success_returns_psk(pool: DbPool) {
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_oidc_mfa_times_out_when_never_completed(pool: DbPool) {
-    let (mut inst, _loc) = seed_db(&pool).await;
-    let oidc_loc = oidc_loc("office-oidc", inst.id).save(&pool).await.unwrap();
+    let (mut instance, _location) = seed_db(&pool).await;
+    let oidc_location = oidc_location("office-oidc", instance.id)
+        .save(&pool)
+        .await
+        .unwrap();
 
     // Proxy always returns 428 for finish: never authenticates.
     let mock = MockProxy::with_poll(
@@ -330,9 +339,9 @@ async fn test_oidc_mfa_times_out_when_never_completed(pool: DbPool) {
         u32::MAX, // never returns 200
     );
     mock.wait_ready();
-    inst.proxy_url = mock.url();
+    instance.proxy_url = mock.url();
 
-    let err = mfa::authorize_oidc(&oidc_loc, &inst, None, &pool, false)
+    let err = mfa::authorize_oidc(&oidc_location, &instance, None, &pool, false)
         .await
         .unwrap_err();
 
