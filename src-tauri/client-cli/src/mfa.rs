@@ -394,7 +394,7 @@ async fn poll_finish(
         }
 
         // Poll the proxy, yielding to Ctrl-C during the request.
-        let (status, body) = tokio::select! {
+        let (status, body) = select! {
             _ = ctrl_c() => {
                 if !json_mode {
                     eprintln!("MFA login cancelled.");

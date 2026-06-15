@@ -4,6 +4,7 @@ use defguard_client_posture::{authorize_posture_session, get_posture_data};
 use defguard_core::database::models::instance::Instance;
 use secrecy::ExposeSecret;
 
+use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
 use defguard_core::ConnectionType;
 use serde_json::json;
@@ -16,7 +17,6 @@ use crate::{
     resolve::{resolve_connect_target, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
-use defguard_client_proto::defguard::client_types::MfaMethod;
 
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
