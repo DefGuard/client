@@ -279,6 +279,22 @@ jobs:
           asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
+      - name: Rename and tar defguard-cli binary
+        run: |
+          mv src-tauri/target/release/defguard-cli defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          tar -zcf defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz \
+            defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+
+      - name: Upload defguard-cli archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_name: defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/octet-stream
+
       - name: Rename and tar dg binary
         run: |
           mv src-tauri/target/release/dg dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
