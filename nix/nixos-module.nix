@@ -4,7 +4,7 @@
   pkgs,
   ...
 }: let
-  inherit (lib) mkEnableOption mkIf mkOption optional types;
+  inherit (lib) mkDefault mkEnableOption mkIf mkOption optional types;
 
   craneLib = mkCraneLib pkgs;
   defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
@@ -61,7 +61,12 @@ in {
     };
   };
 
-  config = mkIf (svcCfg.enable || clientCfg.enable || cliCfg.enable) {
+  config = {
+    # Auto-enable the daemon when the desktop client or CLI is enabled.
+    # Users can override with services.defguard-client-daemon.enable = false.
+    services.defguard-client-daemon.enable = mkDefault (clientCfg.enable || cliCfg.enable);
+  }
+  // mkIf (svcCfg.enable || clientCfg.enable || cliCfg.enable) {
     environment.systemPackages =
       []
       ++ optional svcCfg.enable svcCfg.package
