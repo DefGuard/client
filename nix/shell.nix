@@ -33,6 +33,8 @@ in
       cargo-nextest
       vtsls
       trivy
+      desktop-file-utils
+      xdg-utils
     ];
 
     shellHook = with pkgs; ''

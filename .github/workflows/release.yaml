@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - v*.*.*
+    branches:
+      - cli-packages
 
 jobs:
   create-release:
@@ -19,11 +21,13 @@ jobs:
           generate_release_notes: true
 
   create-sbom:
+    if: false
     needs:
       - create-release
     uses: ./.github/workflows/sbom.yml
     with:
       upload_url: ${{ needs.create-release.outputs.upload_url }}
+
   ubuntu-22-04-build:
     needs:
       - create-release
