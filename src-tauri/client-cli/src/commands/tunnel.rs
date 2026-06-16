@@ -53,6 +53,7 @@ impl CommandOutput for TunnelListResult {
             .iter()
             .map(|t| {
                 json!({
+                    "id": t.id,
                     "name": t.name,
                     "address": t.address,
                     "endpoint": t.endpoint,
@@ -85,12 +86,13 @@ fn format_tunnel_list_table(tunnels: &[Tunnel<Id>]) -> String {
         .max(MIN_ENDPOINT_COL_WIDTH);
 
     let mut lines = vec![format!(
-        "  {:<name_col_width$}  {:<addr_col_width$}  {:<endpoint_col_width$}  {:>11}",
-        "NAME", "ADDRESS", "ENDPOINT", "Routing"
+        "  {:>4}  {:<name_col_width$}  {:<addr_col_width$}  {:<endpoint_col_width$}  {:>11}",
+        "ID", "NAME", "ADDRESS", "ENDPOINT", "Routing"
     )];
     for tunnel in tunnels {
         lines.push(format!(
-            "  {:<name_col_width$}  {:<addr_col_width$}  {:<endpoint_col_width$}  {:>11}",
+            "  {:>4}  {:<name_col_width$}  {:<addr_col_width$}  {:<endpoint_col_width$}  {:>11}",
+            tunnel.id,
             tunnel.name,
             tunnel.address,
             tunnel.endpoint,
@@ -206,6 +208,7 @@ mod tests {
             tunnels: vec![make_tunnel("gateway")],
         };
         let s = result.human();
+        assert!(s.contains("ID"));
         assert!(s.contains("gateway"));
         assert!(s.contains("10.0.0.0/24"));
         assert!(s.contains("1.2.3.4:51820"));

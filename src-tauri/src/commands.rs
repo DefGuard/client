@@ -2,12 +2,12 @@ use core::fmt;
 use std::{collections::HashMap, env, str::FromStr};
 
 use chrono::{DateTime, Duration, Utc};
-use defguard_client_core::connection::active_connections::{
-    find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS,
-};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-use defguard_client_core::connection::disconnect_interface;
+use defguard_client_core::connection::{
+    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
+    disconnect_interface,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,

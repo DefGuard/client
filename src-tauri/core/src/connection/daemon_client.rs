@@ -1,5 +1,6 @@
 use std::sync::LazyLock;
 
+use defguard_client_proto::defguard::client::v1::desktop_daemon_service_client::DesktopDaemonServiceClient;
 use hyper_util::rt::TokioIo;
 #[cfg(windows)]
 use tokio::net::windows::named_pipe::ClientOptions;
@@ -11,8 +12,6 @@ use tonic::transport::Uri;
 use tower::service_fn;
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
-
-use defguard_client_proto::defguard::client::v1::desktop_daemon_service_client::DesktopDaemonServiceClient;
 
 #[cfg(unix)]
 const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";

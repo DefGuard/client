@@ -76,6 +76,7 @@ async fn main() -> ExitCode {
                 mfa_method.as_deref(),
                 all_traffic,
                 predefined_traffic,
+                cli.json,
             )
             .await,
             cli.json,
@@ -135,12 +136,6 @@ async fn main() -> ExitCode {
                 output::finish(tunnel::handle_show(&state, &name).await, cli.json)
             }
         },
-        Commands::Enroll { .. } => {
-            let err = state::CliError::Usage("command not yet implemented".into());
-            let code = exit::exit_code_for(&err);
-            output::emit_error(&err, cli.json);
-            ExitCode::from(code)
-        }
     }
 }
 

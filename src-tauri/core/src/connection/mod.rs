@@ -6,8 +6,10 @@ pub mod setup;
 #[cfg(target_os = "macos")]
 pub mod apple;
 
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::connection::ActiveConnection;
+#[cfg(target_os = "macos")]
+use std::time::Duration;
+
+use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
 #[cfg(not(target_os = "macos"))]
@@ -15,14 +17,21 @@ use chrono::Utc;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]
 pub use setup::{setup_interface, setup_interface_tunnel};
+#[cfg(target_os = "macos")]
+use tokio::time::sleep;
 
-use active_state::ActiveConnectionInfo;
-
-use crate::database::{
-    models::{location::Location, tunnel::Tunnel, Id},
-    DbPool,
+#[cfg(not(target_os = "macos"))]
+use crate::database::models::connection::ActiveConnection;
+use crate::{
+    database::{
+        models::{location::Location, tunnel::Tunnel, Id},
+        DbPool,
+    },
+    error::Error,
 };
-use crate::error::Error;
+
+#[cfg(target_os = "macos")]
+const TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
 /// Identifies the type of connection target.
 pub enum ConnectionTarget<'a> {
@@ -53,16 +62,13 @@ pub async fn bring_up(
 
     #[cfg(target_os = "macos")]
     {
-        // Work-around MFA propagation delay.
-        const TUNNEL_START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-
         let tunnel_config = match target {
             ConnectionTarget::Location(loc) => loc.tunnel_configuration(psk, mtu).await,
             ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu),
         }?;
 
         tunnel_config.save();
-        tokio::time::sleep(TUNNEL_START_DELAY).await;
+        sleep(TUNNEL_START_DELAY).await;
         tunnel_config.start_tunnel();
 
         // On macOS the interface name is managed by the system.

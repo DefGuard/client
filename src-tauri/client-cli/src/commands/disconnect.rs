@@ -7,8 +7,7 @@ use tracing::{error, info};
 
 use crate::{
     output::CommandOutput,
-    resolve::resolve_disconnect_target,
-    resolve::{ResolvedTarget, TargetSpec},
+    resolve::{resolve_disconnect_target, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 

@@ -1,5 +1,6 @@
-use super::super::super::{disk_encryption_status, linux_kernel_version, os_name, os_version};
 use std::process::Command;
+
+use super::super::super::{disk_encryption_status, linux_kernel_version, os_name, os_version};
 
 fn expected_kernel_version() -> String {
     let output = Command::new("uname")

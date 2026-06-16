@@ -1,18 +1,17 @@
 use std::{fmt, path::PathBuf};
-
-use chrono::{Duration, NaiveDateTime, Utc};
-use database::models::Id;
-use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::{
     fs::{set_permissions, Permissions},
     os::unix::fs::PermissionsExt,
 };
 
-use database::models::location::{
-    infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode,
+use chrono::{Duration, NaiveDateTime, Utc};
+use database::models::{
+    location::{infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode},
+    Id,
 };
 use defguard_client_proto::defguard::client_types::DeviceConfig;
+use serde::{Deserialize, Serialize};
 
 pub mod app_config;
 pub mod connection;

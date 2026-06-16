@@ -8,6 +8,24 @@
     targets = ["x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-pc-windows-gnu"];
   };
 
+  # nightly rustfmt, needed only for the unstable import-grouping options that
+  # `fmt-imports` passes via --config. It is deliberately NOT placed on PATH
+  # (that would collide with the stable rustfmt above); the wrapper points
+  # stable `cargo fmt` at it via RUSTFMT, leaving the default toolchain alone.
+  # The unstable options live only here (not in a committed rustfmt.toml), so a
+  # normal `cargo fmt` sees no unstable keys and stays warning-free.
+  rustfmtNightly = pkgs.rust-bin.nightly.latest.rustfmt;
+
+  # Usage: fmt-imports [cargo fmt flags]   e.g. fmt-imports --check
+  fmtImports = pkgs.writeShellScriptBin "fmt-imports" ''
+    set -euo pipefail
+    root="$(${pkgs.git}/bin/git rev-parse --show-toplevel)"
+    cd "$root/src-tauri"
+    export RUSTFMT="${rustfmtNightly}/bin/rustfmt"
+    exec ${rustToolchain}/bin/cargo fmt "$@" -- \
+      --config imports_granularity=Crate,group_imports=StdExternalCrate
+  '';
+
   craneLib = crane.mkLib pkgs;
 
   defguard-client = pkgs.callPackage ./package.nix {
@@ -28,6 +46,7 @@ in
     # add additional dev tools
     packages = with pkgs; [
       rustToolchain
+      fmtImports
       trunk
       sqlx-cli
       cargo-nextest

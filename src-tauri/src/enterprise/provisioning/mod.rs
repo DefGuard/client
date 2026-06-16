@@ -1,8 +1,6 @@
-pub use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
-
-use tauri::{AppHandle, Manager};
-
 use defguard_client_core::database::{models::instance::Instance, DB_POOL};
+pub use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
+use tauri::{AppHandle, Manager};
 
 /// Checks if the client has already been initialized
 /// and tries to load provisioning config from file if necessary

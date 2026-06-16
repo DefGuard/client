@@ -1,7 +1,6 @@
+use std::process::Command;
 /// Connection setup helpers.
 use std::str::FromStr;
-
-use std::process::Command;
 
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
 use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;

@@ -1,12 +1,12 @@
 use std::{env, time::Duration};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
+use defguard_client_proto::defguard::client_types::ClientPlatformInfo;
 use prost::Message;
 use reqwest::{Client, Response, Url};
 use serde::Serialize;
 
 use crate::version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION};
-use defguard_client_proto::defguard::client_types::ClientPlatformInfo;
 
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
