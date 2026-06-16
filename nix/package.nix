@@ -99,7 +99,7 @@
     inherit version pnpm;
     src = ../new-ui;
     fetcherVersion = 3;
-    hash = "sha256-77eqX4iJs6zxEjguTG0Nf1k2tK+lYJ084sEsbdkl678=";
+    hash = "sha256-baWUPm0kQqCpfPaKQ/XelD253ly/f2icuR/s/+6jVgE=";
   };
 
   # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
@@ -176,8 +176,7 @@ in
 
       # --config replaces the build section from tauri.linux.conf.json.
       pnpm tauri build \
-        --config '{"build":{"beforeBuildCommand":""}}' \
-        --bundles deb
+        --config '{"build":{"beforeBuildCommand":""}}'
 
       runHook postBuild
     '';
