@@ -40,16 +40,23 @@ use crate::{
     state::CliError,
 };
 
-/// Resolve the effective MFA method for a location.
+/// Resolve the effective MFA method for a location and validate CLI flags
+/// that are incompatible with certain methods.
 ///
 /// When `method_override` is `Some`, parses it into [`MfaMethod`]; otherwise
 /// delegates to [`infer_method`] which respects the location's
 /// [`LocationMfaMode`].
+///
+/// Rejects:
+/// * `--mfa-method oidc` on Internal-mode locations
+/// * `--code` / `--code-command` when the resolved method is OIDC
 pub(crate) fn resolve_method(
     location: &Location<Id>,
     method_override: Option<&str>,
+    code: Option<&str>,
+    code_command: Option<&str>,
 ) -> Result<MfaMethod, CliError> {
-    if let Some(raw) = method_override {
+    let method = if let Some(raw) = method_override {
         let method = parse_method(raw)?;
         // OIDC override on an Internal-mode location will be rejected by the
         // server.  Fail early to give the user a clear error before I/O.
@@ -59,10 +66,20 @@ pub(crate) fn resolve_method(
                     .into(),
             ));
         }
-        Ok(method)
+        method
     } else {
-        Ok(infer_method(location))
+        infer_method(location)
+    };
+
+    // OIDC MFA does not use codes; --code / --code-command are incompatible.
+    if method == MfaMethod::Oidc && (code.is_some() || code_command.is_some()) {
+        return Err(CliError::InvalidInput(format!(
+            "location '{}' cannot use --code / --code-command with external (OIDC) MFA",
+            location.name
+        )));
     }
+
+    Ok(method)
 }
 
 /// Run the VPN MFA handshake for a location.
@@ -447,5 +464,83 @@ async fn poll_finish(
             }
             () = sleep(OIDC_POLL_INTERVAL) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use defguard_core::database::models::location::ServiceLocationMode;
+
+    fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
+        Location {
+            id: 1,
+            instance_id: 1,
+            network_id: 1,
+            name: name.into(),
+            address: "10.0.0.0/24".into(),
+            pubkey: "pk".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: mode,
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+        }
+    }
+
+    #[test]
+    fn test_oidc_location_resolves_to_oidc() {
+        let l = location("office", LocationMfaMode::External);
+        let method = resolve_method(&l, None, None, None).unwrap();
+        assert_eq!(method, MfaMethod::Oidc);
+    }
+
+    #[test]
+    fn test_internal_location_resolves_to_totp() {
+        let l = location("office", LocationMfaMode::Internal);
+        let method = resolve_method(&l, None, None, None).unwrap();
+        assert_eq!(method, MfaMethod::Totp);
+    }
+
+    #[test]
+    fn test_code_with_oidc_rejected() {
+        let l = location("office", LocationMfaMode::External);
+        let err = resolve_method(&l, None, Some("123456"), None).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("--code"));
+    }
+
+    #[test]
+    fn test_code_command_with_oidc_rejected() {
+        let l = location("office", LocationMfaMode::External);
+        let err = resolve_method(&l, None, None, Some("pass otp")).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("--code-command"));
+    }
+
+    #[test]
+    fn test_code_with_totp_passes() {
+        let l = location("office", LocationMfaMode::Internal);
+        let method = resolve_method(&l, None, Some("123456"), None).unwrap();
+        assert_eq!(method, MfaMethod::Totp);
+    }
+
+    #[test]
+    fn test_no_code_with_oidc_passes() {
+        let l = location("office", LocationMfaMode::External);
+        let method = resolve_method(&l, None, None, None).unwrap();
+        assert_eq!(method, MfaMethod::Oidc);
+    }
+
+    #[test]
+    fn test_mfa_method_oidc_on_internal_rejected() {
+        let l = location("office", LocationMfaMode::Internal);
+        let err = resolve_method(&l, Some("oidc"), None, None).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("oidc"));
     }
 }

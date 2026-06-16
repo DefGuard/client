@@ -80,10 +80,8 @@ pub async fn handle(
         ResolvedTarget::Location(location) => {
             if location.mfa_enabled() {
                 // Resolve the effective MFA method.
-                let method = mfa::resolve_method(location, mfa_method)?;
-
-                // OIDC MFA does not use codes; --code / --code-command are incompatible.
-                check_oidc_code_conflict(&method, code, code_command, &location.name)?;
+                // Also rejects --code / --code-command when the method is OIDC.
+                let method = mfa::resolve_method(location, mfa_method, code, code_command)?;
 
                 let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
@@ -196,21 +194,6 @@ impl CommandOutput for ConnectResult {
     }
 }
 
-/// Fail-fast: `--code` / `--code-command` are incompatible with OIDC MFA.
-fn check_oidc_code_conflict(
-    method: &MfaMethod,
-    code: Option<&str>,
-    code_command: Option<&str>,
-    location_name: &str,
-) -> Result<(), CliError> {
-    if *method == MfaMethod::Oidc && (code.is_some() || code_command.is_some()) {
-        return Err(CliError::InvalidInput(format!(
-            "location '{location_name}' uses external (OIDC) MFA; --code / --code-command do not apply"
-        )));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,36 +249,5 @@ mod tests {
             name: "office".to_string(),
         };
         assert_eq!(result.exit_code(), 0);
-    }
-
-    #[test]
-    fn test_oidc_with_code_flag_fails() {
-        let err =
-            check_oidc_code_conflict(&MfaMethod::Oidc, Some("123456"), None, "office").unwrap_err();
-        assert!(matches!(err, CliError::InvalidInput(_)));
-        assert!(err.to_string().contains("--code"));
-    }
-
-    #[test]
-    fn test_oidc_with_code_command_flag_fails() {
-        let err = check_oidc_code_conflict(&MfaMethod::Oidc, None, Some("pass otp"), "office")
-            .unwrap_err();
-        assert!(matches!(err, CliError::InvalidInput(_)));
-        assert!(err.to_string().contains("--code-command"));
-    }
-
-    #[test]
-    fn test_oidc_without_code_flags_passes() {
-        check_oidc_code_conflict(&MfaMethod::Oidc, None, None, "office").unwrap();
-    }
-
-    #[test]
-    fn test_totp_with_code_flag_passes() {
-        check_oidc_code_conflict(&MfaMethod::Totp, Some("123456"), None, "office").unwrap();
-    }
-
-    #[test]
-    fn test_email_with_code_flag_passes() {
-        check_oidc_code_conflict(&MfaMethod::Email, Some("123456"), None, "office").unwrap();
     }
 }
