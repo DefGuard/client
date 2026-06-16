@@ -55,12 +55,14 @@ pub fn emit_error(err: &CliError, json: bool) {
 
 #[derive(Serialize)]
 pub struct InstanceEntry {
+    pub id: i64,
     pub name: String,
     pub url: String,
 }
 
 #[derive(Serialize)]
 pub struct LocationEntry {
+    pub id: i64,
     pub name: String,
     pub instance: Option<String>,
     pub address: String,
@@ -75,6 +77,7 @@ pub struct LocationEntry {
 
 #[derive(Serialize)]
 pub struct TunnelEntry {
+    pub id: i64,
     pub name: String,
     pub address: String,
     pub endpoint: String,

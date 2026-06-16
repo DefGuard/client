@@ -50,6 +50,7 @@ impl CommandOutput for ListResult {
             .instances
             .iter()
             .map(|i| InstanceEntry {
+                id: i.id,
                 name: i.name.clone(),
                 url: i.url.clone(),
             })
@@ -59,6 +60,7 @@ impl CommandOutput for ListResult {
             .locations
             .iter()
             .map(|l| LocationEntry {
+                id: l.id,
                 name: l.name.clone(),
                 instance: instance_names.get(&l.instance_id).cloned(),
                 address: l.address.clone(),
@@ -73,6 +75,7 @@ impl CommandOutput for ListResult {
             .tunnels
             .iter()
             .map(|t| TunnelEntry {
+                id: t.id,
                 name: t.name.clone(),
                 address: t.address.clone(),
                 endpoint: t.endpoint.clone(),
@@ -119,8 +122,8 @@ fn format_list_table(
         lines.push(format!("\n{} ({})", instance.name, instance.url));
         if let Some(locations) = instance_locations.get(&instance.id) {
             lines.push(format!(
-                "  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:>3}  {:<11}",
-                "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
+                "  {:>4}  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:>3}  {:<11}",
+                "ID", "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
             ));
             for location in locations {
                 let mfa = if location.mfa_enabled() { "yes" } else { "no" };
@@ -130,8 +133,8 @@ fn format_list_table(
                     "Predefined"
                 };
                 lines.push(format!(
-                    "  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {mfa:>3}  {route_label:<11}",
-                    location.name, location.address, location.endpoint
+                    "  {:>4}  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {mfa:>3}  {route_label:<11}",
+                    location.id, location.name, location.address, location.endpoint
                 ));
             }
         } else {
@@ -155,13 +158,13 @@ fn format_list_table(
 
         lines.push("\nTunnels".to_string());
         lines.push(format!(
-            "  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
-            "NAME", "ADDRESS", "ENDPOINT"
+            "  {:>4}  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
+            "ID", "NAME", "ADDRESS", "ENDPOINT"
         ));
         for tunnel in tunnels {
             lines.push(format!(
-                "  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
-                tunnel.name, tunnel.address, tunnel.endpoint
+                "  {:>4}  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
+                tunnel.id, tunnel.name, tunnel.address, tunnel.endpoint
             ));
         }
     }
@@ -259,6 +262,7 @@ mod tests {
             tunnels: vec![tun],
         };
         let s = result.human();
+        assert!(s.contains("ID"));
         assert!(s.contains("acme"));
         assert!(s.contains("office"));
         assert!(s.contains("datacenter"));
@@ -294,17 +298,20 @@ mod tests {
 
         let instances = json["instances"].as_array().unwrap();
         assert_eq!(instances.len(), 1);
+        assert_eq!(instances[0]["id"], 1);
         assert_eq!(instances[0]["name"], "acme");
         assert_eq!(instances[0]["url"], "https://acme.example");
 
         let locations = json["locations"].as_array().unwrap();
         assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0]["id"], 10);
         assert_eq!(locations[0]["name"], "office");
         assert_eq!(locations[0]["instance"], "acme");
         assert_eq!(locations[1]["name"], "home");
 
         let tunnels = json["tunnels"].as_array().unwrap();
         assert_eq!(tunnels.len(), 1);
+        assert_eq!(tunnels[0]["id"], 20);
         assert_eq!(tunnels[0]["name"], "datacenter");
         assert_eq!(tunnels[0]["endpoint"], "5.6.7.8:51820");
     }
