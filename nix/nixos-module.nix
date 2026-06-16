@@ -61,7 +61,8 @@ in {
   };
 
   config = mkIf (svcCfg.enable || clientCfg.enable || cliCfg.enable) {
-    environment.systemPackages = []
+    environment.systemPackages =
+      []
       ++ optional svcCfg.enable svcCfg.package
       ++ optional clientCfg.enable clientCfg.package
       ++ optional cliCfg.enable cliCfg.package;
