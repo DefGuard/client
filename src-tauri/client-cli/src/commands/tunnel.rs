@@ -53,6 +53,7 @@ impl CommandOutput for TunnelListResult {
             .iter()
             .map(|t| {
                 json!({
+                    "id": t.id,
                     "name": t.name,
                     "address": t.address,
                     "endpoint": t.endpoint,
