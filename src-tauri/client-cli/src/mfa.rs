@@ -273,10 +273,7 @@ fn infer_method(location: &Location<Id>) -> MfaMethod {
 /// travel in cleartext over plain HTTP.
 fn check_proxy_scheme(proxy_base: &Url, proxy_url: &str) {
     if proxy_base.scheme() != "https" {
-        warn!(
-            "Proxy URL '{}' is not HTTPS; secrets will be sent in cleartext.",
-            proxy_url
-        );
+        warn!("Proxy URL '{proxy_url}' is not HTTPS; secrets will be sent in cleartext.");
     }
 }
 
