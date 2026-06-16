@@ -99,11 +99,11 @@ pub enum Commands {
     Location(LocationCommand),
 
     /// Manage instances.
-    #[command(subcommand)]
+    #[command(subcommand, alias = "i")]
     Instance(InstanceCommand),
 
     /// Manage imported WireGuard tunnels.
-    #[command(subcommand)]
+    #[command(subcommand, alias = "t")]
     Tunnel(TunnelCommand),
 
     /// Enroll a new instance (alternative to the desktop enrollment flow).
