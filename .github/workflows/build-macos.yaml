@@ -91,7 +91,17 @@ jobs:
           APP_ID: "6754601166"
         run: |
           UPLOAD_DIR=$(mktemp -d)
+          VERSION=$(jq -r '.version' package.json)
           mkdir -p "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS"
           git log -1 --pretty='"whatsNew" = "%B";' > "${UPLOAD_DIR}/beta-${APP_ID}/upload/MACOS/en-US.txt"
-          xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} --apple-id ${APP_ID} --bundle-version ${{ github.run_number }} --bundle-short-version-string ${{ env.VERSION }} --platform macos --beta-app-store-text "${UPLOAD_DIR}" --upload
+          RETRIES=0
+          until [ ${RETRIES} -gt 6 ]
+          do
+            xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} \
+              --apple-id ${APP_ID} --bundle-version ${{ github.run_number }} \--bundle-short-version-string ${VERSION} \
+              --platform macos --beta-app-store-text "${UPLOAD_DIR}" --upload && break
+            echo "Waiting for app ${APP_ID} build ${{ github.run_number }} version ${VERSION}"
+            sleep 10
+            ((RETRIES++))
+          done
           rm -f -r "${UPLOAD_DIR}"
