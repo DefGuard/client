@@ -34,6 +34,8 @@ jobs:
       - self-hosted
       - Linux
       - ${{ matrix.architecture }}
+    env:
+      SQLX_OFFLINE: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -62,15 +64,15 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
           cache: true
           version: 11
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
 
       - name: Get pnpm store directory
         run: |
@@ -150,6 +152,8 @@ jobs:
       - self-hosted
       - Linux
       - ${{ matrix.architecture }}
+    env:
+      SQLX_OFFLINE: "1"
     strategy:
       fail-fast: false
       matrix:
