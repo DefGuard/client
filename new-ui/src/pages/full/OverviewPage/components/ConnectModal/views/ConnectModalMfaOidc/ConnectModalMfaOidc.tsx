@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
+import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 import { useConnectModalMfaOidc } from '../../hooks/useConnectModalMfaOidc';
@@ -10,13 +11,17 @@ import { useConnectModalMfaOidc } from '../../hooks/useConnectModalMfaOidc';
 type Screen = 'idle' | 'polling' | 'error';
 
 export const ConnectModalMfaOidc = () => {
-  const perviousView = useConnectModal(useShallow((s) => s.perviousView));
+  const [perviousView, location] = useConnectModal(
+    useShallow((s) => [s.perviousView, s.location]),
+  );
 
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
     onSessionExpired: () =>
       useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
-    onPostureError: () =>
-      useConnectModal.getState().setView(ConnectModalView.PostureCheckFail),
+    onPostureError: (msg) => {
+      useConnectModal.setState({ postureError: msg });
+      useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
+    },
   });
 
   const [screen, setScreen] = useState<Screen>('idle');
@@ -35,6 +40,10 @@ export const ConnectModalMfaOidc = () => {
   };
 
   const errorMessage = startError ?? pollError;
+
+  if (isStarting && location?.posture_check_required && !startError) {
+    return <ConnectModalPostureCheckLoading />;
+  }
 
   return (
     <div id="mfa-oidc-view">

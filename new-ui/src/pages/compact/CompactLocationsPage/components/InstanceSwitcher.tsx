@@ -11,12 +11,12 @@ import {
 } from '../../../../shared/rust-api/query';
 import {
   type CompactViewSelection,
-  useAppStore,
-} from '../../../../shared/store/useAppStore';
+  useSharedStorage,
+} from '../../../../shared/store/useSharedStorage';
 import { isPresent } from '../../../../shared/utils/isPresent';
 
 export const InstanceSwitcher = () => {
-  const selectedInstance = useAppStore((s) => s.compactViewSelection);
+  const selectedInstance = useSharedStorage((s) => s.viewSelection);
 
   const { data: tunnels } = useQuery(getTunnelsQueryOptions);
   const { data: instances } = useQuery(getInstancesQueryOptions);
@@ -77,7 +77,7 @@ export const InstanceSwitcher = () => {
       groups={groups}
       value={selectedOption as never}
       onChange={(option) => {
-        useAppStore.setState({ compactViewSelection: option.value });
+        useSharedStorage.setState({ viewSelection: option.value });
       }}
     />
   );

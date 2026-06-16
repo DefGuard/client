@@ -4,7 +4,7 @@ import {
   getInstancesQueryOptions,
   getTunnelsQueryOptions,
 } from '../../../shared/rust-api/query';
-import { useAppStore } from '../../../shared/store/useAppStore';
+import { useSharedStorage } from '../../../shared/store/useSharedStorage';
 
 export const Route = createFileRoute('/full/_default/overview')({
   loader: async ({ context }) => {
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/full/_default/overview')({
       throw redirect({ to: '/empty' });
     }
 
-    const stored = useAppStore.getState().compactViewSelection;
+    const stored = useSharedStorage.getState().viewSelection;
 
     let storedIsValid: boolean;
     if (stored === null) {
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/full/_default/overview')({
         instances.length > 0
           ? { kind: 'instance' as const, data: instances[0] }
           : { kind: 'tunnel' as const, data: tunnels[0] };
-      useAppStore.setState({ compactViewSelection: selected });
+      useSharedStorage.setState({ viewSelection: selected });
     }
   },
   component: OverviewPage,

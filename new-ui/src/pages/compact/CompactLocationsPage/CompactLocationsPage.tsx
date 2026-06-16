@@ -15,13 +15,14 @@ import {
   getLocationsQueryOptions,
 } from '../../../shared/rust-api/query';
 import { useAppStore } from '../../../shared/store/useAppStore';
+import { useSharedStorage } from '../../../shared/store/useSharedStorage';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
 
 export const CompactLocationsPage = () => {
-  const selection = useAppStore((s) => s.compactViewSelection);
+  const selection = useSharedStorage((s) => s.viewSelection);
   const openLocation = useAppStore((s) => s.expandedLocation);
 
   const routeData = useLoaderData({ from: '/compact/' });
@@ -53,8 +54,8 @@ export const CompactLocationsPage = () => {
 
   useEffect(() => {
     if (selection === null || instanceInfo === undefined) {
-      useAppStore.setState({
-        compactViewSelection: { kind: 'instance', data: routeData.instances[0] },
+      useSharedStorage.setState({
+        viewSelection: { kind: 'instance', data: routeData.instances[0] },
       });
     }
   }, [routeData.instances, instanceInfo, selection]);

@@ -6,7 +6,7 @@ import {
   getTunnelsQueryOptions,
 } from '../../shared/rust-api/query';
 import type { LocationInfo } from '../../shared/rust-api/types';
-import { useAppStore } from '../../shared/store/useAppStore';
+import { useSharedStorage } from '../../shared/store/useSharedStorage';
 
 export const Route = createFileRoute('/compact/')({
   loader: async ({ context }) => {
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/compact/')({
       throw redirect({ to: '/empty' });
     }
 
-    const stored = useAppStore.getState().compactViewSelection;
+    const stored = useSharedStorage.getState().viewSelection;
 
     let storedIsValid: boolean;
     if (stored === null) {
@@ -40,7 +40,7 @@ export const Route = createFileRoute('/compact/')({
     }
 
     if (!storedIsValid) {
-      useAppStore.setState({ compactViewSelection: selected });
+      useSharedStorage.setState({ viewSelection: selected });
     }
 
     let locations: LocationInfo[];

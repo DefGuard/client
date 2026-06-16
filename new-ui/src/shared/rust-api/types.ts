@@ -142,6 +142,7 @@ export const TauriEvent = {
   VersionMismatch: 'version-mismatch',
   UuidMismatch: 'uuid-mismatch',
   GlobalLogUpdate: 'log-update-global',
+  WindowSwapped: 'window-swapped',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];

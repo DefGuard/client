@@ -7,6 +7,7 @@ import {
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../rust-api/types';
+import { useSharedStorage } from '../../../../store/useSharedStorage';
 import { ThemeSpacing } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
@@ -30,13 +31,14 @@ export const LocationCardMfaSettings = () => {
     },
   });
 
-  const { previousView, setView, location, localMfaMethod, setLocalMfaMethod } =
-    useLocationCardContext();
+  const { previousView, setView, location } = useLocationCardContext();
 
   const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(
-    localMfaMethod ?? MfaMethod.Totp,
+    location
+      ? useSharedStorage.getState().getLocationMethod(location.id)
+      : MfaMethod.Totp,
   );
 
   const isFromDefault = previousView === LocationCardViews.Default;
@@ -50,7 +52,7 @@ export const LocationCardMfaSettings = () => {
   }, [location.location_mfa_mode]);
 
   const handleSubmit = () => {
-    setLocalMfaMethod(selectedMethod);
+    useSharedStorage.getState().setLocationMethod(location.id, selectedMethod);
     if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
       setMfaMethod({
         locationId: location.id,

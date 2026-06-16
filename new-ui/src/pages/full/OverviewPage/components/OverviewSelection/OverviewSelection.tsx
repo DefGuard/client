@@ -4,8 +4,8 @@ import clsx from 'clsx';
 import type { InstanceInfo, LocationInfo } from '../../../../../shared/rust-api/types';
 import {
   type CompactViewSelection,
-  useAppStore,
-} from '../../../../../shared/store/useAppStore';
+  useSharedStorage,
+} from '../../../../../shared/store/useSharedStorage';
 
 type Props = {
   instances: InstanceInfo[];
@@ -25,10 +25,10 @@ const SelectionItem = ({ label, selected, onClick }: SelectionItemProps) => (
 );
 
 export const OverviewSelection = ({ instances, tunnels }: Props) => {
-  const selection = useAppStore((s) => s.compactViewSelection);
+  const selection = useSharedStorage((s) => s.viewSelection);
 
   const setSelection = (value: CompactViewSelection) => {
-    useAppStore.setState({ compactViewSelection: value });
+    useSharedStorage.setState({ viewSelection: value });
   };
 
   const isSelected = (candidate: CompactViewSelection): boolean => {

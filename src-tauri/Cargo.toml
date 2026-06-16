@@ -110,6 +110,7 @@ tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
+tauri-plugin-zustand = "1"
 thiserror.workspace = true
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio.workspace = true

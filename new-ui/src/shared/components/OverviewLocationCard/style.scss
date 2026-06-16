@@ -29,5 +29,6 @@
     display: flex;
     flex-flow: row nowrap;
     column-gap: var(--spacing-5xl);
+    min-height: 24px;
   }
 }
