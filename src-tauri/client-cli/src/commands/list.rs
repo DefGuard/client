@@ -33,7 +33,7 @@ pub struct ListResult {
 impl CommandOutput for ListResult {
     fn human(&self) -> String {
         if self.instances.is_empty() {
-            "No instances enrolled. Use the desktop app or 'enroll' to get started.".to_string()
+            "No instances enrolled. Use the desktop app to get started.".to_string()
         } else {
             format_list_table(&self.instances, &self.locations, &self.tunnels)
         }

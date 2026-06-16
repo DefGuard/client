@@ -132,7 +132,7 @@ async fn resolve_sole_location(pool: &DbPool) -> Result<ResolvedTarget, CliError
     let locations = Location::all(pool, false).await?;
     match locations.len() {
         0 => Err(CliError::NotEnrolled(
-            "No locations configured. Enroll an instance first.".into(),
+            "No locations configured. Use the desktop app to enroll an instance first.".into(),
         )),
         1 => Ok(ResolvedTarget::Location(
             locations

@@ -105,19 +105,6 @@ pub enum Commands {
     /// Manage imported WireGuard tunnels.
     #[command(subcommand, alias = "t")]
     Tunnel(TunnelCommand),
-
-    /// Enroll a new instance (alternative to the desktop enrollment flow).
-    // TODO: Hidden until implemented
-    #[command(hide = true)]
-    Enroll {
-        /// Enrollment token.
-        #[arg(long, env = "DG_ENROLLMENT_TOKEN")]
-        token: String,
-
-        /// Proxy / Edge URL for enrollment.
-        #[arg(long, env = "DG_URL")]
-        url: String,
-    },
 }
 
 #[derive(Subcommand)]
