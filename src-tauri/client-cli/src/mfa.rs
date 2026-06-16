@@ -110,8 +110,7 @@ pub async fn authorize(
     match method {
         MfaMethod::Biometric | MfaMethod::MobileApprove => {
             return Err(CliError::MfaFailed(format!(
-                "MFA method {:?} is not yet supported by the CLI. Use the desktop client.",
-                method
+                "MFA method {method:?} is not yet supported by the CLI. Use the desktop client."
             )));
         }
         MfaMethod::Oidc => {

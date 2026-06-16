@@ -63,6 +63,11 @@ name = "defguard-client"
 tauri-build = { version = "2", features = [] }
 vergen-git2.workspace = true
 
+[workspace.lints.clippy]
+uninlined_format_args = "deny"
+manual_let_else = "warn"
+redundant_closure = "warn"
+
 [dependencies]
 anyhow = "1.0"
 base64.workspace = true

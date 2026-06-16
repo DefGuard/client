@@ -55,8 +55,7 @@ mod tests {
             assert_eq!(
                 exit_code_for(err),
                 *expected,
-                "{:?} should map to {expected}",
-                err
+                "{err:?} should map to {expected}",
             );
         }
     }
