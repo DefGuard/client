@@ -61,6 +61,11 @@ pub enum Commands {
         #[arg(long)]
         mfa_method: Option<String>,
 
+        /// Save the mobile-approve MFA QR code as a PNG image to this path.
+        /// Required when stderr is not a terminal.
+        #[arg(long)]
+        qr_file: Option<String>,
+
         /// Override route-all-traffic for this connection only.
         #[arg(long, overrides_with = "predefined_traffic")]
         all_traffic: bool,

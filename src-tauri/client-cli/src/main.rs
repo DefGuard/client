@@ -62,6 +62,7 @@ async fn main() -> ExitCode {
             code,
             code_command,
             mfa_method,
+            qr_file,
             all_traffic,
             predefined_traffic,
         } => output::finish(
@@ -74,6 +75,7 @@ async fn main() -> ExitCode {
                 code.as_deref(),
                 code_command.as_deref(),
                 mfa_method.as_deref(),
+                qr_file.as_deref(),
                 all_traffic,
                 predefined_traffic,
                 cli.json,

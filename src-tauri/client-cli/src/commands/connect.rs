@@ -30,6 +30,7 @@ pub async fn handle(
     code: Option<&str>,
     code_command: Option<&str>,
     mfa_method: Option<&str>,
+    _qr_file: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
     json: bool,

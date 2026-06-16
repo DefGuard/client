@@ -29,6 +29,11 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 webbrowser.workspace = true
+http.workspace = true
+qrcode.workspace = true
+image.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
 
 # Dummy feature to let tauri build the release.
 [features]

@@ -32,7 +32,11 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 webbrowser = "1.0"
 tempfile = "3"
+futures-util = "0.3"
 http = "1"
+image = "0.25"
+qrcode = { version = "0.14", features = ["image"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 vergen-git2 = { version = "9.1", features = ["build"] }
 
 [workspace.package]
