@@ -1541,6 +1541,7 @@ dependencies = [
 name = "defguard-cli"
 version = "2.1.0"
 dependencies = [
+ "base64 0.22.1",
  "clap",
  "defguard-client-common",
  "defguard-client-core",

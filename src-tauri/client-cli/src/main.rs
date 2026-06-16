@@ -10,6 +10,7 @@ mod exit;
 mod logging;
 mod mfa;
 mod mfa_code;
+mod mfa_qr;
 mod output;
 mod resolve;
 mod state;
