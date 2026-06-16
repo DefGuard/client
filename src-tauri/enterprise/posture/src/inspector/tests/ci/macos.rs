@@ -1,5 +1,6 @@
-use super::super::super::{device_integrity, disk_encryption_status, os_name, os_version};
 use std::process::Command;
+
+use super::super::super::{device_integrity, disk_encryption_status, os_name, os_version};
 
 fn expected_os_version() -> String {
     let output = Command::new("sw_vers")

@@ -1,12 +1,13 @@
 use std::io::{stdin, IsTerminal};
 
 use defguard_client_posture::{authorize_posture_session, get_posture_data};
-use defguard_core::database::models::instance::Instance;
-use secrecy::ExposeSecret;
-
 use defguard_client_proto::defguard::client_types::MfaMethod;
-use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
-use defguard_core::ConnectionType;
+use defguard_core::{
+    connection::{active_state::active_state, bring_up, ConnectionTarget},
+    database::models::instance::Instance,
+    ConnectionType,
+};
+use secrecy::ExposeSecret;
 use serde_json::json;
 use tracing::info;
 

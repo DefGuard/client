@@ -465,8 +465,9 @@ async fn poll_finish(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use defguard_core::database::models::location::ServiceLocationMode;
+
+    use super::*;
 
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {

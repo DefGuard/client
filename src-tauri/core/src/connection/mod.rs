@@ -9,8 +9,7 @@ pub mod apple;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
 
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::connection::ActiveConnection;
+use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
 #[cfg(not(target_os = "macos"))]
@@ -21,13 +20,15 @@ pub use setup::{setup_interface, setup_interface_tunnel};
 #[cfg(target_os = "macos")]
 use tokio::time::sleep;
 
-use active_state::ActiveConnectionInfo;
-
-use crate::database::{
-    models::{location::Location, tunnel::Tunnel, Id},
-    DbPool,
+#[cfg(not(target_os = "macos"))]
+use crate::database::models::connection::ActiveConnection;
+use crate::{
+    database::{
+        models::{location::Location, tunnel::Tunnel, Id},
+        DbPool,
+    },
+    error::Error,
 };
-use crate::error::Error;
 
 #[cfg(target_os = "macos")]
 const TUNNEL_START_DELAY: Duration = Duration::from_secs(1);

@@ -15,12 +15,7 @@ use std::{
     time::Duration,
 };
 
-use secrecy::ExposeSecret;
-
 use defguard_client_proto::defguard::client_types::MfaMethod;
-
-use crate::{mfa, mfa_code::CodeSource, state::CliError};
-
 use defguard_core::database::{
     models::{
         instance::{ClientTrafficPolicy, Instance},
@@ -29,6 +24,9 @@ use defguard_core::database::{
     },
     DbPool,
 };
+use secrecy::ExposeSecret;
+
+use crate::{mfa, mfa_code::CodeSource, state::CliError};
 
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(50);

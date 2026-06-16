@@ -3,6 +3,7 @@ use std::{collections::HashSet, sync::LazyLock};
 use tokio::sync::Mutex;
 
 use crate::{
+    connection::disconnect_interface,
     database::{
         models::{connection::ActiveConnection, instance::Instance, location::Location, Id},
         DB_POOL,
@@ -10,8 +11,6 @@ use crate::{
     error::Error,
     ConnectionType,
 };
-
-use crate::connection::disconnect_interface;
 
 pub static ACTIVE_CONNECTIONS: LazyLock<Mutex<Vec<ActiveConnection>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));

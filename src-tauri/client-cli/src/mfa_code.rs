@@ -107,8 +107,9 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use secrecy::ExposeSecret;
+
+    use super::*;
 
     fn ctx() -> MfaContext {
         MfaContext {

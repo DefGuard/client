@@ -3,23 +3,22 @@
 //! The daemon (Linux/Windows) and Network Extension managers (macOS) are the shared
 //! source of truth for interface state.
 
-use crate::{
-    database::{models::Id, DbPool},
-    error::Error,
-    ConnectionType,
-};
-
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::{location::Location, tunnel::Tunnel};
-
-#[cfg(not(target_os = "macos"))]
-use crate::connection::daemon_client::DAEMON_CLIENT;
 #[cfg(not(target_os = "macos"))]
 use base64::Engine as _;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{InterfaceData, Peer};
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
+
+#[cfg(not(target_os = "macos"))]
+use crate::connection::daemon_client::DAEMON_CLIENT;
+#[cfg(not(target_os = "macos"))]
+use crate::database::models::{location::Location, tunnel::Tunnel};
+use crate::{
+    database::{models::Id, DbPool},
+    error::Error,
+    ConnectionType,
+};
 
 /// Describes a currently-active WireGuard connection.
 #[derive(Clone, Debug)]
