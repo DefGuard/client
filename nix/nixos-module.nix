@@ -4,7 +4,7 @@
   pkgs,
   ...
 }: let
-  inherit (lib) mkDefault mkEnableOption mkIf mkOption optional types;
+  inherit (lib) mkDefault mkEnableOption mkIf mkMerge mkOption optional types;
 
   craneLib = mkCraneLib pkgs;
   defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
@@ -61,46 +61,52 @@ in {
     };
   };
 
-  config = {
+  config = mkMerge [
     # Auto-enable the daemon when the desktop client or CLI is enabled.
     # Users can override with services.defguard-client-daemon.enable = false.
-    services.defguard-client-daemon.enable = mkDefault (clientCfg.enable || cliCfg.enable);
-  }
-  // mkIf (svcCfg.enable || clientCfg.enable || cliCfg.enable) {
-    environment.systemPackages =
-      []
-      ++ optional svcCfg.enable svcCfg.package
-      ++ optional clientCfg.enable clientCfg.package
-      ++ optional cliCfg.enable cliCfg.package;
-  }
-  // mkIf svcCfg.enable {
-    systemd.services.defguard-service = {
-      description = "Defguard VPN Service";
-      documentation = ["https://docs.defguard.net"];
-      wantedBy = ["multi-user.target"];
-      wants = ["network-online.target"];
-      after = ["network-online.target"];
-      serviceConfig = {
-        Group = "defguard";
-        ExecStart = "${svcCfg.package}/bin/defguard-service --log-level ${svcCfg.logLevel} --log-dir ${svcCfg.logDir} --stats-period ${toString svcCfg.statsPeriod}";
-        ExecReload = "kill -HUP $MAINPID";
-        KillMode = "process";
-        KillSignal = "SIGINT";
-        LimitNOFILE = 65536;
-        LimitNPROC = "infinity";
-        Restart = "on-failure";
-        RestartSec = 2;
-        TasksMax = "infinity";
-        OOMScoreAdjust = -1000;
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-        ProtectControlGroups = true;
-        ProtectKernelModules = true;
-        RestrictRealtime = true;
-        LockPersonality = true;
-      };
-    };
+    {
+      services.defguard-client-daemon.enable = mkDefault (clientCfg.enable || cliCfg.enable);
+    }
 
-    users.groups.defguard = {};
-  };
+    # Add the relevant packages to the system PATH.
+    (mkIf (svcCfg.enable || clientCfg.enable || cliCfg.enable) {
+      environment.systemPackages =
+        []
+        ++ optional svcCfg.enable svcCfg.package
+        ++ optional clientCfg.enable clientCfg.package
+        ++ optional cliCfg.enable cliCfg.package;
+    })
+
+    # Daemon-only configuration: systemd service and dedicated group.
+    (mkIf svcCfg.enable {
+      systemd.services.defguard-service = {
+        description = "Defguard VPN Service";
+        documentation = ["https://docs.defguard.net"];
+        wantedBy = ["multi-user.target"];
+        wants = ["network-online.target"];
+        after = ["network-online.target"];
+        serviceConfig = {
+          Group = "defguard";
+          ExecStart = "${svcCfg.package}/bin/defguard-service --log-level ${svcCfg.logLevel} --log-dir ${svcCfg.logDir} --stats-period ${toString svcCfg.statsPeriod}";
+          ExecReload = "kill -HUP $MAINPID";
+          KillMode = "process";
+          KillSignal = "SIGINT";
+          LimitNOFILE = 65536;
+          LimitNPROC = "infinity";
+          Restart = "on-failure";
+          RestartSec = 2;
+          TasksMax = "infinity";
+          OOMScoreAdjust = -1000;
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          ProtectControlGroups = true;
+          ProtectKernelModules = true;
+          RestrictRealtime = true;
+          LockPersonality = true;
+        };
+      };
+
+      users.groups.defguard = {};
+    })
+  ];
 }
