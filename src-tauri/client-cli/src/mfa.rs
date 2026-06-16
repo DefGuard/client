@@ -43,21 +43,16 @@ use crate::{
     state::CliError,
 };
 
-/// Resolve the effective MFA method for a location and validate CLI flags
-/// that are incompatible with certain methods.
+/// Resolve the effective MFA method for a location.
 ///
 /// When `method_override` is `Some`, parses it into [`MfaMethod`]; otherwise
 /// delegates to [`infer_method`] which respects the location's
 /// [`LocationMfaMode`].
 ///
-/// Rejects:
-/// * `--mfa-method oidc` on Internal-mode locations
-/// * `--code` / `--code-command` when the resolved method is OIDC
+/// Rejects `--mfa-method oidc` on Internal-mode locations.
 pub(crate) fn resolve_method(
     location: &Location<Id>,
     method_override: Option<&str>,
-    code: Option<&str>,
-    code_command: Option<&str>,
 ) -> Result<MfaMethod, CliError> {
     let method = if let Some(raw) = method_override {
         let method = parse_method(raw)?;
@@ -74,15 +69,36 @@ pub(crate) fn resolve_method(
         infer_method(location)
     };
 
-    // OIDC MFA does not use codes; --code / --code-command are incompatible.
-    if method == MfaMethod::Oidc && (code.is_some() || code_command.is_some()) {
+    Ok(method)
+}
+
+/// Validate CLI flags against the resolved MFA method.
+///
+/// * `--code` / `--code-command` are incompatible with OIDC and mobile-approve
+///   (neither method accepts textual codes).
+/// * `--qr-file` is only valid for mobile-approve MFA.
+pub(crate) fn validate_mfa_flags(
+    method: MfaMethod,
+    location_name: &str,
+    code: Option<&str>,
+    code_command: Option<&str>,
+    qr_file: Option<&str>,
+) -> Result<(), CliError> {
+    if matches!(method, MfaMethod::Oidc | MfaMethod::MobileApprove)
+        && (code.is_some() || code_command.is_some())
+    {
         return Err(CliError::InvalidInput(format!(
-            "location '{}' cannot use --code / --code-command with external (OIDC) MFA",
-            location.name
+            "location '{location_name}' cannot use --code / --code-command with {method:?} MFA",
         )));
     }
 
-    Ok(method)
+    if method != MfaMethod::MobileApprove && qr_file.is_some() {
+        return Err(CliError::InvalidInput(
+            "--qr-file is only valid with mobile-approve MFA".into(),
+        ));
+    }
+
+    Ok(())
 }
 
 /// Run the VPN MFA handshake for a location.
@@ -675,51 +691,99 @@ mod tests {
     #[test]
     fn test_oidc_location_resolves_to_oidc() {
         let l = location("office", LocationMfaMode::External);
-        let method = resolve_method(&l, None, None, None).unwrap();
+        let method = resolve_method(&l, None).unwrap();
         assert_eq!(method, MfaMethod::Oidc);
     }
 
     #[test]
     fn test_internal_location_resolves_to_totp() {
         let l = location("office", LocationMfaMode::Internal);
-        let method = resolve_method(&l, None, None, None).unwrap();
+        let method = resolve_method(&l, None).unwrap();
         assert_eq!(method, MfaMethod::Totp);
     }
 
     #[test]
-    fn test_code_with_oidc_rejected() {
-        let l = location("office", LocationMfaMode::External);
-        let err = resolve_method(&l, None, Some("123456"), None).unwrap_err();
+    fn test_validate_flags_oidc_rejects_code() {
+        let err =
+            validate_mfa_flags(MfaMethod::Oidc, "office", Some("123456"), None, None).unwrap_err();
         assert!(matches!(err, CliError::InvalidInput(_)));
         assert!(err.to_string().contains("--code"));
     }
 
     #[test]
-    fn test_code_command_with_oidc_rejected() {
-        let l = location("office", LocationMfaMode::External);
-        let err = resolve_method(&l, None, None, Some("pass otp")).unwrap_err();
+    fn test_validate_flags_oidc_rejects_code_command() {
+        let err = validate_mfa_flags(MfaMethod::Oidc, "office", None, Some("pass otp"), None)
+            .unwrap_err();
         assert!(matches!(err, CliError::InvalidInput(_)));
-        assert!(err.to_string().contains("--code-command"));
+        assert!(err.to_string().contains("--code"));
     }
 
     #[test]
-    fn test_code_with_totp_passes() {
-        let l = location("office", LocationMfaMode::Internal);
-        let method = resolve_method(&l, None, Some("123456"), None).unwrap();
-        assert_eq!(method, MfaMethod::Totp);
+    fn test_validate_flags_mobile_approve_rejects_code() {
+        let err = validate_mfa_flags(
+            MfaMethod::MobileApprove,
+            "office",
+            Some("123456"),
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("--code"));
+    }
+
+    #[test]
+    fn test_validate_flags_mobile_approve_rejects_code_command() {
+        let err = validate_mfa_flags(
+            MfaMethod::MobileApprove,
+            "office",
+            None,
+            Some("pass otp"),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("--code"));
+    }
+
+    #[test]
+    fn test_validate_flags_qr_file_only_for_mobile_approve() {
+        // qr-file on TOTP
+        let err =
+            validate_mfa_flags(MfaMethod::Totp, "office", None, None, Some("qr.png")).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("qr-file"));
+    }
+
+    #[test]
+    fn test_validate_flags_qr_file_ok_for_mobile_approve() {
+        validate_mfa_flags(
+            MfaMethod::MobileApprove,
+            "office",
+            None,
+            None,
+            Some("qr.png"),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_validate_flags_pass_through_totp() {
+        // TOTP with --code should pass validation.
+        validate_mfa_flags(MfaMethod::Totp, "office", Some("123456"), None, None).unwrap();
     }
 
     #[test]
     fn test_no_code_with_oidc_passes() {
         let l = location("office", LocationMfaMode::External);
-        let method = resolve_method(&l, None, None, None).unwrap();
+        let method = resolve_method(&l, None).unwrap();
         assert_eq!(method, MfaMethod::Oidc);
     }
 
     #[test]
     fn test_mfa_method_oidc_on_internal_rejected() {
         let l = location("office", LocationMfaMode::Internal);
-        let err = resolve_method(&l, Some("oidc"), None, None).unwrap_err();
+        let err = resolve_method(&l, Some("oidc")).unwrap_err();
         assert!(matches!(err, CliError::InvalidInput(_)));
         assert!(err.to_string().contains("oidc"));
     }

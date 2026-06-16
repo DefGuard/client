@@ -82,8 +82,10 @@ pub async fn handle(
         ResolvedTarget::Location(location) => {
             if location.mfa_enabled() {
                 // Resolve the effective MFA method.
-                // Also rejects --code / --code-command when the method is OIDC.
-                let method = mfa::resolve_method(location, mfa_method, code, code_command)?;
+                let method = mfa::resolve_method(location, mfa_method)?;
+
+                // Reject flags that are incompatible with the resolved method.
+                mfa::validate_mfa_flags(method, &location.name, code, code_command, qr_file)?;
 
                 let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
