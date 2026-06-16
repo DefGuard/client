@@ -1,24 +1,21 @@
+use defguard_client_core::connection::active_connections::{
+    get_connection_id_by_type, ACTIVE_CONNECTIONS,
+};
 use tauri::{
     image::Image,
     menu::{Menu, MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Runtime,
 };
 
-use defguard_client_core::connection::active_connections::{
-    get_connection_id_by_type, ACTIVE_CONNECTIONS,
-};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
-
-use crate::window_manager::WindowManager;
 use crate::{
     appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window_manager::{show_tray_window, COMPACT_WINDOW_ID, FULL_VIEW_WINDOW_ID},
+    window_manager::{show_tray_window, WindowManager, COMPACT_WINDOW_ID, FULL_VIEW_WINDOW_ID},
     ConnectionType,
 };
 

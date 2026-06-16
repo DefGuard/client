@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Mutex};
 
+use defguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
 use tauri::{
     async_runtime::{spawn, JoinHandle},
     PhysicalPosition,
@@ -13,7 +14,6 @@ use crate::{
     utils::stats_handler,
     ConnectionType,
 };
-use defguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
 
 pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,

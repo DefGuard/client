@@ -1,11 +1,10 @@
-use std::ffi::OsString;
-use std::os::windows::ffi::OsStringExt;
+use std::{ffi::OsString, os::windows::ffi::OsStringExt};
 
-use windows::Win32::Foundation::{LPARAM, RECT};
-use windows::Win32::Graphics::Gdi::{
-    EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW,
+use windows::Win32::{
+    Foundation::{LPARAM, RECT},
+    Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW},
+    UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
 };
-use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 
 use crate::window_manager::{
     WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID, COMPACT_WINDOW_WIDTH,

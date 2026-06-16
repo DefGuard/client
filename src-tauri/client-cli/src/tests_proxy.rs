@@ -8,17 +8,14 @@ use std::{
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
     thread::{sleep, spawn, JoinHandle},
     time::Duration,
 };
 
-use secrecy::ExposeSecret;
-
-use crate::{mfa, mfa_code::CodeSource, state::CliError};
-
+use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::database::{
     models::{
         instance::{ClientTrafficPolicy, Instance},
@@ -27,6 +24,9 @@ use defguard_core::database::{
     },
     DbPool,
 };
+use secrecy::ExposeSecret;
+
+use crate::{mfa, mfa_code::CodeSource, state::CliError};
 
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(50);
@@ -47,13 +47,34 @@ struct MockProxy {
 }
 
 impl MockProxy {
+    /// Single-shot finish: each finish request gets the same response.
     fn new(start_response: MockResponse, finish_response: MockResponse) -> Self {
+        Self::with_counter(start_response, finish_response, None)
+    }
+
+    /// OIDC polling: the first `fail_count` calls to `finish` return HTTP 428;
+    /// subsequent calls return `finish_response` (HTTP 200).
+    fn with_poll(
+        start_response: MockResponse,
+        finish_response: MockResponse,
+        fail_count: u32,
+    ) -> Self {
+        Self::with_counter(start_response, finish_response, Some(fail_count))
+    }
+
+    fn with_counter(
+        start_response: MockResponse,
+        finish_response: MockResponse,
+        fail_count: Option<u32>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         // Non-blocking accept so the loop can observe the shutdown flag and exit cleanly.
         listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
         let shutdown = Arc::new(AtomicBool::new(false));
         let shutdown_thread = shutdown.clone();
+        let finish_hits = Arc::new(AtomicU32::new(0));
+        let finish_hits_thread = finish_hits.clone();
         let handle = spawn(move || {
             while !shutdown_thread.load(Ordering::Relaxed) {
                 let mut stream = match listener.accept() {
@@ -86,6 +107,17 @@ impl MockProxy {
                 let request = String::from_utf8_lossy(&data);
                 let response = if request.contains("/api/v1/client-mfa/start") {
                     &start_response
+                } else if let Some(max) = fail_count {
+                    let current = finish_hits_thread.fetch_add(1, Ordering::Relaxed);
+                    if current < max {
+                        // 428: not yet authenticated
+                        &MockResponse {
+                            status: 428,
+                            body: r#"{"error":"OIDC authentication not completed yet"}"#.into(),
+                        }
+                    } else {
+                        &finish_response
+                    }
                 } else {
                     &finish_response
                 };
@@ -130,7 +162,7 @@ impl Drop for MockProxy {
     }
 }
 
-fn mfa_enabled_loc(name: &str, instance_id: Id) -> Location<NoId> {
+fn mfa_enabled_location(name: &str, instance_id: Id) -> Location<NoId> {
     Location {
         id: NoId,
         instance_id,
@@ -147,6 +179,14 @@ fn mfa_enabled_loc(name: &str, instance_id: Id) -> Location<NoId> {
         service_location_mode: ServiceLocationMode::Disabled,
         mfa_method: None,
         posture_check_required: false,
+    }
+}
+
+/// Build a location that requires **external** (OIDC) MFA.
+fn oidc_location(name: &str, instance_id: Id) -> Location<NoId> {
+    Location {
+        location_mfa_mode: LocationMfaMode::External,
+        ..mfa_enabled_location(name, instance_id)
     }
 }
 
@@ -176,14 +216,17 @@ async fn seed_db(pool: &DbPool) -> (Instance<Id>, Location<Id>) {
         .await
         .unwrap();
 
-    let loc = mfa_enabled_loc("office", inst.id).save(pool).await.unwrap();
+    let loc = mfa_enabled_location("office", inst.id)
+        .save(pool)
+        .await
+        .unwrap();
 
     (inst, loc)
 }
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_mfa_success_returns_psk(pool: DbPool) {
-    let (mut inst, loc) = seed_db(&pool).await;
+    let (mut instance, location) = seed_db(&pool).await;
     let mock = MockProxy::new(
         MockResponse {
             status: 200,
@@ -195,10 +238,10 @@ async fn test_mfa_success_returns_psk(pool: DbPool) {
         },
     );
     mock.wait_ready();
-    inst.proxy_url = mock.url();
+    instance.proxy_url = mock.url();
 
     let source = CodeSource::Literal("123456".into());
-    let psk = mfa::authorize(&loc, &source, &inst, None, None, &pool)
+    let psk = mfa::authorize(&location, &source, &instance, MfaMethod::Totp, None, &pool)
         .await
         .unwrap();
     assert_eq!(psk.expose_secret(), "secret-psk");
@@ -206,7 +249,7 @@ async fn test_mfa_success_returns_psk(pool: DbPool) {
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
-    let (mut inst, loc) = seed_db(&pool).await;
+    let (mut instance, location) = seed_db(&pool).await;
     let mock = MockProxy::new(
         MockResponse {
             status: 200,
@@ -218,10 +261,10 @@ async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
         },
     );
     mock.wait_ready();
-    inst.proxy_url = mock.url();
+    instance.proxy_url = mock.url();
 
     let source = CodeSource::Literal("000000".into());
-    let err = mfa::authorize(&loc, &source, &inst, None, None, &pool)
+    let err = mfa::authorize(&location, &source, &instance, MfaMethod::Totp, None, &pool)
         .await
         .unwrap_err();
 
@@ -231,12 +274,12 @@ async fn test_mfa_rejection_returns_mfa_failed(pool: DbPool) {
 
 #[sqlx::test(migrations = "../migrations")]
 async fn test_mfa_proxy_unreachable(pool: DbPool) {
-    let (mut inst, loc) = seed_db(&pool).await;
+    let (mut instance, location) = seed_db(&pool).await;
     // Point at a port where nothing is listening.
-    inst.proxy_url = "http://127.0.0.1:19999/".into();
+    instance.proxy_url = "http://127.0.0.1:19999/".into();
 
     let source = CodeSource::Literal("123456".into());
-    let err = mfa::authorize(&loc, &source, &inst, None, None, &pool)
+    let err = mfa::authorize(&location, &source, &instance, MfaMethod::Totp, None, &pool)
         .await
         .unwrap_err();
 
@@ -245,4 +288,63 @@ async fn test_mfa_proxy_unreachable(pool: DbPool) {
         "expected CliError::Other, got {err:?}"
     );
     assert!(err.to_string().contains("Failed to reach proxy"));
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_oidc_mfa_success_returns_psk(pool: DbPool) {
+    let (mut instance, _location) = seed_db(&pool).await;
+    let oidc_location = oidc_location("office-oidc", instance.id)
+        .save(&pool)
+        .await
+        .unwrap();
+
+    let mock = MockProxy::with_poll(
+        MockResponse {
+            status: 200,
+            body: r#"{"token":"tok-oidc"}"#.into(),
+        },
+        MockResponse {
+            status: 200,
+            body: r#"{"preshared_key":"secret-oidc-psk"}"#.into(),
+        },
+        2, // first two finish calls return 428, third returns 200
+    );
+    mock.wait_ready();
+    instance.proxy_url = mock.url();
+
+    let psk = mfa::authorize_oidc(&oidc_location, &instance, None, &pool, false)
+        .await
+        .unwrap();
+    assert_eq!(psk.expose_secret(), "secret-oidc-psk");
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_oidc_mfa_times_out_when_never_completed(pool: DbPool) {
+    let (mut instance, _location) = seed_db(&pool).await;
+    let oidc_location = oidc_location("office-oidc", instance.id)
+        .save(&pool)
+        .await
+        .unwrap();
+
+    // Proxy always returns 428 for finish: never authenticates.
+    let mock = MockProxy::with_poll(
+        MockResponse {
+            status: 200,
+            body: r#"{"token":"tok-timeout"}"#.into(),
+        },
+        MockResponse {
+            status: 200,
+            body: r#"{"preshared_key":"unreachable"}"#.into(),
+        },
+        u32::MAX, // never returns 200
+    );
+    mock.wait_ready();
+    instance.proxy_url = mock.url();
+
+    let err = mfa::authorize_oidc(&oidc_location, &instance, None, &pool, false)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, CliError::MfaFailed(_)));
+    assert!(err.to_string().contains("timed out"));
 }

@@ -14,6 +14,8 @@ pub mod tray;
 pub mod utils;
 pub mod window_manager;
 
+#[cfg(unix)]
+pub use defguard_client_core::set_perms;
 pub use defguard_client_core::{
     app_config,
     app_data_dir,
@@ -40,9 +42,6 @@ pub use defguard_client_core::{
     DEFAULT_ROUTE_IPV4,
     DEFAULT_ROUTE_IPV6,
 };
-
-#[cfg(unix)]
-pub use defguard_client_core::set_perms;
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");

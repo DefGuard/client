@@ -1,6 +1,3 @@
-use reqwest::{StatusCode, Url};
-use serde::Deserialize;
-
 #[cfg(windows)]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
@@ -14,6 +11,8 @@ use defguard_client_core::{
 use defguard_client_proto::defguard::enterprise::posture::v2::{
     DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
 };
+use reqwest::{StatusCode, Url};
+use serde::Deserialize;
 
 #[cfg(not(windows))]
 use crate::inspector::device_posture_data;

@@ -9,12 +9,11 @@ pub(crate) mod windows;
 
 use std::env::consts::OS;
 
-use sysinfo::System;
-
 use defguard_client_core::version::PKG_VERSION;
 use defguard_client_proto::defguard::enterprise::posture::v2::{
     BoolCheck, DevicePostureData, Int32Check, StringCheck, UnavailableReason,
 };
+use sysinfo::System;
 
 /// Returns the operating system name.
 fn os_name() -> Result<String, UnavailableReason> {

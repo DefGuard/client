@@ -28,6 +28,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+webbrowser.workspace = true
 
 # Dummy feature to let tauri build the release.
 [features]

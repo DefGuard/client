@@ -150,6 +150,7 @@ impl CommandOutput for LocationListResult {
             .locations
             .iter()
             .map(|l| LocationEntry {
+                id: l.id,
                 name: l.name.clone(),
                 instance: self.instance_names.get(&l.instance_id).cloned(),
                 address: l.address.clone(),
@@ -187,15 +188,16 @@ fn format_location_list_table(
         .max(MIN_INST_COL_WIDTH);
 
     let mut lines = vec![format!(
-        "  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:<11}",
-        "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
+        "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:<11}",
+        "ID", "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
     )];
     for location in locations {
         let instance = instance_names
             .get(&location.instance_id)
             .map_or("?", String::as_str);
         lines.push(format!(
-            "  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
+            "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
+            location.id,
             location.name,
             location.address,
             location.endpoint,
@@ -339,6 +341,7 @@ mod tests {
             instance_names: names,
         };
         let s = result.human();
+        assert!(s.contains("ID"));
         assert!(s.contains("office"));
         assert!(s.contains("acme"));
         assert!(s.contains("1.2.3.4:51820"));
@@ -367,6 +370,7 @@ mod tests {
         let json = result.json();
         let locations = json["locations"].as_array().unwrap();
         assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0]["id"], 1);
         assert_eq!(locations[0]["name"], "office");
         assert_eq!(locations[0]["instance"], "acme");
     }
