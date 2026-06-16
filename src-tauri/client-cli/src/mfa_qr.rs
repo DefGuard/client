@@ -5,6 +5,8 @@
 //!
 //! The payload is never logged via tracing.
 
+#[cfg(not(test))]
+use std::io::stderr;
 use std::{io::IsTerminal, path::Path};
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
@@ -14,8 +16,6 @@ use qrcode::render::unicode::Dense1x2;
 use qrcode::QrCode;
 
 use crate::state::CliError;
-#[cfg(not(test))]
-use std::io::stderr;
 
 /// Build the base64-encoded QR payload for mobile-approve MFA.
 ///

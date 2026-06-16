@@ -6,6 +6,7 @@
 
 use std::time::Duration;
 
+use base64::{prelude::BASE64_STANDARD, Engine as _};
 use defguard_client_proto::defguard::{
     client_types::{
         ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
@@ -23,20 +24,26 @@ use defguard_core::{
         },
         DbPool,
     },
-    proxy::post_with_headers,
+    proxy::{construct_platform_header, post_with_headers},
+    version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
+use futures_util::StreamExt;
+use http::Request;
 use reqwest::{StatusCode, Url};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use tokio::{
-    select,
+    net::TcpStream,
+    pin, select,
     signal::ctrl_c,
     time::{sleep, Instant},
 };
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, info, warn};
 
 use crate::{
     mfa_code::{obtain_code, CodeSource, MfaContext},
+    mfa_qr,
     state::CliError,
 };
 
@@ -459,6 +466,187 @@ async fn poll_finish(
                 return Err(CliError::Cancelled("MFA login cancelled.".into()));
             }
             () = sleep(OIDC_POLL_INTERVAL) => {}
+        }
+    }
+}
+
+/// How long the CLI waits for the user to approve MFA on their mobile device.
+#[cfg(not(test))]
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(60);
+#[cfg(test)]
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Run the mobile-approve MFA flow.
+///
+/// Displays a QR code (terminal and/or `--qr-file` PNG), opens a WebSocket
+/// to the proxy, and waits for the mobile app to approve the authentication.
+/// The CLI performs no cryptography; the mobile device signs the challenge
+/// and the proxy pushes the resulting preshared key back over the WebSocket.
+///
+/// When `json_mode` is true, progress messages on stderr are suppressed so
+/// that `--json` output consumers only see the final result/error.
+pub(crate) async fn authorize_mobile_approve(
+    location: &Location<Id>,
+    instance: &Instance<Id>,
+    posture_data: Option<DevicePostureData>,
+    qr_file: Option<&str>,
+    pool: &DbPool,
+    json_mode: bool,
+) -> Result<SecretString, CliError> {
+    let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
+        .await
+        .map_err(|e| CliError::Other(e.to_string()))?
+        .ok_or_else(|| {
+            CliError::Other(format!(
+                "WireGuard keys not found for instance {}",
+                instance.name
+            ))
+        })?;
+
+    let proxy_base = Url::parse(&instance.proxy_url)
+        .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
+    check_proxy_scheme(&proxy_base, &instance.proxy_url);
+
+    // Step 1: Start the MFA session.
+    let start_req = ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: wireguard_keys.pubkey.clone(),
+        method: MfaMethod::MobileApprove as i32,
+        posture_data,
+    };
+
+    let start_url = proxy_base
+        .join("api/v1/client-mfa/start")
+        .map_err(|e| CliError::Other(format!("Failed to build MFA start URL: {e}")))?;
+
+    debug!("Starting mobile-approve MFA session at {start_url}");
+    let response = post_with_headers(start_url, &start_req)
+        .await
+        .map_err(|e| CliError::Other(format!("Failed to reach proxy: {e}")))?;
+
+    if !response.status().is_success() {
+        return Err(handle_mfa_error(response).await);
+    }
+
+    let start_resp: ClientMfaStartResponse = response
+        .json()
+        .await
+        .map_err(|e| CliError::Other(format!("Invalid MFA start response: {e}")))?;
+
+    // The challenge is always present for MobileApprove (core always generates
+    // a BiometricChallenge for this method).
+    let challenge = start_resp.challenge.ok_or_else(|| {
+        CliError::Other("Proxy did not return a challenge for mobile-approve MFA".into())
+    })?;
+
+    // Step 2: Build and render the QR code.
+    let payload = mfa_qr::build_qr_payload(&start_resp.token, &challenge, &instance.uuid);
+    if !json_mode {
+        mfa_qr::render_qr(&payload, qr_file)?;
+        eprintln!("Waiting for mobile approval... (Ctrl-C to cancel)");
+    }
+
+    // Step 3: Open a WebSocket and wait for the preshared key.
+    let ws_url = derive_ws_url(&proxy_base, &start_resp.token)?;
+
+    let request = Request::builder()
+        .uri(&ws_url)
+        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
+        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
+        .body(())
+        .map_err(|e| CliError::Other(format!("Failed to build WebSocket request: {e}")))?;
+
+    debug!("Connecting WebSocket to {ws_url}");
+    let (ws_stream, _response) = connect_async(request)
+        .await
+        .map_err(|e| CliError::Other(format!("Failed to connect to proxy: {e}")))?;
+
+    let psk = wait_for_mfa_success(ws_stream, MOBILE_APPROVE_TIMEOUT, json_mode).await?;
+
+    info!("Mobile-approve MFA completed, preshared key obtained");
+    Ok(SecretString::from(psk))
+}
+
+/// Derive the WebSocket URL from the proxy's base URL and the MFA token.
+fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, CliError> {
+    let ws_scheme = match proxy_base.scheme() {
+        "https" => "wss",
+        "http" => "ws",
+        other => {
+            return Err(CliError::Other(format!(
+                "Invalid proxy URL scheme '{other}'; expected http or https"
+            )));
+        }
+    };
+    Ok(format!(
+        "{}://{}/api/v1/client-mfa/remote?token={token}",
+        ws_scheme,
+        proxy_base.authority(),
+    ))
+}
+
+/// Wait on the WebSocket for a single `{"type":"mfa_success","preshared_key":"..."}`
+/// text frame, or fail if the deadline expires or the user cancels.
+async fn wait_for_mfa_success(
+    ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    timeout: Duration,
+    json_mode: bool,
+) -> Result<String, CliError> {
+    let (_, mut read) = ws_stream.split();
+
+    loop {
+        let msg = select! {
+            _ = sleep(timeout) => {
+                if !json_mode {
+                    eprintln!("Mobile approval timed out.");
+                }
+                return Err(CliError::MfaFailed(
+                    "mobile approval timed out; re-run to get a fresh QR".into(),
+                ));
+            }
+            _ = ctrl_c() => {
+                if !json_mode {
+                    eprintln!("MFA cancelled.");
+                }
+                return Err(CliError::Cancelled("MFA cancelled.".into()));
+            }
+            msg = read.next() => {
+                match msg {
+                    Some(Ok(msg)) => msg,
+                    Some(Err(e)) => {
+                        return Err(CliError::Other(format!("WebSocket error: {e}")));
+                    }
+                    None => {
+                        // Server closed the connection without sending mfa_success.
+                        if !json_mode {
+                            eprintln!("Mobile approval timed out.");
+                        }
+                        return Err(CliError::MfaFailed(
+                            "mobile approval timed out; re-run to get a fresh QR".into(),
+                        ));
+                    }
+                }
+            }
+        };
+
+        match msg {
+            Message::Text(text) => {
+                let parsed: serde_json::Value = serde_json::from_str(&text)
+                    .map_err(|e| CliError::Other(format!("Invalid WebSocket message: {e}")))?;
+                if let Some(key) = parsed["preshared_key"].as_str() {
+                    return Ok(key.to_string());
+                }
+                // Ignore unrecognised text frames.
+            }
+            Message::Close(_) => {
+                if !json_mode {
+                    eprintln!("Mobile approval timed out.");
+                }
+                return Err(CliError::MfaFailed(
+                    "mobile approval timed out; re-run to get a fresh QR".into(),
+                ));
+            }
+            _ => {} // Ignore ping, pong, binary.
         }
     }
 }
