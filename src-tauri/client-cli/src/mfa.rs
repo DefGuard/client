@@ -1,12 +1,10 @@
 //! Connect-time VPN MFA over `core::proxy` (HTTP).
 //!
-//! Flow: `start` → `obtain_code` → `finish` → preshared_key.
-//! Supports TOTP, email, and OIDC methods.  Mobile-approve is
-//! not yet supported by the CLI.
+//! Flow: `start` → `obtain_code` / QR render → `finish` / WebSocket → preshared_key.
+//! Supports TOTP, email, OIDC, and mobile-approve methods.
 
 use std::time::Duration;
 
-use base64::{prelude::BASE64_STANDARD, Engine as _};
 use defguard_client_proto::defguard::{
     client_types::{
         ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
@@ -24,17 +22,15 @@ use defguard_core::{
         },
         DbPool,
     },
-    proxy::{construct_platform_header, post_with_headers},
-    version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
+    proxy::post_with_headers,
 };
 use futures_util::StreamExt;
-use http::Request;
 use reqwest::{StatusCode, Url};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use tokio::{
     net::TcpStream,
-    pin, select,
+    select,
     signal::ctrl_c,
     time::{sleep, Instant},
 };
@@ -115,10 +111,16 @@ pub async fn authorize(
     // accidentally invoke authorize() with OIDC, this catch-all is a
     // defense-in-depth barrier that emits a clear error.
     match method {
-        MfaMethod::Biometric | MfaMethod::MobileApprove => {
+        MfaMethod::Biometric => {
             return Err(CliError::MfaFailed(format!(
                 "MFA method {method:?} is not yet supported by the CLI. Use the desktop client."
             )));
+        }
+        MfaMethod::MobileApprove => {
+            return Err(CliError::Other(
+                "Internal error: MobileApprove MFA must use authorize_mobile_approve, not authorize"
+                    .into(),
+            ));
         }
         MfaMethod::Oidc => {
             return Err(CliError::Other(
@@ -549,15 +551,8 @@ pub(crate) async fn authorize_mobile_approve(
     // Step 3: Open a WebSocket and wait for the preshared key.
     let ws_url = derive_ws_url(&proxy_base, &start_resp.token)?;
 
-    let request = Request::builder()
-        .uri(&ws_url)
-        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
-        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
-        .body(())
-        .map_err(|e| CliError::Other(format!("Failed to build WebSocket request: {e}")))?;
-
     debug!("Connecting WebSocket to {ws_url}");
-    let (ws_stream, _response) = connect_async(request)
+    let (ws_stream, _response) = connect_async(&ws_url)
         .await
         .map_err(|e| CliError::Other(format!("Failed to connect to proxy: {e}")))?;
 

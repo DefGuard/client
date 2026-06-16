@@ -1,4 +1,4 @@
-use std::io::{stdin, IsTerminal};
+use std::io::{stderr, stdin, IsTerminal};
 
 use defguard_client_posture::{authorize_posture_session, get_posture_data};
 use defguard_client_proto::defguard::client_types::MfaMethod;
@@ -30,7 +30,7 @@ pub async fn handle(
     code: Option<&str>,
     code_command: Option<&str>,
     mfa_method: Option<&str>,
-    _qr_file: Option<&str>,
+    qr_file: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
     json: bool,
@@ -107,6 +107,25 @@ pub async fn handle(
                 let psk = if method == MfaMethod::Oidc {
                     mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
                         .await?
+                } else if method == MfaMethod::MobileApprove {
+                    // Fail-fast: if neither stderr is a TTY nor --qr-file is set,
+                    // the user cannot scan the QR.  Do not call /start.
+                    if !stderr().is_terminal() && qr_file.is_none() {
+                        return Err(CliError::InvalidInput(
+                            "No QR display available (stderr is not a TTY). \
+                             Use --qr-file <path> to save the QR as a PNG image."
+                                .into(),
+                        ));
+                    }
+                    mfa::authorize_mobile_approve(
+                        location,
+                        &instance,
+                        posture_data,
+                        qr_file,
+                        &state.pool,
+                        json,
+                    )
+                    .await?
                 } else {
                     // Determine the MFA code source from CLI flags.
                     let code_source = code

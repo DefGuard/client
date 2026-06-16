@@ -6,16 +6,22 @@
 //! The payload is never logged via tracing.
 
 #[cfg(not(test))]
-use std::io::stderr;
-use std::{io::IsTerminal, path::Path};
+use std::io::{stderr, IsTerminal};
+use std::path::Path;
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
+#[cfg(not(test))]
+use image::imageops::{resize, FilterType};
 use image::Luma;
 #[cfg(not(test))]
 use qrcode::render::unicode::Dense1x2;
 use qrcode::QrCode;
 
 use crate::state::CliError;
+
+#[cfg(not(test))]
+// Target minimum size (in pixels) for QR PNG output.
+const QR_PNG_MIN_SIZE: u32 = 300;
 
 /// Build the base64-encoded QR payload for mobile-approve MFA.
 ///
@@ -64,7 +70,17 @@ pub(crate) fn render_qr(payload: &str, qr_file: Option<&str>) -> Result<(), CliE
         let code = QrCode::new(payload.as_bytes())
             .map_err(|e| CliError::Other(format!("Failed to generate QR code: {e}")))?;
         let image = code.render::<Luma<u8>>().build();
-        image
+        // Scale up so the QR is large enough to scan.
+        // Nearest-neighbour preserves sharp module edges.
+        let max_dim = image.width().max(image.height());
+        let scale = (QR_PNG_MIN_SIZE + max_dim - 1) / max_dim.max(1);
+        let scaled = resize(
+            &image,
+            image.width() * scale,
+            image.height() * scale,
+            FilterType::Nearest,
+        );
+        scaled
             .save(Path::new(path))
             .map_err(|e| CliError::Other(format!("Failed to save QR image: {e}")))?;
     }
