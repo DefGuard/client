@@ -1556,6 +1556,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sha1",
  "sqlx",
  "tempfile",
  "thiserror 2.0.18",

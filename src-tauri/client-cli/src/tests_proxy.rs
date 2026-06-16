@@ -15,6 +15,7 @@ use std::{
     time::Duration,
 };
 
+use base64::{prelude::BASE64_STANDARD, Engine as _};
 use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::database::{
     models::{
@@ -25,6 +26,8 @@ use defguard_core::database::{
     DbPool,
 };
 use secrecy::ExposeSecret;
+use serde_json::json;
+use sha1::{Digest, Sha1};
 
 use crate::{mfa, mfa_code::CodeSource, state::CliError};
 
@@ -39,7 +42,7 @@ struct MockResponse {
     body: String,
 }
 
-/// A tiny HTTP server that responds to MFA start/finish requests.
+/// A tiny HTTP server that responds to MFA start/finish/remote requests.
 struct MockProxy {
     addr: SocketAddr,
     shutdown: Arc<AtomicBool>,
@@ -47,6 +50,88 @@ struct MockProxy {
 }
 
 impl MockProxy {
+    /// Mobile-approve MFA: /start returns a token+challenge, /remote upgrades to
+    /// WebSocket and sends the given preshared key.
+    fn with_mobile_approve(start_response: MockResponse, preshared_key: &str) -> Self {
+        let psk = preshared_key.to_string();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_thread = shutdown.clone();
+        let handle = spawn(move || {
+            while !shutdown_thread.load(Ordering::Relaxed) {
+                let mut stream = match listener.accept() {
+                    Ok((stream, _)) => stream,
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                        sleep(WAIT_TIMEOUT);
+                        continue;
+                    }
+                    Err(_) => break,
+                };
+                stream.set_nonblocking(false).ok();
+                stream.set_read_timeout(Some(READ_TIMEOUT)).ok();
+
+                // Read the full request head.
+                let mut data = Vec::new();
+                let mut buf = [0u8; 4096];
+                loop {
+                    match stream.read(&mut buf) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            data.extend_from_slice(&buf[..n]);
+                            if data.windows(4).any(|w| w == b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+
+                let request = String::from_utf8_lossy(&data);
+
+                if request.contains("/api/v1/client-mfa/remote") {
+                    // WebSocket upgrade.
+                    if let Some(key) = extract_header(&request, "Sec-WebSocket-Key") {
+                        let accept = compute_ws_accept(&key);
+                        let resp = format!(
+                            "HTTP/1.1 101 Switching Protocols\r\n\
+                             Upgrade: websocket\r\n\
+                             Connection: Upgrade\r\n\
+                             Sec-WebSocket-Accept: {accept}\r\n\
+                             \r\n"
+                        );
+                        let _ = stream.write_all(resp.as_bytes());
+
+                        // Send the mfa_success text frame.
+                        let payload = json!({
+                            "type": "mfa_success",
+                            "preshared_key": &psk,
+                        });
+                        let payload_str = serde_json::to_string(&payload).unwrap();
+                        let frame = build_ws_text_frame(&payload_str);
+                        let _ = stream.write_all(&frame);
+                    }
+                } else if request.contains("/api/v1/client-mfa/start") {
+                    let body = format!(
+                        "HTTP/1.1 {} OK\r\nContent-Type: application/json\r\n\
+                         Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        start_response.status,
+                        start_response.body.len(),
+                        start_response.body,
+                    );
+                    let _ = stream.write_all(body.as_bytes());
+                }
+                // Unknown paths: no response, just close.
+            }
+        });
+        MockProxy {
+            addr,
+            shutdown,
+            handle: Some(handle),
+        }
+    }
+
     /// Single-shot finish: each finish request gets the same response.
     fn new(start_response: MockResponse, finish_response: MockResponse) -> Self {
         Self::with_counter(start_response, finish_response, None)
@@ -160,6 +245,38 @@ impl Drop for MockProxy {
             let _ = handle.join();
         }
     }
+}
+
+/// Extract a header value from an HTTP request string.
+fn extract_header(request: &str, name: &str) -> Option<String> {
+    let prefix = format!("{name}: ");
+    request
+        .lines()
+        .find(|l| l.to_lowercase().starts_with(&prefix.to_lowercase()))
+        .and_then(|l| l.split_once(": ").map(|(_, v)| v.trim().to_string()))
+}
+
+/// Compute the Sec-WebSocket-Accept value per RFC 6455 §4.2.2.
+fn compute_ws_accept(key: &str) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(key.as_bytes());
+    hasher.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    BASE64_STANDARD.encode(hasher.finalize())
+}
+
+/// Build a WebSocket text frame (unmasked, for server→client).
+fn build_ws_text_frame(payload: &str) -> Vec<u8> {
+    let len = payload.len();
+    let mut frame = vec![0x81]; // FIN + text opcode
+    if len < 126 {
+        frame.push(len as u8);
+    } else {
+        // Our test payloads are small; 16-bit length is sufficient.
+        frame.push(126);
+        frame.extend_from_slice(&(len as u16).to_be_bytes());
+    }
+    frame.extend_from_slice(payload.as_bytes());
+    frame
 }
 
 fn mfa_enabled_location(name: &str, instance_id: Id) -> Location<NoId> {
@@ -347,4 +464,29 @@ async fn test_oidc_mfa_times_out_when_never_completed(pool: DbPool) {
 
     assert!(matches!(err, CliError::MfaFailed(_)));
     assert!(err.to_string().contains("timed out"));
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_mobile_approve_success_returns_psk(pool: DbPool) {
+    let (mut instance, location) = seed_db(&pool).await;
+
+    // /start must return a challenge — mobile-approve requires it.
+    let mock = MockProxy::with_mobile_approve(
+        MockResponse {
+            status: 200,
+            body: r#"{"token":"tok-mob","challenge":"chal-xyz"}"#.into(),
+        },
+        "secret-mobile-psk",
+    );
+    mock.wait_ready();
+    instance.proxy_url = mock.url();
+
+    let psk = mfa::authorize_mobile_approve(
+        &location, &instance, None, // no posture data
+        None, // no qr-file (test render_qr is a no-op)
+        &pool, false, // not json mode
+    )
+    .await
+    .unwrap();
+    assert_eq!(psk.expose_secret(), "secret-mobile-psk");
 }

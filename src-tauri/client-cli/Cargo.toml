@@ -41,6 +41,7 @@ futures-util.workspace = true
 custom-protocol = []
 
 [dev-dependencies]
+sha1 = "0.10"
 tempfile.workspace = true
 tokio-stream = "0.1"
 tonic.workspace = true
