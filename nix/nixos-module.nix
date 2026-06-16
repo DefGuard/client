@@ -4,7 +4,7 @@
   pkgs,
   ...
 }: let
-  inherit (lib) mkEnableOption mkIf mkOption mkPackageOption optional types;
+  inherit (lib) mkEnableOption mkIf mkOption optional types;
 
   craneLib = mkCraneLib pkgs;
   defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
@@ -16,9 +16,10 @@ in {
   options.services.defguard-client-daemon = {
     enable = mkEnableOption "Defguard VPN client background service (required by both the desktop client and CLI)";
 
-    package = mkPackageOption pkgs "defguard-client" {
-      default = ["defguard-client"];
-      extraDescription = "Package that provides the defguard-service binary.";
+    package = mkOption {
+      type = types.package;
+      default = defguard-client;
+      description = "Package that provides the defguard-service binary.";
     };
 
     logLevel = mkOption {
@@ -66,7 +67,8 @@ in {
       ++ optional svcCfg.enable svcCfg.package
       ++ optional clientCfg.enable clientCfg.package
       ++ optional cliCfg.enable cliCfg.package;
-
+  }
+  // mkIf svcCfg.enable {
     systemd.services.defguard-service = {
       description = "Defguard VPN Service";
       documentation = ["https://docs.defguard.net"];
