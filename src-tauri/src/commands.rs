@@ -1165,6 +1165,7 @@ pub struct AppVersionInfo {
     pub release_date: String,
     pub release_notes_url: String,
     pub update_url: String,
+    pub summary: Option<String>,
 }
 
 const PRODUCT_NAME: &str = "defguard-client";
