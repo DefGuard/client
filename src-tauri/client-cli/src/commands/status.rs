@@ -155,8 +155,9 @@ fn format_handshake(secs: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use defguard_core::{connection::active_state::InterfaceStats, ConnectionType};
+
+    use super::*;
 
     fn make_conn(
         name: &str,

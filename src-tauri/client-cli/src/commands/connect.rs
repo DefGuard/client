@@ -1,11 +1,13 @@
 use std::io::{stdin, IsTerminal};
 
 use defguard_client_posture::{authorize_posture_session, get_posture_data};
-use defguard_core::database::models::instance::Instance;
+use defguard_client_proto::defguard::client_types::MfaMethod;
+use defguard_core::{
+    connection::{active_state::active_state, bring_up, ConnectionTarget},
+    database::models::instance::Instance,
+    ConnectionType,
+};
 use secrecy::ExposeSecret;
-
-use defguard_core::connection::{active_state::active_state, bring_up, ConnectionTarget};
-use defguard_core::ConnectionType;
 use serde_json::json;
 use tracing::info;
 
@@ -30,6 +32,7 @@ pub async fn handle(
     mfa_method: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
+    json: bool,
 ) -> Result<ConnectResult, CliError> {
     #[cfg(target_os = "macos")]
     {
@@ -77,21 +80,9 @@ pub async fn handle(
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(location) => {
             if location.mfa_enabled() {
-                // Determine the MFA code source from CLI flags.
-                let code_source = code
-                    .map(|c| CodeSource::Literal(c.to_string()))
-                    .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
-
-                let source = if let Some(code_source) = code_source {
-                    code_source
-                } else if stdin().is_terminal() {
-                    CodeSource::Interactive
-                } else {
-                    return Err(CliError::MfaInputRequired(format!(
-                        "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
-                        location.name
-                    )));
-                };
+                // Resolve the effective MFA method.
+                // Also rejects --code / --code-command when the method is OIDC.
+                let method = mfa::resolve_method(location, mfa_method, code, code_command)?;
 
                 let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
@@ -112,15 +103,36 @@ pub async fn handle(
                     None
                 };
 
-                let psk = mfa::authorize(
-                    location,
-                    &source,
-                    &instance,
-                    mfa_method,
-                    posture_data,
-                    &state.pool,
-                )
-                .await?;
+                let psk = if method == MfaMethod::Oidc {
+                    mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
+                        .await?
+                } else {
+                    // Determine the MFA code source from CLI flags.
+                    let code_source = code
+                        .map(|c| CodeSource::Literal(c.to_string()))
+                        .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
+
+                    let source = if let Some(code_source) = code_source {
+                        code_source
+                    } else if stdin().is_terminal() {
+                        CodeSource::Interactive
+                    } else {
+                        return Err(CliError::MfaInputRequired(format!(
+                            "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
+                            location.name
+                        )));
+                    };
+
+                    mfa::authorize(
+                        location,
+                        &source,
+                        &instance,
+                        method,
+                        posture_data,
+                        &state.pool,
+                    )
+                    .await?
+                };
                 (
                     location.name.clone(),
                     Some(psk.expose_secret().to_string()),

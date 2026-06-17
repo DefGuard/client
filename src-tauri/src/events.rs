@@ -1,3 +1,4 @@
+pub use defguard_client_core::events::EventKey;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
@@ -6,8 +7,6 @@ use crate::{
     window_manager::{WindowManager, COMPACT_WINDOW_ID},
     ConnectionType,
 };
-
-pub use defguard_client_core::events::EventKey;
 
 /// Used as payload for [`DEAD_CONNECTION_DROPPED`] event
 #[derive(Clone, Serialize)]

@@ -12,6 +12,7 @@ use crate::state::CliError;
 /// | 5    | mfa-failed         |
 /// | 6    | not-enrolled       |
 /// | 7    | invalid-input      |
+/// | 8    | cancelled          |
 pub fn exit_code_for(err: &CliError) -> u8 {
     match err {
         CliError::Usage(_) => 2,
@@ -20,6 +21,7 @@ pub fn exit_code_for(err: &CliError) -> u8 {
         CliError::MfaFailed(_) | CliError::MfaInputRequired(_) => 5,
         CliError::NotEnrolled(_) => 6,
         CliError::InvalidInput(_) => 7,
+        CliError::Cancelled(_) => 8,
         CliError::Database(_) => 1,
         CliError::Other(_) => 1,
     }
@@ -42,6 +44,7 @@ mod tests {
                 &CliError::InvalidInput("route_all_traffic enforced".into()),
                 7,
             ),
+            (&CliError::Cancelled("user cancelled".into()), 8),
             (
                 &CliError::Database(sqlx::Error::Protocol("bad schema".into())),
                 1,
@@ -52,8 +55,7 @@ mod tests {
             assert_eq!(
                 exit_code_for(err),
                 *expected,
-                "{:?} should map to {expected}",
-                err
+                "{err:?} should map to {expected}",
             );
         }
     }

@@ -42,6 +42,9 @@ pub enum CliError {
     InvalidInput(String),
 
     #[error("{0}")]
+    Cancelled(String),
+
+    #[error("{0}")]
     Other(String),
 
     #[error("database error: {0}")]

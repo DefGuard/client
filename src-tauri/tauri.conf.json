@@ -57,6 +57,7 @@
       "deb": {
         "files": {
           "/usr/bin/defguard-cli": "target/release/defguard-cli",
+          "/usr/bin/dg": "target/release/dg",
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/usr/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service",
           "../control/rules": "../resources-linux/rules",
@@ -71,6 +72,7 @@
       "rpm": {
         "files": {
           "/usr/bin/defguard-cli": "target/release/defguard-cli",
+          "/usr/bin/dg": "target/release/dg",
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
         },

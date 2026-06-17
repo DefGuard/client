@@ -20,11 +20,7 @@ const UpdateAvailable = ({ info }: { info: NewAppVersionInfo }) => (
   <>
     <p className="title">New {info.version} version is available.</p>
     <SizedBox height={ThemeSpacing.Sm} />
-    <p className="description">
-      We're preparing a new version of the desktop VPN client with a focus on performance,
-      stability, and everyday usability. These improvements are based on user feedback and
-      internal testing to make your connection faster, safer, and easier to manage.
-    </p>
+    {isPresent(info.summary) && <p className="description">{info.summary}</p>}
     <SizedBox height={ThemeSpacing.Xl} />
     <div className="actions">
       <Button
