@@ -492,7 +492,7 @@ async fn poll_finish(
 
 /// How long the CLI waits for the user to approve MFA on their mobile device.
 #[cfg(not(test))]
-const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(60);
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(120);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
