@@ -1,6 +1,5 @@
 //! Connect-time VPN MFA over `core::proxy` (HTTP).
 //!
-//! Flow: `start` → `obtain_code` / QR render → `finish` / WebSocket → preshared_key.
 //! Supports TOTP, email, OIDC, and mobile-approve methods.
 
 use std::time::Duration;
@@ -129,7 +128,7 @@ pub async fn authorize(
     match method {
         MfaMethod::Biometric => {
             return Err(CliError::MfaFailed(format!(
-                "MFA method {method:?} is not yet supported by the CLI. Use the desktop client."
+                "MFA method {method:?} is not supported by the CLI. Use the mobile client."
             )));
         }
         MfaMethod::MobileApprove => {
@@ -156,13 +155,13 @@ pub async fn authorize(
             ))
         })?;
 
-    // Parse the proxy base URL once and reuse it for both MFA requests.
-    let proxy_base = Url::parse(&instance.proxy_url)
+    // Parse the proxy URL once and reuse it for both MFA requests.
+    let proxy_url = Url::parse(&instance.proxy_url)
         .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
 
     // The one-time MFA code and the returned preshared key are sensitive; warn (but do
     // not block) if the proxy is not using HTTPS, since they would travel in cleartext.
-    check_proxy_scheme(&proxy_base, &instance.proxy_url);
+    check_proxy_scheme(&proxy_url);
 
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
@@ -172,7 +171,7 @@ pub async fn authorize(
         posture_data,
     };
 
-    let start_url = proxy_base
+    let start_url = proxy_url
         .join("api/v1/client-mfa/start")
         .map_err(|e| CliError::Other(format!("Failed to build MFA start URL: {e}")))?;
 
@@ -207,7 +206,7 @@ pub async fn authorize(
         auth_pub_key: None,
     };
 
-    let finish_url = proxy_base
+    let finish_url = proxy_url
         .join("api/v1/client-mfa/finish")
         .map_err(|e| CliError::Other(format!("Failed to build MFA finish URL: {e}")))?;
 
@@ -295,9 +294,12 @@ fn infer_method(location: &Location<Id>) -> MfaMethod {
 ///
 /// The one-time MFA code and the returned preshared key are sensitive and would
 /// travel in cleartext over plain HTTP.
-fn check_proxy_scheme(proxy_base: &Url, proxy_url: &str) {
+fn check_proxy_scheme(proxy_base: &Url) {
     if proxy_base.scheme() != "https" {
-        warn!("Proxy URL '{proxy_url}' is not HTTPS; secrets will be sent in cleartext.");
+        warn!(
+            "Proxy URL '{}' is not HTTPS; secrets will be sent in cleartext.",
+            proxy_base.as_str()
+        );
     }
 }
 
@@ -363,7 +365,7 @@ pub(crate) async fn authorize_oidc(
 
     let proxy_base = Url::parse(&instance.proxy_url)
         .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
-    check_proxy_scheme(&proxy_base, &instance.proxy_url);
+    check_proxy_scheme(&proxy_base);
 
     // Step 1: Start the OIDC MFA session.
     let start_req = ClientMfaStartRequest {
@@ -523,7 +525,7 @@ pub(crate) async fn authorize_mobile_approve(
 
     let proxy_base = Url::parse(&instance.proxy_url)
         .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
-    check_proxy_scheme(&proxy_base, &instance.proxy_url);
+    check_proxy_scheme(&proxy_base);
 
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
@@ -565,7 +567,6 @@ pub(crate) async fn authorize_mobile_approve(
     }
 
     // Step 3: Open a WebSocket and wait for the preshared key.
-    // Never log the token-bearing URL via tracing.
     let ws_url = derive_ws_url(&proxy_base, &start_resp.token)?;
     let (ws_stream, _response) = connect_async(&ws_url)
         .await
@@ -604,7 +605,13 @@ async fn handle_mobile_approve_start_error(response: reqwest::Response) -> CliEr
 }
 
 /// Derive the WebSocket URL from the proxy's base URL and the MFA token.
+///
+/// Uses [`Url::join`] so that any path prefix is preserved.
 fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, CliError> {
+    let mut ws_url = proxy_base
+        .join("api/v1/client-mfa/remote")
+        .map_err(|e| CliError::Other(format!("Failed to build WebSocket URL: {e}")))?;
+
     let ws_scheme = match proxy_base.scheme() {
         "https" => "wss",
         "http" => "ws",
@@ -614,11 +621,13 @@ fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, CliError> {
             )));
         }
     };
-    Ok(format!(
-        "{}://{}/api/v1/client-mfa/remote?token={token}",
-        ws_scheme,
-        proxy_base.authority(),
-    ))
+
+    ws_url
+        .set_scheme(ws_scheme)
+        .map_err(|()| CliError::Other("Failed to set WebSocket URL scheme".into()))?;
+    ws_url.query_pairs_mut().append_pair("token", token);
+
+    Ok(ws_url.to_string())
 }
 
 /// Wait on the WebSocket for a single `{"type":"mfa_success","preshared_key":"..."}`
@@ -631,10 +640,7 @@ async fn wait_for_mfa_success(
     timeout: Duration,
     json_mode: bool,
 ) -> Result<String, CliError> {
-    let (write, mut read) = ws_stream.split();
-    // Keep the write half alive so tungstenite can send automatic
-    // pong replies to server pings.  Dropping it would prevent pongs.
-    let _write = write;
+    let (_write, mut read) = ws_stream.split();
 
     let deadline = Instant::now() + timeout;
 

@@ -1,9 +1,4 @@
 //! Mobile-approve MFA QR code payload construction and rendering.
-//!
-//! QR payload format (matches the desktop client):
-//!   Base64(JSON{token, challenge, instance_id})
-//!
-//! The payload is never logged via tracing.
 
 #[cfg(not(test))]
 use std::io::{stderr, IsTerminal};
@@ -25,9 +20,8 @@ const QR_PNG_MIN_SIZE: u32 = 300;
 
 /// Build the base64-encoded QR payload for mobile-approve MFA.
 ///
-/// The payload is a JSON object containing the MFA session token, the
-/// biometric challenge, and the instance UUID.  This matches the format
-/// expected by the Defguard mobile app.
+/// QR payload format:
+///   Base64(JSON{token, challenge, instance_id})
 pub(crate) fn build_qr_payload(token: &str, challenge: &str, instance_id: &str) -> String {
     let json = serde_json::json!({
         "token": token,
