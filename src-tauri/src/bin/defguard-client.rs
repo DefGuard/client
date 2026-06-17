@@ -209,8 +209,8 @@ fn main() {
             close_tray_window,
             all_active_connections,
             disconnect_locations,
-            session_state::command_get_session_state,
-            session_state::command_patch_session_state,
+            session_state::get_session_state,
+            session_state::patch_session_state,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

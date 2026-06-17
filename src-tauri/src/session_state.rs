@@ -26,12 +26,12 @@ pub struct SessionState {
 }
 
 #[tauri::command]
-pub fn command_get_session_state(app_state: State<'_, AppState>) -> SessionState {
+pub fn get_session_state(app_state: State<'_, AppState>) -> SessionState {
     app_state.session_state.lock().unwrap().clone()
 }
 
 #[tauri::command(async)]
-pub async fn command_patch_session_state(
+pub async fn patch_session_state(
     patch: SessionStatePatch,
     app_handle: AppHandle,
 ) -> Result<SessionState, ()> {

@@ -124,8 +124,8 @@ export const TauriCommand = {
   SwapToTray: 'swap_to_tray',
   CloseTrayWindow: 'close_tray_window',
   // Session state
-  GetSessionState: 'command_get_session_state',
-  PatchSessionState: 'command_patch_session_state',
+  GetSessionState: 'get_session_state',
+  PatchSessionState: 'patch_session_state',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];
