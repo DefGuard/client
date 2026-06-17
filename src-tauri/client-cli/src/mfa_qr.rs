@@ -40,15 +40,21 @@ pub(crate) fn build_qr_payload(token: &str, challenge: &str, instance_id: &str) 
 
 /// Render the QR code for a payload string to available output(s).
 ///
-/// * When **stderr is a TTY**, prints a Unicode `Dense1x2` QR to stderr.
-/// * When **`qr_file` is `Some`**, writes a PNG image to that path.
+/// * When **stderr is a TTY** and `json_mode` is false, prints a Unicode
+///   `Dense1x2` QR to stderr.
+/// * When **`qr_file` is `Some`**, always writes a PNG image to that path
+///   (regardless of `json_mode` - the file is machine-readable output).
 /// * If **neither** output is viable (non-TTY + no `qr_file`), returns
 ///   [`CliError::InvalidInput`] with guidance to use `--qr-file`.
 ///
-/// Both outputs are rendered independently -- when both are available the
-/// user sees the terminal QR *and* gets a PNG file.
+/// Terminal and file outputs are independent: when both are available
+/// and `!json_mode`, the user sees the terminal QR *and* gets a PNG file.
 #[cfg(not(test))]
-pub(crate) fn render_qr(payload: &str, qr_file: Option<&str>) -> Result<(), CliError> {
+pub(crate) fn render_qr(
+    payload: &str,
+    qr_file: Option<&str>,
+    json_mode: bool,
+) -> Result<(), CliError> {
     let is_tty = stderr().is_terminal();
 
     if !is_tty && qr_file.is_none() {
@@ -59,7 +65,7 @@ pub(crate) fn render_qr(payload: &str, qr_file: Option<&str>) -> Result<(), CliE
         ));
     }
 
-    if is_tty {
+    if is_tty && !json_mode {
         let code = QrCode::new(payload.as_bytes())
             .map_err(|e| CliError::Other(format!("Failed to generate QR code: {e}")))?;
         let rendered = code.render::<Dense1x2>().build();
@@ -89,7 +95,11 @@ pub(crate) fn render_qr(payload: &str, qr_file: Option<&str>) -> Result<(), CliE
 }
 
 #[cfg(test)]
-pub(crate) fn render_qr(_payload: &str, qr_file: Option<&str>) -> Result<(), CliError> {
+pub(crate) fn render_qr(
+    _payload: &str,
+    qr_file: Option<&str>,
+    _json_mode: bool,
+) -> Result<(), CliError> {
     // Test mode: never render to the terminal.  Write to --qr-file
     // only so that integration tests can verify the file was produced.
     if let Some(path) = qr_file {

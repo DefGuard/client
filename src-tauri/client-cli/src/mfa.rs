@@ -559,8 +559,8 @@ pub(crate) async fn authorize_mobile_approve(
 
     // Step 2: Build and render the QR code.
     let payload = mfa_qr::build_qr_payload(&start_resp.token, &challenge, &instance.uuid);
+    mfa_qr::render_qr(&payload, qr_file, json_mode)?;
     if !json_mode {
-        mfa_qr::render_qr(&payload, qr_file)?;
         eprintln!("Waiting for mobile approval... (Ctrl-C to cancel)");
     }
 
@@ -623,16 +623,36 @@ fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, CliError> {
 
 /// Wait on the WebSocket for a single `{"type":"mfa_success","preshared_key":"..."}`
 /// text frame, or fail if the deadline expires or the user cancels.
+///
+/// Uses an absolute deadline (not a per-frame-gap timeout) so that stray
+/// ping/pong traffic does not silently extend the wait.
 async fn wait_for_mfa_success(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     timeout: Duration,
     json_mode: bool,
 ) -> Result<String, CliError> {
-    let (_, mut read) = ws_stream.split();
+    let (write, mut read) = ws_stream.split();
+    // Keep the write half alive so tungstenite can send automatic
+    // pong replies to server pings.  Dropping it would prevent pongs.
+    let _write = write;
+
+    let deadline = Instant::now() + timeout;
 
     loop {
+        let remaining = deadline
+            .checked_duration_since(Instant::now())
+            .unwrap_or_default();
+        if remaining.is_zero() {
+            if !json_mode {
+                eprintln!("Mobile approval timed out.");
+            }
+            return Err(CliError::MfaFailed(
+                "mobile approval timed out; re-run to get a fresh QR".into(),
+            ));
+        }
+
         let msg = select! {
-            _ = sleep(timeout) => {
+            _ = sleep(remaining) => {
                 if !json_mode {
                     eprintln!("Mobile approval timed out.");
                 }
@@ -682,10 +702,10 @@ async fn wait_for_mfa_success(
             }
             Message::Close(_) => {
                 if !json_mode {
-                    eprintln!("Mobile approval timed out.");
+                    eprintln!("Mobile approval failed: connection closed by proxy.");
                 }
                 return Err(CliError::MfaFailed(
-                    "mobile approval timed out; re-run to get a fresh QR".into(),
+                    "mobile approval failed: connection closed by proxy".into(),
                 ));
             }
             _ => {} // Ignore ping, pong, binary.
