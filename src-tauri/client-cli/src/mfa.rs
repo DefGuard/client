@@ -543,7 +543,7 @@ pub(crate) async fn authorize_mobile_approve(
         .map_err(|e| CliError::Other(format!("Failed to reach proxy: {e}")))?;
 
     if !response.status().is_success() {
-        return Err(handle_mfa_error(response).await);
+        return Err(handle_mobile_approve_start_error(response).await);
     }
 
     let start_resp: ClientMfaStartResponse = response
@@ -576,6 +576,32 @@ pub(crate) async fn authorize_mobile_approve(
 
     info!("Mobile-approve MFA completed, preshared key obtained");
     Ok(SecretString::from(psk))
+}
+
+/// Handle a non-2xx response from /start during mobile-approve MFA.
+///
+/// Rewraps the cryptic server error "selected MFA method is not available"
+/// into actionable guidance telling the user to register a mobile authenticator.
+async fn handle_mobile_approve_start_error(response: reqwest::Response) -> CliError {
+    let status = response.status();
+    let error_body: Option<ErrorBody> = response.json().await.ok();
+    let message = error_body
+        .and_then(|b| b.error)
+        .unwrap_or_else(|| format!("HTTP {status}"));
+
+    if message.contains("selected MFA method is not available") {
+        return CliError::MfaFailed(
+            "No mobile authenticator is registered for your account. \
+             Register one in the Defguard mobile app, then retry."
+                .into(),
+        );
+    }
+
+    if status.is_client_error() {
+        CliError::MfaFailed(format!("MFA error: {message}"))
+    } else {
+        CliError::Other(format!("Proxy error (HTTP {status}): {message}"))
+    }
 }
 
 /// Derive the WebSocket URL from the proxy's base URL and the MFA token.

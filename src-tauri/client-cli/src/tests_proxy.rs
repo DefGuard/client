@@ -490,3 +490,47 @@ async fn test_mobile_approve_success_returns_psk(pool: DbPool) {
     .unwrap();
     assert_eq!(psk.expose_secret(), "secret-mobile-psk");
 }
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_mobile_approve_no_device_returns_guidance(pool: DbPool) {
+    let (mut instance, location) = seed_db(&pool).await;
+
+    let mock = MockProxy::with_mobile_approve(
+        MockResponse {
+            status: 400,
+            body: r#"{"error":"selected MFA method is not available"}"#.into(),
+        },
+        "unused",
+    );
+    mock.wait_ready();
+    instance.proxy_url = mock.url();
+
+    let err = mfa::authorize_mobile_approve(&location, &instance, None, None, &pool, false)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, CliError::MfaFailed(_)));
+    assert!(err.to_string().contains("No mobile authenticator"));
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_mobile_approve_unrelated_error_passes_through(pool: DbPool) {
+    let (mut instance, location) = seed_db(&pool).await;
+
+    let mock = MockProxy::with_mobile_approve(
+        MockResponse {
+            status: 500,
+            body: r#"{"error":"internal server error"}"#.into(),
+        },
+        "unused",
+    );
+    mock.wait_ready();
+    instance.proxy_url = mock.url();
+
+    let err = mfa::authorize_mobile_approve(&location, &instance, None, None, &pool, false)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, CliError::Other(_)));
+    assert!(err.to_string().contains("internal server error"));
+}
