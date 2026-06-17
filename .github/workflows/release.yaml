@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - v*.*.*
+env:
+  SQLX_OFFLINE: "1"
 
 jobs:
   create-release:
@@ -33,8 +35,6 @@ jobs:
       - self-hosted
       - Linux
       - ${{ matrix.architecture }}
-    env:
-      SQLX_OFFLINE: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -151,8 +151,6 @@ jobs:
       - self-hosted
       - Linux
       - ${{ matrix.architecture }}
-    env:
-      SQLX_OFFLINE: "1"
     strategy:
       fail-fast: false
       matrix:
