@@ -11,13 +11,13 @@ import { IconButton } from '../../../../../../../shared/components/IconButton/Ic
 import { IconButtonVariant } from '../../../../../../../shared/components/IconButton/types';
 import { MfaSelector } from '../../../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
+import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
 import {
   LocationMfaMode,
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../../../../shared/rust-api/types';
-import { useSharedStorage } from '../../../../../../../shared/store/useSharedStorage';
 import { ThemeSpacing } from '../../../../../../../shared/types';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
@@ -28,6 +28,8 @@ export const ConnectModalMfaSettings = () => {
     meta: { invalidate: [['locations']] },
   });
 
+  const { locationMfaPreference, setLocationMfaPreference } = useAppData();
+
   const [perviousView, location] = useConnectModal(
     useShallow((s) => [s.perviousView, s.location]),
   );
@@ -36,7 +38,7 @@ export const ConnectModalMfaSettings = () => {
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(
     location
-      ? useSharedStorage.getState().getLocationMethod(location.id)
+      ? (locationMfaPreference[String(location.id)] ?? MfaMethod.Totp)
       : MfaMethod.Totp,
   );
   const [setAsDefault, setSetAsDefault] = useState(true);
@@ -50,7 +52,7 @@ export const ConnectModalMfaSettings = () => {
 
   const handleSubmit = () => {
     if (!location) return;
-    useSharedStorage.getState().setLocationMethod(location.id, selectedMethod);
+    setLocationMfaPreference(location.id, selectedMethod);
     if (setAsDefault && selectedMethod !== locationDefaultMfaMethod && location) {
       setMfaMethod({ locationId: location.id, mfaMethod: selectedMethod });
     } else {

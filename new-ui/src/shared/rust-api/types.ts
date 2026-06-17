@@ -123,6 +123,9 @@ export const TauriCommand = {
   SwapToFullView: 'swap_to_full_view',
   SwapToTray: 'swap_to_tray',
   CloseTrayWindow: 'close_tray_window',
+  // Session state
+  GetSessionState: 'command_get_session_state',
+  PatchSessionState: 'command_patch_session_state',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];
@@ -143,6 +146,7 @@ export const TauriEvent = {
   UuidMismatch: 'uuid-mismatch',
   GlobalLogUpdate: 'log-update-global',
   WindowSwapped: 'window-swapped',
+  SessionStateChanged: 'session-state-changed',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];
@@ -362,3 +366,16 @@ export type SetLocationMfaMethodArgs = {
   locationId: number;
   mfaMethod: MfaMethodValue;
 };
+
+export type OverviewViewSelection =
+  | { kind: 'instance'; data: InstanceInfo }
+  | { kind: 'tunnel'; data: LocationInfo };
+
+/** Mirrors `SessionState` in src/session_state.rs. Fields are snake_case (raw serde output). */
+export type SessionState = {
+  view_selection: OverviewViewSelection | null;
+  /** Keys are location IDs serialized as strings (JSON object keys are always strings). */
+  location_mfa_preference: Record<string, MfaMethodValue>;
+};
+
+export type SessionStatePatch = Partial<SessionState>;

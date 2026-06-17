@@ -110,6 +110,10 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         void debug(`UI Received event UuidMismatch: ${JSON.stringify(event.payload)}`);
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
       }),
+
+      listen(TauriEvent.SessionStateChanged, () => {
+        void queryClient.invalidateQueries({ queryKey: ['session-state'] });
+      }),
     ]);
 
     return () => {

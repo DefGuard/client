@@ -1,8 +1,8 @@
 import './style.scss';
 import clsx from 'clsx';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useAppData } from '../../../../providers/AppDataContext';
 import { type LocationInfo, MfaMethod } from '../../../../rust-api/types';
-import { useSharedStorage } from '../../../../store/useSharedStorage';
 import { mfaToText } from '../../../../utils/mfa';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
@@ -14,15 +14,11 @@ interface Props {
 }
 
 export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
-  const methodSelection = useSharedStorage((s) => s.locationMethodSelection);
+  const { locationMfaPreference } = useAppData();
   const mfaMethod = useMemo(
-    () => methodSelection[location.id] ?? MfaMethod.Totp,
-    [methodSelection, location.id],
+    () => locationMfaPreference[String(location.id)] ?? MfaMethod.Totp,
+    [locationMfaPreference, location.id],
   );
-
-  useEffect(() => {
-    console.log(mfaMethod, methodSelection);
-  }, [mfaMethod, methodSelection]);
 
   if (location.location_mfa_mode === 'disabled') return null;
 

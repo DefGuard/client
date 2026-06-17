@@ -29,7 +29,6 @@
     "@tauri-apps/plugin-log": "^2.8.0",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-os": "^2.3.2",
-    "@tauri-store/zustand": "^1.2.0",
     "@uidotdev/usehooks": "^2.4.1",
     "byte-size": "^9.0.1",
     "chart.js": "^4.5.1",

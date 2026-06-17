@@ -1,12 +1,13 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { CompactLocationsPage } from '../../pages/compact/CompactLocationsPage/CompactLocationsPage';
+import { api } from '../../shared/rust-api/api';
 import {
   getInstancesQueryOptions,
   getLocationsQueryOptions,
+  getSessionStateQueryOptions,
   getTunnelsQueryOptions,
 } from '../../shared/rust-api/query';
-import type { LocationInfo } from '../../shared/rust-api/types';
-import { useSharedStorage } from '../../shared/store/useSharedStorage';
+import type { LocationInfo, OverviewViewSelection } from '../../shared/rust-api/types';
 
 export const Route = createFileRoute('/compact/')({
   loader: async ({ context }) => {
@@ -19,7 +20,10 @@ export const Route = createFileRoute('/compact/')({
       throw redirect({ to: '/empty' });
     }
 
-    const stored = useSharedStorage.getState().viewSelection;
+    const sessionState = await context.queryClient.fetchQuery(
+      getSessionStateQueryOptions,
+    );
+    const stored = sessionState?.view_selection ?? null;
 
     let storedIsValid: boolean;
     if (stored === null) {
@@ -30,7 +34,7 @@ export const Route = createFileRoute('/compact/')({
       storedIsValid = tunnels.some((t) => t.id === stored.data.id);
     }
 
-    let selected: NonNullable<typeof stored>;
+    let selected: OverviewViewSelection;
     if (storedIsValid && stored !== null) {
       selected = stored;
     } else if (instances.length > 0) {
@@ -40,7 +44,8 @@ export const Route = createFileRoute('/compact/')({
     }
 
     if (!storedIsValid) {
-      useSharedStorage.setState({ viewSelection: selected });
+      await api.patchSessionState({ view_selection: selected });
+      await context.queryClient.invalidateQueries({ queryKey: ['session-state'] });
     }
 
     let locations: LocationInfo[];

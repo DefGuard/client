@@ -1,13 +1,13 @@
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { useAppData } from '../../../../providers/AppDataContext';
 import { api } from '../../../../rust-api/api';
 import {
   LocationMfaMode,
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../rust-api/types';
-import { useSharedStorage } from '../../../../store/useSharedStorage';
 import { ThemeSpacing } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
@@ -31,14 +31,13 @@ export const LocationCardMfaSettings = () => {
     },
   });
 
+  const { locationMfaPreference, setLocationMfaPreference } = useAppData();
   const { previousView, setView, location } = useLocationCardContext();
 
   const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(
-    location
-      ? useSharedStorage.getState().getLocationMethod(location.id)
-      : MfaMethod.Totp,
+    locationMfaPreference[String(location.id)] ?? MfaMethod.Totp,
   );
 
   const isFromDefault = previousView === LocationCardViews.Default;
@@ -52,7 +51,7 @@ export const LocationCardMfaSettings = () => {
   }, [location.location_mfa_mode]);
 
   const handleSubmit = () => {
-    useSharedStorage.getState().setLocationMethod(location.id, selectedMethod);
+    setLocationMfaPreference(location.id, selectedMethod);
     if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
       setMfaMethod({
         locationId: location.id,
