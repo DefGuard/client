@@ -86,7 +86,7 @@
     "react-loading-skeleton": "^3.5.0",
     "react-markdown": "^10.1.0",
     "react-qr-code": "^2.0.21",
-    "react-router-dom": "^6.30.3",
+    "react-router-dom": "^6.30.4",
     "react-use-websocket": "^4.13.0",
     "react-virtualized-auto-sizer": "^1.0.26",
     "recharts": "^3.8.1",
