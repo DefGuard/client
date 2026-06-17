@@ -14,7 +14,7 @@ mod mfa_qr;
 mod output;
 mod resolve;
 mod state;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests_daemon;
 #[cfg(test)]
 mod tests_proxy;
