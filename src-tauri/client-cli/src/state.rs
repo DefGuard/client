@@ -35,7 +35,7 @@ pub enum CliError {
     #[error("MFA input required but no TTY: {0}")]
     MfaInputRequired(String),
 
-    #[error("not enrolled: {0}")]
+    #[error("enrollment required: {0}")]
     NotEnrolled(String),
 
     #[error("invalid input: {0}")]

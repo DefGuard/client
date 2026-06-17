@@ -139,7 +139,7 @@ pub struct LocationListResult {
 impl CommandOutput for LocationListResult {
     fn human(&self) -> String {
         if self.locations.is_empty() {
-            "No locations configured.".to_string()
+            "No locations configured. Use the desktop app to enroll an instance first.".to_string()
         } else {
             format_location_list_table(&self.locations, &self.instance_names)
         }
@@ -328,7 +328,10 @@ mod tests {
             locations: Vec::new(),
             instance_names: HashMap::new(),
         };
-        assert_eq!(result.human(), "No locations configured.");
+        assert_eq!(
+            result.human(),
+            "No locations configured. Use the desktop app to enroll an instance first."
+        );
     }
 
     #[test]

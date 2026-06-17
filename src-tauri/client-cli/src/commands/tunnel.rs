@@ -41,7 +41,7 @@ pub struct TunnelListResult {
 impl CommandOutput for TunnelListResult {
     fn human(&self) -> String {
         if self.tunnels.is_empty() {
-            "No tunnels configured.".to_string()
+            "No tunnels configured. Import tunnels via the desktop app.".to_string()
         } else {
             format_tunnel_list_table(&self.tunnels)
         }
@@ -199,7 +199,10 @@ mod tests {
         let result = TunnelListResult {
             tunnels: Vec::new(),
         };
-        assert_eq!(result.human(), "No tunnels configured.");
+        assert_eq!(
+            result.human(),
+            "No tunnels configured. Import tunnels via the desktop app."
+        );
     }
 
     #[test]
