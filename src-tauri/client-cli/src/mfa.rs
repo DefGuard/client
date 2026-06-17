@@ -565,9 +565,8 @@ pub(crate) async fn authorize_mobile_approve(
     }
 
     // Step 3: Open a WebSocket and wait for the preshared key.
+    // Never log the token-bearing URL via tracing.
     let ws_url = derive_ws_url(&proxy_base, &start_resp.token)?;
-
-    debug!("Connecting WebSocket to {ws_url}");
     let (ws_stream, _response) = connect_async(&ws_url)
         .await
         .map_err(|e| CliError::Other(format!("Failed to connect to proxy: {e}")))?;
