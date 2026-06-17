@@ -559,5 +559,5 @@ async fn test_mobile_approve_server_close_without_frame_times_out(pool: DbPool) 
         .unwrap_err();
 
     assert!(matches!(err, CliError::MfaFailed(_)));
-    assert!(err.to_string().contains("timed out"));
+    assert!(err.to_string().contains("connection closed by proxy"));
 }

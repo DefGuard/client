@@ -652,19 +652,19 @@ async fn wait_for_mfa_success(
                     Some(Err(_)) => {
                         // Server closed or errored without sending mfa_success.
                         if !json_mode {
-                            eprintln!("Mobile approval timed out.");
+                            eprintln!("Mobile approval failed: connection closed by proxy.");
                         }
                         return Err(CliError::MfaFailed(
-                            "mobile approval timed out; re-run to get a fresh QR".into(),
+                            "mobile approval failed: connection closed by proxy".into(),
                         ));
                     }
                     None => {
                         // Server closed the connection without sending mfa_success.
                         if !json_mode {
-                            eprintln!("Mobile approval timed out.");
+                            eprintln!("Mobile approval failed: connection closed by proxy.");
                         }
                         return Err(CliError::MfaFailed(
-                            "mobile approval timed out; re-run to get a fresh QR".into(),
+                            "mobile approval failed: connection closed by proxy".into(),
                         ));
                     }
                 }
