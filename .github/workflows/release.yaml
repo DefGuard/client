@@ -2,8 +2,7 @@ name: "Build app and create release"
 on:
   push:
     tags:
-      # - v*.*.*
-      - v210-packages
+      - v*.*.*
 
 jobs:
   create-release:
