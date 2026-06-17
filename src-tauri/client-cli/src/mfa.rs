@@ -699,12 +699,14 @@ async fn wait_for_mfa_success(
 
         match msg {
             Message::Text(text) => {
-                let parsed: serde_json::Value = serde_json::from_str(&text)
-                    .map_err(|e| CliError::Other(format!("Invalid WebSocket message: {e}")))?;
-                if let Some(key) = parsed["preshared_key"].as_str() {
-                    return Ok(key.to_string());
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
+                        if let Some(key) = parsed["preshared_key"].as_str() {
+                            return Ok(key.to_string());
+                        }
+                    }
                 }
-                // Ignore unrecognised text frames.
+                // Ignore unrecognised text frames (non-JSON, wrong type, or missing preshared_key).
             }
             Message::Close(_) => {
                 if !json_mode {
