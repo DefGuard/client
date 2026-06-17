@@ -650,8 +650,14 @@ async fn wait_for_mfa_success(
             msg = read.next() => {
                 match msg {
                     Some(Ok(msg)) => msg,
-                    Some(Err(e)) => {
-                        return Err(CliError::Other(format!("WebSocket error: {e}")));
+                    Some(Err(_)) => {
+                        // Server closed or errored without sending mfa_success.
+                        if !json_mode {
+                            eprintln!("Mobile approval timed out.");
+                        }
+                        return Err(CliError::MfaFailed(
+                            "mobile approval timed out; re-run to get a fresh QR".into(),
+                        ));
                     }
                     None => {
                         // Server closed the connection without sending mfa_success.

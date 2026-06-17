@@ -51,9 +51,10 @@ struct MockProxy {
 
 impl MockProxy {
     /// Mobile-approve MFA: /start returns a token+challenge, /remote upgrades to
-    /// WebSocket and sends the given preshared key.
-    fn with_mobile_approve(start_response: MockResponse, preshared_key: &str) -> Self {
-        let psk = preshared_key.to_string();
+    /// WebSocket and sends the given preshared key (if `Some`).  When `None`, the
+    /// server closes the connection right after the handshake (used for timeout tests).
+    fn with_mobile_approve(start_response: MockResponse, preshared_key: Option<&str>) -> Self {
+        let psk = preshared_key.map(|s| s.to_string());
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
@@ -103,14 +104,17 @@ impl MockProxy {
                         );
                         let _ = stream.write_all(resp.as_bytes());
 
-                        // Send the mfa_success text frame.
-                        let payload = json!({
-                            "type": "mfa_success",
-                            "preshared_key": &psk,
-                        });
-                        let payload_str = serde_json::to_string(&payload).unwrap();
-                        let frame = build_ws_text_frame(&payload_str);
-                        let _ = stream.write_all(&frame);
+                        // Send the mfa_success text frame if we have a PSK.
+                        if let Some(ref key) = psk {
+                            let payload = json!({
+                                "type": "mfa_success",
+                                "preshared_key": key,
+                            });
+                            let payload_str = serde_json::to_string(&payload).unwrap();
+                            let frame = build_ws_text_frame(&payload_str);
+                            let _ = stream.write_all(&frame);
+                        }
+                        // When psk is None, just close (no frame) to simulate timeout.
                     }
                 } else if request.contains("/api/v1/client-mfa/start") {
                     let body = format!(
@@ -476,7 +480,7 @@ async fn test_mobile_approve_success_returns_psk(pool: DbPool) {
             status: 200,
             body: r#"{"token":"tok-mob","challenge":"chal-xyz"}"#.into(),
         },
-        "secret-mobile-psk",
+        Some("secret-mobile-psk"),
     );
     mock.wait_ready();
     instance.proxy_url = mock.url();
@@ -500,7 +504,7 @@ async fn test_mobile_approve_no_device_returns_guidance(pool: DbPool) {
             status: 400,
             body: r#"{"error":"selected MFA method is not available"}"#.into(),
         },
-        "unused",
+        Some("unused"),
     );
     mock.wait_ready();
     instance.proxy_url = mock.url();
@@ -522,7 +526,7 @@ async fn test_mobile_approve_unrelated_error_passes_through(pool: DbPool) {
             status: 500,
             body: r#"{"error":"internal server error"}"#.into(),
         },
-        "unused",
+        Some("unused"),
     );
     mock.wait_ready();
     instance.proxy_url = mock.url();
@@ -533,4 +537,27 @@ async fn test_mobile_approve_unrelated_error_passes_through(pool: DbPool) {
 
     assert!(matches!(err, CliError::Other(_)));
     assert!(err.to_string().contains("internal server error"));
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_mobile_approve_server_close_without_frame_times_out(pool: DbPool) {
+    let (mut instance, location) = seed_db(&pool).await;
+
+    // psk=None: the mock accepts the WS upgrade but closes without sending a frame.
+    let mock = MockProxy::with_mobile_approve(
+        MockResponse {
+            status: 200,
+            body: r#"{"token":"tok-close","challenge":"chal-xyz"}"#.into(),
+        },
+        None,
+    );
+    mock.wait_ready();
+    instance.proxy_url = mock.url();
+
+    let err = mfa::authorize_mobile_approve(&location, &instance, None, None, &pool, false)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, CliError::MfaFailed(_)));
+    assert!(err.to_string().contains("timed out"));
 }
