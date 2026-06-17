@@ -37,7 +37,6 @@ use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{Target, TargetKind};
-use tauri_plugin_zustand;
 
 #[macro_use]
 extern crate log;
@@ -244,7 +243,6 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_zustand::Builder::new().save_denylist(&["shared-session-store"]).build())
         .setup(|app| {
             // Create Help menu on macOS.
             // https://github.com/tauri-apps/tauri/issues/9371

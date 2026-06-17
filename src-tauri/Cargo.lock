@@ -1382,20 +1382,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dashmap"
-version = "6.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6361d5c062261c78a176addb82d4c821ae42bed6089de0e12603cd25de2059c"
-dependencies = [
- "cfg-if",
- "crossbeam-utils",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
-]
-
-[[package]]
 name = "data-url"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1492,7 +1478,6 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
- "tauri-plugin-zustand",
  "thiserror 2.0.18",
  "time",
  "tokio",
@@ -6970,18 +6955,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-zustand"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "555b972b3adc737535a82c64b3fc425d2272162979a123ab6b7a7517d30405e8"
-dependencies = [
- "serde",
- "tauri",
- "tauri-plugin",
- "tauri-store",
-]
-
-[[package]]
 name = "tauri-runtime"
 version = "2.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7030,49 +7003,6 @@ dependencies = [
  "webview2-com",
  "windows 0.61.3",
  "wry",
-]
-
-[[package]]
-name = "tauri-store"
-version = "1.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8e2b75d2702cfa42b6994a187de814c691edf9e56dd049406cf5df8e915cf86"
-dependencies = [
- "dashmap",
- "futures",
- "itertools",
- "semver",
- "serde",
- "serde_json",
- "tauri",
- "tauri-store-macros",
- "tauri-store-utils",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
-name = "tauri-store-macros"
-version = "1.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae6e366131190fd2f23a9275cefc90cdac0c4837e6ad3920d9b99901cfdb2f1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "tauri-store-utils"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2edd6d150fd2797bbce745d1c55c11887c4456c41d31f56e8eb867d62bd334e7"
-dependencies = [
- "parking_lot",
- "semver",
- "tauri",
- "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]
