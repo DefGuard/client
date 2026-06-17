@@ -87,7 +87,6 @@ jobs:
           # xcrun stapler staple defguard-client.pkg
 
       - name: Upload What's New
-        if: false
         env:
           APP_ID: "6754601166"
         run: |

@@ -21,7 +21,6 @@ jobs:
           generate_release_notes: true
 
   create-sbom:
-    if: false
     needs:
       - create-release
     uses: ./.github/workflows/sbom.yml
