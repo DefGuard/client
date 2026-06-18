@@ -3,6 +3,8 @@
     display: flex;
     flex-flow: row wrap;
     gap: var(--spacing-3xl);
+    align-items: flex-start;
+    justify-content: flex-start;
 
     > div {
       width: 342px;

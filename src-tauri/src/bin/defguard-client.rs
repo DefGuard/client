@@ -387,6 +387,16 @@ fn main() {
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
+            match async_runtime::block_on(session_state::initialize_session_state()) {
+                Ok(initial_state) => {
+                    let managed = app_handle.state::<AppState>();
+                    if let Ok(mut guard) = managed.session_state.lock() {
+                        *guard = initial_state;
+                    };
+                }
+                Err(e) => warn!("Failed to initialize session state from DB: {e}"),
+            }
+
             // Pre-build both windows hidden so they can be shown/hidden without recreation.
             if let Err(e) = WindowManager::build_tray_window(app_handle) {
                 warn!("Failed to pre-build tray window: {e}");

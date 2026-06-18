@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: temp */
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { Fragment, useMemo, useState } from 'react';
@@ -19,6 +20,7 @@ import {
   type MfaMethodValue,
 } from '../../../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../../../shared/types';
+import { decideLocationMfaMethod } from '../../../../../../../shared/utils/decideLocationMfaMethod';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
@@ -37,9 +39,8 @@ export const ConnectModalMfaSettings = () => {
   const locationDefaultMfaMethod = location?.mfa_method ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(
-    location
-      ? (locationMfaPreference[String(location.id)] ?? MfaMethod.Totp)
-      : MfaMethod.Totp,
+    decideLocationMfaMethod(location!, locationMfaPreference[String(location!.id)]) ??
+      MfaMethod.Totp,
   );
   const [setAsDefault, setSetAsDefault] = useState(true);
 

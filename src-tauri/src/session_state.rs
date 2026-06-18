@@ -9,7 +9,12 @@ use defguard_client_core::{
     events::EventKey,
 };
 
-use crate::{appstate::AppState, commands::LocationInfo};
+use crate::{
+    appstate::AppState,
+    commands::LocationInfo,
+    database::{models::location::Location, DB_POOL},
+    error::Error,
+};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "data", rename_all = "lowercase")]
@@ -23,6 +28,18 @@ pub enum OverviewViewSelection {
 pub struct SessionState {
     pub view_selection: Option<OverviewViewSelection>,
     pub location_mfa_preference: HashMap<String, LocationMfaMethod>,
+}
+
+pub async fn initialize_session_state() -> Result<SessionState, Error> {
+    let locations = Location::all(&*DB_POOL, false).await?;
+    let location_mfa_preference = locations
+        .into_iter()
+        .filter_map(|loc| loc.mfa_method.map(|method| (loc.id.to_string(), method)))
+        .collect();
+    Ok(SessionState {
+        location_mfa_preference,
+        ..SessionState::default()
+    })
 }
 
 #[tauri::command]

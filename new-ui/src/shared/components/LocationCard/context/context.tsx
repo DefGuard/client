@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useState } from
 import { useAppData } from '../../../providers/AppDataContext';
 import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
+import { decideLocationMfaMethod } from '../../../utils/decideLocationMfaMethod';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
@@ -53,7 +54,11 @@ export const LocationCardProvider = ({
   const { locationMfaPreference } = useAppData();
 
   const startMfa = useCallback(() => {
-    const mfaMethod = locationMfaPreference[String(location.id)] ?? MfaMethod.Totp;
+    const mfaMethod = decideLocationMfaMethod(
+      location,
+      locationMfaPreference[String(location.id)],
+    );
+    if (!mfaMethod) return;
 
     switch (mfaMethod) {
       case MfaMethod.Totp:
@@ -69,7 +74,7 @@ export const LocationCardProvider = ({
         setView(LocationCardViews.MfaMobile);
         break;
     }
-  }, [setView, location.id, locationMfaPreference]);
+  }, [setView, location.id, locationMfaPreference, location]);
 
   return (
     <LocationCardContext.Provider

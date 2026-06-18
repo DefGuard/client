@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
 import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as CompactIndexRouteImport } from './routes/compact/index'
+import { Route as FullTunnelWizardRouteImport } from './routes/full/tunnel-wizard'
 import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
@@ -24,6 +25,7 @@ import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
 import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
+import { Route as FullDefaultAddTunnelRouteImport } from './routes/full/_default/add/tunnel'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
 
 const FullRoute = FullRouteImport.update({
@@ -55,6 +57,11 @@ const CompactIndexRoute = CompactIndexRouteImport.update({
   id: '/compact/',
   path: '/compact/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const FullTunnelWizardRoute = FullTunnelWizardRouteImport.update({
+  id: '/tunnel-wizard',
+  path: '/tunnel-wizard',
+  getParentRoute: () => FullRoute,
 } as any)
 const FullSessionTimeoutRoute = FullSessionTimeoutRouteImport.update({
   id: '/session-timeout',
@@ -100,6 +107,11 @@ const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
   path: '/add/',
   getParentRoute: () => FullDefaultRoute,
 } as any)
+const FullDefaultAddTunnelRoute = FullDefaultAddTunnelRouteImport.update({
+  id: '/add/tunnel',
+  path: '/add/tunnel',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultAddInstanceRoute = FullDefaultAddInstanceRouteImport.update({
   id: '/add/instance',
   path: '/add/instance',
@@ -112,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/full': typeof FullRouteWithChildren
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
+  '/full/tunnel-wizard': typeof FullTunnelWizardRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
@@ -121,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add/tunnel': typeof FullDefaultAddTunnelRoute
   '/full/add/': typeof FullDefaultAddIndexRoute
 }
 export interface FileRoutesByTo {
@@ -129,6 +143,7 @@ export interface FileRoutesByTo {
   '/full': typeof FullIndexRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
+  '/full/tunnel-wizard': typeof FullTunnelWizardRoute
   '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
   '/full/log': typeof FullDefaultLogRoute
@@ -137,6 +152,7 @@ export interface FileRoutesByTo {
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add/tunnel': typeof FullDefaultAddTunnelRoute
   '/full/add': typeof FullDefaultAddIndexRoute
 }
 export interface FileRoutesById {
@@ -147,6 +163,7 @@ export interface FileRoutesById {
   '/full/_default': typeof FullDefaultRouteWithChildren
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
+  '/full/tunnel-wizard': typeof FullTunnelWizardRoute
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
@@ -156,6 +173,7 @@ export interface FileRoutesById {
   '/full/_default/support': typeof FullDefaultSupportRoute
   '/full/_default/update': typeof FullDefaultUpdateRoute
   '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/_default/add/tunnel': typeof FullDefaultAddTunnelRoute
   '/full/_default/add/': typeof FullDefaultAddIndexRoute
 }
 export interface FileRouteTypes {
@@ -166,6 +184,7 @@ export interface FileRouteTypes {
     | '/full'
     | '/full/enrollment'
     | '/full/session-timeout'
+    | '/full/tunnel-wizard'
     | '/compact/'
     | '/full/'
     | '/playground/'
@@ -175,6 +194,7 @@ export interface FileRouteTypes {
     | '/full/support'
     | '/full/update'
     | '/full/add/instance'
+    | '/full/add/tunnel'
     | '/full/add/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -183,6 +203,7 @@ export interface FileRouteTypes {
     | '/full'
     | '/full/enrollment'
     | '/full/session-timeout'
+    | '/full/tunnel-wizard'
     | '/compact'
     | '/playground'
     | '/full/log'
@@ -191,6 +212,7 @@ export interface FileRouteTypes {
     | '/full/support'
     | '/full/update'
     | '/full/add/instance'
+    | '/full/add/tunnel'
     | '/full/add'
   id:
     | '__root__'
@@ -200,6 +222,7 @@ export interface FileRouteTypes {
     | '/full/_default'
     | '/full/enrollment'
     | '/full/session-timeout'
+    | '/full/tunnel-wizard'
     | '/compact/'
     | '/full/'
     | '/playground/'
@@ -209,6 +232,7 @@ export interface FileRouteTypes {
     | '/full/_default/support'
     | '/full/_default/update'
     | '/full/_default/add/instance'
+    | '/full/_default/add/tunnel'
     | '/full/_default/add/'
   fileRoutesById: FileRoutesById
 }
@@ -263,6 +287,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/compact/'
       preLoaderRoute: typeof CompactIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/full/tunnel-wizard': {
+      id: '/full/tunnel-wizard'
+      path: '/tunnel-wizard'
+      fullPath: '/full/tunnel-wizard'
+      preLoaderRoute: typeof FullTunnelWizardRouteImport
+      parentRoute: typeof FullRoute
     }
     '/full/session-timeout': {
       id: '/full/session-timeout'
@@ -327,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultAddIndexRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/add/tunnel': {
+      id: '/full/_default/add/tunnel'
+      path: '/add/tunnel'
+      fullPath: '/full/add/tunnel'
+      preLoaderRoute: typeof FullDefaultAddTunnelRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/add/instance': {
       id: '/full/_default/add/instance'
       path: '/add/instance'
@@ -344,6 +382,7 @@ interface FullDefaultRouteChildren {
   FullDefaultSupportRoute: typeof FullDefaultSupportRoute
   FullDefaultUpdateRoute: typeof FullDefaultUpdateRoute
   FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
+  FullDefaultAddTunnelRoute: typeof FullDefaultAddTunnelRoute
   FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
 }
 
@@ -354,6 +393,7 @@ const FullDefaultRouteChildren: FullDefaultRouteChildren = {
   FullDefaultSupportRoute: FullDefaultSupportRoute,
   FullDefaultUpdateRoute: FullDefaultUpdateRoute,
   FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
+  FullDefaultAddTunnelRoute: FullDefaultAddTunnelRoute,
   FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
 }
 
@@ -365,6 +405,7 @@ interface FullRouteChildren {
   FullDefaultRoute: typeof FullDefaultRouteWithChildren
   FullEnrollmentRoute: typeof FullEnrollmentRoute
   FullSessionTimeoutRoute: typeof FullSessionTimeoutRoute
+  FullTunnelWizardRoute: typeof FullTunnelWizardRoute
   FullIndexRoute: typeof FullIndexRoute
 }
 
@@ -372,6 +413,7 @@ const FullRouteChildren: FullRouteChildren = {
   FullDefaultRoute: FullDefaultRouteWithChildren,
   FullEnrollmentRoute: FullEnrollmentRoute,
   FullSessionTimeoutRoute: FullSessionTimeoutRoute,
+  FullTunnelWizardRoute: FullTunnelWizardRoute,
   FullIndexRoute: FullIndexRoute,
 }
 
