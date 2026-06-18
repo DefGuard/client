@@ -29,7 +29,7 @@ pub struct InstanceListResult {
 impl CommandOutput for InstanceListResult {
     fn human(&self) -> String {
         if self.instances.is_empty() {
-            "No instances configured.".to_string()
+            "No instances configured. Use the desktop app to enroll first.".to_string()
         } else {
             format_instance_list_table(&self.instances)
         }
@@ -149,7 +149,10 @@ mod tests {
         let result = InstanceListResult {
             instances: Vec::new(),
         };
-        assert_eq!(result.human(), "No instances configured.");
+        assert_eq!(
+            result.human(),
+            "No instances configured. Use the desktop app to enroll first."
+        );
     }
 
     #[test]

@@ -10,10 +10,11 @@ mod exit;
 mod logging;
 mod mfa;
 mod mfa_code;
+mod mfa_qr;
 mod output;
 mod resolve;
 mod state;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests_daemon;
 #[cfg(test)]
 mod tests_proxy;
@@ -62,6 +63,7 @@ async fn main() -> ExitCode {
             code,
             code_command,
             mfa_method,
+            qr_file,
             all_traffic,
             predefined_traffic,
         } => output::finish(
@@ -74,6 +76,7 @@ async fn main() -> ExitCode {
                 code.as_deref(),
                 code_command.as_deref(),
                 mfa_method.as_deref(),
+                qr_file.as_deref(),
                 all_traffic,
                 predefined_traffic,
                 cli.json,
