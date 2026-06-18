@@ -212,6 +212,14 @@ fn main() {
             session_state::patch_session_state,
         ])
         .on_window_event(|window, event| {
+            if let WindowEvent::ThemeChanged(_theme) = event {
+                let app = window.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(err) = defguard_client::tray::configure_tray_icon(&app).await {
+                        error!("Failed to reconfigure tray icon on theme change: {err}");
+                    }
+                });
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
                 if label == COMPACT_WINDOW_ID || label == FULL_VIEW_WINDOW_ID {

@@ -1,12 +1,10 @@
 {
   "bundle": {
-    "targets": [
-      "msi"
-    ],
+    "targets": ["msi"],
     "resources": [
       "resources-windows/binaries/*",
       "resources-windows/scripts/*",
-      "resources/icons/*"
+      "resources/icons/tray/*"
     ]
   }
 }
