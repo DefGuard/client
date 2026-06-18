@@ -1,10 +1,11 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { OverviewPage } from '../../../pages/full/OverviewPage/OverviewPage';
+import { api } from '../../../shared/rust-api/api';
 import {
   getInstancesQueryOptions,
+  getSessionStateQueryOptions,
   getTunnelsQueryOptions,
 } from '../../../shared/rust-api/query';
-import { useAppStore } from '../../../shared/store/useAppStore';
 
 export const Route = createFileRoute('/full/_default/overview')({
   loader: async ({ context }) => {
@@ -17,7 +18,10 @@ export const Route = createFileRoute('/full/_default/overview')({
       throw redirect({ to: '/empty' });
     }
 
-    const stored = useAppStore.getState().compactViewSelection;
+    const sessionState = await context.queryClient.fetchQuery(
+      getSessionStateQueryOptions,
+    );
+    const stored = sessionState?.view_selection ?? null;
 
     let storedIsValid: boolean;
     if (stored === null) {
@@ -33,7 +37,8 @@ export const Route = createFileRoute('/full/_default/overview')({
         instances.length > 0
           ? { kind: 'instance' as const, data: instances[0] }
           : { kind: 'tunnel' as const, data: tunnels[0] };
-      useAppStore.setState({ compactViewSelection: selected });
+      await api.patchSessionState({ view_selection: selected });
+      await context.queryClient.invalidateQueries({ queryKey: ['session-state'] });
     }
   },
   component: OverviewPage,

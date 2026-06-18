@@ -1,8 +1,11 @@
 #[cfg(not(target_os = "windows"))]
 use tauri::Manager;
-use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use crate::database::{models::location::Location, DB_POOL};
+use crate::{
+    database::{models::location::Location, DB_POOL},
+    events::EventKey,
+};
 
 /// Returns `true` if there are any non-service locations in the database.
 pub async fn has_non_service_locations() -> bool {
@@ -141,6 +144,8 @@ pub fn swap_to_full_view(app: AppHandle) {
     }
     if let Err(err) = WindowManager::open_full_view(&app) {
         error!("swap_to_full_view task: Failed to open full view: {err:?}");
+    } else if let Err(err) = app.emit(EventKey::WindowSwapped.into(), ()) {
+        error!("swap_to_full_view task: Failed to emit window swapped event: {err:?}");
     }
 }
 
@@ -166,5 +171,8 @@ pub fn swap_to_tray(app: AppHandle) {
         if let Err(err) = window.hide() {
             error!("swap_to_tray task: Failed to hide full-view window: {err:?}");
         }
+    }
+    if let Err(err) = app.emit(EventKey::WindowSwapped.into(), ()) {
+        error!("swap_to_tray task: Failed to emit window swapped event: {err:?}");
     }
 }

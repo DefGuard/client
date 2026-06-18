@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { debug } from '@tauri-apps/plugin-log';
 import { Fragment, type PropsWithChildren, useEffect } from 'react';
 import { WindowId } from '../consts';
 import {
@@ -18,7 +19,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     const unlisteners = Promise.all([
       listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
-        console.log('[TauriEvent] AddInstance', event.payload);
+        void debug(`UI Received event AddInstance (${event.payload.url})`);
         const windowLabel = getCurrentWindow().label;
         if (windowLabel === WindowId.FullView) {
           const { token, url } = event.payload;
@@ -32,7 +33,9 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         }
       }),
       listen(TauriEvent.ConnectionChanged, (event) => {
-        console.log('[TauriEvent] ConnectionChanged', event.payload);
+        void debug(
+          `UI Received event ConnectionChanged: ${JSON.stringify(event.payload)}`,
+        );
         void queryClient.invalidateQueries({ queryKey: ['alive-connection'] });
         void queryClient.invalidateQueries({ queryKey: ['active-connection'] });
         void queryClient.invalidateQueries({ queryKey: ['locations'] });
@@ -42,26 +45,26 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       }),
 
       listen(TauriEvent.InstanceUpdate, (event) => {
-        console.log('[TauriEvent] InstanceUpdate', event.payload);
+        void debug(`UI Received event InstanceUpdate: ${JSON.stringify(event.payload)}`);
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
         void queryClient.invalidateQueries({ queryKey: ['locations'] });
         void queryClient.invalidateQueries({ queryKey: ['has-any-visible-locations'] });
       }),
 
       listen(TauriEvent.LocationUpdate, (event) => {
-        console.log('[TauriEvent] LocationUpdate', event.payload);
+        void debug(`UI Received event LocationUpdate: ${JSON.stringify(event.payload)}`);
         void queryClient.invalidateQueries({ queryKey: ['locations'] });
         void queryClient.invalidateQueries({ queryKey: ['location-details'] });
         void queryClient.invalidateQueries({ queryKey: ['has-any-visible-locations'] });
       }),
 
       listen(TauriEvent.AppVersionFetch, (event) => {
-        console.log('[TauriEvent] AppVersionFetch', event.payload);
+        void debug(`UI Received event AppVersionFetch: ${JSON.stringify(event.payload)}`);
         void queryClient.invalidateQueries({ queryKey: ['latest-app-version'] });
       }),
 
       listen(TauriEvent.ConfigChanged, (event) => {
-        console.log('[TauriEvent] ConfigChanged', event.payload);
+        void debug(`UI Received event ConfigChanged: ${JSON.stringify(event.payload)}`);
         void queryClient.invalidateQueries({ queryKey: ['settings'] });
         void queryClient.invalidateQueries({ queryKey: ['provisioning-config'] });
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
@@ -69,7 +72,9 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       }),
 
       listen<DeadConnectionDroppedPayload>(TauriEvent.DeadConnectionDropped, (event) => {
-        console.log('[TauriEvent] DeadConnectionDropped', event.payload);
+        void debug(
+          `UI Received event DeadConnectionDropped: ${JSON.stringify(event.payload)}`,
+        );
         void queryClient.invalidateQueries({ queryKey: ['alive-connection'] });
         void queryClient.invalidateQueries({ queryKey: ['active-connection'] });
         void queryClient.invalidateQueries({ queryKey: ['locations'] });
@@ -79,7 +84,9 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       listen<DeadConnectionReconnectedPayload>(
         TauriEvent.DeadConnectionReconnected,
         (event) => {
-          console.log('[TauriEvent] DeadConnectionReconnected', event.payload);
+          void debug(
+            `UI Received event DeadConnectionReconnected: ${JSON.stringify(event.payload)}`,
+          );
           void queryClient.invalidateQueries({ queryKey: ['alive-connection'] });
           void queryClient.invalidateQueries({ queryKey: ['active-connection'] });
           void queryClient.invalidateQueries({ queryKey: ['locations'] });
@@ -88,18 +95,19 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       ),
 
       listen(TauriEvent.ApplicationConfigChanged, (event) => {
-        console.log('[TauriEvent] ApplicationConfigChanged', event.payload);
+        void debug(
+          `UI Received event ApplicationConfigChanged: ${JSON.stringify(event.payload)}`,
+        );
         void queryClient.invalidateQueries({ queryKey: ['settings'] });
       }),
 
-      listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
-        console.log('[TauriEvent] AddInstance (instances invalidation)', event.payload);
+      listen(TauriEvent.UuidMismatch, (event) => {
+        void debug(`UI Received event UuidMismatch: ${JSON.stringify(event.payload)}`);
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
       }),
 
-      listen(TauriEvent.UuidMismatch, (event) => {
-        console.log('[TauriEvent] UuidMismatch', event.payload);
-        void queryClient.invalidateQueries({ queryKey: ['instances'] });
+      listen(TauriEvent.SessionStateChanged, () => {
+        void queryClient.invalidateQueries({ queryKey: ['session-state'] });
       }),
     ]);
 

@@ -7,6 +7,7 @@ import { Controls } from '../../../../../../../shared/components/Controls/Contro
 import { useMfaMobileConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaMobileConnect';
 import { QrCard } from '../../../../../../../shared/components/QrCard/QrCard';
 import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
+import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
@@ -20,8 +21,10 @@ export const ConnectModalMfaMobile = () => {
   const { start, isStarting, startError, qrValue, connectionError } = useMfaMobileConnect(
     location as LocationInfo,
     {
-      onPostureError: () =>
-        useConnectModal.getState().setView(ConnectModalView.PostureCheckFail),
+      onPostureError: (msg) => {
+        useConnectModal.setState({ postureError: msg });
+        useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
+      },
     },
   );
 
@@ -45,6 +48,10 @@ export const ConnectModalMfaMobile = () => {
   }, [isStarting, startError, connectionError, qrValue]);
 
   const errorMessage = startError ?? connectionError;
+
+  if (isStarting && location?.posture_check_required && !startError) {
+    return <ConnectModalPostureCheckLoading />;
+  }
 
   return (
     <div id="mfa-mobile-view">

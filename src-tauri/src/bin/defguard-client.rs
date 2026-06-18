@@ -26,7 +26,7 @@ use defguard_client::{
     enterprise::provisioning::handle_client_initialization,
     events::handle_deep_link,
     periodic::run_periodic_tasks,
-    service,
+    service, session_state,
     tray::{configure_tray_icon, setup_tray},
     utils::load_log_targets,
     window_manager::*,
@@ -208,6 +208,8 @@ fn main() {
             close_tray_window,
             all_active_connections,
             disconnect_locations,
+            session_state::get_session_state,
+            session_state::patch_session_state,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

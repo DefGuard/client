@@ -20,7 +20,7 @@ type MfaFinishResponse = { preshared_key: string };
 type MfaErrorResponse = { error: string };
 
 type Options = {
-  onPostureError?: () => void;
+  onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
 };
 
@@ -146,7 +146,7 @@ export const useConnectModalMfaOidc = ({
       startPolling(response.token, instance.proxy_url, headers);
     } catch (e) {
       if (shouldShowPostureError(e, location)) {
-        onPostureError?.();
+        onPostureError?.(e.message);
         return;
       }
       setStartError(

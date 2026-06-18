@@ -39,4 +39,6 @@ commands.allow = [
   "all_active_connections",
   "disconnect_locations",
   "get_posture_data",
+  "get_session_state",
+  "patch_session_state",
 ]

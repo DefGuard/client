@@ -5,26 +5,24 @@ import type {
   SelectOption,
   SelectOptionGroup,
 } from '../../../../shared/components/Select/types';
+import { useAppData } from '../../../../shared/providers/AppDataContext';
 import {
   getInstancesQueryOptions,
   getTunnelsQueryOptions,
 } from '../../../../shared/rust-api/query';
-import {
-  type CompactViewSelection,
-  useAppStore,
-} from '../../../../shared/store/useAppStore';
+import type { OverviewViewSelection } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
 
 export const InstanceSwitcher = () => {
-  const selectedInstance = useAppStore((s) => s.compactViewSelection);
+  const { viewSelection: selectedInstance, setViewSelection } = useAppData();
 
   const { data: tunnels } = useQuery(getTunnelsQueryOptions);
   const { data: instances } = useQuery(getInstancesQueryOptions);
 
-  const groups = useMemo((): readonly SelectOptionGroup<CompactViewSelection>[] => {
+  const groups = useMemo((): readonly SelectOptionGroup<OverviewViewSelection>[] => {
     if (!isPresent(instances) || !isPresent(tunnels)) return [];
 
-    const instanceGroup: SelectOptionGroup<CompactViewSelection> = {
+    const instanceGroup: SelectOptionGroup<OverviewViewSelection> = {
       key: 'instances',
       label: 'Instances',
       options: instances.map((instance) => ({
@@ -34,7 +32,7 @@ export const InstanceSwitcher = () => {
       })),
     };
 
-    const tunnelGroup: SelectOptionGroup<CompactViewSelection> = {
+    const tunnelGroup: SelectOptionGroup<OverviewViewSelection> = {
       key: 'tunnels',
       label: 'Tunnels',
       options: tunnels.map((tunnel) => ({
@@ -52,7 +50,7 @@ export const InstanceSwitcher = () => {
     [groups],
   );
 
-  const selectedOption = useMemo((): SelectOption<CompactViewSelection> | undefined => {
+  const selectedOption = useMemo((): SelectOption<OverviewViewSelection> | undefined => {
     if (!isPresent(selectedInstance)) return undefined;
     for (const group of groups) {
       const found = group.options.find((o) => {
@@ -77,7 +75,7 @@ export const InstanceSwitcher = () => {
       groups={groups}
       value={selectedOption as never}
       onChange={(option) => {
-        useAppStore.setState({ compactViewSelection: option.value });
+        setViewSelection(option.value);
       }}
     />
   );

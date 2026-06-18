@@ -10,6 +10,7 @@ pub mod events;
 pub mod log_watcher;
 pub mod periodic;
 pub mod service;
+pub mod session_state;
 pub mod tray;
 pub mod utils;
 pub mod window_manager;

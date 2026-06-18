@@ -14,6 +14,8 @@ pub enum EventKey {
     MfaTrigger,
     VersionMismatch,
     UuidMismatch,
+    WindowSwapped,
+    SessionStateChanged,
 }
 
 impl From<EventKey> for &'static str {
@@ -31,6 +33,8 @@ impl From<EventKey> for &'static str {
             EventKey::MfaTrigger => "mfa-trigger",
             EventKey::VersionMismatch => "version-mismatch",
             EventKey::UuidMismatch => "uuid-mismatch",
+            EventKey::WindowSwapped => "window-swapped",
+            EventKey::SessionStateChanged => "session-state-changed",
         }
     }
 }

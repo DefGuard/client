@@ -11,6 +11,7 @@ import { MfaStartMethod } from '../../../../../../../shared/components/LocationC
 import { useMfaConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaConnect';
 import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
+import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
@@ -28,8 +29,10 @@ export const ConnectModalMfaEmail = () => {
       debounceMs: location?.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onSessionExpired: () =>
         useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
-      onPostureError: () =>
-        useConnectModal.getState().setView(ConnectModalView.PostureCheckFail),
+      onPostureError: (msg) => {
+        useConnectModal.setState({ postureError: msg });
+        useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
+      },
     },
   );
 
@@ -56,6 +59,10 @@ export const ConnectModalMfaEmail = () => {
   useEffect(() => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
+
+  if (isStarting && location?.posture_check_required && !startError) {
+    return <ConnectModalPostureCheckLoading />;
+  }
 
   return (
     <div

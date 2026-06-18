@@ -9,6 +9,7 @@ import { Divider } from '../../../shared/components/Divider/Divider';
 import { LocationCard } from '../../../shared/components/LocationCard/LocationCard';
 import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { WindowHeader } from '../../../shared/components/WindowHeader/WindowHeader';
+import { useAppData } from '../../../shared/providers/AppDataContext';
 import { api } from '../../../shared/rust-api/api';
 import {
   getInstancesQueryOptions,
@@ -21,7 +22,7 @@ import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
 
 export const CompactLocationsPage = () => {
-  const selection = useAppStore((s) => s.compactViewSelection);
+  const { viewSelection: selection, setViewSelection } = useAppData();
   const openLocation = useAppStore((s) => s.expandedLocation);
 
   const routeData = useLoaderData({ from: '/compact/' });
@@ -53,11 +54,9 @@ export const CompactLocationsPage = () => {
 
   useEffect(() => {
     if (selection === null || instanceInfo === undefined) {
-      useAppStore.setState({
-        compactViewSelection: { kind: 'instance', data: routeData.instances[0] },
-      });
+      setViewSelection({ kind: 'instance', data: routeData.instances[0] });
     }
-  }, [routeData.instances, instanceInfo, selection]);
+  }, [routeData.instances, instanceInfo, selection, setViewSelection]);
 
   return (
     <CompactPage

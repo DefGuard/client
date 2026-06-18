@@ -11,6 +11,7 @@ import { IconButton } from '../../../../../../../shared/components/IconButton/Ic
 import { IconButtonVariant } from '../../../../../../../shared/components/IconButton/types';
 import { MfaSelector } from '../../../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
+import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
 import {
   LocationMfaMode,
@@ -18,6 +19,7 @@ import {
   type MfaMethodValue,
 } from '../../../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../../../shared/types';
+import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
 export const ConnectModalMfaSettings = () => {
@@ -26,6 +28,8 @@ export const ConnectModalMfaSettings = () => {
     meta: { invalidate: [['locations']] },
   });
 
+  const { locationMfaPreference, setLocationMfaPreference } = useAppData();
+
   const [perviousView, location] = useConnectModal(
     useShallow((s) => [s.perviousView, s.location]),
   );
@@ -33,7 +37,9 @@ export const ConnectModalMfaSettings = () => {
   const locationDefaultMfaMethod = location?.mfa_method ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(
-    location?.mfa_method ?? MfaMethod.Totp,
+    location
+      ? (locationMfaPreference[String(location.id)] ?? MfaMethod.Totp)
+      : MfaMethod.Totp,
   );
   const [setAsDefault, setSetAsDefault] = useState(true);
 
@@ -45,13 +51,31 @@ export const ConnectModalMfaSettings = () => {
   }, [location?.location_mfa_mode]);
 
   const handleSubmit = () => {
+    if (!location) return;
+    setLocationMfaPreference(location.id, selectedMethod);
     if (setAsDefault && selectedMethod !== locationDefaultMfaMethod && location) {
       setMfaMethod({ locationId: location.id, mfaMethod: selectedMethod });
     }
     if (perviousView === null) {
       useConnectModal.setState({ visible: false });
     } else {
-      useConnectModal.getState().setView(perviousView);
+      switch (selectedMethod) {
+        case 'totp':
+          useConnectModal.setState({ view: ConnectModalView.MfaTotp });
+          break;
+        case 'email':
+          useConnectModal.setState({ view: ConnectModalView.MfaEmail });
+          break;
+        case 'mobileapprove':
+          useConnectModal.setState({ view: ConnectModalView.MfaMobile });
+          break;
+        case 'oidc':
+          useConnectModal.setState({ view: ConnectModalView.MfaOidc });
+          break;
+        default:
+          useConnectModal.setState({ visible: false });
+          break;
+      }
     }
   };
 

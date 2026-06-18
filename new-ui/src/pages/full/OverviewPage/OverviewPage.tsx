@@ -11,7 +11,6 @@ import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { useAppData } from '../../../shared/providers/AppDataContext';
 import { getLocationsQueryOptions } from '../../../shared/rust-api/query';
 import type { InstanceInfo } from '../../../shared/rust-api/types';
-import { useAppStore } from '../../../shared/store/useAppStore';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { ConnectModal } from './components/ConnectModal/ConnectModal';
@@ -23,7 +22,7 @@ const isWindows = platform() === 'windows';
 export const OverviewPage = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const { instances, tunnels } = useAppData();
-  const selection = useAppStore((s) => s.compactViewSelection);
+  const { viewSelection: selection } = useAppData();
 
   const queryInstanceId = useMemo(() => {
     if (!isPresent(selection)) return instances[0].id;

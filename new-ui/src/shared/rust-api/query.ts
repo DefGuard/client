@@ -91,3 +91,8 @@ export const getPlatformHeaderQueryOptions = queryOptions({
   queryKey: ['platform-header'] as const,
   queryFn: () => api.getPlatformHeader(),
 });
+
+export const getSessionStateQueryOptions = queryOptions({
+  queryKey: ['session-state'] as const,
+  queryFn: () => api.getSessionState(),
+});

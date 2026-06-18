@@ -520,7 +520,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     Ok(instance_info)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct LocationInfo {
     pub id: Id,
     pub instance_id: Id,

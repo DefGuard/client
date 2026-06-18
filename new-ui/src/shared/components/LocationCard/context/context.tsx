@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
-import type { InstanceInfo, LocationInfo, MfaMethodValue } from '../../../rust-api/types';
+import { useAppData } from '../../../providers/AppDataContext';
+import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
@@ -12,8 +13,6 @@ interface LocationCardContextValue {
   setView: (view: LocationCardViewsValue) => void;
   setPostureError: (error: string | null) => void;
   startMfa: () => void;
-  localMfaMethod: MfaMethodValue;
-  setLocalMfaMethod: (method: MfaMethodValue) => void;
 }
 
 const LocationCardContext = createContext<LocationCardContextValue | null>(null);
@@ -42,9 +41,6 @@ export const LocationCardProvider = ({
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
-  const [localMfaMethod, setLocalMfaMethod] = useState<MfaMethodValue>(
-    location.mfa_method ?? MfaMethod.Totp,
-  );
 
   const setView = useCallback(
     (view: LocationCardViewsValue) => {
@@ -54,8 +50,12 @@ export const LocationCardProvider = ({
     [currentView],
   );
 
+  const { locationMfaPreference } = useAppData();
+
   const startMfa = useCallback(() => {
-    switch (localMfaMethod) {
+    const mfaMethod = locationMfaPreference[String(location.id)] ?? MfaMethod.Totp;
+
+    switch (mfaMethod) {
       case MfaMethod.Totp:
         setView(LocationCardViews.MfaTotp);
         break;
@@ -69,7 +69,7 @@ export const LocationCardProvider = ({
         setView(LocationCardViews.MfaMobile);
         break;
     }
-  }, [localMfaMethod, setView]);
+  }, [setView, location.id, locationMfaPreference]);
 
   return (
     <LocationCardContext.Provider
@@ -82,8 +82,6 @@ export const LocationCardProvider = ({
         location,
         instance,
         startMfa,
-        localMfaMethod,
-        setLocalMfaMethod,
       }}
     >
       {children}

@@ -205,7 +205,7 @@ impl Instance<NoId> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InstanceInfo<I = NoId> {
     pub id: I,
     pub name: String,
@@ -226,7 +226,7 @@ impl fmt::Display for InstanceInfo<Id> {
 }
 
 /// Describes allowed traffic options for clients connecting to an instance.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
 #[serde(rename_all = "snake_case")]
 pub enum ClientTrafficPolicy {

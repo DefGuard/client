@@ -15,6 +15,8 @@ import type {
   RoutingArgs,
   SaveConfigArgs,
   SaveDeviceConfigResponse,
+  SessionState,
+  SessionStatePatch,
   SetLocationMfaMethodArgs,
   StatsArgs,
   TunnelInfo,
@@ -124,6 +126,11 @@ const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
 
+const getSessionState = (): Promise<SessionState> => invoke(TauriCommand.GetSessionState);
+
+const patchSessionState = (patch: SessionStatePatch): Promise<SessionState> =>
+  invoke(TauriCommand.PatchSessionState, { patch });
+
 export const api = {
   // Instances
   getInstances,
@@ -167,4 +174,7 @@ export const api = {
   swapToFullView,
   swapToTray,
   closeTrayWindow,
+  // Session state
+  getSessionState,
+  patchSessionState,
 };
