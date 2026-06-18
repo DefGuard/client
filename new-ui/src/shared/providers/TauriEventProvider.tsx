@@ -19,7 +19,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     const unlisteners = Promise.all([
       listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
-        void debug(`UI Received event AddInstance: ${JSON.stringify(event.payload)}`);
+        void debug(`UI Received event AddInstance (${event.payload.url})`);
         const windowLabel = getCurrentWindow().label;
         if (windowLabel === WindowId.FullView) {
           const { token, url } = event.payload;
@@ -99,11 +99,6 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
           `UI Received event ApplicationConfigChanged: ${JSON.stringify(event.payload)}`,
         );
         void queryClient.invalidateQueries({ queryKey: ['settings'] });
-      }),
-
-      listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
-        void debug(`UI Received event AddInstance: ${JSON.stringify(event.payload)}`);
-        void queryClient.invalidateQueries({ queryKey: ['instances'] });
       }),
 
       listen(TauriEvent.UuidMismatch, (event) => {

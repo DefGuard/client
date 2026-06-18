@@ -26,21 +26,28 @@ pub struct SessionState {
 }
 
 #[tauri::command]
-pub fn get_session_state(app_state: State<'_, AppState>) -> SessionState {
-    app_state.session_state.lock().unwrap().clone()
+pub fn get_session_state(app_state: State<'_, AppState>) -> Result<SessionState, String> {
+    app_state
+        .session_state
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|err| format!("Session state mutex poisoned: {err}"))
 }
 
 #[tauri::command(async)]
 pub async fn patch_session_state(
     patch: SessionStatePatch,
     app_handle: AppHandle,
-) -> Result<SessionState, ()> {
+) -> Result<SessionState, String> {
     let app_state = app_handle.state::<AppState>();
-    let updated = {
-        let mut session_state = app_state.session_state.lock().unwrap();
-        session_state.apply(patch);
-        session_state.clone()
-    };
+    let updated = app_state
+        .session_state
+        .lock()
+        .map_err(|err| format!("Session state mutex poisoned: {err}"))
+        .map(|mut s| {
+            s.apply(patch);
+            s.clone()
+        })?;
     if let Err(err) = app_handle.emit(EventKey::SessionStateChanged.into(), ()) {
         error!("Failed to emit session-state-changed event: {err}");
     }

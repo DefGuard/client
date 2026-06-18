@@ -55,7 +55,6 @@ export const ConnectModalMfaSettings = () => {
     setLocationMfaPreference(location.id, selectedMethod);
     if (setAsDefault && selectedMethod !== locationDefaultMfaMethod && location) {
       setMfaMethod({ locationId: location.id, mfaMethod: selectedMethod });
-    } else {
     }
     if (perviousView === null) {
       useConnectModal.setState({ visible: false });
