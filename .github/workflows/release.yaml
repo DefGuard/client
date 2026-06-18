@@ -128,6 +128,65 @@ jobs:
           asset_name: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
 
+  # Dedicated dg build for AlmaLinux 9 (and the RHEL 9 family: Rocky 9, RHEL 9).
+  # The default dg RPM is built against a newer glibc/OpenSSL and fails to run on
+  # Alma 9, so dg is compiled inside an almalinux:9 container to link Alma's
+  # glibc 2.34 and OpenSSL 3, then packaged with fpm. x86_64 only.
+  build-dg-alma9:
+    needs:
+      - create-release
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+    container:
+      image: almalinux:9
+      env:
+        HOME: /root
+        RUSTUP_HOME: /root/.rustup
+        CARGO_HOME: /root/.cargo
+        SQLX_OFFLINE: "true"
+    steps:
+      - name: Install build prerequisites
+        run: |
+          dnf -y install git gcc gcc-c++ make openssl-devel perl pkgconfig unzip
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+      - name: Install protoc
+        run: |
+          PB_REL='https://github.com/protocolbuffers/protobuf/releases'
+          PB_VERSION='3.20.0'
+          curl -LO $PB_REL/download/v$PB_VERSION/protoc-$PB_VERSION-linux-x86_64.zip
+          unzip -o protoc-$PB_VERSION-linux-x86_64.zip bin/protoc 'include/google/*' -d /usr/local
+          echo "PROTOC=/usr/local/bin/protoc" >> ${GITHUB_ENV}
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build dg (AlmaLinux 9)
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml -p defguard-dg --bin dg
+      - name: Rename dg binary
+        run: mv src-tauri/target/release/dg dg-linux-x86_64-${{ github.ref_name }}
+      - name: Build dg rpm
+        uses: defGuard/fpm-action@main
+        with:
+          fpm_args: "dg-linux-x86_64-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_opts: "--architecture x86_64 --debug --output-type rpm --version ${{ env.VERSION }} --no-auto-depends --depends openssl-libs --depends wireguard-tools --package dg-linux-x86_64-${{ github.ref_name }}-el9.rpm"
+      - name: Upload RPM
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dg-linux-x86_64-${{ github.ref_name }}-el9.rpm
+          asset_name: dg-linux-x86_64-${{ github.ref_name }}-el9.rpm
+          asset_content_type: application/octet-stream
+
   build-linux:
     env:
       CARGO_TERM_COLOR: always

@@ -1046,7 +1046,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "1.6.9"
+version = "1.6.10"
 dependencies = [
  "nix",
 ]
@@ -1407,7 +1407,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client"
-version = "1.6.9"
+version = "1.6.10"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1477,7 +1477,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-dg"
-version = "1.6.9"
+version = "1.6.10"
 dependencies = [
  "clap",
  "common",
