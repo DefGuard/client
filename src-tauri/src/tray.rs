@@ -6,7 +6,7 @@ use tauri::{
     menu::{Menu, MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, Runtime, Theme,
+    AppHandle, Emitter, Manager, Runtime,
 };
 
 use crate::{
@@ -291,15 +291,22 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
         return Ok(());
     };
 
-    let theme = app_handle.system_theme();
     let mut resource_str = String::from("resources/icons/tray/");
     #[cfg(windows)]
     resource_str.push_str("blue");
     #[cfg(not(windows))]
-    resource_str.push_str(match theme {
-        Some(Theme::Dark) => "dark",
-        _ => "light",
-    });
+    {
+        use tauri::Theme;
+        let theme = app_handle
+            .webview_windows()
+            .into_values()
+            .next()
+            .and_then(|w| w.theme().ok());
+        resource_str.push_str(match theme {
+            Some(Theme::Dark) => "dark",
+            _ => "light",
+        });
+    }
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
     if !active_connections.is_empty() {
         resource_str.push_str("-connected");
