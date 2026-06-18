@@ -12,6 +12,8 @@
   transition-duration: 160ms;
   transition-timing-function: ease-out;
   transition-property: border-color, box-shadow, color;
+  max-width: 342px;
+  min-height: 172px;
 
   &:hover {
     --border: var(--border-default);
@@ -25,6 +27,16 @@
         position: absolute;
         top: -55px;
         left: -80px;
+      }
+    }
+  }
+
+  &.image-wireguard {
+    .images {
+      img {
+        position: absolute;
+        top: -40px;
+        left: -50px;
       }
     }
   }

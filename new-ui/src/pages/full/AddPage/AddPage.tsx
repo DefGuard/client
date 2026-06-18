@@ -22,6 +22,17 @@ export const AddPage = () => {
           actionText="Add instance"
           description={`Establish a secure connection to your Defguard instance effortlessly by configuring it with a single token—no manual setup.`}
         />
+        <AddCard
+          image="wireguard"
+          onClick={() => {
+            navigate({
+              to: '/full/add/tunnel',
+            });
+          }}
+          title="Add WireGuard Tunnel"
+          actionText="Add tunnel"
+          description={`Add and configure a WireGuard tunnel to securely route traffic through an encrypted connection using predefined configuration.`}
+        />
       </div>
     </FullPage>
   );
