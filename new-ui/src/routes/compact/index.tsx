@@ -29,18 +29,18 @@ export const Route = createFileRoute('/compact/')({
     if (stored === null) {
       storedIsValid = false;
     } else if (stored.kind === 'instance') {
-      storedIsValid = instances.some((i) => i.id === stored.data.id);
+      storedIsValid = instances.some((i) => i.id === stored.id);
     } else {
-      storedIsValid = tunnels.some((t) => t.id === stored.data.id);
+      storedIsValid = tunnels.some((t) => t.id === stored.id);
     }
 
     let selected: OverviewViewSelection;
     if (storedIsValid && stored !== null) {
       selected = stored;
     } else if (instances.length > 0) {
-      selected = { kind: 'instance', data: instances[0] };
+      selected = { kind: 'instance', id: instances[0].id };
     } else {
-      selected = { kind: 'tunnel', data: tunnels[0] };
+      selected = { kind: 'tunnel', id: tunnels[0].id };
     }
 
     if (!storedIsValid) {
@@ -51,7 +51,7 @@ export const Route = createFileRoute('/compact/')({
     let locations: LocationInfo[];
     if (selected.kind === 'instance') {
       locations = await context.queryClient.fetchQuery(
-        getLocationsQueryOptions(selected.data.id),
+        getLocationsQueryOptions(selected.id),
       );
     } else {
       locations = [];

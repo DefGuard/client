@@ -16,6 +16,7 @@ pub enum EventKey {
     UuidMismatch,
     WindowSwapped,
     SessionStateChanged,
+    InstanceUpdated,
 }
 
 impl From<EventKey> for &'static str {
@@ -35,6 +36,7 @@ impl From<EventKey> for &'static str {
             EventKey::UuidMismatch => "uuid-mismatch",
             EventKey::WindowSwapped => "window-swapped",
             EventKey::SessionStateChanged => "session-state-changed",
+            EventKey::InstanceUpdated => "instance-updated",
         }
     }
 }

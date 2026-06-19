@@ -27,34 +27,38 @@ export const CompactLocationsPage = () => {
 
   const routeData = useLoaderData({ from: '/compact/' });
 
+  const { data: instances } = useQuery(getInstancesQueryOptions);
+
+  const allInstances = instances ?? routeData.instances;
+  const allTunnels = routeData.tunnels;
+
   const queryInstanceId = useMemo(() => {
     if (!isPresent(selection)) return routeData.instances[0].id;
-    if (selection.kind === 'instance') return selection.data.id;
-    return selection.data.instance_id;
-  }, [selection, routeData.instances]);
+    if (selection.kind === 'instance') return selection.id;
+    return allTunnels.find((t) => t.id === selection.id)?.instance_id ?? routeData.instances[0].id;
+  }, [selection, routeData.instances, allTunnels]);
 
   const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));
 
-  const { data: instances } = useQuery(getInstancesQueryOptions);
-
   const instanceInfo = useMemo(() => {
-    const allInstances = instances ?? routeData.instances;
     if (!isPresent(selection)) return allInstances[0];
-    if (selection.kind === 'instance')
-      return allInstances.find((i) => i.id === selection.data.id);
-    return allInstances.find((i) => i.id === selection.data.instance_id);
-  }, [selection, instances, routeData.instances]);
+    if (selection.kind === 'instance') return allInstances.find((i) => i.id === selection.id);
+    const tunnel = allTunnels.find((t) => t.id === selection.id);
+    return tunnel ? allInstances.find((i) => i.id === tunnel.instance_id) : undefined;
+  }, [selection, allInstances, allTunnels]);
 
   const displayedLocations = useMemo(() => {
     if (!isPresent(selection) || selection.kind === 'instance') {
       return locations ?? routeData.locations;
     }
-    return [selection.data];
-  }, [selection, locations, routeData.locations]);
+    const tunnel = allTunnels.find((t) => t.id === selection.id);
+    return tunnel ? [tunnel] : [];
+  }, [selection, locations, routeData.locations, allTunnels]);
 
   useEffect(() => {
+    if (selection?.kind === 'tunnel') return;
     if (selection === null || instanceInfo === undefined) {
-      setViewSelection({ kind: 'instance', data: routeData.instances[0] });
+      setViewSelection({ kind: 'instance', id: routeData.instances[0].id });
     }
   }, [routeData.instances, instanceInfo, selection, setViewSelection]);
 

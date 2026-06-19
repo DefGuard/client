@@ -27,16 +27,16 @@ export const Route = createFileRoute('/full/_default/overview')({
     if (stored === null) {
       storedIsValid = false;
     } else if (stored.kind === 'instance') {
-      storedIsValid = instances.some((i) => i.id === stored.data.id);
+      storedIsValid = instances.some((i) => i.id === stored.id);
     } else {
-      storedIsValid = tunnels.some((t) => t.id === stored.data.id);
+      storedIsValid = tunnels.some((t) => t.id === stored.id);
     }
 
     if (!storedIsValid) {
       const selected =
         instances.length > 0
-          ? { kind: 'instance' as const, data: instances[0] }
-          : { kind: 'tunnel' as const, data: tunnels[0] };
+          ? { kind: 'instance' as const, id: instances[0].id }
+          : { kind: 'tunnel' as const, id: tunnels[0].id };
       await api.patchSessionState({ view_selection: selected });
       await context.queryClient.invalidateQueries({ queryKey: ['session-state'] });
     }

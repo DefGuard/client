@@ -33,8 +33,7 @@ export const OverviewSelection = ({ instances, tunnels }: Props) => {
 
   const isSelected = (candidate: OverviewViewSelection): boolean => {
     if (!selection) return false;
-    if (candidate.kind !== selection.kind) return false;
-    return candidate.data.id === selection.data.id;
+    return candidate.kind === selection.kind && candidate.id === selection.id;
   };
 
   return (
@@ -44,10 +43,10 @@ export const OverviewSelection = ({ instances, tunnels }: Props) => {
           <p className="label">Instances</p>
           <div className="items">
             {instances.map((instance) => {
-              const value: OverviewViewSelection = { kind: 'instance', data: instance };
+              const value: OverviewViewSelection = { kind: 'instance', id: instance.id };
               return (
                 <SelectionItem
-                  key={instance.id}
+                  key={`instance-${instance.id}`}
                   label={instance.name}
                   selected={isSelected(value)}
                   onClick={() => setSelection(value)}
@@ -62,10 +61,10 @@ export const OverviewSelection = ({ instances, tunnels }: Props) => {
           <p className="label">Tunnels</p>
           <div className="items">
             {tunnels.map((tunnel) => {
-              const value: OverviewViewSelection = { kind: 'tunnel', data: tunnel };
+              const value: OverviewViewSelection = { kind: 'tunnel', id: tunnel.id };
               return (
                 <SelectionItem
-                  key={tunnel.id ?? tunnel.name}
+                  key={`tunnel-${tunnel.id ?? tunnel.name}`}
                   label={tunnel.name}
                   selected={isSelected(value)}
                   onClick={() => setSelection(value)}

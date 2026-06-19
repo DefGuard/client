@@ -24,11 +24,27 @@ export const OverviewPage = () => {
   const { instances, tunnels } = useAppData();
   const { viewSelection: selection } = useAppData();
 
+  const selectedTunnel = useMemo(
+    () =>
+      selection?.kind === 'tunnel'
+        ? tunnels.find((t) => t.id === selection.id)
+        : undefined,
+    [selection, tunnels],
+  );
+
+  const selectedInstance = useMemo(
+    () =>
+      selection?.kind === 'instance'
+        ? instances.find((i) => i.id === selection.id)
+        : undefined,
+    [selection, instances],
+  );
+
   const queryInstanceId = useMemo(() => {
     if (!isPresent(selection)) return instances[0].id;
-    if (selection.kind === 'instance') return selection.data.id;
-    return selection.data.instance_id;
-  }, [selection, instances]);
+    if (selection.kind === 'instance') return selection.id;
+    return selectedTunnel?.instance_id ?? instances[0].id;
+  }, [selection, instances, selectedTunnel]);
 
   const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));
 
@@ -36,8 +52,8 @@ export const OverviewPage = () => {
     if (!isPresent(selection) || selection.kind === 'instance') {
       return locations ?? [];
     }
-    return [selection.data];
-  }, [selection, locations]);
+    return selectedTunnel ? [selectedTunnel] : [];
+  }, [selection, locations, selectedTunnel]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect only relevant on selection
   useEffect(() => {
@@ -79,18 +95,14 @@ export const OverviewPage = () => {
               <div className="instance-details">
                 <Fold open={detailsOpen && selection?.kind === 'instance'}>
                   <SizedBox height={ThemeSpacing.Xl} />
-                  {selection?.kind === 'instance' && (
-                    <DetailsFold data={selection.data} />
-                  )}
+                  {selectedInstance && <DetailsFold data={selectedInstance} />}
                 </Fold>
               </div>
               <SizedBox height={ThemeSpacing.Xl} />
               <div className="locations">
                 {displayedLocations.map((location) => {
-                  let instance: InstanceInfo | undefined;
-                  if (selection?.kind === 'instance') {
-                    instance = selection.data;
-                  }
+                  const instance: InstanceInfo | undefined =
+                    selection?.kind === 'instance' ? selectedInstance : undefined;
                   return (
                     <OverviewLocationCard
                       location={location}

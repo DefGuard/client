@@ -28,7 +28,7 @@ export const InstanceSwitcher = () => {
       options: instances.map((instance) => ({
         key: instance.id,
         label: instance.name,
-        value: { kind: 'instance', data: instance },
+        value: { kind: 'instance', id: instance.id },
       })),
     };
 
@@ -38,7 +38,7 @@ export const InstanceSwitcher = () => {
       options: tunnels.map((tunnel) => ({
         key: tunnel.id ?? tunnel.name,
         label: tunnel.name,
-        value: { kind: 'tunnel', data: tunnel },
+        value: { kind: 'tunnel', id: tunnel.id },
       })),
     };
 
@@ -54,13 +54,7 @@ export const InstanceSwitcher = () => {
     if (!isPresent(selectedInstance)) return undefined;
     for (const group of groups) {
       const found = group.options.find((o) => {
-        if (selectedInstance.kind === 'instance' && o.value.kind === 'instance') {
-          return o.value.data.id === selectedInstance.data.id;
-        }
-        if (selectedInstance.kind === 'tunnel' && o.value.kind === 'tunnel') {
-          return o.value.data.id === selectedInstance.data.id;
-        }
-        return false;
+        return o.value.kind === selectedInstance.kind && o.value.id === selectedInstance.id;
       });
       if (found) return found;
     }
