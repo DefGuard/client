@@ -291,10 +291,25 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
         return Ok(());
     };
 
-    let mut resource_str = String::from("resources/icons/tray-32x32");
+    let mut resource_str = String::from("resources/icons/tray/");
+    #[cfg(windows)]
+    resource_str.push_str("blue");
+    #[cfg(not(windows))]
+    {
+        use tauri::Theme;
+        let theme = app_handle
+            .webview_windows()
+            .into_values()
+            .next()
+            .and_then(|w| w.theme().ok());
+        resource_str.push_str(match theme {
+            Some(Theme::Dark) => "dark",
+            _ => "light",
+        });
+    }
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
     if !active_connections.is_empty() {
-        resource_str.push_str("-active");
+        resource_str.push_str("-connected");
     }
     resource_str.push_str(".png");
     debug!("Trying to load the tray icon from {resource_str}");

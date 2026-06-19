@@ -14,15 +14,19 @@ Desktop client for managing WireGuard VPN connections
 %{__mkdir} -p %{buildroot}/%{_bindir}
 %{__mkdir} -p %{buildroot}/%{_sbindir}
 %{__mkdir} -p %{buildroot}/%{_prefix}/lib/systemd/system
-%{__mkdir} -p %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons
+%{__mkdir} -p %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray
 %{__mkdir} -p %{buildroot}/%{_datadir}/applications
 %{__mkdir} -p %{buildroot}/%{_datadir}/icons/hicolor/128x128/apps
 %{__mkdir} -p %{buildroot}/%{_datadir}/icons/hicolor/256x256@2/apps
 %{__mkdir} -p %{buildroot}/%{_datadir}/icons/hicolor/32x32/apps
 %{__install} -m 755 src-tauri/target/release/defguard-client %{buildroot}/%{_bindir}/
 %{__install} -m 755 src-tauri/target/release/defguard-service %{buildroot}/%{_sbindir}/
-%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32.png
-%{__install} -m 644 src-tauri/target/release/resources/icons/tray-32x32-active.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-active.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray/blue.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray/blue.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray/blue-connected.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray/blue-connected.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray/dark.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray/dark.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray/dark-connected.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray/dark-connected.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray/white.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray/white.png
+%{__install} -m 644 src-tauri/target/release/resources/icons/tray/white-connected.png %{buildroot}/%{_prefix}/lib/defguard-client/resources/icons/tray/white-connected.png
 %{__install} -m 644 resources-linux/defguard-service.service %{buildroot}/%{_prefix}/lib/systemd/system/
 %{__install} -m 644 resources-linux/defguard-client.desktop %{buildroot}/%{_datadir}/applications/defguard-client.desktop
 %{__install} -m 644 src-tauri/icons/128x128.png %{buildroot}/%{_datadir}/icons/hicolor/128x128/apps/defguard-client.png
@@ -51,8 +55,12 @@ systemctl daemon-reload
 %files
 %{_bindir}/defguard-client
 %{_sbindir}/defguard-service
-%{_prefix}/lib/defguard-client/resources/icons/tray-32x32.png
-%{_prefix}/lib/defguard-client/resources/icons/tray-32x32-active.png
+%{_prefix}/lib/defguard-client/resources/icons/tray/blue.png
+%{_prefix}/lib/defguard-client/resources/icons/tray/blue-connected.png
+%{_prefix}/lib/defguard-client/resources/icons/tray/dark.png
+%{_prefix}/lib/defguard-client/resources/icons/tray/dark-connected.png
+%{_prefix}/lib/defguard-client/resources/icons/tray/white.png
+%{_prefix}/lib/defguard-client/resources/icons/tray/white-connected.png
 %{_prefix}/lib/systemd/system/defguard-service.service
 %{_datadir}/applications/defguard-client.desktop
 %{_datadir}/icons/hicolor/128x128/apps/defguard-client.png
