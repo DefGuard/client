@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { useMutation } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import clsx from 'clsx';
 import { useMemo } from 'react';
 import { ConnectModalView } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export const OverviewLocationCard = ({ location, instance }: Props) => {
+  const navigate = useNavigate();
   const { mutate: updateRouting } = useMutation({
     mutationFn: api.updateLocationRouting,
     meta: {
@@ -103,7 +105,19 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   return (
     <div className={clsx('overview-location-card')}>
       <div className="header">
-        <LocationCardHeaderInfo location={location} />
+        <LocationCardHeaderInfo
+          location={location}
+          onInfoClick={() =>
+            navigate({
+              to: '/full/location-details',
+              search: {
+                locationId: location.id,
+                locationName: location.name,
+                connectionType: location.connection_type,
+              },
+            })
+          }
+        />
         <div className="right">
           <ConnectButton active={location.active} onClick={handleConnectClick} />
         </div>

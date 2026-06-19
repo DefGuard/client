@@ -24,6 +24,7 @@ import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/s
 import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/settings'
 import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
 import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
+import { Route as FullDefaultLocationDetailsRouteImport } from './routes/full/_default/location-details'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
 import { Route as FullDefaultAddTunnelRouteImport } from './routes/full/_default/add/tunnel'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
@@ -102,6 +103,12 @@ const FullDefaultLogRoute = FullDefaultLogRouteImport.update({
   path: '/log',
   getParentRoute: () => FullDefaultRoute,
 } as any)
+const FullDefaultLocationDetailsRoute =
+  FullDefaultLocationDetailsRouteImport.update({
+    id: '/location-details',
+    path: '/location-details',
+    getParentRoute: () => FullDefaultRoute,
+  } as any)
 const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
   id: '/add/',
   path: '/add/',
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/location-details': typeof FullDefaultLocationDetailsRoute
   '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
   '/full/settings': typeof FullDefaultSettingsRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
   '/compact': typeof CompactIndexRoute
   '/playground': typeof PlaygroundIndexRoute
+  '/full/location-details': typeof FullDefaultLocationDetailsRoute
   '/full/log': typeof FullDefaultLogRoute
   '/full/overview': typeof FullDefaultOverviewRoute
   '/full/settings': typeof FullDefaultSettingsRoute
@@ -167,6 +176,7 @@ export interface FileRoutesById {
   '/compact/': typeof CompactIndexRoute
   '/full/': typeof FullIndexRoute
   '/playground/': typeof PlaygroundIndexRoute
+  '/full/_default/location-details': typeof FullDefaultLocationDetailsRoute
   '/full/_default/log': typeof FullDefaultLogRoute
   '/full/_default/overview': typeof FullDefaultOverviewRoute
   '/full/_default/settings': typeof FullDefaultSettingsRoute
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/location-details'
     | '/full/log'
     | '/full/overview'
     | '/full/settings'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/full/tunnel-wizard'
     | '/compact'
     | '/playground'
+    | '/full/location-details'
     | '/full/log'
     | '/full/overview'
     | '/full/settings'
@@ -226,6 +238,7 @@ export interface FileRouteTypes {
     | '/compact/'
     | '/full/'
     | '/playground/'
+    | '/full/_default/location-details'
     | '/full/_default/log'
     | '/full/_default/overview'
     | '/full/_default/settings'
@@ -351,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultLogRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/location-details': {
+      id: '/full/_default/location-details'
+      path: '/location-details'
+      fullPath: '/full/location-details'
+      preLoaderRoute: typeof FullDefaultLocationDetailsRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/add/': {
       id: '/full/_default/add/'
       path: '/add'
@@ -376,6 +396,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface FullDefaultRouteChildren {
+  FullDefaultLocationDetailsRoute: typeof FullDefaultLocationDetailsRoute
   FullDefaultLogRoute: typeof FullDefaultLogRoute
   FullDefaultOverviewRoute: typeof FullDefaultOverviewRoute
   FullDefaultSettingsRoute: typeof FullDefaultSettingsRoute
@@ -387,6 +408,7 @@ interface FullDefaultRouteChildren {
 }
 
 const FullDefaultRouteChildren: FullDefaultRouteChildren = {
+  FullDefaultLocationDetailsRoute: FullDefaultLocationDetailsRoute,
   FullDefaultLogRoute: FullDefaultLogRoute,
   FullDefaultOverviewRoute: FullDefaultOverviewRoute,
   FullDefaultSettingsRoute: FullDefaultSettingsRoute,
