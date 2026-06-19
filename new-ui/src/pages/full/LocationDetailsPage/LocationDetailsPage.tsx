@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
+import { Controls } from '../../../shared/components/Controls/Controls';
 import { DetailsFold } from '../../../shared/components/DetailsFold/DetailsFold';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
@@ -57,13 +58,13 @@ export const LocationDetailsPage = () => {
           },
         ]}
       />
-      <div className="page-controls">
+      <Controls>
         <Button
           text="Back"
           variant={ButtonVariant.Primary}
           onClick={() => navigate({ to: '/full/overview' })}
         />
-      </div>
+      </Controls>
     </FullPage>
   );
 };
