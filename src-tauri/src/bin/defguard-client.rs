@@ -62,7 +62,7 @@ async fn startup(app_handle: &AppHandle) {
                         return;
                     }
                 };
-                match session_state::validate_location_mfa_preference(&*DB_POOL, preference).await {
+                match session_state::validate_location_mfa_preference(&DB_POOL, preference).await {
                     Ok(validated) => {
                         if let Ok(mut guard) = app_state.session_state.lock() {
                             guard.location_mfa_preference = validated;
