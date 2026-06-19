@@ -19,6 +19,7 @@ common = { package = "defguard-client-common", path = "../common" }
 defguard_core = { package = "defguard-client-core", path = "../core" }
 defguard_client_posture = { package = "defguard-client-posture", path = "../enterprise/posture" }
 defguard_client_proto = { package = "defguard-client-proto", path = "../client-proto" }
+base64.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -29,12 +30,18 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 webbrowser.workspace = true
+http.workspace = true
+qrcode.workspace = true
+image.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
 
 # Dummy feature to let tauri build the release.
 [features]
 custom-protocol = []
 
 [dev-dependencies]
+sha1 = "0.10"
 tempfile.workspace = true
 tokio-stream = "0.1"
 tonic.workspace = true
