@@ -1,13 +1,21 @@
+import './style.scss';
+import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { open } from '@tauri-apps/plugin-dialog';
+import { readFile } from '@tauri-apps/plugin-fs';
+import { useMemo, useRef } from 'react';
+import { Subject } from 'rxjs';
 import z from 'zod';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
+import { IconKind } from '../../../../../shared/components/Icon';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
+import { TooltipButton } from '../../../../../shared/components/TooltipButton/TooltipButton';
 import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
+import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { patternValidIp, patternValidIpV6 } from '../../../../../shared/utils/patterns';
 import { useTunnelWizardStore } from '../../hooks/useTunnelWizardStore';
@@ -28,6 +36,36 @@ type FormFields = z.infer<typeof formSchema>;
 export const GeneralInformationStep = () => {
   const navigate = useNavigate();
   const initData = useTunnelWizardStore((s) => s.tunnelData);
+
+  const { mutate: importTunnelFile, isPending } = useMutation({
+    mutationFn: async () => {
+      const filePath = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: 'wg-conf', extensions: ['conf', 'txt', 'config'] }],
+      });
+      if (filePath) {
+        const decoder = new TextDecoder();
+        const fileContents = await readFile(filePath);
+        const fileString = decoder.decode(fileContents);
+        const config = await api.parseTunnelConfig({
+          filename: filePath,
+          config: fileString,
+        });
+        const current = useTunnelWizardStore.getState().tunnelData;
+        useTunnelWizardStore.setState({ tunnelData: { ...current, ...config } });
+        if (config.name) {
+          form.setFieldValue('name', config.name);
+        }
+        if (config.address) {
+          form.setFieldValue('address', config.address);
+        }
+        importTooltipRef.current.next();
+      }
+    },
+  });
+
+  const importTooltipRef = useRef(new Subject<void>());
 
   const defaultValues = useMemo(
     (): FormFields => ({
@@ -55,6 +93,21 @@ export const GeneralInformationStep = () => {
         <h1>General information</h1>
         <SizedBox height={ThemeSpacing.Md} />
         <p>{`Upload your config file (optional) and we'll securely extract the connection settings for you. This is the fastest and recommended way to get started.`}</p>
+        <div className="actions">
+          <TooltipButton
+            buttonProps={{
+              variant: ButtonVariant.Outlined,
+              iconLeft: IconKind.Upload,
+              text: 'Import WireGuard config file',
+              loading: isPending,
+              onClick: () => {
+                importTunnelFile();
+              },
+            }}
+            tooltipText="Config file applied"
+            tooltipTrigger={importTooltipRef.current}
+          />
+        </div>
       </header>
       <Divider spacing={ThemeSpacing.Xl2} />
       <form

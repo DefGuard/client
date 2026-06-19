@@ -74,11 +74,10 @@ const getTunnels = (): Promise<LocationInfo[]> => invoke(TauriCommand.AllTunnels
 const getTunnelDetails = (tunnelId: number): Promise<TunnelInfo> =>
   invoke(TauriCommand.TunnelDetails, { tunnelId });
 
-const parseTunnelConfig = (
-  filename: string,
-  config: string,
-): Promise<Partial<TunnelRequest>> =>
-  invoke(TauriCommand.ParseTunnelConfig, { filename, config });
+const parseTunnelConfig = (data: {
+  filename: string;
+  config: string;
+}): Promise<Partial<TunnelRequest>> => invoke(TauriCommand.ParseTunnelConfig, data);
 
 const saveTunnel = (tunnel: TunnelRequest): Promise<void> =>
   invoke(TauriCommand.SaveTunnel, { tunnel });
