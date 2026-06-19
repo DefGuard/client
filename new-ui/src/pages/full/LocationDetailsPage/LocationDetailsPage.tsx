@@ -32,7 +32,7 @@ export const LocationDetailsPage = () => {
             rows: [
               { label: 'Public key', value: data?.pubkey ?? fallback },
               { label: 'Addresses', value: data?.address ?? fallback },
-              { label: 'Listen port', value: data?.listen_port ?? fallback },
+              { label: 'Listen port', value: data?.listen_port || fallback },
             ],
           },
           {
