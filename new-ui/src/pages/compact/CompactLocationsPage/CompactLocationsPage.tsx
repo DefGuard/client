@@ -35,14 +35,18 @@ export const CompactLocationsPage = () => {
   const queryInstanceId = useMemo(() => {
     if (!isPresent(selection)) return routeData.instances[0].id;
     if (selection.kind === 'instance') return selection.id;
-    return allTunnels.find((t) => t.id === selection.id)?.instance_id ?? routeData.instances[0].id;
+    return (
+      allTunnels.find((t) => t.id === selection.id)?.instance_id ??
+      routeData.instances[0].id
+    );
   }, [selection, routeData.instances, allTunnels]);
 
   const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));
 
   const instanceInfo = useMemo(() => {
     if (!isPresent(selection)) return allInstances[0];
-    if (selection.kind === 'instance') return allInstances.find((i) => i.id === selection.id);
+    if (selection.kind === 'instance')
+      return allInstances.find((i) => i.id === selection.id);
     const tunnel = allTunnels.find((t) => t.id === selection.id);
     return tunnel ? allInstances.find((i) => i.id === tunnel.instance_id) : undefined;
   }, [selection, allInstances, allTunnels]);

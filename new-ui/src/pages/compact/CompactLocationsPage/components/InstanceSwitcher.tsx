@@ -54,7 +54,9 @@ export const InstanceSwitcher = () => {
     if (!isPresent(selectedInstance)) return undefined;
     for (const group of groups) {
       const found = group.options.find((o) => {
-        return o.value.kind === selectedInstance.kind && o.value.id === selectedInstance.id;
+        return (
+          o.value.kind === selectedInstance.kind && o.value.id === selectedInstance.id
+        );
       });
       if (found) return found;
     }
