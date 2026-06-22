@@ -30,6 +30,7 @@
     flex-flow: column;
     align-items: flex-start;
     row-gap: var(--spacing-xs);
+    user-select: none;
 
     > .label {
       font: var(--t-body-sm-500);

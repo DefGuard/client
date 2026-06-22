@@ -1,6 +1,9 @@
 import clsx from 'clsx';
 import './style.scss';
+import { useQuery } from '@tanstack/react-query';
+import { getVersion } from '@tauri-apps/api/app';
 import { useId } from 'react';
+import { isPresent } from '../../utils/isPresent';
 import { ConnectionWatcher } from './components/ConnectionWatcher/ConnectionsWatcher';
 
 interface Props {
@@ -8,13 +11,26 @@ interface Props {
 }
 
 export const WindowHeader = ({ variant }: Props) => {
+  const { data: appVersion } = useQuery({
+    queryFn: getVersion,
+    queryKey: ['app-version'],
+  });
+
+  const version = () => {
+    if (appVersion) {
+      return `Version ${appVersion}`;
+    }
+  };
+
   return (
     <div id="window-header" className={clsx(`variant-${variant}`)}>
       <LogoIcon size={variant === 'desktop' ? 33 : 48} />
       <div className="info">
         <p className="label">Defguard VPN Client</p>
         {variant === 'compact' && <ConnectionWatcher />}
-        {variant === 'desktop' && <p className="version">{`Version placeholder`}</p>}
+        {variant === 'desktop' && isPresent(appVersion) && (
+          <p className="version">{version()}</p>
+        )}
       </div>
       {variant === 'desktop' && (
         <div className="right">
