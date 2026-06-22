@@ -8,6 +8,7 @@ interface StoreValues {
   view: ConnectModalViewValue | null;
   perviousView: ConnectModalViewValue | null;
   postureError: string | null;
+  autoStartOpenId: boolean;
 }
 
 const defaults: StoreValues = {
@@ -16,6 +17,7 @@ const defaults: StoreValues = {
   view: null,
   perviousView: null,
   postureError: null,
+  autoStartOpenId: false,
 } as const;
 
 interface Store extends StoreValues {

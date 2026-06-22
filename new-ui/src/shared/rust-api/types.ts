@@ -186,6 +186,7 @@ export type AppConfig = {
   peer_alive_period: number;
   /** Maximum transmission unit; 0 means system default. */
   mtu: number;
+  auto_start_openid_mfa: boolean;
 };
 
 export type AppConfigPatch = Partial<AppConfig>;
