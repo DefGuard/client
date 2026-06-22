@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
@@ -59,7 +59,7 @@ pub async fn validate_location_mfa_preference(
     }
     let rows = q.fetch_all(pool).await?;
 
-    let mut found = std::collections::HashSet::with_capacity(rows.len());
+    let mut found = HashSet::with_capacity(rows.len());
     for (id, mfa_mode) in rows {
         let key = id.to_string();
         found.insert(key.clone());
