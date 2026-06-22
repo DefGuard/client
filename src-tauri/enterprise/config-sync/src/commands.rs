@@ -49,7 +49,7 @@ pub async fn do_update_instance(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
     response: DeviceConfigResponse,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     debug!("Updating instance {instance}");
     let locations_changed_val = locations_changed(transaction, instance, &response).await?;
     let instance_info = response
@@ -232,7 +232,7 @@ pub async fn do_update_instance(
         }
     }
 
-    Ok(())
+    Ok(locations_changed_val)
 }
 
 pub async fn disable_enterprise_features<'e, E>(

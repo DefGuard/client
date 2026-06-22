@@ -1,4 +1,10 @@
-import { type HTMLProps, type PropsWithChildren, Suspense, useMemo } from 'react';
+import {
+  Fragment,
+  type HTMLProps,
+  type PropsWithChildren,
+  Suspense,
+  useMemo,
+} from 'react';
 import './style.scss';
 import clsx from 'clsx';
 import { sort } from 'radashi';
@@ -47,10 +53,14 @@ export const WizardPage = ({
           <WizardStepsCard steps={visibleSteps} activeStep={activeStepData} />
         </div>
         <div className="main">
-          <div className="wizard-step-badge">
-            <p>{`Step ${activeStepIndex + 1} of ${visibleSteps.length}`}</p>
-          </div>
-          <SizedBox height={ThemeSpacing.Lg} />
+          {activeStepIndex !== visibleSteps.length - 1 && (
+            <Fragment>
+              <div className="wizard-step-badge">
+                <p>{`Step ${activeStepIndex + 1} of ${visibleSteps.length}`}</p>
+              </div>
+              <SizedBox height={ThemeSpacing.Lg} />
+            </Fragment>
+          )}
           <Suspense fallback={<WizardStepSkeleton />}>{children}</Suspense>
         </div>
       </div>

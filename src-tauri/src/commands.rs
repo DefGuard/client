@@ -660,9 +660,15 @@ pub async fn update_instance(
     if let Some(mut instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? {
         debug!("The instance with id {instance_id} to update was found: {instance}");
         let mut transaction = DB_POOL.begin().await?;
-        do_update_instance(&mut transaction, &mut instance, response).await?;
+        let locations_changed =
+            do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
+        if locations_changed {
+            if let Err(err) = app_handle.emit(EventKey::InstanceUpdated.into(), ()) {
+                error!("Failed to emit instance-updated event: {err}");
+            }
+        }
         app_handle
             .emit(EventKey::InstanceUpdate.into(), ())
             .map_err(crate::tauri_err_to_app_err)?;
@@ -1006,7 +1012,7 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TunnelInfo<I = NoId> {
     pub id: I,
     pub name: String,

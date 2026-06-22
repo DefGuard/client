@@ -368,9 +368,10 @@ export type SetLocationMfaMethodArgs = {
   mfaMethod: MfaMethodValue;
 };
 
-export type OverviewViewSelection =
-  | { kind: 'instance'; data: InstanceInfo }
-  | { kind: 'tunnel'; data: LocationInfo };
+export type OverviewViewSelection = {
+  kind: 'instance' | 'tunnel';
+  id: number;
+};
 
 /** Mirrors `SessionState` in src/session_state.rs. Fields are snake_case (raw serde output). */
 export type SessionState = {

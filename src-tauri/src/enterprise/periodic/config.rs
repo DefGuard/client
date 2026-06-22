@@ -164,11 +164,17 @@ pub async fn poll_instance(
             "Updating instance {}({}) configuration: {device_config:?}",
             instance.name, instance.id,
         );
-        do_update_instance(transaction, instance, device_config.clone()).await?;
+        let locations_changed =
+            do_update_instance(transaction, instance, device_config.clone()).await?;
         info!(
             "Updated instance {}({}) configuration based on core's response",
             instance.name, instance.id
         );
+        if locations_changed {
+            if let Err(err) = handle.emit(EventKey::InstanceUpdated.into(), ()) {
+                error!("Failed to emit instance-updated event: {err}");
+            }
+        }
     } else {
         debug!(
             "Emitting config-changed event for instance {}({})",
