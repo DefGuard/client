@@ -3,7 +3,7 @@ import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import clsx from 'clsx';
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { ConnectModalView } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import { api } from '../../rust-api/api';
@@ -15,6 +15,7 @@ import { Divider } from '../Divider/Divider';
 import { parseConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
+import { LocationCardConnectionTiles } from '../LocationCard/components/LocationCardConnectionTiles/LocationCardConnectionTiles';
 import { LocationCardHeaderInfo } from '../LocationCard/components/LocationCardHeaderInfo/LocationCardHeaderInfo';
 import { LocationCardMfaEdit } from '../LocationCard/components/LocationCardMfaEdit/LocationCardMfaEdit';
 import { Toggle } from '../Toggle/Toggle';
@@ -124,33 +125,40 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
       </div>
       <Divider spacing={ThemeSpacing.Lg} />
       <div className="controls">
-        {(instance?.client_traffic_policy === 'none' || !instance) && (
-          <Toggle
-            disabled={location.active}
-            active={location.route_all_traffic}
-            label={traficLabel}
-            onClick={() => {
-              updateRouting({
-                connectionType: location.connection_type,
-                locationId: location.id,
-                routeAllTraffic: !location.route_all_traffic,
-              });
-            }}
-          />
+        {location.active && (
+          <LocationCardConnectionTiles location={location} variant="full" />
         )}
-        <LocationCardMfaEdit
-          variant="full"
-          location={location}
-          onEdit={() => {
-            if (isPresent(location)) {
-              useConnectModal.getState().open({
-                view: ConnectModalView.MfaSettings,
-                location: location,
-                perviousView: null,
-              });
-            }
-          }}
-        />
+        {!location.active && (
+          <Fragment>
+            {(instance?.client_traffic_policy === 'none' || !instance) && (
+              <Toggle
+                disabled={location.active}
+                active={location.route_all_traffic}
+                label={traficLabel}
+                onClick={() => {
+                  updateRouting({
+                    connectionType: location.connection_type,
+                    locationId: location.id,
+                    routeAllTraffic: !location.route_all_traffic,
+                  });
+                }}
+              />
+            )}
+            <LocationCardMfaEdit
+              variant="full"
+              location={location}
+              onEdit={() => {
+                if (isPresent(location)) {
+                  useConnectModal.getState().open({
+                    view: ConnectModalView.MfaSettings,
+                    location: location,
+                    perviousView: null,
+                  });
+                }
+              }}
+            />
+          </Fragment>
+        )}
       </div>
       <Divider spacing={ThemeSpacing.Lg} />
       <LocationCardConnectionInfo location={location} />

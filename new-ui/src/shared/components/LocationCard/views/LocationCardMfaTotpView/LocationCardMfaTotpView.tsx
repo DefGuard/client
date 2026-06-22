@@ -95,6 +95,13 @@ export const LocationCardMfaTotpView = () => {
         />
         <div className="right">
           <Button
+            text="Other methods"
+            variant={ButtonVariant.Outlined}
+            onClick={() => {
+              setView(LocationCardViews.MfaSettings);
+            }}
+          />
+          <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={handleVerify}

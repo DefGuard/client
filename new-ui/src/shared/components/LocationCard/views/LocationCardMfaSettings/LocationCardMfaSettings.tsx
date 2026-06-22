@@ -58,7 +58,22 @@ export const LocationCardMfaSettings = () => {
         mfaMethod: selectedMethod,
       });
     }
-    setView(previousView ?? LocationCardViews.Default);
+    switch (selectedMethod) {
+      case 'totp':
+        setView(LocationCardViews.MfaTotp);
+        break;
+      case 'email':
+        setView(LocationCardViews.MfaEmail);
+        break;
+      case 'mobileapprove':
+        setView(LocationCardViews.MfaMobile);
+        break;
+      case 'oidc':
+        setView(LocationCardViews.MfaOidc);
+        break;
+      default:
+        setView(LocationCardViews.Default);
+    }
   };
 
   return (
@@ -95,7 +110,7 @@ export const LocationCardMfaSettings = () => {
           icon={IconKind.ArrowBig}
           iconRotation="left"
           onClick={() => {
-            setView(previousView ?? LocationCardViews.Default);
+            setView(LocationCardViews.Default);
           }}
         />
         <div className="right">

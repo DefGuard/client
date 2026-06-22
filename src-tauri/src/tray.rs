@@ -304,7 +304,7 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
             .and_then(|w| w.theme().ok());
         resource_str.push_str(match theme {
             Some(Theme::Dark) => "dark",
-            _ => "light",
+            _ => "white",
         });
     }
     let active_connections = ACTIVE_CONNECTIONS.lock().await;

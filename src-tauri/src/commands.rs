@@ -636,6 +636,7 @@ pub struct LocationInterfaceDetails {
     pub allowed_ips: String,
     pub persistent_keepalive_interval: Option<u16>,
     pub last_handshake: Option<i64>,
+    pub mfa_method: Option<LocationMfaMethod>,
 }
 
 #[tauri::command(async)]

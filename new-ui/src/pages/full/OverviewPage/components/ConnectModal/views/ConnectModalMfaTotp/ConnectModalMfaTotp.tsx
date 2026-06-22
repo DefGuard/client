@@ -4,9 +4,6 @@ import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { CodeInput } from '../../../../../../../shared/components/CodeInput/CodeInput';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
-import { IconKind } from '../../../../../../../shared/components/Icon';
-import { IconButton } from '../../../../../../../shared/components/IconButton/IconButton';
-import { IconButtonVariant } from '../../../../../../../shared/components/IconButton/types';
 import { MfaStartMethod } from '../../../../../../../shared/components/LocationCard/api/startClientMfaSession';
 import { useMfaConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaConnect';
 import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
@@ -81,15 +78,12 @@ export const ConnectModalMfaTotp = () => {
         error={startError ?? error}
       />
       <Controls>
-        <IconButton
-          variant={IconButtonVariant.BigSelected}
-          icon={IconKind.ArrowBig}
-          iconRotation="left"
-          onClick={() =>
-            useConnectModal
-              .getState()
-              .setView(perviousView ?? ConnectModalView.MfaSettings)
-          }
+        <Button
+          variant={ButtonVariant.Secondary}
+          text="Use different MFA"
+          onClick={() => {
+            useConnectModal.getState().setView(ConnectModalView.MfaSettings);
+          }}
         />
         <div className="right">
           <Button
