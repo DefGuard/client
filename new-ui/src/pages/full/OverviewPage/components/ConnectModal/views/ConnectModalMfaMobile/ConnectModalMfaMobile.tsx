@@ -66,11 +66,24 @@ export const ConnectModalMfaMobile = () => {
         </div>
       )}
       <Controls>
-        <div className="full">
-          {screen === 'error' && (
-            <Button text="Try again" variant={ButtonVariant.Primary} onClick={start} />
-          )}
-        </div>
+        {screen === 'qr' && (
+          <Button
+            containerProps={{ className: 'full' }}
+            variant={ButtonVariant.Secondary}
+            text="Use different MFA"
+            onClick={() => {
+              useConnectModal.getState().setView(ConnectModalView.MfaSettings);
+            }}
+          />
+        )}
+        {screen === 'error' && (
+          <Button
+            containerProps={{ className: 'full' }}
+            text="Try again"
+            variant={ButtonVariant.Primary}
+            onClick={start}
+          />
+        )}
       </Controls>
     </div>
   );

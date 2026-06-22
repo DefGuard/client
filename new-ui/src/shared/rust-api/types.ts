@@ -272,6 +272,7 @@ export type LocationDetails = {
   allowed_ips: string;
   persistent_keepalive_interval?: number;
   last_handshake?: number;
+  mfa_method?: MfaMethodValue;
 };
 
 export type NewAppVersionInfo = {

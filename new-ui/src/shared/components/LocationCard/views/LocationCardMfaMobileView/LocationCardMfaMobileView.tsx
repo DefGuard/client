@@ -70,6 +70,13 @@ export const LocationCardMfaMobileView = () => {
           onClick={() => setView(LocationCardViews.Default)}
         />
         <div className="right">
+          <Button
+            variant={ButtonVariant.Outlined}
+            text="Other methods"
+            onClick={() => {
+              setView(LocationCardViews.MfaSettings);
+            }}
+          />
           {screen === 'error' && (
             <Button
               text="Try again"

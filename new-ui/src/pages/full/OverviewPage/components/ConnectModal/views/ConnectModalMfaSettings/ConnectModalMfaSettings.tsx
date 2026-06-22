@@ -1,19 +1,17 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: temp */
 import './style.scss';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Fragment, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkbox';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
-import { IconKind } from '../../../../../../../shared/components/Icon';
-import { IconButton } from '../../../../../../../shared/components/IconButton/IconButton';
-import { IconButtonVariant } from '../../../../../../../shared/components/IconButton/types';
 import { MfaSelector } from '../../../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
 import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
+import { getLocationDetailsQueryOptions } from '../../../../../../../shared/rust-api/query';
 import {
   LocationMfaMode,
   MfaMethod,
@@ -36,7 +34,14 @@ export const ConnectModalMfaSettings = () => {
     useShallow((s) => [s.perviousView, s.location]),
   );
 
-  const locationDefaultMfaMethod = location?.mfa_method ?? MfaMethod.Totp;
+  const { data: locationDetails } = useQuery(
+    getLocationDetailsQueryOptions({
+      locationId: location!.id,
+      connectionType: 'Location',
+    }),
+  );
+
+  const locationDefaultMfaMethod = locationDetails?.mfa_method ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(
     decideLocationMfaMethod(location!, locationMfaPreference[String(location!.id)]) ??
@@ -118,10 +123,9 @@ export const ConnectModalMfaSettings = () => {
       {perviousView === null && <SizedBox height={ThemeSpacing.Xl3} />}
       <Controls>
         {perviousView !== null && (
-          <IconButton
-            variant={IconButtonVariant.BigSelected}
-            icon={IconKind.ArrowBig}
-            iconRotation="left"
+          <Button
+            variant={ButtonVariant.Secondary}
+            text="Cancel"
             onClick={() => useConnectModal.getState().setView(perviousView)}
           />
         )}

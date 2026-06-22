@@ -94,6 +94,13 @@ export const LocationCardMfaEmailView = () => {
         />
         <div className="right">
           <Button
+            variant={ButtonVariant.Outlined}
+            text="Other methods"
+            onClick={() => {
+              setView(LocationCardViews.MfaSettings);
+            }}
+          />
+          <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={handleVerify}
