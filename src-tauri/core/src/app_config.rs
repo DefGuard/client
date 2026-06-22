@@ -56,6 +56,7 @@ pub struct AppConfig {
     pub peer_alive_period: u32,
     /// Maximal transmission unit. 0 means default value.
     mtu: u32,
+    pub auto_start_openid_mfa: bool,
 }
 
 // Important: keep in sync with client store default in frontend
@@ -67,6 +68,7 @@ impl Default for AppConfig {
             log_level: LevelFilter::Info,
             peer_alive_period: 300,
             mtu: 0,
+            auto_start_openid_mfa: false,
         }
     }
 }

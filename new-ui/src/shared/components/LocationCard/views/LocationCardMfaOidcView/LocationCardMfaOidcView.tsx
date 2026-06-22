@@ -1,13 +1,18 @@
 import './style.scss';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../../../../rust-api/api';
+import { getAppConfigQueryOptions } from '../../../../rust-api/query';
 import { ThemeSpacing } from '../../../../types';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
+import { Checkbox } from '../../../Checkbox/Checkbox';
 import { Controls } from '../../../Controls/Controls';
 import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { SizedBox } from '../../../SizedBox/SizedBox';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
@@ -16,7 +21,8 @@ import { useMfaOidcConnect } from '../../hooks/useMfaOidcConnect';
 type Screen = 'idle' | 'polling' | 'error';
 
 export const LocationCardMfaOidcView = () => {
-  const { setView, setPostureError } = useLocationCardContext();
+  const { data: appConfig } = useQuery(getAppConfigQueryOptions);
+  const { setView, setPostureError, autoConnectOpenid } = useLocationCardContext();
   const { start, isStarting, startError, isPolling, pollError } = useMfaOidcConnect();
   const [screen, setScreen] = useState<Screen>('idle');
 
@@ -28,10 +34,10 @@ export const LocationCardMfaOidcView = () => {
     }
   }, [startError, pollError, isPolling]);
 
-  const handleStart = async () => {
+  const handleStart = useCallback(async () => {
     await start();
     setScreen('polling');
-  };
+  }, [start]);
 
   const errorMessage = startError ?? pollError;
 
@@ -39,6 +45,13 @@ export const LocationCardMfaOidcView = () => {
     setPostureError(null);
     setView(LocationCardViews.Default);
   };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount effect
+  useEffect(() => {
+    if (autoConnectOpenid) {
+      handleStart();
+    }
+  }, []);
 
   return (
     <div className="location-card-mfa-oidc">
@@ -57,6 +70,23 @@ export const LocationCardMfaOidcView = () => {
         )}
         {screen === 'error' && <p className="error">{errorMessage}</p>}
       </LocationViewHeader>
+      {screen === 'idle' && !autoConnectOpenid && (
+        <div className="actions">
+          <SizedBox height={ThemeSpacing.Lg} />
+          <Checkbox
+            active={appConfig?.auto_start_openid_mfa}
+            text={`Don't show this screen next time`}
+            onClick={() => {
+              void api.setAppConfig(
+                {
+                  auto_start_openid_mfa: !appConfig?.auto_start_openid_mfa,
+                },
+                true,
+              );
+            }}
+          />
+        </div>
+      )}
       <Controls>
         <IconButton
           variant={IconButtonVariant.BigSelected}

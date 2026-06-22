@@ -1,12 +1,13 @@
 import './style.scss';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import clsx from 'clsx';
 import { Fragment, useMemo } from 'react';
 import { ConnectModalView } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import { api } from '../../rust-api/api';
+import { getAppConfigQueryOptions } from '../../rust-api/query';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
 import { LocationMfaMode, MfaMethod } from '../../rust-api/types';
 import { ThemeSpacing } from '../../types';
@@ -27,6 +28,7 @@ interface Props {
 
 export const OverviewLocationCard = ({ location, instance }: Props) => {
   const navigate = useNavigate();
+  const { data: appConfig } = useQuery(getAppConfigQueryOptions);
   const { mutate: updateRouting } = useMutation({
     mutationFn: api.updateLocationRouting,
     meta: {
@@ -67,6 +69,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   });
 
   const handleConnectClick = () => {
+    if (!appConfig) return;
     if (location.active) {
       disconnect({ connectionType: location.connection_type, locationId: location.id });
       return;
@@ -88,7 +91,9 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
         default:
           view = ConnectModalView.MfaTotp;
       }
-      useConnectModal.getState().open({ view, location });
+      useConnectModal
+        .getState()
+        .open({ view, location, autoStartOpenId: appConfig.auto_start_openid_mfa });
       return;
     }
 

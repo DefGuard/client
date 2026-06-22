@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import './style.scss';
+import { useQuery } from '@tanstack/react-query';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
-import { Controls } from '../../../../../../../shared/components/Controls/Controls';
+import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkbox';
+import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
+import { api } from '../../../../../../../shared/rust-api/api';
+import { getAppConfigQueryOptions } from '../../../../../../../shared/rust-api/query';
+import { ThemeSpacing } from '../../../../../../../shared/types';
+import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
@@ -11,8 +18,9 @@ import { useConnectModalMfaOidc } from '../../hooks/useConnectModalMfaOidc';
 type Screen = 'idle' | 'polling' | 'error';
 
 export const ConnectModalMfaOidc = () => {
-  const [perviousView, location] = useConnectModal(
-    useShallow((s) => [s.perviousView, s.location]),
+  const { data: appConfig } = useQuery(getAppConfigQueryOptions);
+  const [perviousView, location, initAutoStart] = useConnectModal(
+    useShallow((s) => [s.perviousView, s.location, s.autoStartOpenId]),
   );
 
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
@@ -34,12 +42,19 @@ export const ConnectModalMfaOidc = () => {
     }
   }, [startError, pollError, isPolling]);
 
-  const handleStart = async () => {
+  const handleStart = useCallback(async () => {
     await start();
     setScreen('polling');
-  };
+  }, [start]);
 
   const errorMessage = startError ?? pollError;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount side effect
+  useEffect(() => {
+    if (initAutoStart) {
+      handleStart();
+    }
+  }, [initAutoStart]);
 
   if (isStarting && location?.posture_check_required && !startError) {
     return <ConnectModalPostureCheckLoading />;
@@ -59,25 +74,40 @@ export const ConnectModalMfaOidc = () => {
         </p>
       )}
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
-      <Controls>
-        <div className="right">
-          {screen !== 'error' && (
-            <Button
-              text="Auth with OpenID"
-              variant={ButtonVariant.Primary}
-              loading={screen === 'polling' || isStarting}
-              onClick={handleStart}
+      <div className="actions">
+        {screen !== 'error' && (
+          <Button
+            text="Auth with OpenID"
+            variant={ButtonVariant.Primary}
+            loading={screen === 'polling' || isStarting}
+            onClick={handleStart}
+          />
+        )}
+        {screen === 'error' && (
+          <Button
+            text="Try again"
+            variant={ButtonVariant.Primary}
+            onClick={() => setScreen('idle')}
+          />
+        )}
+        {isPresent(appConfig) && screen === 'idle' && !initAutoStart && (
+          <Fragment>
+            <SizedBox height={ThemeSpacing.Xl3} />
+            <Checkbox
+              active={appConfig.auto_start_openid_mfa}
+              text={`Don't show this screen next time`}
+              onClick={() => {
+                void api.setAppConfig(
+                  {
+                    auto_start_openid_mfa: !appConfig.auto_start_openid_mfa,
+                  },
+                  true,
+                );
+              }}
             />
-          )}
-          {screen === 'error' && (
-            <Button
-              text="Try again"
-              variant={ButtonVariant.Primary}
-              onClick={() => setScreen('idle')}
-            />
-          )}
-        </div>
-      </Controls>
+          </Fragment>
+        )}
+      </div>
     </div>
   );
 };

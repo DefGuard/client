@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
 import { useAppData } from '../../../providers/AppDataContext';
+import { api } from '../../../rust-api/api';
 import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
 import { decideLocationMfaMethod } from '../../../utils/decideLocationMfaMethod';
@@ -11,6 +12,7 @@ interface LocationCardContextValue {
   currentView: LocationCardViewsValue;
   previousView: LocationCardViewsValue | null;
   postureError: string | null;
+  autoConnectOpenid: boolean;
   setView: (view: LocationCardViewsValue) => void;
   setPostureError: (error: string | null) => void;
   startMfa: () => void;
@@ -37,6 +39,7 @@ export const LocationCardProvider = ({
   instance,
   children,
 }: LocationCardProviderProps) => {
+  const [autoConnectOpenid, setAutoConnectOpenid] = useState(false);
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
@@ -53,7 +56,10 @@ export const LocationCardProvider = ({
 
   const { locationMfaPreference } = useAppData();
 
-  const startMfa = useCallback(() => {
+  const startMfa = useCallback(async () => {
+    const appConfig = await api.getAppConfig();
+    setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
+
     const mfaMethod = decideLocationMfaMethod(
       location,
       locationMfaPreference[String(location.id)],
@@ -82,6 +88,7 @@ export const LocationCardProvider = ({
         currentView,
         previousView,
         postureError,
+        autoConnectOpenid,
         setView,
         setPostureError,
         location,

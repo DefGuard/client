@@ -102,6 +102,15 @@ export const SettingsPage = () => {
           />
         </SettingRow>
 
+        <SettingRow title="Auto start OpenID MFA" inline>
+          <Toggle
+            active={appConfig.auto_start_openid_mfa}
+            onClick={() =>
+              patchConfig({ auto_start_openid_mfa: !appConfig.auto_start_openid_mfa })
+            }
+          />
+        </SettingRow>
+
         <p className="footer">
           Defguard is made possible by other open-source software.{' '}
           <button
