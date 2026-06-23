@@ -36,12 +36,8 @@ image.workspace = true
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
 
-# Dummy feature to let tauri build the release.
-[features]
-custom-protocol = []
-
 [dev-dependencies]
-sha1 = "0.10"
+sha1 = "0.11"
 tempfile.workspace = true
 tokio-stream = "0.1"
 tonic.workspace = true

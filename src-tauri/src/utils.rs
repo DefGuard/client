@@ -859,12 +859,3 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
 
     Ok(())
 }
-
-#[must_use]
-/// Utility function to get all tunnels and locations from the database.
-#[cfg(target_os = "macos")]
-pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
-    let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
-    let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
-    (tunnels, locations)
-}

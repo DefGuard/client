@@ -12,7 +12,6 @@ use std::time::Duration;
 use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
-#[cfg(not(target_os = "macos"))]
 use chrono::Utc;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]
@@ -20,11 +19,9 @@ pub use setup::{setup_interface, setup_interface_tunnel};
 #[cfg(target_os = "macos")]
 use tokio::time::sleep;
 
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::connection::ActiveConnection;
 use crate::{
     database::{
-        models::{location::Location, tunnel::Tunnel, Id},
+        models::{connection::ActiveConnection, location::Location, tunnel::Tunnel, Id},
         DbPool,
     },
     error::Error,
@@ -86,25 +83,12 @@ pub async fn bring_up(
 // tracking should be refactored to carry the real start time from the
 // active-state record through to the history persistence path.
 pub async fn tear_down(conn: &ActiveConnectionInfo) -> Result<(), Error> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        let connection = ActiveConnection {
-            location_id: conn.target_id,
-            connection_type: conn.connection_type,
-            start: Utc::now().naive_utc(),
-            interface_name: conn.interface_name.clone(),
-        };
+    let connection = ActiveConnection {
+        location_id: conn.target_id,
+        connection_type: conn.connection_type,
+        start: Utc::now().naive_utc(),
+        interface_name: conn.interface_name.clone(),
+    };
 
-        disconnect_interface(&connection).await
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let _ = conn;
-        Err(Error::BackendUnavailable(
-            "VPN connection management is not yet supported on macOS from the CLI. \
-             Use the desktop client."
-                .into(),
-        ))
-    }
+    disconnect_interface(&connection).await
 }

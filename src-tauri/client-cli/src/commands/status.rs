@@ -13,13 +13,6 @@ const MIN_IFACE_COL_WIDTH: usize = 9;
 
 #[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
 pub async fn handle(state: &State) -> Result<StatusResult, CliError> {
-    #[cfg(target_os = "macos")]
-    {
-        return Ok(StatusResult {
-            connections: Vec::new(),
-        });
-    }
-
     let connections = active_state(&state.pool).await?;
     Ok(StatusResult { connections })
 }
@@ -30,19 +23,10 @@ pub struct StatusResult {
 
 impl CommandOutput for StatusResult {
     fn human(&self) -> String {
-        #[cfg(target_os = "macos")]
-        {
-            "Connection status is not yet supported on macOS from the CLI. \
-                    Use the desktop client."
-                .to_string()
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            if self.connections.is_empty() {
-                "No active connections.".to_string()
-            } else {
-                format_status_table(&self.connections)
-            }
+        if self.connections.is_empty() {
+            "No active connections.".to_string()
+        } else {
+            format_status_table(&self.connections)
         }
     }
 

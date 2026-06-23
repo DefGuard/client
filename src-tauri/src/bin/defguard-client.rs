@@ -116,7 +116,8 @@ async fn startup(app_handle: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
         use defguard_client::{
-            apple::get_managers_for_tunnels_and_locations, utils::get_all_tunnels_locations,
+            apple::get_managers_for_tunnels_and_locations,
+            database::models::get_all_tunnels_locations,
         };
         use defguard_client_core::connection::sync_locations_and_tunnels;
 
