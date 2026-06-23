@@ -15,7 +15,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../rust-api/api';
-import { ThemeSpacing, ThemeVariable } from '../../../../types';
+import { Direction, ThemeSpacing, ThemeVariable } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Divider } from '../../../Divider/Divider';
 import { FloatingMenu } from '../../../FloatingMenu/FloatingMenu';
@@ -88,7 +88,7 @@ export const ConnectionWatcher = () => {
               size={16}
               icon="arrow-small"
               staticColor="var(--fg-action)"
-              rotationDirection={floatingOpen ? 'down' : 'right'}
+              rotationDirection={Direction.DOWN}
             />
           </div>
         )}
@@ -105,7 +105,13 @@ export const ConnectionWatcher = () => {
           >
             <p className="label">Connected locations</p>
             {connections?.map((con) => (
-              <div className="connection" key={con.id}>
+              <div
+                className="connection"
+                key={con.id}
+                onClick={() => {
+                  disconnect([con.id]);
+                }}
+              >
                 <svg
                   width="16"
                   height="16"

@@ -35,7 +35,7 @@ export const LocationCardConnectionInfo = ({ location }: { location: LocationInf
     return (
       <div className="no-connection-info">
         <EmptyIcon />
-        <SizedBox height={ThemeSpacing.Xl} />
+        <SizedBox height={ThemeSpacing.Sm} />
         <p className="title">{`Traffic data not available`}</p>
         <SizedBox height={ThemeSpacing.Xs} />
         <p className="description">{`Connect once to see the traffic details.`}</p>

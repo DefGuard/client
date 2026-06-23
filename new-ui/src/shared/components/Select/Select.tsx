@@ -111,7 +111,7 @@ export function Select<T>(props: SelectProps<T>): JSX.Element {
                 icon={IconKind.ArrowSmall}
                 size={20}
                 staticColor={ThemeVariable.FgWhite100}
-                rotationDirection={floatingOpen ? Direction.DOWN : Direction.RIGHT}
+                rotationDirection={Direction.DOWN}
               />
             }
             forceFocusState={floatingOpen}

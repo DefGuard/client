@@ -4,7 +4,6 @@ import type { LocationInfo } from '../../../../rust-api/types';
 import { mfaToText } from '../../../../utils/mfa';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
-import { useLocationCardContext } from '../../context/context';
 
 interface Props {
   variant: 'compact' | 'full';
@@ -13,16 +12,14 @@ interface Props {
 }
 
 export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
-  const { mfaMethod } = useLocationCardContext();
-
-  if (location.location_mfa_mode === 'disabled' || mfaMethod === null) return null;
+  if (location.location_mfa_mode === 'disabled' || !location.mfa_method) return null;
 
   return (
     <div className={clsx('location-card-mfa-edit', `variant-${variant}`)}>
       <div className="mfa-badge">
         <p>MFA</p>
       </div>
-      <p className="name">{mfaToText(mfaMethod)}</p>
+      <p className="name">{mfaToText(location.mfa_method)}</p>
       {location.location_mfa_mode === 'internal' && !location.active && (
         <IconButton
           variant={IconButtonVariant.SmallSelected}

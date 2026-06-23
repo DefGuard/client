@@ -4,9 +4,19 @@ use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use defguard_client_core::{events::EventKey, proto::client_types::MfaMethod};
+use defguard_client_core::events::EventKey;
 
 use crate::appstate::AppState;
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionStateMfaMethod {
+    Totp,
+    Email,
+    Oidc,
+    Biometric,
+    MobileApprove,
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -26,7 +36,7 @@ pub struct OverviewViewSelection {
 pub struct SessionState {
     pub view_selection: Option<OverviewViewSelection>,
     // needed to display properly the method tile between windows as connection doesn't hold this
-    pub connection_mfa_method: HashMap<String, Option<MfaMethod>>,
+    pub connection_mfa_method: HashMap<String, Option<SessionStateMfaMethod>>,
 }
 
 #[tauri::command]

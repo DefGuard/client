@@ -66,7 +66,7 @@ export const OverviewPage = () => {
               <div className="header">
                 <p>{`Locations (${displayedLocations.length})`}</p>
               </div>
-              <SizedBox height={ThemeSpacing.Xl} />
+              <SizedBox height={ThemeSpacing.Lg} />
               <div className="locations">
                 {displayedLocations.map((location) => {
                   const instance: InstanceInfo | undefined =

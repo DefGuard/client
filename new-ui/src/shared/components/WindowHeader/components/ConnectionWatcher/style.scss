@@ -59,6 +59,9 @@
   }
 
   .connection {
+    --bg: transparent;
+
+    border-radius: 8px;
     display: flex;
     flex-flow: row;
     align-items: center;
@@ -67,6 +70,15 @@
     padding: 0 var(--spacing-sm);
     column-gap: var(--spacing-md);
     min-height: 36px;
+    user-select: none;
+    cursor: pointer;
+    background: var(--bg);
+
+    @include animate(background);
+
+    &:hover {
+      --bg: var(--bg-white-5);
+    }
 
     svg circle {
       fill: var(--bg-success);

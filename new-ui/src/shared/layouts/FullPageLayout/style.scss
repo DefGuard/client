@@ -25,6 +25,11 @@
     box-sizing: border-box;
     padding: var(--spacing-md) var(--spacing-lg);
 
+    .page-description {
+      font: var(--t-body-sm-400);
+      color: var(--fg-white-70);
+    }
+
     > .scroll-container {
       min-height: 100%;
     }
