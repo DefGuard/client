@@ -10,7 +10,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
 
 export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
 
-const mfaMethodApiValues: Record<MfaMethodValue, string> = {
+export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
   [MfaMethod.Email]: 'Email',
   [MfaMethod.MobileApprove]: 'MobileApprove',
   [MfaMethod.Oidc]: 'Oidc',

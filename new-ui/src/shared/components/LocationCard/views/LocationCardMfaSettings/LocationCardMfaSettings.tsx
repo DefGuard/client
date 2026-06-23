@@ -1,7 +1,6 @@
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useAppData } from '../../../../providers/AppDataContext';
 import { api } from '../../../../rust-api/api';
 import {
   LocationMfaMode,
@@ -31,14 +30,17 @@ export const LocationCardMfaSettings = () => {
     },
   });
 
-  const { locationMfaPreference, setLocationMfaPreference } = useAppData();
-  const { previousView, setView, location } = useLocationCardContext();
+  const {
+    previousView,
+    setView,
+    location,
+    mfaMethod: currentMethod,
+    setMfaMethod: setContextMethod,
+  } = useLocationCardContext();
 
   const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
 
-  const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(
-    locationMfaPreference[String(location.id)] ?? MfaMethod.Totp,
-  );
+  const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(currentMethod);
 
   const isFromDefault = previousView === LocationCardViews.Default;
   const [setAsDefault, setSetAsDefault] = useState(true);
@@ -51,7 +53,7 @@ export const LocationCardMfaSettings = () => {
   }, [location.location_mfa_mode]);
 
   const handleSubmit = () => {
-    setLocationMfaPreference(location.id, selectedMethod);
+    setContextMethod(selectedMethod);
     if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
       setMfaMethod({
         locationId: location.id,

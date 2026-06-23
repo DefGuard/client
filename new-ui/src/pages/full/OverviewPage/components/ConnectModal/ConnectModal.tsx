@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Modal } from '../../../../../shared/components/Modal/Modal';
+import { useAppData } from '../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../shared/rust-api/api';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
@@ -59,6 +60,7 @@ const viewContent: Record<ConnectModalViewValue, ReactNode> = {
 } as const;
 
 const ModalContent = () => {
+  const { setConnectionMethod } = useAppData();
   const storeLocation = useConnectModal((s) => s.location);
   const { data: activeConnection, isFetching } = useQuery({
     queryKey: ['active-connection', storeLocation?.id, storeLocation?.connection_type],
@@ -73,8 +75,11 @@ const ModalContent = () => {
   const activeView = useConnectModal((s) => s.view);
 
   // When user completes connection and it's working modal is no longer needed so auto close it
+  // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect on connect
   useEffect(() => {
-    if (!isFetching && isPresent(activeConnection)) {
+    if (!isFetching && isPresent(activeConnection) && isPresent(storeLocation)) {
+      const mfaMethod = useConnectModal.getState().mfaMethod;
+      setConnectionMethod(storeLocation.id, storeLocation.connection_type, mfaMethod);
       useConnectModal.setState({ visible: false });
     }
   }, [activeConnection, isFetching]);

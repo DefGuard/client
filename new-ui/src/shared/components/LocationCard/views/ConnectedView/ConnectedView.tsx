@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { Divider } from '../../../Divider/Divider';
 import { SizedBox } from '../../../SizedBox/SizedBox';
@@ -9,11 +10,12 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
 export const ConnectedView = () => {
-  const { location, setView } = useLocationCardContext();
+  const { location, setView, setMfaMethod } = useLocationCardContext();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect
   useEffect(() => {
     if (!location.active) {
+      setMfaMethod(location.mfa_method ?? MfaMethod.Totp);
       setView(LocationCardViews.Default);
     }
   }, [location.active]);

@@ -4,5 +4,5 @@ export type { OverviewViewSelection };
 
 export type SharedSessionStorage = {
   viewSelection: OverviewViewSelection | null;
-  locationMfaPreference: Record<string, MfaMethodValue | undefined>;
+  connectionMfaMethod: Record<string, MfaMethodValue | undefined>;
 };

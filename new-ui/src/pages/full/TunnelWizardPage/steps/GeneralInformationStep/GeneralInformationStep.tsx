@@ -17,7 +17,10 @@ import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
 import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
-import { patternValidIp, patternValidIpV6 } from '../../../../../shared/utils/patterns';
+import {
+  patternValidIpV6WithMask,
+  patternValidIpWithMask,
+} from '../../../../../shared/utils/patterns';
 import { useTunnelWizardStore } from '../../hooks/useTunnelWizardStore';
 
 const formSchema = z.object({
@@ -25,7 +28,9 @@ const formSchema = z.object({
   address: z.string().refine((value) => {
     if (value) {
       const ips = value.split(',').map((ip) => ip.trim());
-      return ips.every((ip) => patternValidIp.test(ip) || patternValidIpV6.test(ip));
+      return ips.every(
+        (ip) => patternValidIpWithMask.test(ip) || patternValidIpV6WithMask.test(ip),
+      );
     }
     return false;
   }, 'Field is invalid'),

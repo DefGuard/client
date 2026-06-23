@@ -375,11 +375,9 @@ export type OverviewViewSelection = {
   id: number;
 };
 
-/** Mirrors `SessionState` in src/session_state.rs. Fields are snake_case (raw serde output). */
 export type SessionState = {
   view_selection: OverviewViewSelection | null;
-  /** Keys are location IDs serialized as strings (JSON object keys are always strings). */
-  location_mfa_preference: Record<string, MfaMethodValue>;
+  connection_mfa_method: Record<string, MfaMethodValue | undefined>;
 };
 
 export type SessionStatePatch = Partial<SessionState>;

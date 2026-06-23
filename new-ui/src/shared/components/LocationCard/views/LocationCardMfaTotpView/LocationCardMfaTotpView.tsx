@@ -83,6 +83,10 @@ export const LocationCardMfaTotpView = () => {
         value={totpCode}
         onChange={setTotpCode}
         error={startError ?? error}
+        onSuccessPaste={(value) => {
+          setTotpCode(value);
+          handleVerify();
+        }}
       />
       <Controls>
         <IconButton

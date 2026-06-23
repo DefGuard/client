@@ -118,6 +118,13 @@ export const AddInstancePage = () => {
             {(field) => <field.FormInput required label="Device name" />}
           </form.AppField>
           <Controls>
+            <Button
+              text="Back"
+              variant={ButtonVariant.Secondary}
+              onClick={() => {
+                navigate({ to: '/full/add' });
+              }}
+            />
             <div className="right">
               <form.Subscribe selector={(s) => s.isSubmitting}>
                 {(isSubmitting) => (

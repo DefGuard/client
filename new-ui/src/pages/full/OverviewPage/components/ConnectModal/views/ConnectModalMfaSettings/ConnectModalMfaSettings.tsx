@@ -9,7 +9,6 @@ import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkb
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
 import { MfaSelector } from '../../../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
-import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
 import { getLocationDetailsQueryOptions } from '../../../../../../../shared/rust-api/query';
 import {
@@ -18,7 +17,6 @@ import {
   type MfaMethodValue,
 } from '../../../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../../../shared/types';
-import { decideLocationMfaMethod } from '../../../../../../../shared/utils/decideLocationMfaMethod';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
@@ -28,10 +26,8 @@ export const ConnectModalMfaSettings = () => {
     meta: { invalidate: [['locations']] },
   });
 
-  const { locationMfaPreference, setLocationMfaPreference } = useAppData();
-
-  const [perviousView, location] = useConnectModal(
-    useShallow((s) => [s.perviousView, s.location]),
+  const [perviousView, location, currentMethod] = useConnectModal(
+    useShallow((s) => [s.perviousView, s.location, s.mfaMethod]),
   );
 
   const { data: locationDetails } = useQuery(
@@ -43,10 +39,8 @@ export const ConnectModalMfaSettings = () => {
 
   const locationDefaultMfaMethod = locationDetails?.mfa_method ?? MfaMethod.Totp;
 
-  const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(
-    decideLocationMfaMethod(location!, locationMfaPreference[String(location!.id)]) ??
-      MfaMethod.Totp,
-  );
+  const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(currentMethod);
+
   const [setAsDefault, setSetAsDefault] = useState(true);
 
   const MfaFactorsList = useMemo((): MfaMethodValue[] => {
@@ -58,7 +52,7 @@ export const ConnectModalMfaSettings = () => {
 
   const handleSubmit = () => {
     if (!location) return;
-    setLocationMfaPreference(location.id, selectedMethod);
+    useConnectModal.setState({ mfaMethod: selectedMethod });
     if (setAsDefault && selectedMethod !== locationDefaultMfaMethod && location) {
       setMfaMethod({ locationId: location.id, mfaMethod: selectedMethod });
     }

@@ -24,7 +24,7 @@ use defguard_client::{
         DB_POOL,
     },
     enterprise::provisioning::handle_client_initialization,
-    events::{handle_deep_link, EventKey},
+    events::handle_deep_link,
     periodic::run_periodic_tasks,
     service, session_state,
     tray::{configure_tray_icon, setup_tray},
@@ -34,7 +34,7 @@ use defguard_client::{
 };
 use defguard_client_core::connection::active_connections::close_all_connections;
 use log::{Level, LevelFilter};
-use tauri::{async_runtime, AppHandle, Builder, Emitter, Listener, Manager, RunEvent, WindowEvent};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -48,35 +48,6 @@ const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "
 static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
 
 async fn startup(app_handle: &AppHandle) {
-    // When instance locations change, re-validate MFA preferences and update session state.
-    {
-        let handle = app_handle.clone();
-        app_handle.listen(Into::<&'static str>::into(EventKey::InstanceUpdated), move |_| {
-            let handle = handle.clone();
-            async_runtime::spawn(async move {
-                let app_state = handle.state::<AppState>();
-                let preference = match app_state.session_state.lock() {
-                    Ok(guard) => guard.location_mfa_preference.clone(),
-                    Err(err) => {
-                        error!("Session state mutex poisoned during MFA preference validation: {err}");
-                        return;
-                    }
-                };
-                match session_state::validate_location_mfa_preference(&DB_POOL, preference).await {
-                    Ok(validated) => {
-                        if let Ok(mut guard) = app_state.session_state.lock() {
-                            guard.location_mfa_preference = validated;
-                        }
-                        if let Err(err) = handle.emit(EventKey::SessionStateChanged.into(), ()) {
-                            error!("Failed to emit session-state-changed after MFA preference validation: {err}");
-                        }
-                    }
-                    Err(err) => error!("Failed to validate location MFA preference: {err}"),
-                }
-            });
-        });
-    }
-
     debug!("Purging old stats from the database.");
     if let Err(err) = LocationStats::purge(&*DB_POOL).await {
         error!("Failed to purge location stats: {err}");
@@ -424,16 +395,6 @@ fn main() {
 
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
-
-            match async_runtime::block_on(session_state::initialize_session_state()) {
-                Ok(initial_state) => {
-                    let managed = app_handle.state::<AppState>();
-                    if let Ok(mut guard) = managed.session_state.lock() {
-                        *guard = initial_state;
-                    };
-                }
-                Err(e) => warn!("Failed to initialize session state from DB: {e}"),
-            }
 
             // Pre-build both windows hidden so they can be shown/hidden without recreation.
             if let Err(e) = WindowManager::build_tray_window(app_handle) {
