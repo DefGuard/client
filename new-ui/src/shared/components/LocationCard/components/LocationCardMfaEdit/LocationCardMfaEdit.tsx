@@ -1,12 +1,10 @@
 import './style.scss';
 import clsx from 'clsx';
-import { useMemo } from 'react';
-import { useAppData } from '../../../../providers/AppDataContext';
 import type { LocationInfo } from '../../../../rust-api/types';
-import { decideLocationMfaMethod } from '../../../../utils/decideLocationMfaMethod';
 import { mfaToText } from '../../../../utils/mfa';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { useLocationCardContext } from '../../context/context';
 
 interface Props {
   variant: 'compact' | 'full';
@@ -15,12 +13,7 @@ interface Props {
 }
 
 export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
-  const { locationMfaPreference } = useAppData();
-
-  const mfaMethod = useMemo(
-    () => decideLocationMfaMethod(location, locationMfaPreference[String(location.id)]),
-    [locationMfaPreference, location],
-  );
+  const { mfaMethod } = useLocationCardContext();
 
   if (location.location_mfa_mode === 'disabled' || mfaMethod === null) return null;
 

@@ -377,6 +377,7 @@ export type OverviewViewSelection = {
 
 export type SessionState = {
   view_selection: OverviewViewSelection | null;
+  connection_mfa_method: Record<string, MfaMethodValue | undefined>;
 };
 
 export type SessionStatePatch = Partial<SessionState>;

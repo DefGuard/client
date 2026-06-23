@@ -1,4 +1,13 @@
-import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { useAppData } from '../../../providers/AppDataContext';
 import { api } from '../../../rust-api/api';
 import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 import { MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
@@ -39,6 +48,8 @@ export const LocationCardProvider = ({
   instance,
   children,
 }: LocationCardProviderProps) => {
+  const conTypeSetOnce = useRef(false);
+  const { setConnectionMethod } = useAppData();
   const [autoConnectOpenid, setAutoConnectOpenid] = useState(false);
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
@@ -75,6 +86,17 @@ export const LocationCardProvider = ({
         break;
     }
   }, [setView, mfaMethod]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect on location.active
+  useEffect(() => {
+    if (location.active && !conTypeSetOnce.current) {
+      conTypeSetOnce.current = true;
+      setConnectionMethod(location.id, location.connection_type, mfaMethod);
+    }
+    if (!location.active) {
+      conTypeSetOnce.current = false;
+    }
+  }, [location.active]);
 
   return (
     <LocationCardContext.Provider

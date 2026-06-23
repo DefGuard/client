@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use defguard_client_core::events::EventKey;
+use defguard_client_core::{events::EventKey, proto::client_types::MfaMethod};
 
 use crate::appstate::AppState;
 
@@ -23,6 +25,8 @@ pub struct OverviewViewSelection {
 #[patch(attribute(derive(Debug, Deserialize, Serialize)))]
 pub struct SessionState {
     pub view_selection: Option<OverviewViewSelection>,
+    // needed to display properly the method tile between windows as connection doesn't hold this
+    pub connection_mfa_method: HashMap<String, Option<MfaMethod>>,
 }
 
 #[tauri::command]
