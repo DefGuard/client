@@ -9,7 +9,6 @@ import {
 import type {
   InstanceInfo,
   LocationInfo,
-  MfaMethodValue,
   OverviewViewSelection,
 } from '../rust-api/types';
 import type { SharedSessionStorage } from './types';
@@ -19,7 +18,6 @@ interface AppDataContextValue extends SharedSessionStorage {
   tunnels: LocationInfo[];
   isEmpty: boolean;
   setViewSelection: (selection: OverviewViewSelection | null) => void;
-  setLocationMfaPreference: (locationId: number, method: MfaMethodValue) => void;
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -46,18 +44,6 @@ export const AppDataProvider = ({ children }: PropsWithChildren) => {
     [queryClient],
   );
 
-  const setLocationMfaPreference = useCallback(
-    (locationId: number, method: MfaMethodValue) => {
-      const current = sessionState?.location_mfa_preference ?? {};
-      api
-        .patchSessionState({
-          location_mfa_preference: { ...current, [String(locationId)]: method },
-        })
-        .then(() => queryClient.invalidateQueries({ queryKey: ['session-state'] }));
-    },
-    [queryClient, sessionState?.location_mfa_preference],
-  );
-
   return (
     <AppDataContext.Provider
       value={{
@@ -65,9 +51,7 @@ export const AppDataProvider = ({ children }: PropsWithChildren) => {
         tunnels,
         isEmpty,
         viewSelection: sessionState?.view_selection ?? null,
-        locationMfaPreference: sessionState?.location_mfa_preference ?? {},
         setViewSelection,
-        setLocationMfaPreference,
       }}
     >
       {children}

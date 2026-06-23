@@ -91,9 +91,12 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
         default:
           view = ConnectModalView.MfaTotp;
       }
-      useConnectModal
-        .getState()
-        .open({ view, location, autoStartOpenId: appConfig.auto_start_openid_mfa });
+      useConnectModal.getState().open({
+        view,
+        location,
+        autoStartOpenId: appConfig.auto_start_openid_mfa,
+        mfaMethod: location.mfa_method,
+      });
       return;
     }
 

@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import type { LocationInfo } from '../../../../../../shared/rust-api/types';
+import {
+  type LocationInfo,
+  MfaMethod,
+  type MfaMethodValue,
+} from '../../../../../../shared/rust-api/types';
 import type { ConnectModalViewValue } from './types';
 
 interface StoreValues {
@@ -9,10 +13,12 @@ interface StoreValues {
   perviousView: ConnectModalViewValue | null;
   postureError: string | null;
   autoStartOpenId: boolean;
+  mfaMethod: MfaMethodValue;
 }
 
 const defaults: StoreValues = {
   visible: false,
+  mfaMethod: MfaMethod.Totp,
   location: null,
   view: null,
   perviousView: null,
