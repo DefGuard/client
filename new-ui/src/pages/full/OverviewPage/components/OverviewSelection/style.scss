@@ -52,11 +52,9 @@
           color: inherit;
         }
 
-        &:not(.selected) {
-          :hover {
-            --bg: var(--bg-white-5);
-            --color: var(--fg-white-100);
-          }
+        &:not(.selected):hover {
+          --bg: var(--bg-white-5);
+          --color: var(--fg-white-100);
         }
 
         &.selected {

@@ -38,7 +38,7 @@ export const EmptyState = ({
       {isPresent(icon) && (
         <>
           <RenderIcon />
-          <SizedBox height={ThemeSpacing.Lg} />
+          <SizedBox height={ThemeSpacing.Sm} />
         </>
       )}
       {isPresent(title) && (

@@ -1,9 +1,16 @@
-import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useAppData } from '../../../providers/AppDataContext';
 import { api } from '../../../rust-api/api';
 import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
-import { MfaMethod } from '../../../rust-api/types';
-import { decideLocationMfaMethod } from '../../../utils/decideLocationMfaMethod';
+import { MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
@@ -13,6 +20,8 @@ interface LocationCardContextValue {
   previousView: LocationCardViewsValue | null;
   postureError: string | null;
   autoConnectOpenid: boolean;
+  mfaMethod: MfaMethodValue;
+  setMfaMethod: (value: MfaMethodValue) => void;
   setView: (view: LocationCardViewsValue) => void;
   setPostureError: (error: string | null) => void;
   startMfa: () => void;
@@ -39,11 +48,16 @@ export const LocationCardProvider = ({
   instance,
   children,
 }: LocationCardProviderProps) => {
+  const conTypeSetOnce = useRef(false);
+  const { setConnectionMethod } = useAppData();
   const [autoConnectOpenid, setAutoConnectOpenid] = useState(false);
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
+  );
+  const [mfaMethod, setMfaMethod] = useState<MfaMethodValue>(
+    location.mfa_method ?? MfaMethod.Totp,
   );
 
   const setView = useCallback(
@@ -54,18 +68,9 @@ export const LocationCardProvider = ({
     [currentView],
   );
 
-  const { locationMfaPreference } = useAppData();
-
   const startMfa = useCallback(async () => {
     const appConfig = await api.getAppConfig();
     setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
-
-    const mfaMethod = decideLocationMfaMethod(
-      location,
-      locationMfaPreference[String(location.id)],
-    );
-    if (!mfaMethod) return;
-
     switch (mfaMethod) {
       case MfaMethod.Totp:
         setView(LocationCardViews.MfaTotp);
@@ -80,7 +85,18 @@ export const LocationCardProvider = ({
         setView(LocationCardViews.MfaMobile);
         break;
     }
-  }, [setView, location.id, locationMfaPreference, location]);
+  }, [setView, mfaMethod]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect on location.active
+  useEffect(() => {
+    if (location.active && !conTypeSetOnce.current) {
+      conTypeSetOnce.current = true;
+      setConnectionMethod(location.id, location.connection_type, mfaMethod);
+    }
+    if (!location.active) {
+      conTypeSetOnce.current = false;
+    }
+  }, [location.active]);
 
   return (
     <LocationCardContext.Provider
@@ -89,11 +105,13 @@ export const LocationCardProvider = ({
         previousView,
         postureError,
         autoConnectOpenid,
-        setView,
-        setPostureError,
         location,
         instance,
+        mfaMethod,
+        setView,
+        setPostureError,
         startMfa,
+        setMfaMethod,
       }}
     >
       {children}

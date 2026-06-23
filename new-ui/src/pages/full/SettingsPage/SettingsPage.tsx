@@ -160,6 +160,6 @@ const SettingRow = ({
         <div className="control">{children}</div>
       </>
     )}
-    {divider && <Divider spacing={ThemeSpacing.Xl2} />}
+    {divider && <Divider spacing={ThemeSpacing.Xl} />}
   </div>
 );
