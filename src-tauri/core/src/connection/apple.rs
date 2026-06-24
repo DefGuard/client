@@ -45,10 +45,11 @@ static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::
 type VpnStateSender = Mutex<Sender<()>>;
 type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
 
-static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> = LazyLock::new(|| {
-    let (tx, rx) = mpsc::channel();
-    (Mutex::new(tx), Mutex::new(Some(rx)))
-});
+pub static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> =
+    LazyLock::new(|| {
+        let (tx, rx) = mpsc::channel();
+        (Mutex::new(tx), Mutex::new(Some(rx)))
+    });
 
 /// Thread responsible for observing VPN status changes.
 /// This is intentionally a blocking function, as it uses the Objective-C objects which are not

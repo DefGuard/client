@@ -60,16 +60,15 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
     };
 
     let (tunnels, locations) = crate::database::models::get_all_tunnels_locations().await;
-    let mut result = Vec::new();
 
     let semaphore = Arc::new(AtomicBool::new(false));
     let semaphore_clone = Arc::clone(&semaphore);
 
     let handle = tokio::spawn(async move {
+        let mut result = Vec::new();
         for location in locations {
             match location.status() {
                 Some(objc2_network_extension::NEVPNStatus::Connected) => {
-                    eprintln!("FOUND {}", location.name);
                     let info = ActiveConnectionInfo {
                         connection_type: ConnectionType::Location,
                         target_id: location.id,
@@ -77,7 +76,7 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
                         interface_name: String::new(),
                         stats: None, // TODO
                     };
-                    // result.push(info);
+                    result.push(info);
                 }
                 _ => (),
             }
@@ -94,16 +93,18 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
                         interface_name: String::new(),
                         stats: None, // TODO
                     };
-                    // result.push(info);
+                    result.push(info);
                 }
                 _ => (),
             }
         }
 
         semaphore_clone.store(true, Ordering::Release);
+
+        result
     });
     super::apple::spawn_runloop_and_wait_for(&semaphore);
-    let _ = handle.await;
+    let result = handle.await.unwrap_or_default();
 
     Ok(result)
 }

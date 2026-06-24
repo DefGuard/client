@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>net.defguard.cli</string>
+	<string>net.defguard</string>
 	<key>CFBundleName</key>
 	<string>Defguard</string>
 	<key>CFBundleExecutable</key>

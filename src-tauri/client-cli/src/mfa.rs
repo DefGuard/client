@@ -334,7 +334,7 @@ const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
 /// Total time the CLI will wait for the user to complete OIDC authentication
 /// before giving up (shortened for tests).
 #[cfg(not(test))]
-const OIDC_POLL_TIMEOUT: Duration = Duration::from_secs(300);
+const OIDC_POLL_TIMEOUT: Duration = Duration::from_mins(5);
 #[cfg(test)]
 const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
 
@@ -492,7 +492,7 @@ async fn poll_finish(
 
 /// How long the CLI waits for the user to approve MFA on their mobile device.
 #[cfg(not(test))]
-const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(120);
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -658,7 +658,7 @@ async fn wait_for_mfa_success(
         }
 
         let msg = select! {
-            _ = sleep(remaining) => {
+            () = sleep(remaining) => {
                 if !json_mode {
                     eprintln!("Mobile approval timed out.");
                 }

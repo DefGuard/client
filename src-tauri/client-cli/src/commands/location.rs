@@ -182,7 +182,11 @@ fn format_location_list_table(
         .max(MIN_ENDPOINT_COL_WIDTH);
     let inst_col_width = locations
         .iter()
-        .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
+        .filter_map(|l| {
+            instance_names
+                .get(&l.instance_id)
+                .map(std::string::String::len)
+        })
         .max()
         .unwrap_or(MIN_INST_COL_WIDTH)
         .max(MIN_INST_COL_WIDTH);

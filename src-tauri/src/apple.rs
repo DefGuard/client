@@ -3,30 +3,24 @@
 use std::{
     collections::HashMap,
     hint::spin_loop,
-    ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, RecvTimeoutError, Sender},
-        Arc, LazyLock, Mutex,
+        Arc, Mutex,
     },
     time::Duration,
 };
 
 use block2::RcBlock;
 use defguard_client_core::{
-    connection::active_connections::find_connection,
+    connection::{active_connections::find_connection, apple::VPN_STATE_UPDATE_COMMS},
     database::models::tunnel_configuration::{
-        manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID, TUNNEL_ID,
+        manager_for_key_and_value, LOCATION_ID, PLUGIN_BUNDLE_ID, TUNNEL_ID,
     },
 };
-use objc2::{rc::Retained, runtime::ProtocolObject};
-use objc2_foundation::{
-    ns_string, NSData, NSDate, NSNotification, NSNotificationCenter, NSObjectProtocol,
-    NSOperationQueue, NSRunLoop,
-};
+use objc2::rc::Retained;
+use objc2_foundation::{ns_string, NSData};
 use objc2_network_extension::{
-    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNConnection,
-    NEVPNStatus, NEVPNStatusDidChangeNotification,
+    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNStatus,
 };
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -35,7 +29,7 @@ use tracing::Level;
 
 use crate::{
     appstate::AppState,
-    database::models::{location::Location, tunnel::Tunnel, Id},
+    database::models::{get_all_tunnels_locations, location::Location, tunnel::Tunnel, Id},
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     tray::{configure_tray_icon, reload_tray_menu, show_main_window},
@@ -43,14 +37,6 @@ use crate::{
 };
 
 const SYSTEM_SYNC_DELAY: Duration = Duration::from_millis(500);
-
-type VpnStateSender = Mutex<Sender<()>>;
-type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
-
-static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> = LazyLock::new(|| {
-    let (tx, rx) = mpsc::channel();
-    (Mutex::new(tx), Mutex::new(Some(rx)))
-});
 
 /// Thread responsible for handling VPN status update requests.
 /// This is an async function.
@@ -78,9 +64,9 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
 /// Synchronize the app's connection state with the system's VPN state.
 /// This checks all locations and tunnels and updates the app state to match
 /// what's actually running in the system.
-pub async fn sync_connections_with_system(app_handle: &AppHandle) {
+async fn sync_connections_with_system(app_handle: &AppHandle) {
     let app_state = app_handle.state::<AppState>();
-    let (tunnels, locations) = crate::database::models::get_all_tunnels_locations().await;
+    let (tunnels, locations) = get_all_tunnels_locations().await;
 
     for location in locations {
         debug!(
@@ -279,89 +265,6 @@ pub async fn sync_connections_with_system(app_handle: &AppHandle) {
     }
 }
 
-const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
-
-/// Thread responsible for observing VPN status changes.
-/// This is intentionally a blocking function, as it uses the Objective-C objects which are not
-/// thread safe.
-pub fn observer_thread(
-    initial_managers: HashMap<(&'static str, Id), Retained<NETunnelProviderManager>>,
-) {
-    debug!("Starting VPN connection observer thread");
-    let receiver = {
-        let mut rx_opt = OBSERVER_COMMS
-            .1
-            .lock()
-            .expect("Failed to lock observer receiver");
-        rx_opt.take().expect("Receiver already taken")
-    };
-
-    let mut observers = HashMap::new();
-
-    // spawn initial observers for existing managers
-    for ((key, value), manager) in initial_managers {
-        debug!("Spawning initial observer for manager with key: {key}, value: {value}");
-        let connection = unsafe { manager.connection() };
-        let observer = create_observer(&connection);
-        debug!("Registered initial observer for manager with key: {key}, value: {value}");
-        observers.insert((key, value), observer);
-    }
-
-    loop {
-        match receiver.recv_timeout(OBSERVER_CLEANUP_INTERVAL) {
-            Ok(message) => {
-                debug!("Received message to observe the following connection: {message:?}");
-
-                let (key, value) = message;
-
-                if observers.contains_key(&(key, value)) {
-                    debug!(
-                        "Observer for manager with key: {key}, value: {value} already exists,
-                        skipping",
-                    );
-                    continue;
-                }
-
-                let manager = manager_for_key_and_value(key, value).unwrap();
-                let connection = unsafe { manager.connection() };
-                let observer = create_observer(&connection);
-
-                observers.insert((key, value), observer);
-                debug!("Registered observer for manager with key: {key}, value: {value}");
-            }
-            Err(RecvTimeoutError::Timeout) => {
-                debug!("Performing periodic cleanup of dead observers");
-                let mut dead_keys = Vec::new();
-
-                for (key, value) in observers.keys() {
-                    if manager_for_key_and_value(key, *value).is_none() {
-                        debug!(
-                            "Manager for key: {key}, value: {value} no longer exists, marking for
-                            removal"
-                        );
-                        dead_keys.push((*key, *value));
-                    }
-                }
-
-                for dead_key in dead_keys {
-                    if let Some(_observer) = observers.remove(&dead_key) {
-                        debug!(
-                            "Removed dead VPN connection observer for key: {}, value: {}",
-                            dead_key.0, dead_key.1
-                        );
-                    }
-                }
-            }
-            Err(RecvTimeoutError::Disconnected) => {
-                error!("Observer receiver channel disconnected, exiting observer thread");
-                break;
-            }
-        }
-    }
-
-    debug!("Exiting VPN connection observer thread");
-}
-
 /// Tunnel statistics shared with VPNExtension (written in Swift).
 #[derive(Deserialize)]
 #[repr(C)]
@@ -372,51 +275,6 @@ pub(crate) struct Stats {
     pub(crate) tx_bytes: u64,
     pub(crate) rx_bytes: u64,
     pub(crate) last_handshake: u64,
-}
-
-/// Run [`NSRunLoop`] until semaphore becomes `true`.
-pub fn spawn_runloop_and_wait_for(semaphore: &Arc<AtomicBool>) {
-    const ONE_SECOND: f64 = 1.;
-    let run_loop = NSRunLoop::currentRunLoop();
-    let mut date = NSDate::dateWithTimeIntervalSinceNow(ONE_SECOND);
-    loop {
-        run_loop.runUntilDate(&date);
-        if semaphore.load(Ordering::Acquire) {
-            break;
-        }
-        date = date.dateByAddingTimeInterval(ONE_SECOND);
-    }
-}
-
-/// Handle VPN status change.
-fn vpn_status_change_handler(notification: &NSNotification) {
-    let name = notification.name();
-    debug!("Received VPN status change notification: {name:?}");
-    VPN_STATE_UPDATE_COMMS
-        .0
-        .lock()
-        .expect("Failed to lock state update sender")
-        .send(())
-        .expect("Failed to send to state update channel");
-    debug!("Sent status update request to channel");
-}
-
-/// Observe VPN status change.
-fn create_observer(object: &NEVPNConnection) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
-    let center = NSNotificationCenter::defaultCenter();
-    let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
-        vpn_status_change_handler(unsafe { notification.as_ref() });
-    });
-    let queue = NSOperationQueue::mainQueue();
-    unsafe {
-        let name = NEVPNStatusDidChangeNotification;
-        center.addObserverForName_object_queue_usingBlock(
-            Some(name),
-            Some(object),
-            Some(&queue),
-            &block,
-        )
-    }
 }
 
 #[must_use]

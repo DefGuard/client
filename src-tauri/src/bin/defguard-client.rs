@@ -17,6 +17,7 @@ use defguard_client::utils::sync_connections;
 use defguard_client::{
     app_config::AppConfig,
     appstate::AppState,
+    check_version_flag,
     commands::*,
     database::{
         handle_db_migrations,
@@ -32,7 +33,15 @@ use defguard_client::{
     window_manager::*,
     LOG_FILENAME, VERSION,
 };
+#[cfg(target_os = "macos")]
+use defguard_client::{
+    apple::{connection_state_update_thread, get_managers_for_tunnels_and_locations},
+    connection::apple::{observer_thread, spawn_runloop_and_wait_for},
+    database::models::get_all_tunnels_locations,
+};
 use defguard_client_core::connection::active_connections::close_all_connections;
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::sync_locations_and_tunnels;
 use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -86,12 +95,6 @@ async fn startup(app_handle: &AppHandle) {
     }
     #[cfg(target_os = "macos")]
     {
-        use defguard_client::{
-            apple::get_managers_for_tunnels_and_locations,
-            database::models::get_all_tunnels_locations,
-        };
-        use defguard_client_core::connection::sync_locations_and_tunnels;
-
         let semaphore = Arc::new(AtomicBool::new(false));
         let semaphore_clone = Arc::clone(&semaphore);
 
@@ -108,7 +111,7 @@ async fn startup(app_handle: &AppHandle) {
             }
             semaphore_clone.store(true, Ordering::Release);
         });
-        defguard_client::apple::spawn_runloop_and_wait_for(&semaphore);
+        spawn_runloop_and_wait_for(&semaphore);
         let _ = handle.await;
 
         let (tunnels, locations) = get_all_tunnels_locations().await;
@@ -116,16 +119,14 @@ async fn startup(app_handle: &AppHandle) {
         // Observer thread is blocking, so its better not to mess with the tauri runtime,
         // hence std::thread::spawn.
         std::thread::spawn(move || {
-            defguard_client::apple::observer_thread(get_managers_for_tunnels_and_locations(
-                &tunnels, &locations,
-            ));
+            observer_thread(get_managers_for_tunnels_and_locations(&tunnels, &locations));
             error!("VPN observer thread has exited unexpectedly, quitting the app.");
             handle.exit(0);
         });
 
         let handle = app_handle.clone();
         async_runtime::spawn(async move {
-            defguard_client::apple::connection_state_update_thread(&handle).await;
+            connection_state_update_thread(&handle).await;
             error!("Connection state update thread has exited unexpectedly, quitting the app.");
             handle.exit(0);
         });
@@ -168,7 +169,7 @@ fn open_appropriate_window(app_handle: &AppHandle) {
 
 fn main() {
     // Handle --version / -V before starting the GUI.
-    defguard_client::check_version_flag("defguard-client");
+    check_version_flag("defguard-client");
 
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -216,7 +217,7 @@ fn main() {
             if let WindowEvent::ThemeChanged(_theme) = event {
                 let app = window.app_handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Err(err) = defguard_client::tray::configure_tray_icon(&app).await {
+                    if let Err(err) = configure_tray_icon(&app).await {
                         error!("Failed to reconfigure tray icon on theme change: {err}");
                     }
                 });
@@ -500,7 +501,7 @@ fn main() {
                 });
                 // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
                 // create a temporary one.
-                defguard_client::apple::spawn_runloop_and_wait_for(&semaphore);
+                spawn_runloop_and_wait_for(&semaphore);
                 async_runtime::block_on(async move {
                     let _ = handle.await;
                 });
