@@ -108,7 +108,7 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
 }
 
 #[cfg(not(target_os = "macos"))]
-async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
+pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
     let request = tonic::Request::new(());
     let response = DAEMON_CLIENT
         .clone()

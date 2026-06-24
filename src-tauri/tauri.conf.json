@@ -21,7 +21,7 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "certificateThumbprint": "9d3df627dbf037f1553582ce9a806d09c9b78654",
+      "certificateThumbprint": "c79305cdcb7e5832dd161d18580d6a846bd0506b",
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://time.certum.pl/",
       "wix": {
@@ -44,6 +44,7 @@
       "entitlements": "./Client.entitlements",
       "files": {
         "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
+        "Helpers/defguard-cli/Contents/MacOS/defguard-cli": "target/release/defguard-cli",
         "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
       },
       "minimumSystemVersion": "13.5"
