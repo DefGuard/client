@@ -148,7 +148,7 @@ async fn main() -> ExitCode {
 /// `-h`. Suppressed for `--version` / `-V` -- that surface must stay
 /// grep-friendly (`defguard-cli --version | head -1`).
 fn show_banner_if_appropriate() {
-    let args: Vec<String> = std::env::args().collect();
+    let args = std::env::args().collect::<Vec<_>>();
     // Skip argv[0]. If user supplied any subcommand or flag other
     // than --help / -h, do not print the banner.
     let user_args = &args[1..];

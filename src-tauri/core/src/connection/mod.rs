@@ -7,13 +7,7 @@ pub mod setup;
 pub mod apple;
 
 #[cfg(target_os = "macos")]
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::time::Duration;
 
 use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
@@ -37,15 +31,15 @@ use crate::{
 const TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
 /// Identifies the type of connection target.
-pub enum ConnectionTarget<'a> {
-    Location(&'a Location<Id>),
-    Tunnel(&'a Tunnel<Id>),
+pub enum ConnectionTarget {
+    Location(Location<Id>),
+    Tunnel(Tunnel<Id>),
 }
 
 /// Bring a WireGuard interface up for the given target.
 #[cfg_attr(target_os = "macos", allow(unused_variables))]
 pub async fn bring_up(
-    target: ConnectionTarget<'_>,
+    target: ConnectionTarget,
     psk: Option<String>,
     mtu: Option<u32>,
     pool: &DbPool,
@@ -55,10 +49,12 @@ pub async fn bring_up(
     {
         match target {
             ConnectionTarget::Location(loc) => {
-                setup::setup_interface(loc, &loc.name, psk, mtu, pool, route_all_traffic).await
+                let name = loc.name.clone();
+                setup::setup_interface(loc, &name, psk, mtu, pool, route_all_traffic).await
             }
             ConnectionTarget::Tunnel(tun) => {
-                setup::setup_interface_tunnel(tun, &tun.name, mtu, route_all_traffic).await
+                let name = tun.name.clone();
+                setup::setup_interface_tunnel(tun, &name, mtu, route_all_traffic).await
             }
         }
     }
@@ -70,16 +66,9 @@ pub async fn bring_up(
             ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu),
         }?;
 
-        let semaphore = Arc::new(AtomicBool::new(false));
-        let semaphore_clone = Arc::clone(&semaphore);
-        let handle = tokio::spawn(async move {
-            tunnel_config.save();
-            sleep(TUNNEL_START_DELAY).await;
-            tunnel_config.start_tunnel();
-            semaphore_clone.store(true, Ordering::Release);
-        });
-        self::apple::spawn_runloop_and_wait_for(&semaphore);
-        let _ = handle.await;
+        tunnel_config.save();
+        sleep(TUNNEL_START_DELAY).await;
+        tunnel_config.start_tunnel();
 
         // On macOS the interface name is managed by the system.
         Ok(String::new())
@@ -101,20 +90,5 @@ pub async fn tear_down(conn: &ActiveConnectionInfo) -> Result<(), Error> {
         interface_name: conn.interface_name.clone(),
     };
 
-    #[cfg(target_os = "macos")]
-    {
-        let semaphore = Arc::new(AtomicBool::new(false));
-        let semaphore_clone = Arc::clone(&semaphore);
-        let handle = tokio::spawn(async move {
-            let result = disconnect_interface(&connection).await;
-            semaphore_clone.store(true, Ordering::Release);
-
-            result
-        });
-        self::apple::spawn_runloop_and_wait_for(&semaphore);
-        handle.await.unwrap()
-    }
-
-    #[cfg(not(target_os = "macos"))]
     disconnect_interface(&connection).await
 }

@@ -2,7 +2,7 @@ use defguard_core::{
     connection::{active_state::active_state, tear_down},
     ConnectionType,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use tracing::{error, info};
 
 use crate::{
@@ -11,7 +11,6 @@ use crate::{
     state::{CliError, State},
 };
 
-#[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
 pub async fn handle(
     state: &State,
     name: Option<&str>,
@@ -68,16 +67,41 @@ pub async fn handle(
                     let ifname = connection.interface_name.clone();
                     let name = connection.name.clone();
                     info!("Disconnecting sole active connection {name} on interface {ifname}...");
+
+                    #[cfg(not(target_os = "macos"))]
                     tear_down(connection).await?;
+
+                    #[cfg(target_os = "macos")]
+                    {
+                        use std::sync::{
+                            atomic::{AtomicBool, Ordering},
+                            Arc,
+                        };
+
+                        use defguard_core::connection::apple::spawn_runloop_and_wait_for;
+
+                        let semaphore = Arc::new(AtomicBool::new(false));
+                        let semaphore_clone = Arc::clone(&semaphore);
+                        let connection_clone = connection.clone();
+                        let handle = tokio::spawn(async move {
+                            let result = tear_down(&connection_clone).await;
+                            semaphore_clone.store(true, Ordering::Release);
+                            result
+                        });
+                        spawn_runloop_and_wait_for(&semaphore);
+                        handle.await.unwrap()?;
+                    }
+
                     return Ok(DisconnectResult::Single {
                         name,
                         interface: ifname,
                     });
                 }
                 _ => {
-                    let names: Vec<_> = active.iter().map(|c| c.name.as_str()).collect();
+                    let names = active.iter().map(|c| c.name.as_str()).collect::<Vec<_>>();
                     return Err(CliError::Usage(format!(
-                        "Multiple active connections ({}). Specify which to disconnect, --all to disconnect all.",
+                        "Multiple active connections ({}). Specify which to disconnect, --all to \
+                        disconnect all.",
                         names.join(", ")
                     )));
                 }
@@ -143,7 +167,7 @@ impl CommandOutput for DisconnectResult {
                 disconnected,
                 errors,
             } => {
-                let mut parts: Vec<String> = Vec::new();
+                let mut parts = Vec::new();
                 if !disconnected.is_empty() {
                     parts.push(format!("disconnected: {}", disconnected.join(", ")));
                 }
@@ -160,7 +184,7 @@ impl CommandOutput for DisconnectResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         match self {
             DisconnectResult::Single { name, interface } => json!({
                 "disconnected": name,

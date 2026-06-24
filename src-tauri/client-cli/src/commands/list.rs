@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     commands::location::mfa_label,
@@ -39,7 +39,7 @@ impl CommandOutput for ListResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         let instance_names = self
             .instances
             .iter()
@@ -56,7 +56,7 @@ impl CommandOutput for ListResult {
             })
             .collect::<Vec<_>>();
 
-        let locations: Vec<LocationEntry> = self
+        let locations = self
             .locations
             .iter()
             .map(|l| LocationEntry {
@@ -69,9 +69,9 @@ impl CommandOutput for ListResult {
                 mfa_method: Some(mfa_label(l.mfa_method).to_string()),
                 route_all_traffic: Some(l.route_all_traffic),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        let tunnels: Vec<TunnelEntry> = self
+        let tunnels = self
             .tunnels
             .iter()
             .map(|t| TunnelEntry {
@@ -80,7 +80,7 @@ impl CommandOutput for ListResult {
                 address: t.address.clone(),
                 endpoint: t.endpoint.clone(),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         json!({
             "instances": instances,

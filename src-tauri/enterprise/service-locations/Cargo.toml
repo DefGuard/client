@@ -12,7 +12,7 @@ version.workspace = true
 defguard-client-common = { path = "../../common" }
 defguard-client-core = { path = "../../core" }
 defguard-client-proto = { path = "../../client-proto" }
-defguard_wireguard_rs = { workspace = true }
+defguard_wireguard_rs.workspace = true
 base64.workspace = true
 log.workspace = true
 prost = { workspace = true }

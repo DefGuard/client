@@ -23,7 +23,7 @@ use crate::{
 #[cfg(not(target_os = "macos"))]
 use crate::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Type)]
 #[repr(u32)]
 #[serde(rename_all = "lowercase")]
 pub enum LocationMfaMode {
@@ -44,7 +44,7 @@ impl From<ProtoLocationMfaMode> for LocationMfaMode {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Type)]
 #[repr(u32)]
 #[serde(rename_all = "lowercase")]
 pub enum ServiceLocationMode {
@@ -105,7 +105,7 @@ pub fn infer_mfa_method(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
 pub struct Location<I = NoId> {
     pub id: I,
     pub instance_id: Id,

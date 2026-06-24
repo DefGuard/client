@@ -5,7 +5,7 @@ use defguard_core::database::models::{
     location::{Location, LocationMfaMethod},
     Id,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     output::{CommandOutput, LocationEntry},
@@ -141,8 +141,8 @@ impl CommandOutput for LocationListResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
-        let locations: Vec<LocationEntry> = self
+    fn json(&self) -> Value {
+        let locations = self
             .locations
             .iter()
             .map(|l| LocationEntry {
@@ -155,7 +155,7 @@ impl CommandOutput for LocationListResult {
                 mfa_method: Some(mfa_label(l.mfa_method).to_string()),
                 route_all_traffic: Some(l.route_all_traffic),
             })
-            .collect();
+            .collect::<Vec<_>>();
         json!({ "locations": locations })
     }
 }
@@ -242,7 +242,7 @@ impl CommandOutput for LocationShowResult {
         lines.join("\n")
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         let mut json = json!({
             "name": self.name,
             "address": self.address,
@@ -278,7 +278,7 @@ impl CommandOutput for LocationSetResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         json!({
             "location": self.name,
             "changes": self.changes,

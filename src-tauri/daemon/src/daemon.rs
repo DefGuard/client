@@ -527,12 +527,12 @@ impl DesktopDaemonService for DaemonService {
         debug!("Received ListInterfaces request");
 
         // Collect interface names under a brief lock.
-        let ifnames: Vec<String> = {
+        let ifnames = {
             let Ok(wgapis_map) = self.wgapis.read() else {
                 error!("Failed to acquire read lock for WGApis");
                 return Err(Status::new(Code::Internal, "read lock error"));
             };
-            wgapis_map.keys().cloned().collect()
+            wgapis_map.keys().cloned().collect::<Vec<_>>()
         };
 
         // Read each interface's data, acquiring and releasing the lock per interface

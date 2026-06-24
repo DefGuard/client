@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{exit, state::CliError};
 
@@ -10,7 +10,7 @@ pub trait CommandOutput {
     /// Produce a human-readable string (no trailing newline required).
     fn human(&self) -> String;
     /// Produce a structured JSON value.
-    fn json(&self) -> serde_json::Value;
+    fn json(&self) -> Value;
     /// Exit code override; defaults to 0 (success).
     fn exit_code(&self) -> u8 {
         0

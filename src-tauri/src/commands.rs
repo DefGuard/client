@@ -105,7 +105,7 @@ pub async fn connect(
             } else {
                 preshared_key
             };
-            handle_connection_for_location(&location, preshared_key, &handle).await?;
+            handle_connection_for_location(location.clone(), preshared_key, &handle).await?;
             reload_tray_menu(&handle).await;
             info!("Connected to location {location}");
         } else {
@@ -120,7 +120,7 @@ pub async fn connect(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
         );
-        handle_connection_for_tunnel(&tunnel, &handle).await?;
+        handle_connection_for_tunnel(tunnel.clone(), &handle).await?;
         info!("Successfully connected to tunnel {tunnel}");
     } else {
         error!("Tunnel {location_id} not found");
@@ -492,7 +492,10 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
         let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
-        let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
+        let location_ids = locations
+            .iter()
+            .map(|location| location.id)
+            .collect::<Vec<_>>();
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
@@ -724,17 +727,17 @@ pub async fn all_connections(
     connection_type: ConnectionType,
 ) -> Result<Vec<CommonConnectionInfo>, Error> {
     debug!("Retrieving connections for location {location_id}");
-    let connections: Vec<CommonConnectionInfo> = match connection_type {
+    let connections = match connection_type {
         ConnectionType::Location => ConnectionInfo::all_by_location_id(&*DB_POOL, location_id)
             .await?
             .into_iter()
             .map(Into::into)
-            .collect(),
+            .collect::<Vec<_>>(),
         ConnectionType::Tunnel => TunnelConnectionInfo::all_by_tunnel_id(&*DB_POOL, location_id)
             .await?
             .into_iter()
             .map(Into::into)
-            .collect(),
+            .collect::<Vec<_>>(),
     };
     debug!("Connections retrieved({})", connections.len());
     trace!("Connections found:\n{connections:#?}");

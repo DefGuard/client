@@ -1,5 +1,5 @@
 use defguard_core::database::models::{instance::Instance, Id};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     output::CommandOutput,
@@ -35,8 +35,8 @@ impl CommandOutput for InstanceListResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
-        let instances: Vec<serde_json::Value> = self
+    fn json(&self) -> Value {
+        let instances = self
             .instances
             .iter()
             .map(|inst| {
@@ -47,7 +47,7 @@ impl CommandOutput for InstanceListResult {
                     "traffic_policy": format!("{:?}", inst.client_traffic_policy),
                 })
             })
-            .collect();
+            .collect::<Vec<_>>();
         json!({ "instances": instances })
     }
 }
@@ -110,7 +110,7 @@ impl CommandOutput for InstanceShowResult {
         lines.join("\n")
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         json!({
             "name": self.instance.name,
             "uuid": self.instance.uuid,

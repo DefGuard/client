@@ -27,6 +27,7 @@ use futures_util::StreamExt;
 use reqwest::{StatusCode, Url};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
+use serde_json::Value;
 use tokio::{
     net::TcpStream,
     select,
@@ -699,7 +700,7 @@ async fn wait_for_mfa_success(
 
         match msg {
             Message::Text(text) => {
-                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                if let Ok(parsed) = serde_json::from_str::<Value>(&text) {
                     if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
                         if let Some(key) = parsed["preshared_key"].as_str() {
                             return Ok(key.to_string());

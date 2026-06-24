@@ -1,5 +1,5 @@
 use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     output::{ActiveEntry, CommandOutput},
@@ -27,7 +27,7 @@ impl CommandOutput for StatusResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         let active = self
             .connections
             .iter()
