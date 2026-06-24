@@ -166,7 +166,7 @@ pub async fn authorize(
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey.clone(),
+        pubkey: wireguard_keys.pubkey,
         method: method as i32,
         posture_data,
     };
@@ -189,7 +189,7 @@ pub async fn authorize(
         .await
         .map_err(|e| CliError::Other(format!("Invalid MFA start response: {e}")))?;
 
-    let token = start_resp.token.clone();
+    let token = start_resp.token;
     debug!("MFA session started, token obtained");
 
     // Step 2: Obtain the code.
@@ -370,7 +370,7 @@ pub(crate) async fn authorize_oidc(
     // Step 1: Start the OIDC MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey.clone(),
+        pubkey: wireguard_keys.pubkey,
         method: MfaMethod::Oidc as i32,
         posture_data,
     };
@@ -530,7 +530,7 @@ pub(crate) async fn authorize_mobile_approve(
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey.clone(),
+        pubkey: wireguard_keys.pubkey,
         method: MfaMethod::MobileApprove as i32,
         posture_data,
     };
