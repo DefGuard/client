@@ -13,7 +13,7 @@ const MIN_LOCATION_NAME_COL_WIDTH: usize = 8;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 
-pub async fn handle(state: &State) -> Result<ListResult, CliError> {
+pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
     let locations = Location::all(&state.pool, false).await?;
     let tunnels = Tunnel::all(&state.pool).await?;
@@ -40,13 +40,13 @@ impl CommandOutput for ListResult {
     }
 
     fn json(&self) -> serde_json::Value {
-        let instance_names: HashMap<Id, String> = self
+        let instance_names = self
             .instances
             .iter()
             .map(|i| (i.id, i.name.clone()))
-            .collect();
+            .collect::<HashMap<_, _>>();
 
-        let instances: Vec<InstanceEntry> = self
+        let instances = self
             .instances
             .iter()
             .map(|i| InstanceEntry {
@@ -54,7 +54,7 @@ impl CommandOutput for ListResult {
                 name: i.name.clone(),
                 url: i.url.clone(),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         let locations: Vec<LocationEntry> = self
             .locations

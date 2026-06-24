@@ -1,8 +1,8 @@
-#[cfg(not(target_os = "macos"))]
-use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
-use std::{env, path::Path, process::Command};
+use std::{env, process::Command};
+#[cfg(not(target_os = "macos"))]
+use std::{path::Path, str::FromStr};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -156,7 +156,11 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                     }
                 };
 
-                let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
+                let peers = interface_data
+                    .peers
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<_>>();
                 for peer in peers {
                     if connection_type.eq(&ConnectionType::Location) {
                         let location_stats = match peer_to_location_stats(
@@ -263,6 +267,7 @@ pub fn load_log_targets() -> Vec<String> {
 }
 
 /// Helper function to get log file directory for `defguard-service` daemon.
+#[cfg(not(target_os = "macos"))]
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
     #[cfg(windows)]

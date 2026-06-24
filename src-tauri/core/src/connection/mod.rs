@@ -7,7 +7,13 @@ pub mod setup;
 pub mod apple;
 
 #[cfg(target_os = "macos")]
-use std::time::Duration;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
@@ -64,9 +70,16 @@ pub async fn bring_up(
             ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu),
         }?;
 
-        tunnel_config.save();
-        sleep(TUNNEL_START_DELAY).await;
-        tunnel_config.start_tunnel();
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+        let handle = tokio::spawn(async move {
+            tunnel_config.save();
+            sleep(TUNNEL_START_DELAY).await;
+            tunnel_config.start_tunnel();
+            semaphore_clone.store(true, Ordering::Release);
+        });
+        self::apple::spawn_runloop_and_wait_for(&semaphore);
+        let _ = handle.await;
 
         // On macOS the interface name is managed by the system.
         Ok(String::new())
@@ -74,8 +87,6 @@ pub async fn bring_up(
 }
 
 /// Tear down a WireGuard interface identified by `ActiveConnectionInfo`.
-///
-/// On macOS this returns [`Error::BackendUnavailable`] - see [`bring_up`].
 //
 // FIXME: This constructs an `ActiveConnection` with `start: Utc::now()`,
 // which records a zero-duration connection when saved. This impacts the
@@ -90,5 +101,20 @@ pub async fn tear_down(conn: &ActiveConnectionInfo) -> Result<(), Error> {
         interface_name: conn.interface_name.clone(),
     };
 
+    #[cfg(target_os = "macos")]
+    {
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+        let handle = tokio::spawn(async move {
+            let result = disconnect_interface(&connection).await;
+            semaphore_clone.store(true, Ordering::Release);
+
+            result
+        });
+        self::apple::spawn_runloop_and_wait_for(&semaphore);
+        handle.await.unwrap()
+    }
+
+    #[cfg(not(target_os = "macos"))]
     disconnect_interface(&connection).await
 }

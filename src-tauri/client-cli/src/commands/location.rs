@@ -17,14 +17,14 @@ const MIN_NAME_COL_WIDTH: usize = 8;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_INST_COL_WIDTH: usize = 8;
 
-pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
+pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
 
-    let instance_names: HashMap<Id, String> = Instance::all(&state.pool)
+    let instance_names = Instance::all(&state.pool)
         .await?
         .into_iter()
         .map(|inst| (inst.id, inst.name))
-        .collect();
+        .collect::<HashMap<_, _>>();
 
     Ok(LocationListResult {
         locations,
@@ -50,7 +50,7 @@ pub async fn handle_set(
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
     let location_id = match &target {
         ResolvedTarget::Location(loc) => loc.id,
-        _ => {
+        ResolvedTarget::Tunnel(_) => {
             return Err(CliError::NotFound(format!("Location '{name}' not found")));
         }
     };
@@ -122,11 +122,7 @@ fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
 
 pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
     match method {
-        Some(LocationMfaMethod::Totp) => "totp",
-        Some(LocationMfaMethod::Email) => "email",
-        Some(LocationMfaMethod::Oidc) => "oidc",
-        Some(LocationMfaMethod::Biometric) => "biometric",
-        Some(LocationMfaMethod::MobileApprove) => "mobile",
+        Some(method) => method.as_str(),
         None => "none",
     }
 }

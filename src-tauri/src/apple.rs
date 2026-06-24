@@ -11,10 +11,10 @@ use std::{
 };
 
 use block2::RcBlock;
-use defguard_client_core::{
-    connection::{active_connections::find_connection, apple::VPN_STATE_UPDATE_COMMS},
-    database::models::tunnel_configuration::{
-        manager_for_key_and_value, LOCATION_ID, PLUGIN_BUNDLE_ID, TUNNEL_ID,
+use defguard_client_core::connection::{
+    active_connections::find_connection,
+    apple::{
+        manager_for_key_and_value, LOCATION_ID, PLUGIN_BUNDLE_ID, TUNNEL_ID, VPN_STATE_UPDATE_COMMS,
     },
 };
 use objc2::rc::Retained;
@@ -99,7 +99,7 @@ async fn sync_connections_with_system(app_handle: &AppHandle) {
                                 canceling system connection and triggering MFA flow",
                             location.name
                         );
-                        location.stop_vpn_tunnel();
+                        let _ = location.stop_vpn_tunnel();
                         show_main_window(app_handle);
                         let _ = app_handle.emit(EventKey::MfaTrigger.into(), &location);
                         continue;

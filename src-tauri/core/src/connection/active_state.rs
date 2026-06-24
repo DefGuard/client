@@ -3,17 +3,28 @@
 //! The daemon (Linux/Windows) and Network Extension managers (macOS) are the shared
 //! source of truth for interface state.
 
+#[cfg(target_os = "macos")]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
 #[cfg(not(target_os = "macos"))]
 use base64::Engine as _;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{InterfaceData, Peer};
+#[cfg(target_os = "macos")]
+use objc2_network_extension::NEVPNStatus;
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
 
+#[cfg(target_os = "macos")]
+use crate::database::models::get_all_tunnels_locations;
 #[cfg(not(target_os = "macos"))]
-use crate::connection::daemon_client::DAEMON_CLIENT;
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::{location::Location, tunnel::Tunnel};
+use crate::{
+    connection::daemon_client::DAEMON_CLIENT,
+    database::models::{location::Location, tunnel::Tunnel},
+};
 use crate::{
     database::{models::Id, DbPool},
     error::Error,
@@ -54,48 +65,35 @@ pub struct InterfaceStats {
 /// On macOS the Network Extension path is stubbed (pending the NE spike).
 #[cfg(target_os = "macos")]
 pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
-    use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    };
-
-    let (tunnels, locations) = crate::database::models::get_all_tunnels_locations().await;
-
+    let (tunnels, locations) = get_all_tunnels_locations().await;
     let semaphore = Arc::new(AtomicBool::new(false));
     let semaphore_clone = Arc::clone(&semaphore);
 
     let handle = tokio::spawn(async move {
         let mut result = Vec::new();
         for location in locations {
-            match location.status() {
-                Some(objc2_network_extension::NEVPNStatus::Connected) => {
-                    let info = ActiveConnectionInfo {
-                        connection_type: ConnectionType::Location,
-                        target_id: location.id,
-                        name: location.name,
-                        interface_name: String::new(),
-                        stats: None, // TODO
-                    };
-                    result.push(info);
-                }
-                _ => (),
+            if let Some(NEVPNStatus::Connected) = location.status() {
+                let info = ActiveConnectionInfo {
+                    connection_type: ConnectionType::Location,
+                    target_id: location.id,
+                    name: location.name,
+                    interface_name: String::new(),
+                    stats: None, // TODO
+                };
+                result.push(info);
             }
         }
 
         for tunnel in tunnels {
-            match tunnel.status() {
-                Some(objc2_network_extension::NEVPNStatus::Connected) => {
-                    eprintln!("FOUND {}", tunnel.name);
-                    let info = ActiveConnectionInfo {
-                        connection_type: ConnectionType::Tunnel,
-                        target_id: tunnel.id,
-                        name: tunnel.name,
-                        interface_name: String::new(),
-                        stats: None, // TODO
-                    };
-                    result.push(info);
-                }
-                _ => (),
+            if let Some(NEVPNStatus::Connected) = tunnel.status() {
+                let info = ActiveConnectionInfo {
+                    connection_type: ConnectionType::Tunnel,
+                    target_id: tunnel.id,
+                    name: tunnel.name,
+                    interface_name: String::new(),
+                    stats: None, // TODO
+                };
+                result.push(info);
             }
         }
 

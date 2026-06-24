@@ -20,7 +20,6 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
 pub async fn handle(
     state: &State,
     name: Option<&str>,

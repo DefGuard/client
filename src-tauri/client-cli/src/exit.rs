@@ -5,7 +5,7 @@ use crate::state::CliError;
 /// | Code | Meaning            |
 /// |------|--------------------|
 /// | 0    | ok                 |
-/// | 1    | other              |
+/// | 1    | database, other    |
 /// | 2    | usage              |
 /// | 3    | not-found          |
 /// | 4    | daemon-unavailable |
@@ -22,8 +22,7 @@ pub fn exit_code_for(err: &CliError) -> u8 {
         CliError::NotEnrolled(_) => 6,
         CliError::InvalidInput(_) => 7,
         CliError::Cancelled(_) => 8,
-        CliError::Database(_) => 1,
-        CliError::Other(_) => 1,
+        CliError::Database(_) | CliError::Other(_) => 1,
     }
 }
 

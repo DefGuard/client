@@ -77,6 +77,20 @@ pub enum LocationMfaMethod {
     MobileApprove = 4,
 }
 
+impl LocationMfaMethod {
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Totp => "totp",
+            Self::Email => "email",
+            Self::Oidc => "oidc",
+            Self::Biometric => "biometric",
+            Self::MobileApprove => "mobile",
+        }
+    }
+}
+
+#[must_use]
 pub fn infer_mfa_method(
     mode: LocationMfaMode,
     method: Option<LocationMfaMethod>,
@@ -307,6 +321,7 @@ impl Location<Id> {
         Ok(())
     }
 
+    #[must_use]
     pub fn mfa_enabled(&self) -> bool {
         match self.location_mfa_mode {
             LocationMfaMode::Disabled => false,
