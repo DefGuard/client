@@ -18,7 +18,7 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "certificateThumbprint": "9d3df627dbf037f1553582ce9a806d09c9b78654",
+      "certificateThumbprint": "331011e625718fde3ad2a37ab27fea37befe3b70",
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://time.certum.pl/",
       "wix": {
