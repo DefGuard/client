@@ -24,6 +24,13 @@ if (-not $thumbprint) {
 
 $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
 if (-not $signtool) {
+    $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
+        Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+}
+
+if (-not $signtool) {
     throw 'signtool.exe was not found.'
 }
 
