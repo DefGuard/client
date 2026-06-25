@@ -62,6 +62,7 @@ jobs:
         run: |
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/client-cli/Info.plist
 
       - name: Unlock keychain
         run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
@@ -97,7 +98,7 @@ jobs:
             ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS/defguard-cli
           codesign --verbose --force --options runtime \
             --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
-            --entitlements Client.entitlements ${BUNDLE}
+            --deep --entitlements Client.entitlements ${BUNDLE}
 
       - name: Build installation package
         run: |
