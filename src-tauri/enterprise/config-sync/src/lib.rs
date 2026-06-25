@@ -77,8 +77,6 @@ pub async fn fetch_instance_config(
         instance.name
     );
 
-    let version_mismatch = check_min_version(&response, instance);
-
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
@@ -102,6 +100,10 @@ pub async fn fetch_instance_config(
         }
         return Err(Error::CoreNotEnterprise);
     }
+
+    ensure_success_status(&response, instance)?;
+
+    let version_mismatch = check_min_version(&response, instance);
 
     // Parse the response
     debug!(
@@ -128,6 +130,22 @@ pub async fn fetch_instance_config(
         response,
         version_mismatch,
     })
+}
+
+fn ensure_success_status(
+    response: &reqwest::Response,
+    instance: &Instance<Id>,
+) -> Result<(), Error> {
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    Err(Error::HttpError(format!(
+        "Config polling failed for instance {}({}) with status {}",
+        instance.name,
+        instance.id,
+        response.status(),
+    )))
 }
 
 /// Checks if config has changed compared to what's in the database.
@@ -318,7 +336,15 @@ mod tests {
     }
 
     fn response_with_headers(headers: &[(&str, &str)]) -> reqwest::Response {
+        response_with_status_and_headers(StatusCode::OK, headers)
+    }
+
+    fn response_with_status_and_headers(
+        status: StatusCode,
+        headers: &[(&str, &str)],
+    ) -> reqwest::Response {
         let mut builder = http::Response::builder();
+        builder = builder.status(status);
         for (key, value) in headers {
             builder = builder.header(*key, *value);
         }
@@ -370,6 +396,17 @@ mod tests {
         assert!(!payload.proxy_compatible);
         assert_eq!(payload.core_version, "unknown");
         assert_eq!(payload.proxy_version, "unknown");
+    }
+
+    #[test]
+    fn test_non_success_status_returns_http_error_before_version_check() {
+        let response = response_with_status_and_headers(StatusCode::BAD_GATEWAY, &[]);
+        let instance = instance_with_token(Some("tok"));
+        let err = ensure_success_status(&response, &instance).expect_err("HTTP error expected");
+
+        assert!(
+            matches!(err, Error::HttpError(message) if message.contains("status 502 Bad Gateway"))
+        );
     }
 
     #[test]
