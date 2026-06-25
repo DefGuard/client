@@ -88,7 +88,7 @@ jobs:
               target/aarch64-apple-darwin/release/defguard-cli \
               target/x86_64-apple-darwin/release/defguard-cli
             ln -f client-cli/Info.plist ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/Info.plist
-            pushd ${BUNDLE}/Contents/Helpers
+            pushd ${BUNDLE}/Contents/Helpers/defguard-cli/Contents
             ln -f -s ../../../embedded.provisionprofile .
             popd
             codesign --verbose --force --options runtime \
