@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Tunnel<I = NoId> {
     pub id: I,
     pub name: String,

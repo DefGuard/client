@@ -1,11 +1,11 @@
 [workspace]
 members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
-default-members = [".", "cli", "client-cli", "daemon"]
+default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
 base64 = "0.22"
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = "0.9"
+defguard_wireguard_rs = "0.10"
 dirs-next = "2.0"
 log = { version = "0.4", features = ["serde"] }
 prost = "0.14"
@@ -36,7 +36,7 @@ futures-util = "0.3"
 http = "1"
 image = "0.25"
 qrcode = { version = "0.14", features = ["image"] }
-tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 vergen-git2 = { version = "9.1", features = ["build"] }
 
 [workspace.package]

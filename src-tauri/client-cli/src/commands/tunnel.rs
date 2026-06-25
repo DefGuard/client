@@ -1,5 +1,5 @@
 use defguard_core::database::models::{tunnel::Tunnel, Id};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     output::CommandOutput,
@@ -47,8 +47,8 @@ impl CommandOutput for TunnelListResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
-        let tunnels: Vec<serde_json::Value> = self
+    fn json(&self) -> Value {
+        let tunnels = self
             .tunnels
             .iter()
             .map(|t| {
@@ -60,7 +60,7 @@ impl CommandOutput for TunnelListResult {
                     "route_all_traffic": t.route_all_traffic,
                 })
             })
-            .collect();
+            .collect::<Vec<_>>();
         json!({ "tunnels": tunnels })
     }
 }
@@ -150,7 +150,7 @@ impl CommandOutput for TunnelShowResult {
         lines.join("\n")
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         json!({
             "name": self.tunnel.name,
             "address": self.tunnel.address,

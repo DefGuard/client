@@ -15,7 +15,7 @@ defguard-client-common = { path = "../common" }
 defguard-client-proto = { path = "../client-proto" }
 defguard-client-posture = { path = "../enterprise/posture" }
 defguard-client-service-locations = { path = "../enterprise/service-locations" }
-defguard_wireguard_rs = { workspace = true }
+defguard_wireguard_rs.workspace = true
 log.workspace = true
 serde.workspace = true
 thiserror = { workspace = true }
@@ -33,7 +33,7 @@ nix = { version = "0.31", features = ["fs", "user"] }
 async-stream = "0.3"
 futures-core = "0.3"
 tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
-windows-core = "0.61"
+windows-core = "0.62"
 windows-service = "0.8"
 windows-sys = "0.61"
 

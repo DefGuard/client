@@ -4,8 +4,7 @@ use std::{
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, channel, Receiver, Sender},
-        Arc, LazyLock, Mutex,
+        Arc,
     },
 };
 
@@ -14,12 +13,14 @@ use defguard_client_common::dns_owned;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNumber,
-    NSString,
+    ns_string, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNumber, NSString,
 };
 use objc2_network_extension::{NETunnelProviderManager, NETunnelProviderProtocol, NEVPNStatus};
 
 use crate::{
+    connection::apple::{
+        manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID, TUNNEL_ID,
+    },
     database::{
         models::{
             instance::{ClientTrafficPolicy, Instance},
@@ -33,19 +34,6 @@ use crate::{
     error::Error,
     DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
-
-pub const LOCATION_ID: &str = "locationId";
-pub const TUNNEL_ID: &str = "tunnelId";
-
-type ObserverSender = Mutex<Sender<(&'static str, Id)>>;
-type ObserverReceiver = Mutex<Option<Receiver<(&'static str, Id)>>>;
-
-pub static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::new(|| {
-    let (tx, rx) = mpsc::channel();
-    (Mutex::new(tx), Mutex::new(Some(rx)))
-});
-
-pub const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
 
 /// Try to get `Id` out of manager. ID is embedded in configuration dictionary under `key`.
 pub fn id_from_manager(manager: &NETunnelProviderManager, key: &NSString) -> Option<Id> {
@@ -74,47 +62,6 @@ pub fn id_from_manager(manager: &NETunnelProviderManager, key: &NSString) -> Opt
     }
 
     None
-}
-
-/// Try to find [`NETunnelProviderManager`] in system settings that matches key and value.
-/// Key is usually `locationId` or `tunnelId`.
-pub fn manager_for_key_and_value(
-    key: &str,
-    value: Id,
-) -> Option<Retained<NETunnelProviderManager>> {
-    let key_string = NSString::from_str(key);
-    let (tx, rx) = channel();
-
-    let handler = RcBlock::new(
-        move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
-            if !error_ptr.is_null() {
-                error!("Failed to load tunnel provider managers.");
-                return;
-            }
-
-            let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
-                error!("No managers");
-                return;
-            };
-
-            for manager in managers {
-                if let Some(id) = id_from_manager(&manager, &key_string) {
-                    if id == value {
-                        // This is the manager we were looking for.
-                        tx.send(Some(manager)).expect("Sender is dead");
-                        return;
-                    }
-                }
-            }
-
-            tx.send(None).expect("Sender is dead");
-        },
-    );
-    unsafe {
-        NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
-    }
-
-    rx.recv().expect("Receiver is dead")
 }
 
 /// Tunnel configuration shared with VPNExtension (written in Swift).
@@ -244,6 +191,7 @@ impl TunnelConfiguration {
 
     /// Try to find `NETunnelProviderManager` for this configuration, based on location ID or
     /// tunnel ID.
+    #[must_use]
     pub fn tunnel_provider_manager(&self) -> Option<Retained<NETunnelProviderManager>> {
         let (key, value) = match (self.location_id, self.tunnel_id) {
             (Some(location_id), None) => (LOCATION_ID, location_id),
@@ -433,6 +381,7 @@ impl Location<Id> {
     }
 
     /// Check whether VPN tunnel is running for [`Location`].
+    #[must_use]
     pub fn status(&self) -> Option<NEVPNStatus> {
         manager_for_key_and_value(LOCATION_ID, self.id).map_or_else(
             || {
@@ -464,6 +413,7 @@ impl Location<Id> {
     }
 
     /// Stop VPN tunnel for [`Location`].
+    #[must_use]
     pub fn stop_vpn_tunnel(&self) -> bool {
         manager_for_key_and_value(LOCATION_ID, self.id).map_or_else(
             || {
@@ -565,6 +515,7 @@ impl Tunnel<Id> {
     }
 
     /// Check whether VPN tunnel is running for [`Tunnel`].
+    #[must_use]
     pub fn status(&self) -> Option<NEVPNStatus> {
         manager_for_key_and_value(TUNNEL_ID, self.id).map_or_else(
             || {
@@ -596,6 +547,7 @@ impl Tunnel<Id> {
     }
 
     /// Stop tunnel for [`Tunnel`].
+    #[must_use]
     pub fn stop_vpn_tunnel(&self) -> bool {
         manager_for_key_and_value(TUNNEL_ID, self.id).map_or_else(
             || {

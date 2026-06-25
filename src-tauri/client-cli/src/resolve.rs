@@ -87,7 +87,7 @@ async fn resolve_named(
 
     // Fetch matching locations by name.  Instance filter is applied in Rust
     // since cross-instance ambiguity is a business rule, not a query concern.
-    let loc_matches: Vec<Location<Id>> = if let Some(inst_name) = instance_filter {
+    let loc_matches = if let Some(inst_name) = instance_filter {
         let inst = Instance::find_by_name(pool, inst_name)
             .await?
             .ok_or_else(|| CliError::NotFound(format!("Instance '{inst_name}' not found")))?;
@@ -95,7 +95,7 @@ async fn resolve_named(
             .await?
             .into_iter()
             .filter(|l| l.instance_id == inst.id)
-            .collect()
+            .collect::<Vec<_>>()
     } else {
         Location::find_by_name(pool, name).await?
     };

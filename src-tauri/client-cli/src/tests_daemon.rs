@@ -113,7 +113,7 @@ impl DesktopDaemonService for MockDaemon {
         &self,
         _req: Request<()>,
     ) -> Result<Response<ListInterfacesResponse>, Status> {
-        let interfaces: Vec<ManagedInterfaceData> = self
+        let interfaces = self
             .state
             .interfaces
             .lock()
@@ -123,7 +123,7 @@ impl DesktopDaemonService for MockDaemon {
                 interface_name: ifname.clone(),
                 data: Some(data.clone()),
             })
-            .collect();
+            .collect::<Vec<_>>();
         Ok(Response::new(ListInterfacesResponse { interfaces }))
     }
 }

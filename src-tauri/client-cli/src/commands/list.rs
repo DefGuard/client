@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     commands::location::mfa_label,
@@ -13,7 +13,7 @@ const MIN_LOCATION_NAME_COL_WIDTH: usize = 8;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 
-pub async fn handle(state: &State) -> Result<ListResult, CliError> {
+pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
     let locations = Location::all(&state.pool, false).await?;
     let tunnels = Tunnel::all(&state.pool).await?;
@@ -39,14 +39,14 @@ impl CommandOutput for ListResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
-        let instance_names: HashMap<Id, String> = self
+    fn json(&self) -> Value {
+        let instance_names = self
             .instances
             .iter()
             .map(|i| (i.id, i.name.clone()))
-            .collect();
+            .collect::<HashMap<_, _>>();
 
-        let instances: Vec<InstanceEntry> = self
+        let instances = self
             .instances
             .iter()
             .map(|i| InstanceEntry {
@@ -54,9 +54,9 @@ impl CommandOutput for ListResult {
                 name: i.name.clone(),
                 url: i.url.clone(),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        let locations: Vec<LocationEntry> = self
+        let locations = self
             .locations
             .iter()
             .map(|l| LocationEntry {
@@ -69,9 +69,9 @@ impl CommandOutput for ListResult {
                 mfa_method: Some(mfa_label(l.mfa_method).to_string()),
                 route_all_traffic: Some(l.route_all_traffic),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        let tunnels: Vec<TunnelEntry> = self
+        let tunnels = self
             .tunnels
             .iter()
             .map(|t| TunnelEntry {
@@ -80,7 +80,7 @@ impl CommandOutput for ListResult {
                 address: t.address.clone(),
                 endpoint: t.endpoint.clone(),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         json!({
             "instances": instances,

@@ -35,7 +35,7 @@ pub struct MonitorInfo {
 
 impl WindowManager {
     pub fn get_monitors() -> Vec<MonitorInfo> {
-        let mut monitors: Vec<MonitorInfo> = Vec::new();
+        let mut monitors = Vec::new();
 
         unsafe extern "system" fn monitor_enum_proc(
             hmonitor: HMONITOR,

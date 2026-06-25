@@ -27,6 +27,7 @@ use futures_util::StreamExt;
 use reqwest::{StatusCode, Url};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
+use serde_json::Value;
 use tokio::{
     net::TcpStream,
     select,
@@ -166,7 +167,7 @@ pub async fn authorize(
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey.clone(),
+        pubkey: wireguard_keys.pubkey,
         method: method as i32,
         posture_data,
     };
@@ -189,7 +190,7 @@ pub async fn authorize(
         .await
         .map_err(|e| CliError::Other(format!("Invalid MFA start response: {e}")))?;
 
-    let token = start_resp.token.clone();
+    let token = start_resp.token;
     debug!("MFA session started, token obtained");
 
     // Step 2: Obtain the code.
@@ -334,7 +335,7 @@ const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
 /// Total time the CLI will wait for the user to complete OIDC authentication
 /// before giving up (shortened for tests).
 #[cfg(not(test))]
-const OIDC_POLL_TIMEOUT: Duration = Duration::from_secs(300);
+const OIDC_POLL_TIMEOUT: Duration = Duration::from_mins(5);
 #[cfg(test)]
 const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
 
@@ -370,7 +371,7 @@ pub(crate) async fn authorize_oidc(
     // Step 1: Start the OIDC MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey.clone(),
+        pubkey: wireguard_keys.pubkey,
         method: MfaMethod::Oidc as i32,
         posture_data,
     };
@@ -492,7 +493,7 @@ async fn poll_finish(
 
 /// How long the CLI waits for the user to approve MFA on their mobile device.
 #[cfg(not(test))]
-const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(120);
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -530,7 +531,7 @@ pub(crate) async fn authorize_mobile_approve(
     // Step 1: Start the MFA session.
     let start_req = ClientMfaStartRequest {
         location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey.clone(),
+        pubkey: wireguard_keys.pubkey,
         method: MfaMethod::MobileApprove as i32,
         posture_data,
     };
@@ -658,7 +659,7 @@ async fn wait_for_mfa_success(
         }
 
         let msg = select! {
-            _ = sleep(remaining) => {
+            () = sleep(remaining) => {
                 if !json_mode {
                     eprintln!("Mobile approval timed out.");
                 }
@@ -699,7 +700,7 @@ async fn wait_for_mfa_success(
 
         match msg {
             Message::Text(text) => {
-                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                if let Ok(parsed) = serde_json::from_str::<Value>(&text) {
                     if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
                         if let Some(key) = parsed["preshared_key"].as_str() {
                             return Ok(key.to_string());

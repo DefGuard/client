@@ -12,7 +12,6 @@ use std::time::Duration;
 use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
-#[cfg(not(target_os = "macos"))]
 use chrono::Utc;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]
@@ -20,11 +19,9 @@ pub use setup::{setup_interface, setup_interface_tunnel};
 #[cfg(target_os = "macos")]
 use tokio::time::sleep;
 
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::connection::ActiveConnection;
 use crate::{
     database::{
-        models::{location::Location, tunnel::Tunnel, Id},
+        models::{connection::ActiveConnection, location::Location, tunnel::Tunnel, Id},
         DbPool,
     },
     error::Error,
@@ -34,15 +31,15 @@ use crate::{
 const TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
 /// Identifies the type of connection target.
-pub enum ConnectionTarget<'a> {
-    Location(&'a Location<Id>),
-    Tunnel(&'a Tunnel<Id>),
+pub enum ConnectionTarget {
+    Location(Location<Id>),
+    Tunnel(Tunnel<Id>),
 }
 
 /// Bring a WireGuard interface up for the given target.
 #[cfg_attr(target_os = "macos", allow(unused_variables))]
 pub async fn bring_up(
-    target: ConnectionTarget<'_>,
+    target: ConnectionTarget,
     psk: Option<String>,
     mtu: Option<u32>,
     pool: &DbPool,
@@ -52,10 +49,12 @@ pub async fn bring_up(
     {
         match target {
             ConnectionTarget::Location(loc) => {
-                setup::setup_interface(loc, &loc.name, psk, mtu, pool, route_all_traffic).await
+                let name = loc.name.clone();
+                setup::setup_interface(loc, &name, psk, mtu, pool, route_all_traffic).await
             }
             ConnectionTarget::Tunnel(tun) => {
-                setup::setup_interface_tunnel(tun, &tun.name, mtu, route_all_traffic).await
+                let name = tun.name.clone();
+                setup::setup_interface_tunnel(tun, &name, mtu, route_all_traffic).await
             }
         }
     }
@@ -77,8 +76,6 @@ pub async fn bring_up(
 }
 
 /// Tear down a WireGuard interface identified by `ActiveConnectionInfo`.
-///
-/// On macOS this returns [`Error::BackendUnavailable`] - see [`bring_up`].
 //
 // FIXME: This constructs an `ActiveConnection` with `start: Utc::now()`,
 // which records a zero-duration connection when saved. This impacts the
@@ -86,25 +83,12 @@ pub async fn bring_up(
 // tracking should be refactored to carry the real start time from the
 // active-state record through to the history persistence path.
 pub async fn tear_down(conn: &ActiveConnectionInfo) -> Result<(), Error> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        let connection = ActiveConnection {
-            location_id: conn.target_id,
-            connection_type: conn.connection_type,
-            start: Utc::now().naive_utc(),
-            interface_name: conn.interface_name.clone(),
-        };
+    let connection = ActiveConnection {
+        location_id: conn.target_id,
+        connection_type: conn.connection_type,
+        start: Utc::now().naive_utc(),
+        interface_name: conn.interface_name.clone(),
+    };
 
-        disconnect_interface(&connection).await
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let _ = conn;
-        Err(Error::BackendUnavailable(
-            "VPN connection management is not yet supported on macOS from the CLI. \
-             Use the desktop client."
-                .into(),
-        ))
-    }
+    disconnect_interface(&connection).await
 }
