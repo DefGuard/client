@@ -154,11 +154,7 @@ mod tests {
             connections: Vec::new(),
         };
         let s = result.human();
-        if cfg!(target_os = "macos") {
-            assert!(s.contains("not yet supported on macOS"));
-        } else {
-            assert!(s.contains("No active connections"));
-        }
+        assert!(s.contains("No active connections"));
     }
 
     #[test]
