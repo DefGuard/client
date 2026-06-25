@@ -78,6 +78,20 @@ jobs:
         with:
           args: --target universal-apple-darwin
 
+      - name: Bundle Defguard CLI
+        env:
+          BUNDLE: "target/universal-apple-darwin/release/bundle/macos/Defguard.app"
+        run: |
+            cd src-tauri
+            ln -f client-cli/Info.plist ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/Info.plist
+            pushd ${BUNDLE}/Contents/Helpers
+            ln -f -s ../../../embedded.provisionprofile .
+            popd
+            codesign --verbose --force --options runtime \
+              --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
+              --prefix net.defguard. --entitlements Client.entitlements \
+              ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS/defguard-cli
+
       - name: Build installation package
         run: |
           security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
