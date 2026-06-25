@@ -1,4 +1,10 @@
 {
+  "build": {
+    "beforeBundleCommand": {
+      "cwd": ".",
+      "script": "powershell -ExecutionPolicy Bypass -File ./resources-windows/scripts/Sign-Binaries.ps1"
+    }
+  },
   "bundle": {
     "targets": ["msi"],
     "resources": [

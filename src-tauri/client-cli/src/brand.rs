@@ -3,7 +3,12 @@
 //! Shown when invoked with no arguments or with `--help`.
 //! Suppressed for `--version` (which must stay grep-friendly).
 //!
-//! Two assets:
+//! The logo is emitted on non-Windows platforms only. Its art uses
+//! fine-grained Unicode block glyphs (eighths/quadrant blocks) that many
+//! Windows console fonts can't render, so Windows shows just the
+//! copyright + version line.
+//!
+//! Two assets (non-Windows):
 //!   - assets/logo-color.ansi -- ANSI block-character art,
 //!     used when stdout is an interactive TTY
 //!   - assets/logo-mono.txt   -- plain ASCII fallback (no ANSI),
@@ -11,16 +16,20 @@
 //!
 //! Both assets are embedded at compile time via `include_str!`.
 
+#[cfg(not(windows))]
 use owo_colors::{OwoColorize, Stream};
 
+#[cfg(not(windows))]
 const LOGO_COLOR: &str = include_str!("../assets/logo-color.ansi");
+#[cfg(not(windows))]
 const LOGO_MONO: &str = include_str!("../assets/logo-mono.txt");
 
 const COPYRIGHT: &str = "Copyright (C) 2026 Defguard Sp. z o.o.";
 
-/// Print logo + copyright + project name/version to stdout. Picks
-/// the colored variant on an interactive TTY, the mono fallback
+/// Print logo + copyright + project name/version to stdout. Picks the
+/// colored logo variant on an interactive TTY and the mono fallback
 /// otherwise (so `defguard-cli --help | cat` stays clean ASCII).
+#[cfg(not(windows))]
 pub fn print_banner() {
     // owo-colors' supports-colors detection drives the choice: if
     // stdout supports color, emit the ANSI variant; otherwise mono.
@@ -38,13 +47,22 @@ pub fn print_banner() {
 
     let project = common::version_string("defguard-cli");
     if use_color {
-        let p = project.bright_yellow().bold().to_string();
-        let c = COPYRIGHT.dimmed().to_string();
-        println!("    {p}");
-        println!("    {c}");
+        println!("    {}", project.bright_yellow().bold());
+        println!("    {}", COPYRIGHT.dimmed());
     } else {
         println!("    {project}");
         println!("    {COPYRIGHT}");
     }
+    println!();
+}
+
+/// Print copyright + project name/version to stdout. The logo is skipped
+/// on Windows: its art relies on Unicode block glyphs that many Windows
+/// console fonts can't render, and the console may not interpret ANSI.
+#[cfg(windows)]
+pub fn print_banner() {
+    let project = common::version_string("defguard-cli");
+    println!("    {project}");
+    println!("    {COPYRIGHT}");
     println!();
 }
