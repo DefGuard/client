@@ -22,16 +22,24 @@ const COPYRIGHT: &str = "Copyright (C) 2026 Defguard Sp. z o.o.";
 /// the colored variant on an interactive TTY, the mono fallback
 /// otherwise (so `defguard-cli --help | cat` stays clean ASCII).
 pub fn print_banner() {
+    // On Windows, try to enable virtual-terminal processing so that
+    // ANSI escapes render correctly.
+    #[cfg(windows)]
+    let ansi_enabled = enable_ansi_support::enable_ansi_support().is_ok();
+    #[cfg(not(windows))]
+    let ansi_enabled = true;
+
     // owo-colors' supports-colors detection drives the choice: if
     // stdout supports color, emit the ANSI variant; otherwise mono.
     // We do not feed the logo through if_supports_color directly --
     // it carries its own ANSI escapes -- we just gate which string
     // we emit. NO_COLOR / CLICOLOR_FORCE propagate via the
     // supports_color() helper.
-    let use_color = "x"
-        .if_supports_color(Stream::Stdout, |s| s.red())
-        .to_string()
-        != "x";
+    let use_color = ansi_enabled
+        && "x"
+            .if_supports_color(Stream::Stdout, |s| s.red())
+            .to_string()
+            != "x";
 
     let logo = if use_color { LOGO_COLOR } else { LOGO_MONO };
     println!("{logo}");
