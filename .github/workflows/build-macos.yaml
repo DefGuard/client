@@ -83,6 +83,10 @@ jobs:
           BUNDLE: "target/universal-apple-darwin/release/bundle/macos/Defguard.app"
         run: |
             cd src-tauri
+            mkdir -p ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS
+            lipo -create -output ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS/defguard-cli \
+              target/aarch64-apple-darwin/release/defguard-cli \
+              target/x86_64-apple-darwin/release/defguard-cli
             ln -f client-cli/Info.plist ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/Info.plist
             pushd ${BUNDLE}/Contents/Helpers
             ln -f -s ../../../embedded.provisionprofile .
