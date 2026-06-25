@@ -225,12 +225,7 @@ fn main() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
                 if label == COMPACT_WINDOW_ID || label == FULL_VIEW_WINDOW_ID {
-                    #[cfg(not(target_os = "macos"))]
                     let _ = window.hide();
-
-                    #[cfg(target_os = "macos")]
-                    let _ = tauri::AppHandle::hide(window.app_handle());
-
                     api.prevent_close();
                 }
             }
