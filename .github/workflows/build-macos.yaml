@@ -79,26 +79,26 @@ jobs:
         with:
           args: --target universal-apple-darwin
 
-      - name: Bundle Defguard CLI
-        env:
-          BUNDLE: "target/universal-apple-darwin/release/bundle/macos/Defguard.app"
-        run: |
-          cd src-tauri
-          mkdir -p ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS
-          lipo -create -output ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS/defguard-cli \
-            target/aarch64-apple-darwin/release/defguard-cli \
-            target/x86_64-apple-darwin/release/defguard-cli
-          ln -f client-cli/Info.plist ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/Info.plist
-          pushd ${BUNDLE}/Contents/Helpers/defguard-cli/Contents
-          ln -f ../../../embedded.provisionprofile .
-          popd
-          codesign --verbose --force --options runtime \
-            --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
-            --prefix net.defguard. --entitlements Client.entitlements \
-            ${BUNDLE}/Contents/Helpers/defguard-cli
-          codesign --verbose --force --options runtime \
-            --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
-            --deep --entitlements Client.entitlements ${BUNDLE}
+      # - name: Bundle Defguard CLI
+      #   env:
+      #     BUNDLE: "target/universal-apple-darwin/release/bundle/macos/Defguard.app"
+      #   run: |
+      #     cd src-tauri
+      #     mkdir -p ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS
+      #     lipo -create -output ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS/defguard-cli \
+      #       target/aarch64-apple-darwin/release/defguard-cli \
+      #       target/x86_64-apple-darwin/release/defguard-cli
+      #     ln -f client-cli/Info.plist ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/Info.plist
+      #     pushd ${BUNDLE}/Contents/Helpers/defguard-cli/Contents
+      #     ln -f ../../../embedded.provisionprofile .
+      #     popd
+      #     codesign --verbose --force --options runtime \
+      #       --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
+      #       --prefix net.defguard. --entitlements Client.entitlements \
+      #       ${BUNDLE}/Contents/Helpers/defguard-cli
+      #     codesign --verbose --force --options runtime \
+      #       --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
+      #       --entitlements Client.entitlements ${BUNDLE}
 
       - name: Build installation package
         run: |
