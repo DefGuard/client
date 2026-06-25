@@ -155,8 +155,6 @@ pub async fn poll_instance(
         instance.name
     );
 
-    check_min_version(&response, instance, handle);
-
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
@@ -182,6 +180,17 @@ pub async fn poll_instance(
         }
         return Err(Error::CoreNotEnterprise);
     }
+
+    if !response.status().is_success() {
+        return Err(Error::InternalError(format!(
+            "Config polling failed for instance {}({}) with status {}",
+            instance.name,
+            instance.id,
+            response.status(),
+        )));
+    }
+
+    check_min_version(&response, instance, handle);
 
     // Parse the response
     debug!(
