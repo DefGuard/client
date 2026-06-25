@@ -22,15 +22,18 @@ if (-not $thumbprint) {
     throw 'Windows certificate thumbprint is not configured.'
 }
 
-$signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
-if (-not $signtool) {
-    $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
+# Resolve signtool to a plain path string. Get-Command returns a
+# CommandInfo (use .Source); the Windows Kits fallback returns a
+# FileInfo (use .FullName).
+$signtoolPath = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+if (-not $signtoolPath) {
+    $signtoolPath = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
         Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
         Sort-Object FullName -Descending |
-        Select-Object -First 1
+        Select-Object -First 1 -ExpandProperty FullName
 }
 
-if (-not $signtool) {
+if (-not $signtoolPath) {
     throw 'signtool.exe was not found.'
 }
 
@@ -45,7 +48,7 @@ foreach ($binary in $binaries) {
     }
 
     Write-Host "Signing $binary"
-    & $signtool.Source sign /sha1 $thumbprint /fd $digestAlgorithm /tr $timestampUrl /td $digestAlgorithm $binary
+    & $signtoolPath sign /sha1 $thumbprint /fd $digestAlgorithm /tr $timestampUrl /td $digestAlgorithm $binary
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to sign $binary"
     }
