@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="DefguardCliFragment" Guid="*">
+        <File KeyPath="yes" Id="DefguardCliFile" Source="..\..\defguard-cli.exe" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

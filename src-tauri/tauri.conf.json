@@ -27,9 +27,14 @@
         "dialogImagePath": "./resources-windows/msi/side_banner.png",
         "fragmentPaths": [
           "./resources-windows/fragments/service.wxs",
+          "./resources-windows/fragments/cli.wxs",
           "./resources-windows/fragments/provisioning.wxs"
         ],
-        "componentRefs": ["DefguardServiceFragment", "ProvisioningScriptFragment"],
+        "componentRefs": [
+          "DefguardServiceFragment",
+          "DefguardCliFragment",
+          "ProvisioningScriptFragment"
+        ],
         "template": "./resources-windows/msi/main.wxs"
       }
     },
