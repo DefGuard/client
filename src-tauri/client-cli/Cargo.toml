@@ -36,9 +36,6 @@ image.workspace = true
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
 
-[target.'cfg(windows)'.dependencies]
-enable-ansi-support = "0.3.1"
-
 # Dummy feature to let tauri build the release.
 [features]
 custom-protocol = []
