@@ -8,7 +8,7 @@ use defguard_core::{
     ConnectionType,
 };
 use secrecy::ExposeSecret;
-use serde_json::json;
+use serde_json::{json, Value};
 use tracing::info;
 
 use crate::{
@@ -20,7 +20,6 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
 pub async fn handle(
     state: &State,
     name: Option<&str>,
@@ -35,15 +34,6 @@ pub async fn handle(
     predefined_traffic: bool,
     json: bool,
 ) -> Result<ConnectResult, CliError> {
-    #[cfg(target_os = "macos")]
-    {
-        return Err(CliError::Other(
-            "VPN connection management is not yet supported on macOS from the CLI. \
-             Use the desktop client."
-                .into(),
-        ));
-    }
-
     // Per-call routing override: --all-traffic = true, --predefined-traffic = false,
     // neither = None (use the location/tunnel default).
     let routing_override: Option<bool> = if all_traffic {
@@ -178,11 +168,34 @@ pub async fn handle(
     };
 
     info!("Connecting to {target_name}...");
-    let conn_target = match &target {
+    let conn_target = match target {
         ResolvedTarget::Location(loc) => ConnectionTarget::Location(loc),
         ResolvedTarget::Tunnel(tun) => ConnectionTarget::Tunnel(tun),
     };
+
+    #[cfg(not(target_os = "macos"))]
     bring_up(conn_target, psk, mtu, &state.pool, routing_override).await?;
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::sync::{atomic::AtomicBool, Arc};
+
+        use defguard_core::connection::apple::spawn_runloop_and_wait_for;
+
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+        let pool = state.pool.clone();
+        let handle = tokio::spawn(async move {
+            use std::sync::atomic::Ordering;
+
+            let result = bring_up(conn_target, psk, mtu, &pool, routing_override).await;
+            semaphore_clone.store(true, Ordering::Release);
+
+            result
+        });
+        spawn_runloop_and_wait_for(&semaphore);
+        let _ = handle.await.unwrap()?;
+    }
 
     Ok(ConnectResult::Connected { name: target_name })
 }
@@ -204,7 +217,7 @@ impl CommandOutput for ConnectResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         match self {
             ConnectResult::Connected { name } => json!({
                 "connected": name,

@@ -29,7 +29,7 @@ use crate::{
 
 #[cfg(not(target_os = "macos"))]
 pub async fn setup_interface(
-    location: &Location<Id>,
+    location: Location<Id>,
     name: &str,
     preshared_key: Option<String>,
     mtu: Option<u32>,
@@ -93,7 +93,7 @@ pub async fn setup_interface(
 }
 
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     name: &str,
     mtu: Option<u32>,
     route_all_traffic: Option<bool>,

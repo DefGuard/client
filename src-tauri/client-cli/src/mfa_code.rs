@@ -126,6 +126,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "`echo -n` is not portable"]
     fn test_command_produces_stdout() {
         let source = CodeSource::Command("echo -n 654321".into());
         let secret = obtain_code(&source, &ctx()).unwrap();
@@ -149,6 +150,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "`echo -n` is not portable"]
     fn test_command_receives_env_vars() {
         // Print the env vars to stdout so we can assert they're set.
         let source = CodeSource::Command("echo -n $DG_INSTANCE/$DG_LOCATION".into());

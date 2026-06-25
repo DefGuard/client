@@ -1,8 +1,8 @@
-#[cfg(not(target_os = "macos"))]
-use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
-use std::{env, path::Path, process::Command};
+use std::{env, process::Command};
+#[cfg(not(target_os = "macos"))]
+use std::{path::Path, str::FromStr};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -156,7 +156,11 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                     }
                 };
 
-                let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
+                let peers = interface_data
+                    .peers
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<_>>();
                 for peer in peers {
                     if connection_type.eq(&ConnectionType::Location) {
                         let location_stats = match peer_to_location_stats(
@@ -263,6 +267,7 @@ pub fn load_log_targets() -> Vec<String> {
 }
 
 /// Helper function to get log file directory for `defguard-service` daemon.
+#[cfg(not(target_os = "macos"))]
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
     #[cfg(windows)]
@@ -277,7 +282,7 @@ pub fn get_service_log_dir() -> &'static Path {
 /// Setup client interface
 #[cfg(not(target_os = "macos"))]
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     name: &str,
     mtu: Option<u32>,
 ) -> Result<String, Error> {
@@ -432,7 +437,7 @@ pub async fn setup_interface_tunnel(
 
 #[cfg(target_os = "macos")]
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     _name: &str,
     mtu: Option<u32>,
 ) -> Result<String, Error> {
@@ -581,7 +586,7 @@ pub async fn get_location_interface_details(
 
 /// Setup new connection for location
 pub(crate) async fn handle_connection_for_location(
-    location: &Location<Id>,
+    location: Location<Id>,
     preshared_key: Option<String>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
@@ -593,7 +598,7 @@ pub(crate) async fn handle_connection_for_location(
         .expect("failed to lock app state")
         .mtu();
     let interface_name = bring_up(
-        ConnectionTarget::Location(location),
+        ConnectionTarget::Location(location.clone()),
         preshared_key,
         mtu,
         &DB_POOL,
@@ -627,10 +632,13 @@ pub(crate) async fn handle_connection_for_location(
 
 /// Setup new connection for tunnel
 pub(crate) async fn handle_connection_for_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
-    debug!("Setting up the connection for tunnel: {}", tunnel.name);
+    let tunnel_id = tunnel.id;
+    let tunnel_name = tunnel.name.clone();
+    let tunnel_preshared_key = tunnel.preshared_key.clone();
+    debug!("Setting up the connection for tunnel: {tunnel_name}");
     let state = handle.state::<AppState>();
     let mtu = state
         .app_config
@@ -639,14 +647,14 @@ pub(crate) async fn handle_connection_for_tunnel(
         .mtu();
     let interface_name = bring_up(
         ConnectionTarget::Tunnel(tunnel),
-        tunnel.preshared_key.clone(),
+        tunnel_preshared_key,
         mtu,
         &DB_POOL,
         None,
     )
     .await?;
     state
-        .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
+        .add_connection(tunnel_id, &interface_name, ConnectionType::Tunnel)
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
@@ -656,17 +664,17 @@ pub(crate) async fn handle_connection_for_tunnel(
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
-    debug!("Spawning log watcher for tunnel {}", tunnel.name);
+    debug!("Spawning log watcher for tunnel {tunnel_name}");
     spawn_log_watcher_task(
         handle,
-        tunnel.id,
+        tunnel_id,
         interface_name,
         ConnectionType::Tunnel,
         Level::DEBUG,
         None,
     )
     .await?;
-    debug!("Log watcher for tunnel {} spawned", tunnel.name);
+    debug!("Log watcher for tunnel {tunnel_name} spawned");
     Ok(())
 }
 
@@ -858,13 +866,4 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Active connections synchronized with the system state");
 
     Ok(())
-}
-
-#[must_use]
-/// Utility function to get all tunnels and locations from the database.
-#[cfg(target_os = "macos")]
-pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
-    let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
-    let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
-    (tunnels, locations)
 }

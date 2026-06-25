@@ -30,14 +30,14 @@ use crate::database::{
     DB_POOL,
 };
 
-const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
-const LOCATION_ID: &str = "locationId";
-const TUNNEL_ID: &str = "tunnelId";
+pub const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
+pub const LOCATION_ID: &str = "locationId";
+pub const TUNNEL_ID: &str = "tunnelId";
 
 type ObserverSender = Mutex<Sender<(&'static str, Id)>>;
 type ObserverReceiver = Mutex<Option<Receiver<(&'static str, Id)>>>;
 
-static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::new(|| {
+pub static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::new(|| {
     let (tx, rx) = mpsc::channel();
     (Mutex::new(tx), Mutex::new(Some(rx)))
 });
@@ -45,10 +45,11 @@ static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLock::
 type VpnStateSender = Mutex<Sender<()>>;
 type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
 
-static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> = LazyLock::new(|| {
-    let (tx, rx) = mpsc::channel();
-    (Mutex::new(tx), Mutex::new(Some(rx)))
-});
+pub static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> =
+    LazyLock::new(|| {
+        let (tx, rx) = mpsc::channel();
+        (Mutex::new(tx), Mutex::new(Some(rx)))
+    });
 
 /// Thread responsible for observing VPN status changes.
 /// This is intentionally a blocking function, as it uses the Objective-C objects which are not
@@ -230,7 +231,11 @@ fn id_from_manager(manager: &NETunnelProviderManager, key: &NSString) -> Option<
 
 /// Try to find [`NETunnelProviderManager`] in system settings that matches key and value.
 /// Key is usually `locationId` or `tunnelId`.
-fn manager_for_key_and_value(key: &str, value: Id) -> Option<Retained<NETunnelProviderManager>> {
+#[must_use]
+pub fn manager_for_key_and_value(
+    key: &str,
+    value: Id,
+) -> Option<Retained<NETunnelProviderManager>> {
     let key_string = NSString::from_str(key);
     let (tx, rx) = channel();
 

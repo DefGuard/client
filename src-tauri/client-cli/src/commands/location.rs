@@ -5,7 +5,7 @@ use defguard_core::database::models::{
     location::{Location, LocationMfaMethod},
     Id,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     output::{CommandOutput, LocationEntry},
@@ -17,14 +17,14 @@ const MIN_NAME_COL_WIDTH: usize = 8;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_INST_COL_WIDTH: usize = 8;
 
-pub async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
+pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
 
-    let instance_names: HashMap<Id, String> = Instance::all(&state.pool)
+    let instance_names = Instance::all(&state.pool)
         .await?
         .into_iter()
         .map(|inst| (inst.id, inst.name))
-        .collect();
+        .collect::<HashMap<_, _>>();
 
     Ok(LocationListResult {
         locations,
@@ -50,7 +50,7 @@ pub async fn handle_set(
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
     let location_id = match &target {
         ResolvedTarget::Location(loc) => loc.id,
-        _ => {
+        ResolvedTarget::Tunnel(_) => {
             return Err(CliError::NotFound(format!("Location '{name}' not found")));
         }
     };
@@ -122,11 +122,7 @@ fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
 
 pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
     match method {
-        Some(LocationMfaMethod::Totp) => "totp",
-        Some(LocationMfaMethod::Email) => "email",
-        Some(LocationMfaMethod::Oidc) => "oidc",
-        Some(LocationMfaMethod::Biometric) => "biometric",
-        Some(LocationMfaMethod::MobileApprove) => "mobile",
+        Some(method) => method.as_str(),
         None => "none",
     }
 }
@@ -145,8 +141,8 @@ impl CommandOutput for LocationListResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
-        let locations: Vec<LocationEntry> = self
+    fn json(&self) -> Value {
+        let locations = self
             .locations
             .iter()
             .map(|l| LocationEntry {
@@ -159,7 +155,7 @@ impl CommandOutput for LocationListResult {
                 mfa_method: Some(mfa_label(l.mfa_method).to_string()),
                 route_all_traffic: Some(l.route_all_traffic),
             })
-            .collect();
+            .collect::<Vec<_>>();
         json!({ "locations": locations })
     }
 }
@@ -182,7 +178,11 @@ fn format_location_list_table(
         .max(MIN_ENDPOINT_COL_WIDTH);
     let inst_col_width = locations
         .iter()
-        .filter_map(|l| instance_names.get(&l.instance_id).map(|n| n.len()))
+        .filter_map(|l| {
+            instance_names
+                .get(&l.instance_id)
+                .map(std::string::String::len)
+        })
         .max()
         .unwrap_or(MIN_INST_COL_WIDTH)
         .max(MIN_INST_COL_WIDTH);
@@ -242,7 +242,7 @@ impl CommandOutput for LocationShowResult {
         lines.join("\n")
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         let mut json = json!({
             "name": self.name,
             "address": self.address,
@@ -278,7 +278,7 @@ impl CommandOutput for LocationSetResult {
         }
     }
 
-    fn json(&self) -> serde_json::Value {
+    fn json(&self) -> Value {
         json!({
             "location": self.name,
             "changes": self.changes,

@@ -8,7 +8,10 @@
     "active": true,
     "category": "Utility",
     "copyright": "Defguard",
-    "targets": ["deb", "app"],
+    "targets": [
+      "deb",
+      "app"
+    ],
     "externalBin": [],
     "icon": [
       "icons/32x32.png",
@@ -18,7 +21,7 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "certificateThumbprint": "9d3df627dbf037f1553582ce9a806d09c9b78654",
+      "certificateThumbprint": "c79305cdcb7e5832dd161d18580d6a846bd0506b",
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://time.certum.pl/",
       "wix": {
@@ -29,7 +32,10 @@
           "./resources-windows/fragments/service.wxs",
           "./resources-windows/fragments/provisioning.wxs"
         ],
-        "componentRefs": ["DefguardServiceFragment", "ProvisioningScriptFragment"],
+        "componentRefs": [
+          "DefguardServiceFragment",
+          "ProvisioningScriptFragment"
+        ],
         "template": "./resources-windows/msi/main.wxs"
       }
     },
@@ -38,11 +44,14 @@
       "entitlements": "./Client.entitlements",
       "files": {
         "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
+        "Helpers/defguard-cli/Contents/MacOS/defguard-cli": "target/release/defguard-cli",
         "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
       },
       "minimumSystemVersion": "13.5"
     },
-    "resources": ["resources/icons/tray/*"],
+    "resources": [
+      "resources/icons/tray/*"
+    ],
     "shortDescription": "Defguard desktop client",
     "longDescription": "Defguard desktop client",
     "linux": {
@@ -57,7 +66,9 @@
           "../control/prerm": "../resources-linux/prerm",
           "../control/postrm": "../resources-linux/postrm"
         },
-        "depends": ["desktop-file-utils"]
+        "depends": [
+          "desktop-file-utils"
+        ]
       },
       "rpm": {
         "files": {
@@ -66,7 +77,9 @@
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
         },
-        "depends": ["desktop-file-utils"],
+        "depends": [
+          "desktop-file-utils"
+        ],
         "postInstallScript": "../resources-linux/postinst",
         "preRemoveScript": "../resources-linux/prerm",
         "postRemoveScript": "../resources-linux/postrm"
@@ -79,7 +92,9 @@
   "version": "2.1.0",
   "app": {
     "security": {
-      "capabilities": ["main-capability"],
+      "capabilities": [
+        "main-capability"
+      ],
       "csp": null
     },
     "windows": []
@@ -87,7 +102,9 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["defguard"]
+        "schemes": [
+          "defguard"
+        ]
       }
     }
   }

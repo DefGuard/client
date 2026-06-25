@@ -1,25 +1,15 @@
 use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{
     output::{ActiveEntry, CommandOutput},
     state::{CliError, State},
 };
 
-#[cfg_attr(target_os = "macos", allow(dead_code))]
 const MIN_NAME_COL_WIDTH: usize = 4;
-#[cfg_attr(target_os = "macos", allow(dead_code))]
 const MIN_IFACE_COL_WIDTH: usize = 9;
 
-#[cfg_attr(target_os = "macos", allow(unused_variables, unreachable_code))]
-pub async fn handle(state: &State) -> Result<StatusResult, CliError> {
-    #[cfg(target_os = "macos")]
-    {
-        return Ok(StatusResult {
-            connections: Vec::new(),
-        });
-    }
-
+pub(crate) async fn handle(state: &State) -> Result<StatusResult, CliError> {
     let connections = active_state(&state.pool).await?;
     Ok(StatusResult { connections })
 }
@@ -30,24 +20,15 @@ pub struct StatusResult {
 
 impl CommandOutput for StatusResult {
     fn human(&self) -> String {
-        #[cfg(target_os = "macos")]
-        {
-            "Connection status is not yet supported on macOS from the CLI. \
-                    Use the desktop client."
-                .to_string()
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            if self.connections.is_empty() {
-                "No active connections.".to_string()
-            } else {
-                format_status_table(&self.connections)
-            }
+        if self.connections.is_empty() {
+            "No active connections.".to_string()
+        } else {
+            format_status_table(&self.connections)
         }
     }
 
-    fn json(&self) -> serde_json::Value {
-        let active: Vec<ActiveEntry> = self
+    fn json(&self) -> Value {
+        let active = self
             .connections
             .iter()
             .map(|c| ActiveEntry {
@@ -59,13 +40,12 @@ impl CommandOutput for StatusResult {
                 rx_bytes: c.stats.as_ref().map(|s| s.rx_bytes),
                 last_handshake_secs: c.stats.as_ref().and_then(|s| s.last_handshake),
             })
-            .collect();
+            .collect::<Vec<_>>();
         json!({ "active": active })
     }
 }
 
 /// Build a human-readable status table string.
-#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
     let name_col_width = connections
         .iter()
@@ -104,18 +84,13 @@ fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
 
         lines.push(format!(
             "  {:<name_col_width$}  {:<10}  {:<iface_col_width$}  {:<10}  {:<10}  {handshake:<9}",
-            connection.name,
-            connection.connection_type.to_string(),
-            connection.interface_name,
-            tx,
-            rx
+            connection.name, connection.connection_type, connection.interface_name, tx, rx
         ));
     }
 
     lines.join("\n")
 }
 
-#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
@@ -131,7 +106,6 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
-#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn format_handshake(secs: u64) -> String {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -180,11 +154,7 @@ mod tests {
             connections: Vec::new(),
         };
         let s = result.human();
-        if cfg!(target_os = "macos") {
-            assert!(s.contains("not yet supported on macOS"));
-        } else {
-            assert!(s.contains("No active connections"));
-        }
+        assert!(s.contains("No active connections"));
     }
 
     #[test]

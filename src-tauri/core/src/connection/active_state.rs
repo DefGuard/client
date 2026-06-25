@@ -3,17 +3,28 @@
 //! The daemon (Linux/Windows) and Network Extension managers (macOS) are the shared
 //! source of truth for interface state.
 
+#[cfg(target_os = "macos")]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
 #[cfg(not(target_os = "macos"))]
 use base64::Engine as _;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{InterfaceData, Peer};
+#[cfg(target_os = "macos")]
+use objc2_network_extension::NEVPNStatus;
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
 
+#[cfg(target_os = "macos")]
+use crate::database::models::get_all_tunnels_locations;
 #[cfg(not(target_os = "macos"))]
-use crate::connection::daemon_client::DAEMON_CLIENT;
-#[cfg(not(target_os = "macos"))]
-use crate::database::models::{location::Location, tunnel::Tunnel};
+use crate::{
+    connection::daemon_client::DAEMON_CLIENT,
+    database::models::{location::Location, tunnel::Tunnel},
+};
 use crate::{
     database::{models::Id, DbPool},
     error::Error,
@@ -52,23 +63,52 @@ pub struct InterfaceStats {
 /// drops peers that haven't completed a handshake or whose stats haven't changed).
 ///
 /// On macOS the Network Extension path is stubbed (pending the NE spike).
-pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        active_state_daemon(pool).await
-    }
+#[cfg(target_os = "macos")]
+pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
+    let (tunnels, locations) = get_all_tunnels_locations().await;
+    let semaphore = Arc::new(AtomicBool::new(false));
+    let semaphore_clone = Arc::clone(&semaphore);
 
-    #[cfg(target_os = "macos")]
-    {
-        warn!("active_state: macOS Network Extension enumeration not yet implemented; returning empty list");
-        // Stub: NE-based enumeration pending the macOS spike.
-        let _ = pool;
-        Ok(Vec::new())
-    }
+    let handle = tokio::spawn(async move {
+        let mut result = Vec::new();
+        for location in locations {
+            if let Some(NEVPNStatus::Connected) = location.status() {
+                let info = ActiveConnectionInfo {
+                    connection_type: ConnectionType::Location,
+                    target_id: location.id,
+                    name: location.name,
+                    interface_name: String::new(),
+                    stats: None, // TODO
+                };
+                result.push(info);
+            }
+        }
+
+        for tunnel in tunnels {
+            if let Some(NEVPNStatus::Connected) = tunnel.status() {
+                let info = ActiveConnectionInfo {
+                    connection_type: ConnectionType::Tunnel,
+                    target_id: tunnel.id,
+                    name: tunnel.name,
+                    interface_name: String::new(),
+                    stats: None, // TODO
+                };
+                result.push(info);
+            }
+        }
+
+        semaphore_clone.store(true, Ordering::Release);
+
+        result
+    });
+    super::apple::spawn_runloop_and_wait_for(&semaphore);
+    let result = handle.await.unwrap_or_default();
+
+    Ok(result)
 }
 
 #[cfg(not(target_os = "macos"))]
-async fn active_state_daemon(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
+pub async fn active_state(pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
     let request = tonic::Request::new(());
     let response = DAEMON_CLIENT
         .clone()
