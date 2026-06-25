@@ -95,7 +95,7 @@ jobs:
           codesign --verbose --force --options runtime \
             --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
             --prefix net.defguard. --entitlements Client.entitlements \
-            ${BUNDLE}/Contents/Helpers/defguard-cli/Contents/MacOS/defguard-cli
+            ${BUNDLE}/Contents/Helpers/defguard-cli
           codesign --verbose --force --options runtime \
             --sign "${{ env.APPLE_SIGNING_IDENTITY }}" \
             --deep --entitlements Client.entitlements ${BUNDLE}
