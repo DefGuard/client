@@ -10,11 +10,11 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     app_config::AppConfig,
     database::models::{connection::ActiveConnection, Id},
-    enterprise::provisioning::ProvisioningConfig,
     session_state::SessionState,
     utils::stats_handler,
     ConnectionType,
 };
+use defguard_client_provisioning::ProvisioningConfig;
 
 pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,

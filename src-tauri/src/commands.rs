@@ -8,6 +8,7 @@ use defguard_client_core::connection::{
     active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
     disconnect_interface,
 };
+use defguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
@@ -15,6 +16,8 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
 };
+use defguard_client_provisioning::ProvisioningConfig;
+use defguard_client_service_locations::to_service_location;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -38,12 +41,6 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::{
-        self,
-        periodic::config::{do_update_instance, poll_instance_with_events},
-        posture::authorize_posture_session,
-        provisioning::ProvisioningConfig,
-    },
     error::Error,
     events::EventKey,
     into_location,
@@ -51,6 +48,7 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
+    periodic::config::{do_update_instance, poll_instance_with_events},
     proxy::construct_platform_header,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
@@ -441,9 +439,7 @@ async fn push_service_locations(
                 "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
                 saved_location.name, saved_location.id, instance.name, instance.id,
             );
-            service_locations.push(crate::enterprise::service_locations::to_service_location(
-                saved_location,
-            )?);
+            service_locations.push(to_service_location(saved_location)?);
         }
     }
 
@@ -1291,7 +1287,7 @@ pub fn get_platform_header() -> String {
 #[tauri::command(async)]
 pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     debug!("Received a command to prepare posture report");
-    enterprise::posture::get_posture_data().await
+    defguard_client_posture::get_posture_data().await
 }
 
 #[derive(Debug, Serialize)]

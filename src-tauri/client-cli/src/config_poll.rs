@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use defguard_client_config_sync::{poll_instance, PollInstanceResult};
+use defguard_client_config_sync::{poll_instances, PollInstanceResult};
 use defguard_core::{
     connection::active_state::active_state,
-    database::models::{instance::Instance, location::Location, Id},
+    database::models::{location::Location, Id},
     error::Error,
     ConnectionType,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::state::State;
 
@@ -20,47 +20,42 @@ pub async fn poll_config(state: &State) {
         }
     };
 
-    let mut transaction = match state.pool.begin().await {
-        Ok(transaction) => transaction,
+    let outcomes = match poll_instances(&state.pool, &active_instance_ids).await {
+        Ok(outcomes) => outcomes,
         Err(err) => {
-            debug!("Skipping configuration polling, failed to begin database transaction: {err}");
+            debug!("Skipping configuration polling: {err}");
             return;
         }
     };
 
-    let mut instances = match Instance::all_with_token(&mut *transaction).await {
-        Ok(instances) => instances,
-        Err(err) => {
-            debug!("Skipping configuration polling, failed to load instances: {err}");
-            let _ = transaction.rollback().await;
-            return;
-        }
-    };
-
-    for instance in &mut instances {
-        let has_active_connections = active_instance_ids.contains(&instance.id);
-        match poll_instance(&mut transaction, instance, has_active_connections).await {
+    for outcome in outcomes {
+        match outcome.result {
             Ok(PollInstanceResult::ChangedWhileActive { .. }) => {
                 eprintln!(
                     "Instance {} configuration changed, disconnect to apply changes",
-                    instance.name
+                    outcome.instance_name
                 );
             }
             Ok(PollInstanceResult::Updated { .. } | PollInstanceResult::Unchanged { .. }) => {}
             Err(Error::CoreNotEnterprise) => {
-                debug!("Instance {instance} is not enterprise, skipping configuration polling");
+                debug!(
+                    "Instance {} is not enterprise, skipping configuration polling",
+                    outcome.instance_name
+                );
             }
             Err(Error::NoToken) => {
-                debug!("Instance {instance} has no polling token, skipping configuration polling");
+                debug!(
+                    "Instance {} has no polling token, skipping configuration polling",
+                    outcome.instance_name
+                );
             }
             Err(err) => {
-                debug!("Failed to poll configuration for instance {instance}: {err}");
+                debug!(
+                    "Failed to poll configuration for instance {}: {err}",
+                    outcome.instance_name
+                );
             }
         }
-    }
-
-    if let Err(err) = transaction.commit().await {
-        warn!("Failed to commit configuration polling transaction: {err}");
     }
 }
 

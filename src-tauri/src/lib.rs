@@ -5,10 +5,10 @@
 pub mod apple;
 pub mod appstate;
 pub mod commands;
-pub mod enterprise;
 pub mod events;
 pub mod log_watcher;
 pub mod periodic;
+pub mod provisioning;
 pub mod service;
 pub mod session_state;
 pub mod tray;

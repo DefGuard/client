@@ -1,9 +1,9 @@
 use defguard_client_core::database::{models::instance::Instance, DB_POOL};
-pub use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
+use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
 use tauri::{AppHandle, Manager};
 
 /// Checks if the client has already been initialized
-/// and tries to load provisioning config from file if necessary
+/// and tries to load provisioning config from file if necessary.
 pub async fn handle_client_initialization(app_handle: &AppHandle) -> Option<ProvisioningConfig> {
     match Instance::all(&*DB_POOL).await {
         Ok(instances) => {

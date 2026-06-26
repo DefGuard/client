@@ -1,12 +1,15 @@
 #[macro_use]
 extern crate log;
 
-use std::{cmp::Ordering, str::FromStr};
+use std::{cmp::Ordering, collections::HashSet, str::FromStr};
 
 pub mod commands;
 
 use defguard_client_core::{
-    database::models::{instance::Instance, Id},
+    database::{
+        models::{instance::Instance, Id},
+        DbPool,
+    },
     error::Error,
     proxy::post_with_headers,
     version::{MIN_CORE_VERSION, MIN_PROXY_VERSION},
@@ -45,6 +48,14 @@ pub enum PollInstanceResult {
     ChangedWhileActive {
         version_mismatch: Option<VersionMismatchPayload>,
     },
+}
+
+/// Outcome of polling a single instance in a batch.
+#[derive(Debug)]
+pub struct PollInstanceOutcome {
+    pub instance_id: Id,
+    pub instance_name: String,
+    pub result: Result<PollInstanceResult, Error>,
 }
 
 /// Payload emitted when a version mismatch is detected.
@@ -193,6 +204,32 @@ pub async fn poll_instance(
         locations_changed,
         version_mismatch,
     })
+}
+
+/// Polls all instances that have a polling token and commits any safe configuration updates.
+///
+/// The caller owns active-connection detection and all user-facing side effects.
+pub async fn poll_instances(
+    pool: &DbPool,
+    active_instance_ids: &HashSet<Id>,
+) -> Result<Vec<PollInstanceOutcome>, Error> {
+    let mut transaction = pool.begin().await?;
+    let mut instances = Instance::all_with_token(&mut *transaction).await?;
+    let mut outcomes = Vec::with_capacity(instances.len());
+
+    for instance in &mut instances {
+        let has_active_connections = active_instance_ids.contains(&instance.id);
+        let instance_id = instance.id;
+        let result = poll_instance(&mut transaction, instance, has_active_connections).await;
+        outcomes.push(PollInstanceOutcome {
+            instance_id,
+            instance_name: instance.name.clone(),
+            result,
+        });
+    }
+
+    transaction.commit().await?;
+    Ok(outcomes)
 }
 
 /// Checks if config has changed compared to what's in the database.
