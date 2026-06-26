@@ -53,7 +53,7 @@ pub async fn poll_config(handle: AppHandle) {
             }
         };
 
-        let outcomes = match poll_instances(&*DB_POOL, &active_instance_ids).await {
+        let outcomes = match poll_instances(&DB_POOL, &active_instance_ids).await {
             Ok(outcomes) => outcomes,
             Err(err) => {
                 error!(
