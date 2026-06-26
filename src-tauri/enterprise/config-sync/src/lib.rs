@@ -17,7 +17,7 @@ use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 
-use crate::commands::disable_enterprise_features;
+use crate::commands::{disable_enterprise_features, do_update_instance};
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -30,6 +30,21 @@ const PROXY_VERSION_HEADER: &str = "defguard-component-version";
 pub struct FetchedConfig {
     pub response: InstanceInfoResponse,
     pub version_mismatch: Option<VersionMismatchPayload>,
+}
+
+/// Result of polling a single instance once.
+#[derive(Debug)]
+pub enum PollInstanceResult {
+    Unchanged {
+        version_mismatch: Option<VersionMismatchPayload>,
+    },
+    Updated {
+        locations_changed: bool,
+        version_mismatch: Option<VersionMismatchPayload>,
+    },
+    ChangedWhileActive {
+        version_mismatch: Option<VersionMismatchPayload>,
+    },
 }
 
 /// Payload emitted when a version mismatch is detected.
@@ -126,6 +141,56 @@ pub async fn fetch_instance_config(
 
     Ok(FetchedConfig {
         response,
+        version_mismatch,
+    })
+}
+
+/// Polls one instance once and applies changed configuration only when safe.
+///
+/// The caller owns scheduling, active-connection detection, and user-facing notifications.
+pub async fn poll_instance(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &mut Instance<Id>,
+    has_active_connections: bool,
+) -> Result<PollInstanceResult, Error> {
+    let fetched = fetch_instance_config(transaction, instance).await?;
+    let version_mismatch = fetched.version_mismatch;
+
+    let device_config =
+        fetched.response.device_config.as_ref().ok_or_else(|| {
+            Error::InternalError("Device config not present in response".to_string())
+        })?;
+
+    if !config_changed(transaction, instance, device_config).await? {
+        debug!(
+            "Config for instance {}({}) didn't change",
+            instance.name, instance.id
+        );
+        return Ok(PollInstanceResult::Unchanged { version_mismatch });
+    }
+
+    debug!(
+        "Config for instance {}({}) changed",
+        instance.name, instance.id
+    );
+
+    if has_active_connections {
+        return Ok(PollInstanceResult::ChangedWhileActive { version_mismatch });
+    }
+
+    debug!(
+        "Updating instance {}({}) configuration: {device_config:?}",
+        instance.name, instance.id,
+    );
+    let locations_changed =
+        do_update_instance(transaction, instance, device_config.clone()).await?;
+    info!(
+        "Updated instance {}({}) configuration based on core's response",
+        instance.name, instance.id
+    );
+
+    Ok(PollInstanceResult::Updated {
+        locations_changed,
         version_mismatch,
     })
 }

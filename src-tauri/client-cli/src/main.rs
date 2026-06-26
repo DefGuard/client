@@ -6,6 +6,7 @@ use common::check_version_flag;
 mod brand;
 mod cli;
 mod commands;
+mod config_poll;
 mod exit;
 mod logging;
 mod mfa;
@@ -50,6 +51,8 @@ async fn main() -> ExitCode {
             return ExitCode::from(code);
         }
     };
+
+    config_poll::poll_config(&state).await;
 
     // Dispatch command.
     match cli.command {

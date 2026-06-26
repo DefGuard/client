@@ -17,6 +17,7 @@ owo-colors = { version = "4", features = ["supports-colors"] }
 
 common = { package = "defguard-client-common", path = "../common" }
 defguard_core = { package = "defguard-client-core", path = "../core" }
+defguard_client_config_sync = { package = "defguard-client-config-sync", path = "../enterprise/config-sync" }
 defguard_client_posture = { package = "defguard-client-posture", path = "../enterprise/posture" }
 defguard_client_proto = { package = "defguard-client-proto", path = "../client-proto" }
 base64.workspace = true

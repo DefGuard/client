@@ -7,7 +7,7 @@ use std::{
 pub use defguard_client_config_sync::commands::{
     disable_enterprise_features, do_update_instance, locations_changed,
 };
-use defguard_client_config_sync::{config_changed, fetch_instance_config};
+use defguard_client_config_sync::{poll_instance, PollInstanceResult};
 use defguard_client_core::{
     connection::active_connections::active_connections,
     database::{
@@ -62,7 +62,9 @@ pub async fn poll_config(handle: AppHandle) {
         let mut config_retrieved = 0;
         for instance in &mut instances {
             if instance.token.is_some() {
-                if let Err(err) = poll_instance(&mut transaction, instance, &handle).await {
+                if let Err(err) =
+                    poll_instance_with_events(&mut transaction, instance, &handle).await
+                {
                     match err {
                         Error::CoreNotEnterprise => {
                             debug!(
@@ -119,18 +121,27 @@ pub async fn poll_config(handle: AppHandle) {
 /// Retrieves configuration for a given [`Instance`].
 /// Updates the instance if there aren't any active connections, otherwise emits
 /// a ConfigChanged event so the frontend can prompt the user to reconnect.
-pub async fn poll_instance(
+pub async fn poll_instance_with_events(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
-    let fetched = fetch_instance_config(transaction, instance).await?;
+    let has_active_connections = !active_connections(instance).await?.is_empty();
+    let result = poll_instance(transaction, instance, has_active_connections).await?;
+
+    let version_mismatch = match &result {
+        PollInstanceResult::Unchanged { version_mismatch }
+        | PollInstanceResult::Updated {
+            version_mismatch, ..
+        }
+        | PollInstanceResult::ChangedWhileActive { version_mismatch } => version_mismatch,
+    };
 
     // Emit version-mismatch event if applicable and not already notified
-    if let Some(payload) = fetched.version_mismatch {
+    if let Some(payload) = version_mismatch {
         let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
         if notified_instances.insert(instance.id) {
-            if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload) {
+            if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload.clone()) {
                 error!("Failed to emit version mismatch event to the frontend: {err}");
                 // Remove so we can retry next cycle
                 notified_instances.remove(&instance.id);
@@ -138,53 +149,28 @@ pub async fn poll_instance(
         }
     }
 
-    let device_config =
-        fetched.response.device_config.as_ref().ok_or_else(|| {
-            Error::InternalError("Device config not present in response".to_string())
-        })?;
-
-    // Early return if config didn't change
-    if !config_changed(transaction, instance, device_config).await? {
-        debug!(
-            "Config for instance {}({}) didn't change",
-            instance.name, instance.id
-        );
-        return Ok(());
-    }
-
-    debug!(
-        "Config for instance {}({}) changed",
-        instance.name, instance.id
-    );
-
-    // Config changed. If there are no active connections for this instance, update the database.
-    // Otherwise just display a message to reconnect.
-    if active_connections(instance).await?.is_empty() {
-        debug!(
-            "Updating instance {}({}) configuration: {device_config:?}",
-            instance.name, instance.id,
-        );
-        let locations_changed =
-            do_update_instance(transaction, instance, device_config.clone()).await?;
-        info!(
-            "Updated instance {}({}) configuration based on core's response",
-            instance.name, instance.id
-        );
-        if locations_changed {
-            if let Err(err) = handle.emit(EventKey::InstanceUpdated.into(), ()) {
-                error!("Failed to emit instance-updated event: {err}");
+    match result {
+        PollInstanceResult::Unchanged { .. } => {}
+        PollInstanceResult::Updated {
+            locations_changed, ..
+        } => {
+            if locations_changed {
+                if let Err(err) = handle.emit(EventKey::InstanceUpdated.into(), ()) {
+                    error!("Failed to emit instance-updated event: {err}");
+                }
             }
         }
-    } else {
-        debug!(
-            "Emitting config-changed event for instance {}({})",
-            instance.name, instance.id,
-        );
-        let _ = handle.emit(EventKey::ConfigChanged.into(), &instance.name);
-        info!(
-            "Emitted config-changed event for instance {}({})",
-            instance.name, instance.id,
-        );
+        PollInstanceResult::ChangedWhileActive { .. } => {
+            debug!(
+                "Emitting config-changed event for instance {}({})",
+                instance.name, instance.id,
+            );
+            let _ = handle.emit(EventKey::ConfigChanged.into(), &instance.name);
+            info!(
+                "Emitted config-changed event for instance {}({})",
+                instance.name, instance.id,
+            );
+        }
     }
 
     Ok(())

@@ -40,7 +40,7 @@ use crate::{
     },
     enterprise::{
         self,
-        periodic::config::{do_update_instance, poll_instance},
+        periodic::config::{do_update_instance, poll_instance_with_events},
         posture::authorize_posture_session,
         provisioning::ProvisioningConfig,
     },
@@ -310,7 +310,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
         );
         return Err(Error::NotFound);
     };
-    poll_instance(&mut transaction, &mut instance, handle).await?;
+    poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
