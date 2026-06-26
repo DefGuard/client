@@ -441,8 +441,7 @@ mod tests {
             let addr = listener.local_addr().unwrap();
 
             let handle = spawn(move || {
-                let mut responses = responses.into_iter();
-                while let Some(response) = responses.next() {
+                for response in responses {
                     let mut stream = loop {
                         match listener.accept() {
                             Ok((stream, _)) => break stream,
