@@ -1,0 +1,101 @@
+.snackbar {
+  --bg: var(--bg-white-100);
+  --color: var(--fg-faded);
+  --icon: var(--fg-faded);
+  --close: var(--fg-faded);
+
+  display: flex;
+  border-radius: var(--radius-xl);
+  background-color: var(--bg);
+  user-select: none;
+  box-sizing: border-box;
+  padding: var(--spacing-xs) var(--spacing-md);
+  overflow: hidden;
+  min-height: 32px;
+
+  @include animate(background-color);
+
+  &.can-click {
+    cursor: pointer;
+  }
+
+  &.variant-default {
+    --bg: var(--bg-white-100);
+    --color: var(--fg-faded);
+    --icon: var(--fg-faded);
+    --close: var(--fg-faded);
+
+    .loader-spinner {
+      --spinner-track: var(--c-dark-neutral-400);
+      --spinner-indicator: var(--fg-faded);
+    }
+  }
+
+  &.variant-success {
+    --bg: var(--bg-success);
+    --color: var(--fg-faded);
+    --icon: var(--fg-faded);
+    --close: var(--fg-action);
+
+    .loader-spinner {
+      --spinner-track: var(--c-white-30);
+      --spinner-indicator: var(--c-white-100);
+    }
+  }
+
+  &.variant-critical {
+    --bg: var(--bg-critical);
+    --color: var(--fg-white-100);
+    --icon: var(--fg-white-100);
+    --close: var(--fg-action);
+
+    .loader-spinner {
+      --spinner-track: var(--c-white-30);
+      --spinner-indicator: var(--c-white-100);
+    }
+  }
+
+  & > .content-track {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-md);
+    width: 100%;
+
+    .snackbar-icon {
+      --icon-color: var(--icon);
+
+      display: block;
+      width: 20px;
+      height: 20px;
+    }
+
+    p,
+    span {
+      font: var(--t-body-xs-500);
+      color: var(--color);
+
+      @include animate(color);
+    }
+
+    .snackbar-action {
+      background-color: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+
+      span {
+        text-decoration: underline;
+        text-decoration-color: var(--fg-action);
+        font: var(--t-body-xs-600);
+      }
+    }
+
+    .interaction-box .icon {
+      --icon-color: var(--close);
+    }
+  }
+}

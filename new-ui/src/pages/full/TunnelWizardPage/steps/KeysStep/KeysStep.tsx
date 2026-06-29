@@ -3,11 +3,12 @@ import { useMemo } from 'react';
 import z from 'zod';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
+import { ButtonMenu } from '../../../../../shared/components/ButtonMenu/MenuButton';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { TooltipButton } from '../../../../../shared/components/TooltipButton/TooltipButton';
 import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
+import { Snackbar } from '../../../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { generateWGKeys } from '../../../../../shared/utils/generateWGKeys';
 import { patternValidWireguardKey } from '../../../../../shared/utils/patterns';
@@ -72,18 +73,25 @@ export const KeysStep = () => {
           </form.AppField>
           <SizedBox height={ThemeSpacing.Md} />
           <div className="actions">
-            <TooltipButton
-              buttonProps={{
-                text: 'Generate keys',
-                iconLeft: 'refresh',
-                variant: ButtonVariant.Secondary,
-                onClick: () => {
-                  const pair = generateWGKeys();
-                  form.setFieldValue('prvkey', pair.privateKey);
-                  form.setFieldValue('pubkey', pair.publicKey);
+            <ButtonMenu
+              text="Actions"
+              variant={ButtonVariant.Secondary}
+              menuItems={[
+                {
+                  items: [
+                    {
+                      text: 'Generate keys',
+                      icon: 'refresh',
+                      onClick: () => {
+                        const pair = generateWGKeys();
+                        form.setFieldValue('prvkey', pair.privateKey);
+                        form.setFieldValue('pubkey', pair.publicKey);
+                        Snackbar.default('New keys set');
+                      },
+                    },
+                  ],
                 },
-              }}
-              tooltipText="New keys set"
+              ]}
             />
           </div>
         </form.AppForm>

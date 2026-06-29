@@ -5,14 +5,14 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Subject } from 'rxjs';
 import { ButtonVariant } from '../../../shared/components/Button/types';
+import { ButtonMenu } from '../../../shared/components/ButtonMenu/MenuButton';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { Select } from '../../../shared/components/Select/Select';
 import type { SelectOption } from '../../../shared/components/Select/types';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
-import { TooltipButton } from '../../../shared/components/TooltipButton/TooltipButton';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
+import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
 import { api } from '../../../shared/rust-api/api';
 import {
   type LogItem,
@@ -86,14 +86,11 @@ export const LogPage = () => {
     return logs;
   }, []);
 
-  const clipboardSub = useRef(new Subject<void>());
-  const downloadSub = useRef(new Subject<void>());
-
   const handleLogsCopy = useCallback(() => {
     const logs = getAllLogs();
     if (logs) {
       clipboard.writeText(logs).then(() => {
-        clipboardSub.current.next();
+        Snackbar.default('Logs copied to clipboard');
       });
     }
   }, [getAllLogs]);
@@ -110,7 +107,7 @@ export const LogPage = () => {
       });
       if (path) {
         await writeTextFile(path, getAllLogs());
-        downloadSub.current.next();
+        Snackbar.default('Logs downloaded');
       }
     } catch (e) {
       error(`Failed to save logs to file: ${String(e)}`);
@@ -189,25 +186,19 @@ export const LogPage = () => {
           }}
         />
         <div className="spacer" />
-        <TooltipButton
-          tooltipTrigger={downloadSub.current}
-          tooltipText="Logs downloaded"
-          buttonProps={{
-            variant: ButtonVariant.Outlined,
-            text: 'Download',
-            iconLeft: 'download',
-            onClick: handleLogsDownload,
-          }}
-        />
-        <TooltipButton
-          tooltipTrigger={clipboardSub.current}
-          tooltipText="Logs copied to clipboard"
-          buttonProps={{
-            variant: ButtonVariant.Outlined,
-            text: 'Copy to Clipboard',
-            iconLeft: 'copy',
-            onClick: handleLogsCopy,
-          }}
+        <ButtonMenu
+          iconRight="arrow-small"
+          iconRightRotation="down"
+          variant={ButtonVariant.Outlined}
+          text="Actions"
+          menuItems={[
+            {
+              items: [
+                { text: 'Download', icon: 'download', onClick: handleLogsDownload },
+                { text: 'Copy to Clipboard', icon: 'copy', onClick: handleLogsCopy },
+              ],
+            },
+          ]}
         />
       </div>
       <SizedBox height={ThemeSpacing.Xl2} />

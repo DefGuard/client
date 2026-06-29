@@ -15,6 +15,7 @@ export const MenuHeader = ({ text, testId, onHelp, onClose }: MenuHeaderProps) =
       <p className="group-title">{text}</p>
       {isPresent(onHelp) && (
         <InteractionBox
+          interactionSize={26}
           className="menu-header-help"
           onClick={() => {
             onClose?.();
