@@ -4,6 +4,11 @@ use tracing::error;
 
 use crate::state::State;
 
+/// Determine whether a connection is stale based on its latest WireGuard handshake.
+///
+/// Returns `None` when live backend stats are unavailable or the connection has no
+/// recorded handshake, because in that case the CLI cannot safely decide whether the
+/// connection is stale.
 fn is_stale(connection: &ActiveConnectionInfo, peer_alive_period: u32) -> Option<bool> {
     let last_handshake = connection.stats.as_ref()?.last_handshake?;
     let now: u64 = Utc::now().timestamp().try_into().ok()?;
@@ -11,7 +16,12 @@ fn is_stale(connection: &ActiveConnectionInfo, peer_alive_period: u32) -> Option
     Some(now.saturating_sub(last_handshake) > u64::from(peer_alive_period))
 }
 
-pub async fn monitor(state: &State) {
+/// Disconnect active connections whose latest handshake is older than the configured
+/// peer alive period.
+///
+/// Connections without usable live stats are left untouched. Failures are logged and do
+/// not stop cleanup of the remaining connections.
+pub async fn tear_down_stale_connections(state: &State) {
     let connections = match active_state(&state.pool).await {
         Ok(connections) => connections,
         Err(err) => {
