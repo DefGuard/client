@@ -6,7 +6,6 @@ use common::check_version_flag;
 mod brand;
 mod cli;
 mod commands;
-mod polling;
 mod exit;
 mod logging;
 mod mfa;
@@ -14,6 +13,7 @@ mod mfa_code;
 mod mfa_qr;
 mod monitor;
 mod output;
+mod polling;
 mod resolve;
 mod state;
 #[cfg(all(test, target_os = "linux"))]
@@ -54,7 +54,7 @@ async fn main() -> ExitCode {
     };
 
     polling::poll_config(&state).await;
-    monitor::monitor(&state).await;
+    let _ = monitor::monitor(&state).await;
 
     // Dispatch command.
     match cli.command {
