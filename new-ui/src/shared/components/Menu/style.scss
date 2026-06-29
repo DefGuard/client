@@ -5,9 +5,10 @@
   box-sizing: border-box;
   padding: var(--spacing-sm);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-disabled);
-  background-color: var(--bg-default);
+  border: 0;
+  background-color: var(--c-saturated-dark-blue-60);
   box-shadow: 0 4px 12px 0 rgb(0 0 0 / 7%);
+  backdrop-filter: blur(4px);
   overflow: hidden auto;
   z-index: 5;
 
@@ -33,7 +34,7 @@
 
     p {
       font: var(--t-menu-title);
-      color: var(--fg-muted);
+      color: var(--fg-white-60);
       padding-left: var(--spacing-sm);
     }
 
@@ -43,11 +44,13 @@
         width: 26px;
       }
 
+      .icon {
+        --icon-color: var(--fg-white-60);
+      }
+
       &:hover {
-        svg {
-          path {
-            fill: var(--fg-action);
-          }
+        .icon {
+          --icon-color: var(--fg-white-100);
         }
       }
     }
@@ -56,7 +59,7 @@
   .menu-item {
     --bg-color: var(--bg-default);
     --color: var(--fg-default);
-    --icon-fill: var(--fg-muted);
+    --icon-fill: var(--fg-white-100);
 
     display: flex;
     flex-flow: row nowrap;
@@ -75,6 +78,10 @@
     @include animate(background-color);
 
     &.disabled {
+      --bg-color: var(--fg-white-0);
+      --icon-fill: var(--fg-white-60);
+      --color: var(--fg-white-60);
+
       cursor: not-allowed;
     }
 
@@ -90,7 +97,7 @@
 
     &:not(.disabled) {
       &:hover {
-        --bg-color: var(--bg-muted);
+        --bg-color: var(--bg-white-5);
       }
     }
 
@@ -99,8 +106,8 @@
       color: inherit;
     }
 
-    & > .icon svg path {
-      fill: var(--icon-fill);
+    & > .icon {
+      --icon-color: var(--icon-fill);
     }
 
     & > .suffix {
@@ -111,8 +118,8 @@
       right: var(--spacing-sm);
       transform: translateY(-50%);
 
-      svg path {
-        fill: var(--fg-muted);
+      .icon {
+        --icon-color: var(--fg-white-100);
       }
     }
   }

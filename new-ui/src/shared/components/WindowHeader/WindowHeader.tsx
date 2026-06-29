@@ -27,14 +27,14 @@ export const WindowHeader = ({ variant }: Props) => {
       <LogoIcon size={variant === 'desktop' ? 33 : 48} />
       <div className="info">
         <p className="label">Defguard VPN Client</p>
-        {variant === 'compact' && <ConnectionWatcher />}
+        {variant === 'compact' && <ConnectionWatcher placement="bottom-start" />}
         {variant === 'desktop' && isPresent(appVersion) && (
           <p className="version">{version()}</p>
         )}
       </div>
       {variant === 'desktop' && (
         <div className="right">
-          <ConnectionWatcher />
+          <ConnectionWatcher placement={'bottom-end'} />
         </div>
       )}
     </div>

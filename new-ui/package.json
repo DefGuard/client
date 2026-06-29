@@ -13,12 +13,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@biomejs/biome": "2.4.16",
+    "@biomejs/biome": "2.5.1",
     "@floating-ui/react": "^0.27.19",
     "@stablelib/base64": "^2.0.1",
     "@stablelib/x25519": "^2.0.1",
     "@tanstack/react-form": "^1.33.0",
-    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.16",
     "@tanstack/router-plugin": "^1.168.18",
     "@tauri-apps/api": "^2.11.1",
@@ -34,9 +34,9 @@
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.21",
-    "motion": "^12.40.0",
+    "motion": "^12.42.0",
     "p-timeout": "^7.0.1",
-    "prettier": "^3.8.4",
+    "prettier": "^3.9.1",
     "qrcode.react": "^4.2.0",
     "radashi": "^12.9.1",
     "react": "^19.2.7",
@@ -50,18 +50,18 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@tanstack/devtools-vite": "^0.7.2",
+    "@tanstack/devtools-vite": "^0.8.1",
     "@types/byte-size": "^8.1.2",
-    "@types/node": "^25.9.4",
+    "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
-    "autoprefixer": "^10.5.0",
-    "globals": "^17.6.0",
-    "stylelint": "^17.13.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "autoprefixer": "^10.5.2",
+    "globals": "^17.7.0",
+    "stylelint": "^17.14.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.2.0",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.1.0"
   }
 }
