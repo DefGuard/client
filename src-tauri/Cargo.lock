@@ -1577,6 +1577,7 @@ dependencies = [
  "base64 0.22.1",
  "clap",
  "defguard-client-common",
+ "defguard-client-config-sync",
  "defguard-client-core",
  "defguard-client-posture",
  "defguard-client-proto",

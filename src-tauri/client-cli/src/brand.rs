@@ -62,6 +62,7 @@ pub fn print_banner() {
 #[cfg(windows)]
 pub fn print_banner() {
     let project = common::version_string("defguard-cli");
+    println!();
     println!("    {project}");
     println!("    {COPYRIGHT}");
     println!();
