@@ -17,17 +17,21 @@ const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
 use block2::RcBlock;
 use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_foundation::{
-    ns_string, NSArray, NSDate, NSError, NSNotification, NSNotificationCenter, NSNumber,
+    ns_string, NSArray, NSData, NSDate, NSError, NSNotification, NSNotificationCenter, NSNumber,
     NSObjectProtocol, NSOperationQueue, NSRunLoop, NSString,
 };
 use objc2_network_extension::{
-    NETunnelProviderManager, NETunnelProviderProtocol, NEVPNConnection,
+    NETunnelProviderManager, NETunnelProviderProtocol, NETunnelProviderSession, NEVPNConnection,
     NEVPNStatusDidChangeNotification,
 };
+use serde::Deserialize;
 
-use crate::database::{
-    models::{location::Location, tunnel::Tunnel, Id},
-    DB_POOL,
+use crate::{
+    database::{
+        models::{location::Location, tunnel::Tunnel, Id},
+        DB_POOL,
+    },
+    ConnectionType,
 };
 
 pub const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
@@ -145,6 +149,92 @@ pub fn spawn_runloop_and_wait_for(semaphore: &Arc<AtomicBool>) {
         }
         date = date.dateByAddingTimeInterval(ONE_SECOND);
     }
+}
+
+/// Tunnel statistics shared with VPNExtension (written in Swift).
+#[derive(Deserialize)]
+#[repr(C)]
+#[serde(rename_all = "camelCase")]
+pub struct Stats {
+    pub location_id: Option<Id>,
+    pub tunnel_id: Option<Id>,
+    pub tx_bytes: u64,
+    pub rx_bytes: u64,
+    pub last_handshake: u64,
+}
+
+/// Retrieve VPN tunnel statistics from VPNExtension.
+pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
+    let new_stats = Arc::new(Mutex::new(None));
+    let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
+
+    let new_stats_clone = Arc::clone(&new_stats);
+
+    let finished = Arc::new(AtomicBool::new(false));
+    let finished_clone = Arc::clone(&finished);
+
+    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
+        if let Some(data) = unsafe { data_ptr.as_ref() } {
+            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
+                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
+                    *new_stats_locked = Some(stats);
+                }
+            } else {
+                warn!("Failed to deserialize tunnel stats");
+            }
+        } else {
+            debug!("No data received in tunnel stats response, skipping");
+        }
+        finished_clone.store(true, Ordering::Release);
+    });
+
+    let manager = manager_for_key_and_value(
+        match connection_type {
+            ConnectionType::Location => LOCATION_ID,
+            ConnectionType::Tunnel => TUNNEL_ID,
+        },
+        id,
+    )?;
+
+    let vpn_protocol = (unsafe { manager.protocolConfiguration() })?;
+    let Ok(tunnel_protocol) = vpn_protocol.downcast::<NETunnelProviderProtocol>() else {
+        error!("Failed to downcast to NETunnelProviderProtocol");
+        return None;
+    };
+
+    // Sometimes all managers from all apps come through, so filter by bundle ID.
+    if let Some(bundle_id) = unsafe { tunnel_protocol.providerBundleIdentifier() } {
+        if &*bundle_id != plugin_bundle_id {
+            return None;
+        }
+    }
+
+    let Ok(session) = unsafe { manager.connection() }.downcast::<NETunnelProviderSession>() else {
+        error!("Failed to downcast to NETunnelProviderSession");
+        return None;
+    };
+
+    let message_data = NSData::new();
+    if unsafe {
+        session.sendProviderMessage_returnError_responseHandler(
+            &message_data,
+            None,
+            Some(&response_handler),
+        )
+    } {
+        debug!("Message sent to NETunnelProviderSession");
+    } else {
+        error!("Failed to send to NETunnelProviderSession while requesting stats");
+    }
+
+    // Wait for the response handler to complete.
+    while !finished.load(Ordering::Acquire) {
+        spin_loop();
+    }
+
+    new_stats
+        .lock()
+        .map_or(None, |mut new_stats_locked| new_stats_locked.take())
 }
 
 /// Handle VPN status change.
