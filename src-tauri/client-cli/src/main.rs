@@ -6,7 +6,7 @@ use common::check_version_flag;
 mod brand;
 mod cli;
 mod commands;
-mod config_poll;
+mod polling;
 mod exit;
 mod logging;
 mod mfa;
@@ -52,7 +52,7 @@ async fn main() -> ExitCode {
         }
     };
 
-    config_poll::poll_config(&state).await;
+    polling::poll_config(&state).await;
 
     // Dispatch command.
     match cli.command {
