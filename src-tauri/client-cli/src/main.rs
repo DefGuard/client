@@ -54,7 +54,8 @@ async fn main() -> ExitCode {
     };
 
     polling::poll_config(&state).await;
-    let _ = monitor::monitor(&state).await;
+    #[cfg(not(target_os = "macos"))]
+    monitor::monitor(&state).await;
 
     // Dispatch command.
     match cli.command {

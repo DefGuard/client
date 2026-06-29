@@ -11,15 +11,20 @@ fn is_stale(connection: &ActiveConnectionInfo, peer_alive_period: u32) -> Option
     Some(now.saturating_sub(last_handshake) > u64::from(peer_alive_period))
 }
 
-pub async fn monitor(state: &State) -> Result<(), defguard_core::error::Error> {
-    let connections = active_state(&state.pool).await?;
+pub async fn monitor(state: &State) {
+    let connections = match active_state(&state.pool).await {
+        Ok(connections) => connections,
+        Err(err) => {
+            error!("Failed to retrieve active connections: {err}");
+            return;
+        }
+    };
     if connections.is_empty() {
-        return Ok(());
+        return;
     }
-    error!(state.app_config.peer_alive_period);
+
     for connection in connections {
         if is_stale(&connection, state.app_config.peer_alive_period).is_some_and(|v| v) {
-        // if is_stale(&connection, 10).is_some_and(|v| v) {
             let result;
             #[cfg(not(target_os = "macos"))]
             {
@@ -36,5 +41,4 @@ pub async fn monitor(state: &State) -> Result<(), defguard_core::error::Error> {
             }
         }
     }
-    Ok(())
 }
