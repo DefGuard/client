@@ -56,7 +56,7 @@ async fn main() -> ExitCode {
 
     polling::poll_config(&state).await;
     #[cfg(not(target_os = "macos"))]
-    monitor::monitor(&state).await;
+    monitor::tear_down_stale_connections(&state).await;
 
     // Dispatch command.
     match cli.command {
