@@ -1575,6 +1575,7 @@ name = "defguard-cli"
 version = "2.1.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "clap",
  "defguard-client-common",
  "defguard-client-config-sync",

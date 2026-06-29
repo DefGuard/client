@@ -12,6 +12,7 @@ mod logging;
 mod mfa;
 mod mfa_code;
 mod mfa_qr;
+mod monitor;
 mod output;
 mod resolve;
 mod state;
@@ -53,6 +54,7 @@ async fn main() -> ExitCode {
     };
 
     polling::poll_config(&state).await;
+    monitor::monitor(&state).await;
 
     // Dispatch command.
     match cli.command {
