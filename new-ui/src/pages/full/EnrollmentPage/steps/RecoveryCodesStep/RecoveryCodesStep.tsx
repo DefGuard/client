@@ -1,13 +1,13 @@
 import './style.scss';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Subject } from 'rxjs';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
+import { ButtonMenu } from '../../../../../shared/components/ButtonMenu/MenuButton';
 import { Checkbox } from '../../../../../shared/components/Checkbox/Checkbox';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { TooltipButton } from '../../../../../shared/components/TooltipButton/TooltipButton';
+import { Snackbar } from '../../../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { downloadText } from '../../../../../shared/utils/download';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
@@ -16,18 +16,15 @@ export const RecoveryCodesStep = () => {
   const codes = useEnrollmentStore((s) => s.userRecoveryCodes) ?? [];
   const codesActionValue = useMemo(() => codes.join('\n'), [codes]);
   const [confirmed, setConfirmed] = useState(false);
-  const clipboardSub = useRef(new Subject<void>());
-  const downloadSub = useRef(new Subject<void>());
-
   const handleCopy = useCallback(async () => {
     writeText(codesActionValue).then(() => {
-      clipboardSub.current.next();
+      Snackbar.default('Codes copied to clipboard');
     });
   }, [codesActionValue]);
 
   const handleDownload = useCallback(() => {
     downloadText(codesActionValue, `recovery`, 'txt').then(() => {
-      downloadSub.current.next();
+      Snackbar.default('Codes downloaded');
     });
   }, [codesActionValue]);
 
@@ -45,25 +42,17 @@ export const RecoveryCodesStep = () => {
       </div>
       <SizedBox height={ThemeSpacing.Lg} />
       <div className="actions">
-        <TooltipButton
-          tooltipTrigger={downloadSub.current}
-          tooltipText="Codes downloaded"
-          buttonProps={{
-            variant: ButtonVariant.Outlined,
-            text: 'Download codes',
-            iconLeft: 'download',
-            onClick: handleDownload,
-          }}
-        />
-        <TooltipButton
-          tooltipTrigger={clipboardSub.current}
-          tooltipText="Codes copied to clipboard"
-          buttonProps={{
-            variant: ButtonVariant.Outlined,
-            text: 'Copy to Clipboard',
-            iconLeft: 'copy',
-            onClick: handleCopy,
-          }}
+        <ButtonMenu
+          variant={ButtonVariant.Outlined}
+          text="Actions"
+          menuItems={[
+            {
+              items: [
+                { text: 'Download codes', icon: 'download', onClick: handleDownload },
+                { text: 'Copy to Clipboard', icon: 'copy', onClick: handleCopy },
+              ],
+            },
+          ]}
         />
       </div>
       <Controls>

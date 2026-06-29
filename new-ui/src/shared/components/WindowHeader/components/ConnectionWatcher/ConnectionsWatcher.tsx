@@ -1,4 +1,5 @@
 import './style.scss';
+import type { Placement } from '@floating-ui/react';
 import {
   autoUpdate,
   FloatingPortal,
@@ -21,7 +22,11 @@ import { Divider } from '../../../Divider/Divider';
 import { FloatingMenu } from '../../../FloatingMenu/FloatingMenu';
 import { Icon } from '../../../Icon';
 
-export const ConnectionWatcher = () => {
+type Props = {
+  placement?: Placement;
+};
+
+export const ConnectionWatcher = ({ placement = 'bottom-start' }: Props) => {
   const { mutate: disconnect } = useMutation({
     mutationFn: api.disconnectLocations,
   });
@@ -43,12 +48,12 @@ export const ConnectionWatcher = () => {
   }, [connected]);
 
   const { refs, context, floatingStyles } = useFloating({
-    placement: 'bottom-start',
+    placement,
     open: floatingOpen,
     onOpenChange: setFloatingOpen,
     middleware: [
       offset(4),
-      shift(),
+      shift({ padding: 4 }),
       floatingSize({
         apply({ rects, elements }) {
           elements.floating.style.minWidth = `${rects.reference.width}px`;
