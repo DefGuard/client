@@ -11,7 +11,6 @@ mod logging;
 mod mfa;
 mod mfa_code;
 mod mfa_qr;
-#[cfg(not(target_os = "macos"))]
 mod monitor;
 mod output;
 mod polling;
@@ -55,7 +54,6 @@ async fn main() -> ExitCode {
     };
 
     polling::poll_config(&state).await;
-    #[cfg(not(target_os = "macos"))]
     monitor::tear_down_stale_connections(&state).await;
 
     // Dispatch command.
