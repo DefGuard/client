@@ -25,17 +25,9 @@ pub async fn monitor(state: &State) {
 
     for connection in connections {
         if is_stale(&connection, state.app_config.peer_alive_period).is_some_and(|v| v) {
-            let result;
-            #[cfg(not(target_os = "macos"))]
-            {
-                use defguard_core::connection::tear_down;
+            use defguard_core::connection::tear_down;
 
-                result = tear_down(&connection).await;
-            }
-            #[cfg(target_os = "macos")]
-            {
-                result = macos_tear_down(connection.clone()).await;
-            }
+            let result = tear_down(&connection).await;
             if let Err(err) = result {
                 error!("Error removing stale connection {}: {err}", connection.name);
             }

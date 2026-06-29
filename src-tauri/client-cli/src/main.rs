@@ -11,6 +11,7 @@ mod logging;
 mod mfa;
 mod mfa_code;
 mod mfa_qr;
+#[cfg(not(target_os = "macos"))]
 mod monitor;
 mod output;
 mod polling;
