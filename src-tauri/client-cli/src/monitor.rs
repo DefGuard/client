@@ -9,11 +9,12 @@ use crate::state::State;
 /// Returns `None` when live backend stats are unavailable or the connection has no
 /// recorded handshake, because in that case the CLI cannot safely decide whether the
 /// connection is stale.
-fn is_stale(connection: &ActiveConnectionInfo, peer_alive_period: u32) -> Option<bool> {
+fn is_stale(connection: &ActiveConnectionInfo, _peer_alive_period: u32) -> Option<bool> {
     let last_handshake = connection.stats.as_ref()?.last_handshake?;
     let now: u64 = Utc::now().timestamp().try_into().ok()?;
 
-    Some(now.saturating_sub(last_handshake) > u64::from(peer_alive_period))
+    // Some(now.saturating_sub(last_handshake) > u64::from(peer_alive_period))
+    Some(now.saturating_sub(last_handshake) > u64::from(20u64))
 }
 
 /// Disconnect active connections whose latest handshake is older than the configured
