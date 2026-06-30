@@ -3,6 +3,8 @@
 
 #[cfg(target_os = "macos")]
 pub mod apple;
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+pub mod system_extension;
 pub mod appstate;
 pub mod commands;
 pub mod events;

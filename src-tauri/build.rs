@@ -13,6 +13,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let git2 = Git2Builder::default().branch(true).sha(true).build()?;
     Emitter::default().add_instructions(&git2)?.emit()?;
 
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "macos"
+        && std::env::var("CARGO_FEATURE_MACOS_INSTALLER").is_ok()
+    {
+        println!("cargo:rustc-link-lib=framework=SystemExtensions");
+    }
+
     tauri_build::build();
     Ok(())
 }

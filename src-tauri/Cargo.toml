@@ -187,6 +187,7 @@ wmi = {version = "0.18", default-features = false}
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+macos_installer = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
