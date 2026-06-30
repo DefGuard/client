@@ -22,7 +22,7 @@ use defguard_client_proto::defguard::{
     enterprise::posture::v2::DevicePostureData,
 };
 use defguard_client_service_locations::ServiceLocationError;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 use defguard_client_service_locations::ServiceLocationManager;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
@@ -84,7 +84,7 @@ pub(crate) struct DaemonService {
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 }
 
@@ -92,13 +92,15 @@ impl DaemonService {
     #[must_use]
     pub fn new(
         config: &Config,
-        #[cfg(windows)] service_location_manager: Arc<RwLock<ServiceLocationManager>>,
+        #[cfg(any(windows, target_os = "linux"))] service_location_manager: Arc<
+            RwLock<ServiceLocationManager>,
+        >,
     ) -> Self {
         Self {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             service_location_manager,
         }
     }
@@ -178,7 +180,7 @@ pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
 
-    #[cfg(not(windows))]
+    #[cfg(all(not(windows), not(target_os = "linux")))]
     async fn save_service_locations(
         &self,
         _request: tonic::Request<SaveServiceLocationsRequest>,
@@ -187,7 +189,7 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[cfg(not(windows))]
+    #[cfg(all(not(windows), not(target_os = "linux")))]
     async fn delete_service_locations(
         &self,
         _request: tonic::Request<DeleteServiceLocationsRequest>,
@@ -196,7 +198,7 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     async fn save_service_locations(
         &self,
         request: tonic::Request<SaveServiceLocationsRequest>,
@@ -224,25 +226,30 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
-        for saved_location in service_location.service_locations {
-            match self
-                .service_location_manager
-                .clone()
-                .write()
-                .unwrap()
-                .reset_service_location_state(&service_location.instance_id, &saved_location.pubkey)
-            {
-                Ok(()) => {
-                    debug!(
-                        "Service location '{}' state reset successfully",
-                        saved_location.name
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to reset state for service location '{}': {e}",
-                        saved_location.name
-                    );
+        #[cfg(windows)]
+        {
+            for saved_location in service_location.service_locations {
+                match self
+                    .service_location_manager
+                    .clone()
+                    .write()
+                    .unwrap()
+                    .reset_service_location_state(
+                        &service_location.instance_id,
+                        &saved_location.pubkey,
+                    ) {
+                    Ok(()) => {
+                        debug!(
+                            "Service location '{}' state reset successfully",
+                            saved_location.name
+                        );
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to reset state for service location '{}': {e}",
+                            saved_location.name
+                        );
+                    }
                 }
             }
         }
@@ -263,7 +270,7 @@ impl DesktopDaemonService for DaemonService {
         ))
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     async fn delete_service_locations(
         &self,
         request: tonic::Request<DeleteServiceLocationsRequest>,
@@ -586,7 +593,14 @@ impl DesktopDaemonService for DaemonService {
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
-    let daemon_service = DaemonService::new(&config);
+    #[cfg(target_os = "linux")]
+    let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
+
+    let daemon_service = DaemonService::new(
+        &config,
+        #[cfg(target_os = "linux")]
+        service_location_manager,
+    );
 
     // Remove existing socket if it exists
     if Path::new(DAEMON_SOCKET_PATH).exists() {

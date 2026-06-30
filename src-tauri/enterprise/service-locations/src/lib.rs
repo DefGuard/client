@@ -14,6 +14,8 @@ use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 use log::warn;
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "linux")]
+pub mod linux;
 #[cfg(windows)]
 pub mod windows;
 
