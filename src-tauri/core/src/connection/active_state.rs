@@ -86,7 +86,6 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
         for location in locations {
             if let Some(NEVPNStatus::Connected) = location.status() {
                 let stats = tunnel_stats(location.id, &ConnectionType::Location).map(Into::into);
-                eprintln!("STATS {stats:?}");
                 let info = ActiveConnectionInfo {
                     connection_type: ConnectionType::Location,
                     target_id: location.id,

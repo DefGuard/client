@@ -1,5 +1,8 @@
 use chrono::Utc;
-use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
+use defguard_core::connection::{
+    active_state::{active_state, ActiveConnectionInfo},
+    tear_down,
+};
 use tracing::error;
 
 use crate::state::State;
@@ -9,12 +12,14 @@ use crate::state::State;
 /// Returns `None` when live backend stats are unavailable or the connection has no
 /// recorded handshake, because in that case the CLI cannot safely decide whether the
 /// connection is stale.
-fn is_stale(connection: &ActiveConnectionInfo, _peer_alive_period: u32) -> Option<bool> {
-    let last_handshake = connection.stats.as_ref()?.last_handshake?;
-    let now: u64 = Utc::now().timestamp().try_into().ok()?;
-
-    // Some(now.saturating_sub(last_handshake) > u64::from(peer_alive_period))
-    Some(now.saturating_sub(last_handshake) > u64::from(20u64))
+fn is_stale(connection: &ActiveConnectionInfo, peer_alive_period: u32) -> bool {
+    if let Some(stats) = connection.stats.as_ref() {
+        if let Some(last_handshake) = stats.last_handshake {
+            let now = Utc::now().timestamp() as u64;
+            return now.saturating_sub(last_handshake) > u64::from(peer_alive_period);
+        }
+    }
+    false
 }
 
 /// Disconnect active connections whose latest handshake is older than the configured
@@ -34,13 +39,42 @@ pub async fn tear_down_stale_connections(state: &State) {
         return;
     }
 
-    for connection in connections {
-        if is_stale(&connection, state.app_config.peer_alive_period).is_some_and(|v| v) {
-            use defguard_core::connection::tear_down;
+    let peer_alive_period = state.app_config.peer_alive_period;
 
-            let result = tear_down(&connection).await;
-            if let Err(err) = result {
-                error!("Error removing stale connection {}: {err}", connection.name);
+    #[cfg(target_os = "macos")]
+    {
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+
+        use defguard_core::connection::apple::spawn_runloop_and_wait_for;
+
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+        let handle = tokio::spawn(async move {
+            for connection in connections {
+                if is_stale(&connection, peer_alive_period) {
+                    let result = tear_down(&connection).await;
+                    if let Err(err) = result {
+                        error!("Error removing stale connection {}: {err}", connection.name);
+                    }
+                }
+            }
+            semaphore_clone.store(true, Ordering::Release);
+        });
+        spawn_runloop_and_wait_for(&semaphore);
+        let _ = handle.await.unwrap();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        for connection in connections {
+            if is_stale(&connection, peer_alive_period) {
+                let result = tear_down(&connection).await;
+                if let Err(err) = result {
+                    error!("Error removing stale connection {}: {err}", connection.name);
+                }
             }
         }
     }
