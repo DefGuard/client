@@ -203,7 +203,7 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     async fn save_service_locations(
         &self,
         request: tonic::Request<SaveServiceLocationsRequest>,
@@ -211,83 +211,82 @@ impl DesktopDaemonService for DaemonService {
         debug!("Received a request to save service location");
         let service_location = request.into_inner();
 
-        #[cfg(target_os = "linux")]
-        {
-            let mut manager = self.service_location_manager.write().unwrap();
-            manager
-                .disconnect_service_locations_by_instance(&service_location.instance_id)
-                .map_err(|err| {
-                    let msg = format!("Failed to disconnect service location: {err}");
-                    error!(msg);
-                    Status::internal(msg)
-                })?;
-            manager
-                .save_service_locations(
-                    service_location.service_locations.as_slice(),
-                    &service_location.instance_id,
-                    &service_location.private_key,
-                )
-                .map_err(|err| {
-                    let msg = format!("Failed to save service location: {err}");
-                    error!(msg);
-                    Status::internal(msg)
-                })?;
-            manager.connect_to_service_locations().map_err(|err| {
-                let msg = format!("Failed to connect service location: {err}");
+        let mut manager = self.service_location_manager.write().unwrap();
+        manager
+            .disconnect_service_locations_by_instance(&service_location.instance_id)
+            .map_err(|err| {
+                let msg = format!("Failed to disconnect service locations: {err}");
                 error!(msg);
                 Status::internal(msg)
             })?;
+        manager
+            .save_service_locations(
+                service_location.service_locations.as_slice(),
+                &service_location.instance_id,
+                &service_location.private_key,
+            )
+            .map_err(|err| {
+                let msg = format!("Failed to save service locations: {err}");
+                error!(msg);
+                Status::internal(msg)
+            })?;
+        manager.connect_to_service_locations().map_err(|err| {
+            let msg = format!("Failed to connect service locations: {err}");
+            error!(msg);
+            Status::internal(msg)
+        })?;
 
-            debug!("Linux service locations saved and reconnected successfully");
-        }
+        debug!("Service locations saved and reconnected successfully");
+        Ok(Response::new(()))
+    }
 
-        #[cfg(windows)]
-        {
+    #[cfg(windows)]
+    async fn save_service_locations(
+        &self,
+        request: tonic::Request<SaveServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Received a request to save service locations");
+        let service_location = request.into_inner();
+
+        match self
+            .service_location_manager
+            .clone()
+            .read()
+            .unwrap()
+            .save_service_locations(
+                service_location.service_locations.as_slice(),
+                &service_location.instance_id,
+                &service_location.private_key,
+            ) {
+            Ok(()) => {
+                debug!("Service locations saved successfully");
+            }
+            Err(e) => {
+                let msg = format!("Failed to save service locations: {e}");
+                error!(msg);
+                return Err(Status::internal(msg));
+            }
+        };
+
+        for saved_location in service_location.service_locations {
             match self
                 .service_location_manager
                 .clone()
-                .read()
+                .write()
                 .unwrap()
-                .save_service_locations(
-                    service_location.service_locations.as_slice(),
-                    &service_location.instance_id,
-                    &service_location.private_key,
-                ) {
+                .reset_service_location_state(&service_location.instance_id, &saved_location.pubkey)
+            {
                 Ok(()) => {
-                    debug!("Service location saved successfully");
+                    debug!(
+                        "Service location '{}' state reset successfully",
+                        saved_location.name
+                    );
                 }
                 Err(e) => {
-                    let msg = format!("Failed to save service location: {e}");
-                    error!(msg);
-                    return Err(Status::internal(msg));
-                }
-            }
-        }
-
-        #[cfg(windows)]
-        {
-            for saved_location in service_location.service_locations {
-                match self
-                    .service_location_manager
-                    .clone()
-                    .write()
-                    .unwrap()
-                    .reset_service_location_state(
-                        &service_location.instance_id,
-                        &saved_location.pubkey,
-                    ) {
-                    Ok(()) => {
-                        debug!(
-                            "Service location '{}' state reset successfully",
-                            saved_location.name
-                        );
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to reset state for service location '{}': {e}",
-                            saved_location.name
-                        );
-                    }
+                    error!(
+                        "Failed to reset state for service location '{}': {e}",
+                        saved_location.name
+                    );
                 }
             }
         }
@@ -308,12 +307,40 @@ impl DesktopDaemonService for DaemonService {
         ))
     }
 
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     async fn delete_service_locations(
         &self,
         request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Received a request to delete service location");
+        debug!("Received a request to delete service locations");
+        let instance_id = request.into_inner().instance_id;
+
+        let mut manager = self.service_location_manager.write().unwrap();
+        manager
+            .disconnect_service_locations_by_instance(&instance_id)
+            .map_err(|err| {
+                let msg = format!("Failed to disconnect service locations: {err}");
+                error!(msg);
+                Status::internal(msg)
+            })?;
+        manager
+            .delete_all_service_locations_for_instance(&instance_id)
+            .map_err(|err| {
+                let msg = format!("Failed to delete service locations: {err}");
+                error!(msg);
+                Status::internal(msg)
+            })?;
+
+        debug!("Service locations deleted successfully");
+        Ok(Response::new(()))
+    }
+
+    #[cfg(windows)]
+    async fn delete_service_locations(
+        &self,
+        request: tonic::Request<DeleteServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        debug!("Received a request to delete service locations");
         let instance_id = request.into_inner().instance_id;
 
         self.service_location_manager
@@ -322,7 +349,7 @@ impl DesktopDaemonService for DaemonService {
             .unwrap()
             .disconnect_service_locations_by_instance(&instance_id)
             .map_err(|err| {
-                let msg = format!("Failed to disconnect service location: {err}");
+                let msg = format!("Failed to disconnect service locations: {err}");
                 error!(msg);
                 Status::internal(msg)
             })?;
@@ -341,7 +368,7 @@ impl DesktopDaemonService for DaemonService {
             Err(err) => {
                 error!("Failed to delete service location: {err}");
                 Err(Status::internal(format!(
-                    "Failed to delete service location: {err}"
+                    "Failed to delete service locations: {err}"
                 )))
             }
         }
