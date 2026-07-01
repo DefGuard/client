@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::OsStr,
     fs::{self, create_dir_all},
     path::PathBuf,
@@ -820,7 +820,7 @@ impl ServiceLocationManager {
     }
 
     pub fn save_service_locations(
-        &self,
+        &mut self,
         service_locations: &[ServiceLocation],
         instance_id: &str,
         private_key: &str,
@@ -831,6 +831,17 @@ impl ServiceLocationManager {
         );
 
         debug!("Service locations to save: {service_locations:?}");
+        let old_locations = self
+            .load_service_locations_for_instance(instance_id)?
+            .map_or_else(Vec::new, |data| data.service_locations);
+        let old_pubkeys = old_locations
+            .iter()
+            .map(|location| location.pubkey.clone())
+            .collect::<HashSet<_>>();
+        let new_pubkeys = service_locations
+            .iter()
+            .map(|location| location.pubkey.clone())
+            .collect::<HashSet<_>>();
 
         create_dir_all(get_shared_directory()?)?;
 
@@ -869,6 +880,28 @@ impl ServiceLocationManager {
             "Service locations saved successfully for instance {instance_id} to {}",
             instance_file_path.display()
         );
+
+        for removed_pubkey in old_pubkeys.difference(&new_pubkeys) {
+            self.disconnect_service_location(instance_id, removed_pubkey)?;
+        }
+
+        for saved_location in service_locations {
+            match self.reset_service_location_state(instance_id, &saved_location.pubkey) {
+                Ok(()) => {
+                    debug!(
+                        "Service location '{}' state reset successfully",
+                        saved_location.name
+                    );
+                }
+                Err(err) => {
+                    error!(
+                        "Failed to reset state for service location '{}': {err}",
+                        saved_location.name
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -947,6 +980,19 @@ impl ServiceLocationManager {
             debug!("No service location file found for instance {instance_id}");
             Ok(None)
         }
+    }
+
+    fn load_service_locations_for_instance(
+        &self,
+        instance_id: &str,
+    ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
+        let instance_file_path = get_instance_file_path(instance_id)?;
+        if !instance_file_path.exists() {
+            return Ok(None);
+        }
+
+        let data = fs::read_to_string(instance_file_path)?;
+        Ok(Some(serde_json::from_str::<ServiceLocationData>(&data)?))
     }
 
     pub fn delete_all_service_locations_for_instance(

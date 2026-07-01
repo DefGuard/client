@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     ffi::OsStr,
     fs::{self, create_dir_all, set_permissions},
     os::unix::fs::PermissionsExt,
@@ -47,7 +48,7 @@ impl ServiceLocationManager {
     }
 
     pub fn save_service_locations(
-        &self,
+        &mut self,
         service_locations: &[ServiceLocation],
         instance_id: &str,
         private_key: &str,
@@ -57,19 +58,34 @@ impl ServiceLocationManager {
             service_locations.len(),
         );
 
+        let old_locations = self
+            .load_service_locations_for_instance(instance_id)?
+            .map_or_else(Vec::new, |data| data.service_locations);
+        let old_pubkeys = old_locations
+            .iter()
+            .map(|location| location.pubkey.clone())
+            .collect::<HashSet<_>>();
+
         let service_locations = service_locations
             .iter()
             .filter(|location| location.mode == ServiceLocationMode::AlwaysOn as i32)
             .cloned()
             .collect::<Vec<_>>();
+        let new_pubkeys = service_locations
+            .iter()
+            .map(|location| location.pubkey.clone())
+            .collect::<HashSet<_>>();
 
         if service_locations.is_empty() {
             debug!("No Linux-supported service locations to save for instance {instance_id}");
+            for removed_pubkey in old_pubkeys {
+                self.disconnect_service_location(instance_id, &removed_pubkey)?;
+            }
             return self.delete_all_service_locations_for_instance(instance_id);
         }
 
         let service_location_data = ServiceLocationData {
-            service_locations,
+            service_locations: service_locations.clone(),
             instance_id: instance_id.to_string(),
             private_key: private_key.to_string(),
         };
@@ -89,6 +105,15 @@ impl ServiceLocationManager {
         )?;
 
         debug!("Service locations saved for instance {instance_id}");
+
+        for removed_pubkey in old_pubkeys.difference(&new_pubkeys) {
+            self.disconnect_service_location(instance_id, removed_pubkey)?;
+        }
+        for location in &service_locations {
+            self.disconnect_service_location(instance_id, &location.pubkey)?;
+            self.connect_service_location(instance_id, location, private_key)?;
+        }
+
         Ok(())
     }
 
@@ -137,6 +162,46 @@ impl ServiceLocationManager {
             } else {
                 debug!("Linux service location interface {ifname} was not tracked as connected");
             }
+        }
+
+        Ok(())
+    }
+
+    fn disconnect_service_location(
+        &mut self,
+        instance_id: &str,
+        location_pubkey: &str,
+    ) -> Result<(), ServiceLocationError> {
+        let Some(locations) = self.connected_service_locations.get_mut(instance_id) else {
+            debug!("No connected Linux service locations found for instance {instance_id}");
+            return Ok(());
+        };
+
+        let Some(position) = locations
+            .iter()
+            .position(|location| location.pubkey == location_pubkey)
+        else {
+            debug!(
+				"Linux service location with pubkey {location_pubkey} for instance {instance_id} is not connected"
+			);
+            return Ok(());
+        };
+
+        let location = locations.remove(position);
+        if locations.is_empty() {
+            self.connected_service_locations.remove(instance_id);
+        }
+
+        let ifname = get_interface_name(&location.name);
+        debug!("Tearing down Linux service location interface: {ifname}");
+        if let Some(wgapi) = self.wgapis.remove(&ifname) {
+            if let Err(err) = wgapi.remove_interface() {
+                error!("Failed to remove Linux service location interface {ifname}: {err}");
+            } else {
+                debug!("Linux service location interface {ifname} removed successfully");
+            }
+        } else {
+            debug!("Linux service location interface {ifname} was not tracked as connected");
         }
 
         Ok(())
@@ -204,6 +269,26 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    fn connect_service_location(
+        &mut self,
+        instance_id: &str,
+        location: &ServiceLocation,
+        private_key: &str,
+    ) -> Result<(), ServiceLocationError> {
+        if self.is_service_location_connected(instance_id, &location.pubkey) {
+            debug!(
+                "Skipping Linux service location '{}' because it's already connected",
+                location.name
+            );
+            return Ok(());
+        }
+
+        self.setup_service_location_interface(location, private_key)?;
+        self.add_connected_service_location(instance_id, location);
+        debug!("Connected Linux service location '{}'", location.name);
+        Ok(())
+    }
+
     pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect Linux Always-on service locations");
 
@@ -229,19 +314,17 @@ impl ServiceLocationManager {
                     continue;
                 }
 
-                if let Err(err) =
-                    self.setup_service_location_interface(&location, &instance_data.private_key)
-                {
+                if let Err(err) = self.connect_service_location(
+                    &instance_data.instance_id,
+                    &location,
+                    &instance_data.private_key,
+                ) {
                     warn!(
                         "Failed to setup Linux service location interface for '{}': {err:?}",
                         location.name
                     );
                     all_connected = false;
-                    continue;
                 }
-
-                self.add_connected_service_location(&instance_data.instance_id, &location);
-                debug!("Connected Linux service location '{}'", location.name);
             }
         }
 
@@ -292,5 +375,18 @@ impl ServiceLocationManager {
         }
 
         Ok(all_locations_data)
+    }
+
+    fn load_service_locations_for_instance(
+        &self,
+        instance_id: &str,
+    ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
+        let instance_file_path = get_instance_file_path(instance_id);
+        if !instance_file_path.exists() {
+            return Ok(None);
+        }
+
+        let data = fs::read_to_string(instance_file_path)?;
+        Ok(Some(serde_json::from_str::<ServiceLocationData>(&data)?))
     }
 }
