@@ -41,8 +41,8 @@ define_class!(
         #[unsafe(method(requestNeedsUserApproval:))]
         fn request_needs_user_approval(&self, _request: &OSSystemExtensionRequest) {
             info!(
-                "VPN system extension requires user approval — open System Settings > \
-                Privacy & Security to enable it."
+                "VPN system extension requires user approval — open System Settings > General > \
+                Login Items & Extensions > Network Extensions to enable it."
             );
         }
 

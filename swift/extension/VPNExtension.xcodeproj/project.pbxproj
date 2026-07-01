@@ -21,14 +21,15 @@
 		66C2A3292FF503FA00A2A8F7 /* Exceptions for "VPNExtension" folder in "VPNSystemExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				"Info-SysExt.plist",
 			);
 			target = 66C2A31C2FF503F900A2A8F7 /* VPNSystemExtension */;
 		};
 		66CABCDE2EA76D070057D1AF /* Exceptions for "VPNExtension" folder in "VPNExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				"Info-AppExt.plist",
+				"Info-SysExt.plist",
 				main.swift,
 			);
 			target = 66CABCD32EA76D060057D1AF /* VPNExtension */;
@@ -165,7 +166,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
-				LastUpgradeCheck = 2610;
+				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					66C2A31C2FF503F900A2A8F7 = {
 						CreatedOnToolsVersion = 26.0.1;
@@ -297,9 +298,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = VPNExtension/Info.plist;
+				INFOPLIST_FILE = "VPNExtension/Info-SysExt.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VPNExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -388,9 +388,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = VPNExtension/Info.plist;
+				INFOPLIST_FILE = "VPNExtension/Info-SysExt.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VPNExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -480,9 +479,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = VPNExtension/Info.plist;
+				INFOPLIST_FILE = "VPNExtension/Info-SysExt.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VPNExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -542,6 +540,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				ONLY_ACTIVE_ARCH = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/defguard_boringtunFFI.h";
@@ -581,6 +580,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/defguard_boringtunFFI.h";
@@ -654,9 +654,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = VPNExtension/Info.plist;
+				INFOPLIST_FILE = "VPNExtension/Info-AppExt.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VPNExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -745,9 +744,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = VPNExtension/Info.plist;
+				INFOPLIST_FILE = "VPNExtension/Info-AppExt.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VPNExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -807,6 +805,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/defguard_boringtunFFI.h";
@@ -876,9 +875,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = VPNExtension/Info.plist;
+				INFOPLIST_FILE = "VPNExtension/Info-AppExt.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = VPNExtension;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
