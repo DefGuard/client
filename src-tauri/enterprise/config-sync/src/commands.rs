@@ -83,8 +83,6 @@ pub async fn do_update_instance(
         "A new base configuration has been applied to instance {instance}, even if nothing changed"
     );
 
-    let mut service_locations = Vec::new();
-
     if locations_changed_val {
         debug!(
             "Updating locations for instance {}({}).",
@@ -130,10 +128,9 @@ pub async fn do_update_instance(
 
             if saved_location.is_service_location() {
                 debug!(
-                    "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
+                    "Location {}({}) for instance {}({}) is a service location.",
                     saved_location.name, saved_location.id, instance.name, instance.id,
                 );
-                service_locations.push(to_service_location(&saved_location)?);
             }
         }
 
@@ -147,6 +144,28 @@ pub async fn do_update_instance(
         debug!("Finished updating locations for instance {instance}");
     } else {
         info!("Locations for instance {instance} didn't change. Not updating them.");
+    }
+
+    sync_service_locations(transaction, instance).await?;
+
+    Ok(locations_changed_val)
+}
+
+pub async fn sync_service_locations(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &Instance<Id>,
+) -> Result<(), Error> {
+    let mut service_locations = Vec::new();
+    let current_locations =
+        Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
+    for location in current_locations {
+        if location.is_service_location() {
+            debug!(
+                "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
+                location.name, location.id, instance.name, instance.id,
+            );
+            service_locations.push(to_service_location(&location)?);
+        }
     }
 
     if service_locations.is_empty() {
@@ -232,7 +251,7 @@ pub async fn do_update_instance(
         }
     }
 
-    Ok(locations_changed_val)
+    Ok(())
 }
 
 pub async fn disable_enterprise_features<'e, E>(

@@ -20,7 +20,7 @@ use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 
-use crate::commands::{disable_enterprise_features, do_update_instance};
+use crate::commands::{disable_enterprise_features, do_update_instance, sync_service_locations};
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -177,6 +177,9 @@ pub async fn poll_instance(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
         );
+        if !has_active_connections {
+            sync_service_locations(transaction, instance).await?;
+        }
         return Ok(PollInstanceResult::Unchanged { version_mismatch });
     }
 
