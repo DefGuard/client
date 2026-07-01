@@ -86,30 +86,27 @@ export const WindowDecorations = () => {
         >
           {isMaximized && (
             <svg
+              xmlns="http://www.w3.org/2000/svg"
               width="12"
               height="12"
               viewBox="0 0 12 12"
               fill="none"
-              xmlns="http://www.w3.org/2000/svg"
             >
               <rect
-                x="2.6"
-                y="0.6"
-                width="8.8"
-                height="8.8"
-                rx="1.4"
+                x="0.599976"
+                y="3.59998"
+                width="7"
+                height="7"
+                rx="1.5"
                 stroke="white"
-                strokeWidth="1.2"
+                stroke-width="1.2"
               />
-              <rect
-                x="0.6"
-                y="2.6"
-                width="8.8"
-                height="8.8"
-                rx="1.4"
-                stroke="white"
-                strokeWidth="1.2"
-                fill="var(--bg, transparent)"
+              <path
+                d="M3.59998 3.09998V2.09998C3.59998 1.27155 4.27155 0.599976 5.09998 0.599976H9.09998C9.9284 0.599976 10.6 1.27155 10.6 2.09998V6.09998C10.6 6.9284 9.9284 7.59998 9.09998 7.59998H8.09998"
+                stroke-width="1.2"
+                style={{
+                  stroke: 'var(--icon)',
+                }}
               />
             </svg>
           )}
