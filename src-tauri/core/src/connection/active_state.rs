@@ -19,7 +19,7 @@ use objc2_network_extension::NEVPNStatus;
 use tonic::Code;
 
 #[cfg(target_os = "macos")]
-use crate::database::models::get_all_tunnels_locations;
+use crate::{connection::apple::tunnel_stats, database::models::get_all_tunnels_locations};
 #[cfg(not(target_os = "macos"))]
 use crate::{
     connection::daemon_client::DAEMON_CLIENT,
@@ -55,6 +55,18 @@ pub struct InterfaceStats {
     pub last_handshake: Option<u64>,
 }
 
+#[cfg(target_os = "macos")]
+impl From<super::apple::Stats> for InterfaceStats {
+    fn from(stats: super::apple::Stats) -> Self {
+        Self {
+            listen_port: 0,
+            tx_bytes: stats.tx_bytes,
+            rx_bytes: stats.rx_bytes,
+            last_handshake: (stats.last_handshake != 0).then_some(stats.last_handshake),
+        }
+    }
+}
+
 /// Query the platform backend for all currently-up WireGuard interfaces and match each
 /// peer back to a known `Location` or `Tunnel`.
 ///
@@ -62,7 +74,7 @@ pub struct InterfaceStats {
 /// **unfiltered** snapshot of all managed interfaces (unlike `ReadInterfaceData`, which
 /// drops peers that haven't completed a handshake or whose stats haven't changed).
 ///
-/// On macOS the Network Extension path is stubbed (pending the NE spike).
+/// On macOS this queries Network Extension managers and asks connected providers for stats.
 #[cfg(target_os = "macos")]
 pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, Error> {
     let (tunnels, locations) = get_all_tunnels_locations().await;
@@ -73,12 +85,13 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
         let mut result = Vec::new();
         for location in locations {
             if let Some(NEVPNStatus::Connected) = location.status() {
+                let stats = tunnel_stats(location.id, &ConnectionType::Location).map(Into::into);
                 let info = ActiveConnectionInfo {
                     connection_type: ConnectionType::Location,
                     target_id: location.id,
                     name: location.name,
                     interface_name: String::new(),
-                    stats: None, // TODO
+                    stats,
                 };
                 result.push(info);
             }
@@ -86,12 +99,13 @@ pub async fn active_state(_pool: &DbPool) -> Result<Vec<ActiveConnectionInfo>, E
 
         for tunnel in tunnels {
             if let Some(NEVPNStatus::Connected) = tunnel.status() {
+                let stats = tunnel_stats(tunnel.id, &ConnectionType::Tunnel).map(Into::into);
                 let info = ActiveConnectionInfo {
                     connection_type: ConnectionType::Tunnel,
                     target_id: tunnel.id,
                     name: tunnel.name,
                     interface_name: String::new(),
-                    stats: None, // TODO
+                    stats,
                 };
                 result.push(info);
             }

@@ -30,8 +30,6 @@ use windows_service::{
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
-#[cfg(target_os = "macos")]
-use crate::apple::tunnel_stats;
 #[cfg(not(target_os = "macos"))]
 use crate::database::models::{
     location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats,
@@ -48,6 +46,8 @@ use crate::{
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     ConnectionType,
 };
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::apple::tunnel_stats;
 
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]

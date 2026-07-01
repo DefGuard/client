@@ -12,6 +12,7 @@ version.workspace = true
 name = "defguard-cli"
 
 [dependencies]
+chrono.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
 owo-colors = { version = "4", features = ["supports-colors"] }
 
