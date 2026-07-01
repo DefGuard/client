@@ -36,17 +36,21 @@ export const ConnectModalMfaTotp = () => {
   const [totpCode, setTotpCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = useCallback(() => {
-    if (!isPresent(totpCode)) {
-      setError('Enter code');
-      return;
-    }
-    if (totpCode.replaceAll(' ', '').length !== 6) {
-      setError('6 digits are required');
-      return;
-    }
-    verifyCode(totpCode);
-  }, [totpCode, verifyCode]);
+  const handleVerify = useCallback(
+    (initCode?: string | null) => {
+      const codeToVerify = initCode ?? totpCode;
+      if (!isPresent(codeToVerify)) {
+        setError('Enter code');
+        return;
+      }
+      if (codeToVerify.replaceAll(' ', '').length !== 6) {
+        setError('6 digits are required');
+        return;
+      }
+      verifyCode(codeToVerify);
+    },
+    [totpCode, verifyCode],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
   useEffect(() => {
@@ -74,8 +78,11 @@ export const ConnectModalMfaTotp = () => {
       <CodeInput
         length={6}
         value={totpCode}
-        onChange={setTotpCode}
+        onChange={(val) => setTotpCode(val)}
         error={startError ?? error}
+        onSuccessPaste={(value) => {
+          handleVerify(value);
+        }}
       />
       <Controls>
         <Button
@@ -89,7 +96,7 @@ export const ConnectModalMfaTotp = () => {
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
-            onClick={handleVerify}
+            onClick={() => handleVerify()}
             loading={isVerifying}
             disabled={isStarting}
           />
