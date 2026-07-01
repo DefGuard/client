@@ -48,7 +48,7 @@ jobs:
             # Match the line containing "hash = " that follows the
             # attribute definition block (${attr} ... = fetchPnpmDeps).
             local CURRENT
-            CURRENT=$(awk "/^[[:space:]]*${attr} = fetchPnpmDeps/,/;[[:space:]]*\$/" nix/package.nix \
+            CURRENT=$(awk "/^[[:space:]]*${attr} = fetchPnpmDeps/,/^[[:space:]]*};[[:space:]]*\$/" nix/package.nix \
               | sed -n 's/^[[:space:]]*hash = "\(sha256-[^"]*\)".*/\1/p' | head -1)
 
             if [ -z "$CURRENT" ]; then
@@ -59,7 +59,7 @@ jobs:
             echo "${attr}_current=${CURRENT}" >> "$GITHUB_OUTPUT"
 
             # Swap in the fake hash.
-            sed -i "/^[[:space:]]*${attr} = fetchPnpmDeps/,/;[[:space:]]*\$/{s|hash = \"${CURRENT}\"|hash = \"${FAKE}\"|}" nix/package.nix
+            sed -i "/^[[:space:]]*${attr} = fetchPnpmDeps/,/^[[:space:]]*};[[:space:]]*\$/{s|hash = \"${CURRENT}\"|hash = \"${FAKE}\"|}" nix/package.nix
 
             # Build only this fixed-output derivation.
             echo "building ${attr} for ${SYSTEM}..."
@@ -81,7 +81,7 @@ jobs:
             echo "${attr}_new=${NEW}" >> "$GITHUB_OUTPUT"
 
             # Write the correct hash back.
-            sed -i "/^[[:space:]]*${attr} = fetchPnpmDeps/,/;[[:space:]]*\$/{s|hash = \"${FAKE}\"|hash = \"${NEW}\"|}" nix/package.nix
+            sed -i "/^[[:space:]]*${attr} = fetchPnpmDeps/,/^[[:space:]]*};[[:space:]]*\$/{s|hash = \"${FAKE}\"|hash = \"${NEW}\"|}" nix/package.nix
 
             # Track whether this hash changed.
             if [ "$CURRENT" != "$NEW" ]; then
