@@ -1,7 +1,17 @@
 use std::sync::{LazyLock, Mutex};
 
-use objc2::{define_class, msg_send, rc::Retained, runtime::AnyObject, AnyThread};
+use dispatch2::DispatchQueue;
+use objc2::{
+    define_class, msg_send,
+    rc::Retained,
+    runtime::{NSObjectProtocol, ProtocolObject},
+    AnyThread,
+};
 use objc2_foundation::{NSError, NSObject, NSString};
+use objc2_system_extensions::{
+    OSSystemExtensionManager, OSSystemExtensionProperties, OSSystemExtensionReplacementAction,
+    OSSystemExtensionRequest, OSSystemExtensionRequestDelegate, OSSystemExtensionRequestResult,
+};
 
 // OSSystemExtensionRequest.delegate is a `weak` property, so we must keep our delegate alive
 // for the duration of the activation handshake.
@@ -13,21 +23,37 @@ define_class!(
     #[name = "DefguardSystemExtensionDelegate"]
     struct SystemExtensionDelegate;
 
-    impl SystemExtensionDelegate {
+    unsafe impl NSObjectProtocol for SystemExtensionDelegate {}
+
+    unsafe impl OSSystemExtensionRequestDelegate for SystemExtensionDelegate {
+        /// A newer version of the extension is being installed; always replace.
+        #[unsafe(method(request:actionForReplacingExtension:withExtension:))]
+        fn action_for_replacing(
+            &self,
+            _request: &OSSystemExtensionRequest,
+            _existing: &OSSystemExtensionProperties,
+            _ext: &OSSystemExtensionProperties,
+        ) -> OSSystemExtensionReplacementAction {
+            OSSystemExtensionReplacementAction::Replace
+        }
+
         /// The extension is waiting for user approval in System Settings > Privacy & Security.
         #[unsafe(method(requestNeedsUserApproval:))]
-        fn request_needs_user_approval(&self, _request: &AnyObject) {
+        fn request_needs_user_approval(&self, _request: &OSSystemExtensionRequest) {
             info!(
-                "VPN system extension requires user approval — open \
-                System Settings > Privacy & Security to enable it."
+                "VPN system extension requires user approval — open System Settings > \
+                Privacy & Security to enable it."
             );
         }
 
         /// Activation finished (or will finish after reboot).
         #[unsafe(method(request:didFinishWithResult:))]
-        fn request_did_finish(&self, _request: &AnyObject, result: isize) {
-            // OSSystemExtensionResult::WillCompleteAfterReboot == 1
-            if result == 1 {
+        fn request_did_finish(
+            &self,
+            _request: &OSSystemExtensionRequest,
+            result: OSSystemExtensionRequestResult,
+        ) {
+            if result == OSSystemExtensionRequestResult::WillCompleteAfterReboot {
                 info!("VPN system extension installed; activation will complete after reboot.");
             } else {
                 info!("VPN system extension activated successfully.");
@@ -36,22 +62,11 @@ define_class!(
 
         /// Activation failed.
         #[unsafe(method(request:didFailWithError:))]
-        fn request_did_fail(&self, _request: &AnyObject, error: &NSError) {
+        fn request_did_fail(&self, _request: &OSSystemExtensionRequest, error: &NSError) {
             error!(
                 "VPN system extension activation failed: {}",
                 error.localizedDescription()
             );
-        }
-
-        /// A newer version of the extension is being installed; always replace.
-        #[unsafe(method(request:actionForReplacingExtension:withExtension:))]
-        fn action_for_replacing(
-            &self,
-            _request: &AnyObject,
-            _old: &AnyObject,
-            _new: &AnyObject,
-        ) -> isize {
-            1 // OSSystemExtensionReplacementAction::Replace
         }
     }
 );
@@ -63,52 +78,27 @@ impl SystemExtensionDelegate {
     }
 }
 
-/// Submit a system extension activation request for `bundle_id` to
-/// `OSSystemExtensionManager`. Safe to call on every launch — the OS ignores duplicate
-/// requests for extensions that are already active. Callbacks arrive asynchronously on the
-/// main queue via the embedded delegate.
+/// Activate a system extension.
 ///
-/// Silently skips when `OSSystemExtensionRequest` is absent from the ObjC runtime, which
-/// happens for App Store builds (no `packet-tunnel-provider-systemextension` entitlement)
-/// or when `SystemExtensions.framework` is not linked.
+/// Safe to call on every launch — the OS ignores duplicate requests for extensions that are
+/// already active. Callbacks arrive asynchronously on the main queue via the embedded delegate.
+///
+/// <https://developer.apple.com/documentation/systemextensions/installing-system-extensions-and-drivers>
 pub fn activate_system_extension(bundle_id: &str) {
-    use objc2::runtime::AnyClass;
-
-    let Some(req_class) = AnyClass::get(c"OSSystemExtensionRequest") else {
-        debug!(
-            "OSSystemExtensionRequest not found in ObjC runtime — \
-            skipping system extension activation."
-        );
-        return;
-    };
-    let Some(mgr_class) = AnyClass::get(c"OSSystemExtensionManager") else {
-        warn!("OSSystemExtensionManager not found — skipping system extension activation.");
-        return;
-    };
-
-    let ext_id = NSString::from_str(bundle_id);
+    let identifier = NSString::from_str(bundle_id);
     let delegate = SystemExtensionDelegate::new();
 
+    // SAFETY: `delegate` is kept alive in DELEGATE for the duration of the async handshake, and
+    // the main dispatch queue lives for the whole process.
     unsafe {
-        // Passing nil for the queue uses the main queue (documented behaviour).
-        let queue: *mut std::ffi::c_void = std::ptr::null_mut();
+        let request = OSSystemExtensionRequest::activationRequestForExtension_queue(
+            &identifier,
+            DispatchQueue::main(),
+        );
+        request.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
 
-        let request: Option<Retained<AnyObject>> = msg_send![
-            req_class,
-            activationRequestForExtensionWithIdentifier: &*ext_id,
-            queue: queue
-        ];
-        let Some(request) = request else {
-            error!("Failed to create system extension activation request for {bundle_id}.");
-            return;
-        };
-
-        // Set our delegate (weak reference on the request side — strong ref kept in DELEGATE).
-        let delegate_ns: &NSObject = &*delegate;
-        let _: () = msg_send![&*request, setDelegate: delegate_ns];
-
-        let manager: Retained<AnyObject> = msg_send![mgr_class, sharedManager];
-        let _: () = msg_send![&*manager, submitRequest: &*request];
+        let manager = OSSystemExtensionManager::sharedManager();
+        manager.submitRequest(&request);
     }
 
     info!("Submitted system extension activation request for {bundle_id}.");
