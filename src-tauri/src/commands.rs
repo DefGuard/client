@@ -17,7 +17,6 @@ use defguard_client_proto::defguard::{
     client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
 };
 use defguard_client_provisioning::ProvisioningConfig;
-use defguard_client_service_locations::to_service_location;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};

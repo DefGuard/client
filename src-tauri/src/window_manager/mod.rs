@@ -58,7 +58,7 @@ impl WindowManager {
         let window = window.build()?;
 
         #[cfg(target_os = "macos")]
-        if let Err(err) = macos::enable_rounded_corners(&window) {
+        if let Err(err) = macos::enable_rounded_corners(&window, false) {
             warn!("Failed to enable rounded corners on tray window: {err}");
         }
 
@@ -66,13 +66,23 @@ impl WindowManager {
     }
 
     pub fn build_full_view_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-        WebviewWindowBuilder::new(app, FULL_VIEW_WINDOW_ID, full_view_ui_url())
+        let window = WebviewWindowBuilder::new(app, FULL_VIEW_WINDOW_ID, full_view_ui_url())
             .title(WINDOW_TITLE)
             .inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
             .min_inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
             .decorations(cfg!(not(any(windows, target_os = "macos"))))
-            .visible(false)
-            .build()
+            .visible(false);
+        #[cfg(target_os = "macos")]
+        let window = window.hidden_title(true);
+
+        let window = window.build()?;
+
+        #[cfg(target_os = "macos")]
+        if let Err(err) = macos::enable_rounded_corners(&window, true) {
+            warn!("Failed to enable rounded corners on full view window: {err}");
+        }
+
+        Ok(window)
     }
 }
 

@@ -6,8 +6,12 @@ use tauri::{
 
 use crate::{appstate::AppState, window_manager::WINDOW_GAP};
 
-/// Enforce rounded window corners. Not yet available in Tauri.
-pub(crate) fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
+const TRAFFIC_LIGHT_Y: f64 = 4.0;
+
+pub(crate) fn enable_rounded_corners<R: Runtime>(
+    window: &WebviewWindow<R>,
+    enable_system_controls: bool,
+) -> Result<(), String> {
     window
         .with_webview(move |webview| {
             let ns_window = unsafe { &*webview.ns_window().cast::<NSWindow>() };
@@ -20,7 +24,7 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> R
             ns_window.setStyleMask(style_mask);
             ns_window.setTitlebarAppearsTransparent(true);
 
-            // Position traffic light buttons: 20px from left, 12px from top to comply with figma design
+            // Traffic light buttons, positioned 20px from left.
             let buttons = [
                 (
                     ns_window.standardWindowButton(NSWindowButton::CloseButton),
@@ -37,13 +41,10 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> R
             ];
             for (button, x) in buttons {
                 if let Some(btn) = button {
-                    let superview_height = unsafe {
-                        btn.superview()
-                            .map(|sv| sv.frame().size.height)
-                            .unwrap_or(28.0)
-                    };
-                    let y = superview_height - 12.0 - btn.frame().size.height;
-                    btn.setFrameOrigin(NSPoint::new(x, y));
+                    btn.setHidden(!enable_system_controls);
+                    if enable_system_controls {
+                        btn.setFrameOrigin(NSPoint::new(x, TRAFFIC_LIGHT_Y));
+                    }
                 }
             }
         })

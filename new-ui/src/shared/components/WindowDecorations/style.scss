@@ -30,7 +30,7 @@
   }
 
   > .window-controls {
-    display: flex;
+    display: var(--controls-display);
     flex-flow: row nowrap;
   }
 
