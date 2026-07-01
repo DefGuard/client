@@ -55,6 +55,7 @@ pub async fn tear_down_stale_connections(state: &State) {
         let handle = tokio::spawn(async move {
             for connection in connections {
                 if is_stale(&connection, peer_alive_period) {
+                    eprintln!("Removing stale connection {}", connection.name);
                     let result = tear_down(&connection).await;
                     if let Err(err) = result {
                         error!("Error removing stale connection {}: {err}", connection.name);
@@ -71,6 +72,7 @@ pub async fn tear_down_stale_connections(state: &State) {
     {
         for connection in connections {
             if is_stale(&connection, peer_alive_period) {
+                eprintln!("Removing stale connection {}", connection.name);
                 let result = tear_down(&connection).await;
                 if let Err(err) = result {
                     error!("Error removing stale connection {}: {err}", connection.name);
