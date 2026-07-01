@@ -24,23 +24,24 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) -> R
             let buttons = [
                 (
                     ns_window.standardWindowButton(NSWindowButton::CloseButton),
-                    20.0_f64,
+                    20.0,
                 ),
                 (
                     ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
-                    40.0_f64,
+                    40.0,
                 ),
                 (
                     ns_window.standardWindowButton(NSWindowButton::ZoomButton),
-                    60.0_f64,
+                    60.0,
                 ),
             ];
             for (button, x) in buttons {
                 if let Some(btn) = button {
-                    let superview_height = btn
-                        .superview()
-                        .map(|sv| sv.frame().size.height)
-                        .unwrap_or(28.0);
+                    let superview_height = unsafe {
+                        btn.superview()
+                            .map(|sv| sv.frame().size.height)
+                            .unwrap_or(28.0)
+                    };
                     let y = superview_height - 12.0 - btn.frame().size.height;
                     btn.setFrameOrigin(NSPoint::new(x, y));
                 }
