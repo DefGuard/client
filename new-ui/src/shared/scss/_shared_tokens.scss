@@ -21,6 +21,11 @@ $jetbrains:
   #{$font-fallback};
 /* stylelint-disable value-keyword-case */
 :root {
+  // sizings
+  // set by WindowDecorations component via effect on window metadata
+  // --window-decorations-height: 33px;
+  --window-header-height: 50px;
+
   // font settings
   --font-family-title: #{$geist};
   --font-family-body: #{$geist};

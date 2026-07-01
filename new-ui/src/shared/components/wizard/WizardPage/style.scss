@@ -1,7 +1,7 @@
 .wizard-page {
   --page-content-limit: 536px;
 
-  height: 100dvh;
+  height: calc(100dvh - var(--window-decorations-height));
   overflow-y: auto;
 
   > .page-grid {

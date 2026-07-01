@@ -1131,10 +1131,10 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                     ))
                 })?;
             info!(
-            "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
+                "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
-            connection.interface_name
-        );
+                connection.interface_name
+            );
             if let Some(post_down) = &tunnel.post_down {
                 debug!(
                     "Executing defined PostDown command after removing the interface {} for the \

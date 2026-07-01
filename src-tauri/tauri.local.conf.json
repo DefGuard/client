@@ -1,5 +1,9 @@
 {
+  "build": {
+    "beforeBundleCommand": null
+  },
   "bundle": {
+    "targets": ["msi"],
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": null,

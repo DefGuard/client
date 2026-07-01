@@ -303,7 +303,7 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
             .next()
             .and_then(|w| w.theme().ok());
         resource_str.push_str(match theme {
-            Some(Theme::Dark) => "dark",
+            Some(Theme::Dark) => "white",
             _ => "white",
         });
     }
