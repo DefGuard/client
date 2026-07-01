@@ -3,10 +3,15 @@ use std::{
     fs::{self, create_dir_all, set_permissions},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
+    str::FromStr,
 };
 
+use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use defguard_client_proto::defguard::client::v1::{ServiceLocation, ServiceLocationMode};
-use log::{debug, warn};
+use defguard_wireguard_rs::{
+    key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+};
+use log::{debug, error, warn};
 
 use crate::{ServiceLocationData, ServiceLocationError, ServiceLocationManager};
 
@@ -14,6 +19,7 @@ const DEFGUARD_DIR: &str = "/etc/defguard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 const SERVICE_LOCATION_DIR_PERMS: u32 = 0o700;
 const SERVICE_LOCATION_FILE_PERMS: u32 = 0o600;
+const DEFAULT_WIREGUARD_PORT: u16 = 51820;
 
 fn get_shared_directory() -> PathBuf {
     PathBuf::from(DEFGUARD_DIR).join(SERVICE_LOCATIONS_SUBDIR)
@@ -86,15 +92,160 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    fn add_connected_service_location(&mut self, instance_id: &str, location: &ServiceLocation) {
+        self.connected_service_locations
+            .entry(instance_id.to_string())
+            .or_default()
+            .push(location.clone());
+
+        debug!(
+            "Added connected Linux service location for instance '{instance_id}', location '{}'",
+            location.name
+        );
+    }
+
+    fn is_service_location_connected(&self, instance_id: &str, location_pubkey: &str) -> bool {
+        self.connected_service_locations
+            .get(instance_id)
+            .is_some_and(|locations| {
+                locations
+                    .iter()
+                    .any(|location| location.pubkey == location_pubkey)
+            })
+    }
+
     pub fn disconnect_service_locations_by_instance(
         &mut self,
         instance_id: &str,
     ) -> Result<(), ServiceLocationError> {
-        debug!(
-			"Disconnect requested for Linux service locations for instance {instance_id}; no active \
-			interface lifecycle is implemented yet"
-		);
+        debug!("Disconnecting Linux service locations for instance {instance_id}");
+
+        let Some(locations) = self.connected_service_locations.remove(instance_id) else {
+            debug!("No connected Linux service locations found for instance {instance_id}");
+            return Ok(());
+        };
+
+        for location in locations {
+            let ifname = get_interface_name(&location.name);
+            debug!("Tearing down Linux service location interface: {ifname}");
+            if let Some(wgapi) = self.wgapis.remove(&ifname) {
+                if let Err(err) = wgapi.remove_interface() {
+                    error!("Failed to remove Linux service location interface {ifname}: {err}");
+                } else {
+                    debug!("Linux service location interface {ifname} removed successfully");
+                }
+            } else {
+                debug!("Linux service location interface {ifname} was not tracked as connected");
+            }
+        }
+
         Ok(())
+    }
+
+    fn setup_service_location_interface(
+        &mut self,
+        location: &ServiceLocation,
+        private_key: &str,
+    ) -> Result<(), ServiceLocationError> {
+        let peer_key = Key::from_str(&location.pubkey)?;
+        let mut peer = Peer::new(peer_key);
+        peer.set_endpoint(&location.endpoint)?;
+        peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
+
+        for allowed_ip in location.allowed_ips.split(',').map(str::trim) {
+            if allowed_ip.is_empty() {
+                continue;
+            }
+            match IpAddrMask::from_str(allowed_ip) {
+                Ok(addr) => peer.allowed_ips.push(addr),
+                Err(err) => error!(
+					"Error parsing allowed IP {allowed_ip} while setting up Linux service location {}: {err}",
+					location.name
+				),
+            }
+        }
+
+        let addresses = location
+            .address
+            .split(',')
+            .map(str::trim)
+            .filter(|address| !address.is_empty())
+            .map(IpAddrMask::from_str)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let ifname = get_interface_name(&location.name);
+        let config = InterfaceConfiguration {
+            name: ifname.clone(),
+            prvkey: private_key.to_string(),
+            addresses,
+            port: find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
+            peers: vec![peer],
+            mtu: None,
+            fwmark: None,
+        };
+
+        let mut wgapi = WGApi::new(&ifname).map_err(|err| {
+            ServiceLocationError::InterfaceError(format!(
+                "Failed to setup Linux WireGuard API for interface {ifname}: {err}"
+            ))
+        })?;
+
+        wgapi.create_interface()?;
+        let dns_config = Some(location.dns.clone());
+        let (dns, search_domains) = dns_borrow(&dns_config);
+        debug!(
+			"Configuring Linux service location interface {ifname} with DNS: {dns:?} and search domains: {search_domains:?}"
+		);
+        wgapi.configure_interface(&config)?;
+        wgapi.configure_dns(&dns, &search_domains)?;
+        self.wgapis.insert(ifname.clone(), wgapi);
+
+        debug!("Linux service location interface {ifname} configured successfully");
+        Ok(())
+    }
+
+    pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
+        debug!("Attempting to auto-connect Linux Always-on service locations");
+
+        let data = self.load_service_locations()?;
+        let mut all_connected = true;
+
+        for instance_data in data {
+            for location in instance_data.service_locations {
+                if location.mode != ServiceLocationMode::AlwaysOn as i32 {
+                    debug!(
+                        "Skipping Linux service location '{}' because only Always-on is supported",
+                        location.name
+                    );
+                    continue;
+                }
+
+                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
+                {
+                    debug!(
+                        "Skipping Linux service location '{}' because it's already connected",
+                        location.name
+                    );
+                    continue;
+                }
+
+                if let Err(err) =
+                    self.setup_service_location_interface(&location, &instance_data.private_key)
+                {
+                    warn!(
+                        "Failed to setup Linux service location interface for '{}': {err:?}",
+                        location.name
+                    );
+                    all_connected = false;
+                    continue;
+                }
+
+                self.add_connected_service_location(&instance_data.instance_id, &location);
+                debug!("Connected Linux service location '{}'", location.name);
+            }
+        }
+
+        Ok(all_connected)
     }
 
     pub fn delete_all_service_locations_for_instance(

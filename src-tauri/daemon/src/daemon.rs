@@ -57,6 +57,11 @@ pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 #[cfg(target_os = "linux")]
 pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
+#[cfg(target_os = "linux")]
+const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
+#[cfg(target_os = "linux")]
+const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
+
 #[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
     #[error(transparent)]
@@ -206,23 +211,56 @@ impl DesktopDaemonService for DaemonService {
         debug!("Received a request to save service location");
         let service_location = request.into_inner();
 
-        match self
-            .service_location_manager
-            .clone()
-            .read()
-            .unwrap()
-            .save_service_locations(
-                service_location.service_locations.as_slice(),
-                &service_location.instance_id,
-                &service_location.private_key,
-            ) {
-            Ok(()) => {
-                debug!("Service location saved successfully");
-            }
-            Err(e) => {
-                let msg = format!("Failed to save service location: {e}");
+        #[cfg(target_os = "linux")]
+        {
+            let mut manager = self.service_location_manager.write().unwrap();
+            manager
+                .disconnect_service_locations_by_instance(&service_location.instance_id)
+                .map_err(|err| {
+                    let msg = format!("Failed to disconnect service location: {err}");
+                    error!(msg);
+                    Status::internal(msg)
+                })?;
+            manager
+                .save_service_locations(
+                    service_location.service_locations.as_slice(),
+                    &service_location.instance_id,
+                    &service_location.private_key,
+                )
+                .map_err(|err| {
+                    let msg = format!("Failed to save service location: {err}");
+                    error!(msg);
+                    Status::internal(msg)
+                })?;
+            manager.connect_to_service_locations().map_err(|err| {
+                let msg = format!("Failed to connect service location: {err}");
                 error!(msg);
-                return Err(Status::internal(msg));
+                Status::internal(msg)
+            })?;
+
+            debug!("Linux service locations saved and reconnected successfully");
+        }
+
+        #[cfg(windows)]
+        {
+            match self
+                .service_location_manager
+                .clone()
+                .read()
+                .unwrap()
+                .save_service_locations(
+                    service_location.service_locations.as_slice(),
+                    &service_location.instance_id,
+                    &service_location.private_key,
+                ) {
+                Ok(()) => {
+                    debug!("Service location saved successfully");
+                }
+                Err(e) => {
+                    let msg = format!("Failed to save service location: {e}");
+                    error!(msg);
+                    return Err(Status::internal(msg));
+                }
             }
         }
 
@@ -595,6 +633,48 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     #[cfg(target_os = "linux")]
     let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
+    #[cfg(target_os = "linux")]
+    {
+        let service_location_manager_connect = service_location_manager.clone();
+        tokio::spawn(async move {
+            for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
+                info!(
+                    "Attempting to auto-connect Linux service locations \
+					(attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
+                );
+                match service_location_manager_connect
+                    .write()
+                    .unwrap()
+                    .connect_to_service_locations()
+                {
+                    Ok(true) => {
+                        info!(
+                            "All Linux service locations connected successfully \
+							(attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
+                        );
+                        break;
+                    }
+                    Ok(false) => {
+                        warn!(
+                            "Linux service location auto-connect attempt \
+							{attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} completed with some failures"
+                        );
+                    }
+                    Err(err) => {
+                        warn!(
+                            "Linux service location auto-connect attempt \
+							{attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} failed: {err}"
+                        );
+                    }
+                }
+
+                if attempt < SERVICE_LOCATION_CONNECT_RETRY_COUNT {
+                    tokio::time::sleep(SERVICE_LOCATION_CONNECT_RETRY_DELAY).await;
+                }
+            }
+            info!("Linux service location auto-connect task finished");
+        });
+    }
 
     let daemon_service = DaemonService::new(
         &config,
