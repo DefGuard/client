@@ -3,18 +3,18 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
-import { useMemo, useRef } from 'react';
-import { Subject } from 'rxjs';
+import { useMemo } from 'react';
 import z from 'zod';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
+import { ButtonMenu } from '../../../../../shared/components/ButtonMenu/MenuButton';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { IconKind } from '../../../../../shared/components/Icon';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { TooltipButton } from '../../../../../shared/components/TooltipButton/TooltipButton';
 import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
+import { Snackbar } from '../../../../../shared/providers/snackbar/snackbar';
 import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
 import {
@@ -65,12 +65,10 @@ export const GeneralInformationStep = () => {
         if (config.address) {
           form.setFieldValue('address', config.address);
         }
-        importTooltipRef.current.next();
+        Snackbar.default('Config file applied');
       }
     },
   });
-
-  const importTooltipRef = useRef(new Subject<void>());
 
   const defaultValues = useMemo(
     (): FormFields => ({
@@ -99,18 +97,23 @@ export const GeneralInformationStep = () => {
         <SizedBox height={ThemeSpacing.Md} />
         <p>{`Upload your config file (optional) and we'll securely extract the connection settings for you. This is the fastest and recommended way to get started.`}</p>
         <div className="actions">
-          <TooltipButton
-            buttonProps={{
-              variant: ButtonVariant.Outlined,
-              iconLeft: IconKind.Upload,
-              text: 'Import WireGuard config file',
-              loading: isPending,
-              onClick: () => {
-                importTunnelFile();
+          <ButtonMenu
+            variant={ButtonVariant.Outlined}
+            text="Actions"
+            loading={isPending}
+            menuItems={[
+              {
+                items: [
+                  {
+                    text: 'Import WireGuard config file',
+                    icon: IconKind.Upload,
+                    onClick: () => {
+                      importTunnelFile();
+                    },
+                  },
+                ],
               },
-            }}
-            tooltipText="Config file applied"
-            tooltipTrigger={importTooltipRef.current}
+            ]}
           />
         </div>
       </header>

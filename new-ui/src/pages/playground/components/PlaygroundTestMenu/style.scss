@@ -1,0 +1,10 @@
+.playground-test-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .last-clicked {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+}

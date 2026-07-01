@@ -13,7 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@biomejs/biome": "2.4.16",
+    "@biomejs/biome": "2.5.1",
     "@floating-ui/react": "^0.27.19",
     "@stablelib/base64": "^2.0.1",
     "@stablelib/x25519": "^2.0.1",
@@ -50,9 +50,9 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@tanstack/devtools-vite": "^0.7.2",
+    "@tanstack/devtools-vite": "^0.8.1",
     "@types/byte-size": "^8.1.2",
-    "@types/node": "^25.9.4",
+    "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",

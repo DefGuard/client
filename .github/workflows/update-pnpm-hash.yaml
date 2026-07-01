@@ -37,7 +37,6 @@ jobs:
 
           FAKE="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
           SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
-          CHANGED=0
 
           # Helper: extract the hash for a given attribute, swap in FAKE,
           # build it, capture the real hash, and write it back.
@@ -84,30 +83,20 @@ jobs:
             # Write the correct hash back.
             sed -i "/^[[:space:]]*${attr} = fetchPnpmDeps/,/;[[:space:]]*\$/{s|hash = \"${FAKE}\"|hash = \"${NEW}\"|}" nix/package.nix
 
-            # Track whether anything changed.
+            # Track whether this hash changed.
             if [ "$CURRENT" != "$NEW" ]; then
               echo "${attr}_changed=true" >> "$GITHUB_OUTPUT"
-              CHANGED=1
             else
               echo "${attr}_changed=false" >> "$GITHUB_OUTPUT"
             fi
           }
 
-          # ----- root pnpm-lock.yaml -----
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qx 'pnpm-lock.yaml'; then
-            update_hash "pnpmDeps" "pnpm root"
-          fi
-
-          # ----- new-ui/pnpm-lock.yaml -----
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qx 'new-ui/pnpm-lock.yaml'; then
-            update_hash "newUiPnpmDeps" "pnpm new-ui"
-          fi
-
-          # If neither lockfile was actually modified, warn but don't fail
-          # (can happen when the PR touches both, then one is reverted).
-          if [ "$CHANGED" -eq 0 ]; then
-            echo "::warning::Workflow triggered but no lockfile changed relative to base."
-          fi
+          # Always attempt both hashes - the workflow trigger already ensures
+          # at least one lockfile was modified. The commit step below only
+          # fires when a hash actually changed, so there's no harm in
+          # computing both every time.
+          update_hash "pnpmDeps" "pnpm root"
+          update_hash "newUiPnpmDeps" "pnpm new-ui"
 
       - name: Commit updated hashes
         if: >
