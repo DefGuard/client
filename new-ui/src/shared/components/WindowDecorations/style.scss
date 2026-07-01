@@ -1,0 +1,75 @@
+#window-decorations {
+  --controls-display: none;
+
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: var(--window-decorations-height);
+  border-bottom: 1px solid var(--border-disabled);
+  box-sizing: border-box;
+
+  &.macos {
+    > .window-drag {
+      margin-left: 100px;
+    }
+  }
+
+  &.windows {
+    --controls-display: flex;
+  }
+
+  > .window-drag {
+    content: ' ';
+    display: flex;
+    flex: 1 1 auto;
+    flex-flow: row;
+    min-width: 0;
+    height: 100%;
+  }
+
+  > .window-controls {
+    display: flex;
+    flex-flow: row nowrap;
+  }
+
+  button {
+    --bg: transparent;
+    --icon: var(--fg-white-80);
+
+    border: 0;
+    background-color: var(--bg);
+    width: 46px;
+    height: 32px;
+    display: inline-flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    @include animate(background-color);
+
+    &:not(.close):hover {
+      --bg: var(--bg-white-10);
+      --icon: var(--fg-white-100);
+    }
+
+    &.close:hover {
+      --bg: var(--bg-critical);
+      --icon: var(--fg-white-100);
+    }
+
+    &.minimize svg path {
+      stroke: var(--icon);
+    }
+
+    &.maximize svg rect {
+      stroke: var(--icon);
+    }
+
+    &.close svg path {
+      fill: var(--icon);
+    }
+  }
+}

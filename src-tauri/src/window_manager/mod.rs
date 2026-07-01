@@ -70,7 +70,7 @@ impl WindowManager {
             .title(WINDOW_TITLE)
             .inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
             .min_inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
-            .decorations(true)
+            .decorations(cfg!(not(any(windows, target_os = "macos"))))
             .visible(false)
             .build()
     }

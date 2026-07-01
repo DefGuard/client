@@ -6,18 +6,22 @@
 
     .backdrop {
       position: fixed;
-      inset: 0;
+      left: 0;
+      top: var(--window-decorations-height);
       display: block;
       content: ' ';
       width: 100%;
-      height: 100%;
+      height: calc(100dvh - var(--window-decorations-height));
       z-index: 4;
     }
 
     .modal-positioner {
       overflow: auto;
       position: fixed;
-      inset: 0;
+      left: 0;
+      top: var(--window-decorations-height);
+      width: 100%;
+      height: calc(100dvh - var(--window-decorations-height));
       z-index: 4;
       display: flex;
       flex-flow: column;
