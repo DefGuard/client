@@ -20,7 +20,7 @@ use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 
-use crate::commands::{disable_enterprise_features, do_update_instance, sync_service_locations};
+use crate::commands::{disable_enterprise_features, do_update_instance};
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -171,15 +171,11 @@ pub async fn poll_instance(
         fetched.response.device_config.as_ref().ok_or_else(|| {
             Error::InternalError("Device config not present in response".to_string())
         })?;
-    error!("DeviceConfig: {:#?}", device_config);
     if !config_changed(transaction, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
         );
-        if !has_active_connections {
-            sync_service_locations(transaction, instance).await?;
-        }
         return Ok(PollInstanceResult::Unchanged { version_mismatch });
     }
 
