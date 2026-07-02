@@ -15,7 +15,7 @@ const appWindow = getCurrentWindow();
 
 const isFullView = appWindow.label === WindowId.FullView;
 
-const decorationsHeight = 33;
+const decorationsHeight = 32;
 
 export const WindowDecorations = () => {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -26,9 +26,10 @@ export const WindowDecorations = () => {
   }, []);
 
   useEffect(() => {
+    const shouldReserveSpace = isFullView && osCheck && (isMac || !isDecorated);
     document.documentElement.style.setProperty(
       '--window-decorations-height',
-      !isDecorated && isFullView && osCheck ? `${decorationsHeight}px` : '0',
+      shouldReserveSpace ? `${decorationsHeight}px` : '0',
     );
   }, [isDecorated]);
 
@@ -46,7 +47,7 @@ export const WindowDecorations = () => {
     };
   }, [isDecorated]);
 
-  if (isDecorated || !isFullView) {
+  if (!isFullView || (!isMac && isDecorated)) {
     return null;
   }
 
