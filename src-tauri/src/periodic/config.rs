@@ -80,26 +80,22 @@ pub async fn poll_config(handle: AppHandle) {
                     emit_version_mismatch(&handle, instance_id, version_mismatch(&result));
                     emit_poll_result_events(&handle, instance_id, &instance_name, result);
                     debug!(
-                        "Finished processing configuration polling request for instance {}(ID: {})",
-                        instance_name, instance_id
+                        "Finished processing configuration polling request for instance {instance_name}(ID: {instance_id})"
                     );
                 }
                 Err(Error::CoreNotEnterprise) => {
                     debug!(
-                        "Tried to contact core for instance {}(ID: {}) config but it's not enterprise, can't retrieve config",
-                        instance_name, instance_id
+                        "Tried to contact core for instance {instance_name}(ID: {instance_id}) config but it's not enterprise, can't retrieve config"
                     );
                 }
                 Err(Error::NoToken) => {
                     debug!(
-                        "Instance {}(ID: {}) has no token, can't retrieve its config from the core",
-                        instance_name, instance_id,
+                        "Instance {instance_name}(ID: {instance_id}) has no token, can't retrieve its config from the core",
                     );
                 }
                 Err(err) => {
                     error!(
-                        "Failed to retrieve instance {}(ID: {}) config from core: {err}",
-                        instance_name, instance_id
+                        "Failed to retrieve instance {instance_name}(ID: {instance_id}) config from core: {err}"
                     );
                 }
             }
@@ -175,15 +171,9 @@ fn emit_poll_result_events(
             }
         }
         PollInstanceResult::ChangedWhileActive { .. } => {
-            debug!(
-                "Emitting config-changed event for instance {}({})",
-                instance_name, instance_id,
-            );
+            debug!("Emitting config-changed event for instance {instance_name}({instance_id})",);
             let _ = handle.emit(EventKey::ConfigChanged.into(), instance_name);
-            info!(
-                "Emitted config-changed event for instance {}({})",
-                instance_name, instance_id,
-            );
+            info!("Emitted config-changed event for instance {instance_name}({instance_id})",);
         }
     }
 }
