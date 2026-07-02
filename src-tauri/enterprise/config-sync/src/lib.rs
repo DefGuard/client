@@ -103,8 +103,6 @@ pub async fn fetch_instance_config(
         instance.name
     );
 
-    let version_mismatch = check_min_version(&response, instance);
-
     // Return early if the enterprise features are disabled in the core
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
@@ -128,6 +126,17 @@ pub async fn fetch_instance_config(
         }
         return Err(Error::CoreNotEnterprise);
     }
+
+    if !response.status().is_success() {
+        return Err(Error::InternalError(format!(
+            "Config polling failed for instance {}({}) with status {}",
+            instance.name,
+            instance.id,
+            response.status(),
+        )));
+    }
+
+    let version_mismatch = check_min_version(&response, instance);
 
     // Parse the response
     debug!(
