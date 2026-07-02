@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Create GitHub release
         id: release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           generate_release_notes: true
@@ -113,7 +113,7 @@ jobs:
           args: "--bundles deb"
 
       - name: Upload DEB
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -132,13 +132,12 @@ jobs:
           fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb"
 
       - name: Upload DEB
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
-          asset_name: dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
 
   build-linux:
@@ -227,23 +226,21 @@ jobs:
           echo "deb_sha256_${{ matrix.deb_arch }}=$DEB_SHA256" >> ${GITHUB_OUTPUT}
 
       - name: Upload RPM
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
-          asset_name: defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_content_type: application/octet-stream
 
       - name: Upload DEB
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_content_type: application/octet-stream
 
       - name: Rename and tar client binary
@@ -253,13 +250,12 @@ jobs:
             defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
 
       - name: Upload client archive
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
       - name: Rename and tar daemon binary
@@ -269,13 +265,12 @@ jobs:
             defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
 
       - name: Upload daemon archive
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
       - name: Rename and tar defguard-cli binary
@@ -285,13 +280,12 @@ jobs:
             defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
 
       - name: Upload defguard-cli archive
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: defguard-cli-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
       - name: Rename and tar dg binary
@@ -301,13 +295,12 @@ jobs:
             dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
 
       - name: Upload dg archive
-        uses: actions/upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
       - name: Build dg deb
@@ -317,13 +310,12 @@ jobs:
           fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
 
       - name: Upload DEB
-        uses: actions/upload-release-asset@v1.0.2
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb
           asset_content_type: application/octet-stream
 
       - name: Build dg rpm
@@ -333,14 +325,20 @@ jobs:
           fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
 
       - name: Upload RPM
-        uses: actions/upload-release-asset@v1.0.2
+        uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
-          asset_name: dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm
           asset_content_type: application/octet-stream
+
+  build-macos:
+    needs:
+      - create-release
+    uses: ./.github/workflows/sbom.yml
+    with:
+      upload_url: ${{ needs.create-release.outputs.upload_url }}
 
   # Builds Windows MSI and uploads it as artifact
   # build-windows:
@@ -423,7 +421,7 @@ jobs:
   #     - name: Sign bundle
   #       run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
   #     - name: Upload installer asset
-  #       uses: actions/upload-release-asset@v1
+  #       uses: shogo82148/actions-upload-release-asset@v1
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #       with:

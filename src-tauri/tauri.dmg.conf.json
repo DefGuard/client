@@ -3,7 +3,10 @@
     "beforeBundleCommand": {
       "cwd": "../swift",
       "script": "./build.sh VPNSystemExtension Installer"
-    }
+    },
+    "features": [
+      "macos_installer"
+    ]
   },
   "bundle": {
     "macOS": {
@@ -12,6 +15,9 @@
         "embedded.provisionprofile": "Defguard_Client_Mac_DeveloperID.provisionprofile",
         "Library/SystemExtensions/net.defguard.VPNExtension.systemextension": "../swift/extension/build/Installer/VPNSystemExtension.systemextension"
       }
-    }
+    },
+    "targets": [
+      "dmg"
+    ]
   }
 }
