@@ -24,15 +24,16 @@ use windows_service::{
 
 use crate::{
     config::Config,
-    daemon::{run_server, DaemonError},
+    daemon::{
+        run_server, DaemonError, SERVICE_LOCATION_CONNECT_RETRY_COUNT,
+        SERVICE_LOCATION_CONNECT_RETRY_DELAY,
+    },
     utils::logging_setup,
 };
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
-const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
-const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking

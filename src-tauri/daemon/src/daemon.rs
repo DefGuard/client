@@ -57,10 +57,10 @@ pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 #[cfg(target_os = "linux")]
 pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
-#[cfg(target_os = "linux")]
-const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
-#[cfg(target_os = "linux")]
-const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
+#[cfg(any(windows, target_os = "linux"))]
+pub(crate) const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
+#[cfg(any(windows, target_os = "linux"))]
+pub(crate) const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
 
 #[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
