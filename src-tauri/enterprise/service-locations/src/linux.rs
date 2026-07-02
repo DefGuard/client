@@ -105,18 +105,10 @@ impl ServiceLocationManager {
 
         let mut reset_failed = false;
         for location in &service_locations {
-            if let Err(err) = self.disconnect_service_location(instance_id, &location.pubkey) {
-                error!(
-                    "Failed to disconnect Linux service location '{}' before reconnecting: {err}",
-                    location.name
-                );
-                reset_failed = true;
-                continue;
-            }
-
-            if let Err(err) = self.connect_service_location(instance_id, location, private_key) {
+            if let Err(err) = self.reset_service_location_state(instance_id, location, private_key)
+            {
                 warn!(
-                    "Failed to connect Linux service location '{}' after saving: {err}",
+                    "Failed to reset Linux service location '{}' after saving: {err}",
                     location.name
                 );
                 reset_failed = true;
@@ -129,6 +121,27 @@ impl ServiceLocationManager {
             )));
         }
 
+        Ok(())
+    }
+
+    fn reset_service_location_state(
+        &mut self,
+        instance_id: &str,
+        location: &ServiceLocation,
+        private_key: &str,
+    ) -> Result<(), ServiceLocationError> {
+        debug!(
+            "Resetting Linux service location '{}' for instance {instance_id}",
+            location.name
+        );
+
+        self.disconnect_service_location(instance_id, &location.pubkey)?;
+        self.connect_service_location(instance_id, location, private_key)?;
+
+        debug!(
+            "Linux service location '{}' state reset successfully",
+            location.name
+        );
         Ok(())
     }
 
