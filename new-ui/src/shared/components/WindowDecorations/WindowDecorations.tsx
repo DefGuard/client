@@ -54,7 +54,7 @@ export const WindowDecorations = () => {
     <div
       id="window-decorations"
       className={clsx({
-        widows: isWindows,
+        windows: isWindows,
         macos: isMac,
       })}
     >
