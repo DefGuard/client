@@ -3,8 +3,6 @@
 
 #[cfg(target_os = "macos")]
 pub mod apple;
-#[cfg(all(target_os = "macos", feature = "macos_installer"))]
-pub mod system_extension;
 pub mod appstate;
 pub mod commands;
 pub mod events;
@@ -13,6 +11,8 @@ pub mod periodic;
 pub mod provisioning;
 pub mod service;
 pub mod session_state;
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+pub mod system_extension;
 pub mod tray;
 pub mod utils;
 pub mod window_manager;
