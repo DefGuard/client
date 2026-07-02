@@ -151,6 +151,11 @@ pub async fn do_update_instance(
     Ok(locations_changed_val)
 }
 
+/// Synchronizes the daemon's persisted service-location state from the current database state.
+///
+/// This is called after a real config update has been applied locally. It sends all currently
+/// persisted service locations for the instance to the daemon, or asks the daemon to delete its
+/// service-location state when none remain.
 pub async fn sync_service_locations(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,

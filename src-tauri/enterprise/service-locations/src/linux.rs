@@ -47,6 +47,11 @@ impl ServiceLocationManager {
         Ok(Self::default())
     }
 
+    /// Persists Linux-supported service locations and resets their runtime connection state.
+    ///
+    /// Linux supports Always-on service locations only. Unsupported modes are filtered out before
+    /// storage, stale previously-saved locations are disconnected, and every saved Always-on location
+    /// is reset. All resets are attempted before returning an aggregate error.
     pub fn save_service_locations(
         &mut self,
         service_locations: &[ServiceLocation],
@@ -124,6 +129,7 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    /// Reconnects one Linux always-on service location.
     fn reset_service_location_state(
         &mut self,
         instance_id: &str,
@@ -145,6 +151,7 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    /// Records a service location as connected in the in-memory daemon state.
     fn add_connected_service_location(&mut self, instance_id: &str, location: &ServiceLocation) {
         self.connected_service_locations
             .entry(instance_id.to_string())
@@ -317,6 +324,10 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    /// Attempts to connect all persisted Linux always-on service locations.
+    ///
+    /// Returns `Ok(true)` when every supported location is connected or already connected, and
+    /// `Ok(false)` when at least one supported location failed so the caller can retry later.
     pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect Linux Always-on service locations");
 
@@ -377,6 +388,7 @@ impl ServiceLocationManager {
     }
 
     #[allow(dead_code)]
+    /// Loads persisted service-location data for all Linux instances.
     fn load_service_locations(&self) -> Result<Vec<ServiceLocationData>, ServiceLocationError> {
         let base_dir = ensure_shared_directory()?;
         let mut all_locations_data = Vec::new();
@@ -405,6 +417,7 @@ impl ServiceLocationManager {
         Ok(all_locations_data)
     }
 
+    /// Loads persisted service-location data for one Linux instance, if present.
     fn load_service_locations_for_instance(
         &self,
         instance_id: &str,
