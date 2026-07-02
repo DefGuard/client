@@ -171,7 +171,6 @@ pub async fn poll_instance(
         fetched.response.device_config.as_ref().ok_or_else(|| {
             Error::InternalError("Device config not present in response".to_string())
         })?;
-
     if !config_changed(transaction, instance, device_config).await? {
         debug!(
             "Config for instance {}({}) didn't change",
