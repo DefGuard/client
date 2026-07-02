@@ -885,6 +885,7 @@ impl ServiceLocationManager {
             self.disconnect_service_location(instance_id, removed_pubkey)?;
         }
 
+        let mut reset_failed = false;
         for saved_location in service_locations {
             match self.reset_service_location_state(instance_id, &saved_location.pubkey) {
                 Ok(()) => {
@@ -898,8 +899,15 @@ impl ServiceLocationManager {
                         "Failed to reset state for service location '{}': {err}",
                         saved_location.name
                     );
+                    reset_failed = true;
                 }
             }
+        }
+
+        if reset_failed {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "Failed to reset one or more service locations for instance {instance_id}"
+            )));
         }
 
         Ok(())

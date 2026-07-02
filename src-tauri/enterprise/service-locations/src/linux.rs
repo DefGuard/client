@@ -58,6 +58,7 @@ impl ServiceLocationManager {
             service_locations.len(),
         );
 
+        debug!("Service locations to save: {service_locations:?}");
         let old_locations = self
             .load_service_locations_for_instance(instance_id)?
             .map_or_else(Vec::new, |data| data.service_locations);
@@ -76,14 +77,6 @@ impl ServiceLocationManager {
             .map(|location| location.pubkey.clone())
             .collect::<HashSet<_>>();
 
-        if service_locations.is_empty() {
-            debug!("No Linux-supported service locations to save for instance {instance_id}");
-            for removed_pubkey in old_pubkeys {
-                self.disconnect_service_location(instance_id, &removed_pubkey)?;
-            }
-            return self.delete_all_service_locations_for_instance(instance_id);
-        }
-
         let service_location_data = ServiceLocationData {
             service_locations: service_locations.clone(),
             instance_id: instance_id.to_string(),
@@ -95,7 +88,7 @@ impl ServiceLocationManager {
         let json = serde_json::to_string_pretty(&service_location_data)?;
 
         debug!(
-            "Writing Linux service location data to file: {}",
+            "Writing service location data to file: {}",
             instance_file_path.display()
         );
         fs::write(&instance_file_path, json)?;
@@ -109,9 +102,31 @@ impl ServiceLocationManager {
         for removed_pubkey in old_pubkeys.difference(&new_pubkeys) {
             self.disconnect_service_location(instance_id, removed_pubkey)?;
         }
+
+        let mut reset_failed = false;
         for location in &service_locations {
-            self.disconnect_service_location(instance_id, &location.pubkey)?;
-            self.connect_service_location(instance_id, location, private_key)?;
+            if let Err(err) = self.disconnect_service_location(instance_id, &location.pubkey) {
+                error!(
+                    "Failed to disconnect Linux service location '{}' before reconnecting: {err}",
+                    location.name
+                );
+                reset_failed = true;
+                continue;
+            }
+
+            if let Err(err) = self.connect_service_location(instance_id, location, private_key) {
+                warn!(
+                    "Failed to connect Linux service location '{}' after saving: {err}",
+                    location.name
+                );
+                reset_failed = true;
+            }
+        }
+
+        if reset_failed {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "Failed to connect one or more Linux service locations for instance {instance_id}"
+            )));
         }
 
         Ok(())
