@@ -12,7 +12,7 @@
     "macOS": {
       "entitlements": "Installer.entitlements",
       "files": {
-        "embedded.provisionprofile": "Defguard_Client_Mac_DeveloperID.provisionprofile",
+        "embedded.provisionprofile": "/Users/admin/Library/Developer/Xcode/UserData/Provisioning Profiles/fbbc4fe8-8738-432c-a647-484dee3f95bb.provisionprofile",
         "Library/SystemExtensions/net.defguard.VPNExtension.systemextension": "../swift/extension/build/Installer/VPNSystemExtension.systemextension"
       }
     },

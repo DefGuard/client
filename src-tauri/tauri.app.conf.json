@@ -3,7 +3,7 @@
     "macOS": {
       "entitlements": "./Client.entitlements",
       "files": {
-        "embedded.provisionprofile": "Defguard_Client_Mac_App_Store.provisionprofile",
+        "embedded.provisionprofile": "/Users/admin/Library/Developer/Xcode/UserData/Provisioning Profiles/3e2fba84-ccd2-45cc-b40e-80a9f103b5d9.provisionprofile",
         "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
       }
     },
