@@ -140,10 +140,12 @@ x25519-dalek = { version = "2", features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
+dispatch2 = { version = "0.3", optional = true }
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 objc2-network-extension = "0.3"
+objc2-system-extensions = { version = "0.3", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["user", "fs"] }
@@ -188,6 +190,7 @@ wmi = {version = "0.18", default-features = false}
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+macos_installer = ["dep:dispatch2", "dep:objc2-system-extensions"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

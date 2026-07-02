@@ -39,6 +39,10 @@ use defguard_client::{
     connection::apple::{observer_thread, spawn_runloop_and_wait_for},
     database::models::get_all_tunnels_locations,
 };
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+use defguard_client::{
+    connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension,
+};
 use defguard_client_core::connection::active_connections::close_all_connections;
 #[cfg(target_os = "macos")]
 use defguard_client_core::connection::sync_locations_and_tunnels;
@@ -93,6 +97,9 @@ async fn startup(app_handle: &AppHandle) {
             }
         };
     }
+    #[cfg(all(target_os = "macos", feature = "macos_installer"))]
+    activate_system_extension(PLUGIN_BUNDLE_ID);
+
     #[cfg(target_os = "macos")]
     {
         let semaphore = Arc::new(AtomicBool::new(false));

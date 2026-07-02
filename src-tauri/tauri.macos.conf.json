@@ -4,5 +4,11 @@
       "cwd": "../swift",
       "script": "./build.sh"
     }
+  },
+  "bundle": {
+    "macOS": {
+      "bundleVersion": "@BUILD_NUMBER@",
+      "minimumSystemVersion": "13.5"
+    }
   }
 }

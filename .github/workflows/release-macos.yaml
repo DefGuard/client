@@ -1,0 +1,83 @@
+name: Build macOS dmg
+on:
+  workflow_call:
+    inputs:
+      upload_url:
+        description: 'Upload URL for release'
+        required: true
+        type: string
+
+env:
+  SQLX_OFFLINE: "1"
+
+jobs:
+  build-macos-dmg:
+    runs-on:
+      - self-hosted
+      - macOS
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Write release version
+        run: |
+          VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
+          fi
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+          version: 11
+
+      - name: Install Node dependencies for New UI
+        run: |
+          cd new-ui
+          pnpm install --no-frozen-lockfile
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Set build number
+        run: |
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.macos.conf.json
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/client-cli/Info.plist
+
+      - name: Unlock keychain
+        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+
+      - name: Build new UI
+        run: |
+          cd new-ui
+          pnpm build
+
+      - name: Build app
+        uses: tauri-apps/tauri-action@v1
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
+
+      - name: Upload DMG
+        uses: shogo82148/actions-upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ inputs.upload_url }}
+          asset_path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/Defguard_${{ env.VERSION }}_universal.dmg
+          asset_content_type: application/x-apple-diskimage
+          overwrite: true

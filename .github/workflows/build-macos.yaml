@@ -73,11 +73,11 @@ jobs:
           pnpm build
 
       - name: Build app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target universal-apple-darwin
+          args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
 
       # - name: Bundle Defguard CLI
       #   env:
