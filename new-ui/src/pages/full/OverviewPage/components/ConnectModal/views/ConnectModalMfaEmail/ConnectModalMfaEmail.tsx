@@ -36,17 +36,22 @@ export const ConnectModalMfaEmail = () => {
   const [emailCode, setEmailCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = useCallback(() => {
-    if (!isPresent(emailCode)) {
-      setError('Enter code');
-      return;
-    }
-    if (emailCode.length !== 6) {
-      setError('6 digits are required');
-      return;
-    }
-    verifyCode(emailCode);
-  }, [emailCode, verifyCode]);
+  const handleVerify = useCallback(
+    (initCode?: string | null) => {
+      const codeToVerify = initCode ?? emailCode;
+
+      if (!isPresent(codeToVerify)) {
+        setError('Enter code');
+        return;
+      }
+      if (codeToVerify.length !== 6) {
+        setError('6 digits are required');
+        return;
+      }
+      verifyCode(codeToVerify);
+    },
+    [emailCode, verifyCode],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
   useEffect(() => {
@@ -76,6 +81,9 @@ export const ConnectModalMfaEmail = () => {
         value={emailCode}
         onChange={setEmailCode}
         error={startError ?? error}
+        onSuccessPaste={(value) => {
+          handleVerify(value);
+        }}
       />
       <Controls>
         <Button
@@ -89,7 +97,7 @@ export const ConnectModalMfaEmail = () => {
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
-            onClick={handleVerify}
+            onClick={() => handleVerify()}
             loading={isStarting || isVerifying}
           />
         </div>

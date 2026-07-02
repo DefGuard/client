@@ -161,6 +161,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
                     view: ConnectModalView.MfaSettings,
                     location: location,
                     perviousView: null,
+                    mfaMethod: location.mfa_method,
                   });
                 }
               }}
