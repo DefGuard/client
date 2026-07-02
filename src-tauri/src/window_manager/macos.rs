@@ -6,7 +6,11 @@ use tauri::{
 
 use crate::{appstate::AppState, window_manager::WINDOW_GAP};
 
-const TRAFFIC_LIGHT_Y: f64 = 4.0;
+/// Fixed AppKit titlebar height when `FullSizeContentView` is set.
+const NATIVE_TITLEBAR_HEIGHT: f64 = 28.0;
+
+/// Must match `decorationsHeight` in `WindowDecorations.tsx`.
+const HEADER_HEIGHT: f64 = 32.0;
 
 pub(crate) fn enable_rounded_corners<R: Runtime>(
     window: &WebviewWindow<R>,
@@ -20,7 +24,8 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(
                 | NSWindowStyleMask::Borderless
                 | NSWindowStyleMask::Titled
                 | NSWindowStyleMask::Closable
-                | NSWindowStyleMask::Miniaturizable;
+                | NSWindowStyleMask::Miniaturizable
+                | NSWindowStyleMask::FullSizeContentView;
             ns_window.setStyleMask(style_mask);
             ns_window.setTitlebarAppearsTransparent(true);
 
@@ -43,7 +48,10 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(
                 if let Some(btn) = button {
                     btn.setHidden(!enable_system_controls);
                     if enable_system_controls {
-                        btn.setFrameOrigin(NSPoint::new(x, TRAFFIC_LIGHT_Y));
+                        let y = (NATIVE_TITLEBAR_HEIGHT
+                            - (HEADER_HEIGHT + btn.frame().size.height) / 2.0)
+                            .round();
+                        btn.setFrameOrigin(NSPoint::new(x, y));
                     }
                 }
             }
