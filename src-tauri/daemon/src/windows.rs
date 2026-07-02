@@ -10,7 +10,7 @@ use defguard_client_service_locations::{
     windows::{watch_for_login_logoff, watch_for_network_change},
     ServiceLocationError, ServiceLocationManager,
 };
-use tokio::{runtime::Runtime, time::sleep};
+use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 use windows_service::{
     define_windows_service,
@@ -128,52 +128,18 @@ fn run_service() -> Result<(), DaemonError> {
             })
             .expect("Failed to spawn network change monitor thread");
 
-        // Spawn service location auto-connect task with retries.
-        // Each attempt skips locations that are already connected, so it is safe to call
-        // connect_to_service_locations repeatedly. The retry loop exists to handle the case
-        // where the connection may fail initially at startup because the network
-        // (e.g. Wi-Fi) is not yet available (mainly DNS resolution issues), and serves as
-        // a backstop for any network events missed by the watcher above.
-        // If all locations connect successfully on a given attempt, no further retries are made.
-        let service_location_manager_connect = service_location_manager.clone();
-        runtime.spawn(async move {
-            for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
-                info!(
-                    "Attempting to auto-connect to service locations \
-                    (attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
-                );
-                match service_location_manager_connect
-                    .write()
-                    .unwrap()
-                    .connect_to_service_locations()
-                {
-                    Ok(true) => {
-                        info!(
-                            "All service locations connected successfully \
-                            (attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
-                        );
-                        break;
-                    }
-                    Ok(false) => {
-                        warn!(
-                            "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
-                            completed with some failures"
-                        );
-                    }
-                    Err(err) => {
-                        warn!(
-                            "Auto-connect attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} \
-                            failed: {err}"
-                        );
-                    }
-                }
-
-                if attempt < SERVICE_LOCATION_CONNECT_RETRY_COUNT {
-                    sleep(SERVICE_LOCATION_CONNECT_RETRY_DELAY).await;
-                }
-            }
-            info!("Service location auto-connect task finished");
-        });
+        // Spawn the service location auto-connect task with retries. Each attempt skips locations
+        // that are already connected, so it is safe to call repeatedly. The retry loop handles the
+        // case where the connection fails initially at startup because the network (e.g. Wi-Fi) is
+        // not yet available (mainly DNS resolution issues), and serves as a backstop for any
+        // network events missed by the watcher above.
+        runtime.spawn(
+            defguard_client_service_locations::connect_service_locations(
+                service_location_manager.clone(),
+                SERVICE_LOCATION_CONNECT_RETRY_COUNT,
+                SERVICE_LOCATION_CONNECT_RETRY_DELAY,
+            ),
+        );
 
         // Spawn login/logoff monitoring on a dedicated OS thread so the blocking
         // WTSWaitSystemEvent syscall does not stall Tokio's async worker threads.

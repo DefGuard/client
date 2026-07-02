@@ -558,47 +558,13 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
     #[cfg(target_os = "linux")]
-    {
-        let service_location_manager_connect = service_location_manager.clone();
-        tokio::spawn(async move {
-            for attempt in 1..=SERVICE_LOCATION_CONNECT_RETRY_COUNT {
-                info!(
-                    "Attempting to auto-connect Linux service locations \
-					(attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
-                );
-                match service_location_manager_connect
-                    .write()
-                    .unwrap()
-                    .connect_to_service_locations()
-                {
-                    Ok(true) => {
-                        info!(
-                            "All Linux service locations connected successfully \
-							(attempt {attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT})"
-                        );
-                        break;
-                    }
-                    Ok(false) => {
-                        warn!(
-                            "Linux service location auto-connect attempt \
-							{attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} completed with some failures"
-                        );
-                    }
-                    Err(err) => {
-                        warn!(
-                            "Linux service location auto-connect attempt \
-							{attempt}/{SERVICE_LOCATION_CONNECT_RETRY_COUNT} failed: {err}"
-                        );
-                    }
-                }
-
-                if attempt < SERVICE_LOCATION_CONNECT_RETRY_COUNT {
-                    tokio::time::sleep(SERVICE_LOCATION_CONNECT_RETRY_DELAY).await;
-                }
-            }
-            info!("Linux service location auto-connect task finished");
-        });
-    }
+    tokio::spawn(
+        defguard_client_service_locations::connect_service_locations(
+            service_location_manager.clone(),
+            SERVICE_LOCATION_CONNECT_RETRY_COUNT,
+            SERVICE_LOCATION_CONNECT_RETRY_DELAY,
+        ),
+    );
 
     let daemon_service = DaemonService::new(
         &config,

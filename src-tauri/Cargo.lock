@@ -1831,6 +1831,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tokio",
  "windows 0.62.2",
  "windows-acl",
  "windows-service",
