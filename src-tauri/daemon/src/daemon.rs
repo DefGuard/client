@@ -185,7 +185,7 @@ pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
 
-    #[cfg(all(not(windows), not(target_os = "linux")))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     async fn save_service_locations(
         &self,
         _request: tonic::Request<SaveServiceLocationsRequest>,
@@ -194,7 +194,7 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    #[cfg(all(not(windows), not(target_os = "linux")))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     async fn delete_service_locations(
         &self,
         _request: tonic::Request<DeleteServiceLocationsRequest>,
