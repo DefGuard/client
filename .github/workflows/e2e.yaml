@@ -39,14 +39,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11
-
       - uses: actions/setup-node@v6
         with:
           node-version: 26
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          cache: true
+          version: 11
+          run_install: false
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
