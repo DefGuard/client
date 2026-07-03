@@ -1,12 +1,9 @@
-use objc2_app_kit::{NSWindow, NSWindowButton, NSWindowStyleMask};
-use objc2_foundation::NSPoint;
+use objc2_app_kit::{NSWindow, NSWindowButton, NSWindowStyleMask, NSWindowTitleVisibility};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Position, Runtime, WebviewWindow,
 };
 
 use crate::{appstate::AppState, window_manager::WINDOW_GAP};
-
-const TRAFFIC_LIGHT_Y: f64 = 4.0;
 
 pub(crate) fn enable_rounded_corners<R: Runtime>(
     window: &WebviewWindow<R>,
@@ -20,31 +17,20 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(
                 | NSWindowStyleMask::Borderless
                 | NSWindowStyleMask::Titled
                 | NSWindowStyleMask::Closable
-                | NSWindowStyleMask::Miniaturizable;
+                | NSWindowStyleMask::Miniaturizable
+                | NSWindowStyleMask::FullSizeContentView;
             ns_window.setStyleMask(style_mask);
             ns_window.setTitlebarAppearsTransparent(true);
+            ns_window.setTitleVisibility(NSWindowTitleVisibility::Hidden);
 
-            // Traffic light buttons, positioned 20px from left.
             let buttons = [
-                (
-                    ns_window.standardWindowButton(NSWindowButton::CloseButton),
-                    20.0,
-                ),
-                (
-                    ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
-                    40.0,
-                ),
-                (
-                    ns_window.standardWindowButton(NSWindowButton::ZoomButton),
-                    60.0,
-                ),
+                ns_window.standardWindowButton(NSWindowButton::CloseButton),
+                ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
+                ns_window.standardWindowButton(NSWindowButton::ZoomButton),
             ];
-            for (button, x) in buttons {
+            for button in buttons {
                 if let Some(btn) = button {
                     btn.setHidden(!enable_system_controls);
-                    if enable_system_controls {
-                        btn.setFrameOrigin(NSPoint::new(x, TRAFFIC_LIGHT_Y));
-                    }
                 }
             }
         })
