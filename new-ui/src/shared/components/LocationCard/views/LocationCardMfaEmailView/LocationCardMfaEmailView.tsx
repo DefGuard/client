@@ -38,17 +38,22 @@ export const LocationCardMfaEmailView = () => {
   const [emailCode, setEmailCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = useCallback(() => {
-    if (!isPresent(emailCode)) {
-      setError('Enter code');
-      return;
-    }
-    if (emailCode.length !== 6) {
-      setError('6 digits are required');
-      return;
-    }
-    verifyCode(emailCode);
-  }, [emailCode, verifyCode]);
+  const handleVerify = useCallback(
+    (argCode?: string | null) => {
+      const toCheck = argCode ?? emailCode;
+
+      if (!isPresent(toCheck)) {
+        setError('Enter code');
+        return;
+      }
+      if (toCheck.length !== 6) {
+        setError('6 digits are required');
+        return;
+      }
+      verifyCode(toCheck);
+    },
+    [emailCode, verifyCode],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
   useEffect(() => {
@@ -83,8 +88,7 @@ export const LocationCardMfaEmailView = () => {
         onChange={setEmailCode}
         error={startError ?? error}
         onSuccessPaste={(value) => {
-          setEmailCode(value);
-          handleVerify();
+          handleVerify(value);
         }}
       />
       <Controls>
@@ -107,7 +111,7 @@ export const LocationCardMfaEmailView = () => {
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
-            onClick={handleVerify}
+            onClick={() => handleVerify(emailCode)}
             loading={isStarting || isVerifying}
           />
         </div>

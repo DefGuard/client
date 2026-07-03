@@ -15,7 +15,7 @@ pub async fn has_non_service_locations() -> bool {
 pub const COMPACT_WINDOW_ID: &str = "compact-view";
 pub const FULL_VIEW_WINDOW_ID: &str = "full-view";
 pub const COMPACT_WINDOW_WIDTH: f64 = 380.0;
-pub const COMPACT_WINDOW_HEIGHT: f64 = 640.0;
+pub const COMPACT_WINDOW_HEIGHT: f64 = 680.0;
 pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
 pub const FULL_VIEW_WINDOW_HEIGHT: f64 = 700.0;
 #[cfg(not(target_os = "linux"))]

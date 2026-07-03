@@ -7,6 +7,10 @@
       justify-content: flex-start;
       column-gap: var(--spacing-lg);
       padding-bottom: var(--spacing-lg);
+
+      > .info {
+        row-gap: var(--spacing-xs);
+      }
     }
 
     &-desktop {
@@ -29,7 +33,7 @@
     display: flex;
     flex-flow: column;
     align-items: flex-start;
-    row-gap: var(--spacing-xs);
+    row-gap: 0;
     user-select: none;
 
     > .label {
