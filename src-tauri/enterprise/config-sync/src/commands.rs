@@ -139,21 +139,21 @@ pub async fn do_update_instance(
             removed_location.delete(transaction.as_mut()).await?;
             info!(
                 "Removed location {removed_location} for instance {instance} during instance update"
-            );
+			);
         }
         debug!("Finished updating locations for instance {instance}");
+
+        sync_service_locations(transaction, instance).await?;
     } else {
         info!("Locations for instance {instance} didn't change. Not updating them.");
     }
-
-    sync_service_locations(transaction, instance).await?;
 
     Ok(locations_changed_val)
 }
 
 /// Synchronizes the daemon's persisted service-location state from the current database state.
 ///
-/// This is called after a real config update has been applied locally. It sends all currently
+/// This is called after location config changes have been applied locally. It sends all currently
 /// persisted service locations for the instance to the daemon, or asks the daemon to delete its
 /// service-location state when none remain.
 pub async fn sync_service_locations(
