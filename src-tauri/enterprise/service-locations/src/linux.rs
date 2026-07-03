@@ -309,6 +309,11 @@ impl ServiceLocationManager {
             remove_created_interface(&wgapi, &ifname);
             return Err(err.into());
         }
+        debug!("Configuring Linux service location interface {ifname} routing");
+        if let Err(err) = wgapi.configure_peer_routing(&config.peers) {
+            remove_created_interface(&wgapi, &ifname);
+            return Err(err.into());
+        }
         if let Err(err) = wgapi.configure_dns(&dns, &search_domains) {
             remove_created_interface(&wgapi, &ifname);
             return Err(err.into());
