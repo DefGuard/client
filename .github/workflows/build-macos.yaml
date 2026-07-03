@@ -75,6 +75,7 @@ jobs:
       - name: Build app
         uses: tauri-apps/tauri-action@v1
         env:
+          CI: "1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
