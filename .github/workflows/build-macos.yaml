@@ -60,9 +60,9 @@ jobs:
 
       - name: Set build number
         run: |
-          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.conf.json
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/client-cli/Info.plist
+          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.macos.conf.json
 
       - name: Unlock keychain
         run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
@@ -73,11 +73,11 @@ jobs:
           pnpm build
 
       - name: Build app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target universal-apple-darwin
+          args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
 
       # - name: Bundle Defguard CLI
       #   env:

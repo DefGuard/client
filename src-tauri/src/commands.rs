@@ -51,6 +51,7 @@ use crate::{
     },
     periodic::config::{do_update_instance, poll_instance_with_events},
     proxy::construct_platform_header,
+    tauri_err_to_app_err,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
         get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
@@ -173,7 +174,7 @@ pub async fn disconnect(
         );
         handle
             .emit(EventKey::ConnectionChanged.into(), ())
-            .map_err(crate::tauri_err_to_app_err)?;
+            .map_err(tauri_err_to_app_err)?;
         debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
         reload_tray_menu(&handle).await;
@@ -285,7 +286,7 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
     if any_disconnected {
         handle
             .emit(EventKey::ConnectionChanged.into(), ())
-            .map_err(crate::tauri_err_to_app_err)?;
+            .map_err(tauri_err_to_app_err)?;
         reload_tray_menu(&handle).await;
         configure_tray_icon(&handle).await?;
     }
@@ -313,7 +314,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     transaction.commit().await?;
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -404,7 +405,7 @@ pub async fn save_device_config(
 
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     let res = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -672,7 +673,7 @@ pub async fn update_instance(
         }
         app_handle
             .emit(EventKey::InstanceUpdate.into(), ())
-            .map_err(crate::tauri_err_to_app_err)?;
+            .map_err(tauri_err_to_app_err)?;
         reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
@@ -820,7 +821,7 @@ pub async fn update_location_routing(
             debug!("Location routing updated for location {name}(ID: {location_id})");
             handle
                 .emit(EventKey::LocationUpdate.into(), ())
-                .map_err(crate::tauri_err_to_app_err)?;
+                .map_err(tauri_err_to_app_err)?;
             Ok(())
         }
         ConnectionType::Tunnel => {
@@ -830,7 +831,7 @@ pub async fn update_location_routing(
                 info!("Tunnel routing updated for tunnel {location_id}");
                 handle
                     .emit(EventKey::LocationUpdate.into(), ())
-                    .map_err(crate::tauri_err_to_app_err)?;
+                    .map_err(tauri_err_to_app_err)?;
                 Ok(())
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
@@ -851,7 +852,7 @@ pub async fn set_location_mfa_method(
     debug!("MFA method updated for location (ID: {location_id})");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -898,7 +899,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -975,7 +976,7 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -998,7 +999,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
     info!("The tunnel {tunnel} configuration has been updated.");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
 }
 
@@ -1009,7 +1010,7 @@ pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), 
     info!("The tunnel {tunnel} configuration has been saved.");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
 }
 
