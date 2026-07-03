@@ -70,7 +70,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --ci --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
+          args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
       - name: Upload DMG
         uses: shogo82148/actions-upload-release-asset@v1
