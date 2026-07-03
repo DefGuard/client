@@ -50,6 +50,11 @@ jobs:
           version: 11
           run_install: false
 
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
@@ -77,9 +82,7 @@ jobs:
           echo "NETWORK_ENDPOINT=${{ secrets.E2E_NETWORK_ENDPOINT }}" >> e2e/.env
 
       - name: Check deployment is reachable
-        run: |
-          source e2e/.env
-          curl -sf --max-time 15 "$CORE_URL/api/v1/health"
+        run: curl -sf --max-time 15 "${{ secrets.E2E_CORE_URL }}/api/v1/health"
 
       - name: Start defguard-service
         run: |
