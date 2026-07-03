@@ -1,0 +1,22 @@
+{
+  "name": "e2e",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "wdio run ./wdio.conf.ts",
+    "provision": "node scripts/provision.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "@wdio/cli": "^9.20.0",
+    "@wdio/globals": "^9.27.2",
+    "@wdio/local-runner": "^9.20.0",
+    "@wdio/mocha-framework": "^9.20.0",
+    "@wdio/spec-reporter": "^9.20.0",
+    "@wdio/types": "^9.27.2",
+    "otpauth": "^9.4.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
