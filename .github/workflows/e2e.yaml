@@ -86,6 +86,7 @@ jobs:
 
       - name: Start defguard-service
         run: |
+          groupadd -f defguard
           setsid src-tauri/target/release/defguard-service < /dev/null &
           for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
           test -S /var/run/defguard.socket
