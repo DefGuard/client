@@ -40,6 +40,15 @@ fn ensure_shared_directory() -> Result<PathBuf, ServiceLocationError> {
     Ok(path)
 }
 
+/// Removes an interface created during setup after a later configuration step failed.
+fn remove_created_interface(wgapi: &WGApi, ifname: &str) {
+    if let Err(err) = wgapi.remove_interface() {
+        error!(
+            "Failed to remove Linux service location interface {ifname} after setup failure: {err}"
+        );
+    }
+}
+
 impl ServiceLocationManager {
     pub fn init() -> Result<Self, ServiceLocationError> {
         debug!("Initializing Linux service location storage");
@@ -296,8 +305,14 @@ impl ServiceLocationManager {
         debug!(
 			"Configuring Linux service location interface {ifname} with DNS: {dns:?} and search domains: {search_domains:?}"
 		);
-        wgapi.configure_interface(&config)?;
-        wgapi.configure_dns(&dns, &search_domains)?;
+        if let Err(err) = wgapi.configure_interface(&config) {
+            remove_created_interface(&wgapi, &ifname);
+            return Err(err.into());
+        }
+        if let Err(err) = wgapi.configure_dns(&dns, &search_domains) {
+            remove_created_interface(&wgapi, &ifname);
+            return Err(err.into());
+        }
         self.wgapis.insert(ifname.clone(), wgapi);
 
         debug!("Linux service location interface {ifname} configured successfully");
