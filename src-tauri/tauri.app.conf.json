@@ -3,7 +3,7 @@
     "macOS": {
       "entitlements": "./Client.entitlements",
       "files": {
-        "embedded.provisionprofile": "/Users/admin/Library/Developer/Xcode/UserData/Provisioning Profiles/3e2fba84-ccd2-45cc-b40e-80a9f103b5d9.provisionprofile",
+        "embedded.provisionprofile": "/Users/admin/Library/Developer/Xcode/UserData/Provisioning Profiles/fc371386-d198-4658-be77-5d659f274523.provisionprofile",
         "PlugIns/VPNExtension.appex": "../swift/extension/build/Release/VPNExtension.appex"
       }
     },
