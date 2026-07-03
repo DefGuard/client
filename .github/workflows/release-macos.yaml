@@ -67,7 +67,7 @@ jobs:
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
