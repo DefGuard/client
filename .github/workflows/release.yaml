@@ -336,7 +336,7 @@ jobs:
   build-macos:
     needs:
       - create-release
-    uses: ./.github/workflows/sbom.yml
+    uses: ./.github/workflows/release-macos.yml
     with:
       upload_url: ${{ needs.create-release.outputs.upload_url }}
 
