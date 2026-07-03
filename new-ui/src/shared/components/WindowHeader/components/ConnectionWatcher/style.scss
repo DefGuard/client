@@ -90,8 +90,11 @@
   }
 
   .disconnect {
+    --bg: transparent;
+
+    border-radius: 8px;
     box-sizing: border-box;
-    background: transparent;
+    background: var(--bg);
     border: 0;
     padding: 0 var(--spacing-sm);
     display: flex;
@@ -101,6 +104,12 @@
     column-gap: var(--spacing-sm);
     min-height: 36px;
     cursor: pointer;
+
+    @include animate(background);
+
+    &:hover {
+      --bg: var(--bg-white-5);
+    }
 
     p {
       font: var(--t-menu-text);

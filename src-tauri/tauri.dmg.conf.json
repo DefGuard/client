@@ -4,11 +4,16 @@
       "cwd": "../swift",
       "script": "./build.sh VPNSystemExtension Installer"
     },
-    "features": [
-      "macos_installer"
-    ]
+    "features": ["macos_installer"]
   },
   "bundle": {
+    "icon": [
+      "icons/macos/32x32.png",
+      "icons/macos/128x128.png",
+      "icons/macos/128x128@2x.png",
+      "icons/macos/icon.icns",
+      "icons/macos/icon.ico"
+    ],
     "macOS": {
       "entitlements": "Installer.entitlements",
       "files": {
@@ -16,8 +21,6 @@
         "Library/SystemExtensions/net.defguard.VPNExtension.systemextension": "../swift/extension/build/Installer/VPNSystemExtension.systemextension"
       }
     },
-    "targets": [
-      "dmg"
-    ]
+    "targets": ["dmg"]
   }
 }

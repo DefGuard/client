@@ -1,17 +1,16 @@
 .add-card {
   --border: var(--border-action-disabled);
   --shadow: box-shadow: 0 4px 12px 0 rgb(13 47 157 / 0%);
-  --color: var(--fg-white-80);
+  --color: var(--fg-white-60);
 
   box-sizing: border-box;
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  color: var(--color);
   overflow: hidden;
   transition-duration: 160ms;
   transition-timing-function: ease-out;
-  transition-property: border-color, box-shadow, color;
+  transition-property: border-color, box-shadow;
   max-width: 342px;
   min-height: 172px;
 
@@ -48,9 +47,12 @@
   }
 
   .description {
-    color: inherit;
+    color: var(--color);
     font: var(--t-body-xs-400);
     padding-bottom: var(--spacing-xl);
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+    transition-property: color;
   }
 
   > .track {
