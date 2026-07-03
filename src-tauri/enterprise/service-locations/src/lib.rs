@@ -1,4 +1,9 @@
 use std::{collections::HashMap, fmt};
+#[cfg(any(windows, target_os = "linux"))]
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use defguard_client_core::{
     database::models::{
@@ -11,9 +16,13 @@ use defguard_client_proto::defguard::client::v1::{
     ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
 };
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
+#[cfg(any(windows, target_os = "linux"))]
+use log::info;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "linux")]
+pub mod linux;
 #[cfg(windows)]
 pub mod windows;
 
@@ -121,4 +130,42 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
         keepalive_interval: location.keepalive_interval.try_into().unwrap_or(0),
         mode,
     })
+}
+
+/// Repeatedly attempts to auto-connect all persisted service locations until every location
+/// connects or `retry_count` attempts are exhausted, sleeping `retry_delay` between attempts.
+///
+/// Safe to call at startup: `connect_to_service_locations` skips already-connected locations, so
+/// retrying is idempotent. Intended to be spawned as a background task by the daemon, which owns
+/// the retry policy and passes it in.
+#[cfg(any(windows, target_os = "linux"))]
+pub async fn connect_service_locations(
+    manager: Arc<RwLock<ServiceLocationManager>>,
+    retry_count: u32,
+    retry_delay: Duration,
+) {
+    for attempt in 1..=retry_count {
+        info!("Attempting to auto-connect service locations (attempt {attempt}/{retry_count})");
+        match manager.write().unwrap().connect_to_service_locations() {
+            Ok(true) => {
+                info!(
+                    "All service locations connected successfully (attempt {attempt}/{retry_count})"
+                );
+                break;
+            }
+            Ok(false) => warn!(
+                "Service location auto-connect attempt {attempt}/{retry_count} completed with some \
+                failures"
+            ),
+            Err(err) => {
+                warn!("Service location auto-connect attempt {attempt}/{retry_count} failed: {err}")
+            }
+        }
+
+        if attempt < retry_count {
+            tokio::time::sleep(retry_delay).await;
+        }
+    }
+
+    info!("Service location auto-connect task finished");
 }
