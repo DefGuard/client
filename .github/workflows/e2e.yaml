@@ -24,6 +24,7 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
       CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/release/defguard-client
       NATIVE_DRIVER: /usr/bin/WebKitWebDriver
+      SQLX_OFFLINE: '1'
     steps:
       - name: Install system dependencies
         run: |
