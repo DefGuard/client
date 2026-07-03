@@ -76,8 +76,6 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # https://github.com/tauri-apps/tauri-action/issues/1003
-          TAURI_BUNDLER_DMG_IGNORE_CI: "false"
         with:
           args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
 
