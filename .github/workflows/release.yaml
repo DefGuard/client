@@ -397,6 +397,7 @@ jobs:
     needs:
       - create-release
     uses: ./.github/workflows/release-macos.yaml
+    secrets: inherit
     with:
       upload_url: ${{ needs.create-release.outputs.upload_url }}
 
