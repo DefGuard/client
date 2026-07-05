@@ -1,15 +1,19 @@
 import './style.scss';
 import dayjs from 'dayjs';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { InfoBanner } from '../../../../../shared/components/InfoBanner/InfoBanner';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { formatDuration } from '../../../../../shared/utils/formatDuration';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { activateUser } from '../../hooks/activateUser';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const WelcomeStep = () => {
   const enrollData = useEnrollmentStore((s) => s.startResponse);
+  const [activating, setActivating] = useState(false);
+  const skipPassword = useEnrollmentStore((s) => s.skipPassword);
+  const skipMfa = useEnrollmentStore((s) => s.skipMfa);
 
   const timeLeft = useMemo(() => {
     const deadline = enrollData?.deadline_timestamp;
@@ -45,10 +49,15 @@ export const WelcomeStep = () => {
         <a href={`mailto:${enrollData.admin.email}`}>{enrollData.admin.email}</a>
       </div>
       <EnrollmentControls
-        onNext={() => {
+        onNext={async () => {
+          if (skipPassword && skipMfa) {
+            setActivating(true);
+            await activateUser();
+          }
           useEnrollmentStore.getState().next();
         }}
         disableBack
+        loading={activating}
       />
     </div>
   );
