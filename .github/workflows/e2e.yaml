@@ -33,7 +33,7 @@ jobs:
             libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf libssl-dev libxdo-dev protobuf-compiler \
             libprotobuf-dev webkit2gtk-driver xvfb wireguard-tools iproute2 \
-            iputils-ping procps xclip
+            iputils-ping procps xclip desktop-file-utils xdg-utils
 
       - uses: actions/checkout@v6
         with:
