@@ -5,12 +5,7 @@ import path from 'node:path';
 
 const envFile = path.resolve(import.meta.dirname, '../.env');
 if (fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (match && process.env[match[1]] === undefined) {
-      process.env[match[1]] = match[2];
-    }
-  }
+  process.loadEnvFile(envFile);
 }
 
 const CORE_URL = requireEnv('CORE_URL');
