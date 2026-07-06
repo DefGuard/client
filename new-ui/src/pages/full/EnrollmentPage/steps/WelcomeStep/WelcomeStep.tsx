@@ -36,8 +36,8 @@ export const WelcomeStep = () => {
       </header>
       <SizedBox height={ThemeSpacing.Xl} />
       <ul>
-        <li>{`Create your password`}</li>
-        <li>{`Configure MFA`}</li>
+        {!skipPassword && <li>{`Create your password`}</li>}
+        {!skipMfa && <li>{`Configure MFA`}</li>}
       </ul>
       <SizedBox height={ThemeSpacing.Xl2} />
       <InfoBanner
