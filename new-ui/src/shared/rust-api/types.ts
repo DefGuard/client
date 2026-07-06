@@ -355,6 +355,12 @@ export type TunnelRequest = {
   post_down?: string;
 };
 
+export type UpdateTunnelRequest = TunnelRequest & {
+  id: number;
+  preshared_key?: string;
+  route_all_traffic: boolean;
+};
+
 export type SaveConfigArgs = {
   privateKey: string;
   response: CreateDeviceResponse;

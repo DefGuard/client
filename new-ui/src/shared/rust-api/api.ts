@@ -22,6 +22,7 @@ import type {
   TunnelInfo,
   TunnelRequest,
   UpdateInstanceArgs,
+  UpdateTunnelRequest,
 } from './types';
 import { TauriCommand } from './types';
 
@@ -82,7 +83,7 @@ const parseTunnelConfig = (data: {
 const saveTunnel = (tunnel: TunnelRequest): Promise<void> =>
   invoke(TauriCommand.SaveTunnel, { tunnel });
 
-const updateTunnel = (tunnel: TunnelRequest): Promise<void> =>
+const updateTunnel = (tunnel: UpdateTunnelRequest): Promise<void> =>
   invoke(TauriCommand.UpdateTunnel, { tunnel });
 
 const deleteTunnel = (tunnelId: number): Promise<void> =>
