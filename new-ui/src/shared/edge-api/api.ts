@@ -16,6 +16,7 @@ import type {
   AddInstanceRequest,
   AddInstanceResult,
   EdgeRequestHeaders,
+  EnrollmentErrorKind,
   EnrollmentStartResponse,
   MfaSetupFinishRequest,
   MfaSetupFinishResponse,
@@ -78,22 +79,52 @@ const createDevice = async (
   return {};
 };
 
+type EnrollmentStartOutcome =
+  | { ok: true; response: Response }
+  | { ok: false; error?: string; errorKind: EnrollmentErrorKind };
+
+const startEnrollment = async (
+  proxyUrl: string,
+  token: string,
+  edgeHeaders: EdgeRequestHeaders,
+): Promise<EnrollmentStartOutcome> => {
+  let res: Response;
+  try {
+    res = await fetch(`${proxyUrl}/enrollment/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    return { ok: false, errorKind: 'network' };
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      return { ok: false, errorKind: 'unauthorized' };
+    }
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return {
+      ok: false,
+      error: body.error ?? `Enrollment start failed (${res.status})`,
+      errorKind: 'server',
+    };
+  }
+
+  return { ok: true, response: res };
+};
+
 const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
   try {
     const proxyUrl = buildProxyUrl(values.url);
 
     const edgeHeaders = await getEdgeRequestHeaders();
 
-    const startRes = await fetch(`${proxyUrl}/enrollment/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
-      body: JSON.stringify({ token: values.token }),
-    });
-
-    if (!startRes.ok) {
-      const body = (await startRes.json()) as { error?: string };
-      return { error: body.error ?? `Enrollment start failed (${startRes.status})` };
+    const startResult = await startEnrollment(proxyUrl, values.token, edgeHeaders);
+    if (!startResult.ok) {
+      return { error: startResult.error, errorKind: startResult.errorKind };
     }
+    const startRes = startResult.response;
 
     const cookie = startRes.headers
       .getSetCookie()
@@ -149,19 +180,11 @@ const updateExistingInstance = async (
     const existing = instances.find((i) => i.id === values.instanceId);
     if (!existing) return { error: 'Instance no longer exists.' };
 
-    const startRes = await fetch(`${proxyUrl}/enrollment/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
-      body: JSON.stringify({ token: values.token }),
-    });
-
-    if (!startRes.ok) {
-      const body = (await startRes.json()) as { error?: string };
-      return {
-        error: body.error ?? `Enrollment start failed (${startRes.status})`,
-        isCredentialsError: true,
-      };
+    const startResult = await startEnrollment(proxyUrl, values.token, edgeHeaders);
+    if (!startResult.ok) {
+      return { error: startResult.error, errorKind: startResult.errorKind };
     }
+    const startRes = startResult.response;
 
     const cookie = startRes.headers
       .getSetCookie()
@@ -173,7 +196,7 @@ const updateExistingInstance = async (
     if (resp.instance.id !== existing.uuid) {
       return {
         error: 'Provided token belongs to a different instance.',
-        isCredentialsError: true,
+        errorKind: 'unauthorized',
       };
     }
 

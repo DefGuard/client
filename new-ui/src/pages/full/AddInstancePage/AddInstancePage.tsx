@@ -12,6 +12,7 @@ import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
+import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
@@ -48,26 +49,26 @@ export const AddInstancePage = () => {
     },
     onSubmit: async ({ value, formApi }) => {
       const result = await edgeApi.addInstance(value);
-      if (result.error) {
-        if (result.error.toLowerCase().includes('device name')) {
+      if (result.error ?? result.errorKind) {
+        if (result.errorKind === 'network') {
           formApi.setErrorMap({
-            onSubmit: {
-              fields: {
-                name: 'Name already used.',
-              },
-            },
+            onSubmit: { fields: { url: 'Invalid URL.' } },
           });
           return;
-        } else {
-          formApi.setErrorMap({
-            onSubmit: {
-              fields: {
-                token: 'Invalid Token or URL',
-                url: 'Invalid Token or URL',
-              },
-            },
-          });
         }
+        if (result.errorKind === 'unauthorized') {
+          formApi.setErrorMap({
+            onSubmit: { fields: { token: 'Invalid token.' } },
+          });
+          return;
+        }
+        if (result.error?.toLowerCase().includes('device name')) {
+          formApi.setErrorMap({
+            onSubmit: { fields: { name: 'Name already used.' } },
+          });
+          return;
+        }
+        Snackbar.error('Communication error, contact administrator.');
         return;
       }
       if (result.cookie) {

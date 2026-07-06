@@ -49,19 +49,24 @@ export type EdgeRequestHeaders = {
   'defguard-client-platform': string;
 };
 
+/** `network`: the request could not be sent, most likely a bad URL.
+ *  `unauthorized`: the server responded 401, the token is invalid.
+ *  `server`: any other failure response. */
+export type EnrollmentErrorKind = 'network' | 'unauthorized' | 'server';
+
 export type AddInstanceRequest = { url: string; token: string; name: string };
 export type AddInstanceResult = {
   startResponse?: EnrollmentStartResponse;
   proxyUrl?: string;
   cookie?: string;
   error?: string;
+  errorKind?: EnrollmentErrorKind;
 };
 
 export type UpdateInstanceRequest = { instanceId: number; url: string; token: string };
 export type UpdateInstanceResult = {
   error?: string;
-  /** Set when the error is about the provided url/token and should be shown on the form fields. */
-  isCredentialsError?: boolean;
+  errorKind?: EnrollmentErrorKind;
 };
 
 export type MfaSetupStartRequest = { method: MfaMethodValue };
