@@ -37,7 +37,14 @@ const ModalContent = () => {
     useShallow((s) => [s.cancelProps, s.submitProps, s.onSubmit]),
   );
 
-  const { mutate, isPending } = useMutation({ mutationFn: onSubmit });
+  const { mutate, isPending } = useMutation({
+    mutationFn: onSubmit,
+    onSuccess: () => {
+      useConfirmModal.setState({
+        visible: false,
+      });
+    },
+  });
 
   return (
     <>
