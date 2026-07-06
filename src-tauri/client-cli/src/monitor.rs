@@ -65,7 +65,7 @@ pub async fn tear_down_stale_connections(state: &State) {
             semaphore_clone.store(true, Ordering::Release);
         });
         spawn_runloop_and_wait_for(&semaphore);
-        let _ = handle.await.unwrap();
+        let () = handle.await.unwrap();
     }
 
     #[cfg(not(target_os = "macos"))]

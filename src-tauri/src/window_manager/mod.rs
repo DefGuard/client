@@ -71,11 +71,8 @@ impl WindowManager {
             .inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
             .min_inner_size(FULL_VIEW_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT)
             .decorations(cfg!(not(any(windows, target_os = "macos"))))
-            .visible(false);
-        #[cfg(target_os = "macos")]
-        let window = window.hidden_title(true);
-
-        let window = window.build()?;
+            .visible(false)
+            .build()?;
 
         #[cfg(target_os = "macos")]
         if let Err(err) = macos::enable_rounded_corners(&window, true) {
