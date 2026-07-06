@@ -71,6 +71,8 @@ feature-depth = 1
 # output a note when they are encountered.
 ignore = [
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained netlink dependency" },
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml <0.41 pulled by Tauri/plist; no compatible upstream update yet" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml <0.41 pulled by Tauri/plist; no compatible upstream update yet" },
     # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
     { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
