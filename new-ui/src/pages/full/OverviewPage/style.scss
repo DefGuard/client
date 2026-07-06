@@ -8,7 +8,7 @@
     height: 100%;
     width: 100%;
     overflow: hidden;
-    max-height: calc(100dvh - 50px);
+    max-height: calc(var(--app-dvh) - 50px);
   }
 
   .overview-content {

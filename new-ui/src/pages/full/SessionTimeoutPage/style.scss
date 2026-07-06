@@ -1,9 +1,9 @@
 #session-timeout {
-  min-height: 100dvh;
+  min-height: var(--app-dvh);
   min-width: 100%;
 
   > .positioner {
-    height: 100dvh;
+    height: var(--app-dvh);
     display: flex;
     flex-flow: column;
     align-items: center;

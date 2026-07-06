@@ -1,7 +1,7 @@
 #compact-locations-page {
   display: flex;
   flex-flow: column;
-  height: 100dvh;
+  height: var(--app-dvh);
 
   > .compact-footer {
     display: flex;

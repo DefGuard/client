@@ -11,7 +11,7 @@
       display: block;
       content: ' ';
       width: 100%;
-      height: calc(100dvh - var(--window-decorations-height));
+      height: calc(var(--app-dvh) - var(--window-decorations-height));
       z-index: 4;
     }
 
@@ -21,7 +21,7 @@
       left: 0;
       top: var(--window-decorations-height);
       width: 100%;
-      height: calc(100dvh - var(--window-decorations-height));
+      height: calc(var(--app-dvh) - var(--window-decorations-height));
       z-index: 4;
       display: flex;
       flex-flow: column;

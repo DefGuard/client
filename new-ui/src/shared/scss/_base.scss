@@ -25,7 +25,7 @@ body {
 
 #root,
 #app {
-  min-height: 100dvh;
+  min-height: var(--app-dvh);
   overflow: hidden;
 }
 

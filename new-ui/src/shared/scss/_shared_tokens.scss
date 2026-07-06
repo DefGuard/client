@@ -25,6 +25,8 @@ $jetbrains:
   // set by WindowDecorations component via effect on window metadata
   // --window-decorations-height: 33px;
   --window-header-height: 50px;
+  // 100dvh on Windows/macOS; overridden in px on Linux by App.tsx, see applyLinuxViewportHeightFix
+  --app-dvh: 100dvh;
 
   // font settings
   --font-family-title: #{$geist};
