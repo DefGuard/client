@@ -21,17 +21,30 @@
       display: flex;
       align-items: center;
       column-gap: var(--spacing-xs);
+
+      .bottom {
+        button {
+          height: 24px;
+          width: 24px;
+        }
+      }
     }
 
-    button {
-      min-height: 36px;
+    > .left {
+      button {
+        min-height: 36px;
+      }
     }
+  }
+
+  .no-connection-info {
+    min-height: 124px;
   }
 
   > .controls {
     display: flex;
     flex-flow: row nowrap;
     column-gap: var(--spacing-5xl);
-    min-height: 24px;
+    min-height: 40px;
   }
 }
