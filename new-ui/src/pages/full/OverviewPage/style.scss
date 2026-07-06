@@ -22,39 +22,25 @@
       padding: var(--spacing-md) calc(var(--spacing-lg) - 6px) 0 var(--spacing-lg);
     }
 
-    .scroll-container {
-      > .header {
-        display: flex;
-        flex-flow: row nowrap;
-        align-items: center;
-        justify-content: flex-start;
-        user-select: none;
+    > .header {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: flex-start;
+      user-select: none;
+      min-height: 28px;
 
-        > p {
-          font: var(--t-h5);
-          color: var(--fg-white-100);
-        }
-
-        > button {
-          display: flex;
-          flex-flow: row nowrap;
-          align-items: center;
-          justify-content: center;
-          margin-left: auto;
-          padding: 0;
-          height: 28px;
-          border: 0;
-          background: transparent;
-          column-gap: var(--spacing-xs);
-          user-select: none;
-
-          span {
-            font: var(--t-body-xs-500);
-            color: var(--fg-white-80);
-          }
-        }
+      > p {
+        font: var(--t-h5);
+        color: var(--fg-white-100);
       }
 
+      > .right {
+        margin-left: auto;
+      }
+    }
+
+    .scroll-container {
       > .locations {
         display: flex;
         flex-flow: column;

@@ -57,6 +57,13 @@ export type AddInstanceResult = {
   error?: string;
 };
 
+export type UpdateInstanceRequest = { instanceId: number; url: string; token: string };
+export type UpdateInstanceResult = {
+  error?: string;
+  /** Set when the error is about the provided url/token and should be shown on the form fields. */
+  isCredentialsError?: boolean;
+};
+
 export type MfaSetupStartRequest = { method: MfaMethodValue };
 export type MfaSetupStartResponse = { totp_secret?: string };
 

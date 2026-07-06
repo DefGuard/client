@@ -1155,6 +1155,10 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
 
     transaction.commit().await?;
 
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+
     info!("Successfully deleted tunnel {tunnel}");
     Ok(())
 }

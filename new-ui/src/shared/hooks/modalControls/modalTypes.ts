@@ -1,17 +1,21 @@
 import z from 'zod';
+import type { OpenUpdateInstanceModalData, OpenUpdateTunnelModalData } from './types';
 
 export const ModalName = {
-  Test: 'test',
+  UpdateInstance: 'update-instance',
+  UpdateTunnel: 'update-tunnel',
 } as const;
 
 export type ModalNameValue = (typeof ModalName)[keyof typeof ModalName];
 
 const modalOpenArgsSchema = z.discriminatedUnion('name', [
   z.object({
-    name: z.literal(ModalName.Test),
-    data: z.object({
-      test: z.string(),
-    }),
+    name: z.literal(ModalName.UpdateInstance),
+    data: z.custom<OpenUpdateInstanceModalData>(),
+  }),
+  z.object({
+    name: z.literal(ModalName.UpdateTunnel),
+    data: z.custom<OpenUpdateTunnelModalData>(),
   }),
 ]);
 

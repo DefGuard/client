@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import { ConfirmModal } from '../shared/components/ConfirmModal/ConfirmModal';
 import { AppDataProvider } from '../shared/providers/AppDataContext';
 import { SnackbarManager } from '../shared/providers/snackbar/SnackbarManager';
 import { TauriEventProvider } from '../shared/providers/TauriEventProvider';
@@ -20,6 +21,7 @@ function RootComponent() {
       <TauriEventProvider>
         <SnackbarManager>
           <Outlet />
+          <ConfirmModal />
         </SnackbarManager>
       </TauriEventProvider>
     </AppDataProvider>

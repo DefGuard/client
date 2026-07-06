@@ -13,7 +13,10 @@ import type { InstanceInfo } from '../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { ConnectModal } from './components/ConnectModal/ConnectModal';
+import { OverviewActionsButton } from './components/OverviewActionsButton/OverviewActionsButton';
 import { OverviewSelection } from './components/OverviewSelection/OverviewSelection';
+import { UpdateInstanceModal } from './components/UpdateInstanceModal/UpdateInstanceModal';
+import { UpdateTunnelModal } from './components/UpdateTunnelModal/UpdateTunnelModal';
 
 const isWindows = platform() === 'windows';
 
@@ -62,11 +65,19 @@ export const OverviewPage = () => {
               windows: isWindows,
             })}
           >
-            <ScrollContainer>
-              <div className="header">
+            <div className="header">
+              {selection?.kind === 'instance' && (
                 <p>{`Locations (${displayedLocations.length})`}</p>
+              )}
+              <div className="right">
+                <OverviewActionsButton
+                  selection={selection}
+                  instance={selectedInstance ?? null}
+                />
               </div>
-              <SizedBox height={ThemeSpacing.Lg} />
+            </div>
+            <SizedBox height={ThemeSpacing.Lg} />
+            <ScrollContainer>
               <div className="locations">
                 {displayedLocations.map((location) => {
                   const instance: InstanceInfo | undefined =
@@ -85,6 +96,8 @@ export const OverviewPage = () => {
         </div>
       </FullPage>
       <ConnectModal />
+      <UpdateTunnelModal />
+      <UpdateInstanceModal />
     </Fragment>
   );
 };
