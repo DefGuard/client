@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "test": "wdio run ./wdio.conf.ts",
-    "provision": "node scripts/provision.mjs"
+    "provision": "node scripts/provision.mjs",
+    "fix": "biome check --fix",
+    "lint": "biome check"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.16",
     "@types/node": "^25.9.2",
     "@wdio/cli": "^9.20.0",
     "@wdio/globals": "^9.27.2",

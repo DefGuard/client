@@ -81,7 +81,7 @@ export const config: WebdriverIO.Config = {
     if (!fs.existsSync(clientBinary)) {
       throw new Error(
         `Client binary not found at ${clientBinary}. Build it with ` +
-        '`pnpm tauri build` or set CLIENT_BINARY.',
+          '`pnpm tauri build` or set CLIENT_BINARY.',
       );
     }
   },
@@ -115,7 +115,12 @@ export const config: WebdriverIO.Config = {
   afterSession: () => {
     cleanup();
     if (dataDir) {
-      fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      fs.rmSync(dataDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
       dataDir = undefined;
     }
   },

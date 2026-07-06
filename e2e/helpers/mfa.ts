@@ -15,13 +15,18 @@ export const submitTotpCode = async (
   submit: () => Promise<void>,
   accepted: () => Promise<boolean>,
 ) => {
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await fillCode(scope, totpCode(secret));
     await submit();
-    const ok = await browser
-      .waitUntil(accepted, { timeout: 6_000, interval: 500 })
-      .then(() => true, () => false);
-    if (ok) return;
+    try {
+      await browser.waitUntil(accepted, {
+        timeout: 6_000,
+        interval: 500,
+        timeoutMsg: 'TOTP code was not accepted after several attempts',
+      });
+      return;
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) throw error;
+    }
   }
-  throw new Error('TOTP code was not accepted after several attempts');
 };

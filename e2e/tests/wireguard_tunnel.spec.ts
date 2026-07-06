@@ -1,5 +1,9 @@
 import { $, expect } from '@wdio/globals';
-import { type CoreApi, type LocationMfaMode, loggedInCoreApi } from '../helpers/coreApi.js';
+import {
+  type CoreApi,
+  type LocationMfaMode,
+  loggedInCoreApi,
+} from '../helpers/coreApi.js';
 import { switchToFullView } from '../helpers/windows.js';
 import { provisionTunnel } from '../helpers/wireguard.js';
 
@@ -53,6 +57,8 @@ describe.skip('WireGuard tunnel', () => {
     await continueStep('#advanced-settings-step');
 
     await expect($('#finish-step')).toBeDisplayed();
-    await expect($('#finish-step')).toHaveText('added successfully', { containing: true });
+    await expect($('#finish-step')).toHaveText('added successfully', {
+      containing: true,
+    });
   });
 });

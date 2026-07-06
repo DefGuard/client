@@ -4,8 +4,14 @@ import type { CoreApi } from './coreApi.js';
 export const generateWireguardKeys = () => {
   const { privateKey, publicKey } = generateKeyPairSync('x25519');
   return {
-    privateKey: privateKey.export({ type: 'pkcs8', format: 'der' }).subarray(-32).toString('base64'),
-    publicKey: publicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('base64'),
+    privateKey: privateKey
+      .export({ type: 'pkcs8', format: 'der' })
+      .subarray(-32)
+      .toString('base64'),
+    publicKey: publicKey
+      .export({ type: 'spki', format: 'der' })
+      .subarray(-32)
+      .toString('base64'),
   };
 };
 
@@ -21,8 +27,6 @@ export type TunnelConfig = {
   keepalive: string;
 };
 
-// Registers a network device in core for the given location and turns the
-// WireGuard config core returns into the values the client's tunnel wizard needs.
 export const provisionTunnel = async (
   core: CoreApi,
   networkId: number,

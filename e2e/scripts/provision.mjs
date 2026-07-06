@@ -75,8 +75,8 @@ async function api(method, apiPath, body) {
     const allow = res.headers.get('allow');
     throw new Error(
       `${method} ${apiPath} failed: ${res.status}` +
-      (allow ? ` (Allow: ${allow})` : '') +
-      ` ${await res.text()}`,
+        (allow ? ` (Allow: ${allow})` : '') +
+        ` ${await res.text()}`,
     );
   }
   return res;
@@ -94,12 +94,7 @@ try {
   });
 } catch (error) {
   if (String(error).includes('405')) {
-    console.error(
-      `\nCore at ${CORE_URL} is still in initial-setup mode. ` +
-      `Open ${CORE_URL} in a browser and complete the setup wizard ` +
-      '(all the way through the final step — core restarts afterwards), ' +
-      'then re-run this script.\n',
-    );
+    console.error(`\nCore at ${CORE_URL} is still in initial-setup mode`);
     process.exit(1);
   }
   throw error;
@@ -113,7 +108,6 @@ let network = existing.find((n) => n.name === NETWORK.name);
 if (network) {
   console.log(`Network "${NETWORK.name}" already exists with id ${network.id}`);
 } else {
-  console.log('Creating VPN network...');
   network = await (await api('POST', '/api/v1/network', NETWORK)).json();
   console.log(`Network created with id ${network.id}`);
 }
@@ -122,13 +116,6 @@ const gateways = await (
   await api('GET', `/api/v1/network/${network.id}/gateways`)
 ).json();
 if (gateways.length === 0) {
-  console.error(
-    `\nNo gateway is connected to network "${NETWORK.name}" (id ${network.id}).\n` +
-    'Gateway setup is intentionally not automated — add and connect one yourself,\n' +
-    `then re-run this script. See https://docs.defguard.net for the deployment guide.\n`,
-  );
   process.exit(1);
 }
 console.log(`Gateway connected: ${gateways[0].name}`);
-
-console.log('Provisioning done.');

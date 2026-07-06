@@ -19,9 +19,8 @@ describe('logs', () => {
   });
 
   it('copies logs to the clipboard', async () => {
-    const sample = (
-      (await $('#log-page-view .log-container p').getProperty('textContent')) as string
-    ).trim();
+    const firstLine = $('#log-page-view .log-container p');
+    const sample = ((await firstLine.getProperty('textContent')) as string).trim();
     await openActionsMenu();
     const copy = $('.menu-item*=Copy to Clipboard');
     await copy.waitForClickable();

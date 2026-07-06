@@ -8,16 +8,17 @@ export const connectAndPing = async (totpSecret?: string) => {
   await connect.click();
 
   if (totpSecret) {
-    await $('#mfa-totp-view').waitForDisplayed();
+    const view = $('#mfa-totp-view');
+    await view.waitForDisplayed();
     await submitTotpCode(
       totpSecret,
       '#mfa-totp-view',
       async () => {
-        const verify = $('#mfa-totp-view').$('button=Verify');
+        const verify = view.$('button=Verify');
         await verify.waitForClickable();
         await verify.click();
       },
-      () => $('#mfa-totp-view').isDisplayed().then((shown) => !shown, () => true),
+      async () => !(await view.isDisplayed().catch(() => false)),
     );
   }
 

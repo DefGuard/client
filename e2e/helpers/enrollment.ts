@@ -37,10 +37,12 @@ export const configureTotp = async (): Promise<string> => {
   await expect($('#mfa-configuration-step')).toBeDisplayed();
   const secretField = $('#mfa-configuration-step .copy-field .track p');
   await secretField.waitForExist();
-  const raw = (await secretField.getProperty('textContent')) as string | null;
-  const secret = (raw ?? '').replace(/\s/g, '').toUpperCase();
+  const secret =
+    ((await secretField.getProperty('textContent')) as string | null)?.trim() ?? '';
   await submitTotpCode(secret, '#mfa-configuration-step', clickNext, () =>
-    $('#recovery-codes-step').isDisplayed().catch(() => false),
+    $('#recovery-codes-step')
+      .isDisplayed()
+      .catch(() => false),
   );
   await $('#recovery-codes-step .checkbox').click();
   const complete = $('#recovery-codes-step').$('button=Complete');

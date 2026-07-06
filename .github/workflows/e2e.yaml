@@ -92,9 +92,8 @@ jobs:
       - name: Start defguard-service
         run: |
           groupadd -f defguard
-          modprobe wireguard || echo "WARN: could not modprobe wireguard"
-          setsid src-tauri/target/release/defguard-service < /dev/null \
-            > "$RUNNER_TEMP/defguard-service.log" 2>&1 &
+          modprobe wireguard || true
+          setsid src-tauri/target/release/defguard-service < /dev/null &
           for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
           test -S /var/run/defguard.socket
 
@@ -109,24 +108,3 @@ jobs:
       - name: Run e2e tests
         run: xvfb-run -a pnpm test
         working-directory: e2e
-
-      - name: Tunnel diagnostics
-        if: always()
-        run: |
-          # Keep this secret-safe: no peer endpoints (NETWORK_ENDPOINT), no keys/tokens.
-          echo "===== wireguard module ====="
-          lsmod | grep -i wireguard || echo "wireguard module NOT loaded"
-          echo "===== wireguard interfaces ====="
-          wg show interfaces || echo "no wg interfaces"
-          echo "===== latest handshakes (proves tunnel came up; pubkey + time only) ====="
-          wg show all latest-handshakes || true
-          echo "===== transfer (pubkey + bytes only) ====="
-          wg show all transfer || true
-          echo "===== wireguard addrs / routes ====="
-          ip -br addr show type wireguard || true
-          ip route show table all | grep -Ei 'wg|10\.10\.10\.' || true
-          echo "===== ping gateway ====="
-          ping -c 3 -W 5 10.10.10.1 || true
-          echo "===== defguard-service log (base64 keys redacted) ====="
-          sed -E 's#[A-Za-z0-9+/]{42}[A-Za-z0-9+/]=#<REDACTED-KEY>#g' \
-            "$RUNNER_TEMP/defguard-service.log" 2>/dev/null | tail -n 200 || true

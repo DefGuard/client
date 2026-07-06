@@ -1,6 +1,3 @@
-// Minimal client for the defguard core REST API, used to provision fixtures
-// (users, enrollment tokens, location MFA mode) from within specs.
-
 const MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA = 120;
 
 const requireEnv = (name: string): string => {
@@ -27,7 +24,11 @@ export interface EnrollmentFixture {
 export class CoreApi {
   private cookie = '';
 
-  private async request(method: string, apiPath: string, body?: unknown): Promise<Response> {
+  private async request(
+    method: string,
+    apiPath: string,
+    body?: unknown,
+  ): Promise<Response> {
     const response = await fetch(`${coreUrl()}${apiPath}`, {
       method,
       redirect: 'manual',
@@ -81,9 +82,14 @@ export class CoreApi {
     await this.request('DELETE', `/api/v1/user/${username}`);
   }
 
-  async listNetworks(): Promise<Array<{ id: number; location_mfa_mode: LocationMfaMode }>> {
+  async listNetworks(): Promise<
+    Array<{ id: number; location_mfa_mode: LocationMfaMode }>
+  > {
     const response = await this.request('GET', '/api/v1/network');
-    return (await response.json()) as Array<{ id: number; location_mfa_mode: LocationMfaMode }>;
+    return (await response.json()) as Array<{
+      id: number;
+      location_mfa_mode: LocationMfaMode;
+    }>;
   }
 
   async findAvailableIp(networkId: number): Promise<string> {
@@ -92,7 +98,6 @@ export class CoreApi {
     return ips[0].ip;
   }
 
-  // Registers a standalone WireGuard device and returns its generated config.
   async addNetworkDevice(
     networkId: number,
     name: string,
@@ -112,7 +117,10 @@ export class CoreApi {
 
   // Core reports settings.mfa_required (which drives the enrollment MFA steps)
   // when a location uses 'internal' MFA. Returns the previous mode to restore.
-  async setLocationMfaMode(networkId: number, mode: LocationMfaMode): Promise<LocationMfaMode> {
+  async setLocationMfaMode(
+    networkId: number,
+    mode: LocationMfaMode,
+  ): Promise<LocationMfaMode> {
     const current = (await (
       await this.request('GET', `/api/v1/network/${networkId}`)
     ).json()) as Record<string, unknown>;
@@ -146,10 +154,17 @@ export class CoreApi {
     return previous;
   }
 
-  private async startEnrollment(username: string, ephemeral: boolean): Promise<EnrollmentFixture> {
-    const response = await this.request('POST', `/api/v1/user/${username}/start_enrollment`, {
-      send_enrollment_notification: false,
-    });
+  private async startEnrollment(
+    username: string,
+    ephemeral: boolean,
+  ): Promise<EnrollmentFixture> {
+    const response = await this.request(
+      'POST',
+      `/api/v1/user/${username}/start_enrollment`,
+      {
+        send_enrollment_notification: false,
+      },
+    );
     const data = (await response.json()) as { enrollment_token: string };
     return {
       username,
