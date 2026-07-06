@@ -1,6 +1,5 @@
 import { $, browser } from '@wdio/globals';
 
-
 export const switchToFullView = async () => {
   for (const handle of await browser.getWindowHandles()) {
     await browser.switchToWindow(handle);

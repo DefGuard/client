@@ -108,3 +108,27 @@ jobs:
       - name: Run e2e tests
         run: xvfb-run -a pnpm test
         working-directory: e2e
+
+  lint-e2e:
+    runs-on:
+      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install e2e dependencies
+        run: pnpm install --no-frozen-lockfile
+        working-directory: e2e
+
+      - name: Lint e2e
+        run: pnpm lint
+        working-directory: e2e
