@@ -17,7 +17,6 @@ export interface EnrollmentFixture {
   username: string;
   enrollmentToken: string;
   enrollmentUrl: string;
-  // The test owns and deletes this user unless it is pinned via TEST_USERNAME.
   ephemeral: boolean;
 }
 
@@ -115,8 +114,6 @@ export class CoreApi {
     return data.config.config;
   }
 
-  // Core reports settings.mfa_required (which drives the enrollment MFA steps)
-  // when a location uses 'internal' MFA. Returns the previous mode to restore.
   async setLocationMfaMode(
     networkId: number,
     mode: LocationMfaMode,
