@@ -80,19 +80,20 @@ const ModalContent = ({ data }: { data: OpenUpdateInstanceModalData }) => {
         url: value.url,
         token: value.token,
       });
-      if (result.error) {
-        if (result.isCredentialsError) {
+      if (result.error ?? result.errorKind) {
+        if (result.errorKind === 'network') {
           formApi.setErrorMap({
-            onSubmit: {
-              fields: {
-                token: 'Invalid Token or URL',
-                url: 'Invalid Token or URL',
-              },
-            },
+            onSubmit: { fields: { url: 'Invalid URL.' } },
           });
-        } else {
-          Snackbar.error(result.error);
+          return;
         }
+        if (result.errorKind === 'unauthorized') {
+          formApi.setErrorMap({
+            onSubmit: { fields: { token: 'Invalid token.' } },
+          });
+          return;
+        }
+        Snackbar.error('Communication error, contact administrator.');
         return;
       }
       Snackbar.default('Instance updated.');
