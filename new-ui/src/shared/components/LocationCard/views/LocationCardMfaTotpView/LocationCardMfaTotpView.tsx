@@ -38,17 +38,22 @@ export const LocationCardMfaTotpView = () => {
   const [totpCode, setTotpCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = useCallback(() => {
-    if (!isPresent(totpCode)) {
-      setError('Enter code');
-      return;
-    }
-    if (totpCode.replaceAll(' ', '').length !== 6) {
-      setError('6 digits are required');
-      return;
-    }
-    verifyCode(totpCode);
-  }, [totpCode, verifyCode]);
+  const handleVerify = useCallback(
+    (argCode?: string | null) => {
+      const toCheck = argCode ?? totpCode;
+
+      if (!isPresent(toCheck)) {
+        setError('Enter code');
+        return;
+      }
+      if (toCheck.replaceAll(' ', '').length !== 6) {
+        setError('6 digits are required');
+        return;
+      }
+      verifyCode(toCheck);
+    },
+    [totpCode, verifyCode],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
   useEffect(() => {
@@ -84,8 +89,7 @@ export const LocationCardMfaTotpView = () => {
         onChange={setTotpCode}
         error={startError ?? error}
         onSuccessPaste={(value) => {
-          setTotpCode(value);
-          handleVerify();
+          handleVerify(value);
         }}
       />
       <Controls>
@@ -108,7 +112,7 @@ export const LocationCardMfaTotpView = () => {
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
-            onClick={handleVerify}
+            onClick={() => handleVerify(totpCode)}
             loading={isVerifying}
             disabled={isStarting}
           />

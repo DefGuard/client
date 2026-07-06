@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { clone } from 'radashi';
-import { createContext, type PropsWithChildren, useCallback, useContext } from 'react';
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+} from 'react';
 import { api } from '../rust-api/api';
 import {
   getInstancesQueryOptions,
@@ -37,14 +43,49 @@ export const useAppData = (): AppDataContextValue => {
 };
 
 export const AppDataProvider = ({ children }: PropsWithChildren) => {
-  const { data: instances = [] } = useQuery(getInstancesQueryOptions);
-  const { data: tunnels = [] } = useQuery(getTunnelsQueryOptions);
+  const { data: instances = [], isPending: instancesPending } = useQuery(
+    getInstancesQueryOptions,
+  );
+  const { data: tunnels = [], isPending: tunnelsPending } =
+    useQuery(getTunnelsQueryOptions);
   const { data: sessionState } = useQuery(getSessionStateQueryOptions);
   const isEmpty = instances.length === 0 && tunnels.length === 0;
 
   const setViewSelection = useCallback((selection: OverviewViewSelection | null) => {
     api.patchSessionState({ view_selection: selection });
   }, []);
+
+  // keep the selection valid when its instance/tunnel gets removed
+  useEffect(() => {
+    if (instancesPending || tunnelsPending || sessionState === undefined) return;
+
+    const selection = sessionState.view_selection ?? null;
+    const isValid =
+      selection !== null &&
+      (selection.kind === 'instance'
+        ? instances.some((instance) => instance.id === selection.id)
+        : tunnels.some((tunnel) => tunnel.id === selection.id));
+
+    if (isValid) return;
+
+    const fallback: OverviewViewSelection | null =
+      instances.length > 0
+        ? { kind: 'instance', id: instances[0].id }
+        : tunnels.length > 0
+          ? { kind: 'tunnel', id: tunnels[0].id }
+          : null;
+
+    if (selection === null && fallback === null) return;
+
+    setViewSelection(fallback);
+  }, [
+    instances,
+    tunnels,
+    instancesPending,
+    tunnelsPending,
+    sessionState,
+    setViewSelection,
+  ]);
 
   const setConnectionMethod = useCallback(
     (id: number, conType: ConnectionType, method: MfaMethodValue) => {

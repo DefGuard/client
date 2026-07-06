@@ -16,17 +16,20 @@ import type {
   AddInstanceRequest,
   AddInstanceResult,
   EdgeRequestHeaders,
+  EnrollmentErrorKind,
   EnrollmentStartResponse,
   MfaSetupFinishRequest,
   MfaSetupFinishResponse,
   MfaSetupStartResponse,
+  UpdateInstanceRequest,
+  UpdateInstanceResult,
 } from './types';
 
 const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatformHeader);
 const getInstances = (): Promise<InstanceInfo[]> => invoke(TauriCommand.AllInstances);
 const deleteInstance = (instanceId: number): Promise<void> =>
   invoke(TauriCommand.DeleteInstance, { instanceId });
-const updateInstance = (args: {
+const updateInstanceRecord = (args: {
   instanceId: number;
   response: CreateDeviceResponse;
 }): Promise<void> => invoke(TauriCommand.UpdateInstance, args);
@@ -76,22 +79,52 @@ const createDevice = async (
   return {};
 };
 
+type EnrollmentStartOutcome =
+  | { ok: true; response: Response }
+  | { ok: false; error?: string; errorKind: EnrollmentErrorKind };
+
+const startEnrollment = async (
+  proxyUrl: string,
+  token: string,
+  edgeHeaders: EdgeRequestHeaders,
+): Promise<EnrollmentStartOutcome> => {
+  let res: Response;
+  try {
+    res = await fetch(`${proxyUrl}/enrollment/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    return { ok: false, errorKind: 'network' };
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      return { ok: false, errorKind: 'unauthorized' };
+    }
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return {
+      ok: false,
+      error: body.error ?? `Enrollment start failed (${res.status})`,
+      errorKind: 'server',
+    };
+  }
+
+  return { ok: true, response: res };
+};
+
 const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
   try {
     const proxyUrl = buildProxyUrl(values.url);
 
     const edgeHeaders = await getEdgeRequestHeaders();
 
-    const startRes = await fetch(`${proxyUrl}/enrollment/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
-      body: JSON.stringify({ token: values.token }),
-    });
-
-    if (!startRes.ok) {
-      const body = (await startRes.json()) as { error?: string };
-      return { error: body.error ?? `Enrollment start failed (${startRes.status})` };
+    const startResult = await startEnrollment(proxyUrl, values.token, edgeHeaders);
+    if (!startResult.ok) {
+      return { error: startResult.error, errorKind: startResult.errorKind };
     }
+    const startRes = startResult.response;
 
     const cookie = startRes.headers
       .getSetCookie()
@@ -117,7 +150,10 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
         await deleteInstance(existing.id);
       } else {
         if (!netRes.ok) return { error: `network_info failed (${netRes.status})` };
-        await updateInstance({ instanceId: existing.id, response: await netRes.json() });
+        await updateInstanceRecord({
+          instanceId: existing.id,
+          response: await netRes.json(),
+        });
         return {};
       }
     }
@@ -128,6 +164,62 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
     }
 
     return { startResponse: resp, proxyUrl, cookie };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+};
+
+const updateExistingInstance = async (
+  values: UpdateInstanceRequest,
+): Promise<UpdateInstanceResult> => {
+  try {
+    const proxyUrl = buildProxyUrl(values.url);
+    const edgeHeaders = await getEdgeRequestHeaders();
+
+    const instances = await getInstances();
+    const existing = instances.find((i) => i.id === values.instanceId);
+    if (!existing) return { error: 'Instance no longer exists.' };
+
+    const startResult = await startEnrollment(proxyUrl, values.token, edgeHeaders);
+    if (!startResult.ok) {
+      return { error: startResult.error, errorKind: startResult.errorKind };
+    }
+    const startRes = startResult.response;
+
+    const cookie = startRes.headers
+      .getSetCookie()
+      .find((c) => c.startsWith('defguard_proxy='));
+    if (!cookie) return { error: 'Auth cookie missing from enrollment response' };
+
+    const resp = (await startRes.json()) as EnrollmentStartResponse;
+
+    if (resp.instance.id !== existing.uuid) {
+      return {
+        error: 'Provided token belongs to a different instance.',
+        errorKind: 'unauthorized',
+      };
+    }
+
+    const netRes = await fetch(`${proxyUrl}/enrollment/network_info`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+        ...edgeHeaders,
+      },
+      body: JSON.stringify({ pubkey: existing.pubkey }),
+    });
+
+    if (!netRes.ok) {
+      const body = (await netRes.json()) as { error?: string };
+      return { error: body.error ?? `network_info failed (${netRes.status})` };
+    }
+
+    await updateInstanceRecord({
+      instanceId: existing.id,
+      response: await netRes.json(),
+    });
+    return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -209,6 +301,7 @@ export const edgeApi = {
   getEdgeRequestHeaders,
   createDevice,
   addInstance,
+  updateInstance: updateExistingInstance,
   startMfaSetup,
   activateUser,
   finishMfaSetup,

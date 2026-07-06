@@ -41,7 +41,7 @@ export const ConnectModalMfaSettings = () => {
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(currentMethod);
 
-  const [setAsDefault, setSetAsDefault] = useState(true);
+  const [setAsDefault, setSetAsDefault] = useState(perviousView === null);
 
   const MfaFactorsList = useMemo((): MfaMethodValue[] => {
     if (location?.location_mfa_mode === LocationMfaMode.Internal) {
