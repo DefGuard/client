@@ -14,8 +14,10 @@ import { ThemeVariable } from '../../../../../shared/types';
 import './style.scss';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useMemo, useState } from 'react';
+import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Menu } from '../../../../../shared/components/Menu/Menu';
 import type { MenuItemsGroup } from '../../../../../shared/components/Menu/types';
+import { useConfirmModal } from '../../../../../shared/hooks/confirmModal/useConfirmModal';
 import { openModal } from '../../../../../shared/hooks/modalControls/modalsSubjects';
 import { ModalName } from '../../../../../shared/hooks/modalControls/modalTypes';
 import { api } from '../../../../../shared/rust-api/api';
@@ -100,6 +102,34 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     }
   }, [selection]);
 
+  const handleDeleteIntent = useCallback(() => {
+    if (!selection) return;
+    switch (selection.kind) {
+      case 'instance':
+        useConfirmModal.getState().open({
+          title: 'Delete instance',
+          content: `Are you sure you want to delete this instance ? You will lose access to all locations associated with this instance. This action cannot be undone.`,
+          submitProps: {
+            variant: ButtonVariant.Critical,
+            text: `Delete instance`,
+          },
+          onSubmit: handleDelete,
+        });
+        break;
+      case 'tunnel':
+        useConfirmModal.getState().open({
+          title: 'Delete tunnel',
+          content: `Are you sure you want to delete this tunnel ?. This action cannot be undone.`,
+          submitProps: {
+            variant: ButtonVariant.Critical,
+            text: `Delete tunnel`,
+          },
+          onSubmit: handleDelete,
+        });
+        break;
+    }
+  }, [selection, handleDelete]);
+
   const menuConfig = useMemo(() => {
     const config: MenuItemsGroup[] = [
       {
@@ -112,13 +142,13 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
           {
             text: 'Delete',
             icon: 'delete',
-            onClick: handleDelete,
+            onClick: handleDeleteIntent,
           },
         ],
       },
     ];
     return config;
-  }, [handleUpdate, handleDelete, selection?.kind]);
+  }, [handleUpdate, selection?.kind, handleDeleteIntent]);
 
   const text = () => {
     switch (selection?.kind) {
