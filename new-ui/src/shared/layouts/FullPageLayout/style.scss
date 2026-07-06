@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 52px 1fr;
   grid-template-rows: 50px 1fr;
-  height: calc(100dvh - var(--window-decorations-height));
+  height: 100%;
   overflow: hidden;
 
   #window-header {

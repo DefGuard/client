@@ -7,11 +7,11 @@
     .backdrop {
       position: fixed;
       left: 0;
+      right: 0;
       top: var(--window-decorations-height);
+      bottom: 0;
       display: block;
       content: ' ';
-      width: 100%;
-      height: calc(100dvh - var(--window-decorations-height));
       z-index: 4;
     }
 
@@ -19,9 +19,9 @@
       overflow: auto;
       position: fixed;
       left: 0;
+      right: 0;
       top: var(--window-decorations-height);
-      width: 100%;
-      height: calc(100dvh - var(--window-decorations-height));
+      bottom: 0;
       z-index: 4;
       display: flex;
       flex-flow: column;
