@@ -10,8 +10,8 @@ on:
     paths-ignore: ['*.md', 'LICENSE']
 
 concurrency:
-  group: e2e
-  cancel-in-progress: false
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e:
@@ -25,6 +25,8 @@ jobs:
       CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/release/defguard-client
       NATIVE_DRIVER: /usr/bin/WebKitWebDriver
       SQLX_OFFLINE: '1'
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: 'true'
     steps:
       - name: Install system dependencies
         run: |
@@ -41,7 +43,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -50,18 +52,11 @@ jobs:
           version: 11
           run_install: false
 
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
