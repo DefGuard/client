@@ -1,6 +1,11 @@
 import { $, expect } from '@wdio/globals';
 import { resetInstances } from '../helpers/client.js';
-import { connectAndPing } from '../helpers/connection.js';
+import {
+  connectAndPing,
+  disconnect,
+  FULL_MFA_VIEW,
+  TRAY_MFA_VIEW,
+} from '../helpers/connection.js';
 import {
   type CoreApi,
   type EnrollmentFixture,
@@ -13,6 +18,7 @@ import {
   finishEnrollment,
   setPassword,
 } from '../helpers/enrollment.js';
+import { switchToTrayView } from '../helpers/windows.js';
 
 describe('enrollment', () => {
   let core: CoreApi;
@@ -33,7 +39,7 @@ describe('enrollment', () => {
     }
   });
 
-  it('enrolls a user without MFA and connects to the VPN', async () => {
+  it('enrolls a user without MFA and connects from the full and tray views', async () => {
     previousMfaMode = await core.setLocationMfaMode(networkId, 'disabled');
     fixture = await core.createEnrollmentFixture();
 
@@ -41,10 +47,15 @@ describe('enrollment', () => {
     await setPassword();
     await expect($('#mfa-configuration-step')).not.toBeDisplayed();
     await finishEnrollment();
-    await connectAndPing();
+
+    await connectAndPing(FULL_MFA_VIEW);
+    await disconnect();
+
+    await switchToTrayView();
+    await connectAndPing(TRAY_MFA_VIEW);
   });
 
-  it('enrolls a user with TOTP MFA and connects to the VPN', async () => {
+  it('enrolls a user with TOTP MFA and connects from the full and tray views', async () => {
     previousMfaMode = await core.setLocationMfaMode(networkId, 'internal');
     fixture = await core.createEnrollmentFixture();
 
@@ -52,6 +63,11 @@ describe('enrollment', () => {
     await setPassword();
     const secret = await configureTotp();
     await finishEnrollment();
-    await connectAndPing(secret);
+
+    await connectAndPing(FULL_MFA_VIEW, secret);
+    await disconnect();
+
+    await switchToTrayView();
+    await connectAndPing(TRAY_MFA_VIEW, secret);
   });
 });

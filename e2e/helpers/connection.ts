@@ -2,17 +2,20 @@ import { $, browser } from '@wdio/globals';
 import { submitTotpCode } from './mfa.js';
 import { canPingGateway } from './tunnel.js';
 
-export const connectAndPing = async (totpSecret?: string) => {
-  const connect = $('.connect-button');
-  await connect.waitForClickable();
-  await connect.click();
+export const FULL_MFA_VIEW = '#mfa-totp-view';
+export const TRAY_MFA_VIEW = '.location-card-mfa-totp-view';
+
+export const connectAndPing = async (mfaView: string, totpSecret?: string) => {
+  const button = $('.connect-button');
+  await button.waitForClickable();
+  await button.click();
 
   if (totpSecret) {
-    const view = $('#mfa-totp-view');
+    const view = $(mfaView);
     await view.waitForDisplayed();
     await submitTotpCode(
       totpSecret,
-      '#mfa-totp-view',
+      mfaView,
       async () => {
         const verify = view.$('button=Verify');
         await verify.waitForClickable();
@@ -27,4 +30,11 @@ export const connectAndPing = async (totpSecret?: string) => {
     interval: 2_000,
     timeoutMsg: 'Could not ping the gateway through the VPN',
   });
+};
+
+export const disconnect = async () => {
+  const button = $('.connect-button.connected');
+  await button.waitForClickable();
+  await button.click();
+  await $('.connect-button.disconnected').waitForDisplayed();
 };
