@@ -164,11 +164,6 @@ async fn startup(app_handle: &AppHandle) {
     debug!("Tray menu has been re-generated successfully.");
 }
 
-/// Open the appropriate window, either the old or the new UI, depending if there are locations.
-fn open_appropriate_window(app_handle: &AppHandle) {
-    show_tray_or_full_view(app_handle);
-}
-
 fn main() {
     // Handle --version / -V before starting the GUI.
     check_version_flag("defguard-client");
@@ -238,7 +233,7 @@ fn main() {
             let is_deep_link = argv.iter().any(|a| a.starts_with("defguard://"));
             // User tried to spawn second instance, mirror tray left click path.
             if !is_deep_link {
-                open_appropriate_window(app);
+                show_tray_or_full_view(app);
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
@@ -415,7 +410,7 @@ fn main() {
                 info!("App launched via deep link, opening full view directly.");
                 let _ = WindowManager::open_full_view(app_handle);
             } else {
-                open_appropriate_window(app_handle);
+                show_tray_or_full_view(app_handle);
             }
 
             info!("App setup completed, log level: {log_level}");
@@ -518,7 +513,7 @@ fn main() {
             ..
         } => {
             if !has_visible_windows {
-                open_appropriate_window(app_handle);
+                show_tray_or_full_view(app_handle);
             }
         }
         _ => {
