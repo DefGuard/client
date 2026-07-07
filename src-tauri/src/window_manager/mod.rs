@@ -1,15 +1,28 @@
-#[cfg(not(target_os = "windows"))]
-use tauri::Manager;
-use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    async_runtime::block_on, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
+};
 
 use crate::{
-    database::{models::location::Location, DB_POOL},
+    database::{
+        models::{location::Location, tunnel::Tunnel},
+        DB_POOL,
+    },
     events::EventKey,
 };
 
 /// Returns `true` if there are any non-service locations in the database.
 pub async fn has_non_service_locations() -> bool {
     Location::exist(&*DB_POOL, false).await.unwrap_or_default()
+}
+
+/// Returns `true` if the compact (tray) view has anything to show: at least
+/// one non-service location or at least one tunnel.
+pub async fn has_tray_content() -> bool {
+    if has_non_service_locations().await {
+        return true;
+    }
+    Tunnel::exists(&*DB_POOL).await.unwrap_or_default()
 }
 
 pub const COMPACT_WINDOW_ID: &str = "compact-view";
@@ -131,6 +144,23 @@ pub(crate) fn show_tray_window(app: &AppHandle) {
     let _ = WindowManager::open_tray(app);
 }
 
+/// Show the compact (tray) window when there is tray content (a non-service
+/// location or a tunnel), otherwise fall back to the full view.
+pub fn show_tray_or_full_view(app: &AppHandle) {
+    if block_on(has_tray_content()) {
+        // Hide the full view if it is open and visible (not minimized) so only the compact window is shown.
+        if let Some(full_view) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
+            let full_view_visible = full_view.is_visible().ok().unwrap_or(false);
+            if full_view_visible {
+                let _ = full_view.hide();
+            }
+        }
+        show_tray_window(app);
+    } else {
+        let _ = WindowManager::open_full_view(app);
+    }
+}
+
 #[tauri::command]
 pub fn open_tray_window(app: AppHandle) {
     show_tray_window(&app);
@@ -144,7 +174,7 @@ pub fn open_full_view_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_full_view(app: AppHandle) {
     info!("swap_to_full_view called");
-    if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
+    if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
         if let Err(err) = window.hide() {
             error!("swap_to_full_view task: Failed to hide new-ui window: {err:?}");
         }
@@ -160,7 +190,7 @@ pub fn swap_to_full_view(app: AppHandle) {
 pub fn close_tray_window(app: AppHandle) {
     info!("close_tray_window called");
 
-    if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
+    if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
         info!("close_tray_window task: Hiding new-ui window");
         if let Err(err) = window.hide() {
             error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
@@ -174,7 +204,7 @@ pub fn close_tray_window(app: AppHandle) {
 pub fn swap_to_tray(app: AppHandle) {
     info!("swap_to_tray called");
     show_tray_window(&app);
-    if let Some(window) = tauri::Manager::get_webview_window(&app, FULL_VIEW_WINDOW_ID) {
+    if let Some(window) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
         if let Err(err) = window.hide() {
             error!("swap_to_tray task: Failed to hide full-view window: {err:?}");
         }
