@@ -29,7 +29,7 @@ export const WindowDecorations = () => {
     const shouldReserveSpace = isFullView && osCheck && (isMac || !isDecorated);
     document.documentElement.style.setProperty(
       '--window-decorations-height',
-      shouldReserveSpace ? `${decorationsHeight}px` : '0',
+      shouldReserveSpace ? `${decorationsHeight}px` : '0px',
     );
   }, [isDecorated]);
 
