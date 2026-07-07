@@ -129,6 +129,17 @@ impl Tunnel<Id> {
         Ok(tunnels)
     }
 
+    /// Returns `true` if there is at least one tunnel in the database.
+    pub async fn exists<'e, E>(executor: E) -> sqlx::Result<bool>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let result = query_scalar!("SELECT EXISTS (SELECT 1 FROM tunnel);")
+            .fetch_one(executor)
+            .await?;
+        Ok(result != 0)
+    }
+
     /// Find tunnels by name.
     pub async fn find_by_name<'e, E>(executor: E, name: &str) -> sqlx::Result<Vec<Self>>
     where

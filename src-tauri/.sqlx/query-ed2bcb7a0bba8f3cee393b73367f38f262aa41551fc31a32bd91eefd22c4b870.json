@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS (SELECT 1 FROM tunnel);",
+  "describe": {
+    "columns": [
+      {
+        "name": "EXISTS (SELECT 1 FROM tunnel)",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ed2bcb7a0bba8f3cee393b73367f38f262aa41551fc31a32bd91eefd22c4b870"
+}

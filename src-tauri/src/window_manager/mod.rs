@@ -4,13 +4,25 @@ use tauri::{
 };
 
 use crate::{
-    database::{models::location::Location, DB_POOL},
+    database::{
+        models::{location::Location, tunnel::Tunnel},
+        DB_POOL,
+    },
     events::EventKey,
 };
 
 /// Returns `true` if there are any non-service locations in the database.
 pub async fn has_non_service_locations() -> bool {
     Location::exist(&*DB_POOL, false).await.unwrap_or_default()
+}
+
+/// Returns `true` if the compact (tray) view has anything to show: at least
+/// one non-service location or at least one tunnel.
+pub async fn has_tray_content() -> bool {
+    if has_non_service_locations().await {
+        return true;
+    }
+    Tunnel::exists(&*DB_POOL).await.unwrap_or_default()
 }
 
 pub const COMPACT_WINDOW_ID: &str = "compact-view";
@@ -132,10 +144,10 @@ pub(crate) fn show_tray_window(app: &AppHandle) {
     let _ = WindowManager::open_tray(app);
 }
 
-/// Show the compact (tray) window when non-service locations exist,
-/// otherwise fall back to the full view.
+/// Show the compact (tray) window when there is tray content (a non-service
+/// location or a tunnel), otherwise fall back to the full view.
 pub fn show_tray_or_full_view(app: &AppHandle) {
-    if block_on(has_non_service_locations()) {
+    if block_on(has_tray_content()) {
         // Hide the full view if it is open and visible (not minimized) so only the compact window is shown.
         if let Some(full_view) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
             let full_view_visible = full_view.is_visible().ok().unwrap_or(false);
