@@ -1,7 +1,6 @@
-#[cfg(not(target_os = "windows"))]
-use tauri::Manager;
 use tauri::{
-    async_runtime::block_on, AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    async_runtime::block_on, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
 };
 
 use crate::{
@@ -163,7 +162,7 @@ pub fn open_full_view_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_full_view(app: AppHandle) {
     info!("swap_to_full_view called");
-    if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
+    if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
         if let Err(err) = window.hide() {
             error!("swap_to_full_view task: Failed to hide new-ui window: {err:?}");
         }
@@ -179,7 +178,7 @@ pub fn swap_to_full_view(app: AppHandle) {
 pub fn close_tray_window(app: AppHandle) {
     info!("close_tray_window called");
 
-    if let Some(window) = tauri::Manager::get_webview_window(&app, COMPACT_WINDOW_ID) {
+    if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
         info!("close_tray_window task: Hiding new-ui window");
         if let Err(err) = window.hide() {
             error!("close_tray_window task: Failed to hide new-ui window: {err:?}");
@@ -193,7 +192,7 @@ pub fn close_tray_window(app: AppHandle) {
 pub fn swap_to_tray(app: AppHandle) {
     info!("swap_to_tray called");
     show_tray_window(&app);
-    if let Some(window) = tauri::Manager::get_webview_window(&app, FULL_VIEW_WINDOW_ID) {
+    if let Some(window) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
         if let Err(err) = window.hide() {
             error!("swap_to_tray task: Failed to hide full-view window: {err:?}");
         }
