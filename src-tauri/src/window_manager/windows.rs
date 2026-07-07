@@ -1,5 +1,6 @@
 use std::{ffi::OsString, os::windows::ffi::OsStringExt};
 
+use tauri::Manager;
 use windows::Win32::{
     Foundation::{LPARAM, RECT},
     Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW},
@@ -144,13 +145,12 @@ impl WindowManager {
             .find(|m| m.is_primary)
             .unwrap_or(&monitors[0]);
 
-        let window =
-            if let Some(window) = tauri::Manager::get_webview_window(app, COMPACT_WINDOW_ID) {
-                let _ = window.unminimize();
-                window
-            } else {
-                Self::build_tray_window(app)?
-            };
+        let window = if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
+            let _ = window.unminimize();
+            window
+        } else {
+            Self::build_tray_window(app)?
+        };
 
         let logical_width = COMPACT_WINDOW_WIDTH;
         let logical_height = COMPACT_WINDOW_HEIGHT;
@@ -247,18 +247,17 @@ impl WindowManager {
             primary.scale_factor
         );
 
-        info!("open_full_view: Checking if old-ui window exists");
-        let window =
-            if let Some(window) = tauri::Manager::get_webview_window(app, FULL_VIEW_WINDOW_ID) {
-                info!("open_full_view: old-ui window exists, unminimizing");
-                let _ = window.unminimize();
-                window
-            } else {
-                info!("open_full_view: old-ui window does not exist, building it");
-                let win = Self::build_full_view_window(app)?;
-                info!("open_full_view: old-ui window built successfully");
-                win
-            };
+        info!("open_full_view: Checking if full view window exists");
+        let window = if let Some(window) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
+            info!("open_full_view: full view window exists, unminimizing");
+            let _ = window.unminimize();
+            window
+        } else {
+            info!("open_full_view: full view window does not exist, building it");
+            let win = Self::build_full_view_window(app)?;
+            info!("open_full_view: full view window built successfully");
+            win
+        };
 
         info!("open_full_view: Querying outer_size");
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
