@@ -183,6 +183,34 @@ impl ServiceLocationManager {
             })
     }
 
+    fn find_interface_by_peer_pubkey(&self, location_pubkey: &str) -> Option<String> {
+        let peer_key = match Key::from_str(location_pubkey) {
+            Ok(peer_key) => peer_key,
+            Err(err) => {
+                warn!(
+                    "Failed to parse Linux service location peer pubkey {location_pubkey}: {err}"
+                );
+                return None;
+            }
+        };
+
+        for (ifname, wgapi) in &self.wgapis {
+            match wgapi.read_interface_data() {
+                Ok(host) => {
+                    if host.peers.contains_key(&peer_key) {
+                        return Some(ifname.clone());
+                    }
+                }
+                Err(err) => warn!(
+					"Failed to read Linux service location interface {ifname} while looking for peer \
+					{location_pubkey}: {err}"
+				),
+            }
+        }
+
+        None
+    }
+
     pub fn disconnect_service_locations_by_instance(
         &mut self,
         instance_id: &str,
@@ -195,16 +223,24 @@ impl ServiceLocationManager {
         };
 
         for location in locations {
-            let ifname = get_interface_name(&location.name);
-            debug!("Tearing down Linux service location interface: {ifname}");
-            if let Some(wgapi) = self.wgapis.remove(&ifname) {
-                if let Err(err) = wgapi.remove_interface() {
-                    error!("Failed to remove Linux service location interface {ifname}: {err}");
+            if let Some(ifname) = self.find_interface_by_peer_pubkey(&location.pubkey) {
+                debug!("Tearing down Linux service location interface: {ifname}");
+                if let Some(wgapi) = self.wgapis.remove(&ifname) {
+                    if let Err(err) = wgapi.remove_interface() {
+                        error!("Failed to remove Linux service location interface {ifname}: {err}");
+                    } else {
+                        debug!("Linux service location interface {ifname} removed successfully");
+                    }
                 } else {
-                    debug!("Linux service location interface {ifname} removed successfully");
+                    debug!(
+                        "Linux service location interface {ifname} was not tracked as connected"
+                    );
                 }
             } else {
-                debug!("Linux service location interface {ifname} was not tracked as connected");
+                debug!(
+					"No Linux service location interface found for instance {instance_id}, location '{}'",
+					location.name
+				);
             }
         }
 
@@ -216,36 +252,46 @@ impl ServiceLocationManager {
         instance_id: &str,
         location_pubkey: &str,
     ) -> Result<(), ServiceLocationError> {
-        let Some(locations) = self.connected_service_locations.get_mut(instance_id) else {
+        let Some(position) =
+            self.connected_service_locations
+                .get(instance_id)
+                .and_then(|locations| {
+                    locations
+                        .iter()
+                        .position(|location| location.pubkey == location_pubkey)
+                })
+        else {
             debug!("No connected Linux service locations found for instance {instance_id}");
             return Ok(());
         };
 
-        let Some(position) = locations
-            .iter()
-            .position(|location| location.pubkey == location_pubkey)
-        else {
-            debug!(
-				"Linux service location with pubkey {location_pubkey} for instance {instance_id} is not connected"
-			);
+        let ifname = self.find_interface_by_peer_pubkey(location_pubkey);
+
+        let Some(locations) = self.connected_service_locations.get_mut(instance_id) else {
+            warn!("Linux service location for instance {instance_id} disappeared before removal");
             return Ok(());
         };
-
         let location = locations.remove(position);
         if locations.is_empty() {
             self.connected_service_locations.remove(instance_id);
         }
 
-        let ifname = get_interface_name(&location.name);
-        debug!("Tearing down Linux service location interface: {ifname}");
-        if let Some(wgapi) = self.wgapis.remove(&ifname) {
-            if let Err(err) = wgapi.remove_interface() {
-                error!("Failed to remove Linux service location interface {ifname}: {err}");
+        if let Some(ifname) = ifname {
+            debug!("Tearing down Linux service location interface: {ifname}");
+            if let Some(wgapi) = self.wgapis.remove(&ifname) {
+                if let Err(err) = wgapi.remove_interface() {
+                    error!("Failed to remove Linux service location interface {ifname}: {err}");
+                } else {
+                    debug!("Linux service location interface {ifname} removed successfully");
+                }
             } else {
-                debug!("Linux service location interface {ifname} removed successfully");
+                debug!("Linux service location interface {ifname} was not tracked as connected");
             }
         } else {
-            debug!("Linux service location interface {ifname} was not tracked as connected");
+            debug!(
+				"No Linux service location interface found for instance {instance_id}, location '{}'",
+				location.name
+			);
         }
 
         Ok(())
@@ -335,6 +381,18 @@ impl ServiceLocationManager {
                 "Skipping Linux service location '{}' because it's already connected",
                 location.name
             );
+            return Ok(());
+        }
+
+        if self
+            .find_interface_by_peer_pubkey(&location.pubkey)
+            .is_some()
+        {
+            debug!(
+                "Skipping Linux service location '{}' because its interface already exists",
+                location.name
+            );
+            self.add_connected_service_location(instance_id, location);
             return Ok(());
         }
 
