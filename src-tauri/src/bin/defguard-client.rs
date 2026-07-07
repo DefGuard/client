@@ -166,12 +166,7 @@ async fn startup(app_handle: &AppHandle) {
 
 /// Open the appropriate window, either the old or the new UI, depending if there are locations.
 fn open_appropriate_window(app_handle: &AppHandle) {
-    let has_locations = async_runtime::block_on(has_non_service_locations());
-    if has_locations {
-        let _ = WindowManager::open_tray(app_handle);
-    } else {
-        let _ = WindowManager::open_full_view(app_handle);
-    }
+    show_tray_or_full_view(app_handle);
 }
 
 fn main() {

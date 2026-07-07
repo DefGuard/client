@@ -1,6 +1,8 @@
 #[cfg(not(target_os = "windows"))]
 use tauri::Manager;
-use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    async_runtime::block_on, AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+};
 
 use crate::{
     database::{models::location::Location, DB_POOL},
@@ -129,6 +131,16 @@ pub mod macos;
 // Export tauri commands so they can be registered in main.rs
 pub(crate) fn show_tray_window(app: &AppHandle) {
     let _ = WindowManager::open_tray(app);
+}
+
+/// Show the compact (tray) window when non-service locations exist,
+/// otherwise fall back to the full view.
+pub fn show_tray_or_full_view(app: &AppHandle) {
+    if block_on(has_non_service_locations()) {
+        show_tray_window(app);
+    } else {
+        let _ = WindowManager::open_full_view(app);
+    }
 }
 
 #[tauri::command]

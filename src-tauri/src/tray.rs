@@ -15,7 +15,7 @@ use crate::{
     database::{models::location::Location, DB_POOL},
     error::Error,
     events::EventKey,
-    window_manager::{show_tray_window, WindowManager, COMPACT_WINDOW_ID, FULL_VIEW_WINDOW_ID},
+    window_manager::{show_tray_or_full_view, COMPACT_WINDOW_ID, FULL_VIEW_WINDOW_ID},
     ConnectionType,
 };
 
@@ -188,17 +188,7 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
                         let _ = w.hide();
                     }
                 } else {
-                    let has_locations = tauri::async_runtime::block_on(
-                        crate::window_manager::has_non_service_locations(),
-                    );
-                    if has_locations {
-                        if let Some(old_ui) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
-                            let _ = old_ui.hide();
-                        }
-                        show_tray_window(app);
-                    } else {
-                        let _ = WindowManager::open_full_view(app);
-                    }
+                    show_tray_or_full_view(app);
                 }
             }
         })
@@ -264,7 +254,7 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
             info!("Received QUIT request. Initiating shutdown...");
             handle.exit(0);
         }
-        TRAY_EVENT_SHOW => show_tray_window(app),
+        TRAY_EVENT_SHOW => show_tray_or_full_view(app),
         TRAY_EVENT_HIDE => hide_visible_windows(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
