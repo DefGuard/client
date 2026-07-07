@@ -167,17 +167,6 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
             {
                 let app = icon.app_handle();
 
-                let main_visible = app
-                    .get_webview_window(FULL_VIEW_WINDOW_ID)
-                    .and_then(|w| w.is_visible().ok())
-                    .unwrap_or(false);
-
-                if main_visible {
-                    if let Some(w) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
-                        let _ = w.hide();
-                    }
-                }
-
                 let tray_visible = app
                     .get_webview_window(COMPACT_WINDOW_ID)
                     .and_then(|w| w.is_visible().ok())

@@ -137,6 +137,13 @@ pub(crate) fn show_tray_window(app: &AppHandle) {
 /// otherwise fall back to the full view.
 pub fn show_tray_or_full_view(app: &AppHandle) {
     if block_on(has_non_service_locations()) {
+        // Hide the full view if it is open and visible (not minimized) so only the compact window is shown.
+        if let Some(full_view) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
+            let full_view_visible = full_view.is_visible().ok().unwrap_or(false);
+            if full_view_visible {
+                let _ = full_view.hide();
+            }
+        }
         show_tray_window(app);
     } else {
         let _ = WindowManager::open_full_view(app);
