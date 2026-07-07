@@ -19,6 +19,7 @@ jobs:
     runs-on:
       - self-hosted
       - macOS
+      - native
     env:
       APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
       APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
