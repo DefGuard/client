@@ -2,7 +2,6 @@ name: "Test posture checks gathering"
 on:
   push:
     branches:
-      - linux_posture_workflow
       - main
       - dev
       - 'release/**'
