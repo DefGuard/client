@@ -11,6 +11,7 @@ import { ThemeSpacing } from '../../../../../shared/types';
 import {
   cidrRegex,
   patternValidEndpoint,
+  patternValidIpV6WithPort,
   patternValidWireguardKey,
 } from '../../../../../shared/utils/patterns';
 import { useTunnelWizardStore } from '../../hooks/useTunnelWizardStore';
@@ -22,7 +23,12 @@ const formSchema = z.object({
   preshared_key: z
     .string()
     .refine((v) => !v || patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  endpoint: z.string().refine((v) => patternValidEndpoint.test(v), 'Invalid address'),
+  endpoint: z
+    .string()
+    .refine(
+      (v) => patternValidEndpoint.test(v) || patternValidIpV6WithPort.test(v),
+      'Invalid address',
+    ),
   dns: z.string(),
   allowed_ips: z.string().refine((v) => {
     if (!v) return true;

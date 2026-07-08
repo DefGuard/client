@@ -24,6 +24,7 @@ import {
   cidrRegex,
   patternValidEndpoint,
   patternValidIpV6WithMask,
+  patternValidIpV6WithPort,
   patternValidIpWithMask,
   patternValidWireguardKey,
 } from '../../../../../shared/utils/patterns';
@@ -84,7 +85,12 @@ const formSchema = z.object({
   preshared_key: z
     .string()
     .refine((v) => !v || patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  endpoint: z.string().refine((v) => patternValidEndpoint.test(v), 'Invalid address'),
+  endpoint: z
+    .string()
+    .refine(
+      (v) => patternValidEndpoint.test(v) || patternValidIpV6WithPort.test(v),
+      'Invalid address',
+    ),
   dns: z.string(),
   allowed_ips: z.string().refine((v) => {
     if (!v) return true;
