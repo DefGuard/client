@@ -61,6 +61,7 @@ export const useEnrollmentStore = create<Store>()(
           skipMfaChoice:
             !response.settings.smtp_configured || !response.settings.mfa_required,
           skipMfa: !response.settings.mfa_required,
+          skipPassword: response.user.password_management_disabled,
           deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
           userTotpSecret: secret ?? null,
         });

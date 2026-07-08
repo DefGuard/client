@@ -24,6 +24,7 @@ export type UserInfo = {
   phone_number: string;
   device_names: string[];
   enrolled: boolean;
+  password_management_disabled: boolean;
 };
 
 export type EnrollmentSettings = {
@@ -76,7 +77,7 @@ export type MfaSetupFinishRequest = { code: string; method: MfaMethodValue };
 export type MfaSetupFinishResponse = { recovery_codes: string[] };
 
 export type ActivateUserRequest = {
-  password: string;
+  password?: string;
   phone_number: string;
 };
 

@@ -54,6 +54,7 @@ in
       trivy
       desktop-file-utils
       xdg-utils
+      just
     ];
 
     shellHook = with pkgs; ''

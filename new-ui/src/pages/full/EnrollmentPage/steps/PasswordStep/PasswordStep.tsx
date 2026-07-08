@@ -14,6 +14,7 @@ import { formChangeLogic } from '../../../../../shared/formLogic';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { activateUser } from '../../hooks/activateUser';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 import {
   type PasswordErrorCodeValue,
@@ -85,14 +86,11 @@ export const PasswordStep = () => {
           return;
         }
       }
+      useEnrollmentStore.setState({
+        userPassword: value.password.trim(),
+      });
       if (skipMfa) {
-        await edgeApi.activateUser(proxyUrl, cookie, {
-          password: value.password,
-        });
-      } else {
-        useEnrollmentStore.setState({
-          userPassword: value.password.trim(),
-        });
+        await activateUser();
       }
       useEnrollmentStore.getState().next();
     },

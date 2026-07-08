@@ -171,9 +171,9 @@ fn emit_poll_result_events(
             }
         }
         PollInstanceResult::ChangedWhileActive { .. } => {
-            debug!("Emitting config-changed event for instance {instance_name}({instance_id})",);
+            debug!("Emitting config-changed event for instance {instance_name}({instance_id})");
             let _ = handle.emit(EventKey::ConfigChanged.into(), instance_name);
-            info!("Emitted config-changed event for instance {instance_name}({instance_id})",);
+            info!("Emitted config-changed event for instance {instance_name}({instance_id})");
         }
     }
 }

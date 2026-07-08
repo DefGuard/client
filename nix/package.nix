@@ -90,7 +90,7 @@
     inherit pname version pnpm;
     src = ../.;
     fetcherVersion = 3;
-    hash = "sha256-Ktczlfddb77pNoo16sZTQ19ZpG5IrEpKigFXDEiT42k=";
+    hash = "sha256-iE5IgvW375eIblAJj60+tc5mKYKvpht8USYlJC9/wkg=";
   };
 
   # Prefetch pnpm dependencies for the new UI (separate pnpm project).
@@ -200,8 +200,8 @@ in
       cp ${desktopItem}/share/applications/* $out/share/applications/
 
       mkdir -p $out/share/icons/hicolor/{32x32,128x128}/apps
-      install -Dm644 src-tauri/icons/32x32.png  $out/share/icons/hicolor/32x32/apps/${pname}.png
-      install -Dm644 src-tauri/icons/128x128.png $out/share/icons/hicolor/128x128/apps/${pname}.png
+      install -Dm644 src-tauri/icons/windows/32x32.png  $out/share/icons/hicolor/32x32/apps/${pname}.png
+      install -Dm644 src-tauri/icons/windows/128x128.png $out/share/icons/hicolor/128x128/apps/${pname}.png
 
       runHook postInstall
     '';
