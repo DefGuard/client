@@ -12,15 +12,16 @@ import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { activateUser } from '../../hooks/activateUser';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const MfaConfigurationStep = () => {
   const method = useEnrollmentStore((s) => s.userMfaChoice);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [proxyUrl, cookie, password] = useEnrollmentStore(
+  const [proxyUrl, cookie] = useEnrollmentStore(
     // biome-ignore lint/style/noNonNullAssertion: safe
-    useShallow((s) => [s.proxyUrl!, s.sessionCookie!, s.userPassword!]),
+    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
   );
 
   const { mutate, isPending } = useMutation({
@@ -30,9 +31,7 @@ export const MfaConfigurationStep = () => {
         code: code!,
         method,
       });
-      await edgeApi.activateUser(proxyUrl, cookie, {
-        password,
-      });
+      await activateUser();
       return resp;
     },
     onError: () => {},

@@ -130,5 +130,6 @@ pub fn device_posture_data() -> DevicePostureData {
         windows_security_update_age_days: Some(Int32Check::from(security_update_age_days())),
         linux_kernel_version: Some(StringCheck::from(linux_kernel_version())),
         device_integrity: Some(BoolCheck::from(device_integrity())),
+        android_security_patch_date: None,
     }
 }
