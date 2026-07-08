@@ -90,7 +90,7 @@
     inherit pname version pnpm;
     src = ../.;
     fetcherVersion = 3;
-    hash = "sha256-vqBzk7E++I1A/dyOSBhzNTd1VkyVi4TMKBOMlAr0+T4=";
+    hash = "sha256-Ktczlfddb77pNoo16sZTQ19ZpG5IrEpKigFXDEiT42k=";
   };
 
   # Prefetch pnpm dependencies for the new UI (separate pnpm project).
