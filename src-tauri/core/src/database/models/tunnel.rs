@@ -15,6 +15,7 @@ use crate::{
 #[serde_as]
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Tunnel<I = NoId> {
+    #[serde(default)]
     pub id: I,
     pub name: String,
     // encryption keys
