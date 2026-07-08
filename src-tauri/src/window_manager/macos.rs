@@ -28,10 +28,8 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(
                 ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
                 ns_window.standardWindowButton(NSWindowButton::ZoomButton),
             ];
-            for button in buttons {
-                if let Some(btn) = button {
-                    btn.setHidden(!enable_system_controls);
-                }
+            for btn in buttons.into_iter().flatten() {
+                btn.setHidden(!enable_system_controls);
             }
         })
         .map_err(|err| err.to_string())

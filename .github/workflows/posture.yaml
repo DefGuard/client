@@ -2,6 +2,7 @@ name: "Test posture checks gathering"
 on:
   push:
     branches:
+      - linux_posture_workflow
       - main
       - dev
       - 'release/**'
@@ -42,10 +43,44 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux -- --ignored
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup1 -- --ignored
 
       - name: Show sccache stats
         run: sccache --show-stats
+
+
+  test-linux-postures-encrypted:
+    name: macOS postures - encrypted
+    runs-on:
+      - self-hosted
+      - Linux
+      - virtual
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm cryptsetup-bin util-linux
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Run tests
+        working-directory: src-tauri/
+        run: |
+          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup2 -- --ignored
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
 
   test-windows-postures-setup1:
     name: Windows postures - setup1
