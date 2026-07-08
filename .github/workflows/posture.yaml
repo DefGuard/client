@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - macos_posture_workflow
       - dev
       - 'release/**'
     paths-ignore:
