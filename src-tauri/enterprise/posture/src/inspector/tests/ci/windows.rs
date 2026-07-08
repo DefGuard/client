@@ -1,5 +1,10 @@
 use std::process::Command;
 
+use super::super::super::{
+    anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
+    security_update_age_days,
+};
+
 fn expected_security_update_age_days() -> i32 {
     let output = Command::new("powershell")
         .args([
@@ -28,13 +33,7 @@ fn expected_security_update_age_days() -> i32 {
 }
 
 mod setup1 {
-    use super::{
-        super::super::super::{
-            anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
-            security_update_age_days,
-        },
-        expected_security_update_age_days,
-    };
+    use super::*;
 
     #[test]
     #[ignore = "CI posture testing only"]
@@ -77,13 +76,7 @@ mod setup1 {
 }
 
 mod setup2 {
-    use super::{
-        super::super::super::{
-            anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
-            security_update_age_days,
-        },
-        expected_security_update_age_days,
-    };
+    use super::*;
 
     #[test]
     #[ignore = "CI posture testing only"]

@@ -17,26 +17,58 @@ fn expected_os_version() -> String {
         .to_owned()
 }
 
-#[test]
-#[ignore = "CI posture testing only"]
-fn test_os_name() {
-    assert_eq!(os_name().unwrap(), "Darwin");
+mod setup1 {
+    use super::*;
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_name() {
+        assert_eq!(os_name().unwrap(), "Darwin");
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_version() {
+        assert_eq!(os_version().unwrap(), expected_os_version());
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_device_integrity() {
+        assert_eq!(device_integrity().unwrap(), true);
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_disk_encryption_status_unencrypted() {
+        assert_eq!(disk_encryption_status().unwrap(), false);
+    }
 }
 
-#[test]
-#[ignore = "CI posture testing only"]
-fn test_os_version() {
-    assert_eq!(os_version().unwrap(), expected_os_version());
-}
+mod setup2 {
+    use super::*;
 
-#[test]
-#[ignore = "CI posture testing only"]
-fn test_device_integrity() {
-    assert_eq!(device_integrity().unwrap(), true);
-}
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_name() {
+        assert_eq!(os_name().unwrap(), "Darwin");
+    }
 
-#[test]
-#[ignore = "CI posture testing only"]
-fn test_disk_encryption_status_unencrypted() {
-    assert_eq!(disk_encryption_status().unwrap(), false);
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_version() {
+        assert_eq!(os_version().unwrap(), expected_os_version());
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_device_integrity() {
+        assert_eq!(device_integrity().unwrap(), false);
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_disk_encryption_status_unencrypted() {
+        assert_eq!(disk_encryption_status().unwrap(), true);
+    }
 }
