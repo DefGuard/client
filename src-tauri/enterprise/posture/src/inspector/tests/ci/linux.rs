@@ -73,7 +73,7 @@ mod setup1 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert_eq!(disk_encryption_status().unwrap(), false);
+        assert!(!disk_encryption_status().unwrap());
     }
 }
 
@@ -101,6 +101,6 @@ mod setup2 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert_eq!(disk_encryption_status().unwrap(), true);
+        assert!(disk_encryption_status().unwrap());
     }
 }

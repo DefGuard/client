@@ -50,13 +50,13 @@ mod setup1 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_anti_virus_status_on() {
-        assert_eq!(anti_virus_status().unwrap(), true);
+        assert!(anti_virus_status().unwrap());
     }
 
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_part_of_domain_false() {
-        assert_eq!(part_of_domain().unwrap(), false);
+        assert!(!part_of_domain().unwrap());
     }
 
     #[test]
@@ -71,7 +71,7 @@ mod setup1 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert_eq!(disk_encryption_status().unwrap(), false);
+        assert!(!disk_encryption_status().unwrap());
     }
 }
 
@@ -93,13 +93,13 @@ mod setup2 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_anti_virus_status_off() {
-        assert_eq!(anti_virus_status().unwrap(), false);
+        assert!(!anti_virus_status().unwrap());
     }
 
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_part_of_domain_true() {
-        assert_eq!(part_of_domain().unwrap(), true);
+        assert!(part_of_domain().unwrap());
     }
 
     #[test]
@@ -114,6 +114,6 @@ mod setup2 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_encrypted() {
-        assert_eq!(disk_encryption_status().unwrap(), true);
+        assert!(disk_encryption_status().unwrap());
     }
 }
