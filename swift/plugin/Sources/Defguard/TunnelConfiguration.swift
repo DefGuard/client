@@ -71,10 +71,15 @@ final class TunnelConfiguration: Codable {
         networkSettings.tunnelOverheadBytes = 80
 
         let dnsSettings = NEDNSSettings(servers: dns)
-        dnsSettings.searchDomains = dnsSearch
         if !dns.isEmpty {
-            // Make all DNS queries go through the tunnel.
-            dnsSettings.matchDomains = [""]
+            if dnsSearch.isEmpty {
+                // Resolve all DNS queries.
+                dnsSettings.matchDomains = [""]
+            } else {
+                // Split DNS queries.
+                dnsSettings.matchDomains = dnsSearch
+                dnsSettings.searchDomains = dnsSearch
+            }
         }
         networkSettings.dnsSettings = dnsSettings
 
