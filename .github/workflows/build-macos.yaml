@@ -89,9 +89,8 @@ jobs:
             --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
             /Applications defguard-client.pkg
           xcrun notarytool submit defguard-client.pkg \
-            --key ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
-            --key-id "${{ secrets.APPLE_API_KEY_ID }}" \
-            --issuer "${{ secrets.APPLE_API_ISSUER }}" \
+            --key ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY }}.p8 \
+            --key-id "${{ secrets.APPLE_API_KEY }}" --issuer "${{ secrets.APPLE_API_ISSUER }}" \
             --wait
 
       - name: Upload What's New
