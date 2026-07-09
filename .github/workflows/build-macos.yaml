@@ -90,10 +90,9 @@ jobs:
             --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
             --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
             /Applications defguard-client.pkg
-          xcrun notarytool submit defguard-client.pkg \
-            --key ~/.private_keys/AuthKey_${{ secrets.APPLE_API_KEY }}.p8 \
-            --key-id "${{ secrets.APPLE_API_KEY }}" --issuer "${{ secrets.APPLE_API_ISSUER }}" \
-            --wait
+          xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} \
+            --api-issuer ${{ secrets.APPLE_API_ISSUER }} \
+            --upload-app --platform macos --file defguard-client.pkg --wait
 
       - name: Upload What's New
         env:
