@@ -73,6 +73,10 @@ jobs:
           cd new-ui
           pnpm build
 
+      - name: Unlock keychain
+        run: |
+          security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
+
       - name: Build app
         uses: tauri-apps/tauri-action@v1
         env:
@@ -82,7 +86,6 @@ jobs:
 
       - name: Build installation package
         run: |
-          security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
           xcrun productbuild --keychain build.keychain \
             --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
             --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \

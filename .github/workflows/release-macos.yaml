@@ -66,6 +66,10 @@ jobs:
           cd new-ui
           pnpm build
 
+      - name: Unlock keychain
+        run: |
+          security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
+
       - name: Build app
         uses: tauri-apps/tauri-action@v1
         env:
