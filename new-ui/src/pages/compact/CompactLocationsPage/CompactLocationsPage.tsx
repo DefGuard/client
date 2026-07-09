@@ -42,10 +42,7 @@ export const CompactLocationsPage = () => {
     );
   }, [selection, allInstances, allTunnels]);
 
-  const { data: locations } = useQuery({
-    ...getLocationsQueryOptions(queryInstanceId ?? 0),
-    enabled: isPresent(queryInstanceId),
-  });
+  const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));
 
   const instanceInfo = useMemo(() => {
     if (!isPresent(selection)) return allInstances[0];

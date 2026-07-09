@@ -46,10 +46,7 @@ export const OverviewPage = () => {
     return selectedTunnel?.instance_id ?? instances[0]?.id;
   }, [selection, instances, selectedTunnel]);
 
-  const { data: locations } = useQuery({
-    ...getLocationsQueryOptions(queryInstanceId ?? 0),
-    enabled: isPresent(queryInstanceId),
-  });
+  const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));
 
   const displayedLocations = useMemo(() => {
     if (!isPresent(selection) || selection.kind === 'instance') {
