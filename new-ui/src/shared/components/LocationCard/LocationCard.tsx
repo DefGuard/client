@@ -24,7 +24,7 @@ interface Props {
   isOpen: boolean;
   onOpen: () => void;
   disableOpen?: boolean;
-  instance: InstanceInfo;
+  instance?: InstanceInfo;
 }
 
 const views: Record<LocationCardViewsValue, ReactNode> = {

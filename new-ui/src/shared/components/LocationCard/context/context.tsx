@@ -15,7 +15,7 @@ import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
   location: LocationInfo;
-  instance: InstanceInfo;
+  instance?: InstanceInfo;
   currentView: LocationCardViewsValue;
   previousView: LocationCardViewsValue | null;
   postureError: string | null;
@@ -38,7 +38,7 @@ export const useLocationCardContext = (): LocationCardContextValue => {
 };
 
 interface LocationCardProviderProps {
-  instance: InstanceInfo;
+  instance?: InstanceInfo;
   location: LocationInfo;
   children: ReactNode;
 }

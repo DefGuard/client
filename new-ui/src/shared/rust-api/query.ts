@@ -1,5 +1,6 @@
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, skipToken } from '@tanstack/react-query';
 
+import { isPresent } from '../utils/isPresent';
 import { api } from './api';
 import type { ConnectionArgs, LocationDetailsArgs, StatsArgs } from './types';
 
@@ -15,10 +16,13 @@ export const getInstancesQueryOptions = queryOptions({
   refetchInterval: 30_000,
 });
 
-export const getLocationsQueryOptions = (instanceId: number) =>
+// Accepts an absent instance id and self-disables via skipToken, so callers
+// (e.g. a tunnel selection with no backing instance) can pass through whatever
+// they resolved without a sentinel id or a separate `enabled` flag.
+export const getLocationsQueryOptions = (instanceId: number | undefined) =>
   queryOptions({
     queryKey: ['locations', instanceId] as const,
-    queryFn: () => api.getLocations(instanceId),
+    queryFn: isPresent(instanceId) ? () => api.getLocations(instanceId) : skipToken,
   });
 
 export const hasAnyVisibleLocationsQueryOptions = queryOptions({

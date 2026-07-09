@@ -75,9 +75,12 @@ export const patternValidIpWithMask =
 
 export const cidrRegex =
   /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}|[0-9a-fA-F:.]+\/\d{1,3})$/;
-// Regular expression to match IPv4, IPv6, domain name, or localhost with port
+// Regular expression to match a WireGuard endpoint. A bare IPv4 literal must
+// include a port (a port-less IP is almost always a mistake), while domain names
+// and localhost may omit it. IPv6 endpoints are validated separately via
+// patternValidIpV6WithPort (port required there too).
 export const patternValidEndpoint =
-  /^(localhost|\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b|\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b)(?::(\d+))?$/;
+  /^(?:(?:localhost|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})(?::\d+)?|(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d+)$/;
 
 // Copied from zod source code
 export const patternValidIpV6 =

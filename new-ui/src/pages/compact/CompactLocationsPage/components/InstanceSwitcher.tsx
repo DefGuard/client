@@ -26,7 +26,10 @@ export const InstanceSwitcher = () => {
       key: 'instances',
       label: 'Instances',
       options: instances.map((instance) => ({
-        key: instance.id,
+        // Instances and tunnels have separate id spaces, so prefix the key with
+        // the kind to keep it unique across groups (the Select marks the checkmark
+        // by comparing option keys).
+        key: `instance-${instance.id}`,
         label: instance.name,
         value: { kind: 'instance', id: instance.id },
       })),
@@ -36,7 +39,7 @@ export const InstanceSwitcher = () => {
       key: 'tunnels',
       label: 'Tunnels',
       options: tunnels.map((tunnel) => ({
-        key: tunnel.id ?? tunnel.name,
+        key: `tunnel-${tunnel.id ?? tunnel.name}`,
         label: tunnel.name,
         value: { kind: 'tunnel', id: tunnel.id },
       })),

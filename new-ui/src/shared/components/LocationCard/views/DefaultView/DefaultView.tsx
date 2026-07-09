@@ -29,7 +29,7 @@ export const DefaultView = () => {
 
   return (
     <div className="location-view-default">
-      {instance.client_traffic_policy === ClientTrafficPolicy.None && (
+      {(instance?.client_traffic_policy === ClientTrafficPolicy.None || !instance) && (
         <Fragment>
           <Divider spacing={ThemeSpacing.Md} />
           <Toggle

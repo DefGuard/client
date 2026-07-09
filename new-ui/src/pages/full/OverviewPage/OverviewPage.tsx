@@ -41,9 +41,9 @@ export const OverviewPage = () => {
   );
 
   const queryInstanceId = useMemo(() => {
-    if (!isPresent(selection)) return instances[0].id;
+    if (!isPresent(selection)) return instances[0]?.id;
     if (selection.kind === 'instance') return selection.id;
-    return selectedTunnel?.instance_id ?? instances[0].id;
+    return selectedTunnel?.instance_id ?? instances[0]?.id;
   }, [selection, instances, selectedTunnel]);
 
   const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));

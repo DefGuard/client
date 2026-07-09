@@ -23,11 +23,12 @@ export const FormInput = ({ mapError, onDismiss, ...props }: FormInputProps) => 
     return undefined;
   }, [onDismiss, props.type]);
 
-  // allows field to show error even if isPristine is true, this is needed in cases as input required or checkbox checked but user just clicked submit
-  const wasSubmittedWithFailure = useStore(
-    form.store,
-    (store) => !store.isSubmitSuccessful && store.submissionAttempts > 0,
-  );
+  // allows field to show error even if isPristine is true, this is needed in cases as input required or checkbox checked but user just clicked submit.
+  // Keyed on submissionAttempts rather than isSubmitSuccessful: a submit whose
+  // handler injects server-side field errors via setErrorMap (without throwing)
+  // is still recorded as "successful" by the form, which would otherwise hide
+  // the error on a pristine field.
+  const wasSubmitted = useStore(form.store, (store) => store.submissionAttempts > 0);
 
   const isPristine = useStore(field.store, (state) => state.meta.isPristine);
 
@@ -39,7 +40,7 @@ export const FormInput = ({ mapError, onDismiss, ...props }: FormInputProps) => 
 
   const errorMessage = useMemo(() => {
     // ignore errors unless some touches the field or submit's the form
-    if (isPristine && !wasSubmittedWithFailure) return undefined;
+    if (isPristine && !wasSubmitted) return undefined;
 
     const fieldError = errorState[0];
 
@@ -57,7 +58,7 @@ export const FormInput = ({ mapError, onDismiss, ...props }: FormInputProps) => 
       }
     }
     return undefined;
-  }, [mapError, errorState[0], isPristine, wasSubmittedWithFailure]);
+  }, [mapError, errorState[0], isPristine, wasSubmitted]);
 
   return (
     <Input

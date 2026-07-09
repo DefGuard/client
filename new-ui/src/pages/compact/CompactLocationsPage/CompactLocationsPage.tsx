@@ -14,6 +14,7 @@ import { api } from '../../../shared/rust-api/api';
 import {
   getInstancesQueryOptions,
   getLocationsQueryOptions,
+  getTunnelsQueryOptions,
 } from '../../../shared/rust-api/query';
 import { useAppStore } from '../../../shared/store/useAppStore';
 import { ThemeSpacing } from '../../../shared/types';
@@ -28,18 +29,18 @@ export const CompactLocationsPage = () => {
   const routeData = useLoaderData({ from: '/compact/' });
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
+  const { data: tunnels } = useQuery(getTunnelsQueryOptions);
 
   const allInstances = instances ?? routeData.instances;
-  const allTunnels = routeData.tunnels;
+  const allTunnels = tunnels ?? routeData.tunnels;
 
   const queryInstanceId = useMemo(() => {
-    if (!isPresent(selection)) return routeData.instances[0].id;
+    if (!isPresent(selection)) return allInstances[0]?.id;
     if (selection.kind === 'instance') return selection.id;
     return (
-      allTunnels.find((t) => t.id === selection.id)?.instance_id ??
-      routeData.instances[0].id
+      allTunnels.find((t) => t.id === selection.id)?.instance_id ?? allInstances[0]?.id
     );
-  }, [selection, routeData.instances, allTunnels]);
+  }, [selection, allInstances, allTunnels]);
 
   const { data: locations } = useQuery(getLocationsQueryOptions(queryInstanceId));
 
@@ -62,9 +63,11 @@ export const CompactLocationsPage = () => {
   useEffect(() => {
     if (selection?.kind === 'tunnel') return;
     if (selection === null || instanceInfo === undefined) {
-      setViewSelection({ kind: 'instance', id: routeData.instances[0].id });
+      if (allInstances.length > 0) {
+        setViewSelection({ kind: 'instance', id: allInstances[0].id });
+      }
     }
-  }, [routeData.instances, instanceInfo, selection, setViewSelection]);
+  }, [allInstances, instanceInfo, selection, setViewSelection]);
 
   return (
     <CompactPage
@@ -77,27 +80,26 @@ export const CompactLocationsPage = () => {
         <div className="main-content">
           <InstanceSwitcher />
           <div className="locations">
-            {isPresent(instanceInfo) &&
-              displayedLocations.map((location) => {
-                const isOpen =
-                  location.id === openLocation || displayedLocations.length === 1;
-                return (
-                  <LocationCard
-                    instance={instanceInfo}
-                    disableOpen={displayedLocations.length <= 1}
-                    location={location}
-                    key={`${location.instance_id}-${location.id}`}
-                    isOpen={isOpen}
-                    onOpen={() => {
-                      if (isOpen) {
-                        useAppStore.setState({ expandedLocation: null });
-                      } else {
-                        useAppStore.setState({ expandedLocation: location.id });
-                      }
-                    }}
-                  />
-                );
-              })}
+            {displayedLocations.map((location) => {
+              const isOpen =
+                location.id === openLocation || displayedLocations.length === 1;
+              return (
+                <LocationCard
+                  instance={instanceInfo}
+                  disableOpen={displayedLocations.length <= 1}
+                  location={location}
+                  key={`${location.connection_type}-${location.id}`}
+                  isOpen={isOpen}
+                  onOpen={() => {
+                    if (isOpen) {
+                      useAppStore.setState({ expandedLocation: null });
+                    } else {
+                      useAppStore.setState({ expandedLocation: location.id });
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
         </div>
       </ScrollContainer>

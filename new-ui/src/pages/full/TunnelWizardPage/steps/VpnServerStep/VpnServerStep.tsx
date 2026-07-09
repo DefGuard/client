@@ -9,28 +9,19 @@ import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
 import { ThemeSpacing } from '../../../../../shared/types';
 import {
-  cidrRegex,
-  patternValidEndpoint,
-  patternValidWireguardKey,
-} from '../../../../../shared/utils/patterns';
+  allowedIpsSchema,
+  endpointSchema,
+  optionalWireguardKeySchema,
+  wireguardKeySchema,
+} from '../../../../../shared/utils/zod';
 import { useTunnelWizardStore } from '../../hooks/useTunnelWizardStore';
 
 const formSchema = z.object({
-  server_pubkey: z
-    .string()
-    .refine((v) => patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  preshared_key: z
-    .string()
-    .refine((v) => !v || patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  endpoint: z.string().refine((v) => patternValidEndpoint.test(v), 'Invalid address'),
+  server_pubkey: wireguardKeySchema,
+  preshared_key: optionalWireguardKeySchema,
+  endpoint: endpointSchema,
   dns: z.string(),
-  allowed_ips: z.string().refine((v) => {
-    if (!v) return true;
-    return v
-      .split(',')
-      .map((s) => s.trim())
-      .every((cidr) => cidrRegex.test(cidr));
-  }, 'Invalid CIDR notation'),
+  allowed_ips: allowedIpsSchema,
   persistent_keep_alive: z.number().int().min(0),
 });
 

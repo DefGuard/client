@@ -345,10 +345,12 @@ export type TunnelRequest = {
   prvkey: string;
   address: string;
   server_pubkey: string;
+  preshared_key?: string;
   allowed_ips?: string;
   endpoint: string;
   dns?: string;
   persistent_keep_alive: number;
+  route_all_traffic: boolean;
   pre_up?: string;
   post_up?: string;
   pre_down?: string;
