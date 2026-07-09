@@ -62,7 +62,7 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.macos.conf.json
 
       - name: Unlock keychain
-        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+        run: security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
 
       - name: Build new UI
         run: |
