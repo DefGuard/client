@@ -1,8 +1,6 @@
 name: Build macOS dmg
 on:
   push:
-    branches:
-      - better_build
   workflow_call:
     inputs:
       upload_url:
@@ -64,11 +62,6 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/client-cli/Info.plist
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.macos.conf.json
 
-      # - name: Unlock keychain
-      #   run: |
-      #     security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
-      #     security default-keychain -s build.keychain
-
       - name: Build new UI
         run: |
           cd new-ui
@@ -86,12 +79,12 @@ jobs:
         with:
           args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
-      # - name: Upload DMG
-      #   uses: shogo82148/actions-upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ inputs.upload_url }}
-      #     asset_path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/Defguard_${{ env.VERSION }}_universal.dmg
-      #     asset_content_type: application/x-apple-diskimage
-      #     overwrite: true
+      - name: Upload DMG
+        uses: shogo82148/actions-upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ inputs.upload_url }}
+          asset_path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/Defguard_${{ env.VERSION }}_universal.dmg
+          asset_content_type: application/x-apple-diskimage
+          overwrite: true
