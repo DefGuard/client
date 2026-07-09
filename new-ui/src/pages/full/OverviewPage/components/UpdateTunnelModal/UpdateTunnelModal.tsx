@@ -21,13 +21,15 @@ import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
-  cidrRegex,
-  patternValidEndpoint,
   patternValidIpV6WithMask,
-  patternValidIpV6WithPort,
   patternValidIpWithMask,
-  patternValidWireguardKey,
 } from '../../../../../shared/utils/patterns';
+import {
+  allowedIpsSchema,
+  endpointSchema,
+  optionalWireguardKeySchema,
+  wireguardKeySchema,
+} from '../../../../../shared/utils/zod';
 
 const modalNameKey = ModalName.UpdateTunnel;
 
@@ -73,32 +75,13 @@ const formSchema = z.object({
         (ip) => patternValidIpWithMask.test(ip) || patternValidIpV6WithMask.test(ip),
       );
   }, 'Field is invalid'),
-  prvkey: z
-    .string()
-    .refine((v) => patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  pubkey: z
-    .string()
-    .refine((v) => patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  server_pubkey: z
-    .string()
-    .refine((v) => patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  preshared_key: z
-    .string()
-    .refine((v) => !v || patternValidWireguardKey.test(v), 'Invalid WireGuard key'),
-  endpoint: z
-    .string()
-    .refine(
-      (v) => patternValidEndpoint.test(v) || patternValidIpV6WithPort.test(v),
-      'Invalid address',
-    ),
+  prvkey: wireguardKeySchema,
+  pubkey: wireguardKeySchema,
+  server_pubkey: wireguardKeySchema,
+  preshared_key: optionalWireguardKeySchema,
+  endpoint: endpointSchema,
   dns: z.string(),
-  allowed_ips: z.string().refine((v) => {
-    if (!v) return true;
-    return v
-      .split(',')
-      .map((s) => s.trim())
-      .every((cidr) => cidrRegex.test(cidr));
-  }, 'Invalid CIDR notation'),
+  allowed_ips: allowedIpsSchema,
   persistent_keep_alive: z.number().int().min(0),
   pre_up: z.string(),
   post_up: z.string(),
