@@ -1,6 +1,5 @@
 name: Build macOS dmg
 on:
-  push:
   workflow_call:
     inputs:
       upload_url:
