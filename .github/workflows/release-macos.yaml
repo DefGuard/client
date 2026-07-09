@@ -8,6 +8,8 @@ on:
         type: string
 
 env:
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
   SQLX_OFFLINE: "1"
 
 jobs:
@@ -17,7 +19,7 @@ jobs:
       - macOS
       - native
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -37,6 +39,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           cache: true
+          run_install: false
           version: 11
 
       - name: Install Node dependencies for New UI
@@ -48,6 +51,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Set build number
         run: |

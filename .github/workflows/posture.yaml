@@ -44,10 +44,6 @@ jobs:
         run: |
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup1 -- --ignored
 
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-
   test-linux-postures-encrypted:
     name: Linux postures - encrypted
     runs-on:
@@ -77,10 +73,6 @@ jobs:
         run: |
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup2 -- --ignored
 
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-
   test-windows-postures-setup1:
     name: Windows postures - setup1
     runs-on:
@@ -105,9 +97,6 @@ jobs:
         shell: cmd
         run: |
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup1 -- --ignored
-
-      - name: Show sccache stats
-        run: sccache --show-stats
 
   test-windows-postures-setup2:
     name: Windows postures - setup2
@@ -134,9 +123,6 @@ jobs:
         run: |
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup2 -- --ignored
 
-      - name: Show sccache stats
-        run: sccache --show-stats
-
   test-macos-postures-unencrypted:
     name: macOS postures - unencrypted
     runs-on:
@@ -159,9 +145,6 @@ jobs:
         run: |
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos::setup1 -- --ignored
 
-      - name: Show sccache stats
-        run: sccache --show-stats
-
   test-macos-postures-encrypted:
     name: macOS postures - encrypted
     runs-on:
@@ -183,6 +166,3 @@ jobs:
         working-directory: src-tauri/
         run: |
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos::setup2 -- --ignored
-
-      - name: Show sccache stats
-        run: sccache --show-stats

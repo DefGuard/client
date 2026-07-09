@@ -26,9 +26,6 @@ jobs:
     env:
       APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
       APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_PROVIDER_SHORT_NAME: "82GZ7KN29J"
-      APPLE_ID: "kamil@defguard.net"
-      APPLE_TEAM_ID: "82GZ7KN29J"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,9 +69,6 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/client-cli/Info.plist
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.macos.conf.json
 
-      - name: Unlock keychain
-        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-
       - name: Build new UI
         run: |
           cd new-ui
@@ -90,11 +84,14 @@ jobs:
       - name: Build installation package
         run: |
           security -v unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
-          security default-keychain -s build.keychain
-          xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" /Applications defguard-client.pkg
-          xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} --api-issuer ${{ secrets.APPLE_API_ISSUER }} --upload-app --platform macos --file defguard-client.pkg --wait
-          # xcrun notarytool submit --wait --apple-id ${{ env.APPLE_ID }} --password ${{ secrets.NOTARYTOOL_APP_SPECIFIC_PASSWORD }} --team-id ${{ env.APPLE_TEAM_ID }} defguard-client.pkg
-          # xcrun stapler staple defguard-client.pkg
+          xcrun productbuild --keychain build.keychain \
+            --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
+            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
+            /Applications defguard-client.pkg
+          xcrun altool --api-key ${{ secrets.APPLE_API_KEY }} \
+            --api-issuer ${{ secrets.APPLE_API_ISSUER }} \
+            --keychain build.keychain --upload-app --platform macos \
+            --file defguard-client.pkg --wait
 
       - name: Upload What's New
         env:
