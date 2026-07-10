@@ -4,6 +4,9 @@ use std::{
     time::Duration,
 };
 
+pub use defguard_client_config_sync::commands::{
+    disable_enterprise_features, do_update_instance, locations_changed,
+};
 use defguard_client_config_sync::{
     poll_instance, poll_instances, PollInstanceResult, VersionMismatchPayload,
 };
@@ -21,10 +24,6 @@ use log::{debug, error, info};
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
-
-pub use defguard_client_config_sync::commands::{
-    disable_enterprise_features, do_update_instance, locations_changed,
-};
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 

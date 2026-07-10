@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
+use defguard_client_core::events::EventKey;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
-
-use defguard_client_core::events::EventKey;
 
 use crate::appstate::AppState;
 

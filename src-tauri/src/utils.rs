@@ -8,6 +8,8 @@ use std::{path::Path, str::FromStr};
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
 #[cfg(windows)]
 use defguard_client_core::connection::active_connections::find_connection;
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::apple::tunnel_stats;
 use defguard_client_core::connection::{bring_up, ConnectionTarget};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::{
@@ -46,8 +48,6 @@ use crate::{
     log_watcher::service_log_watcher::spawn_log_watcher_task,
     ConnectionType,
 };
-#[cfg(target_os = "macos")]
-use defguard_client_core::connection::apple::tunnel_stats;
 
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]
