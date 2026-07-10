@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod app_config;
 pub mod connection;
+pub mod enrollment;
 pub mod database;
 pub mod error;
 pub mod events;
