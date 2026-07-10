@@ -19,6 +19,8 @@ pub mod database;
 pub mod error;
 pub mod events;
 pub mod proxy;
+#[cfg(test)]
+mod test_helpers;
 pub mod version;
 pub mod wg_config;
 
