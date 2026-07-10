@@ -17,6 +17,10 @@ pub enum EventKey {
     WindowSwapped,
     SessionStateChanged,
     InstanceUpdated,
+    MfaOpenIdComplete,
+    MfaOpenIdError,
+    MfaMobileComplete,
+    MfaMobileError,
 }
 
 impl From<EventKey> for &'static str {
@@ -37,6 +41,10 @@ impl From<EventKey> for &'static str {
             EventKey::WindowSwapped => "window-swapped",
             EventKey::SessionStateChanged => "session-state-changed",
             EventKey::InstanceUpdated => "instance-updated",
+            EventKey::MfaOpenIdComplete => "mfa-openid-complete",
+            EventKey::MfaOpenIdError => "mfa-openid-error",
+            EventKey::MfaMobileComplete => "mfa-mobile-complete",
+            EventKey::MfaMobileError => "mfa-mobile-error",
         }
     }
 }
