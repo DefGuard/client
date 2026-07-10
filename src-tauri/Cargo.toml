@@ -127,6 +127,7 @@ time = { version = "0.3", features = ["formatting", "macros"] }
 tokio.workspace = true
 tokio-util = "0.7"
 tonic.workspace = true
+uuid = { version = "1", features = ["v4"] }
 tonic-prost.workspace = true
 tower = "0.5"
 tracing.workspace = true

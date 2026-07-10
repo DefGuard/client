@@ -1713,6 +1713,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid",
  "vergen-git2",
  "webbrowser",
  "windows 0.62.2",
