@@ -19,6 +19,7 @@ pub mod database;
 pub mod enrollment;
 pub mod error;
 pub mod events;
+pub mod mfa;
 pub mod proxy;
 #[cfg(test)]
 mod test_helpers;
