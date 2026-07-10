@@ -119,7 +119,7 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
           break;
       }
       if (!candidate) {
-        navigate({ to: '/full/add' });
+        navigate({ to: '/full/add', replace: true });
       }
       setViewSelection(candidate);
     } catch (e) {
