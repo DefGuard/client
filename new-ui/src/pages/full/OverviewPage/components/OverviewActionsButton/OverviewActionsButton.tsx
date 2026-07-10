@@ -12,6 +12,7 @@ import {
 import { Icon } from '../../../../../shared/components/Icon';
 import { ThemeVariable } from '../../../../../shared/types';
 import './style.scss';
+import { useNavigate } from '@tanstack/react-router';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useMemo, useState } from 'react';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
@@ -20,6 +21,7 @@ import type { MenuItemsGroup } from '../../../../../shared/components/Menu/types
 import { useConfirmModal } from '../../../../../shared/hooks/confirmModal/useConfirmModal';
 import { openModal } from '../../../../../shared/hooks/modalControls/modalsSubjects';
 import { ModalName } from '../../../../../shared/hooks/modalControls/modalTypes';
+import { useAppData } from '../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../shared/rust-api/api';
 import type {
   InstanceInfo,
@@ -33,6 +35,8 @@ type Props = {
 
 export const OverviewActionsButton = ({ selection, instance }: Props) => {
   const [isOpen, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const { instances, tunnels, setViewSelection } = useAppData();
 
   const { refs, context, floatingStyles } = useFloating({
     placement: 'bottom-end',
@@ -86,8 +90,25 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     }
   }, [selection, instance]);
 
+  const findSelectionCandidate = useCallback(
+    (current: OverviewViewSelection): OverviewViewSelection | null => {
+      const combined: OverviewViewSelection[] = [
+        ...instances.map((i) => ({ kind: 'instance' as const, id: i.id })),
+        ...tunnels.map((t) => ({ kind: 'tunnel' as const, id: t.id })),
+      ];
+      const index = combined.findIndex(
+        (item) => item.kind === current.kind && item.id === current.id,
+      );
+      if (index === -1) return null;
+      const remaining = combined.filter((_, i) => i !== index);
+      return remaining[index] ?? remaining[index - 1] ?? null;
+    },
+    [instances, tunnels],
+  );
+
   const handleDelete = useCallback(async () => {
     if (!selection) return;
+    const candidate = findSelectionCandidate(selection);
     try {
       switch (selection.kind) {
         case 'instance':
@@ -97,10 +118,14 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
           await api.deleteTunnel(selection.id);
           break;
       }
+      if (!candidate) {
+        navigate({ to: '/full/add' });
+      }
+      setViewSelection(candidate);
     } catch (e) {
       error(`Failed delete action, ${String(e)}`);
     }
-  }, [selection]);
+  }, [selection, findSelectionCandidate, setViewSelection, navigate]);
 
   const handleDeleteIntent = useCallback(() => {
     if (!selection) return;
