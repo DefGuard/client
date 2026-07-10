@@ -1,12 +1,21 @@
 //! Connect-time VPN MFA over HTTP.
 //!
-//! Synchronous (request/response) MFA functions for TOTP and email methods.
-//! Long-running flows (OpenID poll, mobile approve WebSocket) are in
-//! separate functions and are covered in later implementation steps.
+//! Synchronous (request/response) MFA functions for TOTP and email methods,
+//! plus long-running flows for OpenID (poll loop) and mobile approve (WebSocket).
 
+use std::time::Duration;
+
+use futures_util::StreamExt;
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::{
+    net::TcpStream,
+    select,
+    time::{sleep, Instant},
+};
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     proxy::construct_platform_header,
@@ -28,6 +37,12 @@ pub enum MfaError {
 
     #[error("MFA rejected: {message}")]
     MfaRejected { message: String },
+
+    #[error("MFA operation timed out")]
+    Timeout,
+
+    #[error("MFA operation cancelled")]
+    Cancelled,
 
     #[error("{message}")]
     Other { message: String },
@@ -163,4 +178,193 @@ pub async fn mfa_finish_code(
     })?;
 
     Ok(PresharedKey(body.preshared_key))
+}
+
+#[cfg(not(test))]
+const OIDC_POLL_INTERVAL: Duration = Duration::from_secs(5);
+#[cfg(test)]
+const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
+
+#[cfg(not(test))]
+const OIDC_POLL_TIMEOUT: Duration = Duration::from_secs(300);
+#[cfg(test)]
+const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
+
+#[cfg(not(test))]
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(120);
+#[cfg(test)]
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Poll the proxy for OpenID MFA completion.
+///
+/// The caller must already have opened the browser to the OIDC provider
+/// URL (the token from `mfa_start` encodes the redirect).  This function
+/// POSTs `{ "token": "..." }` to `/api/v1/client-mfa/finish` every
+/// [`OIDC_POLL_INTERVAL`] until the server returns a 200 (success),
+/// the deadline expires, or the [`CancellationToken`] is fired.
+pub async fn poll_openid_mfa(
+    proxy_url: Url,
+    token: String,
+    cancel: CancellationToken,
+) -> Result<PresharedKey, MfaError> {
+    let client = build_client();
+    let url = proxy_url
+        .join("api/v1/client-mfa/finish")
+        .map_err(|e| MfaError::Other {
+            message: format!("Failed to build MFA finish URL: {e}"),
+        })?;
+
+    let deadline = Instant::now() + OIDC_POLL_TIMEOUT;
+
+    loop {
+        let remaining = deadline
+            .checked_duration_since(Instant::now())
+            .unwrap_or_default();
+        if remaining.is_zero() {
+            return Err(MfaError::Timeout);
+        }
+
+        let mut req = client.post(url.clone()).json(&serde_json::json!({
+            "token": token,
+        }));
+        for (k, v) in standard_headers() {
+            req = req.header(k, v);
+        }
+
+        select! {
+            () = cancel.cancelled() => {
+                return Err(MfaError::Cancelled);
+            }
+            result = req.send() => {
+                let response = result.map_err(|e| MfaError::NetworkError {
+                    message: format!("Failed to reach proxy: {e}"),
+                })?;
+
+                let status = response.status();
+                if status == StatusCode::OK {
+                    let body: MfaFinishBody = response.json().await.map_err(|e| {
+                        MfaError::Other {
+                            message: format!("Invalid MFA finish response: {e}"),
+                        }
+                    })?;
+                    return Ok(PresharedKey(body.preshared_key));
+                }
+                if status != StatusCode::PRECONDITION_REQUIRED {
+                    return Err(check_mfa_response(response).await.err().unwrap_or(
+                        MfaError::Other {
+                            message: format!("Unexpected status: {status}"),
+                        },
+                    ));
+                }
+                // 428: not complete yet — fall through to sleep.
+            }
+        }
+
+        select! {
+            () = cancel.cancelled() => {
+                return Err(MfaError::Cancelled);
+            }
+            () = sleep(OIDC_POLL_INTERVAL) => {}
+        }
+    }
+}
+
+/// Connect to the proxy via WebSocket and wait for mobile-approve MFA
+/// completion.
+///
+/// The caller must have already displayed the QR code to the user
+/// (the token from `mfa_start` encodes the challenge).  This function
+/// opens a WebSocket to `api/v1/client-mfa/remote?token=...` and waits
+/// for a `{"type":"mfa_success","preshared_key":"..."}` text frame.
+/// Returns [`MfaError::Cancelled`] if the token fires or
+/// [`MfaError::Timeout`] if the deadline expires.
+pub async fn connect_mobile_approve(
+    proxy_url: Url,
+    token: String,
+    cancel: CancellationToken,
+) -> Result<PresharedKey, MfaError> {
+    let ws_url = derive_ws_url(&proxy_url, &token)?;
+
+    let (ws_stream, _response) =
+        connect_async(&ws_url)
+            .await
+            .map_err(|e| MfaError::NetworkError {
+                message: format!("Failed to connect to proxy: {e}"),
+            })?;
+
+    wait_for_mfa_success(ws_stream, cancel).await
+}
+
+/// Derive the WebSocket URL from the proxy's base URL and MFA token.
+fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> {
+    let mut ws_url = proxy_base
+        .join("api/v1/client-mfa/remote")
+        .map_err(|e| MfaError::Other {
+            message: format!("Failed to build WebSocket URL: {e}"),
+        })?;
+
+    let ws_scheme = match proxy_base.scheme() {
+        "https" => "wss",
+        "http" => "ws",
+        other => {
+            return Err(MfaError::Other {
+                message: format!("Invalid proxy URL scheme '{other}'; expected http or https"),
+            });
+        }
+    };
+
+    ws_url.set_scheme(ws_scheme).map_err(|()| MfaError::Other {
+        message: "Failed to set WebSocket URL scheme".into(),
+    })?;
+    ws_url.query_pairs_mut().append_pair("token", token);
+
+    Ok(ws_url.to_string())
+}
+
+/// Wait on the WebSocket for an `mfa_success` frame.
+async fn wait_for_mfa_success(
+    ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    cancel: CancellationToken,
+) -> Result<PresharedKey, MfaError> {
+    let (_write, mut read) = ws_stream.split();
+    let deadline = Instant::now() + MOBILE_APPROVE_TIMEOUT;
+
+    loop {
+        let remaining = deadline
+            .checked_duration_since(Instant::now())
+            .unwrap_or_default();
+        if remaining.is_zero() {
+            return Err(MfaError::Timeout);
+        }
+
+        let msg = select! {
+            () = sleep(remaining) => {
+                return Err(MfaError::Timeout);
+            }
+            () = cancel.cancelled() => {
+                return Err(MfaError::Cancelled);
+            }
+            msg = read.next() => {
+                match msg {
+                    Some(Ok(msg)) => msg,
+                    Some(Err(_)) | None => {
+                        return Err(MfaError::MfaRejected {
+                            message: "mobile approval failed: connection closed by proxy"
+                                .into(),
+                        });
+                    }
+                }
+            }
+        };
+
+        if let Message::Text(text) = msg {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
+                    if let Some(key) = parsed["preshared_key"].as_str() {
+                        return Ok(PresharedKey(key.to_string()));
+                    }
+                }
+            }
+        }
+    }
 }
