@@ -6,6 +6,7 @@
 
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use thiserror::Error;
 
 use crate::{
@@ -69,6 +70,65 @@ pub struct UserInfo {
 #[serde(rename_all = "camelCase")]
 struct ProxyEnrollmentStartResponse {
     user: UserInfo,
+}
+
+/// Response from `POST /api/v1/enrollment/register-mfa/code/start`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MfaStartResponse {
+    pub totp_secret: Option<String>,
+}
+
+/// Response from `POST /api/v1/enrollment/register-mfa/code/finish`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MfaFinishResponse {
+    pub recovery_codes: Vec<String>,
+}
+
+/// Send a JSON POST request to an enrollment endpoint with the session
+/// cookie and standard client headers.
+async fn enrollment_post(
+    session: &EnrollmentSession,
+    path: &str,
+    body: serde_json::Value,
+) -> Result<Response, EnrollmentError> {
+    let url = session
+        .proxy_url
+        .join(path)
+        .map_err(|e| EnrollmentError::Other {
+            message: format!("Failed to build URL '{path}': {e}"),
+        })?;
+    let response = session
+        .client
+        .post(url)
+        .json(&body)
+        .header("Cookie", &session.cookie)
+        .header(CLIENT_VERSION_HEADER, PKG_VERSION)
+        .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
+        .send()
+        .await
+        .map_err(|e| EnrollmentError::NetworkError {
+            message: format!("Failed to reach proxy: {e}"),
+        })?;
+
+    check_enrollment_response(response).await
+}
+
+/// Check an enrollment response status and map it to `EnrollmentError`.
+async fn check_enrollment_response(response: Response) -> Result<Response, EnrollmentError> {
+    let status = response.status();
+    if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+        return Err(EnrollmentError::TokenExpired);
+    }
+    if !status.is_success() {
+        let message = read_error_body(response).await;
+        return Err(EnrollmentError::ProxyError {
+            status: status.as_u16(),
+            message,
+        });
+    }
+    Ok(response)
 }
 
 /// Extract the `defguard_proxy` session cookie from a response's `Set-Cookie`
@@ -152,4 +212,124 @@ pub async fn enrollment_start(
     };
 
     Ok((session, body.user))
+}
+
+/// Create a device during enrollment.
+///
+/// POSTs `{ "name": "...", "pubkey": "..." }` to
+/// `/api/v1/enrollment/create_device` and returns the full device
+/// configuration response as a JSON value.
+pub async fn enrollment_create_device(
+    session: EnrollmentSession,
+    name: String,
+    pubkey: String,
+) -> Result<JsonValue, EnrollmentError> {
+    let response = enrollment_post(
+        &session,
+        "api/v1/enrollment/create_device",
+        serde_json::json!({ "name": name, "pubkey": pubkey }),
+    )
+    .await?;
+
+    response.json().await.map_err(|e| EnrollmentError::Other {
+        message: format!("Failed to parse create_device response: {e}"),
+    })
+}
+
+/// Activate the user account during enrollment.
+///
+/// POSTs `{ "password": "...", "phone_number": "..." }` to
+/// `/api/v1/enrollment/activate_user`.  Either field may be omitted when
+/// the server does not require it (externally managed users skip password;
+/// most users skip phone).
+pub async fn enrollment_activate_user(
+    session: EnrollmentSession,
+    password: Option<String>,
+    phone_number: Option<String>,
+) -> Result<(), EnrollmentError> {
+    enrollment_post(
+        &session,
+        "api/v1/enrollment/activate_user",
+        serde_json::json!({
+            "password": password,
+            "phone_number": phone_number,
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Start MFA registration during enrollment.
+///
+/// POSTs `{ "method": "..." }` to
+/// `/api/v1/enrollment/register-mfa/code/start`.  Returns the TOTP secret
+/// (for TOTP method) or an empty response (for email method).
+pub async fn enrollment_register_mfa_start(
+    session: EnrollmentSession,
+    method: String,
+) -> Result<MfaStartResponse, EnrollmentError> {
+    let response = enrollment_post(
+        &session,
+        "api/v1/enrollment/register-mfa/code/start",
+        serde_json::json!({ "method": method }),
+    )
+    .await?;
+
+    response.json().await.map_err(|e| EnrollmentError::Other {
+        message: format!("Failed to parse MFA start response: {e}"),
+    })
+}
+
+/// Finish MFA registration during enrollment.
+///
+/// POSTs `{ "code": "...", "method": "..." }` to
+/// `/api/v1/enrollment/register-mfa/code/finish`.  Returns the recovery
+/// codes that the user should save.
+pub async fn enrollment_register_mfa_finish(
+    session: EnrollmentSession,
+    code: String,
+    method: String,
+) -> Result<MfaFinishResponse, EnrollmentError> {
+    let response = enrollment_post(
+        &session,
+        "api/v1/enrollment/register-mfa/code/finish",
+        serde_json::json!({ "code": code, "method": method }),
+    )
+    .await?;
+
+    response.json().await.map_err(|e| EnrollmentError::Other {
+        message: format!("Failed to parse MFA finish response: {e}"),
+    })
+}
+
+/// Fetch network configuration for an existing device during enrollment.
+///
+/// POSTs `{ "pubkey": "..." }` to `/api/v1/enrollment/network_info`.
+/// This is the fast path for re-enrolling a device whose WireGuard keys
+/// already exist on the server.
+pub async fn enrollment_network_info(
+    session: EnrollmentSession,
+    pubkey: String,
+) -> Result<JsonValue, EnrollmentError> {
+    let response = enrollment_post(
+        &session,
+        "api/v1/enrollment/network_info",
+        serde_json::json!({ "pubkey": pubkey }),
+    )
+    .await?;
+
+    response.json().await.map_err(|e| EnrollmentError::Other {
+        message: format!("Failed to parse network_info response: {e}"),
+    })
+}
+
+/// Mark the enrollment session as finished.
+///
+/// There is no HTTP call for this step -- the session cookie is already
+/// cleared by the `activate_user` call on the server side.  This function
+/// exists as an explicit anchor point for the Tauri command so the
+/// implementation mirrors the UI flow.  It simply drops the session.
+pub fn enrollment_finish(_session: EnrollmentSession) {
+    // Session dropped; cookie is no longer needed.
 }
