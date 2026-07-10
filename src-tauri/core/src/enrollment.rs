@@ -38,7 +38,7 @@ pub enum EnrollmentError {
 }
 
 /// Holds the enrollment session state.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EnrollmentSession {
     pub cookie: String,
     pub proxy_url: Url,
@@ -332,4 +332,247 @@ pub async fn enrollment_network_info(
 /// implementation mirrors the UI flow.  It simply drops the session.
 pub fn enrollment_finish(_session: EnrollmentSession) {
     // Session dropped; cookie is no longer needed.
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::Url;
+    use serde_json::json;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    use super::*;
+
+    fn mock_url(server: &MockServer) -> Url {
+        Url::parse(&server.uri()).expect("MockServer URI should be valid")
+    }
+
+    fn user_json() -> serde_json::Value {
+        json!({
+            "firstName": "John",
+            "lastName": "Doe",
+            "login": "jdoe",
+            "email": "john@example.com",
+            "phoneNumber": null,
+            "isActive": true,
+            "deviceNames": [],
+            "enrolled": false,
+            "isAdmin": false,
+            "passwordManagementDisabled": false,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_start_success() {
+        let server = MockServer::start().await;
+        let response_body = json!({ "user": user_json() });
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/start"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(&response_body)
+                    .insert_header(
+                        "Set-Cookie",
+                        "defguard_proxy=test-session-cookie; Path=/api/v1/enrollment",
+                    ),
+            )
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let (session, user) = enrollment_start(url, "valid-token".into()).await.unwrap();
+
+        assert_eq!(session.cookie, "defguard_proxy=test-session-cookie");
+        assert_eq!(user.first_name, "John");
+        assert_eq!(user.login, "jdoe");
+    }
+
+    #[tokio::test]
+    async fn test_start_token_expired_401() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/start"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let err = enrollment_start(url, "bad-token".into()).await.unwrap_err();
+
+        assert!(matches!(err, EnrollmentError::TokenExpired));
+    }
+
+    #[tokio::test]
+    async fn test_start_token_expired_403() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/start"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let err = enrollment_start(url, "bad-token".into()).await.unwrap_err();
+
+        assert!(matches!(err, EnrollmentError::TokenExpired));
+    }
+
+    #[tokio::test]
+    async fn test_start_missing_cookie() {
+        let server = MockServer::start().await;
+        let response_body = json!({ "user": user_json() });
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/start"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_body))
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let err = enrollment_start(url, "token".into()).await.unwrap_err();
+
+        assert!(matches!(err, EnrollmentError::MissingCookie));
+    }
+
+    #[tokio::test]
+    async fn test_start_proxy_error() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/start"))
+            .respond_with(
+                ResponseTemplate::new(500).set_body_json(json!({ "error": "internal boom" })),
+            )
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let err = enrollment_start(url, "token".into()).await.unwrap_err();
+
+        match err {
+            EnrollmentError::ProxyError { status, message } => {
+                assert_eq!(status, 500);
+                assert!(message.contains("internal boom"));
+            }
+            other => panic!("expected ProxyError, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_start_network_error() {
+        // Use an address where nothing is listening.
+        let url = "http://127.0.0.1:1".parse().unwrap();
+        let err = enrollment_start(url, "token".into()).await.unwrap_err();
+
+        assert!(matches!(err, EnrollmentError::NetworkError { .. }));
+    }
+
+    fn make_session(server: &MockServer) -> EnrollmentSession {
+        EnrollmentSession {
+            cookie: "defguard_proxy=test-session-cookie".into(),
+            proxy_url: mock_url(server),
+            client: Client::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_device_success() {
+        let server = MockServer::start().await;
+        let response_body = json!({ "config": "wg0", "assignedIp": "10.0.0.1" });
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/create_device"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_body))
+            .mount(&server)
+            .await;
+
+        let session = make_session(&server);
+        let result = enrollment_create_device(session, "my-device".into(), "pk".into())
+            .await
+            .unwrap();
+
+        assert_eq!(result["config"], "wg0");
+    }
+
+    #[tokio::test]
+    async fn test_activate_user_success() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/activate_user"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let session = make_session(&server);
+        enrollment_activate_user(session, Some("p4ssw0rd".into()), None)
+            .await
+            .unwrap();
+    }
+
+    // enrollment_register_mfa_start
+
+    #[tokio::test]
+    async fn test_register_mfa_start_success() {
+        let server = MockServer::start().await;
+        let response_body = json!({ "totpSecret": "SECRET123" });
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/register-mfa/code/start"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_body))
+            .mount(&server)
+            .await;
+
+        let session = make_session(&server);
+        let result = enrollment_register_mfa_start(session, "totp".into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.totp_secret.as_deref(), Some("SECRET123"));
+    }
+
+    // enrollment_register_mfa_finish
+
+    #[tokio::test]
+    async fn test_register_mfa_finish_success() {
+        let server = MockServer::start().await;
+        let response_body = json!({ "recoveryCodes": ["rc1", "rc2", "rc3"] });
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/register-mfa/code/finish"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_body))
+            .mount(&server)
+            .await;
+
+        let session = make_session(&server);
+        let result = enrollment_register_mfa_finish(session, "123456".into(), "totp".into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.recovery_codes, vec!["rc1", "rc2", "rc3"]);
+    }
+
+    // enrollment_network_info
+
+    #[tokio::test]
+    async fn test_network_info_success() {
+        let server = MockServer::start().await;
+        let response_body = json!({ "config": "wg0", "assignedIp": "10.0.0.2" });
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/network_info"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&response_body))
+            .mount(&server)
+            .await;
+
+        let session = make_session(&server);
+        let result = enrollment_network_info(session, "pk".into()).await.unwrap();
+
+        assert_eq!(result["assignedIp"], "10.0.0.2");
+    }
 }
