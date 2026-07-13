@@ -1,27 +1,31 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { fetch } from '@tauri-apps/plugin-http';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EdgeRequestHeaders } from '../../../edge-api/types';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo } from '../../../rust-api/types';
-import {
-  CLIENT_MFA_ENDPOINT,
-  type MfaStartMethod,
-  shouldShowPostureError,
-  startClientMfaSession,
-} from '../api/startClientMfaSession';
+import { MfaMethod } from '../../../rust-api/types';
+import type { MfaStartMethod as MfaStartMethodType } from '../api/startClientMfaSession';
+import { MfaStartMethod } from '../api/startClientMfaSession';
 
-type MfaFinishResponse = {
-  preshared_key: string;
+type CodeMfaStartMethod = Extract<MfaStartMethodType, 0 | 1>;
+
+/** Detect posture failures from the serialized MfaError returned by the
+ *  Rust mfa_start command. Posture rejection (403) maps to MfaRejected. */
+const isMfaPostureError = (err: unknown, location: LocationInfo): boolean => {
+  if (!location.posture_check_required) return false;
+  try {
+    const parsed = JSON.parse(String(err)) as { type?: string };
+    return parsed.type === 'mfaRejected';
+  } catch {
+    return false;
+  }
 };
 
-type MfaErrorResponse = {
-  error: string;
+const MFA_METHOD_MAP: Record<number, string> = {
+  [MfaStartMethod.Totp]: MfaMethod.Totp,
+  [MfaStartMethod.Email]: MfaMethod.Email,
 };
-
-type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
@@ -52,7 +56,6 @@ export const useMfaConnect = (
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [requestHeaders, setRequestHeaders] = useState<EdgeRequestHeaders | null>(null);
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
 
@@ -81,23 +84,26 @@ export const useMfaConnect = (
 
     setIsStarting(true);
 
+    const methodString = MFA_METHOD_MAP[method];
+    if (!methodString) {
+      setStartError('Unsupported MFA method');
+      setIsStarting(false);
+      return;
+    }
+
     (async () => {
       try {
-        const { response, headers } = await startClientMfaSession({
-          instance,
-          location,
-          method,
-        });
+        const info = await api.mfaStart(instance.id, location.id, methodString);
         await waitForMinimumDuration(startedAt, debounceMs);
-        setRequestHeaders(headers);
-        setToken(response.token);
+        setToken(info.token);
       } catch (err) {
+        void error(`MFA start failed: ${err}`);
         await waitForMinimumDuration(startedAt, debounceMs);
-        if (shouldShowPostureError(err, location)) {
-          onPostureError?.(err.message);
+        if (isMfaPostureError(err, location)) {
+          onPostureError?.(String(err));
           return;
         }
-        setStartError(err instanceof Error ? err.message : 'Failed to start MFA');
+        setStartError(String(err));
       } finally {
         setIsStarting(false);
       }
@@ -106,51 +112,35 @@ export const useMfaConnect = (
 
   const verifyCode = useCallback(
     async (code: string) => {
-      if (!token || !instance || !requestHeaders) return;
+      if (!token || !instance) return;
 
       setIsVerifying(true);
       setVerifyError(null);
 
-      const body = JSON.stringify({ token, code });
-
       try {
-        const res = await fetch(`${instance.proxy_url}${CLIENT_MFA_ENDPOINT}/finish`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...requestHeaders,
-          },
-          body,
+        const result = await api.mfaFinishCode(instance.id, token, code);
+        connectMutate({
+          locationId: location.id,
+          connectionType: location.connection_type,
+          presharedKey: result.preshared_key,
         });
-
-        if (res.ok) {
-          const data = (await res.json()) as MfaFinishResponse;
-          connectMutate({
-            locationId: location.id,
-            connectionType: location.connection_type,
-            presharedKey: data.preshared_key,
-          });
+      } catch (err) {
+        const message = String(err);
+        if (message.includes('Unauthorized')) {
+          setVerifyError('Invalid code');
+        } else if (
+          message.includes('invalid token') ||
+          message.includes('login session not found')
+        ) {
+          onSessionExpired?.();
         } else {
-          const data = (await res.json()) as MfaErrorResponse;
-          const { error: errorMessage } = data;
-          if (errorMessage === 'Unauthorized') {
-            setVerifyError('Invalid code');
-          } else if (
-            errorMessage === 'invalid token' ||
-            errorMessage === 'login session not found'
-          ) {
-            onSessionExpired?.();
-          } else {
-            setVerifyError('Verification failed');
-          }
+          setVerifyError('Verification failed');
         }
-      } catch {
-        setVerifyError('Failed to reach server');
       } finally {
         setIsVerifying(false);
       }
     },
-    [token, instance, requestHeaders, location, connectMutate, onSessionExpired],
+    [token, instance, location, connectMutate, onSessionExpired],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

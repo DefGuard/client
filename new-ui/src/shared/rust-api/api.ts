@@ -189,7 +189,8 @@ const mfaFinishCode = (
   instanceId: number,
   token: string,
   code: string,
-): Promise<string> => invoke(TauriCommand.MfaFinishCode, { instanceId, token, code });
+): Promise<{ preshared_key: string }> =>
+  invoke(TauriCommand.MfaFinishCode, { instanceId, token, code });
 
 const mfaPollOpenId = (instanceId: number, token: string): Promise<string> =>
   invoke(TauriCommand.MfaPollOpenId, { instanceId, token });
