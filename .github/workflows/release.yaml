@@ -424,7 +424,11 @@ jobs:
     #         cpu: x64
     #       - windows_runner: windows-11-arm
     #         cpu: arm64
-    runs-on: build1-win
+    runs-on:
+      - self-hosted
+      - windows
+      - X64
+      - noad
     steps:
       - uses: actions/checkout@v7
         with:
