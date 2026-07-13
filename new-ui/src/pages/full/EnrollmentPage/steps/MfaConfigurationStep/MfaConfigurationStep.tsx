@@ -1,4 +1,3 @@
-import { error } from '@tauri-apps/plugin-log';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';

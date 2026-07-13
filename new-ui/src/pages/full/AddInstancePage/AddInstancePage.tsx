@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { useLoaderData, useNavigate, useSearch } from '@tanstack/react-router';
+import { error } from '@tauri-apps/plugin-log';
 import { Fragment, useMemo } from 'react';
 import z from 'zod';
 import { Button } from '../../../shared/components/Button/Button';
@@ -12,7 +13,6 @@ import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
-import { error } from '@tauri-apps/plugin-log';
 import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
