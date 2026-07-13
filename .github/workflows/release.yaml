@@ -468,6 +468,21 @@ jobs:
           cd new-ui
           pnpm build
 
+      - name: Debug signing context
+        shell: powershell
+        run: |
+          whoami
+          [Environment]::UserInteractive
+          Get-Process -Id $PID | Select-Object Id, SessionId, ProcessName
+          Write-Host "CurrentUser cert count:"
+          @(Get-ChildItem Cert:\CurrentUser\My -ErrorAction SilentlyContinue).Count
+          Write-Host "LocalMachine cert count:"
+          @(Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue).Count
+          Write-Host "Expected cert visible in CurrentUser:"
+          [bool](Get-ChildItem Cert:\CurrentUser\My | Where-Object Thumbprint -eq 'C79305CDCB7E5832DD161D18580D6A846BD0506B')
+          Write-Host "Expected cert visible in LocalMachine:"
+          [bool](Get-ChildItem Cert:\LocalMachine\My | Where-Object Thumbprint -eq 'C79305CDCB7E5832DD161D18580D6A846BD0506B')
+
       - name: Build MSI
         env:
           WINDOWS_CERT_PIN: ${{ secrets.WINDOWS_CERT_PIN }}
