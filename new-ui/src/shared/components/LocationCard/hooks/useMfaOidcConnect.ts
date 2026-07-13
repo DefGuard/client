@@ -1,15 +1,11 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type {
-  LocationInfo,
-  MfaCompletePayload,
-  MfaErrorPayload,
-} from '../../../rust-api/types';
+import type { LocationInfo, MfaErrorPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
@@ -40,17 +36,6 @@ export const useMfaOidcConnect = () => {
   const taskIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const { mutate: connectMutate } = useMutation({
-    mutationFn: api.connect,
-    onSuccess: () => {
-      setView(LocationCardViews.Connected);
-    },
-    onError: (err) => {
-      error(`Connect command failed after successful OIDC MFA\n${err}`);
-      setPollError('Failed to establish VPN connection');
-    },
-  });
 
   const cleanup = useCallback(() => {
     if (timeoutRef.current !== null) {
@@ -92,21 +77,15 @@ export const useMfaOidcConnect = () => {
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, info.token);
+      const taskId = await api.mfaPollOpenId(instance.id, location.id, info.token);
       taskIdRef.current = taskId;
 
-      const completeUnlisten = await listen<MfaCompletePayload>(
-        TauriEvent.MfaOpenIdComplete,
-        (event) => {
-          cleanup();
-          setIsPolling(false);
-          connectMutate({
-            locationId: location.id,
-            connectionType: location.connection_type,
-            presharedKey: event.payload.preshared_key,
-          });
-        },
-      );
+      // The backend brings up the connection itself; completion means connected.
+      const completeUnlisten = await listen(TauriEvent.MfaOpenIdComplete, () => {
+        cleanup();
+        setIsPolling(false);
+        setView(LocationCardViews.Connected);
+      });
 
       const errorUnlisten = await listen<MfaErrorPayload>(
         TauriEvent.MfaOpenIdError,
@@ -149,7 +128,7 @@ export const useMfaOidcConnect = () => {
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, setPostureError, setView, connectMutate, cleanup]);
+  }, [instance, location, setPostureError, setView, cleanup]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

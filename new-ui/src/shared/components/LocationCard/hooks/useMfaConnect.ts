@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
@@ -70,17 +70,6 @@ export const useMfaConnect = (
 
   const instance = instances?.find((i) => i.id === location.instance_id);
 
-  const { mutate: connectMutate } = useMutation({
-    mutationFn: api.connect,
-    meta: { invalidate: ['locations'] },
-    onSuccess: () => {
-      onConnected?.();
-    },
-    onError: (err) => {
-      error(`Connect command failed after successful code verification\n${err}`);
-    },
-  });
-
   // Fire the /start request exactly once when instance data is ready.
   const startCalled = useRef(false);
 
@@ -127,12 +116,10 @@ export const useMfaConnect = (
       setVerifyError(null);
 
       try {
-        const result = await api.mfaFinishCode(instance.id, token, code);
-        connectMutate({
-          locationId: location.id,
-          connectionType: location.connection_type,
-          presharedKey: result.preshared_key,
-        });
+        // mfaFinishCode completes MFA and brings up the connection in the
+        // backend; the preshared key never reaches the frontend.
+        await api.mfaFinishCode(instance.id, location.id, token, code);
+        onConnected?.();
       } catch (err) {
         const message = String(err);
         if (message.includes('Unauthorized')) {
@@ -149,7 +136,7 @@ export const useMfaConnect = (
         setIsVerifying(false);
       }
     },
-    [token, instance, location, connectMutate, onSessionExpired],
+    [token, instance, location, onConnected, onSessionExpired],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

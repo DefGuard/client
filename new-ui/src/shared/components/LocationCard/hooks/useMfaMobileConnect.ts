@@ -1,16 +1,12 @@
 import { encode } from '@stablelib/base64';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type {
-  LocationInfo,
-  MfaCompletePayload,
-  MfaErrorPayload,
-} from '../../../rust-api/types';
+import type { LocationInfo, MfaErrorPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 
 type TokenData = {
@@ -48,17 +44,6 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
   const taskIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
 
-  const { mutate: connectMutate } = useMutation({
-    mutationFn: api.connect,
-    onSuccess: () => {
-      onConnected?.();
-    },
-    onError: (err) => {
-      error(`Connect command failed after successful mobile MFA\n${err}`);
-      setConnectionError('Failed to establish VPN connection');
-    },
-  });
-
   const cleanupListeners = useCallback(() => {
     if (unlistenRef.current !== null) {
       unlistenRef.current();
@@ -88,24 +73,23 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
 
     (async () => {
       try {
-        const taskId = await api.mfaConnectMobileApprove(instance.id, tokenData.token);
+        const taskId = await api.mfaConnectMobileApprove(
+          instance.id,
+          location.id,
+          tokenData.token,
+        );
         if (cancelled) {
           void api.cancelMfa(taskId).catch(() => {});
           return;
         }
         taskIdRef.current = taskId;
 
-        const completeUnlisten = await listen<MfaCompletePayload>(
-          TauriEvent.MfaMobileComplete,
-          (event) => {
-            cleanupListeners();
-            connectMutate({
-              locationId: location.id,
-              connectionType: location.connection_type,
-              presharedKey: event.payload.preshared_key,
-            });
-          },
-        );
+        // The backend brings up the connection itself; completion means connected.
+        const completeUnlisten = await listen(TauriEvent.MfaMobileComplete, () => {
+          cleanupListeners();
+          setIsConnecting(false);
+          onConnected?.();
+        });
 
         const errorUnlisten = await listen<MfaErrorPayload>(
           TauriEvent.MfaMobileError,
@@ -137,7 +121,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
       cleanupListeners();
       setIsConnecting(false);
     };
-  }, [tokenData, instance, location, connectMutate, cleanupListeners]);
+  }, [tokenData, instance, location, onConnected, cleanupListeners]);
 
   const qrValue = useMemo(() => {
     if (!tokenData || !instance) return null;

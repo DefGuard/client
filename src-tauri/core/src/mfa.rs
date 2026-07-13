@@ -14,7 +14,11 @@ use tokio::{
     select,
     time::{sleep, Instant},
 };
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{Error as WsError, Message},
+    MaybeTlsStream, WebSocketStream,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -297,7 +301,15 @@ pub async fn connect_mobile_approve(
         connect_async(ws_url)
             .await
             .map_err(|e| MfaError::NetworkError {
-                message: format!("Failed to connect to proxy: {e}"),
+                // Never interpolate the raw error: `ws_url` carries the MFA
+                // token as a query parameter and can appear in the error's
+                // Display, which is surfaced to the frontend and logs.
+                message: match &e {
+                    WsError::Io(io_err) => {
+                        format!("Failed to connect to proxy ({})", io_err.kind())
+                    }
+                    _ => "Failed to connect to proxy".to_string(),
+                },
             })?;
 
     wait_for_mfa_success(ws_stream, cancel).await

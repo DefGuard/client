@@ -96,6 +96,21 @@ impl From<sqlx::Error> for ConnectError {
     }
 }
 
+/// Bring up a location connection with an already-obtained preshared key and
+/// refresh the tray. Shared by `connect` and the MFA finish flows so the
+/// preshared key never has to cross back into the frontend.
+async fn connect_location_with_psk(
+    location: Location<Id>,
+    preshared_key: Option<String>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
+    handle_connection_for_location(location.clone(), preshared_key, handle).await?;
+    reload_tray_menu(handle).await;
+    info!("Connected to location {location}");
+    configure_tray_icon(handle).await?;
+    Ok(())
+}
+
 /// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
@@ -116,9 +131,7 @@ pub async fn connect(
             } else {
                 preshared_key
             };
-            handle_connection_for_location(location.clone(), preshared_key, &handle).await?;
-            reload_tray_menu(&handle).await;
-            info!("Connected to location {location}");
+            connect_location_with_psk(location, preshared_key, &handle).await?;
         } else {
             error!(
                 "Location with ID {location_id} not found in the database, aborting connection \
@@ -133,13 +146,12 @@ pub async fn connect(
         );
         handle_connection_for_tunnel(tunnel.clone(), &handle).await?;
         info!("Successfully connected to tunnel {tunnel}");
+        // Update tray icon to reflect connection state.
+        configure_tray_icon(&handle).await?;
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound.into());
     }
-
-    // Update tray icon to reflect connection state.
-    configure_tray_icon(&handle).await?;
 
     Ok(())
 }
@@ -1537,13 +1549,25 @@ pub async fn enrollment_finish(
 }
 
 #[derive(Clone, Serialize)]
-pub struct MfaCompletePayload {
-    pub preshared_key: String,
-}
-
-#[derive(Clone, Serialize)]
 pub struct MfaErrorPayload {
     pub error: String,
+}
+
+/// Bring up a location connection with a preshared key obtained from a
+/// completed MFA handshake. Keeps the preshared key inside the backend - it is
+/// never returned to or emitted at the frontend.
+async fn connect_after_mfa(
+    location_id: Id,
+    preshared_key: String,
+    handle: &AppHandle,
+) -> Result<(), String> {
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Location not found".to_string())?;
+    connect_location_with_psk(location, Some(preshared_key), handle)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Map the frontend MFA method string to the proto `MfaMethod` enum the proxy
@@ -1602,9 +1626,11 @@ pub async fn mfa_start(
 #[tauri::command(async)]
 pub async fn mfa_finish_code(
     instance_id: Id,
+    location_id: Id,
     token: String,
     code: String,
-) -> Result<MfaCompletePayload, String> {
+    handle: AppHandle,
+) -> Result<(), String> {
     debug!("Finishing MFA with code for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
@@ -1612,17 +1638,17 @@ pub async fn mfa_finish_code(
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    mfa::mfa_finish_code(proxy_url, token, code)
+    let psk = mfa::mfa_finish_code(proxy_url, token, code)
         .await
-        .map(|psk| MfaCompletePayload {
-            preshared_key: psk.0,
-        })
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+    // Bring up the connection here so the preshared key stays in the backend.
+    connect_after_mfa(location_id, psk.0, &handle).await
 }
 
 #[tauri::command(async)]
 pub async fn mfa_poll_openid(
     instance_id: Id,
+    location_id: Id,
     token: String,
     state: State<'_, AppState>,
     handle: AppHandle,
@@ -1659,12 +1685,18 @@ pub async fn mfa_poll_openid(
         match result {
             Ok(psk) => {
                 info!("OpenID MFA completed for task {task_id_for_task}");
-                let _ = listen_handle.emit(
-                    EventKey::MfaOpenIdComplete.into(),
-                    MfaCompletePayload {
-                        preshared_key: psk.0,
-                    },
-                );
+                match connect_after_mfa(location_id, psk.0, &listen_handle).await {
+                    Ok(()) => {
+                        let _ = listen_handle.emit(EventKey::MfaOpenIdComplete.into(), ());
+                    }
+                    Err(err) => {
+                        warn!("Connect after OpenID MFA failed for {task_id_for_task}: {err}");
+                        let _ = listen_handle.emit(
+                            EventKey::MfaOpenIdError.into(),
+                            MfaErrorPayload { error: err },
+                        );
+                    }
+                }
             }
             Err(err) => {
                 warn!("OpenID MFA failed for task {task_id_for_task}: {err}");
@@ -1684,6 +1716,7 @@ pub async fn mfa_poll_openid(
 #[tauri::command(async)]
 pub async fn mfa_connect_mobile_approve(
     instance_id: Id,
+    location_id: Id,
     token: String,
     state: State<'_, AppState>,
     handle: AppHandle,
@@ -1721,12 +1754,18 @@ pub async fn mfa_connect_mobile_approve(
         match result {
             Ok(psk) => {
                 info!("Mobile approve MFA completed for task {task_id_for_task}");
-                let _ = listen_handle.emit(
-                    EventKey::MfaMobileComplete.into(),
-                    MfaCompletePayload {
-                        preshared_key: psk.0,
-                    },
-                );
+                match connect_after_mfa(location_id, psk.0, &listen_handle).await {
+                    Ok(()) => {
+                        let _ = listen_handle.emit(EventKey::MfaMobileComplete.into(), ());
+                    }
+                    Err(err) => {
+                        warn!("Connect after mobile MFA failed for {task_id_for_task}: {err}");
+                        let _ = listen_handle.emit(
+                            EventKey::MfaMobileError.into(),
+                            MfaErrorPayload { error: err },
+                        );
+                    }
+                }
             }
             Err(err) => {
                 warn!("Mobile approve MFA failed for task {task_id_for_task}: {err}");

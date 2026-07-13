@@ -185,18 +185,29 @@ const mfaStart = (
 ): Promise<MfaStartResult> =>
   invoke(TauriCommand.MfaStart, { instanceId, locationId, method });
 
+// Completes MFA and brings up the connection in the backend; the preshared key
+// never crosses back to the frontend.
 const mfaFinishCode = (
   instanceId: number,
+  locationId: number,
   token: string,
   code: string,
-): Promise<{ preshared_key: string }> =>
-  invoke(TauriCommand.MfaFinishCode, { instanceId, token, code });
+): Promise<void> =>
+  invoke(TauriCommand.MfaFinishCode, { instanceId, locationId, token, code });
 
-const mfaPollOpenId = (instanceId: number, token: string): Promise<string> =>
-  invoke(TauriCommand.MfaPollOpenId, { instanceId, token });
+const mfaPollOpenId = (
+  instanceId: number,
+  locationId: number,
+  token: string,
+): Promise<string> =>
+  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token });
 
-const mfaConnectMobileApprove = (instanceId: number, token: string): Promise<string> =>
-  invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, token });
+const mfaConnectMobileApprove = (
+  instanceId: number,
+  locationId: number,
+  token: string,
+): Promise<string> =>
+  invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
 
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
@@ -8,7 +8,6 @@ import { api } from '../../../../../../shared/rust-api/api';
 import { getInstancesQueryOptions } from '../../../../../../shared/rust-api/query';
 import type {
   LocationInfo,
-  MfaCompletePayload,
   MfaErrorPayload,
 } from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
@@ -49,14 +48,6 @@ export const useConnectModalMfaOidc = ({
   const unlistenRef = useRef<UnlistenFn | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { mutate: connectMutate } = useMutation({
-    mutationFn: api.connect,
-    onError: (err) => {
-      error(`Connect command failed after successful OIDC MFA\n${err}`);
-      setPollError('Failed to establish VPN connection');
-    },
-  });
-
   const cleanup = useCallback(() => {
     if (timeoutRef.current !== null) {
       clearTimeout(timeoutRef.current);
@@ -96,21 +87,14 @@ export const useConnectModalMfaOidc = ({
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, info.token);
+      const taskId = await api.mfaPollOpenId(instance.id, location.id, info.token);
       taskIdRef.current = taskId;
 
-      const completeUnlisten = await listen<MfaCompletePayload>(
-        TauriEvent.MfaOpenIdComplete,
-        (event) => {
-          cleanup();
-          setIsPolling(false);
-          connectMutate({
-            locationId: location.id,
-            connectionType: location.connection_type,
-            presharedKey: event.payload.preshared_key,
-          });
-        },
-      );
+      // The backend brings up the connection itself; completion means connected.
+      const completeUnlisten = await listen(TauriEvent.MfaOpenIdComplete, () => {
+        cleanup();
+        setIsPolling(false);
+      });
 
       const errorUnlisten = await listen<MfaErrorPayload>(
         TauriEvent.MfaOpenIdError,
@@ -152,7 +136,7 @@ export const useConnectModalMfaOidc = ({
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, connectMutate, cleanup, onPostureError, onSessionExpired]);
+  }, [instance, location, cleanup, onPostureError, onSessionExpired]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

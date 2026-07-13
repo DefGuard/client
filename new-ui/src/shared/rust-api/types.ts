@@ -484,11 +484,6 @@ export type MfaStartResult = {
   challenge: string | null;
 };
 
-/** Payload for mfa-openid-complete / mfa-mobile-complete events. */
-export type MfaCompletePayload = {
-  preshared_key: string;
-};
-
 /** Payload for mfa-openid-error / mfa-mobile-error events. */
 export type MfaErrorPayload = {
   error: string;
