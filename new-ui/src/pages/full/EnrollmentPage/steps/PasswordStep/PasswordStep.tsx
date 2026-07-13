@@ -1,16 +1,16 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: ensured by wizard page */
+import { error } from '@tauri-apps/plugin-log';
 import './style.scss';
 import { useStore } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useCallback } from 'react';
 import z from 'zod';
-import { useShallow } from 'zustand/shallow';
 import { Icon, type IconKindValue } from '../../../../../shared/components/Icon';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../../../shared/edge-api/api';
 import { useAppForm, withForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
+import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
@@ -59,11 +59,9 @@ const defaultValues: FormFields = {
 };
 
 export const PasswordStep = () => {
-  const [proxyUrl, cookie] = useEnrollmentStore(
-    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
-  );
+  const sessionId = useEnrollmentStore((s) => s.sessionId);
   const { mutateAsync: startMfa } = useMutation({
-    mutationFn: () => edgeApi.startMfaSetup(proxyUrl, cookie, MfaMethod.Totp),
+    mutationFn: () => api.enrollmentRegisterMfaStart(sessionId!, MfaMethod.Totp),
   });
 
   const form = useAppForm({
@@ -74,25 +72,24 @@ export const PasswordStep = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value }) => {
-      const { skipMfaChoice, skipMfa } = useEnrollmentStore.getState();
-      if (skipMfaChoice) {
-        const mfaResponse = await startMfa();
-        if (mfaResponse.result) {
+      try {
+        const { skipMfaChoice, skipMfa } = useEnrollmentStore.getState();
+        if (skipMfaChoice) {
+          const mfaResponse = await startMfa();
           useEnrollmentStore.setState({
-            userTotpSecret: mfaResponse.result.totp_secret ?? null,
+            userTotpSecret: mfaResponse.totp_secret,
           });
-        } else {
-          console.error(mfaResponse);
-          return;
         }
+        useEnrollmentStore.setState({
+          userPassword: value.password.trim(),
+        });
+        if (skipMfa) {
+          await activateUser();
+        }
+        useEnrollmentStore.getState().next();
+      } catch (err) {
+        void error(`Password step failed: ${err}`);
       }
-      useEnrollmentStore.setState({
-        userPassword: value.password.trim(),
-      });
-      if (skipMfa) {
-        await activateUser();
-      }
-      useEnrollmentStore.getState().next();
     },
   });
 

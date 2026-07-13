@@ -14,12 +14,14 @@ use crate::{
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
+use defguard_client_proto::defguard::client_types::EnrollmentStartResponse;
+
 /// Error type returned by enrollment operations.
 ///
 /// Serialized as a tagged JSON union so the TypeScript frontend can
 /// match on the `type` field to show context-specific messages.
 #[derive(Debug, Error, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum EnrollmentError {
     #[error("Enrollment token has expired or is invalid")]
     TokenExpired,
@@ -45,43 +47,14 @@ pub struct EnrollmentSession {
     pub client: Client,
 }
 
-/// User information returned by the enrollment process.
-///
-/// Mirrors `InitialUserInfo` from `client_types.proto`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserInfo {
-    pub first_name: String,
-    pub last_name: String,
-    pub login: String,
-    pub email: String,
-    pub phone_number: Option<String>,
-    pub is_active: bool,
-    pub device_names: Vec<String>,
-    pub enrolled: bool,
-    pub is_admin: bool,
-    pub password_management_disabled: bool,
-}
-
-/// Deserialization-only wrapper for the `EnrollmentStartResponse` JSON from
-/// the proxy, so we only pull out the fields we need without a full proto
-/// dependency.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ProxyEnrollmentStartResponse {
-    user: UserInfo,
-}
-
 /// Response from `POST /api/v1/enrollment/register-mfa/code/start`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MfaStartResponse {
     pub totp_secret: Option<String>,
 }
 
 /// Response from `POST /api/v1/enrollment/register-mfa/code/finish`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MfaFinishResponse {
     pub recovery_codes: Vec<String>,
 }
@@ -159,12 +132,12 @@ async fn read_error_body(response: Response) -> String {
 ///
 /// POSTs `{ "token": "<token>" }` to `/api/v1/enrollment/start`, extracts
 /// the `defguard_proxy` session cookie from the `Set-Cookie` response
-/// header, and returns the session together with the enrolling user's
-/// information.
+/// header, and returns the session together with the full enrollment
+/// start response (admin, user, settings, instance, deadline).
 pub async fn enrollment_start(
     proxy_url: Url,
     token: String,
-) -> Result<(EnrollmentSession, UserInfo), EnrollmentError> {
+) -> Result<(EnrollmentSession, EnrollmentStartResponse), EnrollmentError> {
     let client = Client::new();
 
     let url = proxy_url
@@ -200,7 +173,7 @@ pub async fn enrollment_start(
 
     let cookie = extract_defguard_cookie(&response)?;
 
-    let body: ProxyEnrollmentStartResponse =
+    let body: EnrollmentStartResponse =
         response.json().await.map_err(|e| EnrollmentError::Other {
             message: format!("Failed to parse enrollment response: {e}"),
         })?;
@@ -211,7 +184,7 @@ pub async fn enrollment_start(
         client,
     };
 
-    Ok((session, body.user))
+    Ok((session, body))
 }
 
 /// Create a device during enrollment.
@@ -351,23 +324,53 @@ mod tests {
 
     fn user_json() -> serde_json::Value {
         json!({
-            "firstName": "John",
-            "lastName": "Doe",
+            "first_name": "John",
+            "last_name": "Doe",
             "login": "jdoe",
             "email": "john@example.com",
-            "phoneNumber": null,
-            "isActive": true,
-            "deviceNames": [],
+            "phone_number": null,
+            "is_active": true,
+            "device_names": [],
             "enrolled": false,
-            "isAdmin": false,
-            "passwordManagementDisabled": false,
+            "is_admin": false,
+            "password_management_disabled": false,
+        })
+    }
+
+    fn full_start_json() -> serde_json::Value {
+        json!({
+            "admin": {
+                "name": "Admin",
+                "phone_number": null,
+                "email": "admin@example.com",
+            },
+            "user": user_json(),
+            "settings": {
+                "vpn_setup_optional": false,
+                "only_client_activation": false,
+                "admin_device_management": false,
+                "smtp_configured": true,
+                "mfa_required": true,
+            },
+            "instance": {
+                "id": "inst-1",
+                "name": "Test Instance",
+                "url": "https://test.defguard.net",
+                "proxy_url": "https://proxy.defguard.net",
+                "username": "jdoe",
+                "enterprise_enabled": false,
+                "disable_all_traffic": false,
+                "openid_display_name": null,
+            },
+            "deadline_timestamp": 1734567890,
+            "final_page_content": "Welcome!",
         })
     }
 
     #[tokio::test]
     async fn test_start_success() {
         let server = MockServer::start().await;
-        let response_body = json!({ "user": user_json() });
+        let response_body = full_start_json();
 
         Mock::given(method("POST"))
             .and(path("/api/v1/enrollment/start"))
@@ -383,11 +386,20 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let (session, user) = enrollment_start(url, "valid-token".into()).await.unwrap();
+        let (session, response) = enrollment_start(url, "valid-token".into()).await.unwrap();
+        let user = response.user.expect("user must be present");
+        let admin = response.admin.expect("admin must be present");
+        let settings = response.settings.expect("settings must be present");
+        let instance = response.instance.expect("instance must be present");
 
         assert_eq!(session.cookie, "defguard_proxy=test-session-cookie");
         assert_eq!(user.first_name, "John");
         assert_eq!(user.login, "jdoe");
+        assert_eq!(admin.name, "Admin");
+        assert!(settings.mfa_required);
+        assert_eq!(instance.id, "inst-1");
+        assert_eq!(response.deadline_timestamp, 1734567890);
+        assert_eq!(response.final_page_content, "Welcome!");
     }
 
     #[tokio::test]
@@ -520,7 +532,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_mfa_start_success() {
         let server = MockServer::start().await;
-        let response_body = json!({ "totpSecret": "SECRET123" });
+        let response_body = json!({ "totp_secret": "SECRET123" });
 
         Mock::given(method("POST"))
             .and(path("/api/v1/enrollment/register-mfa/code/start"))
@@ -541,7 +553,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_mfa_finish_success() {
         let server = MockServer::start().await;
-        let response_body = json!({ "recoveryCodes": ["rc1", "rc2", "rc3"] });
+        let response_body = json!({ "recovery_codes": ["rc1", "rc2", "rc3"] });
 
         Mock::given(method("POST"))
             .and(path("/api/v1/enrollment/register-mfa/code/finish"))

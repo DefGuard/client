@@ -12,6 +12,7 @@ import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
+import { error } from '@tauri-apps/plugin-log';
 import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
@@ -68,16 +69,21 @@ export const AddInstancePage = () => {
           });
           return;
         }
+        void error(`Failed to add instance: ${result.error ?? 'unknown error'}`);
         Snackbar.error('Communication error, contact administrator.');
         return;
       }
-      if (result.cookie) {
-        await edgeApi.createDevice(value.url, result.cookie, value.name.trim());
+      if (result.session_id) {
+        await edgeApi.createDevice(result.session_id, value.name.trim());
       }
-      if (result.startResponse && !result.startResponse.user.enrolled && result.cookie) {
+      if (
+        result.startResponse &&
+        !result.startResponse.user.enrolled &&
+        result.session_id
+      ) {
         useEnrollmentStore
           .getState()
-          .start(result.startResponse, value.url, result.cookie, undefined);
+          .start(result.startResponse, result.session_id, undefined);
         navigate({
           to: '/full/enrollment',
           replace: true,

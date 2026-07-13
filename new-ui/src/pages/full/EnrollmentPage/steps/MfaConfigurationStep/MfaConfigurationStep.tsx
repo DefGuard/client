@@ -1,13 +1,13 @@
+import { error } from '@tauri-apps/plugin-log';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
-import { useShallow } from 'zustand/shallow';
 import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
 import { CopyField } from '../../../../../shared/components/CopyField/CopyField';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { QrCard } from '../../../../../shared/components/QrCard/QrCard';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../../../shared/edge-api/api';
+import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
@@ -16,36 +16,28 @@ import { activateUser } from '../../hooks/activateUser';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const MfaConfigurationStep = () => {
+  const sessionId = useEnrollmentStore((s) => s.sessionId);
   const method = useEnrollmentStore((s) => s.userMfaChoice);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [proxyUrl, cookie] = useEnrollmentStore(
-    // biome-ignore lint/style/noNonNullAssertion: safe
-    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
-  );
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      const resp = await edgeApi.finishMfaSetup(proxyUrl, cookie, {
-        // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
-        code: code!,
-        method,
-      });
+      // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
+      const resp = await api.enrollmentRegisterMfaFinish(sessionId!, code!, method);
       await activateUser();
       return resp;
     },
-    onError: () => {},
+    onError: (err) => {
+      void error(`MFA configuration failed: ${err}`);
+      setError(String(err));
+    },
     onSuccess: (resp) => {
-      if (resp.result) {
-        useEnrollmentStore.setState({
-          userRecoveryCodes: resp.result.recovery_codes,
-          deadline: null,
-        });
-        useEnrollmentStore.getState().next();
-      }
-      if (resp.error) {
-        setError('Enter a valid code');
-      }
+      useEnrollmentStore.setState({
+        userRecoveryCodes: resp.recovery_codes,
+        deadline: null,
+      });
+      useEnrollmentStore.getState().next();
     },
   });
 

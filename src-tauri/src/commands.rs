@@ -9,7 +9,7 @@ use defguard_client_core::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
         disconnect_interface,
     },
-    enrollment::{self, MfaFinishResponse, MfaStartResponse, UserInfo},
+    enrollment::{self, MfaFinishResponse, MfaStartResponse},
     mfa::{self, PresharedKey},
 };
 use defguard_client_posture::authorize_posture_session;
@@ -18,7 +18,11 @@ use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
 use defguard_client_proto::defguard::{
-    client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
+    client_types::{
+        AdminInfo, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo,
+    },
+    enterprise::posture::v2::DevicePostureData,
 };
 use defguard_client_provisioning::ProvisioningConfig;
 #[cfg(not(target_os = "macos"))]
@@ -1336,10 +1340,14 @@ pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Er
 
 /// Returned by the `enrollment_start` Tauri command.
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EnrollmentStartResult {
     pub session_id: String,
-    pub user: UserInfo,
+    pub user: InitialUserInfo,
+    pub admin: AdminInfo,
+    pub settings: EnrollmentSettings,
+    pub instance: ProtoInstanceInfo,
+    pub deadline_timestamp: i64,
+    pub final_page_content: String,
 }
 
 #[tauri::command(async)]
@@ -1348,8 +1356,9 @@ pub async fn enrollment_start(
     token: String,
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
+    debug!("Starting enrollment at {proxy_url}");
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let (session, user) = enrollment::enrollment_start(url, token)
+    let (session, response) = enrollment::enrollment_start(url, token)
         .await
         .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
     let session_id = Uuid::new_v4().to_string();
@@ -1358,7 +1367,21 @@ pub async fn enrollment_start(
         .lock()
         .unwrap()
         .insert(Uuid::parse_str(&session_id).unwrap(), session);
-    Ok(EnrollmentStartResult { session_id, user })
+    let login = response.user.as_ref().map(|u| u.login.as_str()).unwrap_or("<unknown>");
+    info!("Enrollment started for user {login}, session {session_id}");
+    Ok(EnrollmentStartResult {
+        session_id,
+        user: response.user.expect("proxy must always return user"),
+        admin: response.admin.expect("proxy must always return admin"),
+        settings: response
+            .settings
+            .expect("proxy must always return settings"),
+        instance: response
+            .instance
+            .expect("proxy must always return instance"),
+        deadline_timestamp: response.deadline_timestamp,
+        final_page_content: response.final_page_content,
+    })
 }
 
 #[tauri::command(async)]
@@ -1368,6 +1391,7 @@ pub async fn enrollment_create_device(
     pubkey: String,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
+    debug!("Creating device \"{name}\"");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
         let sessions = state.enrollment_sessions.lock().unwrap();
@@ -1376,9 +1400,11 @@ pub async fn enrollment_create_device(
             .cloned()
             .ok_or_else(|| "Enrollment session not found".to_string())?
     };
-    enrollment::enrollment_create_device(session, name, pubkey)
+    let result = enrollment::enrollment_create_device(session, name, pubkey)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+    info!("Device created");
+    Ok(result)
 }
 
 #[tauri::command(async)]
@@ -1388,6 +1414,7 @@ pub async fn enrollment_activate_user(
     phone_number: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    debug!("Activating user");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
         let sessions = state.enrollment_sessions.lock().unwrap();
@@ -1398,7 +1425,9 @@ pub async fn enrollment_activate_user(
     };
     enrollment::enrollment_activate_user(session, password, phone_number)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+    info!("User activated");
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -1407,6 +1436,7 @@ pub async fn enrollment_register_mfa_start(
     method: String,
     state: State<'_, AppState>,
 ) -> Result<MfaStartResponse, String> {
+    debug!("Starting MFA setup");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
         let sessions = state.enrollment_sessions.lock().unwrap();
@@ -1427,6 +1457,7 @@ pub async fn enrollment_register_mfa_finish(
     method: String,
     state: State<'_, AppState>,
 ) -> Result<MfaFinishResponse, String> {
+    debug!("Finishing MFA setup");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
         let sessions = state.enrollment_sessions.lock().unwrap();
@@ -1446,6 +1477,7 @@ pub async fn enrollment_network_info(
     pubkey: String,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
+    debug!("Fetching network info");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
         let sessions = state.enrollment_sessions.lock().unwrap();
@@ -1464,6 +1496,7 @@ pub async fn enrollment_finish(
     session_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    debug!("Finishing enrollment");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
         let mut sessions = state.enrollment_sessions.lock().unwrap();
@@ -1472,6 +1505,7 @@ pub async fn enrollment_finish(
             .ok_or_else(|| "Enrollment session not found".to_string())?
     };
     enrollment::enrollment_finish(session);
+    info!("Enrollment finished, session {session_id} removed");
     Ok(())
 }
 
@@ -1491,6 +1525,7 @@ pub async fn mfa_start(
     location_id: Id,
     method: String,
 ) -> Result<mfa::MfaInfo, String> {
+    debug!("Starting MFA session for location {location_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1512,6 +1547,7 @@ pub async fn mfa_finish_code(
     token: String,
     code: String,
 ) -> Result<PresharedKey, String> {
+    debug!("Finishing MFA with code for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1530,6 +1566,7 @@ pub async fn mfa_poll_openid(
     state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
+    debug!("Starting OpenID MFA poll for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1557,6 +1594,7 @@ pub async fn mfa_poll_openid(
         }
         match result {
             Ok(psk) => {
+                info!("OpenID MFA completed for task {task_id_for_task}");
                 let _ = listen_handle.emit(
                     EventKey::MfaOpenIdComplete.into(),
                     MfaCompletePayload {
@@ -1565,6 +1603,7 @@ pub async fn mfa_poll_openid(
                 );
             }
             Err(err) => {
+                warn!("OpenID MFA failed for task {task_id_for_task}: {err}");
                 let _ = listen_handle.emit(
                     EventKey::MfaOpenIdError.into(),
                     MfaErrorPayload {
@@ -1585,6 +1624,7 @@ pub async fn mfa_connect_mobile_approve(
     state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
+    debug!("Starting mobile approve MFA for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1613,6 +1653,7 @@ pub async fn mfa_connect_mobile_approve(
         }
         match result {
             Ok(psk) => {
+                info!("Mobile approve MFA completed for task {task_id_for_task}");
                 let _ = listen_handle.emit(
                     EventKey::MfaMobileComplete.into(),
                     MfaCompletePayload {
@@ -1621,6 +1662,7 @@ pub async fn mfa_connect_mobile_approve(
                 );
             }
             Err(err) => {
+                warn!("Mobile approve MFA failed for task {task_id_for_task}: {err}");
                 let _ = listen_handle.emit(
                     EventKey::MfaMobileError.into(),
                     MfaErrorPayload {
@@ -1636,6 +1678,7 @@ pub async fn mfa_connect_mobile_approve(
 
 #[tauri::command(async)]
 pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    debug!("Cancelling MFA task {task_id}");
     let cancel = {
         let tasks = state.mfa_tasks.lock().unwrap();
         tasks

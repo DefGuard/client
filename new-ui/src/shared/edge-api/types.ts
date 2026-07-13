@@ -1,4 +1,4 @@
-import type { MfaMethodValue } from '../rust-api/types';
+import type { EnrollmentStartResult, MfaMethodValue } from '../rust-api/types';
 
 export type EnrollmentInstanceInfo = {
   id: string;
@@ -57,9 +57,8 @@ export type EnrollmentErrorKind = 'network' | 'unauthorized' | 'server';
 
 export type AddInstanceRequest = { url: string; token: string; name: string };
 export type AddInstanceResult = {
-  startResponse?: EnrollmentStartResponse;
-  proxyUrl?: string;
-  cookie?: string;
+  startResponse?: EnrollmentStartResult;
+  session_id?: string;
   error?: string;
   errorKind?: EnrollmentErrorKind;
 };

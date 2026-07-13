@@ -1,14 +1,16 @@
 import dayjs from 'dayjs';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { EnrollmentStartResponse } from '../../../../shared/edge-api/types';
-import type { MfaMethodValue } from '../../../../shared/rust-api/types';
+import type {
+  EnrollmentStartResult,
+  MfaMethodValue,
+} from '../../../../shared/rust-api/types';
 import { EnrollmentStep, type EnrollmentStepValue } from '../types';
 
 type StoreValues = {
   activeStep: EnrollmentStepValue;
-  startResponse: EnrollmentStartResponse | null;
-  proxyUrl: string | null;
+  startResponse: EnrollmentStartResult | null;
+  sessionId: string | null;
   skipMfa: boolean;
   skipPassword: boolean;
   skipMfaChoice: boolean;
@@ -17,13 +19,11 @@ type StoreValues = {
   userTotpSecret: string | null;
   userRecoveryCodes: string[] | null;
   userMfaChoice: MfaMethodValue;
-  sessionCookie: string | null;
 };
 
 const defaults: StoreValues = {
   activeStep: EnrollmentStep.Welcome,
-  sessionCookie: null,
-  proxyUrl: null,
+  sessionId: null,
   userRecoveryCodes: null,
   startResponse: null,
   skipMfa: false,
@@ -37,9 +37,8 @@ const defaults: StoreValues = {
 
 interface Store extends StoreValues {
   start: (
-    response: EnrollmentStartResponse,
-    url: string,
-    cookie: string,
+    response: EnrollmentStartResult,
+    sessionId: string,
     totpSecret?: string,
   ) => void;
   next: () => void;
@@ -50,13 +49,12 @@ export const useEnrollmentStore = create<Store>()(
   persist(
     (set, get) => ({
       ...defaults,
-      start: (response, url, cookie, secret) => {
+      start: (response, sessionId, secret) => {
         set({
           ...defaults,
-          proxyUrl: url,
+          sessionId,
           activeStep: EnrollmentStep.Welcome,
           startResponse: response,
-          sessionCookie: cookie,
           // if smtp is not present then it's not possible to choose.
           skipMfaChoice:
             !response.settings.smtp_configured || !response.settings.mfa_required,

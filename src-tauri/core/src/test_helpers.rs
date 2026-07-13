@@ -75,22 +75,3 @@ pub async fn start_ws_stub() -> WebSocketStub {
 
     WebSocketStub { addr, tx }
 }
-
-/// A simplified stub that waits for one connection and then immediately sends
-/// a single text message before closing.  Convenient for happy-path tests where
-/// no fine-grained control is needed.
-pub async fn one_shot_ws_stub(message: &str) -> SocketAddr {
-    let stub = start_ws_stub().await;
-    let addr = stub.addr;
-    let tx = stub.tx;
-    let msg = message.to_string();
-
-    // Send the success message on the first tick, then close.
-    // The spawned task will process these commands once a client connects.
-    tx.send(WsStubCommand::SendMessage(msg))
-        .expect("ws stub receiver dropped");
-    tx.send(WsStubCommand::Close)
-        .expect("ws stub receiver dropped");
-
-    addr
-}

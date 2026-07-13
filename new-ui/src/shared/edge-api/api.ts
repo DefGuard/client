@@ -1,6 +1,7 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { fetch } from '@tauri-apps/plugin-http';
+import { api } from '../rust-api/api';
 import type {
   CreateDeviceResponse,
   InstanceInfo,
@@ -17,7 +18,6 @@ import type {
   AddInstanceResult,
   EdgeRequestHeaders,
   EnrollmentErrorKind,
-  EnrollmentStartResponse,
   MfaSetupFinishRequest,
   MfaSetupFinishResponse,
   MfaSetupStartResponse,
@@ -25,10 +25,7 @@ import type {
   UpdateInstanceResult,
 } from './types';
 
-const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatformHeader);
 const getInstances = (): Promise<InstanceInfo[]> => invoke(TauriCommand.AllInstances);
-const deleteInstance = (instanceId: number): Promise<void> =>
-  invoke(TauriCommand.DeleteInstance, { instanceId });
 const updateInstanceRecord = (args: {
   instanceId: number;
   response: CreateDeviceResponse;
@@ -44,7 +41,7 @@ const buildProxyUrl = (url: string): string => {
 };
 
 const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
-  const platform = await getPlatformHeader();
+  const platform = (await invoke(TauriCommand.GetPlatformHeader)) as string;
   const version = await getVersion().catch(() => 'unknown');
   return {
     'defguard-client-platform': platform,
@@ -52,120 +49,80 @@ const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
   };
 };
 
-const createDevice = async (
-  proxyUrl: string,
-  cookie: string,
-  name: string,
-): Promise<{ error?: string }> => {
-  const edgeHeaders = await getEdgeRequestHeaders();
-  const { publicKey, privateKey } = generateWGKeys();
-  const url = buildProxyUrl(proxyUrl);
-  const deviceRes = await fetch(`${url}/enrollment/create_device`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Cookie: cookie,
-      ...edgeHeaders,
-    },
-    body: JSON.stringify({ name, pubkey: publicKey }),
-  });
-
-  if (!deviceRes.ok) {
-    const body = (await deviceRes.json()) as { error?: string };
-    return { error: body.error ?? `create_device failed (${deviceRes.status})` };
+/// Parse a Tauri command error that contains a serialized `EnrollmentError`
+/// JSON string into an `EnrollmentErrorKind` and human-readable message.
+const parseEnrollmentError = (
+  err: unknown,
+): { error?: string; errorKind: EnrollmentErrorKind } => {
+  // Tauri 2 command errors are plain objects, not Error instances.
+  // The Rust error message is on the `message` property.
+  const raw =
+    typeof err === 'object' && err !== null && 'message' in err
+      ? String((err as Record<string, unknown>).message)
+      : String(err);
+  try {
+    const parsed = JSON.parse(raw) as { type: string; message?: string; status?: number };
+    switch (parsed.type) {
+      case 'token_expired':
+        return { errorKind: 'unauthorized' };
+      case 'network_error':
+        return { errorKind: 'network' };
+      case 'proxy_error':
+        return { error: parsed.message, errorKind: 'server' };
+      default:
+        return { error: parsed.message ?? raw, errorKind: 'server' };
+    }
+  } catch {
+    return { error: raw, errorKind: 'server' };
   }
-
-  await saveDeviceConfig({ privateKey, response: await deviceRes.json() });
-  return {};
 };
 
-type EnrollmentStartOutcome =
-  | { ok: true; response: Response }
-  | { ok: false; error?: string; errorKind: EnrollmentErrorKind };
-
-const startEnrollment = async (
-  proxyUrl: string,
-  token: string,
-  edgeHeaders: EdgeRequestHeaders,
-): Promise<EnrollmentStartOutcome> => {
-  let res: Response;
+const createDevice = async (
+  sessionId: string,
+  name: string,
+): Promise<{ error?: string }> => {
   try {
-    res = await fetch(`${proxyUrl}/enrollment/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...edgeHeaders },
-      body: JSON.stringify({ token }),
+    const { publicKey, privateKey } = generateWGKeys();
+    const deviceResponse = await api.enrollmentCreateDevice(sessionId, name, publicKey);
+    await saveDeviceConfig({
+      privateKey,
+      response: deviceResponse as CreateDeviceResponse,
     });
-  } catch {
-    return { ok: false, errorKind: 'network' };
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
   }
-
-  if (!res.ok) {
-    if (res.status === 401) {
-      return { ok: false, errorKind: 'unauthorized' };
-    }
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    return {
-      ok: false,
-      error: body.error ?? `Enrollment start failed (${res.status})`,
-      errorKind: 'server',
-    };
-  }
-
-  return { ok: true, response: res };
 };
 
 const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
   try {
-    const proxyUrl = buildProxyUrl(values.url);
-
-    const edgeHeaders = await getEdgeRequestHeaders();
-
-    const startResult = await startEnrollment(proxyUrl, values.token, edgeHeaders);
-    if (!startResult.ok) {
-      return { error: startResult.error, errorKind: startResult.errorKind };
-    }
-    const startRes = startResult.response;
-
-    const cookie = startRes.headers
-      .getSetCookie()
-      .find((c) => c.startsWith('defguard_proxy='));
-    if (!cookie) return { error: 'Auth cookie missing from enrollment response' };
-
-    const resp = (await startRes.json()) as EnrollmentStartResponse;
+    const startResult = await api.enrollmentStart(values.url.trim(), values.token.trim());
 
     const instances = await getInstances();
-    const existing = instances.find((i) => i.uuid === resp.instance.id);
+    const existing = instances.find((i) => i.uuid === startResult.instance.id);
     if (existing) {
-      const netRes = await fetch(`${proxyUrl}/enrollment/network_info`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-          ...edgeHeaders,
-        },
-        body: JSON.stringify({ pubkey: existing.pubkey }),
+      const netInfo = await api.enrollmentNetworkInfo(
+        startResult.session_id,
+        existing.pubkey,
+      );
+      await updateInstanceRecord({
+        instanceId: existing.id,
+        response: netInfo as CreateDeviceResponse,
       });
-      // device no longer exists core side, clean it up
-      if (netRes.status === 404) {
-        await deleteInstance(existing.id);
-      } else {
-        if (!netRes.ok) return { error: `network_info failed (${netRes.status})` };
-        await updateInstanceRecord({
-          instanceId: existing.id,
-          response: await netRes.json(),
-        });
-        return {};
-      }
+      return {};
     }
 
     const normalizedName = values.name.trim().toLowerCase();
-    if (resp.user.device_names.some((n) => n.trim().toLowerCase() === normalizedName)) {
+    if (
+      startResult.user.device_names.some((n) => n.trim().toLowerCase() === normalizedName)
+    ) {
       return { error: `Device name '${values.name}' is already in use` };
     }
 
-    return { startResponse: resp, proxyUrl, cookie };
+    return { startResponse: startResult, session_id: startResult.session_id };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    const parsed = parseEnrollmentError(e);
+    return { error: parsed.error, errorKind: parsed.errorKind };
   }
 };
 
@@ -173,55 +130,31 @@ const updateExistingInstance = async (
   values: UpdateInstanceRequest,
 ): Promise<UpdateInstanceResult> => {
   try {
-    const proxyUrl = buildProxyUrl(values.url);
-    const edgeHeaders = await getEdgeRequestHeaders();
-
     const instances = await getInstances();
     const existing = instances.find((i) => i.id === values.instanceId);
     if (!existing) return { error: 'Instance no longer exists.' };
 
-    const startResult = await startEnrollment(proxyUrl, values.token, edgeHeaders);
-    if (!startResult.ok) {
-      return { error: startResult.error, errorKind: startResult.errorKind };
-    }
-    const startRes = startResult.response;
+    const startResult = await api.enrollmentStart(values.url, values.token);
 
-    const cookie = startRes.headers
-      .getSetCookie()
-      .find((c) => c.startsWith('defguard_proxy='));
-    if (!cookie) return { error: 'Auth cookie missing from enrollment response' };
-
-    const resp = (await startRes.json()) as EnrollmentStartResponse;
-
-    if (resp.instance.id !== existing.uuid) {
+    if (startResult.instance.id !== existing.uuid) {
       return {
         error: 'Provided token belongs to a different instance.',
         errorKind: 'unauthorized',
       };
     }
 
-    const netRes = await fetch(`${proxyUrl}/enrollment/network_info`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: cookie,
-        ...edgeHeaders,
-      },
-      body: JSON.stringify({ pubkey: existing.pubkey }),
-    });
-
-    if (!netRes.ok) {
-      const body = (await netRes.json()) as { error?: string };
-      return { error: body.error ?? `network_info failed (${netRes.status})` };
-    }
-
+    const netInfo = await api.enrollmentNetworkInfo(
+      startResult.session_id,
+      existing.pubkey,
+    );
     await updateInstanceRecord({
       instanceId: existing.id,
-      response: await netRes.json(),
+      response: netInfo as CreateDeviceResponse,
     });
     return {};
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    const parsed = parseEnrollmentError(e);
+    return { error: parsed.error, errorKind: parsed.errorKind };
   }
 };
 

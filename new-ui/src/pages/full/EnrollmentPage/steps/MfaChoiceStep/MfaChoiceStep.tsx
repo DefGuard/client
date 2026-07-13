@@ -1,8 +1,7 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: this cannot be shown without those store values */
+/** biome-ignore-all lint/style/noNonNullAssertion: sessionId is set in start(), called before */
 import { useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { useState } from 'react';
-import { useShallow } from 'zustand/shallow';
 import {
   Icon,
   IconKind,
@@ -10,28 +9,25 @@ import {
 } from '../../../../../shared/components/Icon';
 import { RadioIndicator } from '../../../../../shared/components/RadioIndicator/RadioIndicator';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../../../shared/edge-api/api';
+import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const MfaChoiceStep = () => {
-  const [proxyUrl, cookie] = useEnrollmentStore(
-    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
-  );
+  const sessionId = useEnrollmentStore((s) => s.sessionId);
   const [mfa, setMfa] = useState<MfaMethodValue>(
     useEnrollmentStore.getState().userMfaChoice,
   );
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => edgeApi.startMfaSetup(proxyUrl, cookie, mfa),
+    mutationFn: () => api.enrollmentRegisterMfaStart(sessionId!, mfa),
     onSuccess: (resp) => {
       if (mfa === MfaMethod.Totp) {
-        const secret = resp.result?.totp_secret;
         useEnrollmentStore.setState({
           userMfaChoice: mfa,
-          userTotpSecret: secret,
+          userTotpSecret: resp.totp_secret,
         });
       } else {
         useEnrollmentStore.setState({ userMfaChoice: mfa });
