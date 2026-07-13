@@ -1,3 +1,4 @@
+[windows]
 set shell := ["powershell.exe", "-c"]
 
 dev:
