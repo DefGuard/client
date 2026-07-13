@@ -1,6 +1,8 @@
 name: "Build app and create release"
 on:
   push:
+    branches:
+      - ci-signed-msi
     tags:
       - v*.*.*
 env:
@@ -8,6 +10,7 @@ env:
 
 jobs:
   create-release:
+    if: false
     name: create-release
     runs-on: self-hosted
     outputs:
@@ -21,6 +24,7 @@ jobs:
           generate_release_notes: true
 
   create-sbom:
+    if: false
     needs:
       - create-release
     uses: ./.github/workflows/sbom.yml
@@ -28,6 +32,7 @@ jobs:
       upload_url: ${{ needs.create-release.outputs.upload_url }}
 
   ubuntu-22-04-build:
+    if: false
     needs:
       - create-release
     runs-on:
@@ -142,6 +147,7 @@ jobs:
           asset_content_type: application/octet-stream
 
   build-linux:
+    if: false
     needs:
       - create-release
     outputs:
@@ -339,6 +345,7 @@ jobs:
   # Alma 9, so dg is compiled inside an almalinux:9 container to link Alma's
   # glibc 2.34 and OpenSSL 3, then packaged with fpm. x86_64 only.
   build-dg-alma9:
+    if: false
     needs:
       - create-release
     runs-on:
@@ -394,12 +401,120 @@ jobs:
           asset_content_type: application/octet-stream
 
   build-macos:
+    if: false
     needs:
       - create-release
     uses: ./.github/workflows/release-macos.yaml
     secrets: inherit
     with:
       upload_url: ${{ needs.create-release.outputs.upload_url }}
+
+  # Builds Windows MSI and uploads it as artifact
+  build-windows:
+    # needs:
+    #   - create-release
+    # strategy:
+    #   fail-fast: false
+    #   matrix:
+    #     windows_runner:
+    #       - windows-latest
+    #       - windows-11-arm
+    #     include:
+    #       - windows_runner: windows-latest
+    #         cpu: x64
+    #       - windows_runner: windows-11-arm
+    #         cpu: arm64
+    runs-on: build1-win
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Write release version
+        run: |
+          $env:VERSION=echo ($env:GITHUB_REF_NAME.Substring(1) -Split "-")[0]
+          echo Version: $env:VERSION
+          echo "VERSION=$env:VERSION" >> $env:GITHUB_ENV
+      # - uses: actions/setup-node@v6
+      #   with:
+      #     node-version: 26
+      # - uses: pnpm/action-setup@v6
+      #   with:
+      #     version: 11
+      #     run_install: false
+      # - name: Get pnpm store directory
+      #   shell: bash
+      #   run: echo "STORE_PATH=$(pnpm store path --silent)" >> ${GITHUB_ENV}
+      #
+      # Change to '--frozen-lockfile' once this gets fixed:
+      # https://github.com/pnpm/action-setup/issues/40
+      #
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Node dependencies for new UI
+        run: |
+          cd new-ui
+          pnpm install --no-frozen-lockfile
+
+      - name: Build new UI
+        run: |
+          cd new-ui
+          pnpm build
+
+      - name: Build MSI
+        env:
+          WINDOWS_CERT_PIN: ${{ secrets.WINDOWS_CERT_PIN }}
+        shell: powershell
+        run: |
+          Start-Process C:\users\admin\Documents\PinTool\pintool.exe -ArgumentList '--count', '7', $env:WINDOWS_CERT_PIN -PassThru
+          pnpm tauri build
+
+      # - name: Upload unsigned bundle
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: unsigned-bundle-${{ matrix.cpu }}
+      #     path: src-tauri/target/release/bundle/msi/Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
+
+  # Signs the MSI and uploads it as release asset
+  # sign-bundle:
+  #   needs:
+  #     - create-release
+  #     - build-windows
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       # Match CPUs from build-windows above.
+  #       cpu:
+  #         - x64
+  #         - arm64
+  #   runs-on:
+  #     - self-hosted
+  #     - Linux
+  #     - X64
+  #   steps:
+  #     - name: Write release version
+  #       run: |
+  #         VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
+  #         echo Version: $VERSION
+  #         echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+  #     - name: Download unsigned bundle
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: unsigned-bundle-${{ matrix.cpu }}
+  #     - name: Sign bundle
+  #       run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
+  #     - name: Upload installer asset
+  #       uses: shogo82148/actions-upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ needs.create-release.outputs.upload_url }}
+  #         asset_path: Defguard-signed.msi
+  #         asset_name: Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
+  #         asset_content_type: application/octet-stream
 
   # Builds Windows MSI and uploads it as artifact
   # build-windows:
