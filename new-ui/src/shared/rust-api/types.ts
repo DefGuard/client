@@ -337,7 +337,6 @@ export type SaveDeviceConfigResponse = {
 export type ConnectionArgs = {
   locationId: number;
   connectionType: ConnectionType;
-  presharedKey?: string;
 };
 
 export type RoutingArgs = {

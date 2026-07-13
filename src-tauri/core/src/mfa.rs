@@ -5,9 +5,12 @@
 
 use std::time::Duration;
 
+use defguard_client_proto::defguard::client_types::{
+    ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest, ClientMfaStartResponse,
+};
 use futures_util::StreamExt;
 use reqwest::{Client, Response, StatusCode, Url};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use thiserror::Error;
 use tokio::{
     net::TcpStream,
@@ -22,10 +25,6 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    proto::{
-        client_types::{ClientMfaStartRequest, MfaMethod},
-        enterprise::posture::v2::DevicePostureData,
-    },
     proxy::construct_platform_header,
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
@@ -54,28 +53,6 @@ pub enum MfaError {
 
     #[error("{message}")]
     Other { message: String },
-}
-
-/// WireGuard preshared key returned after a successful MFA handshake.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PresharedKey(pub String);
-
-/// Information returned by the MFA start endpoint.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MfaInfo {
-    pub token: String,
-    #[serde(default)]
-    pub challenge: Option<String>,
-}
-
-/// Deserialization-only payload for the MFA finish response.
-///
-/// The proxy serializes proto types with snake_case field names, so the
-/// wire key is `preshared_key` (not `presharedKey`).
-#[derive(Deserialize)]
-struct MfaFinishBody {
-    preshared_key: String,
 }
 
 fn build_client() -> Client {
@@ -115,17 +92,13 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
 
 /// Start an MFA handshake for a VPN location.
 ///
-/// POSTs a `ClientMfaStartRequest` (snake_case fields, numeric `method`) to
+/// POSTs a `ClientMfaStartRequest` (proto JSON) to
 /// `/api/v1/client-mfa/start` and returns the session token (and
-/// optionally the biometric challenge). When `posture_data` is provided
-/// it is included in the request body.
+/// optionally the biometric challenge).
 pub async fn mfa_start(
     proxy_url: Url,
-    location_id: i64,
-    pubkey: String,
-    method: MfaMethod,
-    posture_data: Option<DevicePostureData>,
-) -> Result<MfaInfo, MfaError> {
+    request: ClientMfaStartRequest,
+) -> Result<ClientMfaStartResponse, MfaError> {
     let client = build_client();
 
     let url = proxy_url
@@ -133,13 +106,6 @@ pub async fn mfa_start(
         .map_err(|e| MfaError::Other {
             message: format!("Failed to build MFA start URL: {e}"),
         })?;
-
-    let request = ClientMfaStartRequest {
-        location_id,
-        pubkey,
-        method: method as i32,
-        posture_data,
-    };
 
     let mut req = client.post(url).json(&request);
 
@@ -159,13 +125,12 @@ pub async fn mfa_start(
 
 /// Finish an MFA handshake using a one-time code (TOTP or email).
 ///
-/// POSTs `{ "token": "...", "code": "..." }` to
-/// `/api/v1/client-mfa/finish` and returns the WireGuard preshared key.
+/// POSTs a `ClientMfaFinishRequest` to `/api/v1/client-mfa/finish`
+/// and returns the preshared key.
 pub async fn mfa_finish_code(
     proxy_url: Url,
-    token: String,
-    code: String,
-) -> Result<PresharedKey, MfaError> {
+    request: ClientMfaFinishRequest,
+) -> Result<ClientMfaFinishResponse, MfaError> {
     let client = build_client();
 
     let url = proxy_url
@@ -174,10 +139,7 @@ pub async fn mfa_finish_code(
             message: format!("Failed to build MFA finish URL: {e}"),
         })?;
 
-    let mut req = client.post(url).json(&serde_json::json!({
-        "token": token,
-        "code": code,
-    }));
+    let mut req = client.post(url).json(&request);
 
     for (k, v) in standard_headers() {
         req = req.header(k, v);
@@ -188,11 +150,9 @@ pub async fn mfa_finish_code(
     })?;
 
     let response = check_mfa_response(response).await?;
-    let body: MfaFinishBody = response.json().await.map_err(|e| MfaError::Other {
+    response.json().await.map_err(|e| MfaError::Other {
         message: format!("Invalid MFA finish response: {e}"),
-    })?;
-
-    Ok(PresharedKey(body.preshared_key))
+    })
 }
 
 #[cfg(not(test))]
@@ -214,14 +174,14 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 ///
 /// The caller must already have opened the browser to the OIDC provider
 /// URL (the token from `mfa_start` encodes the redirect).  This function
-/// POSTs `{ "token": "..." }` to `/api/v1/client-mfa/finish` every
+/// POSTs a `ClientMfaFinishRequest` to `/api/v1/client-mfa/finish` every
 /// [`OIDC_POLL_INTERVAL`] until the server returns a 200 (success),
 /// the deadline expires, or the [`CancellationToken`] is fired.
 pub async fn poll_openid_mfa(
     proxy_url: Url,
     token: String,
     cancel: CancellationToken,
-) -> Result<PresharedKey, MfaError> {
+) -> Result<ClientMfaFinishResponse, MfaError> {
     let client = build_client();
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
@@ -231,6 +191,12 @@ pub async fn poll_openid_mfa(
 
     let deadline = Instant::now() + OIDC_POLL_TIMEOUT;
 
+    let request = ClientMfaFinishRequest {
+        token,
+        code: None,
+        auth_pub_key: None,
+    };
+
     loop {
         let remaining = deadline
             .checked_duration_since(Instant::now())
@@ -239,9 +205,7 @@ pub async fn poll_openid_mfa(
             return Err(MfaError::Timeout);
         }
 
-        let mut req = client.post(url.clone()).json(&serde_json::json!({
-            "token": token,
-        }));
+        let mut req = client.post(url.clone()).json(&request);
         for (k, v) in standard_headers() {
             req = req.header(k, v);
         }
@@ -257,12 +221,9 @@ pub async fn poll_openid_mfa(
 
                 let status = response.status();
                 if status == StatusCode::OK {
-                    let body: MfaFinishBody = response.json().await.map_err(|e| {
-                        MfaError::Other {
-                            message: format!("Invalid MFA finish response: {e}"),
-                        }
-                    })?;
-                    return Ok(PresharedKey(body.preshared_key));
+                    return response.json().await.map_err(|e| MfaError::Other {
+                        message: format!("Invalid MFA finish response: {e}"),
+                    });
                 }
                 if status != StatusCode::PRECONDITION_REQUIRED {
                     return Err(check_mfa_response(response).await.err().unwrap_or(
@@ -296,7 +257,7 @@ pub async fn poll_openid_mfa(
 pub async fn connect_mobile_approve(
     ws_url: &str,
     cancel: CancellationToken,
-) -> Result<PresharedKey, MfaError> {
+) -> Result<ClientMfaFinishResponse, MfaError> {
     let (ws_stream, _response) =
         connect_async(ws_url)
             .await
@@ -345,7 +306,7 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
 async fn wait_for_mfa_success(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
-) -> Result<PresharedKey, MfaError> {
+) -> Result<ClientMfaFinishResponse, MfaError> {
     let (_write, mut read) = ws_stream.split();
     let deadline = Instant::now() + MOBILE_APPROVE_TIMEOUT;
 
@@ -381,7 +342,10 @@ async fn wait_for_mfa_success(
             if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
                 if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
                     if let Some(key) = parsed["preshared_key"].as_str() {
-                        return Ok(PresharedKey(key.to_string()));
+                        return Ok(ClientMfaFinishResponse {
+                            preshared_key: key.to_string(),
+                            token: None,
+                        });
                     }
                 }
             }
@@ -406,6 +370,15 @@ mod tests {
         Url::parse(&server.uri()).expect("MockServer URI should be valid")
     }
 
+    fn start_request() -> ClientMfaStartRequest {
+        ClientMfaStartRequest {
+            location_id: 1,
+            pubkey: "pk".into(),
+            method: 0, // TOTP
+            posture_data: None,
+        }
+    }
+
     fn start_response_json(token: &str) -> serde_json::Value {
         json!({
             "token": token,
@@ -417,34 +390,6 @@ mod tests {
         json!({
             "preshared_key": key,
         })
-    }
-
-    #[test]
-    fn test_mfa_start_request_matches_proxy_contract() {
-        // The proxy deserializes `Json<ClientMfaStartRequest>` where the proto
-        // derives serde with no `rename_all`, so it requires snake_case field
-        // names and a numeric `method`. Guard against a regression to
-        // camelCase / stringly-typed method.
-        let request = ClientMfaStartRequest {
-            location_id: 7,
-            pubkey: "pk".into(),
-            method: MfaMethod::MobileApprove as i32,
-            posture_data: None,
-        };
-        let value = serde_json::to_value(&request).unwrap();
-        assert_eq!(value["location_id"], 7);
-        assert!(value.get("locationId").is_none());
-        assert_eq!(value["method"], MfaMethod::MobileApprove as i32);
-        assert!(value["method"].is_number());
-    }
-
-    #[test]
-    fn test_mfa_finish_body_parses_snake_case() {
-        // The proxy sends `preshared_key` (snake_case); the finish parser must
-        // match that, not `presharedKey`.
-        let body: MfaFinishBody =
-            serde_json::from_value(json!({ "preshared_key": "psk-xyz" })).unwrap();
-        assert_eq!(body.preshared_key, "psk-xyz");
     }
 
     #[tokio::test]
@@ -459,9 +404,7 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let info = mfa_start(url, 1, "pk".into(), MfaMethod::Totp, None)
-            .await
-            .unwrap();
+        let info = mfa_start(url, start_request()).await.unwrap();
         assert_eq!(info.token, "mfa-token-1");
         assert!(info.challenge.is_none());
     }
@@ -479,9 +422,7 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let err = mfa_start(url, 1, "pk".into(), MfaMethod::Totp, None)
-            .await
-            .unwrap_err();
+        let err = mfa_start(url, start_request()).await.unwrap_err();
         assert!(matches!(err, MfaError::MfaRejected { .. }));
     }
 
@@ -497,10 +438,17 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let psk = mfa_finish_code(url, "token".into(), "123456".into())
-            .await
-            .unwrap();
-        assert_eq!(psk.0, "psk-123");
+        let psk = mfa_finish_code(
+            url,
+            ClientMfaFinishRequest {
+                token: "token".into(),
+                code: Some("123456".into()),
+                auth_pub_key: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(psk.preshared_key, "psk-123");
     }
 
     #[tokio::test]
@@ -517,7 +465,7 @@ mod tests {
         let url = mock_url(&server);
         let cancel = CancellationToken::new();
         let psk = poll_openid_mfa(url, "token".into(), cancel).await.unwrap();
-        assert_eq!(psk.0, "oidc-psk");
+        assert_eq!(psk.preshared_key, "oidc-psk");
     }
 
     #[tokio::test]
@@ -541,7 +489,7 @@ mod tests {
         let url = mock_url(&server);
         let cancel = CancellationToken::new();
         let psk = poll_openid_mfa(url, "token".into(), cancel).await.unwrap();
-        assert_eq!(psk.0, "oidc-psk");
+        assert_eq!(psk.preshared_key, "oidc-psk");
     }
 
     #[tokio::test]
@@ -622,7 +570,7 @@ mod tests {
         tx.send(WsStubCommand::Close).unwrap();
 
         let psk = handle.await.unwrap().unwrap();
-        assert_eq!(psk.0, "mobile-psk");
+        assert_eq!(psk.preshared_key, "mobile-psk");
     }
 
     #[tokio::test]

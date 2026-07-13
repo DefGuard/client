@@ -2,6 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
+import {
+  isConnectFailure,
+  isInvalidCode,
+  isMfaPostureError,
+  isSessionExpired,
+  mfaErrorMessage,
+} from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
@@ -18,18 +25,6 @@ export const MfaStartMethod = {
 export type MfaStartMethod = (typeof MfaStartMethod)[keyof typeof MfaStartMethod];
 
 type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
-
-/** Detect posture failures from the serialized MfaError returned by the
- *  Rust mfa_start command. Posture rejection (403) maps to MfaRejected. */
-const isMfaPostureError = (err: unknown, location: LocationInfo): boolean => {
-  if (!location.posture_check_required) return false;
-  try {
-    const parsed = JSON.parse(String(err)) as { type?: string };
-    return parsed.type === 'mfaRejected';
-  } catch {
-    return false;
-  }
-};
 
 const MFA_METHOD_MAP: Record<number, string> = {
   [MfaStartMethod.Totp]: MfaMethod.Totp,
@@ -121,13 +116,12 @@ export const useMfaConnect = (
         await api.mfaFinishCode(instance.id, location.id, token, code);
         onConnected?.();
       } catch (err) {
-        const message = String(err);
-        if (message.includes('Unauthorized')) {
+        const message = mfaErrorMessage(err);
+        if (isConnectFailure(message)) {
+          setVerifyError('Failed to establish VPN connection');
+        } else if (isInvalidCode(message)) {
           setVerifyError('Invalid code');
-        } else if (
-          message.includes('invalid token') ||
-          message.includes('login session not found')
-        ) {
+        } else if (isSessionExpired(message)) {
           onSessionExpired?.();
         } else {
           setVerifyError('Verification failed');

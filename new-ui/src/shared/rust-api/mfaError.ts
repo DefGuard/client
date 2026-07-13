@@ -1,0 +1,41 @@
+import type { LocationInfo } from './types';
+
+/** Shape of the tagged `MfaError` the Rust backend serializes to JSON. */
+export type ParsedMfaError = {
+  type: string;
+  message?: string;
+  status?: number;
+};
+
+/** Parse a structured `MfaError` (JSON) thrown by a command or carried on an
+ *  event payload. Returns null for plain-string errors. */
+export const parseMfaError = (err: unknown): ParsedMfaError | null => {
+  try {
+    const parsed = JSON.parse(String(err)) as ParsedMfaError;
+    return parsed && typeof parsed.type === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Best-effort human-readable message: the structured `message` when present,
+ *  otherwise the raw error string. */
+export const mfaErrorMessage = (err: unknown): string =>
+  parseMfaError(err)?.message ?? String(err);
+
+/** True when the error is a posture rejection for a posture-gated location. */
+export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
+  location.posture_check_required && parseMfaError(err)?.type === 'mfaRejected';
+
+/** The proxy session/token is no longer valid. */
+export const isSessionExpired = (message: string): boolean =>
+  message.includes('invalid token') || message.includes('login session not found');
+
+/** A submitted one-time code was rejected. */
+export const isInvalidCode = (message: string): boolean =>
+  message.includes('Unauthorized');
+
+/** MFA succeeded but bringing up the VPN connection afterwards failed
+ *  (see `connect_after_mfa` in the Rust backend). */
+export const isConnectFailure = (message: string): boolean =>
+  message.includes('VPN connection failed');

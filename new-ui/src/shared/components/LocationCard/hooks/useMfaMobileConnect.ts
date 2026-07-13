@@ -5,6 +5,11 @@ import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
+import {
+  isConnectFailure,
+  isMfaPostureError,
+  mfaErrorMessage,
+} from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo, MfaErrorPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
@@ -12,16 +17,6 @@ import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 type TokenData = {
   token: string;
   challenge: string;
-};
-
-const isMfaPostureError = (err: unknown, location: LocationInfo): boolean => {
-  if (!location.posture_check_required) return false;
-  try {
-    const parsed = JSON.parse(String(err)) as { type?: string };
-    return parsed.type === 'mfaRejected';
-  } catch {
-    return false;
-  }
 };
 
 type Options = {
@@ -96,10 +91,13 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
           (event) => {
             cleanupListeners();
             setIsConnecting(false);
-            setConnectionError('Connection error. Please try again.');
-            error(
-              `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
+            const message = mfaErrorMessage(event.payload.error);
+            setConnectionError(
+              isConnectFailure(message)
+                ? 'Failed to establish VPN connection'
+                : 'Connection error. Please try again.',
             );
+            error(`Mobile MFA failed for location ${location.id}: ${message}`);
           },
         );
 

@@ -19,7 +19,8 @@ use defguard_client_proto::defguard::client::v1::{
 };
 use defguard_client_proto::defguard::{
     client_types::{
-        AdminInfo, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
         InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
@@ -96,6 +97,29 @@ impl From<sqlx::Error> for ConnectError {
     }
 }
 
+/// Serialize a structured error (e.g. `MfaError`, `EnrollmentError`) to JSON so
+/// the frontend can match on its tagged `type`, falling back to the Display
+/// string if serialization somehow fails.
+fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
+    serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
+}
+
+/// Look up a cloned enrollment session by its opaque string id. Used by the
+/// enrollment commands that need read access to the in-memory session.
+fn get_enrollment_session(
+    state: &AppState,
+    session_id: &str,
+) -> Result<enrollment::EnrollmentSession, String> {
+    let uid = Uuid::parse_str(session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
+    state
+        .enrollment_sessions
+        .lock()
+        .expect("enrollment_sessions mutex poisoned")
+        .get(&uid)
+        .cloned()
+        .ok_or_else(|| "Enrollment session not found".to_string())
+}
+
 /// Bring up a location connection with an already-obtained preshared key and
 /// refresh the tray. Shared by `connect` and the MFA finish flows so the
 /// preshared key never has to cross back into the frontend.
@@ -116,7 +140,6 @@ async fn connect_location_with_psk(
 pub async fn connect(
     location_id: Id,
     connection_type: ConnectionType,
-    preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), ConnectError> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
@@ -126,10 +149,13 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
-            let preshared_key = if location.posture_check_required && preshared_key.is_none() {
+            // Connect-time MFA brings the tunnel up itself (keeping the preshared
+            // key backend-side), so the only preshared key resolved here is for
+            // posture-only locations.
+            let preshared_key = if location.posture_check_required {
                 Some(authorize_posture_session(&location).await?)
             } else {
-                preshared_key
+                None
             };
             connect_location_with_psk(location, preshared_key, &handle).await?;
         } else {
@@ -1372,7 +1398,7 @@ pub async fn enrollment_start(
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+        .map_err(err_to_json)?;
     let session_uuid = Uuid::new_v4();
     let session_id = session_uuid.to_string();
     state
@@ -1413,20 +1439,10 @@ pub async fn enrollment_create_device(
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
     debug!("Creating device \"{name}\"");
-    let session = {
-        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state
-            .enrollment_sessions
-            .lock()
-            .expect("enrollment_sessions mutex poisoned");
-        sessions
-            .get(&uid)
-            .cloned()
-            .ok_or_else(|| "Enrollment session not found".to_string())?
-    };
+    let session = get_enrollment_session(&state, &session_id)?;
     let result = enrollment::enrollment_create_device(session, name, pubkey)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+        .map_err(err_to_json)?;
     info!("Device created");
     Ok(result)
 }
@@ -1439,20 +1455,10 @@ pub async fn enrollment_activate_user(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     debug!("Activating user");
-    let session = {
-        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state
-            .enrollment_sessions
-            .lock()
-            .expect("enrollment_sessions mutex poisoned");
-        sessions
-            .get(&uid)
-            .cloned()
-            .ok_or_else(|| "Enrollment session not found".to_string())?
-    };
+    let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_activate_user(session, password, phone_number)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
+        .map_err(err_to_json)?;
     info!("User activated");
     Ok(())
 }
@@ -1464,20 +1470,10 @@ pub async fn enrollment_register_mfa_start(
     state: State<'_, AppState>,
 ) -> Result<MfaStartResponse, String> {
     debug!("Starting MFA setup");
-    let session = {
-        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state
-            .enrollment_sessions
-            .lock()
-            .expect("enrollment_sessions mutex poisoned");
-        sessions
-            .get(&uid)
-            .cloned()
-            .ok_or_else(|| "Enrollment session not found".to_string())?
-    };
+    let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_register_mfa_start(session, method)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(err_to_json)
 }
 
 #[tauri::command(async)]
@@ -1488,20 +1484,10 @@ pub async fn enrollment_register_mfa_finish(
     state: State<'_, AppState>,
 ) -> Result<MfaFinishResponse, String> {
     debug!("Finishing MFA setup");
-    let session = {
-        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state
-            .enrollment_sessions
-            .lock()
-            .expect("enrollment_sessions mutex poisoned");
-        sessions
-            .get(&uid)
-            .cloned()
-            .ok_or_else(|| "Enrollment session not found".to_string())?
-    };
+    let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_register_mfa_finish(session, code, method)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(err_to_json)
 }
 
 #[tauri::command(async)]
@@ -1511,20 +1497,10 @@ pub async fn enrollment_network_info(
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
     debug!("Fetching network info");
-    let session = {
-        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state
-            .enrollment_sessions
-            .lock()
-            .expect("enrollment_sessions mutex poisoned");
-        sessions
-            .get(&uid)
-            .cloned()
-            .ok_or_else(|| "Enrollment session not found".to_string())?
-    };
+    let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_network_info(session, pubkey)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(err_to_json)
 }
 
 #[tauri::command(async)]
@@ -1567,7 +1543,9 @@ async fn connect_after_mfa(
         .ok_or_else(|| "Location not found".to_string())?;
     connect_location_with_psk(location, Some(preshared_key), handle)
         .await
-        .map_err(|e| e.to_string())
+        // Distinct prefix so the frontend can tell a post-MFA connection
+        // failure apart from an MFA/auth failure.
+        .map_err(|e| format!("VPN connection failed: {e}"))
 }
 
 /// Map the frontend MFA method string to the proto `MfaMethod` enum the proxy
@@ -1588,7 +1566,7 @@ pub async fn mfa_start(
     instance_id: Id,
     location_id: Id,
     method: String,
-) -> Result<mfa::MfaInfo, String> {
+) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
     debug!("Starting MFA session for location {location_id}");
     let method = parse_mfa_method(&method)?;
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
@@ -1618,9 +1596,15 @@ pub async fn mfa_start(
             None
         }
     };
-    mfa::mfa_start(proxy_url, location_id, keys.pubkey, method, posture_data)
+    let request = ClientMfaStartRequest {
+        location_id,
+        pubkey: keys.pubkey,
+        method: method as i32,
+        posture_data,
+    };
+    mfa::mfa_start(proxy_url, request)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
+        .map_err(err_to_json)
 }
 
 #[tauri::command(async)]
@@ -1638,11 +1622,83 @@ pub async fn mfa_finish_code(
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let psk = mfa::mfa_finish_code(proxy_url, token, code)
+    let request = ClientMfaFinishRequest {
+        token,
+        code: Some(code),
+        auth_pub_key: None,
+    };
+    let response = mfa::mfa_finish_code(proxy_url, request)
         .await
-        .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
-    // Bring up the connection here so the preshared key stays in the backend.
-    connect_after_mfa(location_id, psk.0, &handle).await
+        .map_err(err_to_json)?;
+    connect_after_mfa(location_id, response.preshared_key, &handle).await
+}
+
+/// Register a long-running MFA task, run its future in the background, and on
+/// success bring up the connection Rust-side before emitting a payload-free
+/// completion event (or an error event). Shared by the OpenID poll and mobile
+/// approve flows so the preshared key never leaves the backend. Returns the
+/// task id the frontend uses to cancel.
+fn spawn_mfa_task<F, R>(
+    handle: &AppHandle,
+    location_id: Id,
+    complete_event: EventKey,
+    error_event: EventKey,
+    run: R,
+) -> String
+where
+    R: FnOnce(CancellationToken) -> F + Send + 'static,
+    F: std::future::Future<Output = Result<ClientMfaFinishResponse, mfa::MfaError>>
+        + Send
+        + 'static,
+{
+    let cancel = CancellationToken::new();
+    let task_id = Uuid::new_v4().to_string();
+    handle
+        .state::<AppState>()
+        .mfa_tasks
+        .lock()
+        .expect("mfa_tasks mutex poisoned")
+        .insert(task_id.clone(), cancel.clone());
+
+    let task_id_for_task = task_id.clone();
+    let listen_handle = handle.clone();
+    tokio::spawn(async move {
+        let result = run(cancel).await;
+        listen_handle
+            .state::<AppState>()
+            .mfa_tasks
+            .lock()
+            .expect("mfa_tasks mutex poisoned")
+            .remove(&task_id_for_task);
+        match result {
+            Ok(response) => {
+                info!("MFA completed for task {task_id_for_task}");
+                match connect_after_mfa(location_id, response.preshared_key, &listen_handle).await {
+                    Ok(()) => {
+                        let _ = listen_handle.emit(complete_event.into(), ());
+                    }
+                    Err(err) => {
+                        warn!("Connect after MFA failed for task {task_id_for_task}: {err}");
+                        let _ =
+                            listen_handle.emit(error_event.into(), MfaErrorPayload { error: err });
+                    }
+                }
+            }
+            Err(err) => {
+                warn!("MFA task {task_id_for_task} failed: {err}");
+                // Emit the structured error as JSON so the frontend classifies
+                // it the same way as command errors.
+                let _ = listen_handle.emit(
+                    error_event.into(),
+                    MfaErrorPayload {
+                        error: err_to_json(err),
+                    },
+                );
+            }
+        }
+    });
+
+    task_id
 }
 
 #[tauri::command(async)]
@@ -1650,7 +1706,6 @@ pub async fn mfa_poll_openid(
     instance_id: Id,
     location_id: Id,
     token: String,
-    state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting OpenID MFA poll for instance {instance_id}");
@@ -1660,57 +1715,13 @@ pub async fn mfa_poll_openid(
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-
-    let cancel = CancellationToken::new();
-    let cancel_clone = cancel.clone();
-    let task_id = Uuid::new_v4().to_string();
-    state
-        .mfa_tasks
-        .lock()
-        .expect("mfa_tasks mutex poisoned")
-        .insert(task_id.clone(), cancel_clone);
-
-    let task_id_for_task = task_id.clone();
-    let listen_handle = handle.clone();
-    tokio::spawn(async move {
-        let result = mfa::poll_openid_mfa(proxy_url, token, cancel).await;
-        {
-            let app_state = listen_handle.state::<AppState>();
-            let mut tasks = app_state
-                .mfa_tasks
-                .lock()
-                .expect("mfa_tasks mutex poisoned");
-            tasks.remove(&task_id_for_task);
-        }
-        match result {
-            Ok(psk) => {
-                info!("OpenID MFA completed for task {task_id_for_task}");
-                match connect_after_mfa(location_id, psk.0, &listen_handle).await {
-                    Ok(()) => {
-                        let _ = listen_handle.emit(EventKey::MfaOpenIdComplete.into(), ());
-                    }
-                    Err(err) => {
-                        warn!("Connect after OpenID MFA failed for {task_id_for_task}: {err}");
-                        let _ = listen_handle.emit(
-                            EventKey::MfaOpenIdError.into(),
-                            MfaErrorPayload { error: err },
-                        );
-                    }
-                }
-            }
-            Err(err) => {
-                warn!("OpenID MFA failed for task {task_id_for_task}: {err}");
-                let _ = listen_handle.emit(
-                    EventKey::MfaOpenIdError.into(),
-                    MfaErrorPayload {
-                        error: err.to_string(),
-                    },
-                );
-            }
-        }
-    });
-
-    Ok(task_id)
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaOpenIdComplete,
+        EventKey::MfaOpenIdError,
+        move |cancel| mfa::poll_openid_mfa(proxy_url, token, cancel),
+    ))
 }
 
 #[tauri::command(async)]
@@ -1718,7 +1729,6 @@ pub async fn mfa_connect_mobile_approve(
     instance_id: Id,
     location_id: Id,
     token: String,
-    state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting mobile approve MFA for instance {instance_id}");
@@ -1729,57 +1739,13 @@ pub async fn mfa_connect_mobile_approve(
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let ws_url = mfa::derive_ws_url(&proxy_url, &token).map_err(|e| e.to_string())?;
-
-    let cancel = CancellationToken::new();
-    let cancel_clone = cancel.clone();
-    let task_id = Uuid::new_v4().to_string();
-    state
-        .mfa_tasks
-        .lock()
-        .expect("mfa_tasks mutex poisoned")
-        .insert(task_id.clone(), cancel_clone);
-
-    let task_id_for_task = task_id.clone();
-    let listen_handle = handle.clone();
-    tokio::spawn(async move {
-        let result = mfa::connect_mobile_approve(&ws_url, cancel).await;
-        {
-            let app_state = listen_handle.state::<AppState>();
-            let mut tasks = app_state
-                .mfa_tasks
-                .lock()
-                .expect("mfa_tasks mutex poisoned");
-            tasks.remove(&task_id_for_task);
-        }
-        match result {
-            Ok(psk) => {
-                info!("Mobile approve MFA completed for task {task_id_for_task}");
-                match connect_after_mfa(location_id, psk.0, &listen_handle).await {
-                    Ok(()) => {
-                        let _ = listen_handle.emit(EventKey::MfaMobileComplete.into(), ());
-                    }
-                    Err(err) => {
-                        warn!("Connect after mobile MFA failed for {task_id_for_task}: {err}");
-                        let _ = listen_handle.emit(
-                            EventKey::MfaMobileError.into(),
-                            MfaErrorPayload { error: err },
-                        );
-                    }
-                }
-            }
-            Err(err) => {
-                warn!("Mobile approve MFA failed for task {task_id_for_task}: {err}");
-                let _ = listen_handle.emit(
-                    EventKey::MfaMobileError.into(),
-                    MfaErrorPayload {
-                        error: err.to_string(),
-                    },
-                );
-            }
-        }
-    });
-
-    Ok(task_id)
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaMobileComplete,
+        EventKey::MfaMobileError,
+        move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
+    ))
 }
 
 #[tauri::command(async)]

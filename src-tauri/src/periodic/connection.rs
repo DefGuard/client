@@ -49,7 +49,7 @@ async fn reconnect(
                 peer_alive_period: peer_alive_period.num_seconds(),
             };
             payload.emit(app_handle);
-            match connect(con_id, con_type, None, app_handle.clone()).await {
+            match connect(con_id, con_type, app_handle.clone()).await {
                 Ok(()) => {
                     info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.");
                 }

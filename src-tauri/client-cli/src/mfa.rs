@@ -137,15 +137,15 @@ pub(crate) async fn authorize(
     check_proxy_scheme(&proxy_url);
 
     debug!("Starting MFA session for location {}", location.name);
-    let info = mfa::mfa_start(
-        proxy_url.clone(),
-        location.network_id,
-        wireguard_keys.pubkey,
-        method,
+    let request = defguard_client_proto::defguard::client_types::ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: wireguard_keys.pubkey,
+        method: method as i32,
         posture_data,
-    )
-    .await
-    .map_err(into_cli)?;
+    };
+    let info = mfa::mfa_start(proxy_url.clone(), request)
+        .await
+        .map_err(into_cli)?;
 
     let ctx = MfaContext {
         instance: instance.name.clone(),
@@ -153,12 +153,17 @@ pub(crate) async fn authorize(
     };
     let code = obtain_code(source, &ctx)?;
 
-    let psk = mfa::mfa_finish_code(proxy_url, info.token, code.expose_secret().to_string())
+    let finish_req = defguard_client_proto::defguard::client_types::ClientMfaFinishRequest {
+        token: info.token,
+        code: Some(code.expose_secret().to_string()),
+        auth_pub_key: None,
+    };
+    let psk = mfa::mfa_finish_code(proxy_url, finish_req)
         .await
         .map_err(into_cli)?;
 
     info!("MFA session completed, preshared key obtained");
-    Ok(SecretString::from(psk.0))
+    Ok(SecretString::from(psk.preshared_key))
 }
 
 /// Run the OIDC MFA flow for an external-IdP location.
@@ -187,15 +192,15 @@ pub(crate) async fn authorize_oidc(
     check_proxy_scheme(&proxy_url);
 
     debug!("Starting OIDC MFA session for location {}", location.name);
-    let info = mfa::mfa_start(
-        proxy_url.clone(),
-        location.network_id,
-        wireguard_keys.pubkey,
-        MfaMethod::Oidc,
+    let request = defguard_client_proto::defguard::client_types::ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: wireguard_keys.pubkey,
+        method: MfaMethod::Oidc as i32,
         posture_data,
-    )
-    .await
-    .map_err(into_cli)?;
+    };
+    let info = mfa::mfa_start(proxy_url.clone(), request)
+        .await
+        .map_err(into_cli)?;
 
     let mut browser_url = proxy_url
         .join("openid/mfa")
@@ -223,7 +228,7 @@ pub(crate) async fn authorize_oidc(
 
     let psk = result.map_err(into_cli)?;
     info!("OIDC MFA session completed, preshared key obtained");
-    Ok(SecretString::from(psk.0))
+    Ok(SecretString::from(psk.preshared_key))
 }
 
 /// Run the mobile-approve MFA flow.
@@ -256,15 +261,15 @@ pub(crate) async fn authorize_mobile_approve(
         "Starting mobile-approve MFA session for location {}",
         location.name
     );
-    let info = mfa::mfa_start(
-        proxy_url.clone(),
-        location.network_id,
-        wireguard_keys.pubkey,
-        MfaMethod::MobileApprove,
+    let request = defguard_client_proto::defguard::client_types::ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: wireguard_keys.pubkey,
+        method: MfaMethod::MobileApprove as i32,
         posture_data,
-    )
-    .await
-    .map_err(into_cli)?;
+    };
+    let info = mfa::mfa_start(proxy_url.clone(), request)
+        .await
+        .map_err(into_cli)?;
 
     let challenge = info.challenge.ok_or_else(|| {
         CliError::Other("Proxy did not return a challenge for mobile-approve MFA".into())
@@ -290,7 +295,7 @@ pub(crate) async fn authorize_mobile_approve(
 
     let psk = result.map_err(into_cli)?;
     info!("Mobile-approve MFA completed, preshared key obtained");
-    Ok(SecretString::from(psk.0))
+    Ok(SecretString::from(psk.preshared_key))
 }
 
 /// Parse a `--mfa-method` flag string into the proto [`MfaMethod`] enum.

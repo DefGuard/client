@@ -5,25 +5,18 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { api } from '../../../../../../shared/rust-api/api';
+import {
+  isConnectFailure,
+  isMfaPostureError,
+  isSessionExpired,
+  mfaErrorMessage,
+} from '../../../../../../shared/rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../../../../shared/rust-api/query';
-import type {
-  LocationInfo,
-  MfaErrorPayload,
-} from '../../../../../../shared/rust-api/types';
+import type { MfaErrorPayload } from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
 import { useConnectModal } from './useConnectModal';
 
 const POLL_TIMEOUT_MS = 5 * 60 * 1_000;
-
-const isMfaPostureError = (err: unknown, location: LocationInfo): boolean => {
-  if (!location.posture_check_required) return false;
-  try {
-    const parsed = JSON.parse(String(err)) as { type?: string };
-    return parsed.type === 'mfaRejected';
-  } catch {
-    return false;
-  }
-};
 
 type Options = {
   onPostureError?: (msg: string) => void;
@@ -101,13 +94,15 @@ export const useConnectModalMfaOidc = ({
         (event) => {
           cleanup();
           setIsPolling(false);
-          const msg = event.payload.error;
-          if (msg.includes('invalid token') || msg.includes('login session not found')) {
+          const message = mfaErrorMessage(event.payload.error);
+          if (isConnectFailure(message)) {
+            setPollError('Failed to establish VPN connection');
+          } else if (isSessionExpired(message)) {
             onSessionExpired?.();
           } else {
             setPollError('Authentication failed. Please try again.');
           }
-          error(`OIDC MFA failed for location ${location.id}: ${msg}`);
+          error(`OIDC MFA failed for location ${location.id}: ${message}`);
         },
       );
 

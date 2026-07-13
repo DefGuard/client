@@ -328,7 +328,7 @@ async fn handle_location_tray_menu(id: String, app: &AppHandle) {
                             show_main_window(app);
                             let _ = app.emit(EventKey::MfaTrigger.into(), &location);
                         } else if let Err(err) =
-                            connect(location_id, ConnectionType::Location, None, app.clone()).await
+                            connect(location_id, ConnectionType::Location, app.clone()).await
                         {
                             info!("Unable to connect location with ID {id}, error: {err:?}");
                         }
