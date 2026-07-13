@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
+import { error as logError } from '@tauri-apps/plugin-log';
 import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
 import { CopyField } from '../../../../../shared/components/CopyField/CopyField';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
@@ -28,7 +29,7 @@ export const MfaConfigurationStep = () => {
       return resp;
     },
     onError: (err) => {
-      void error(`MFA configuration failed: ${err}`);
+      void logError(`MFA configuration failed: ${err}`);
       setError(String(err));
     },
     onSuccess: (resp) => {
