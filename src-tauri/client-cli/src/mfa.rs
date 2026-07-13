@@ -31,17 +31,6 @@ use crate::{
     state::CliError,
 };
 
-/// Convert a proto [`MfaMethod`] to the string expected by `mfa::mfa_start`.
-fn method_to_str(method: MfaMethod) -> &'static str {
-    match method {
-        MfaMethod::Totp => "totp",
-        MfaMethod::Email => "email",
-        MfaMethod::Oidc => "oidc",
-        MfaMethod::Biometric => "biometric",
-        MfaMethod::MobileApprove => "mobile_approve",
-    }
-}
-
 /// Convert a `defguard_core::mfa::MfaError` into a [`CliError`].
 fn into_cli(err: mfa::MfaError) -> CliError {
     let msg = err.to_string();
@@ -152,11 +141,8 @@ pub(crate) async fn authorize(
         proxy_url.clone(),
         location.network_id,
         wireguard_keys.pubkey,
-        method_to_str(method).to_string(),
-        posture_data
-            .map(|p| serde_json::to_value(&p))
-            .transpose()
-            .map_err(|e| CliError::Other(format!("Posture serialization: {e}")))?,
+        method,
+        posture_data,
     )
     .await
     .map_err(into_cli)?;
@@ -205,11 +191,8 @@ pub(crate) async fn authorize_oidc(
         proxy_url.clone(),
         location.network_id,
         wireguard_keys.pubkey,
-        method_to_str(MfaMethod::Oidc).to_string(),
-        posture_data
-            .map(|p| serde_json::to_value(&p))
-            .transpose()
-            .map_err(|e| CliError::Other(format!("Posture serialization: {e}")))?,
+        MfaMethod::Oidc,
+        posture_data,
     )
     .await
     .map_err(into_cli)?;
@@ -277,11 +260,8 @@ pub(crate) async fn authorize_mobile_approve(
         proxy_url.clone(),
         location.network_id,
         wireguard_keys.pubkey,
-        method_to_str(MfaMethod::MobileApprove).to_string(),
-        posture_data
-            .map(|p| serde_json::to_value(&p))
-            .transpose()
-            .map_err(|e| CliError::Other(format!("Posture serialization: {e}")))?,
+        MfaMethod::MobileApprove,
+        posture_data,
     )
     .await
     .map_err(into_cli)?;

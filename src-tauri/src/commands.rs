@@ -10,7 +10,7 @@ use defguard_client_core::{
         disconnect_interface,
     },
     enrollment::{self, MfaFinishResponse, MfaStartResponse},
-    mfa::{self, PresharedKey},
+    mfa,
 };
 use defguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
@@ -20,7 +20,7 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::{
         AdminInfo, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
-        InstanceInfo as ProtoInstanceInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -361,9 +361,9 @@ pub async fn save_device_config(
     debug!("Saving device configuration: {response:#?}.");
 
     let mut transaction = DB_POOL.begin().await?;
-    let instance_info = response
-        .instance
-        .expect("Missing instance info in device config response");
+    let instance_info = response.instance.ok_or_else(|| {
+        Error::ResourceNotFound("instance info in device config response".to_string())
+    })?;
     let mut instance = Instance::from(instance_info);
     if response.token.is_some() {
         debug!(
@@ -383,9 +383,9 @@ pub async fn save_device_config(
     let instance = instance.save(&mut *transaction).await?;
     debug!("Saved instance {}", instance.name);
 
-    let device = response
-        .device
-        .expect("Missing device info in device config response");
+    let device = response.device.ok_or_else(|| {
+        Error::ResourceNotFound("device info in device config response".to_string())
+    })?;
     let keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
     debug!(
         "Saving wireguard key {} for instance {}({})",
@@ -1361,12 +1361,13 @@ pub async fn enrollment_start(
     let (session, response) = enrollment::enrollment_start(url, token)
         .await
         .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))?;
-    let session_id = Uuid::new_v4().to_string();
+    let session_uuid = Uuid::new_v4();
+    let session_id = session_uuid.to_string();
     state
         .enrollment_sessions
         .lock()
-        .unwrap()
-        .insert(Uuid::parse_str(&session_id).unwrap(), session);
+        .expect("enrollment_sessions mutex poisoned")
+        .insert(session_uuid, session);
     let login = response
         .user
         .as_ref()
@@ -1375,14 +1376,18 @@ pub async fn enrollment_start(
     info!("Enrollment started for user {login}, session {session_id}");
     Ok(EnrollmentStartResult {
         session_id,
-        user: response.user.expect("proxy must always return user"),
-        admin: response.admin.expect("proxy must always return admin"),
+        user: response
+            .user
+            .ok_or_else(|| "Proxy did not return user info".to_string())?,
+        admin: response
+            .admin
+            .ok_or_else(|| "Proxy did not return admin info".to_string())?,
         settings: response
             .settings
-            .expect("proxy must always return settings"),
+            .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?,
         instance: response
             .instance
-            .expect("proxy must always return instance"),
+            .ok_or_else(|| "Proxy did not return instance info".to_string())?,
         deadline_timestamp: response.deadline_timestamp,
         final_page_content: response.final_page_content,
     })
@@ -1398,7 +1403,10 @@ pub async fn enrollment_create_device(
     debug!("Creating device \"{name}\"");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state.enrollment_sessions.lock().unwrap();
+        let sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
         sessions
             .get(&uid)
             .cloned()
@@ -1421,7 +1429,10 @@ pub async fn enrollment_activate_user(
     debug!("Activating user");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state.enrollment_sessions.lock().unwrap();
+        let sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
         sessions
             .get(&uid)
             .cloned()
@@ -1443,7 +1454,10 @@ pub async fn enrollment_register_mfa_start(
     debug!("Starting MFA setup");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state.enrollment_sessions.lock().unwrap();
+        let sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
         sessions
             .get(&uid)
             .cloned()
@@ -1464,7 +1478,10 @@ pub async fn enrollment_register_mfa_finish(
     debug!("Finishing MFA setup");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state.enrollment_sessions.lock().unwrap();
+        let sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
         sessions
             .get(&uid)
             .cloned()
@@ -1484,7 +1501,10 @@ pub async fn enrollment_network_info(
     debug!("Fetching network info");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let sessions = state.enrollment_sessions.lock().unwrap();
+        let sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
         sessions
             .get(&uid)
             .cloned()
@@ -1503,7 +1523,10 @@ pub async fn enrollment_finish(
     debug!("Finishing enrollment");
     let session = {
         let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
-        let mut sessions = state.enrollment_sessions.lock().unwrap();
+        let mut sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
         sessions
             .remove(&uid)
             .ok_or_else(|| "Enrollment session not found".to_string())?
@@ -1523,6 +1546,19 @@ pub struct MfaErrorPayload {
     pub error: String,
 }
 
+/// Map the frontend MFA method string to the proto `MfaMethod` enum the proxy
+/// expects on the wire (a numeric enum, not a string).
+fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
+    match method {
+        "totp" => Ok(MfaMethod::Totp),
+        "email" => Ok(MfaMethod::Email),
+        "oidc" => Ok(MfaMethod::Oidc),
+        "biometric" => Ok(MfaMethod::Biometric),
+        "mobileapprove" => Ok(MfaMethod::MobileApprove),
+        other => Err(format!("Unsupported MFA method: {other}")),
+    }
+}
+
 #[tauri::command(async)]
 pub async fn mfa_start(
     instance_id: Id,
@@ -1530,6 +1566,7 @@ pub async fn mfa_start(
     method: String,
 ) -> Result<mfa::MfaInfo, String> {
     debug!("Starting MFA session for location {location_id}");
+    let method = parse_mfa_method(&method)?;
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1549,7 +1586,7 @@ pub async fn mfa_start(
                 let pd = defguard_client_posture::get_posture_data()
                     .await
                     .map_err(|e| format!("Failed to collect posture data: {e}"))?;
-                Some(serde_json::to_value(&pd).map_err(|e| e.to_string())?)
+                Some(pd)
             } else {
                 None
             }
@@ -1567,7 +1604,7 @@ pub async fn mfa_finish_code(
     instance_id: Id,
     token: String,
     code: String,
-) -> Result<PresharedKey, String> {
+) -> Result<MfaCompletePayload, String> {
     debug!("Finishing MFA with code for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
@@ -1577,6 +1614,9 @@ pub async fn mfa_finish_code(
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     mfa::mfa_finish_code(proxy_url, token, code)
         .await
+        .map(|psk| MfaCompletePayload {
+            preshared_key: psk.0,
+        })
         .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
 }
 
@@ -1601,7 +1641,7 @@ pub async fn mfa_poll_openid(
     state
         .mfa_tasks
         .lock()
-        .unwrap()
+        .expect("mfa_tasks mutex poisoned")
         .insert(task_id.clone(), cancel_clone);
 
     let task_id_for_task = task_id.clone();
@@ -1610,7 +1650,10 @@ pub async fn mfa_poll_openid(
         let result = mfa::poll_openid_mfa(proxy_url, token, cancel).await;
         {
             let app_state = listen_handle.state::<AppState>();
-            let mut tasks = app_state.mfa_tasks.lock().unwrap();
+            let mut tasks = app_state
+                .mfa_tasks
+                .lock()
+                .expect("mfa_tasks mutex poisoned");
             tasks.remove(&task_id_for_task);
         }
         match result {
@@ -1660,7 +1703,7 @@ pub async fn mfa_connect_mobile_approve(
     state
         .mfa_tasks
         .lock()
-        .unwrap()
+        .expect("mfa_tasks mutex poisoned")
         .insert(task_id.clone(), cancel_clone);
 
     let task_id_for_task = task_id.clone();
@@ -1669,7 +1712,10 @@ pub async fn mfa_connect_mobile_approve(
         let result = mfa::connect_mobile_approve(&ws_url, cancel).await;
         {
             let app_state = listen_handle.state::<AppState>();
-            let mut tasks = app_state.mfa_tasks.lock().unwrap();
+            let mut tasks = app_state
+                .mfa_tasks
+                .lock()
+                .expect("mfa_tasks mutex poisoned");
             tasks.remove(&task_id_for_task);
         }
         match result {
@@ -1701,7 +1747,7 @@ pub async fn mfa_connect_mobile_approve(
 pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(), String> {
     debug!("Cancelling MFA task {task_id}");
     let cancel = {
-        let tasks = state.mfa_tasks.lock().unwrap();
+        let tasks = state.mfa_tasks.lock().expect("mfa_tasks mutex poisoned");
         tasks
             .get(&task_id)
             .cloned()

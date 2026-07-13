@@ -18,6 +18,10 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    proto::{
+        client_types::{ClientMfaStartRequest, MfaMethod},
+        enterprise::posture::v2::DevicePostureData,
+    },
     proxy::construct_platform_header,
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
@@ -62,8 +66,10 @@ pub struct MfaInfo {
 }
 
 /// Deserialization-only payload for the MFA finish response.
+///
+/// The proxy serializes proto types with snake_case field names, so the
+/// wire key is `preshared_key` (not `presharedKey`).
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct MfaFinishBody {
     preshared_key: String,
 }
@@ -105,7 +111,7 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
 
 /// Start an MFA handshake for a VPN location.
 ///
-/// POSTs `{ "locationId": ..., "pubkey": "...", "method": "..." }` to
+/// POSTs a `ClientMfaStartRequest` (snake_case fields, numeric `method`) to
 /// `/api/v1/client-mfa/start` and returns the session token (and
 /// optionally the biometric challenge). When `posture_data` is provided
 /// it is included in the request body.
@@ -113,8 +119,8 @@ pub async fn mfa_start(
     proxy_url: Url,
     location_id: i64,
     pubkey: String,
-    method: String,
-    posture_data: Option<serde_json::Value>,
+    method: MfaMethod,
+    posture_data: Option<DevicePostureData>,
 ) -> Result<MfaInfo, MfaError> {
     let client = build_client();
 
@@ -124,16 +130,14 @@ pub async fn mfa_start(
             message: format!("Failed to build MFA start URL: {e}"),
         })?;
 
-    let mut body = serde_json::json!({
-        "locationId": location_id,
-        "pubkey": pubkey,
-        "method": method,
-    });
-    if let Some(pd) = posture_data {
-        body["posture_data"] = pd;
-    }
+    let request = ClientMfaStartRequest {
+        location_id,
+        pubkey,
+        method: method as i32,
+        posture_data,
+    };
 
-    let mut req = client.post(url).json(&body);
+    let mut req = client.post(url).json(&request);
 
     for (k, v) in standard_headers() {
         req = req.header(k, v);
@@ -399,8 +403,36 @@ mod tests {
 
     fn finish_response_json(key: &str) -> serde_json::Value {
         json!({
-            "presharedKey": key,
+            "preshared_key": key,
         })
+    }
+
+    #[test]
+    fn test_mfa_start_request_matches_proxy_contract() {
+        // The proxy deserializes `Json<ClientMfaStartRequest>` where the proto
+        // derives serde with no `rename_all`, so it requires snake_case field
+        // names and a numeric `method`. Guard against a regression to
+        // camelCase / stringly-typed method.
+        let request = ClientMfaStartRequest {
+            location_id: 7,
+            pubkey: "pk".into(),
+            method: MfaMethod::MobileApprove as i32,
+            posture_data: None,
+        };
+        let value = serde_json::to_value(&request).unwrap();
+        assert_eq!(value["location_id"], 7);
+        assert!(value.get("locationId").is_none());
+        assert_eq!(value["method"], MfaMethod::MobileApprove as i32);
+        assert!(value["method"].is_number());
+    }
+
+    #[test]
+    fn test_mfa_finish_body_parses_snake_case() {
+        // The proxy sends `preshared_key` (snake_case); the finish parser must
+        // match that, not `presharedKey`.
+        let body: MfaFinishBody =
+            serde_json::from_value(json!({ "preshared_key": "psk-xyz" })).unwrap();
+        assert_eq!(body.preshared_key, "psk-xyz");
     }
 
     #[tokio::test]
@@ -415,7 +447,7 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let info = mfa_start(url, 1, "pk".into(), "totp".into(), None)
+        let info = mfa_start(url, 1, "pk".into(), MfaMethod::Totp, None)
             .await
             .unwrap();
         assert_eq!(info.token, "mfa-token-1");
@@ -435,7 +467,7 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let err = mfa_start(url, 1, "pk".into(), "totp".into(), None)
+        let err = mfa_start(url, 1, "pk".into(), MfaMethod::Totp, None)
             .await
             .unwrap_err();
         assert!(matches!(err, MfaError::MfaRejected { .. }));
