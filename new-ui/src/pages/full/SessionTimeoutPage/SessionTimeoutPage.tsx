@@ -43,24 +43,24 @@ const ClockIcon = () => {
         height="47"
         rx="23.5"
         stroke="white"
-        stroke-opacity="0.4"
-        stroke-dasharray="2 2"
+        strokeOpacity="0.4"
+        strokeDasharray="2 2"
       />
       <g clip-path={`"url(#${id})"`}>
         <path
           d="M25.2447 35.9689C31.1848 35.9689 36.0001 31.1163 36.0001 25.1302C36.0001 19.1442 31.1848 14.2915 25.2447 14.2915C19.3046 14.2915 14.4893 19.1442 14.4893 25.1302C14.4893 31.1163 19.3046 35.9689 25.2447 35.9689Z"
           fill="white"
-          fill-opacity="0.1"
+          fillOpacity="0.1"
         />
         <path
           d="M23.9078 34.8388C29.8479 34.8388 34.6632 29.9861 34.6632 24.0001C34.6632 18.014 29.8479 13.1614 23.9078 13.1614C17.9677 13.1614 13.1523 18.014 13.1523 24.0001C13.1523 29.9861 17.9677 34.8388 23.9078 34.8388Z"
           stroke="white"
-          stroke-linejoin="round"
+          strokeLinejoin="round"
         />
         <path
           d="M23.9077 17.9768V24L27.5185 27.6387"
           stroke="white"
-          stroke-linejoin="round"
+          strokeLinejoin="round"
         />
       </g>
       <defs>

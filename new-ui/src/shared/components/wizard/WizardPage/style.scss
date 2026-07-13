@@ -11,12 +11,19 @@
     height: 100%;
 
     & > .side {
+      position: relative;
       box-sizing: border-box;
       padding: var(--spacing-md) var(--spacing-lg);
       border-right: 1px solid var(--border-disabled);
       user-select: none;
 
-      > .title {
+      > .side-content {
+        position: sticky;
+        top: var(--spacing-md);
+        align-self: start;
+      }
+
+      .title {
         font: var(--t-body-xs-500);
         color: var(--fg-white-100);
       }

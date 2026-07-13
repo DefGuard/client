@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
 
 const sanitizeSchema = {
   ...defaultSchema,
@@ -25,6 +26,7 @@ export const RenderMarkdown = ({
       className={clsx('markdown-render', containerCustomClassName)}
     >
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
         components={{
           a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
