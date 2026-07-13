@@ -1,4 +1,3 @@
-import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { api } from '../rust-api/api';
 import type {
@@ -11,7 +10,6 @@ import { generateWGKeys } from '../utils/generateWGKeys';
 import type {
   AddInstanceRequest,
   AddInstanceResult,
-  EdgeRequestHeaders,
   EnrollmentErrorKind,
   UpdateInstanceRequest,
   UpdateInstanceResult,
@@ -26,15 +24,6 @@ const saveDeviceConfig = (args: {
   privateKey: string;
   response: CreateDeviceResponse;
 }): Promise<SaveDeviceConfigResponse> => invoke(TauriCommand.SaveDeviceConfig, args);
-
-const getEdgeRequestHeaders = async (): Promise<EdgeRequestHeaders> => {
-  const platform = (await invoke(TauriCommand.GetPlatformHeader)) as string;
-  const version = await getVersion().catch(() => 'unknown');
-  return {
-    'defguard-client-platform': platform,
-    'defguard-client-version': version,
-  };
-};
 
 /// Parse a Tauri command error that contains a serialized `EnrollmentError`
 /// JSON string into an `EnrollmentErrorKind` and human-readable message.
@@ -146,7 +135,6 @@ const updateExistingInstance = async (
 };
 
 export const edgeApi = {
-  getEdgeRequestHeaders,
   createDevice,
   addInstance,
   updateInstance: updateExistingInstance,

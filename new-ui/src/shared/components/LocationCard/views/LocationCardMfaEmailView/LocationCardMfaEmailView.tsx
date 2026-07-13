@@ -10,11 +10,10 @@ import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
 import { SizedBox } from '../../../SizedBox/SizedBox';
-import { MfaStartMethod } from '../../api/startClientMfaSession';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
-import { useMfaConnect } from '../../hooks/useMfaConnect';
+import { MfaStartMethod, useMfaConnect } from '../../hooks/useMfaConnect';
 import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/LocationCardMfaStartLoader';
 
 const MIN_POSTURE_LOADER_MS = 500;

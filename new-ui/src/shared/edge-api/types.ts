@@ -1,10 +1,5 @@
 import type { EnrollmentStartResult } from '../rust-api/types';
 
-export type EdgeRequestHeaders = {
-  'defguard-client-version': string;
-  'defguard-client-platform': string;
-};
-
 /** `network`: the request could not be sent, most likely a bad URL.
  *  `unauthorized`: the server responded 401, the token is invalid.
  *  `server`: any other failure response. */

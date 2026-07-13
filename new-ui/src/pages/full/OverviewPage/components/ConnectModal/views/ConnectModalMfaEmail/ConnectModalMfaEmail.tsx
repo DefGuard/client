@@ -4,8 +4,10 @@ import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { CodeInput } from '../../../../../../../shared/components/CodeInput/CodeInput';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
-import { MfaStartMethod } from '../../../../../../../shared/components/LocationCard/api/startClientMfaSession';
-import { useMfaConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaConnect';
+import {
+  MfaStartMethod,
+  useMfaConnect,
+} from '../../../../../../../shared/components/LocationCard/hooks/useMfaConnect';
 import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';

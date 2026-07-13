@@ -5,10 +5,19 @@ import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo } from '../../../rust-api/types';
 import { MfaMethod } from '../../../rust-api/types';
-import type { MfaStartMethod as MfaStartMethodType } from '../api/startClientMfaSession';
-import { MfaStartMethod } from '../api/startClientMfaSession';
 
-type CodeMfaStartMethod = Extract<MfaStartMethodType, 0 | 1>;
+/** MFA method identifiers matching the proxy proto enum (numeric).
+ *  Used by TOTP/email view callers that pass the method to useMfaConnect. */
+export const MfaStartMethod = {
+  Totp: 0,
+  Email: 1,
+  Oidc: 2,
+  MobileApprove: 4,
+} as const;
+
+export type MfaStartMethod = (typeof MfaStartMethod)[keyof typeof MfaStartMethod];
+
+type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
 
 /** Detect posture failures from the serialized MfaError returned by the
  *  Rust mfa_start command. Posture rejection (403) maps to MfaRejected. */
