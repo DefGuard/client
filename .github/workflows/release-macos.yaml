@@ -40,7 +40,7 @@ jobs:
         with:
           cache: true
           run_install: false
-          version: 11
+          version: 11.11
 
       - name: Install Node dependencies for New UI
         run: |

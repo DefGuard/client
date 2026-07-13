@@ -48,9 +48,11 @@ export const WizardPage = ({
     <div className={clsx('wizard-page', className)} {...containerProps}>
       <div className="page-grid">
         <div className="side">
-          <p className="title">{title}</p>
-          <SizedBox height={ThemeSpacing.Xl} />
-          <WizardStepsCard steps={visibleSteps} activeStep={activeStepData} />
+          <div className="side-content">
+            <p className="title">{title}</p>
+            <SizedBox height={ThemeSpacing.Xl} />
+            <WizardStepsCard steps={visibleSteps} activeStep={activeStepData} />
+          </div>
         </div>
         <div className="main">
           {activeStepIndex !== visibleSteps.length - 1 && (

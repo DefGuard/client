@@ -140,7 +140,10 @@ export const useEnrollmentStore = create<Store>()(
           default:
             return;
         }
-        set({ activeStep: nextStep });
+        set({
+          activeStep: nextStep,
+          deadline: nextStep === EnrollmentStep.Finish ? null : get().deadline,
+        });
       },
     }),
     {
