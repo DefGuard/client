@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { mfaToApi } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
   AppConfig,
@@ -13,6 +14,7 @@ import type {
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaMethodValue,
   MfaStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
@@ -159,16 +161,23 @@ const enrollmentActivateUser = (
 
 const enrollmentRegisterMfaStart = (
   sessionId: string,
-  method: string,
+  method: MfaMethodValue,
 ): Promise<EnrollmentMfaStartResult> =>
-  invoke(TauriCommand.EnrollmentRegisterMfaStart, { sessionId, method });
+  invoke(TauriCommand.EnrollmentRegisterMfaStart, {
+    sessionId,
+    method: mfaToApi(method),
+  });
 
 const enrollmentRegisterMfaFinish = (
   sessionId: string,
   code: string,
-  method: string,
+  method: MfaMethodValue,
 ): Promise<EnrollmentMfaFinishResult> =>
-  invoke(TauriCommand.EnrollmentRegisterMfaFinish, { sessionId, code, method });
+  invoke(TauriCommand.EnrollmentRegisterMfaFinish, {
+    sessionId,
+    code,
+    method: mfaToApi(method),
+  });
 
 const enrollmentNetworkInfo = (sessionId: string, pubkey: string): Promise<unknown> =>
   invoke(TauriCommand.EnrollmentNetworkInfo, { sessionId, pubkey });
