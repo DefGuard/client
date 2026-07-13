@@ -1540,7 +1540,24 @@ pub async fn mfa_start(
         .ok_or_else(|| "WireGuard keys not found".to_string())?;
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    mfa::mfa_start(proxy_url, location_id, keys.pubkey, method)
+    let posture_data = {
+        let location = Location::find_by_id(&*DB_POOL, location_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        if let Some(loc) = location {
+            if loc.posture_check_required {
+                let pd = defguard_client_posture::get_posture_data()
+                    .await
+                    .map_err(|e| format!("Failed to collect posture data: {e}"))?;
+                Some(serde_json::to_value(&pd).map_err(|e| e.to_string())?)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+    mfa::mfa_start(proxy_url, location_id, keys.pubkey, method, posture_data)
         .await
         .map_err(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.to_string()))
 }

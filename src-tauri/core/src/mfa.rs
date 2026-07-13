@@ -107,12 +107,14 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
 ///
 /// POSTs `{ "locationId": ..., "pubkey": "...", "method": "..." }` to
 /// `/api/v1/client-mfa/start` and returns the session token (and
-/// optionally the biometric challenge).
+/// optionally the biometric challenge). When `posture_data` is provided
+/// it is included in the request body.
 pub async fn mfa_start(
     proxy_url: Url,
     location_id: i64,
     pubkey: String,
     method: String,
+    posture_data: Option<serde_json::Value>,
 ) -> Result<MfaInfo, MfaError> {
     let client = build_client();
 
@@ -122,11 +124,16 @@ pub async fn mfa_start(
             message: format!("Failed to build MFA start URL: {e}"),
         })?;
 
-    let mut req = client.post(url).json(&serde_json::json!({
+    let mut body = serde_json::json!({
         "locationId": location_id,
         "pubkey": pubkey,
         "method": method,
-    }));
+    });
+    if let Some(pd) = posture_data {
+        body["posture_data"] = pd;
+    }
+
+    let mut req = client.post(url).json(&body);
 
     for (k, v) in standard_headers() {
         req = req.header(k, v);
@@ -408,7 +415,9 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let info = mfa_start(url, 1, "pk".into(), "totp".into()).await.unwrap();
+        let info = mfa_start(url, 1, "pk".into(), "totp".into(), None)
+            .await
+            .unwrap();
         assert_eq!(info.token, "mfa-token-1");
         assert!(info.challenge.is_none());
     }
@@ -426,7 +435,7 @@ mod tests {
             .await;
 
         let url = mock_url(&server);
-        let err = mfa_start(url, 1, "pk".into(), "totp".into())
+        let err = mfa_start(url, 1, "pk".into(), "totp".into(), None)
             .await
             .unwrap_err();
         assert!(matches!(err, MfaError::MfaRejected { .. }));
