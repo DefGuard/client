@@ -1579,25 +1579,21 @@ pub async fn mfa_start(
         .ok_or_else(|| "WireGuard keys not found".to_string())?;
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let posture_data = {
-        let location = Location::find_by_id(&*DB_POOL, location_id)
-            .await
-            .map_err(|e| e.to_string())?;
-        if let Some(loc) = location {
-            if loc.posture_check_required {
-                let pd = defguard_client_posture::get_posture_data()
-                    .await
-                    .map_err(|e| format!("Failed to collect posture data: {e}"))?;
-                Some(pd)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Location not found".to_string())?;
+    let posture_data = if location.posture_check_required {
+        Some(
+            defguard_client_posture::get_posture_data()
+                .await
+                .map_err(|e| format!("Failed to collect posture data: {e}"))?,
+        )
+    } else {
+        None
     };
     let request = ClientMfaStartRequest {
-        location_id,
+        location_id: location.network_id,
         pubkey: keys.pubkey,
         method: method as i32,
         posture_data,
