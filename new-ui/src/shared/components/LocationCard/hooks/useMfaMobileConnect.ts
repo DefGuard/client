@@ -1,20 +1,31 @@
 import { encode } from '@stablelib/base64';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { LocationInfo } from '../../../rust-api/types';
-import {
-  CLIENT_MFA_ENDPOINT,
-  MfaStartMethod,
-  shouldShowPostureError,
-  startClientMfaSession,
-} from '../api/startClientMfaSession';
+import type {
+  LocationInfo,
+  MfaCompletePayload,
+  MfaErrorPayload,
+} from '../../../rust-api/types';
+import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 
 type TokenData = {
   token: string;
   challenge: string;
+};
+
+const isMfaPostureError = (err: unknown, location: LocationInfo): boolean => {
+  if (!location.posture_check_required) return false;
+  try {
+    const parsed = JSON.parse(String(err)) as { type?: string };
+    return parsed.type === 'mfaRejected';
+  } catch {
+    return false;
+  }
 };
 
 type Options = {
@@ -34,8 +45,8 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const expectedCloseRef = useRef(false);
+  const taskIdRef = useRef<string | null>(null);
+  const unlistenRef = useRef<UnlistenFn | null>(null);
 
   const { mutate: connectMutate } = useMutation({
     mutationFn: api.connect,
@@ -48,86 +59,85 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     },
   });
 
-  // Open WebSocket when tokenData is available
+  const cleanupListeners = useCallback(() => {
+    if (unlistenRef.current !== null) {
+      unlistenRef.current();
+      unlistenRef.current = null;
+    }
+  }, []);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      cleanupListeners();
+      const taskId = taskIdRef.current;
+      if (taskId) {
+        void api.cancelMfa(taskId).catch(() => {});
+      }
+    };
+  }, [cleanupListeners]);
+
+  // Connect WebSocket via Rust when tokenData is available
   useEffect(() => {
     if (!tokenData || !instance) return;
 
-    const wsUrl = `${instance.proxy_url
-      .replace(/^http:/, 'ws:')
-      .replace(
-        /^https:/,
-        'wss:',
-      )}${CLIENT_MFA_ENDPOINT}/remote?token=${encodeURIComponent(tokenData.token)}`;
+    let cancelled = false;
+    cleanupListeners();
+    setIsConnecting(true);
+    setConnectionError(null);
 
-    expectedCloseRef.current = false;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setIsConnecting(true);
-      setConnectionError(null);
-    };
-
-    ws.onmessage = (event: MessageEvent) => {
+    (async () => {
       try {
-        const parsed = JSON.parse(event.data as string) as unknown;
-        if (
-          typeof parsed === 'object' &&
-          parsed !== null &&
-          'preshared_key' in parsed &&
-          typeof (parsed as Record<string, unknown>).preshared_key === 'string'
-        ) {
-          const presharedKey = (parsed as { preshared_key: string }).preshared_key;
-          expectedCloseRef.current = true;
-          connectMutate({
-            locationId: location.id,
-            connectionType: location.connection_type,
-            presharedKey,
-          });
-        } else {
-          error(
-            `Unexpected mobile MFA WS message for location ${location.id}: ${event.data}`,
-          );
+        const taskId = await api.mfaConnectMobileApprove(instance.id, tokenData.token);
+        if (cancelled) {
+          void api.cancelMfa(taskId).catch(() => {});
+          return;
         }
+        taskIdRef.current = taskId;
+
+        const completeUnlisten = await listen<MfaCompletePayload>(
+          TauriEvent.MfaMobileComplete,
+          (event) => {
+            cleanupListeners();
+            connectMutate({
+              locationId: location.id,
+              connectionType: location.connection_type,
+              presharedKey: event.payload.preshared_key,
+            });
+          },
+        );
+
+        const errorUnlisten = await listen<MfaErrorPayload>(
+          TauriEvent.MfaMobileError,
+          (event) => {
+            cleanupListeners();
+            setIsConnecting(false);
+            setConnectionError('Connection error. Please try again.');
+            error(
+              `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
+            );
+          },
+        );
+
+        unlistenRef.current = () => {
+          completeUnlisten();
+          errorUnlisten();
+        };
       } catch (e) {
-        error(`Failed to parse mobile MFA WS message for location ${location.id}: ${e}`);
+        if (!cancelled) {
+          setIsConnecting(false);
+          setConnectionError('Failed to start mobile approval. Please try again.');
+          error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
+        }
       }
-    };
-
-    ws.onerror = () => {
-      if (!expectedCloseRef.current) {
-        setIsConnecting(false);
-        setConnectionError('Connection error. Please try again.');
-        error(`Mobile MFA WebSocket error for location ${location.id}`);
-      }
-    };
-
-    ws.onclose = () => {
-      if (!expectedCloseRef.current) {
-        setIsConnecting(false);
-        setConnectionError('Connection closed unexpectedly. Please try again.');
-        error(`Mobile MFA WebSocket closed unexpectedly for location ${location.id}`);
-      }
-    };
+    })();
 
     return () => {
-      expectedCloseRef.current = true;
-      ws.close();
-      wsRef.current = null;
+      cancelled = true;
+      cleanupListeners();
       setIsConnecting(false);
     };
-  }, [tokenData, instance, connectMutate, location]);
-
-  // Clean up WebSocket on unmount
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) {
-        expectedCloseRef.current = true;
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, []);
+  }, [tokenData, instance, location, connectMutate, cleanupListeners]);
 
   const qrValue = useMemo(() => {
     if (!tokenData || !instance) return null;
@@ -148,47 +158,42 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     setIsStarting(true);
     setStartError(null);
     setConnectionError(null);
-    // Clear previous token → triggers WS cleanup via effect
+    // Clear previous task via effect
     setTokenData(null);
 
     try {
-      const { response } = await startClientMfaSession({
-        instance,
-        location,
-        method: MfaStartMethod.MobileApprove,
-      });
-      if (!response.challenge) {
+      const info = await api.mfaStart(instance.id, location.id, MfaMethod.MobileApprove);
+      if (!info.challenge) {
         setStartError('Unsupported response from proxy');
         return;
       }
 
-      setTokenData({ token: response.token, challenge: response.challenge });
+      setTokenData({ token: info.token, challenge: info.challenge });
     } catch (e) {
-      if (shouldShowPostureError(e, location)) {
-        onPostureError?.(e instanceof Error ? e.message : undefined);
+      void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
+      if (isMfaPostureError(e, location)) {
+        onPostureError?.(String(e));
         return;
       }
-      setStartError(
-        e instanceof Error ? e.message : 'Failed to start mobile authentication',
-      );
-      error(`Mobile MFA start network error for location ${location.id}: ${e}`);
+      setStartError(String(e));
     } finally {
       setIsStarting(false);
     }
   }, [instance, location, onPostureError]);
 
   const reset = useCallback(() => {
-    if (wsRef.current) {
-      expectedCloseRef.current = true;
-      wsRef.current.close();
-      wsRef.current = null;
+    cleanupListeners();
+    const taskId = taskIdRef.current;
+    if (taskId) {
+      void api.cancelMfa(taskId).catch(() => {});
+      taskIdRef.current = null;
     }
     setTokenData(null);
     setIsStarting(false);
     setStartError(null);
     setIsConnecting(false);
     setConnectionError(null);
-  }, []);
+  }, [cleanupListeners]);
 
   return { start, isStarting, startError, qrValue, isConnecting, connectionError, reset };
 };
