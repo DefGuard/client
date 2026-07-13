@@ -1339,7 +1339,7 @@ pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Er
 }
 
 /// Returned by the `enrollment_start` Tauri command.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct EnrollmentStartResult {
     pub session_id: String,
     pub user: InitialUserInfo,

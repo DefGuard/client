@@ -47,13 +47,13 @@ pub struct EnrollmentSession {
 }
 
 /// Response from `POST /api/v1/enrollment/register-mfa/code/start`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MfaStartResponse {
     pub totp_secret: Option<String>,
 }
 
 /// Response from `POST /api/v1/enrollment/register-mfa/code/finish`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MfaFinishResponse {
     pub recovery_codes: Vec<String>,
 }

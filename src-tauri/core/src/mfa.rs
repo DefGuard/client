@@ -53,7 +53,7 @@ pub enum MfaError {
 pub struct PresharedKey(pub String);
 
 /// Information returned by the MFA start endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaInfo {
     pub token: String,
