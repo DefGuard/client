@@ -1367,7 +1367,11 @@ pub async fn enrollment_start(
         .lock()
         .unwrap()
         .insert(Uuid::parse_str(&session_id).unwrap(), session);
-    let login = response.user.as_ref().map(|u| u.login.as_str()).unwrap_or("<unknown>");
+    let login = response
+        .user
+        .as_ref()
+        .map(|u| u.login.as_str())
+        .unwrap_or("<unknown>");
     info!("Enrollment started for user {login}, session {session_id}");
     Ok(EnrollmentStartResult {
         session_id,

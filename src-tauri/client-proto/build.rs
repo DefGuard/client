@@ -14,10 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
         // Use proto defaults for missing fields in enrollment types that
         // may differ across proxy versions.
-        .type_attribute(
-            ".defguard.client_types.AdminInfo",
-            "#[serde(default)]",
-        )
+        .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")
         .type_attribute(
             ".defguard.client_types.InitialUserInfo",
             "#[serde(default)]",
@@ -26,10 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client_types.EnrollmentSettings",
             "#[serde(default)]",
         )
-        .type_attribute(
-            ".defguard.client_types.InstanceInfo",
-            "#[serde(default)]",
-        )
+        .type_attribute(".defguard.client_types.InstanceInfo", "#[serde(default)]")
         .type_attribute(
             ".defguard.client_types.EnrollmentStartResponse",
             "#[serde(default)]",

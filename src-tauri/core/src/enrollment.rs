@@ -4,6 +4,7 @@
 //! starting enrollment, creating a device, activating the user, registering
 //! MFA, and finishing the enrollment.
 
+use defguard_client_proto::defguard::client_types::EnrollmentStartResponse;
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -13,8 +14,6 @@ use crate::{
     proxy::construct_platform_header,
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
-
-use defguard_client_proto::defguard::client_types::EnrollmentStartResponse;
 
 /// Error type returned by enrollment operations.
 ///
