@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import {
   CLIENT_MFA_ENDPOINT,
+  isEdgeUnavailable,
   MfaStartMethod,
   shouldShowPostureError,
   startClientMfaSession,
@@ -22,11 +23,13 @@ type MfaErrorResponse = { error: string };
 type Options = {
   onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
+  onServiceUnavailable?: () => void;
 };
 
 export const useConnectModalMfaOidc = ({
   onPostureError,
   onSessionExpired,
+  onServiceUnavailable,
 }: Options = {}) => {
   const location = useConnectModal(useShallow((s) => s.location));
 
@@ -149,6 +152,10 @@ export const useConnectModalMfaOidc = ({
         onPostureError?.(e.message);
         return;
       }
+      if (isEdgeUnavailable(e)) {
+        onServiceUnavailable?.();
+        return;
+      }
       setStartError(
         e instanceof Error ? e.message : 'Failed to start OIDC authentication',
       );
@@ -156,7 +163,14 @@ export const useConnectModalMfaOidc = ({
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, startPolling, stopPolling, onPostureError]);
+  }, [
+    instance,
+    location,
+    startPolling,
+    stopPolling,
+    onPostureError,
+    onServiceUnavailable,
+  ]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

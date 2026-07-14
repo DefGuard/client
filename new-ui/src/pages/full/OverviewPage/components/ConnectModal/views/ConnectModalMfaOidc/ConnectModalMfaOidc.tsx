@@ -30,6 +30,8 @@ export const ConnectModalMfaOidc = () => {
       useConnectModal.setState({ postureError: msg });
       useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
     },
+    onServiceUnavailable: () =>
+      useConnectModal.getState().setView(ConnectModalView.ConnectionError),
   });
 
   const [screen, setScreen] = useState<Screen>('idle');

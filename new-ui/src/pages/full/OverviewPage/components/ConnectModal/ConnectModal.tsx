@@ -14,6 +14,7 @@ import {
   type ConnectModalViewValue,
 } from './hooks/types';
 import { useConnectModal } from './hooks/useConnectModal';
+import { ConnectModalConnectionError } from './views/ConnectModalConnectionError/ConnectModalConnectionError';
 import { ConnectModalMfaEmail } from './views/ConnectModalMfaEmail/ConnectModalMfaEmail';
 import { ConnectModalMfaMobile } from './views/ConnectModalMfaMobile/ConnectModalMfaMobile';
 import { ConnectModalMfaOidc } from './views/ConnectModalMfaOidc/ConnectModalMfaOidc';
@@ -57,6 +58,7 @@ const viewContent: Record<ConnectModalViewValue, ReactNode> = {
   [ConnectModalView.MfaMobile]: <ConnectModalMfaMobile />,
   [ConnectModalView.MfaSettings]: <ConnectModalMfaSettings />,
   [ConnectModalView.PostureCheckFail]: <ConnectModalPostureCheckFail />,
+  [ConnectModalView.ConnectionError]: <ConnectModalConnectionError />,
 } as const;
 
 const ModalContent = () => {

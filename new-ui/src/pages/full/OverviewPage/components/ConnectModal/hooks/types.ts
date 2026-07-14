@@ -5,6 +5,7 @@ export const ConnectModalView = {
   MfaMobile: 'mfa-mobile',
   MfaSettings: 'mfa-settings',
   PostureCheckFail: 'posture-check-fail',
+  ConnectionError: 'connection-error',
 } as const;
 
 export const ConnectModalTitle: Record<ConnectModalViewValue, string> = {
@@ -14,6 +15,7 @@ export const ConnectModalTitle: Record<ConnectModalViewValue, string> = {
   [ConnectModalView.MfaMobile]: 'Two-factor authentication',
   [ConnectModalView.MfaSettings]: 'Change MFA Method',
   [ConnectModalView.PostureCheckFail]: 'Access denied',
+  [ConnectModalView.ConnectionError]: 'Connection error',
 } as const;
 
 export type ConnectModalViewValue =

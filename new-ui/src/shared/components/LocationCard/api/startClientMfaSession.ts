@@ -45,6 +45,10 @@ export const shouldShowPostureError = (
 ): err is MfaStartError =>
   err instanceof MfaStartError && err.status === 403 && location.posture_check_required;
 
+/** Narrows MFA start errors where the Edge responded with a 5xx */
+export const isEdgeUnavailable = (err: unknown): err is MfaStartError =>
+  err instanceof MfaStartError && (err.status ?? 0) >= 500;
+
 /** Input required to start a desktop-client MFA session. */
 type StartClientMfaSessionParams = {
   instance: InstanceInfo;

@@ -30,6 +30,8 @@ export const ConnectModalMfaTotp = () => {
         useConnectModal.setState({ postureError: err });
         useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
       },
+      onServiceUnavailable: () =>
+        useConnectModal.getState().setView(ConnectModalView.ConnectionError),
     },
   );
 
