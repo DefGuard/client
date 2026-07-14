@@ -107,6 +107,7 @@ import { IconRequest } from './icons/IconRequest';
 import { IconRules } from './icons/IconRules';
 import { IconSearch } from './icons/IconSearch';
 import { IconServers } from './icons/IconServers';
+import { IconServiceUnavailable } from './icons/IconServiceUnavailable';
 import { IconSettings } from './icons/IconSettings';
 import { IconShow } from './icons/IconShow';
 import { IconSortable } from './icons/IconSortable';
@@ -297,6 +298,8 @@ export const Icon = <T extends IconKindValue>({
         return IconGlobe;
       case 'globe-blocked':
         return IconGlobeBlocked;
+      case 'service-unavailable':
+        return IconServiceUnavailable;
       case 'help':
         return IconHelp;
       case 'access-settings':

@@ -39,6 +39,7 @@ export const IconKind = {
   Notification: 'notification',
   Globe: 'globe',
   GlobeBlocked: 'globe-blocked',
+  ServiceUnavailable: 'service-unavailable',
   Groups: 'groups',
   OpenInNewWindow: 'open-in-new-window',
   Users: 'users',

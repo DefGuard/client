@@ -60,6 +60,10 @@ export const LocationCardMfaSettings = () => {
         mfaMethod: selectedMethod,
       });
     }
+    if (isFromDefault) {
+      setView(LocationCardViews.Default);
+      return;
+    }
     switch (selectedMethod) {
       case 'totp':
         setView(LocationCardViews.MfaTotp);

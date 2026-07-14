@@ -4,8 +4,10 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
+import { useTrayConnectionError } from '../../../store/useAppStore';
 import {
   CLIENT_MFA_ENDPOINT,
+  isEdgeUnavailable,
   MfaStartMethod,
   startClientMfaSession,
 } from '../api/startClientMfaSession';
@@ -142,6 +144,10 @@ export const useMfaOidcConnect = () => {
       startPolling(response.token, instance.proxy_url, headers);
     } catch (e) {
       if (handleMfaStartError({ err: e, location, setPostureError, setView })) {
+        return;
+      }
+      if (isEdgeUnavailable(e)) {
+        useTrayConnectionError.setState({ visible: true });
         return;
       }
       setStartError(

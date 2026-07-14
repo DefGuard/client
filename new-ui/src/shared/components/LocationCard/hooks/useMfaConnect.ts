@@ -8,6 +8,7 @@ import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo } from '../../../rust-api/types';
 import {
   CLIENT_MFA_ENDPOINT,
+  isEdgeUnavailable,
   type MfaStartMethod,
   shouldShowPostureError,
   startClientMfaSession,
@@ -28,6 +29,7 @@ type UseMfaConnectOptions = {
   onConnected?: () => void;
   onSessionExpired?: () => void;
   onPostureError?: (message: string) => void;
+  onServiceUnavailable?: () => void;
 };
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
@@ -45,6 +47,7 @@ export const useMfaConnect = (
     onConnected,
     onSessionExpired,
     onPostureError,
+    onServiceUnavailable,
   }: UseMfaConnectOptions = {},
 ) => {
   const [token, setToken] = useState<string | null>(null);
@@ -95,6 +98,10 @@ export const useMfaConnect = (
         await waitForMinimumDuration(startedAt, debounceMs);
         if (shouldShowPostureError(err, location)) {
           onPostureError?.(err.message);
+          return;
+        }
+        if (isEdgeUnavailable(err)) {
+          onServiceUnavailable?.();
           return;
         }
         setStartError(err instanceof Error ? err.message : 'Failed to start MFA');

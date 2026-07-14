@@ -7,6 +7,7 @@ import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo } from '../../../rust-api/types';
 import {
   CLIENT_MFA_ENDPOINT,
+  isEdgeUnavailable,
   MfaStartMethod,
   shouldShowPostureError,
   startClientMfaSession,
@@ -20,10 +21,11 @@ type TokenData = {
 type Options = {
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
+  onServiceUnavailable?: () => void;
 };
 
 export const useMfaMobileConnect = (location: LocationInfo, options?: Options) => {
-  const { onConnected, onPostureError } = options ?? {};
+  const { onConnected, onPostureError, onServiceUnavailable } = options ?? {};
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
@@ -168,6 +170,10 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
         onPostureError?.(e instanceof Error ? e.message : undefined);
         return;
       }
+      if (isEdgeUnavailable(e)) {
+        onServiceUnavailable?.();
+        return;
+      }
       setStartError(
         e instanceof Error ? e.message : 'Failed to start mobile authentication',
       );
@@ -175,7 +181,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, onPostureError]);
+  }, [instance, location, onPostureError, onServiceUnavailable]);
 
   const reset = useCallback(() => {
     if (wsRef.current) {

@@ -20,3 +20,11 @@ export const useAppStore = create<Store>()(
     },
   ),
 );
+
+interface TrayConnectionErrorStore {
+  visible: boolean;
+}
+
+export const useTrayConnectionError = create<TrayConnectionErrorStore>(() => ({
+  visible: false,
+}));
