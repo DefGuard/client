@@ -45,12 +45,20 @@ fn into_cli(err: mfa::MfaError) -> CliError {
 }
 
 /// Resolve the effective MFA method for a location.
+///
+/// When `method_override` is `Some`, parses it into [`MfaMethod`]; otherwise
+/// delegates to [`infer_method`] which respects the location's
+/// [`LocationMfaMode`].
+///
+/// Rejects `--mfa-method oidc` on Internal-mode locations.
 pub(crate) fn resolve_method(
     location: &Location<Id>,
     method_override: Option<&str>,
 ) -> Result<MfaMethod, CliError> {
     let method = if let Some(raw) = method_override {
         let method = parse_method(raw)?;
+        // OIDC override on an Internal-mode location will be rejected by the
+        // server. Fail early to give the user a clear error before I/O.
         if method == MfaMethod::Oidc && location.location_mfa_mode == LocationMfaMode::Internal {
             return Err(CliError::InvalidInput(
                 "--mfa-method oidc is only valid for locations that use external (OIDC) MFA."
@@ -66,6 +74,10 @@ pub(crate) fn resolve_method(
 }
 
 /// Validate CLI flags against the resolved MFA method.
+///
+/// * `--code` / `--code-command` are incompatible with OIDC and mobile-approve
+///   (neither method accepts textual codes).
+/// * `--qr-file` is only valid for mobile-approve MFA.
 pub(crate) fn validate_mfa_flags(
     method: MfaMethod,
     location_name: &str,
@@ -102,6 +114,10 @@ pub(crate) async fn authorize(
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<SecretString, CliError> {
+    // Reject methods not yet supported by the CLI before doing any I/O.
+    // OIDC/MobileApprove are not "unsupported" - they have dedicated code
+    // paths (authorize_oidc / authorize_mobile_approve). This catch-all is a
+    // defense-in-depth barrier that emits a clear error if they land here.
     match method {
         MfaMethod::Biometric => {
             return Err(CliError::MfaFailed(format!(
@@ -170,6 +186,9 @@ pub(crate) async fn authorize(
 ///
 /// Opens the system browser and delegates the HTTP poll to
 /// `defguard_core::mfa::poll_openid_mfa`.
+///
+/// When `json_mode` is true, progress messages on stderr are suppressed so
+/// that `--json` output consumers only see the final result/error.
 pub(crate) async fn authorize_oidc(
     location: &Location<Id>,
     instance: &Instance<Id>,
@@ -233,8 +252,11 @@ pub(crate) async fn authorize_oidc(
 
 /// Run the mobile-approve MFA flow.
 ///
-/// Displays a QR code and delegates the WebSocket connection to
-/// `defguard_core::mfa::connect_mobile_approve`.
+/// Displays a QR code (terminal and/or `--qr-file` PNG) and delegates the
+/// WebSocket connection to `defguard_core::mfa::connect_mobile_approve`.
+///
+/// When `json_mode` is true, progress messages on stderr are suppressed so
+/// that `--json` output consumers only see the final result/error.
 pub(crate) async fn authorize_mobile_approve(
     location: &Location<Id>,
     instance: &Instance<Id>,
@@ -313,6 +335,10 @@ fn parse_method(raw: &str) -> Result<MfaMethod, CliError> {
 }
 
 /// Determine the MFA method to use for a location.
+///
+/// Delegates to the core's [`infer_mfa_method`] so that [`LocationMfaMode`]
+/// is respected - an External-mode location always uses OIDC, while an
+/// Internal-mode location respects the stored preference (defaulting to TOTP).
 fn infer_method(location: &Location<Id>) -> MfaMethod {
     let method = infer_mfa_method(location.location_mfa_mode, location.mfa_method);
     match method {
@@ -321,11 +347,18 @@ fn infer_method(location: &Location<Id>) -> MfaMethod {
         Some(LocationMfaMethod::Oidc) => MfaMethod::Oidc,
         Some(LocationMfaMethod::Biometric) => MfaMethod::Biometric,
         Some(LocationMfaMethod::MobileApprove) => MfaMethod::MobileApprove,
-        None => MfaMethod::Totp,
+        None => {
+            // infer_mfa_method only returns None for Disabled mode, but this is
+            // only called when MFA is enabled. Default to TOTP as a safe fallback.
+            MfaMethod::Totp
+        }
     }
 }
 
 /// Warn if the proxy is not using HTTPS.
+///
+/// The one-time MFA code and the returned preshared key are sensitive and
+/// would travel in cleartext over plain HTTP.
 fn check_proxy_scheme(proxy_base: &Url) {
     if proxy_base.scheme() != "https" {
         warn!(
@@ -336,6 +369,11 @@ fn check_proxy_scheme(proxy_base: &Url) {
 }
 
 /// Open a URL in the system browser.
+///
+/// Production: calls [`webbrowser::open`]; prints a hint to stderr on failure.
+/// When `json_mode` is true, the fallback message includes the URL itself since
+/// it wasn't already printed above.
+/// Tests: no-op (never spawn a browser).
 #[cfg(not(test))]
 fn open_url(url: &str, json_mode: bool) {
     if webbrowser::open(url).is_err() {
@@ -348,7 +386,9 @@ fn open_url(url: &str, json_mode: bool) {
 }
 
 #[cfg(test)]
-fn open_url(_url: &str, _json_mode: bool) {}
+fn open_url(_url: &str, _json_mode: bool) {
+    // no-op: tests must not spawn a browser
+}
 
 #[cfg(test)]
 mod tests {
