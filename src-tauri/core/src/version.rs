@@ -16,6 +16,7 @@ pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
 pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const LOG_FILENAME: &str = "defguard-client";
 pub const WELCOME_FORCE_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_FORCE";
+pub const WELCOME_SKIP_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_SKIP";
 pub use defguard_client_common::VERSION as PKG_VERSION;
 
 /// Selects the version string the client should report: the build-version override when present
@@ -91,12 +92,22 @@ fn welcome_force_enabled() -> bool {
         .unwrap_or(false)
 }
 
+fn welcome_skip_enabled() -> bool {
+    std::env::var(WELCOME_SKIP_ENV_VAR)
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
 /// Checks the last known app version (persisted in `config_dir`) against `current_version`,
 /// updating the on-disk state as needed.
 ///
 /// Meant to be called exactly once, synchronously, during app setup.
 #[must_use]
 pub fn check_app_version(config_dir: &Path, current_version: &Version) -> VersionCheckResult {
+    if welcome_skip_enabled() {
+        return VersionCheckResult::Unchanged;
+    }
+
     if welcome_force_enabled() {
         return VersionCheckResult::Upgraded {
             previous: current_version.clone(),
@@ -150,7 +161,7 @@ mod tests {
 
     use super::{
         check_app_version, select_reported_app_version, Version, VersionCheckResult,
-        VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR,
+        VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
     };
 
     #[test]
@@ -269,5 +280,31 @@ mod tests {
         // Flag unset: normal behavior resumes.
         let result = check_app_version(dir.path(), &current);
         assert_eq!(result, VersionCheckResult::Unchanged);
+    }
+
+    #[test]
+    fn test_check_app_version_skip_via_env_var() {
+        let dir = tempdir().unwrap();
+        let previous = Version::new(1, 2, 0);
+        let _ = check_app_version(dir.path(), &previous);
+
+        let current = Version::new(1, 3, 0);
+        for value in ["1", "true", "TRUE"] {
+            std::env::set_var(WELCOME_SKIP_ENV_VAR, value);
+            let result = check_app_version(dir.path(), &current);
+            std::env::remove_var(WELCOME_SKIP_ENV_VAR);
+
+            assert_eq!(result, VersionCheckResult::Unchanged);
+        }
+
+        // Flag unset: normal behavior resumes, upgrade is detected.
+        let result = check_app_version(dir.path(), &current);
+        assert_eq!(
+            result,
+            VersionCheckResult::Upgraded {
+                previous: previous.clone(),
+                current: current.clone(),
+            }
+        );
     }
 }

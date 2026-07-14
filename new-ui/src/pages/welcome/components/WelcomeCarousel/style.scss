@@ -17,12 +17,12 @@
     display: flex;
     flex-flow: column;
     align-items: center;
-    row-gap: var(--spacing-lg);
 
     img,
     video {
       max-width: 100%;
       object-fit: contain;
+      padding-bottom: var(--spacing-md);
     }
 
     > .content {
@@ -43,6 +43,5 @@
     flex-flow: row;
     align-items: center;
     justify-content: space-between;
-    padding-top: var(--spacing-md);
   }
 }
