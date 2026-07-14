@@ -3,13 +3,9 @@ import { type PropsWithChildren, useEffect } from 'react';
 import { isPresent } from '../../../shared/defguard-ui/utils/isPresent';
 import { MFAModal } from '../pages/ClientInstancePage/components/LocationsList/modals/MFAModal/MFAModal';
 import { useMFAModal } from '../pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
-import { type CommonWireguardFields, TauriEventKey } from '../types';
+import { ClientConnectionType, type CommonWireguardFields, TauriEventKey } from '../types';
 
 type Props = PropsWithChildren;
-
-type Payload = {
-  location?: CommonWireguardFields;
-};
 
 export const MfaModalProvider = ({ children }: Props) => {
   const openMFAModal = useMFAModal((state) => state.open);
@@ -19,10 +15,13 @@ export const MfaModalProvider = ({ children }: Props) => {
     let unlisten: UnlistenFn;
 
     (async () => {
-      unlisten = await listen<Payload>(
+      // The backend emits the location as the event payload directly.
+      unlisten = await listen<CommonWireguardFields>(
         TauriEventKey.MFA_TRIGGER,
-        ({ payload: { location } }) => {
+        ({ payload: location }) => {
           if (isPresent(location)) {
+            // Set connection type, as it is not transferred from Rust and MFA is only for locations.
+            location.connection_type = ClientConnectionType.LOCATION;
             openMFAModal(location);
           }
         },
