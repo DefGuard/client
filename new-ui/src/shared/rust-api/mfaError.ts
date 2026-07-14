@@ -23,9 +23,11 @@ export const parseMfaError = (err: unknown): ParsedMfaError | null => {
 export const mfaErrorMessage = (err: unknown): string =>
   parseMfaError(err)?.message ?? String(err);
 
-/** True when the error is a posture rejection for a posture-gated location. */
+/** True when the error is a posture rejection for a posture-gated location.
+ *  The backend maps only HTTP 403 (a failed device posture check) to
+ *  `posture_rejected`; ordinary MFA rejections stay `mfa_rejected`. */
 export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
-  location.posture_check_required && parseMfaError(err)?.type === 'mfa_rejected';
+  location.posture_check_required && parseMfaError(err)?.type === 'posture_rejected';
 
 /** The proxy session/token is no longer valid. */
 export const isSessionExpired = (message: string): boolean =>

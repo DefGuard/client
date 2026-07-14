@@ -46,6 +46,9 @@ pub enum MfaError {
     #[error("MFA rejected: {message}")]
     MfaRejected { message: String },
 
+    #[error("Posture check failed: {message}")]
+    PostureRejected { message: String },
+
     #[error("MFA operation timed out")]
     Timeout,
 
@@ -82,7 +85,12 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         .unwrap_or_else(|| format!("HTTP {status}"));
 
     match status {
-        StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(MfaError::MfaRejected { message }),
+        // The proxy returns 403 only for a failed device posture check
+        // (ApiError::PostureRejected); 401 and other 4xx are ordinary MFA
+        // rejections. Keeping them distinct lets the frontend route posture
+        // failures to the dedicated posture-check-failed view.
+        StatusCode::FORBIDDEN => Err(MfaError::PostureRejected { message }),
+        StatusCode::UNAUTHORIZED => Err(MfaError::MfaRejected { message }),
         _ if status.is_client_error() => Err(MfaError::MfaRejected { message }),
         _ => Err(MfaError::ProxyError {
             status: status.as_u16(),
@@ -448,6 +456,25 @@ mod tests {
         let url = mock_url(&server);
         let err = mfa_start(url, start_request()).await.unwrap_err();
         assert!(matches!(err, MfaError::MfaRejected { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_mfa_start_posture_rejected_on_403() {
+        // 403 is the proxy's posture-check-failure status; it must map to the
+        // dedicated PostureRejected variant, not the generic MfaRejected.
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(
+                ResponseTemplate::new(403).set_body_json(json!({ "error": "firewall enabled" })),
+            )
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let err = mfa_start(url, start_request()).await.unwrap_err();
+        assert!(matches!(err, MfaError::PostureRejected { .. }));
     }
 
     #[tokio::test]

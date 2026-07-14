@@ -38,6 +38,7 @@ fn into_cli(err: mfa::MfaError) -> CliError {
         mfa::MfaError::NetworkError { .. } => CliError::Other(msg),
         mfa::MfaError::ProxyError { .. } => CliError::Other(msg),
         mfa::MfaError::MfaRejected { .. } => CliError::MfaFailed(msg),
+        mfa::MfaError::PostureRejected { .. } => CliError::MfaFailed(msg),
         mfa::MfaError::Timeout => CliError::MfaFailed(msg),
         mfa::MfaError::Cancelled => CliError::Cancelled(msg),
         mfa::MfaError::Other { .. } => CliError::Other(msg),
