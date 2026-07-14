@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: sessionId is set in start(), called before */
 import { useMutation } from '@tanstack/react-query';
+import './style.scss';
 import clsx from 'clsx';
 import { useState } from 'react';
 import {
