@@ -43,7 +43,8 @@ export const MfaConfigurationStep = () => {
 
   const handleSubmit = useCallback(() => {
     if (code?.trim().length !== 6) {
-      setError('');
+      setError('Enter a valid code');
+      return;
     }
     mutate();
   }, [code, mutate]);
