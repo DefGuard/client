@@ -34,7 +34,7 @@ use crate::{
 /// Serialized as a tagged JSON union so the TypeScript frontend can
 /// match on the `type` field to show context-specific messages.
 #[derive(Debug, Error, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MfaError {
     #[error("{message}")]
     NetworkError { message: String },

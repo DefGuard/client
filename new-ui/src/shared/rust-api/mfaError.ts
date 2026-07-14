@@ -25,7 +25,7 @@ export const mfaErrorMessage = (err: unknown): string =>
 
 /** True when the error is a posture rejection for a posture-gated location. */
 export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
-  location.posture_check_required && parseMfaError(err)?.type === 'mfaRejected';
+  location.posture_check_required && parseMfaError(err)?.type === 'mfa_rejected';
 
 /** The proxy session/token is no longer valid. */
 export const isSessionExpired = (message: string): boolean =>
