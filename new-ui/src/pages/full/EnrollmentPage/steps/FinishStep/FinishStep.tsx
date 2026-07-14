@@ -4,6 +4,7 @@ import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { RenderMarkdown } from '../../../../../shared/components/RenderMarkdown/RenderMarkdown';
+import { api } from '../../../../../shared/rust-api/api';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 import bannerSrc from './assets/banner.png';
@@ -11,6 +12,7 @@ import bannerSrc from './assets/banner.png';
 export const FinishStep = () => {
   const navigate = useNavigate();
   const response = useEnrollmentStore((s) => s.startResponse);
+  const sessionId = useEnrollmentStore((s) => s.sessionId);
   const markdownContent = response?.final_page_content;
   const showMarkdown = isPresent(markdownContent) && markdownContent.length > 0;
 
@@ -32,6 +34,12 @@ export const FinishStep = () => {
             variant={ButtonVariant.Primary}
             text="Got it"
             onClick={() => {
+              // Release the enrollment session now that the wizard is done.
+              // Best-effort: enrollment_finish errors if the session is already
+              // gone, so swallow failures and leave the wizard regardless.
+              if (isPresent(sessionId)) {
+                void api.enrollmentFinish(sessionId).catch(() => {});
+              }
               navigate({ to: '/full/overview', replace: true });
             }}
           />

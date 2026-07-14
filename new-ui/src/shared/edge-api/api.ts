@@ -71,8 +71,14 @@ const createDevice = async (
 };
 
 const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
+  let sessionId: string | undefined;
+  // The successful new-enrollment path hands the session to the enrollment
+  // wizard, which owns its lifecycle from there. Every other exit (existing
+  // instance, name clash, error) must release the session it created.
+  let handOffSession = false;
   try {
     const startResult = await api.enrollmentStart(values.url.trim(), values.token.trim());
+    sessionId = startResult.session_id;
 
     const instances = await getInstances();
     const existing = instances.find((i) => i.uuid === startResult.instance.id);
@@ -95,22 +101,33 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
       return { error: `Device name '${values.name}' is already in use` };
     }
 
+    handOffSession = true;
     return { startResponse: startResult, session_id: startResult.session_id };
   } catch (e) {
     const parsed = parseEnrollmentError(e);
     return { error: parsed.error, errorKind: parsed.errorKind };
+  } finally {
+    // Best-effort cleanup; enrollment_finish errors if the session is already
+    // gone, so swallow failures rather than mask the real result.
+    if (sessionId && !handOffSession) {
+      await api.enrollmentFinish(sessionId).catch(() => {});
+    }
   }
 };
 
 const updateExistingInstance = async (
   values: UpdateInstanceRequest,
 ): Promise<UpdateInstanceResult> => {
+  // The update flow only needs the session for the network_info call; it never
+  // hands it to the wizard, so every exit after start() must release it.
+  let sessionId: string | undefined;
   try {
     const instances = await getInstances();
     const existing = instances.find((i) => i.id === values.instanceId);
     if (!existing) return { error: 'Instance no longer exists.' };
 
     const startResult = await api.enrollmentStart(values.url, values.token);
+    sessionId = startResult.session_id;
 
     if (startResult.instance.id !== existing.uuid) {
       return {
@@ -131,6 +148,12 @@ const updateExistingInstance = async (
   } catch (e) {
     const parsed = parseEnrollmentError(e);
     return { error: parsed.error, errorKind: parsed.errorKind };
+  } finally {
+    // Best-effort cleanup; guarded so we never finish a session that was never
+    // created (e.g. the instance-missing early return, or a start() failure).
+    if (sessionId) {
+      await api.enrollmentFinish(sessionId).catch(() => {});
+    }
   }
 };
 
