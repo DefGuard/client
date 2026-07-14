@@ -31,6 +31,10 @@ export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean
 export const isSessionExpired = (message: string): boolean =>
   message.includes('invalid token') || message.includes('login session not found');
 
+/** The MFA operation timed out (the backend poll deadline was reached). */
+export const isTimeout = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'timeout';
+
 /** A submitted one-time code was rejected. */
 export const isInvalidCode = (message: string): boolean =>
   message.includes('Unauthorized');

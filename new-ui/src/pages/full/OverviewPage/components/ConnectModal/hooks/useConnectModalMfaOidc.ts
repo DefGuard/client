@@ -9,14 +9,13 @@ import {
   isConnectFailure,
   isMfaPostureError,
   isSessionExpired,
+  isTimeout,
   mfaErrorMessage,
 } from '../../../../../../shared/rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../../../../shared/rust-api/query';
 import type { MfaErrorPayload } from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
 import { useConnectModal } from './useConnectModal';
-
-const POLL_TIMEOUT_MS = 5 * 60 * 1_000;
 
 type Options = {
   onPostureError?: (msg: string) => void;
@@ -39,13 +38,8 @@ export const useConnectModalMfaOidc = ({
 
   const taskIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanup = useCallback(() => {
-    if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
     if (unlistenRef.current !== null) {
       unlistenRef.current();
       unlistenRef.current = null;
@@ -96,7 +90,9 @@ export const useConnectModalMfaOidc = ({
           setIsPolling(false);
           error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
           const message = mfaErrorMessage(event.payload.error);
-          if (isConnectFailure(message)) {
+          if (isTimeout(event.payload.error)) {
+            setPollError('Authentication timed out. Please try again.');
+          } else if (isConnectFailure(message)) {
             setPollError('Failed to establish VPN connection');
           } else if (isSessionExpired(message)) {
             onSessionExpired?.();
@@ -110,17 +106,6 @@ export const useConnectModalMfaOidc = ({
         completeUnlisten();
         errorUnlisten();
       };
-
-      timeoutRef.current = setTimeout(() => {
-        const taskId = taskIdRef.current;
-        if (taskId) {
-          void api.cancelMfa(taskId).catch(() => {});
-        }
-        cleanup();
-        setIsPolling(false);
-        setPollError('Authentication timed out. Please try again.');
-        error(`OIDC MFA timed out for location ${location.id}`);
-      }, POLL_TIMEOUT_MS);
     } catch (e) {
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
