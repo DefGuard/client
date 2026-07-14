@@ -36,6 +36,7 @@ commands.allow = [
   "swap_to_tray",
   "swap_to_full_view",
   "close_tray_window",
+  "close_welcome_window",
   "all_active_connections",
   "disconnect_locations",
   "get_posture_data",

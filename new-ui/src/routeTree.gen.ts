@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as FullRouteImport } from './routes/full'
 import { Route as EmptyRouteImport } from './routes/empty'
 import { Route as IndexRouteImport } from './routes/index'
@@ -29,6 +30,11 @@ import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/
 import { Route as FullDefaultAddTunnelRouteImport } from './routes/full/_default/add/tunnel'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
 
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FullRoute = FullRouteImport.update({
   id: '/full',
   path: '/full',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
   '/full': typeof FullRouteWithChildren
+  '/welcome': typeof WelcomeRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
+  '/welcome': typeof WelcomeRoute
   '/full': typeof FullIndexRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/empty': typeof EmptyRoute
   '/full': typeof FullRouteWithChildren
+  '/welcome': typeof WelcomeRoute
   '/full/_default': typeof FullDefaultRouteWithChildren
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
     | '/'
     | '/empty'
     | '/full'
+    | '/welcome'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/empty'
+    | '/welcome'
     | '/full'
     | '/full/enrollment'
     | '/full/session-timeout'
@@ -231,6 +242,7 @@ export interface FileRouteTypes {
     | '/'
     | '/empty'
     | '/full'
+    | '/welcome'
     | '/full/_default'
     | '/full/enrollment'
     | '/full/session-timeout'
@@ -253,12 +265,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmptyRoute: typeof EmptyRoute
   FullRoute: typeof FullRouteWithChildren
+  WelcomeRoute: typeof WelcomeRoute
   CompactIndexRoute: typeof CompactIndexRoute
   PlaygroundIndexRoute: typeof PlaygroundIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/full': {
       id: '/full'
       path: '/full'
@@ -445,6 +465,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmptyRoute: EmptyRoute,
   FullRoute: FullRouteWithChildren,
+  WelcomeRoute: WelcomeRoute,
   CompactIndexRoute: CompactIndexRoute,
   PlaygroundIndexRoute: PlaygroundIndexRoute,
 }

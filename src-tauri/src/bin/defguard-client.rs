@@ -46,6 +46,7 @@ use defguard_client::{
 use defguard_client_core::connection::active_connections::close_all_connections;
 #[cfg(target_os = "macos")]
 use defguard_client_core::connection::sync_locations_and_tunnels;
+use defguard_client_core::version::{check_app_version, VersionCheckResult};
 use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -205,6 +206,7 @@ fn main() {
             swap_to_tray,
             swap_to_full_view,
             close_tray_window,
+            close_welcome_window,
             all_active_connections,
             disconnect_locations,
             session_state::get_session_state,
@@ -311,6 +313,21 @@ fn main() {
                 .app_data_dir()
                 .expect("Failed to access app data");
             let config = AppConfig::new(&config_dir);
+            let current_version = app_handle.package_info().version.clone();
+            let open_welcome_view = match check_app_version(&config_dir, &current_version) {
+                VersionCheckResult::Init => {
+                    debug!("No previous version recorded; initializing at {current_version}.");
+                    true
+                }
+                VersionCheckResult::Unchanged => {
+                    debug!("Application version unchanged ({current_version}).");
+                     false
+                }
+                VersionCheckResult::Upgraded { previous, current } => {
+                    info!("Application upgraded from {previous} to {current}.");
+                     true
+                }
+            };
 
             // Setup logging.
 
@@ -389,12 +406,15 @@ fn main() {
             let state = AppState::new(config, provisioning_config);
             app.manage(state);
 
-            // Pre-build both windows hidden so they can be shown/hidden without recreation.
+            // Pre-build windows hidden so they can be shown/hidden without recreation.
             if let Err(e) = WindowManager::build_tray_window(app_handle) {
                 warn!("Failed to pre-build tray window: {e}");
             }
             if let Err(e) = WindowManager::build_full_view_window(app_handle) {
                 warn!("Failed to pre-build full window: {e}");
+            }
+            if let Err(e) = WindowManager::build_welcome_window(app_handle) {
+                warn!("Failed to pre-build welcome window: {e}");
             }
 
             // Decide which window to show based on available locations.
@@ -409,6 +429,9 @@ fn main() {
             if launched_by_deep_link {
                 info!("App launched via deep link, opening full view directly.");
                 let _ = WindowManager::open_full_view(app_handle);
+            } else if open_welcome_view {
+                info!("Opening welcome view.");
+                let _ = WindowManager::open_welcome_view(app_handle);
             } else {
                 show_tray_or_full_view(app_handle);
             }
