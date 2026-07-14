@@ -15,6 +15,27 @@ import { EnrollmentControls } from '../../components/EnrollmentControls/Enrollme
 import { activateUser } from '../../hooks/activateUser';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
+/**
+ * Map a register-mfa-finish error to a user-facing message. The proxy rejects
+ * a wrong code with a `proxy_error` (HTTP 400) whose message contains "invalid"
+ * (core returns "Code invalid" / "Email code invalid"); anything else is
+ * unexpected and gets a generic message.
+ */
+const mfaFinishErrorMessage = (err: unknown): string => {
+  try {
+    const parsed = JSON.parse(String(err)) as { type?: string; message?: string };
+    if (
+      parsed.type === 'proxy_error' &&
+      parsed.message?.toLowerCase().includes('invalid')
+    ) {
+      return 'Invalid code';
+    }
+  } catch {
+    // Non-JSON error: fall through to the generic message.
+  }
+  return 'MFA setup failed. Please try again.';
+};
+
 export const MfaConfigurationStep = () => {
   const sessionId = useEnrollmentStore((s) => s.sessionId);
   const method = useEnrollmentStore((s) => s.userMfaChoice);
@@ -30,7 +51,7 @@ export const MfaConfigurationStep = () => {
     },
     onError: (err) => {
       void logError(`MFA configuration failed: ${err}`);
-      setError(String(err));
+      setError(mfaFinishErrorMessage(err));
     },
     onSuccess: (resp) => {
       useEnrollmentStore.setState({

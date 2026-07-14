@@ -91,13 +91,15 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
           (event) => {
             cleanupListeners();
             setIsConnecting(false);
+            error(
+              `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
+            );
             const message = mfaErrorMessage(event.payload.error);
             setConnectionError(
               isConnectFailure(message)
                 ? 'Failed to establish VPN connection'
                 : 'Connection error. Please try again.',
             );
-            error(`Mobile MFA failed for location ${location.id}: ${message}`);
           },
         );
 
@@ -154,10 +156,10 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     } catch (e) {
       void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
-        onPostureError?.(String(e));
+        onPostureError?.(mfaErrorMessage(e));
         return;
       }
-      setStartError(String(e));
+      setStartError(mfaErrorMessage(e));
     } finally {
       setIsStarting(false);
     }

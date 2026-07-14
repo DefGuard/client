@@ -93,10 +93,10 @@ export const useMfaConnect = (
         void error(`MFA start failed: ${err}`);
         await waitForMinimumDuration(startedAt, debounceMs);
         if (isMfaPostureError(err, location)) {
-          onPostureError?.(String(err));
+          onPostureError?.(mfaErrorMessage(err));
           return;
         }
-        setStartError(String(err));
+        setStartError(mfaErrorMessage(err));
       } finally {
         setIsStarting(false);
       }
@@ -116,6 +116,7 @@ export const useMfaConnect = (
         await api.mfaFinishCode(instance.id, location.id, token, code);
         onConnected?.();
       } catch (err) {
+        void error(`MFA verification failed: ${err}`);
         const message = mfaErrorMessage(err);
         if (isConnectFailure(message)) {
           setVerifyError('Failed to establish VPN connection');

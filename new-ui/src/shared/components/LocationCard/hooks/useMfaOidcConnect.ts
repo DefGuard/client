@@ -88,6 +88,7 @@ export const useMfaOidcConnect = () => {
         (event) => {
           cleanup();
           setIsPolling(false);
+          error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
           const message = mfaErrorMessage(event.payload.error);
           if (isConnectFailure(message)) {
             setPollError('Failed to establish VPN connection');
@@ -96,7 +97,6 @@ export const useMfaOidcConnect = () => {
           } else {
             setPollError('Authentication failed. Please try again.');
           }
-          error(`OIDC MFA failed for location ${location.id}: ${message}`);
         },
       );
 
@@ -118,11 +118,11 @@ export const useMfaOidcConnect = () => {
     } catch (e) {
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
-        setPostureError(String(e));
+        setPostureError(mfaErrorMessage(e));
         setView(LocationCardViews.PostureCheckFail);
         return;
       }
-      setStartError(String(e));
+      setStartError(mfaErrorMessage(e));
     } finally {
       setIsStarting(false);
     }
