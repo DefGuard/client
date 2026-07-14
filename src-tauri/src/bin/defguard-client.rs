@@ -55,6 +55,8 @@ use tauri_plugin_log::{Target, TargetKind};
 #[macro_use]
 extern crate log;
 
+const ENABLE_WELCOME_SCREEN: bool = false;
+
 // For tauri logging plugin:
 // if found in metadata target name it will ignore the log if it was below info level.
 const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
@@ -314,7 +316,7 @@ fn main() {
                 .expect("Failed to access app data");
             let config = AppConfig::new(&config_dir);
             let current_version = app_handle.package_info().version.clone();
-            let open_welcome_view = match check_app_version(&config_dir, &current_version) {
+            let mut open_welcome_view = match check_app_version(&config_dir, &current_version) {
                 VersionCheckResult::Init => {
                     debug!("No previous version recorded; initializing at {current_version}.");
                     true
@@ -328,6 +330,9 @@ fn main() {
                      true
                 }
             };
+            if !ENABLE_WELCOME_SCREEN {
+                open_welcome_view = false;
+            }
 
             // Setup logging.
 
