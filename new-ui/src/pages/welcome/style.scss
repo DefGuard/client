@@ -1,0 +1,30 @@
+#welcome-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-flow: column;
+  padding: 0 var(--spacing-lg) var(--spacing-md);
+  height: calc(100dvh - var(--spacing-md));
+
+  > header {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    user-select: none;
+    padding-bottom: var(--spacing-md);
+
+    h1 {
+      font: var(--t-h5);
+      color: var(--fg-white-100);
+    }
+
+    > .icon-button {
+      margin-left: auto;
+    }
+  }
+
+  > .welcome-carousel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}

@@ -1,0 +1,40 @@
+.carousel-indicators {
+  display: flex;
+  flex-flow: row;
+  align-items: center;
+
+  .indicator {
+    --scale: 1;
+    --color: var(--fg-white-30);
+
+    border: none;
+    padding: 5px;
+    cursor: pointer;
+    box-sizing: border-box;
+    margin: 0;
+    background: transparent;
+    user-select: none;
+
+    &.active {
+      --color: var(--fg-white-100);
+      --scale: 1.25;
+    }
+
+    &:hover:not(.active) {
+      --color: var(--fg-white-60);
+      --scale: 1;
+    }
+
+    > .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color);
+      transform: scale(var(--scale));
+      content: ' ';
+      display: block;
+
+      @include animate(background-color, transform);
+    }
+  }
+}
