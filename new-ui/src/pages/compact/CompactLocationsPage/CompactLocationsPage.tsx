@@ -79,9 +79,7 @@ export const CompactLocationsPage = () => {
     >
       <WindowHeader variant="compact" />
       {connectionError ? (
-        <TrayConnectionError
-          onBack={() => useTrayConnectionError.setState({ visible: false })}
-        />
+        <TrayConnectionError />
       ) : (
         <ScrollContainer>
           <div className="main-content">
