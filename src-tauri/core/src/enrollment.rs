@@ -586,4 +586,30 @@ mod tests {
 
         assert_eq!(result["assignedIp"], "10.0.0.2");
     }
+
+    #[tokio::test]
+    async fn test_network_info_not_found() {
+        // A 404 means the device was deleted server-side. The status must be
+        // preserved as ProxyError { status: 404 } so the client can detect it
+        // and re-enroll (see the addInstance recovery path in the frontend).
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/enrollment/network_info"))
+            .respond_with(
+                ResponseTemplate::new(404).set_body_json(json!({ "error": "device not found" })),
+            )
+            .mount(&server)
+            .await;
+
+        let session = make_session(&server);
+        let err = enrollment_network_info(session, "pk".into())
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            EnrollmentError::ProxyError { status: 404, .. }
+        ));
+    }
 }
