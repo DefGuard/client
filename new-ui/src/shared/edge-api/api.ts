@@ -25,17 +25,20 @@ const saveDeviceConfig = (args: {
   response: CreateDeviceResponse;
 }): Promise<SaveDeviceConfigResponse> => invoke(TauriCommand.SaveDeviceConfig, args);
 
+/// Extract the raw Rust error string from a Tauri command rejection.
+/// Tauri 2 command errors may be plain objects (message on `message`) or the
+/// returned `Err(String)` directly.
+const rustErrorMessage = (err: unknown): string =>
+  typeof err === 'object' && err !== null && 'message' in err
+    ? String((err as Record<string, unknown>).message)
+    : String(err);
+
 /// Parse a Tauri command error that contains a serialized `EnrollmentError`
 /// JSON string into an `EnrollmentErrorKind` and human-readable message.
 const parseEnrollmentError = (
   err: unknown,
 ): { error?: string; errorKind: EnrollmentErrorKind } => {
-  // Tauri 2 command errors are plain objects, not Error instances.
-  // The Rust error message is on the `message` property.
-  const raw =
-    typeof err === 'object' && err !== null && 'message' in err
-      ? String((err as Record<string, unknown>).message)
-      : String(err);
+  const raw = rustErrorMessage(err);
   try {
     const parsed = JSON.parse(raw) as { type: string; message?: string; status?: number };
     switch (parsed.type) {
@@ -50,6 +53,20 @@ const parseEnrollmentError = (
     }
   } catch {
     return { error: raw, errorKind: 'server' };
+  }
+};
+
+/// True when a command error is a proxy 404 - the device was deleted
+/// server-side while a stale local record survived.
+const isDeviceNotFound = (err: unknown): boolean => {
+  try {
+    const parsed = JSON.parse(rustErrorMessage(err)) as {
+      type?: string;
+      status?: number;
+    };
+    return parsed.type === 'proxy_error' && parsed.status === 404;
+  } catch {
+    return false;
   }
 };
 
@@ -83,15 +100,22 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
     const instances = await getInstances();
     const existing = instances.find((i) => i.uuid === startResult.instance.id);
     if (existing) {
-      const netInfo = await api.enrollmentNetworkInfo(
-        startResult.session_id,
-        existing.pubkey,
-      );
-      await updateInstanceRecord({
-        instanceId: existing.id,
-        response: netInfo as CreateDeviceResponse,
-      });
-      return {};
+      try {
+        const netInfo = await api.enrollmentNetworkInfo(
+          startResult.session_id,
+          existing.pubkey,
+        );
+        await updateInstanceRecord({
+          instanceId: existing.id,
+          response: netInfo as CreateDeviceResponse,
+        });
+        return {};
+      } catch (e) {
+        // Device was deleted server-side but the local record survived: drop
+        // the stale record and fall through to a fresh enrollment.
+        if (!isDeviceNotFound(e)) throw e;
+        await api.deleteInstance(existing.id);
+      }
     }
 
     const normalizedName = values.name.trim().toLowerCase();
