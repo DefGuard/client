@@ -17,14 +17,8 @@ import { DeadConDroppedModal } from './components/modals/DeadConDroppedModal/Dea
 import { useDeadConDroppedModal } from './components/modals/DeadConDroppedModal/store';
 import { useClientFlags } from './hooks/useClientFlags';
 import { useClientStore } from './hooks/useClientStore';
-import { useMFAModal } from './pages/ClientInstancePage/components/LocationsList/modals/MFAModal/useMFAModal';
 import { clientQueryKeys } from './query';
-import {
-  ClientConnectionType,
-  type CommonWireguardFields,
-  type DeadConDroppedPayload,
-  TauriEventKey,
-} from './types';
+import { type DeadConDroppedPayload, TauriEventKey } from './types';
 
 const { getInstances, getTunnels, getAppConfig } = clientApi;
 
@@ -43,7 +37,6 @@ export const ClientPage = () => {
   const location = useLocation();
   const toaster = useToaster();
   const openDeadConDroppedModal = useDeadConDroppedModal((s) => s.open);
-  const openMFAModal = useMFAModal((state) => state.open);
   const { LL } = useI18nContext();
 
   const { data: instances } = useQuery({
@@ -177,15 +170,6 @@ export const ClientPage = () => {
       },
     );
 
-    const mfaTrigger = listen<CommonWireguardFields>(
-      TauriEventKey.MFA_TRIGGER,
-      (data) => {
-        // Set connection type, as it is not transferred from Rust and MFA is only for locations.
-        data.payload.connection_type = ClientConnectionType.LOCATION;
-        openMFAModal(data.payload);
-      },
-    );
-
     return () => {
       deadConnectionDropped.then((cleanup) => cleanup());
       deadConnectionReconnected.then((cleanup) => cleanup());
@@ -194,7 +178,6 @@ export const ClientPage = () => {
       instanceUpdate.then((cleanup) => cleanup());
       locationUpdate.then((cleanup) => cleanup());
       appConfigChanged.then((cleanup) => cleanup());
-      mfaTrigger.then((cleanup) => cleanup());
       verionMismatch.then((cleanup) => cleanup());
       uuidMismatch.then((cleanup) => cleanup());
     };

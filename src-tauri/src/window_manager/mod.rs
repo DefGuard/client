@@ -5,7 +5,7 @@ use tauri::{
 
 use crate::{
     database::{
-        models::{location::Location, tunnel::Tunnel},
+        models::{location::Location, tunnel::Tunnel, Id},
         DB_POOL,
     },
     events::EventKey,
@@ -150,11 +150,12 @@ impl WindowManager {
             Self::build_tray_window(app)?
         };
         #[cfg(target_os = "macos")]
-        macos::position_window_near_tray(app, &window);
-        #[cfg(target_os = "macos")]
-        let _ = app.set_dock_visibility(false);
-        #[cfg(target_os = "macos")]
-        let _ = app.show();
+        {
+            macos::position_window_near_tray(app, &window);
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            let _ = app.set_dock_visibility(false);
+            let _ = app.show();
+        }
         let _ = window.show();
         let _ = window.set_focus();
         Ok(window)
@@ -168,9 +169,11 @@ impl WindowManager {
             Self::build_full_view_window(app)?
         };
         #[cfg(target_os = "macos")]
-        let _ = app.set_dock_visibility(true);
-        #[cfg(target_os = "macos")]
-        let _ = app.show();
+        {
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+            let _ = app.set_dock_visibility(true);
+            let _ = app.show();
+        }
         let _ = window.show();
         let _ = window.set_focus();
         Ok(window)
@@ -221,6 +224,22 @@ pub fn show_tray_or_full_view(app: &AppHandle) {
     } else {
         let _ = WindowManager::open_full_view(app);
     }
+}
+
+/// Surface the window that should host the MFA flow, and emit `MfaTrigger` targeted at that window.
+pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
+    let target = if let Some(window) = app
+        .get_webview_window(FULL_VIEW_WINDOW_ID)
+        .filter(|w| w.is_visible().unwrap_or(false))
+    {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        FULL_VIEW_WINDOW_ID
+    } else {
+        show_tray_window(app);
+        COMPACT_WINDOW_ID
+    };
+    let _ = app.emit_to(target, EventKey::MfaTrigger.into(), location);
 }
 
 #[tauri::command]

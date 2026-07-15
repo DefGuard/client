@@ -4,7 +4,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import clsx from 'clsx';
 import { Fragment, useMemo } from 'react';
-import { ConnectModalView } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
+import {
+  ConnectModalView,
+  mfaMethodToConnectModalView,
+} from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
@@ -76,23 +79,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     }
 
     if (location.location_mfa_mode !== LocationMfaMode.Disabled) {
-      const mfaMethod = location.mfa_method ?? MfaMethod.Totp;
-      let view: (typeof ConnectModalView)[keyof typeof ConnectModalView];
-      switch (mfaMethod) {
-        case MfaMethod.Email:
-          view = ConnectModalView.MfaEmail;
-          break;
-        case MfaMethod.Oidc:
-          view = ConnectModalView.MfaOidc;
-          break;
-        case MfaMethod.MobileApprove:
-          view = ConnectModalView.MfaMobile;
-          break;
-        default:
-          view = ConnectModalView.MfaTotp;
-      }
       useConnectModal.getState().open({
-        view,
+        view: mfaMethodToConnectModalView(location.mfa_method ?? MfaMethod.Totp),
         location,
         autoStartOpenId: appConfig.auto_start_openid_mfa,
         mfaMethod: location.mfa_method,
