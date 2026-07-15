@@ -4,7 +4,6 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import { useTrayConnectionError } from '../../../store/useAppStore';
 import {
   CLIENT_MFA_ENDPOINT,
   isEdgeUnavailable,
@@ -147,7 +146,7 @@ export const useMfaOidcConnect = () => {
         return;
       }
       if (isEdgeUnavailable(e)) {
-        useTrayConnectionError.setState({ visible: true });
+        setView(LocationCardViews.ConnectionError);
         return;
       }
       setStartError(

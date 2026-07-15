@@ -8,6 +8,7 @@ export const LocationCardViews = {
   Connecting: 'connecting',
   Connected: 'connected',
   PostureCheckFail: 'posture-check-fail',
+  ConnectionError: 'connection-error',
 } as const;
 
 export type LocationCardViewsValue =
