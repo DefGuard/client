@@ -88,9 +88,6 @@ export const LocationCardProvider = ({
     }
   }, [setView, mfaMethod]);
 
-  // Auto-start the MFA flow when the backend requested it for this location
-  // (e.g. connecting from the tray). The trigger is set in TauriEventProvider.
-  // Select a per-card boolean so only the matching card re-renders on the trigger.
   const mfaAutoStartRequested = useAppStore(
     (s) => s.mfaAutoStartLocationId === location.id,
   );

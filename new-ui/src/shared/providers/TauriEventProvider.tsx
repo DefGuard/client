@@ -44,17 +44,12 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       }),
       // Backend requests the MFA flow (e.g. connecting to an MFA location from the
       // tray or system settings). The location is emitted as the payload directly.
-      // The backend targets whichever window it surfaced: the full view (if it was
-      // already open) or the compact tray window. Each window handles the event in
-      // the way native to it.
       listen<Omit<LocationInfo, 'connection_type' | 'active'>>(
         TauriEvent.MfaTrigger,
         (event) => {
           void debug(`UI Received event MfaTrigger: ${JSON.stringify(event.payload)}`);
           const windowLabel = getCurrentWindow().label;
 
-          // Compact window: select the location's instance, expand its card and
-          // flag it to auto-start the MFA flow so the user can enter their code inline.
           if (windowLabel === WindowId.CompactView) {
             const { id: locationId, instance_id: instanceId } = event.payload;
             setViewSelection({ kind: 'instance', id: instanceId });
@@ -65,8 +60,6 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             return;
           }
 
-          // Full view: open the shared ConnectModal on the overview page. The
-          // location arrives without `connection_type`/`active` (MFA is location-only).
           if (windowLabel === WindowId.FullView) {
             const location: LocationInfo = {
               ...event.payload,
@@ -78,7 +71,6 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
               const mfaMethod =
                 decideLocationMfaMethod(location, location.mfa_method) ?? MfaMethod.Totp;
 
-              // The ConnectModal is only mounted on the overview page.
               await navigate({ to: '/full/overview' });
               useConnectModal.getState().open({
                 view: mfaMethodToConnectModalView(mfaMethod),

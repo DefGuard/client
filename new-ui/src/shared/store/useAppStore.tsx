@@ -4,9 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 interface StoreValues {
   // only used in compact mode
   expandedLocation: number | null;
-  // Location id whose MFA flow should auto-start (e.g. triggered from the tray).
-  // Consumed and cleared by the matching location card. Not persisted so a stale
-  // trigger cannot fire on the next launch.
+  // Location ID whose MFA flow should auto-start (e.g. triggered from the tray).
   mfaAutoStartLocationId: number | null;
 }
 

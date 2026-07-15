@@ -9,7 +9,6 @@ export const ConnectModalView = {
   PostureCheckFail: 'posture-check-fail',
 } as const;
 
-/** Map an MFA method to the ConnectModal view that collects it. */
 export const mfaMethodToConnectModalView = (
   method: MfaMethodValue,
 ): ConnectModalViewValue => {

@@ -164,9 +164,7 @@ pub fn show_tray_or_full_view(app: &AppHandle) {
     }
 }
 
-/// Surface the window that should host the MFA flow — the full view if it is
-/// already open, otherwise the compact tray window — and emit `MfaTrigger`
-/// targeted at that window so only it handles the request.
+/// Surface the window that should host the MFA flow, and emit `MfaTrigger` targeted at that window.
 pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
     let target = if let Some(window) = app
         .get_webview_window(FULL_VIEW_WINDOW_ID)

@@ -15,12 +15,10 @@ export const MfaModalProvider = ({ children }: Props) => {
     let unlisten: UnlistenFn;
 
     (async () => {
-      // The backend emits the location as the event payload directly.
       unlisten = await listen<CommonWireguardFields>(
         TauriEventKey.MFA_TRIGGER,
         ({ payload: location }) => {
           if (isPresent(location)) {
-            // Set connection type, as it is not transferred from Rust and MFA is only for locations.
             location.connection_type = ClientConnectionType.LOCATION;
             openMFAModal(location);
           }
