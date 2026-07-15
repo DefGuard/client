@@ -126,6 +126,7 @@ export const TauriCommand = {
   // Session state
   GetSessionState: 'get_session_state',
   PatchSessionState: 'patch_session_state',
+  CloseWelcomeWindow: 'close_welcome_window',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];

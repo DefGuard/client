@@ -8,8 +8,9 @@ use windows::Win32::{
 };
 
 use crate::window_manager::{
-    WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID, COMPACT_WINDOW_WIDTH,
-    FULL_VIEW_WINDOW_HEIGHT, FULL_VIEW_WINDOW_ID, FULL_VIEW_WINDOW_WIDTH, WINDOW_GAP,
+    hide_shown_windows, WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID,
+    COMPACT_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT, FULL_VIEW_WINDOW_ID, FULL_VIEW_WINDOW_WIDTH,
+    WELCOME_WINDOW_HEIGHT, WELCOME_WINDOW_ID, WELCOME_WINDOW_WIDTH, WINDOW_GAP,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -327,6 +328,42 @@ impl WindowManager {
         info!("open_full_view: Position set, showing window");
         window.show()?;
         info!("open_full_view: Window shown successfully");
+        Ok(window)
+    }
+
+    pub fn open_welcome_view(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+        hide_shown_windows(app, WELCOME_WINDOW_ID);
+
+        let monitors = Self::get_monitors();
+        let primary = monitors
+            .iter()
+            .find(|m| m.is_primary)
+            .unwrap_or(&monitors[0]);
+
+        let window = if let Some(window) = app.get_webview_window(WELCOME_WINDOW_ID) {
+            let _ = window.unminimize();
+            window
+        } else {
+            Self::build_welcome_window(app)?
+        };
+
+        let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
+            width: (WELCOME_WINDOW_WIDTH * primary.scale_factor) as u32,
+            height: (WELCOME_WINDOW_HEIGHT * primary.scale_factor) as u32,
+        });
+
+        let physical_width = outer_size.width as i32;
+        let physical_height = outer_size.height as i32;
+
+        let center_x = primary.physical_x + (primary.physical_width as i32 / 2);
+        let center_y = primary.physical_y + (primary.physical_height as i32 / 2);
+
+        let window_x = center_x - (physical_width / 2);
+        let window_y = center_y - (physical_height / 2);
+
+        window.set_position(tauri::PhysicalPosition::new(window_x, window_y))?;
+        window.show()?;
+        window.set_focus()?;
         Ok(window)
     }
 }
