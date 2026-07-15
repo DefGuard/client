@@ -16,17 +16,15 @@ import {
   getLocationsQueryOptions,
   getTunnelsQueryOptions,
 } from '../../../shared/rust-api/query';
-import { useAppStore, useTrayConnectionError } from '../../../shared/store/useAppStore';
+import { useAppStore } from '../../../shared/store/useAppStore';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { CompactPage } from '../CompactPage/CompactPage';
 import { InstanceSwitcher } from './components/InstanceSwitcher';
-import { TrayConnectionError } from './components/TrayConnectionError';
 
 export const CompactLocationsPage = () => {
   const { viewSelection: selection, setViewSelection } = useAppData();
   const openLocation = useAppStore((s) => s.expandedLocation);
-  const connectionError = useTrayConnectionError((s) => s.visible);
 
   const routeData = useLoaderData({ from: '/compact/' });
 
@@ -78,37 +76,33 @@ export const CompactLocationsPage = () => {
       }}
     >
       <WindowHeader variant="compact" />
-      {connectionError ? (
-        <TrayConnectionError />
-      ) : (
-        <ScrollContainer>
-          <div className="main-content">
-            <InstanceSwitcher />
-            <div className="locations">
-              {displayedLocations.map((location) => {
-                const isOpen =
-                  location.id === openLocation || displayedLocations.length === 1;
-                return (
-                  <LocationCard
-                    instance={instanceInfo}
-                    disableOpen={displayedLocations.length <= 1}
-                    location={location}
-                    key={`${location.connection_type}-${location.id}`}
-                    isOpen={isOpen}
-                    onOpen={() => {
-                      if (isOpen) {
-                        useAppStore.setState({ expandedLocation: null });
-                      } else {
-                        useAppStore.setState({ expandedLocation: location.id });
-                      }
-                    }}
-                  />
-                );
-              })}
-            </div>
+      <ScrollContainer>
+        <div className="main-content">
+          <InstanceSwitcher />
+          <div className="locations">
+            {displayedLocations.map((location) => {
+              const isOpen =
+                location.id === openLocation || displayedLocations.length === 1;
+              return (
+                <LocationCard
+                  instance={instanceInfo}
+                  disableOpen={displayedLocations.length <= 1}
+                  location={location}
+                  key={`${location.connection_type}-${location.id}`}
+                  isOpen={isOpen}
+                  onOpen={() => {
+                    if (isOpen) {
+                      useAppStore.setState({ expandedLocation: null });
+                    } else {
+                      useAppStore.setState({ expandedLocation: location.id });
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
-        </ScrollContainer>
-      )}
+        </div>
+      </ScrollContainer>
       <div className="compact-footer">
         <Divider spacing={ThemeSpacing.Md} />
         <Controls>

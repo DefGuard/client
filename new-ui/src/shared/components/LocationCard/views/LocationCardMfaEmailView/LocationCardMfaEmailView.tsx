@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useTrayConnectionError } from '../../../../store/useAppStore';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
@@ -33,7 +32,7 @@ export const LocationCardMfaEmailView = () => {
         setPostureError(msg);
         setView(LocationCardViews.PostureCheckFail);
       },
-      onServiceUnavailable: () => useTrayConnectionError.setState({ visible: true }),
+      onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
     },
   );
 
