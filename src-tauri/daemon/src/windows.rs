@@ -90,7 +90,7 @@ fn run_service() -> Result<(), DaemonError> {
         })?;
 
         let config: Config = Config::parse();
-        let _guard = logging_setup(&config.log_dir, &config.log_level);
+        let _guard = logging_setup(&config.log_dir, &config.log_level, config.log_max_files);
 
         let default_panic = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {

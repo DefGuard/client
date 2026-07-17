@@ -14,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
 
     // parse config
     let config: Config = Config::parse();
-    let _guard = logging_setup(&config.log_dir, &config.log_level);
+    let _guard = logging_setup(&config.log_dir, &config.log_level, config.log_max_files);
 
     // run gRPC server
     run_server(config).await?;
