@@ -3,21 +3,24 @@ use std::io::stdout;
 use tracing::Level;
 use tracing_appender::{
     non_blocking::WorkerGuard,
-    rolling::{RollingFileAppender, Rotation},
+    rolling::{InitError, RollingFileAppender, Rotation},
 };
 use tracing_subscriber::{
     fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
     Layer,
 };
 
-pub fn logging_setup(log_dir: &str, log_level: &str, log_max_files: usize) -> WorkerGuard {
+pub fn logging_setup(
+    log_dir: &str,
+    log_level: &str,
+    log_max_files: usize,
+) -> Result<WorkerGuard, InitError> {
     // prepare log file appender
     let file_appender = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
         .filename_prefix("defguard-service.log")
         .max_log_files(log_max_files)
-        .build(log_dir)
-        .expect("failed to initialize service log appender");
+        .build(log_dir)?;
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // prepare log level filter for stdout
@@ -43,5 +46,5 @@ pub fn logging_setup(log_dir: &str, log_level: &str, log_max_files: usize) -> Wo
         .with(json_file_layer)
         .init();
 
-    guard
+    Ok(guard)
 }
