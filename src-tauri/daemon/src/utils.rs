@@ -18,11 +18,13 @@ pub fn logging_setup(
     log_max_files: usize,
 ) -> Result<WorkerGuard, InitError> {
     // prepare log file appender
-    let file_appender = RollingFileAppender::builder()
+    let mut appender_builder = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
-        .filename_prefix(SERVICE_LOG_PREFIX)
-        .max_log_files(log_max_files)
-        .build(log_dir)?;
+        .filename_prefix(SERVICE_LOG_PREFIX);
+    if log_max_files > 0 {
+        appender_builder = appender_builder.max_log_files(log_max_files);
+    }
+    let file_appender = appender_builder.build(log_dir)?;
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // prepare log level filter for stdout
