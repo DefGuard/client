@@ -28,6 +28,9 @@ jobs:
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_ENABLED: 'true'
       DEFGUARD_CLIENT_WELCOME_SKIP: '1'
+      # Fix for: repository path is not owned by current user.
+      VERGEN_GIT_SHA: 'e2e'
+      VERGEN_IDEMPOTENT: '1'
     steps:
       - name: Install system dependencies
         run: |
