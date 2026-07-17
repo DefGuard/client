@@ -27,9 +27,9 @@ use defguard_client::{
     events::handle_deep_link,
     periodic::run_periodic_tasks,
     provisioning::handle_client_initialization,
-    service, session_state,
+    session_state,
     tray::{configure_tray_icon, setup_tray},
-    utils::load_log_targets,
+    utils::{load_log_targets, DEFAULT_SERVICE_LOG_DIR},
     window_manager::*,
     LOG_FILENAME, VERSION,
 };
@@ -43,10 +43,12 @@ use defguard_client::{
 use defguard_client::{
     connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension,
 };
-use defguard_client_core::connection::active_connections::close_all_connections;
 #[cfg(target_os = "macos")]
 use defguard_client_core::connection::sync_locations_and_tunnels;
-use defguard_client_core::version::{check_app_version, VersionCheckResult};
+use defguard_client_core::{
+    connection::active_connections::close_all_connections,
+    version::{check_app_version, VersionCheckResult},
+};
 use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -476,7 +478,7 @@ fn main() {
                 connections at the network level will be stored in: {}.",
                 data_dir.display(),
                 log_dir.display(),
-                service::config::DEFAULT_LOG_DIR
+                DEFAULT_SERVICE_LOG_DIR
             );
             async_runtime::block_on(startup(app_handle));
 
