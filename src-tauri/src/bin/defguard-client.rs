@@ -43,10 +43,12 @@ use defguard_client::{
 use defguard_client::{
     connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension,
 };
-use defguard_client_core::connection::active_connections::close_all_connections;
 #[cfg(target_os = "macos")]
 use defguard_client_core::connection::sync_locations_and_tunnels;
-use defguard_client_core::version::{check_app_version, VersionCheckResult};
+use defguard_client_core::{
+    connection::active_connections::close_all_connections,
+    version::{check_app_version, VersionCheckResult},
+};
 use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
