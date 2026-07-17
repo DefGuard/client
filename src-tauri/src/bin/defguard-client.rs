@@ -27,9 +27,9 @@ use defguard_client::{
     events::handle_deep_link,
     periodic::run_periodic_tasks,
     provisioning::handle_client_initialization,
-    service, session_state,
+    session_state,
     tray::{configure_tray_icon, setup_tray},
-    utils::load_log_targets,
+    utils::{load_log_targets, DEFAULT_SERVICE_LOG_DIR},
     window_manager::*,
     LOG_FILENAME, VERSION,
 };
@@ -476,7 +476,7 @@ fn main() {
                 connections at the network level will be stored in: {}.",
                 data_dir.display(),
                 log_dir.display(),
-                service::config::DEFAULT_LOG_DIR
+                DEFAULT_SERVICE_LOG_DIR
             );
             async_runtime::block_on(startup(app_handle));
 

@@ -266,17 +266,20 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
+/// Default log file directory for `defguard-service` daemon.
+#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/Logs/defguard-service";
+
+#[cfg(not(target_os = "macos"))]
+#[cfg(not(windows))]
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/var/log/defguard-service";
+
 /// Helper function to get log file directory for `defguard-service` daemon.
 #[cfg(not(target_os = "macos"))]
 #[must_use]
 pub fn get_service_log_dir() -> &'static Path {
-    #[cfg(windows)]
-    let path = "/Logs/defguard-service";
-
-    #[cfg(not(windows))]
-    let path = "/var/log/defguard-service";
-
-    Path::new(path)
+    Path::new(DEFAULT_SERVICE_LOG_DIR)
 }
 
 /// Setup client interface

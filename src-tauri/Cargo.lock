@@ -1544,7 +1544,6 @@ dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
  "chrono",
- "clap",
  "dark-light",
  "defguard-client-common",
  "defguard-client-config-sync",
