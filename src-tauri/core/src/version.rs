@@ -3,9 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize};
-
 pub use semver::Version;
+use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
 use crate::set_perms;

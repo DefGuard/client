@@ -4,10 +4,12 @@
 //! starting enrollment, creating a device, activating the user, registering
 //! MFA, and finishing the enrollment.
 
-use defguard_client_proto::defguard::client_types::EnrollmentStartResponse;
+use defguard_client_proto::defguard::client_types::{
+    DeviceConfigResponse, EnrollmentStartResponse,
+};
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use serde_json::json;
 use thiserror::Error;
 
 use crate::{
@@ -147,7 +149,7 @@ pub async fn enrollment_start(
 
     let response = client
         .post(url)
-        .json(&serde_json::json!({ "token": token }))
+        .json(&json!({ "token": token }))
         .header(CLIENT_VERSION_HEADER, PKG_VERSION)
         .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
         .send()
@@ -195,11 +197,11 @@ pub async fn enrollment_create_device(
     session: EnrollmentSession,
     name: String,
     pubkey: String,
-) -> Result<JsonValue, EnrollmentError> {
+) -> Result<DeviceConfigResponse, EnrollmentError> {
     let response = enrollment_post(
         &session,
         "api/v1/enrollment/create_device",
-        serde_json::json!({ "name": name, "pubkey": pubkey }),
+        json!({ "name": name, "pubkey": pubkey }),
     )
     .await?;
 
@@ -222,7 +224,7 @@ pub async fn enrollment_activate_user(
     enrollment_post(
         &session,
         "api/v1/enrollment/activate_user",
-        serde_json::json!({
+        json!({
             "password": password,
             "phone_number": phone_number,
         }),
@@ -244,7 +246,7 @@ pub async fn enrollment_register_mfa_start(
     let response = enrollment_post(
         &session,
         "api/v1/enrollment/register-mfa/code/start",
-        serde_json::json!({ "method": method }),
+        json!({ "method": method }),
     )
     .await?;
 
@@ -266,7 +268,7 @@ pub async fn enrollment_register_mfa_finish(
     let response = enrollment_post(
         &session,
         "api/v1/enrollment/register-mfa/code/finish",
-        serde_json::json!({ "code": code, "method": method }),
+        json!({ "code": code, "method": method }),
     )
     .await?;
 
@@ -283,11 +285,11 @@ pub async fn enrollment_register_mfa_finish(
 pub async fn enrollment_network_info(
     session: EnrollmentSession,
     pubkey: String,
-) -> Result<JsonValue, EnrollmentError> {
+) -> Result<DeviceConfigResponse, EnrollmentError> {
     let response = enrollment_post(
         &session,
         "api/v1/enrollment/network_info",
-        serde_json::json!({ "pubkey": pubkey }),
+        json!({ "pubkey": pubkey }),
     )
     .await?;
 
@@ -491,10 +493,42 @@ mod tests {
         }
     }
 
+    fn device_config_json(assigned_ip: &str) -> serde_json::Value {
+        json!({
+            "device": {
+                "id": 1,
+                "name": "my-device",
+                "pubkey": "pk",
+                "user_id": 1,
+                "created_at": 1734567890,
+            },
+            "configs": [{
+                "network_id": 1,
+                "network_name": "main",
+                "config": "wg0",
+                "endpoint": "1.2.3.4:51820",
+                "assigned_ip": assigned_ip,
+                "pubkey": "nw-pk",
+                "allowed_ips": "0.0.0.0/0",
+                "keepalive_interval": 25,
+                "mfa_enabled": false,
+            }],
+            "instance": {
+                "id": "inst-1",
+                "name": "Test Instance",
+                "url": "https://test.defguard.net",
+                "proxy_url": "https://proxy.defguard.net",
+                "username": "jdoe",
+                "enterprise_enabled": false,
+                "disable_all_traffic": false,
+            },
+        })
+    }
+
     #[tokio::test]
     async fn test_create_device_success() {
         let server = MockServer::start().await;
-        let response_body = json!({ "config": "wg0", "assignedIp": "10.0.0.1" });
+        let response_body = device_config_json("10.0.0.1");
 
         Mock::given(method("POST"))
             .and(path("/api/v1/enrollment/create_device"))
@@ -507,7 +541,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result["config"], "wg0");
+        assert_eq!(result.configs[0].config, "wg0");
     }
 
     #[tokio::test]
@@ -573,7 +607,7 @@ mod tests {
     #[tokio::test]
     async fn test_network_info_success() {
         let server = MockServer::start().await;
-        let response_body = json!({ "config": "wg0", "assignedIp": "10.0.0.2" });
+        let response_body = device_config_json("10.0.0.2");
 
         Mock::given(method("POST"))
             .and(path("/api/v1/enrollment/network_info"))
@@ -584,7 +618,7 @@ mod tests {
         let session = make_session(&server);
         let result = enrollment_network_info(session, "pk".into()).await.unwrap();
 
-        assert_eq!(result["assignedIp"], "10.0.0.2");
+        assert_eq!(result.configs[0].assigned_ip, "10.0.0.2");
     }
 
     #[tokio::test]

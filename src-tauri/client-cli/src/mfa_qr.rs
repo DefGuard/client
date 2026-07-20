@@ -11,6 +11,7 @@ use image::Luma;
 #[cfg(not(test))]
 use qrcode::render::unicode::Dense1x2;
 use qrcode::QrCode;
+use serde_json::json;
 
 use crate::state::CliError;
 
@@ -23,7 +24,7 @@ const QR_PNG_MIN_SIZE: u32 = 300;
 /// QR payload format:
 ///   Base64(JSON{token, challenge, instance_id})
 pub(crate) fn build_qr_payload(token: &str, challenge: &str, instance_id: &str) -> String {
-    let json = serde_json::json!({
+    let json = json!({
         "token": token,
         "challenge": challenge,
         "instance_id": instance_id,

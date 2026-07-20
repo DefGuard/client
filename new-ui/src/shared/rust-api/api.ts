@@ -6,6 +6,7 @@ import type {
   AppConfigPatch,
   Connection,
   ConnectionArgs,
+  CreateDeviceResponse,
   EnrollmentMfaFinishResult,
   EnrollmentMfaStartResult,
   EnrollmentStartResult,
@@ -151,7 +152,7 @@ const enrollmentCreateDevice = (
   sessionId: string,
   name: string,
   pubkey: string,
-): Promise<unknown> =>
+): Promise<CreateDeviceResponse> =>
   invoke(TauriCommand.EnrollmentCreateDevice, { sessionId, name, pubkey });
 
 const enrollmentActivateUser = (
@@ -181,7 +182,10 @@ const enrollmentRegisterMfaFinish = (
     method: mfaToApi(method),
   });
 
-const enrollmentNetworkInfo = (sessionId: string, pubkey: string): Promise<unknown> =>
+const enrollmentNetworkInfo = (
+  sessionId: string,
+  pubkey: string,
+): Promise<CreateDeviceResponse> =>
   invoke(TauriCommand.EnrollmentNetworkInfo, { sessionId, pubkey });
 
 const enrollmentFinish = (sessionId: string): Promise<void> =>

@@ -75,7 +75,7 @@ export const enrollmentCreateDevice = async (
     const deviceResponse = await api.enrollmentCreateDevice(sessionId, name, publicKey);
     await saveDeviceConfig({
       privateKey,
-      response: deviceResponse as CreateDeviceResponse,
+      response: deviceResponse,
     });
     return {};
   } catch (e) {
@@ -102,7 +102,7 @@ export const enrollmentAddInstance = async (
         );
         await updateInstanceRecord({
           instanceId: existing.id,
-          response: netInfo as CreateDeviceResponse,
+          response: netInfo,
         });
         return {};
       } catch (e) {
@@ -155,7 +155,7 @@ export const enrollmentUpdateInstance = async (
     );
     await updateInstanceRecord({
       instanceId: existing.id,
-      response: netInfo as CreateDeviceResponse,
+      response: netInfo,
     });
     return {};
   } catch (e) {

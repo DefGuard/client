@@ -20,6 +20,7 @@ use defguard_core::{
         DbPool,
     },
     mfa,
+    proto::client_types::{ClientMfaFinishRequest, ClientMfaStartRequest},
 };
 use secrecy::{ExposeSecret, SecretString};
 use tracing::{debug, info, warn};
@@ -154,7 +155,7 @@ pub(crate) async fn authorize(
     check_proxy_scheme(&proxy_url);
 
     debug!("Starting MFA session for location {}", location.name);
-    let request = defguard_client_proto::defguard::client_types::ClientMfaStartRequest {
+    let request = ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: wireguard_keys.pubkey,
         method: method as i32,
@@ -170,7 +171,7 @@ pub(crate) async fn authorize(
     };
     let code = obtain_code(source, &ctx)?;
 
-    let finish_req = defguard_client_proto::defguard::client_types::ClientMfaFinishRequest {
+    let finish_req = ClientMfaFinishRequest {
         token: info.token,
         code: Some(code.expose_secret().to_string()),
         auth_pub_key: None,
@@ -212,7 +213,7 @@ pub(crate) async fn authorize_oidc(
     check_proxy_scheme(&proxy_url);
 
     debug!("Starting OIDC MFA session for location {}", location.name);
-    let request = defguard_client_proto::defguard::client_types::ClientMfaStartRequest {
+    let request = ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: wireguard_keys.pubkey,
         method: MfaMethod::Oidc as i32,
@@ -284,7 +285,7 @@ pub(crate) async fn authorize_mobile_approve(
         "Starting mobile-approve MFA session for location {}",
         location.name
     );
-    let request = defguard_client_proto::defguard::client_types::ClientMfaStartRequest {
+    let request = ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: wireguard_keys.pubkey,
         method: MfaMethod::MobileApprove as i32,
