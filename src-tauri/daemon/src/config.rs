@@ -17,6 +17,10 @@ pub struct Config {
     #[arg(long, env = "DEFGUARD_LOG_DIR", default_value = DEFAULT_LOG_DIR, hide = true)]
     pub log_dir: String,
 
+    /// Configures maximum number of service log files to keep. Set to 0 to disable cleanup.
+    #[arg(long, env = "DEFGUARD_LOG_MAX_FILES", default_value_t = 8)]
+    pub log_max_files: usize,
+
     /// Defines how often (in seconds) interface statistics are sent to defguard client
     #[arg(long, short = 'p', env = "DEFGUARD_STATS_PERIOD", default_value = "10")]
     pub stats_period: u64,

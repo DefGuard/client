@@ -10,7 +10,8 @@ import {
 import { useAppData } from '../../../providers/AppDataContext';
 import { api } from '../../../rust-api/api';
 import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
-import { MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
+import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
+import { useAppStore } from '../../../store/useAppStore';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
@@ -86,6 +87,20 @@ export const LocationCardProvider = ({
         break;
     }
   }, [setView, mfaMethod]);
+
+  const mfaAutoStartRequested = useAppStore(
+    (s) => s.mfaAutoStartLocationId === location.id,
+  );
+  useEffect(() => {
+    if (
+      mfaAutoStartRequested &&
+      location.connection_type === ConnectionType.Location &&
+      !location.active
+    ) {
+      useAppStore.setState({ mfaAutoStartLocationId: null });
+      void startMfa();
+    }
+  }, [mfaAutoStartRequested, location.connection_type, location.active, startMfa]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect on location.active
   useEffect(() => {

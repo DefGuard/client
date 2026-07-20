@@ -1,8 +1,8 @@
+#[cfg(not(target_os = "macos"))]
+use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
 use std::{env, process::Command};
-#[cfg(not(target_os = "macos"))]
-use std::{path::Path, str::FromStr};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -266,18 +266,12 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
-/// Helper function to get log file directory for `defguard-service` daemon.
-#[cfg(not(target_os = "macos"))]
-#[must_use]
-pub fn get_service_log_dir() -> &'static Path {
-    #[cfg(windows)]
-    let path = "/Logs/defguard-service";
+/// Default log file directory for `defguard-service` daemon.
+#[cfg(windows)]
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/Logs/defguard-service";
 
-    #[cfg(not(windows))]
-    let path = "/var/log/defguard-service";
-
-    Path::new(path)
-}
+#[cfg(not(windows))]
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/var/log/defguard-service";
 
 /// Setup client interface
 #[cfg(not(target_os = "macos"))]

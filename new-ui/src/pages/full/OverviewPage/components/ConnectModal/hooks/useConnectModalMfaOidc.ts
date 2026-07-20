@@ -8,6 +8,7 @@ import { api } from '../../../../../../shared/rust-api/api';
 import {
   isConnectFailure,
   isMfaPostureError,
+  isServiceUnavailable,
   isSessionExpired,
   isTimeout,
   mfaErrorMessage,
@@ -20,11 +21,13 @@ import { useConnectModal } from './useConnectModal';
 type Options = {
   onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
+  onServiceUnavailable?: () => void;
 };
 
 export const useConnectModalMfaOidc = ({
   onPostureError,
   onSessionExpired,
+  onServiceUnavailable,
 }: Options = {}) => {
   const location = useConnectModal(useShallow((s) => s.location));
 
@@ -112,11 +115,15 @@ export const useConnectModalMfaOidc = ({
         onPostureError?.(mfaErrorMessage(e));
         return;
       }
+      if (isServiceUnavailable(e)) {
+        onServiceUnavailable?.();
+        return;
+      }
       setStartError(mfaErrorMessage(e));
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, cleanup, onPostureError, onSessionExpired]);
+  }, [instance, location, cleanup, onPostureError, onSessionExpired, onServiceUnavailable]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

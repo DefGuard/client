@@ -17,7 +17,8 @@ use crate::{
     database::models::{get_all_tunnels_locations, location::Location, tunnel::Tunnel, Id},
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    tray::{configure_tray_icon, reload_tray_menu, show_main_window},
+    tray::{configure_tray_icon, reload_tray_menu},
+    window_manager::trigger_mfa,
     ConnectionType,
 };
 
@@ -81,12 +82,11 @@ async fn sync_connections_with_system(app_handle: &AppHandle) {
                     if location.mfa_enabled() {
                         info!(
                             "Location {} requires MFA but was started from system settings, \
-                                canceling system connection and triggering MFA flow",
+                            canceling system connection and triggering MFA flow",
                             location.name
                         );
                         let _ = location.stop_vpn_tunnel();
-                        show_main_window(app_handle);
-                        let _ = app_handle.emit(EventKey::MfaTrigger.into(), &location);
+                        trigger_mfa(app_handle, &location);
                         continue;
                     }
 

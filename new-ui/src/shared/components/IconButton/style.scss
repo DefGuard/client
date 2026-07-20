@@ -73,4 +73,10 @@
       }
     }
   }
+
+  &.disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+    --icon: var(--c-white-30);
+  }
 }

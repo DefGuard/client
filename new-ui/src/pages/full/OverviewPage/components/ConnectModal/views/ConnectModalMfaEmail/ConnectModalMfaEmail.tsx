@@ -32,6 +32,8 @@ export const ConnectModalMfaEmail = () => {
         useConnectModal.setState({ postureError: msg });
         useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
       },
+      onServiceUnavailable: () =>
+        useConnectModal.getState().setView(ConnectModalView.ConnectionError),
     },
   );
 

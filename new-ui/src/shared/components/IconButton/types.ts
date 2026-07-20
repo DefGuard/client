@@ -16,6 +16,7 @@ export type IconButtonProps = {
   variant: IconButtonVariantValue;
   icon: IconKindValue;
   iconRotation?: DirectionValue;
+  disabled?: boolean;
   ref?: Ref<HTMLDivElement>;
   className?: string;
   onClick?: MouseEventHandler<HTMLDivElement>;

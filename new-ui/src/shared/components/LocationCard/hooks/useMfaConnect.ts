@@ -6,6 +6,7 @@ import {
   isConnectFailure,
   isInvalidCode,
   isMfaPostureError,
+  isServiceUnavailable,
   isSessionExpired,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
@@ -36,6 +37,7 @@ type UseMfaConnectOptions = {
   onConnected?: () => void;
   onSessionExpired?: () => void;
   onPostureError?: (message: string) => void;
+  onServiceUnavailable?: () => void;
 };
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
@@ -53,6 +55,7 @@ export const useMfaConnect = (
     onConnected,
     onSessionExpired,
     onPostureError,
+    onServiceUnavailable,
   }: UseMfaConnectOptions = {},
 ) => {
   const [token, setToken] = useState<string | null>(null);
@@ -94,6 +97,10 @@ export const useMfaConnect = (
         await waitForMinimumDuration(startedAt, debounceMs);
         if (isMfaPostureError(err, location)) {
           onPostureError?.(mfaErrorMessage(err));
+          return;
+        }
+        if (isServiceUnavailable(err)) {
+          onServiceUnavailable?.();
           return;
         }
         setStartError(mfaErrorMessage(err));

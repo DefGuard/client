@@ -7,6 +7,7 @@ import { api } from '../../../rust-api/api';
 import {
   isConnectFailure,
   isMfaPostureError,
+  isServiceUnavailable,
   isSessionExpired,
   isTimeout,
   mfaErrorMessage,
@@ -105,6 +106,10 @@ export const useMfaOidcConnect = () => {
       if (isMfaPostureError(e, location)) {
         setPostureError(mfaErrorMessage(e));
         setView(LocationCardViews.PostureCheckFail);
+        return;
+      }
+      if (isServiceUnavailable(e)) {
+        setView(LocationCardViews.ConnectionError);
         return;
       }
       setStartError(mfaErrorMessage(e));

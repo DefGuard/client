@@ -30,7 +30,7 @@ use crate::{
     LOG_FILENAME,
 };
 #[cfg(not(target_os = "macos"))]
-use crate::{log_watcher::extract_timestamp, utils::get_service_log_dir};
+use crate::{log_watcher::extract_timestamp, utils::DEFAULT_SERVICE_LOG_DIR};
 
 #[cfg(target_os = "macos")]
 pub(crate) const VPN_EXTENSION_LOG_FILENAME: &str = "vpn-extension.log";
@@ -56,7 +56,7 @@ impl LogDirs {
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
         debug!("Getting log directories for service and client to watch.");
         #[cfg(not(target_os = "macos"))]
-        let service_log_dir = get_service_log_dir().to_path_buf();
+        let service_log_dir = std::path::Path::new(DEFAULT_SERVICE_LOG_DIR).to_path_buf();
         let client_log_dir = handle.path().app_log_dir().map_err(|_| {
             LogWatcherError::LogPathError("Path to client logs directory is empty.".to_string())
         })?;

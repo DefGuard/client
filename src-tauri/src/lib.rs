@@ -9,7 +9,6 @@ pub mod events;
 pub mod log_watcher;
 pub mod periodic;
 pub mod provisioning;
-pub mod service;
 pub mod session_state;
 #[cfg(all(target_os = "macos", feature = "macos_installer"))]
 pub mod system_extension;

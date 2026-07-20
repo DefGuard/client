@@ -132,6 +132,8 @@ const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
 
+const closeWelcomeWindow = async () => invoke(TauriCommand.CloseWelcomeWindow);
+
 const getSessionState = (): Promise<SessionState> => invoke(TauriCommand.GetSessionState);
 
 const patchSessionState = (patch: SessionStatePatch): Promise<SessionState> =>
@@ -222,6 +224,7 @@ const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
 export const api = {
+  closeWelcomeWindow,
   // Instances
   getInstances,
   deleteInstance,

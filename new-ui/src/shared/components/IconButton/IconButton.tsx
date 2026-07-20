@@ -9,16 +9,20 @@ export const IconButton = ({
   iconRotation,
   className,
   variant = IconButtonVariant.Big,
+  disabled = false,
   onClick,
 }: IconButtonProps) => {
   return (
     <div
       ref={ref}
-      className={clsx('icon-button', className, `variant-${variant}`, {})}
+      className={clsx('icon-button', className, `variant-${variant}`, { disabled })}
       onClick={(e) => {
-        onClick?.(e);
+        if (!disabled) {
+          onClick?.(e);
+        }
       }}
       role="button"
+      aria-disabled={disabled}
     >
       <Icon icon={icon} rotationDirection={iconRotation} />
     </div>

@@ -5,7 +5,7 @@ use tauri::{
 
 use crate::{
     database::{
-        models::{location::Location, tunnel::Tunnel},
+        models::{location::Location, tunnel::Tunnel, Id},
         DB_POOL,
     },
     events::EventKey,
@@ -27,6 +27,9 @@ pub async fn has_tray_content() -> bool {
 
 pub const COMPACT_WINDOW_ID: &str = "compact-view";
 pub const FULL_VIEW_WINDOW_ID: &str = "full-view";
+pub const WELCOME_WINDOW_ID: &str = "welcome";
+pub const WELCOME_WINDOW_WIDTH: f64 = 640.0;
+pub const WELCOME_WINDOW_HEIGHT: f64 = 640.0;
 pub const COMPACT_WINDOW_WIDTH: f64 = 380.0;
 pub const COMPACT_WINDOW_HEIGHT: f64 = 680.0;
 pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
@@ -50,6 +53,24 @@ pub fn full_view_ui_url() -> WebviewUrl {
         WebviewUrl::External("http://localhost:5072/full/".parse().unwrap())
     } else {
         WebviewUrl::App("full/".into())
+    }
+}
+
+#[must_use]
+pub fn welcome_ui_url() -> WebviewUrl {
+    if cfg!(any(defguard_client_dev)) {
+        WebviewUrl::External("http://localhost:5072/welcome/".parse().unwrap())
+    } else {
+        WebviewUrl::App("welcome/".into())
+    }
+}
+
+/// Hides any currently visible webview window other than `skip_label`.
+fn hide_shown_windows(app: &AppHandle, skip_label: &str) {
+    for (label, window) in app.webview_windows() {
+        if label != skip_label && window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        }
     }
 }
 
@@ -94,6 +115,29 @@ impl WindowManager {
 
         Ok(window)
     }
+
+    pub fn build_welcome_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+        let window = WebviewWindowBuilder::new(app, WELCOME_WINDOW_ID, welcome_ui_url())
+            .title(WINDOW_TITLE)
+            .inner_size(WELCOME_WINDOW_WIDTH, WELCOME_WINDOW_HEIGHT)
+            .resizable(false)
+            .maximizable(false)
+            .decorations(false)
+            .skip_taskbar(false)
+            .always_on_top(false)
+            .visible(false);
+        #[cfg(target_os = "macos")]
+        let window = window.hidden_title(true);
+
+        let window = window.build()?;
+
+        #[cfg(target_os = "macos")]
+        if let Err(err) = macos::enable_rounded_corners(&window, false) {
+            warn!("Failed to enable rounded corners on welcome window: {err}");
+        }
+
+        Ok(window)
+    }
 }
 
 #[cfg(not(windows))]
@@ -106,11 +150,12 @@ impl WindowManager {
             Self::build_tray_window(app)?
         };
         #[cfg(target_os = "macos")]
-        macos::position_window_near_tray(app, &window);
-        #[cfg(target_os = "macos")]
-        let _ = app.set_dock_visibility(false);
-        #[cfg(target_os = "macos")]
-        let _ = app.show();
+        {
+            macos::position_window_near_tray(app, &window);
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            let _ = app.set_dock_visibility(false);
+            let _ = app.show();
+        }
         let _ = window.show();
         let _ = window.set_focus();
         Ok(window)
@@ -122,6 +167,26 @@ impl WindowManager {
             window
         } else {
             Self::build_full_view_window(app)?
+        };
+        #[cfg(target_os = "macos")]
+        {
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+            let _ = app.set_dock_visibility(true);
+            let _ = app.show();
+        }
+        let _ = window.show();
+        let _ = window.set_focus();
+        Ok(window)
+    }
+
+    pub fn open_welcome_view(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+        hide_shown_windows(app, WELCOME_WINDOW_ID);
+
+        let window = if let Some(window) = app.get_webview_window(WELCOME_WINDOW_ID) {
+            let _ = window.unminimize();
+            window
+        } else {
+            Self::build_welcome_window(app)?
         };
         #[cfg(target_os = "macos")]
         let _ = app.set_dock_visibility(true);
@@ -161,6 +226,22 @@ pub fn show_tray_or_full_view(app: &AppHandle) {
     }
 }
 
+/// Surface the window that should host the MFA flow, and emit `MfaTrigger` targeted at that window.
+pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
+    let target = if let Some(window) = app
+        .get_webview_window(FULL_VIEW_WINDOW_ID)
+        .filter(|w| w.is_visible().unwrap_or(false))
+    {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        FULL_VIEW_WINDOW_ID
+    } else {
+        show_tray_window(app);
+        COMPACT_WINDOW_ID
+    };
+    let _ = app.emit_to(target, EventKey::MfaTrigger.into(), location);
+}
+
 #[tauri::command]
 pub fn open_tray_window(app: AppHandle) {
     show_tray_window(&app);
@@ -198,6 +279,21 @@ pub fn close_tray_window(app: AppHandle) {
     } else {
         warn!("close_tray_window task: new-ui window not found");
     }
+}
+
+#[tauri::command]
+pub fn close_welcome_window(app: AppHandle) {
+    info!("close_welcome_window called");
+
+    if let Some(window) = app.get_webview_window(WELCOME_WINDOW_ID) {
+        if let Err(err) = window.hide() {
+            error!("close_welcome_window task: Failed to hide welcome window: {err:?}");
+        }
+    } else {
+        warn!("close_welcome_window task: welcome window not found");
+    }
+
+    show_tray_or_full_view(&app);
 }
 
 #[tauri::command]

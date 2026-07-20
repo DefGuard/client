@@ -6,7 +6,7 @@ use tauri::{
     menu::{Menu, MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, Runtime,
+    AppHandle, Manager, Runtime,
 };
 
 use crate::{
@@ -14,8 +14,7 @@ use crate::{
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
     error::Error,
-    events::EventKey,
-    window_manager::{show_tray_or_full_view, COMPACT_WINDOW_ID, FULL_VIEW_WINDOW_ID},
+    window_manager::{show_tray_or_full_view, trigger_mfa, COMPACT_WINDOW_ID},
     ConnectionType,
 };
 
@@ -216,25 +215,6 @@ fn hide_visible_windows(app: &AppHandle) {
     }
 }
 
-pub fn show_main_window(app: &AppHandle) {
-    if let Some(window) = app
-        .get_webview_window(COMPACT_WINDOW_ID)
-        .or_else(|| app.get_webview_window(FULL_VIEW_WINDOW_ID))
-    {
-        if let Err(err) = window.unminimize() {
-            warn!("Failed to unminimize main window: {err}");
-        }
-        #[cfg(target_os = "macos")]
-        if let Err(err) = app.show() {
-            warn!("Failed to show application: {err}");
-        }
-        if let Err(err) = window.show() {
-            warn!("Failed to show main window: {err}");
-        }
-        let _ = window.set_focus();
-    }
-}
-
 /// Handle tray actions.
 pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
     let handle = app.clone();
@@ -325,8 +305,7 @@ async fn handle_location_tray_menu(id: String, app: &AppHandle) {
                         // Check if MFA is enabled. If so, trigger modal on frontend.
                         if location.mfa_enabled() {
                             info!("MFA enabled for location with ID {id}, trigger MFA modal");
-                            show_main_window(app);
-                            let _ = app.emit(EventKey::MfaTrigger.into(), &location);
+                            trigger_mfa(app, &location);
                         } else if let Err(err) =
                             connect(location_id, ConnectionType::Location, app.clone()).await
                         {

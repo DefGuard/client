@@ -21,6 +21,7 @@ export const LocationCardMfaMobileView = () => {
   const { start, startError, qrValue, connectionError } = useMfaMobileConnect(location, {
     onConnected: () => setView(LocationCardViews.Connected),
     onPostureError: (message) => setPostureError(message ?? null),
+    onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
   });
   const [screen, setScreen] = useState<Screen>('loading');
   const startedRef = useRef(false);

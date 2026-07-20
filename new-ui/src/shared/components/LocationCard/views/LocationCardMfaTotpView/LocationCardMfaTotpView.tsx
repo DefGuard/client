@@ -31,6 +31,7 @@ export const LocationCardMfaTotpView = () => {
         setPostureError(msg);
         setView(LocationCardViews.PostureCheckFail);
       },
+      onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
     },
   );
 

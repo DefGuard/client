@@ -79,7 +79,6 @@ redundant_closure = "warn"
 [dependencies]
 anyhow = "1.0"
 base64.workspace = true
-clap.workspace = true
 chrono.workspace = true
 defguard-client-proto = { path = "client-proto" }
 defguard-client-core = { path = "core" }

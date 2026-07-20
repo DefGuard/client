@@ -8,6 +8,7 @@ import { api } from '../../../rust-api/api';
 import {
   isConnectFailure,
   isMfaPostureError,
+  isServiceUnavailable,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
@@ -22,10 +23,11 @@ type TokenData = {
 type Options = {
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
+  onServiceUnavailable?: () => void;
 };
 
 export const useMfaMobileConnect = (location: LocationInfo, options?: Options) => {
-  const { onConnected, onPostureError } = options ?? {};
+  const { onConnected, onPostureError, onServiceUnavailable } = options ?? {};
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
@@ -159,11 +161,15 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
         onPostureError?.(mfaErrorMessage(e));
         return;
       }
+      if (isServiceUnavailable(e)) {
+        onServiceUnavailable?.();
+        return;
+      }
       setStartError(mfaErrorMessage(e));
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, onPostureError]);
+  }, [instance, location, onPostureError, onServiceUnavailable]);
 
   const reset = useCallback(() => {
     cleanupListeners();
