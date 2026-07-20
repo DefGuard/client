@@ -9,11 +9,14 @@ import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
+import {
+  enrollmentAddInstance,
+  enrollmentCreateDevice,
+} from '../../../shared/rust-api/enrollment';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
@@ -49,7 +52,7 @@ export const AddInstancePage = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value, formApi }) => {
-      const result = await edgeApi.addInstance(value);
+      const result = await enrollmentAddInstance(value);
       if (result.error ?? result.errorKind) {
         if (result.errorKind === 'network') {
           formApi.setErrorMap({
@@ -74,7 +77,7 @@ export const AddInstancePage = () => {
         return;
       }
       if (result.session_id) {
-        await edgeApi.createDevice(result.session_id, value.name.trim());
+        await enrollmentCreateDevice(result.session_id, value.name.trim());
       }
       if (
         result.startResponse &&

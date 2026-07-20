@@ -1,19 +1,17 @@
 import { invoke } from '@tauri-apps/api/core';
-import { api } from '../rust-api/api';
-import type {
-  CreateDeviceResponse,
-  InstanceInfo,
-  SaveDeviceConfigResponse,
-} from '../rust-api/types';
-import { TauriCommand } from '../rust-api/types';
 import { generateWGKeys } from '../utils/generateWGKeys';
+import { api } from './api';
 import type {
   AddInstanceRequest,
   AddInstanceResult,
+  CreateDeviceResponse,
   EnrollmentErrorKind,
+  InstanceInfo,
+  SaveDeviceConfigResponse,
   UpdateInstanceRequest,
   UpdateInstanceResult,
 } from './types';
+import { TauriCommand } from './types';
 
 const getInstances = (): Promise<InstanceInfo[]> => invoke(TauriCommand.AllInstances);
 const updateInstanceRecord = (args: {
@@ -25,17 +23,15 @@ const saveDeviceConfig = (args: {
   response: CreateDeviceResponse;
 }): Promise<SaveDeviceConfigResponse> => invoke(TauriCommand.SaveDeviceConfig, args);
 
-/// Extract the raw Rust error string from a Tauri command rejection.
-/// Tauri 2 command errors may be plain objects (message on `message`) or the
-/// returned `Err(String)` directly.
+/** Extract the raw Rust error string from a Tauri command rejection. */
 const rustErrorMessage = (err: unknown): string =>
   typeof err === 'object' && err !== null && 'message' in err
     ? String((err as Record<string, unknown>).message)
     : String(err);
 
-/// Parse a Tauri command error that contains a serialized `EnrollmentError`
-/// JSON string into an `EnrollmentErrorKind` and human-readable message.
-const parseEnrollmentError = (
+/** Parse a Tauri command error that contains a serialized `EnrollmentError`
+ *  JSON string into an `EnrollmentErrorKind` and human-readable message. */
+export const parseEnrollmentError = (
   err: unknown,
 ): { error?: string; errorKind: EnrollmentErrorKind } => {
   const raw = rustErrorMessage(err);
@@ -56,8 +52,8 @@ const parseEnrollmentError = (
   }
 };
 
-/// True when a command error is a proxy 404 - the device was deleted
-/// server-side while a stale local record survived.
+/** True when a command error is a proxy 404 — the device was deleted
+ *  server-side while a stale local record survived. */
 const isDeviceNotFound = (err: unknown): boolean => {
   try {
     const parsed = JSON.parse(rustErrorMessage(err)) as {
@@ -70,7 +66,7 @@ const isDeviceNotFound = (err: unknown): boolean => {
   }
 };
 
-const createDevice = async (
+export const enrollmentCreateDevice = async (
   sessionId: string,
   name: string,
 ): Promise<{ error?: string }> => {
@@ -87,11 +83,10 @@ const createDevice = async (
   }
 };
 
-const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResult> => {
+export const enrollmentAddInstance = async (
+  values: AddInstanceRequest,
+): Promise<AddInstanceResult> => {
   let sessionId: string | undefined;
-  // The successful new-enrollment path hands the session to the enrollment
-  // wizard, which owns its lifecycle from there. Every other exit (existing
-  // instance, name clash, error) must release the session it created.
   let handOffSession = false;
   try {
     const startResult = await api.enrollmentStart(values.url.trim(), values.token.trim());
@@ -111,8 +106,6 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
         });
         return {};
       } catch (e) {
-        // Device was deleted server-side but the local record survived: drop
-        // the stale record and fall through to a fresh enrollment.
         if (!isDeviceNotFound(e)) throw e;
         await api.deleteInstance(existing.id);
       }
@@ -131,19 +124,15 @@ const addInstance = async (values: AddInstanceRequest): Promise<AddInstanceResul
     const parsed = parseEnrollmentError(e);
     return { error: parsed.error, errorKind: parsed.errorKind };
   } finally {
-    // Best-effort cleanup; enrollment_finish errors if the session is already
-    // gone, so swallow failures rather than mask the real result.
     if (sessionId && !handOffSession) {
       await api.enrollmentFinish(sessionId).catch(() => {});
     }
   }
 };
 
-const updateExistingInstance = async (
+export const enrollmentUpdateInstance = async (
   values: UpdateInstanceRequest,
 ): Promise<UpdateInstanceResult> => {
-  // The update flow only needs the session for the network_info call; it never
-  // hands it to the wizard, so every exit after start() must release it.
   let sessionId: string | undefined;
   try {
     const instances = await getInstances();
@@ -173,16 +162,8 @@ const updateExistingInstance = async (
     const parsed = parseEnrollmentError(e);
     return { error: parsed.error, errorKind: parsed.errorKind };
   } finally {
-    // Best-effort cleanup; guarded so we never finish a session that was never
-    // created (e.g. the instance-missing early return, or a start() failure).
     if (sessionId) {
       await api.enrollmentFinish(sessionId).catch(() => {});
     }
   }
-};
-
-export const edgeApi = {
-  createDevice,
-  addInstance,
-  updateInstance: updateExistingInstance,
 };

@@ -5,7 +5,6 @@ import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { Modal } from '../../../../../shared/components/Modal/Modal';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../../../shared/edge-api/api';
 import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
 import {
@@ -16,6 +15,7 @@ import {
 import { ModalName } from '../../../../../shared/hooks/modalControls/modalTypes';
 import type { OpenUpdateInstanceModalData } from '../../../../../shared/hooks/modalControls/types';
 import { Snackbar } from '../../../../../shared/providers/snackbar/snackbar';
+import { enrollmentUpdateInstance } from '../../../../../shared/rust-api/enrollment';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 
@@ -75,7 +75,7 @@ const ModalContent = ({ data }: { data: OpenUpdateInstanceModalData }) => {
       onChange: formSchema,
     },
     onSubmit: async ({ value, formApi }) => {
-      const result = await edgeApi.updateInstance({
+      const result = await enrollmentUpdateInstance({
         instanceId: data.instanceId,
         url: value.url,
         token: value.token,
