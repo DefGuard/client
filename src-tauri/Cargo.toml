@@ -6,7 +6,7 @@ default-members = ["cli", "client-cli", "daemon", "."]
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = "0.10"
+defguard_wireguard_rs = "0.11"
 dirs-next = "2.0"
 log = { version = "0.4", features = ["serde"] }
 prost = "0.14"
@@ -37,8 +37,13 @@ futures-util = "0.3"
 http = "1"
 image = "0.25"
 qrcode = { version = "0.14", features = ["image"] }
-tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
-vergen-git2 = { version = "9.1", features = ["build"] }
+tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
+vergen-git2 = { version = "10.0", features = ["build"] }
+x25519-dalek = { version = "3.0", features = [
+    "getrandom",
+    "serde",
+    "static_secrets",
+] }
 
 [workspace.package]
 authors = ["Defguard"]
@@ -131,11 +136,7 @@ tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber.workspace = true
 webbrowser.workspace = true
-x25519-dalek = { version = "2", features = [
-    "getrandom",
-    "serde",
-    "static_secrets",
-] }
+x25519-dalek.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"

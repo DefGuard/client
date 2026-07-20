@@ -33,8 +33,8 @@ thiserror.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tower = "0.5"
-tracing = { workspace = true }
-x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
+tracing.workspace = true
+x25519-dalek.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

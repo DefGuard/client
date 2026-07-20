@@ -58,7 +58,7 @@ jobs:
           apt-get update
           apt-get install -y git curl ca-certificates libatomic1
           git config --global --add safe.directory '*'
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -162,7 +162,7 @@ jobs:
             deb_arch: amd64
             binary_arch: x86_64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Write release version
@@ -357,7 +357,7 @@ jobs:
         run: |
           dnf -y install git gcc gcc-c++ make openssl-devel perl pkgconfig unzip
           git config --global --add safe.directory '*'
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Write release version
@@ -418,7 +418,7 @@ jobs:
   #           cpu: arm64
   #   runs-on: ${{ matrix.windows_runner }}
   #   steps:
-  #     - uses: actions/checkout@v6
+  #     - uses: actions/checkout@v7
   #       with:
   #         submodules: recursive
   #     - name: Write release version
