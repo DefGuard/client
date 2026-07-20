@@ -123,7 +123,14 @@ export const useConnectModalMfaOidc = ({
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, cleanup, onPostureError, onSessionExpired, onServiceUnavailable]);
+  }, [
+    instance,
+    location,
+    cleanup,
+    onPostureError,
+    onSessionExpired,
+    onServiceUnavailable,
+  ]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };
