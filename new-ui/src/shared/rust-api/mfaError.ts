@@ -42,12 +42,12 @@ export const isInvalidCode = (message: string): boolean =>
   message.includes('Unauthorized');
 
 /** The proxy/edge service is unavailable (network error or 5xx response).
- *  Maps to `MfaError::NetworkError` (type: "networkError") and
- *  `MfaError::ProxyError` (type: "proxyError") from the Rust backend. */
+ *  Maps to `MfaError::NetworkError` (type: "network_error") and
+ *  `MfaError::ProxyError` (type: "proxy_error") from the Rust backend. */
 export const isServiceUnavailable = (err: unknown): boolean => {
   const parsed = parseMfaError(err);
   if (!parsed) return false;
-  return parsed.type === 'networkError' || parsed.type === 'proxyError';
+  return parsed.type === 'network_error' || parsed.type === 'proxy_error';
 };
 
 /** MFA succeeded but bringing up the VPN connection afterwards failed
