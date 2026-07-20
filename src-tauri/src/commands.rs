@@ -367,23 +367,6 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     Ok(())
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct Device {
-    pub id: Id,
-    pub name: String,
-    pub pubkey: String,
-    pub user_id: Id,
-    pub created_at: i64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct InstanceResponse {
-    // uuid
-    pub id: String,
-    pub name: String,
-    pub url: String,
-}
-
 #[derive(Serialize)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location<Id>>,
