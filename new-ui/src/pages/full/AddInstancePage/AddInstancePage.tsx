@@ -1,6 +1,7 @@
 import './style.scss';
 
 import { useLoaderData, useNavigate, useSearch } from '@tanstack/react-router';
+import { error } from '@tauri-apps/plugin-log';
 import { Fragment, useMemo } from 'react';
 import z from 'zod';
 import { Button } from '../../../shared/components/Button/Button';
@@ -8,11 +9,14 @@ import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../shared/edge-api/api';
 import { useAppForm } from '../../../shared/form';
 import { formChangeLogic } from '../../../shared/formLogic';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
+import {
+  enrollmentAddInstance,
+  enrollmentCreateDevice,
+} from '../../../shared/rust-api/enrollment';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
@@ -48,7 +52,7 @@ export const AddInstancePage = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value, formApi }) => {
-      const result = await edgeApi.addInstance(value);
+      const result = await enrollmentAddInstance(value);
       if (result.error ?? result.errorKind) {
         if (result.errorKind === 'network') {
           formApi.setErrorMap({
@@ -68,16 +72,21 @@ export const AddInstancePage = () => {
           });
           return;
         }
+        void error(`Failed to add instance: ${result.error ?? 'unknown error'}`);
         Snackbar.error('Communication error, contact administrator.');
         return;
       }
-      if (result.cookie) {
-        await edgeApi.createDevice(value.url, result.cookie, value.name.trim());
+      if (result.session_id) {
+        await enrollmentCreateDevice(result.session_id, value.name.trim());
       }
-      if (result.startResponse && !result.startResponse.user.enrolled && result.cookie) {
+      if (
+        result.startResponse &&
+        !result.startResponse.user.enrolled &&
+        result.session_id
+      ) {
         useEnrollmentStore
           .getState()
-          .start(result.startResponse, value.url, result.cookie, undefined);
+          .start(result.startResponse, result.session_id, undefined);
         navigate({
           to: '/full/enrollment',
           replace: true,

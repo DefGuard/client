@@ -4,9 +4,8 @@ import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { CodeInput } from '../../../../../../../shared/components/CodeInput/CodeInput';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
-import { MfaStartMethod } from '../../../../../../../shared/components/LocationCard/api/startClientMfaSession';
 import { useMfaConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaConnect';
-import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
+import { type LocationInfo, MfaMethod } from '../../../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
@@ -21,7 +20,7 @@ export const ConnectModalMfaEmail = () => {
 
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location as LocationInfo,
-    MfaStartMethod.Email,
+    MfaMethod.Email,
     {
       debounceMs: location?.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onSessionExpired: () =>

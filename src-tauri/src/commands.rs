@@ -4,9 +4,13 @@ use std::{collections::HashMap, env, str::FromStr};
 use chrono::{DateTime, Duration, Utc};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-use defguard_client_core::connection::{
-    active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
-    disconnect_interface,
+use defguard_client_core::{
+    connection::{
+        active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
+        disconnect_interface,
+    },
+    enrollment::{self, MfaFinishResponse, MfaStartResponse},
+    mfa,
 };
 use defguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
@@ -14,14 +18,22 @@ use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
 use defguard_client_proto::defguard::{
-    client_types::DeviceConfigResponse, enterprise::posture::v2::DevicePostureData,
+    client_types::{
+        AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod,
+    },
+    enterprise::posture::v2::DevicePostureData,
 };
 use defguard_client_provisioning::ProvisioningConfig;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_service_locations::to_service_location;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
@@ -85,12 +97,49 @@ impl From<sqlx::Error> for ConnectError {
     }
 }
 
+/// Serialize a structured error (e.g. `MfaError`, `EnrollmentError`) to JSON so
+/// the frontend can match on its tagged `type`, falling back to the Display
+/// string if serialization somehow fails.
+fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
+    serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
+}
+
+/// Look up a cloned enrollment session by its opaque string id. Used by the
+/// enrollment commands that need read access to the in-memory session.
+fn get_enrollment_session(
+    state: &AppState,
+    session_id: &str,
+) -> Result<enrollment::EnrollmentSession, String> {
+    let uid = Uuid::parse_str(session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
+    state
+        .enrollment_sessions
+        .lock()
+        .expect("enrollment_sessions mutex poisoned")
+        .get(&uid)
+        .cloned()
+        .ok_or_else(|| "Enrollment session not found".to_string())
+}
+
+/// Bring up a location connection with an already-obtained preshared key and
+/// refresh the tray. Shared by `connect` and the MFA finish flows so the
+/// preshared key never has to cross back into the frontend.
+async fn connect_location_with_psk(
+    location: Location<Id>,
+    preshared_key: Option<String>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
+    handle_connection_for_location(location.clone(), preshared_key, handle).await?;
+    reload_tray_menu(handle).await;
+    info!("Connected to location {location}");
+    configure_tray_icon(handle).await?;
+    Ok(())
+}
+
 /// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
     location_id: Id,
     connection_type: ConnectionType,
-    preshared_key: Option<String>,
     handle: AppHandle,
 ) -> Result<(), ConnectError> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
@@ -100,14 +149,15 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
-            let preshared_key = if location.posture_check_required && preshared_key.is_none() {
+            // Connect-time MFA brings the tunnel up itself (keeping the preshared
+            // key backend-side), so the only preshared key resolved here is for
+            // posture-only locations.
+            let preshared_key = if location.posture_check_required {
                 Some(authorize_posture_session(&location).await?)
             } else {
-                preshared_key
+                None
             };
-            handle_connection_for_location(location.clone(), preshared_key, &handle).await?;
-            reload_tray_menu(&handle).await;
-            info!("Connected to location {location}");
+            connect_location_with_psk(location, preshared_key, &handle).await?;
         } else {
             error!(
                 "Location with ID {location_id} not found in the database, aborting connection \
@@ -122,13 +172,12 @@ pub async fn connect(
         );
         handle_connection_for_tunnel(tunnel.clone(), &handle).await?;
         info!("Successfully connected to tunnel {tunnel}");
+        // Update tray icon to reflect connection state.
+        configure_tray_icon(&handle).await?;
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound.into());
     }
-
-    // Update tray icon to reflect connection state.
-    configure_tray_icon(&handle).await?;
 
     Ok(())
 }
@@ -350,9 +399,9 @@ pub async fn save_device_config(
     debug!("Saving device configuration: {response:#?}.");
 
     let mut transaction = DB_POOL.begin().await?;
-    let instance_info = response
-        .instance
-        .expect("Missing instance info in device config response");
+    let instance_info = response.instance.ok_or_else(|| {
+        Error::ResourceNotFound("instance info in device config response".to_string())
+    })?;
     let mut instance = Instance::from(instance_info);
     if response.token.is_some() {
         debug!(
@@ -372,9 +421,9 @@ pub async fn save_device_config(
     let instance = instance.save(&mut *transaction).await?;
     debug!("Saved instance {}", instance.name);
 
-    let device = response
-        .device
-        .expect("Missing device info in device config response");
+    let device = response.device.ok_or_else(|| {
+        Error::ResourceNotFound("device info in device config response".to_string())
+    })?;
     let keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
     debug!(
         "Saving wireguard key {} for instance {}({})",
@@ -1325,4 +1374,386 @@ pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Er
     }
     debug!("Returning {} active connections.", result.len());
     Ok(result)
+}
+
+/// Returned by the `enrollment_start` Tauri command.
+#[derive(Clone, Debug, Serialize)]
+pub struct EnrollmentStartResult {
+    pub session_id: String,
+    pub user: InitialUserInfo,
+    pub admin: AdminInfo,
+    pub settings: EnrollmentSettings,
+    pub instance: ProtoInstanceInfo,
+    pub deadline_timestamp: i64,
+    pub final_page_content: String,
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_start(
+    proxy_url: String,
+    token: String,
+    state: State<'_, AppState>,
+) -> Result<EnrollmentStartResult, String> {
+    debug!("Starting enrollment at {proxy_url}");
+    let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let (session, response) = enrollment::enrollment_start(url, token)
+        .await
+        .map_err(err_to_json)?;
+    let session_uuid = Uuid::new_v4();
+    let session_id = session_uuid.to_string();
+    state
+        .enrollment_sessions
+        .lock()
+        .expect("enrollment_sessions mutex poisoned")
+        .insert(session_uuid, session);
+    let login = response
+        .user
+        .as_ref()
+        .map(|u| u.login.as_str())
+        .unwrap_or("<unknown>");
+    info!("Enrollment started for user {login}, session {session_id}");
+    Ok(EnrollmentStartResult {
+        session_id,
+        user: response
+            .user
+            .ok_or_else(|| "Proxy did not return user info".to_string())?,
+        admin: response
+            .admin
+            .ok_or_else(|| "Proxy did not return admin info".to_string())?,
+        settings: response
+            .settings
+            .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?,
+        instance: response
+            .instance
+            .ok_or_else(|| "Proxy did not return instance info".to_string())?,
+        deadline_timestamp: response.deadline_timestamp,
+        final_page_content: response.final_page_content,
+    })
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_create_device(
+    session_id: String,
+    name: String,
+    pubkey: String,
+    state: State<'_, AppState>,
+) -> Result<DeviceConfigResponse, String> {
+    debug!("Creating device \"{name}\"");
+    let session = get_enrollment_session(&state, &session_id)?;
+    let result = enrollment::enrollment_create_device(session, name, pubkey)
+        .await
+        .map_err(err_to_json)?;
+    info!("Device created");
+    Ok(result)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_activate_user(
+    session_id: String,
+    password: Option<String>,
+    phone_number: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Activating user");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_activate_user(session, password, phone_number)
+        .await
+        .map_err(err_to_json)?;
+    info!("User activated");
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_register_mfa_start(
+    session_id: String,
+    method: String,
+    state: State<'_, AppState>,
+) -> Result<MfaStartResponse, String> {
+    debug!("Starting MFA setup");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_register_mfa_start(session, method)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_register_mfa_finish(
+    session_id: String,
+    code: String,
+    method: String,
+    state: State<'_, AppState>,
+) -> Result<MfaFinishResponse, String> {
+    debug!("Finishing MFA setup");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_register_mfa_finish(session, code, method)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_network_info(
+    session_id: String,
+    pubkey: String,
+    state: State<'_, AppState>,
+) -> Result<DeviceConfigResponse, String> {
+    debug!("Fetching network info");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_network_info(session, pubkey)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_finish(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Finishing enrollment");
+    let session = {
+        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
+        let mut sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
+        sessions
+            .remove(&uid)
+            .ok_or_else(|| "Enrollment session not found".to_string())?
+    };
+    enrollment::enrollment_finish(session);
+    info!("Enrollment finished, session {session_id} removed");
+    Ok(())
+}
+
+#[derive(Clone, Serialize)]
+pub struct MfaErrorPayload {
+    pub error: String,
+}
+
+/// Bring up a location connection with a preshared key obtained from a
+/// completed MFA handshake. Keeps the preshared key inside the backend - it is
+/// never returned to or emitted at the frontend.
+async fn connect_after_mfa(
+    location_id: Id,
+    preshared_key: String,
+    handle: &AppHandle,
+) -> Result<(), String> {
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Location not found".to_string())?;
+    connect_location_with_psk(location, Some(preshared_key), handle)
+        .await
+        // Distinct prefix so the frontend can tell a post-MFA connection
+        // failure apart from an MFA/auth failure.
+        .map_err(|e| format!("VPN connection failed: {e}"))
+}
+
+/// Map the frontend MFA method string to the proto `MfaMethod` enum the proxy
+/// expects on the wire (a numeric enum, not a string).
+fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
+    match method {
+        "totp" => Ok(MfaMethod::Totp),
+        "email" => Ok(MfaMethod::Email),
+        "oidc" => Ok(MfaMethod::Oidc),
+        "biometric" => Ok(MfaMethod::Biometric),
+        "mobileapprove" => Ok(MfaMethod::MobileApprove),
+        other => Err(format!("Unsupported MFA method: {other}")),
+    }
+}
+
+#[tauri::command(async)]
+pub async fn mfa_start(
+    instance_id: Id,
+    location_id: Id,
+    method: String,
+) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
+    debug!("Starting MFA session for location {location_id}");
+    let method = parse_mfa_method(&method)?;
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "WireGuard keys not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Location not found".to_string())?;
+    let posture_data = if location.posture_check_required {
+        Some(
+            defguard_client_posture::get_posture_data()
+                .await
+                .map_err(|e| format!("Failed to collect posture data: {e}"))?,
+        )
+    } else {
+        None
+    };
+    let request = ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: keys.pubkey,
+        method: method as i32,
+        posture_data,
+    };
+    mfa::mfa_start(proxy_url, request)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn mfa_finish_code(
+    instance_id: Id,
+    location_id: Id,
+    token: String,
+    code: String,
+    handle: AppHandle,
+) -> Result<(), String> {
+    debug!("Finishing MFA with code for instance {instance_id}");
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let request = ClientMfaFinishRequest {
+        token,
+        code: Some(code),
+        auth_pub_key: None,
+    };
+    let response = mfa::mfa_finish_code(proxy_url, request)
+        .await
+        .map_err(err_to_json)?;
+    connect_after_mfa(location_id, response.preshared_key, &handle).await
+}
+
+/// Register a long-running MFA task, run its future in the background, and on
+/// success bring up the connection Rust-side before emitting a payload-free
+/// completion event (or an error event). Shared by the OpenID poll and mobile
+/// approve flows so the preshared key never leaves the backend. Returns the
+/// task id the frontend uses to cancel.
+fn spawn_mfa_task<F, R>(
+    handle: &AppHandle,
+    location_id: Id,
+    complete_event: EventKey,
+    error_event: EventKey,
+    run: R,
+) -> String
+where
+    R: FnOnce(CancellationToken) -> F + Send + 'static,
+    F: std::future::Future<Output = Result<ClientMfaFinishResponse, mfa::MfaError>>
+        + Send
+        + 'static,
+{
+    let cancel = CancellationToken::new();
+    let task_id = Uuid::new_v4().to_string();
+    handle
+        .state::<AppState>()
+        .mfa_tasks
+        .lock()
+        .expect("mfa_tasks mutex poisoned")
+        .insert(task_id.clone(), cancel.clone());
+
+    let task_id_for_task = task_id.clone();
+    let listen_handle = handle.clone();
+    tokio::spawn(async move {
+        let result = run(cancel).await;
+        listen_handle
+            .state::<AppState>()
+            .mfa_tasks
+            .lock()
+            .expect("mfa_tasks mutex poisoned")
+            .remove(&task_id_for_task);
+        match result {
+            Ok(response) => {
+                info!("MFA completed for task {task_id_for_task}");
+                match connect_after_mfa(location_id, response.preshared_key, &listen_handle).await {
+                    Ok(()) => {
+                        let _ = listen_handle.emit(complete_event.into(), ());
+                    }
+                    Err(err) => {
+                        warn!("Connect after MFA failed for task {task_id_for_task}: {err}");
+                        let _ =
+                            listen_handle.emit(error_event.into(), MfaErrorPayload { error: err });
+                    }
+                }
+            }
+            Err(err) => {
+                warn!("MFA task {task_id_for_task} failed: {err}");
+                // Emit the structured error as JSON so the frontend classifies
+                // it the same way as command errors.
+                let _ = listen_handle.emit(
+                    error_event.into(),
+                    MfaErrorPayload {
+                        error: err_to_json(err),
+                    },
+                );
+            }
+        }
+    });
+
+    task_id
+}
+
+#[tauri::command(async)]
+pub async fn mfa_poll_openid(
+    instance_id: Id,
+    location_id: Id,
+    token: String,
+    handle: AppHandle,
+) -> Result<String, String> {
+    debug!("Starting OpenID MFA poll for instance {instance_id}");
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaOpenIdComplete,
+        EventKey::MfaOpenIdError,
+        move |cancel| mfa::poll_openid_mfa(proxy_url, token, cancel),
+    ))
+}
+
+#[tauri::command(async)]
+pub async fn mfa_connect_mobile_approve(
+    instance_id: Id,
+    location_id: Id,
+    token: String,
+    handle: AppHandle,
+) -> Result<String, String> {
+    debug!("Starting mobile approve MFA for instance {instance_id}");
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let ws_url = mfa::derive_ws_url(&proxy_url, &token).map_err(|e| e.to_string())?;
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaMobileComplete,
+        EventKey::MfaMobileError,
+        move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
+    ))
+}
+
+#[tauri::command(async)]
+pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    debug!("Cancelling MFA task {task_id}");
+    let cancel = {
+        let tasks = state.mfa_tasks.lock().expect("mfa_tasks mutex poisoned");
+        tasks
+            .get(&task_id)
+            .cloned()
+            .ok_or_else(|| "MFA task not found".to_string())?
+    };
+    cancel.cancel();
+    Ok(())
 }

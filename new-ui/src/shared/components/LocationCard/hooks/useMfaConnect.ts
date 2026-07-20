@@ -1,28 +1,19 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { fetch } from '@tauri-apps/plugin-http';
+import { useQuery } from '@tanstack/react-query';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EdgeRequestHeaders } from '../../../edge-api/types';
 import { api } from '../../../rust-api/api';
-import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { LocationInfo } from '../../../rust-api/types';
 import {
-  CLIENT_MFA_ENDPOINT,
-  isEdgeUnavailable,
-  type MfaStartMethod,
-  shouldShowPostureError,
-  startClientMfaSession,
-} from '../api/startClientMfaSession';
+  isConnectFailure,
+  isInvalidCode,
+  isMfaPostureError,
+  isServiceUnavailable,
+  isSessionExpired,
+  mfaErrorMessage,
+} from '../../../rust-api/mfaError';
+import { getInstancesQueryOptions } from '../../../rust-api/query';
+import type { LocationInfo, MfaMethod } from '../../../rust-api/types';
 
-type MfaFinishResponse = {
-  preshared_key: string;
-};
-
-type MfaErrorResponse = {
-  error: string;
-};
-
-type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
+type CodeMfaMethod = typeof MfaMethod.Totp | typeof MfaMethod.Email;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
@@ -41,7 +32,7 @@ const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
 
 export const useMfaConnect = (
   location: LocationInfo,
-  method: CodeMfaStartMethod,
+  method: CodeMfaMethod,
   {
     debounceMs = 0,
     onConnected,
@@ -55,22 +46,10 @@ export const useMfaConnect = (
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [requestHeaders, setRequestHeaders] = useState<EdgeRequestHeaders | null>(null);
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
 
   const instance = instances?.find((i) => i.id === location.instance_id);
-
-  const { mutate: connectMutate } = useMutation({
-    mutationFn: api.connect,
-    meta: { invalidate: ['locations'] },
-    onSuccess: () => {
-      onConnected?.();
-    },
-    onError: (err) => {
-      error(`Connect command failed after successful code verification\n${err}`);
-    },
-  });
 
   // Fire the /start request exactly once when instance data is ready.
   const startCalled = useRef(false);
@@ -86,25 +65,21 @@ export const useMfaConnect = (
 
     (async () => {
       try {
-        const { response, headers } = await startClientMfaSession({
-          instance,
-          location,
-          method,
-        });
+        const info = await api.mfaStart(instance.id, location.id, method);
         await waitForMinimumDuration(startedAt, debounceMs);
-        setRequestHeaders(headers);
-        setToken(response.token);
+        setToken(info.token);
       } catch (err) {
+        void error(`MFA start failed: ${err}`);
         await waitForMinimumDuration(startedAt, debounceMs);
-        if (shouldShowPostureError(err, location)) {
-          onPostureError?.(err.message);
+        if (isMfaPostureError(err, location)) {
+          onPostureError?.(mfaErrorMessage(err));
           return;
         }
-        if (isEdgeUnavailable(err)) {
+        if (isServiceUnavailable(err)) {
           onServiceUnavailable?.();
           return;
         }
-        setStartError(err instanceof Error ? err.message : 'Failed to start MFA');
+        setStartError(mfaErrorMessage(err));
       } finally {
         setIsStarting(false);
       }
@@ -113,51 +88,33 @@ export const useMfaConnect = (
 
   const verifyCode = useCallback(
     async (code: string) => {
-      if (!token || !instance || !requestHeaders) return;
+      if (!token || !instance) return;
 
       setIsVerifying(true);
       setVerifyError(null);
 
-      const body = JSON.stringify({ token, code });
-
       try {
-        const res = await fetch(`${instance.proxy_url}${CLIENT_MFA_ENDPOINT}/finish`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...requestHeaders,
-          },
-          body,
-        });
-
-        if (res.ok) {
-          const data = (await res.json()) as MfaFinishResponse;
-          connectMutate({
-            locationId: location.id,
-            connectionType: location.connection_type,
-            presharedKey: data.preshared_key,
-          });
+        // mfaFinishCode completes MFA and brings up the connection in the
+        // backend; the preshared key never reaches the frontend.
+        await api.mfaFinishCode(instance.id, location.id, token, code);
+        onConnected?.();
+      } catch (err) {
+        void error(`MFA verification failed: ${err}`);
+        const message = mfaErrorMessage(err);
+        if (isConnectFailure(message)) {
+          setVerifyError('Failed to establish VPN connection');
+        } else if (isInvalidCode(message)) {
+          setVerifyError('Invalid code');
+        } else if (isSessionExpired(message)) {
+          onSessionExpired?.();
         } else {
-          const data = (await res.json()) as MfaErrorResponse;
-          const { error: errorMessage } = data;
-          if (errorMessage === 'Unauthorized') {
-            setVerifyError('Invalid code');
-          } else if (
-            errorMessage === 'invalid token' ||
-            errorMessage === 'login session not found'
-          ) {
-            onSessionExpired?.();
-          } else {
-            setVerifyError('Verification failed');
-          }
+          setVerifyError('Verification failed');
         }
-      } catch {
-        setVerifyError('Failed to reach server');
       } finally {
         setIsVerifying(false);
       }
     },
-    [token, instance, requestHeaders, location, connectMutate, onSessionExpired],
+    [token, instance, location, onConnected, onSessionExpired],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

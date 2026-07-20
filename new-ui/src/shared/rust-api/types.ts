@@ -81,6 +81,20 @@ export type ConnectionType = (typeof ConnectionType)[keyof typeof ConnectionType
 
 /** Typed enum for every Tauri command available on the backend. */
 export const TauriCommand = {
+  // Enrollment
+  EnrollmentStart: 'enrollment_start',
+  EnrollmentCreateDevice: 'enrollment_create_device',
+  EnrollmentActivateUser: 'enrollment_activate_user',
+  EnrollmentRegisterMfaStart: 'enrollment_register_mfa_start',
+  EnrollmentRegisterMfaFinish: 'enrollment_register_mfa_finish',
+  EnrollmentNetworkInfo: 'enrollment_network_info',
+  EnrollmentFinish: 'enrollment_finish',
+  // MFA
+  MfaStart: 'mfa_start',
+  MfaFinishCode: 'mfa_finish_code',
+  MfaPollOpenId: 'mfa_poll_openid',
+  MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
+  CancelMfa: 'cancel_mfa',
   // Instances
   AllInstances: 'all_instances',
   DeleteInstance: 'delete_instance',
@@ -148,6 +162,10 @@ export const TauriEvent = {
   GlobalLogUpdate: 'log-update-global',
   WindowSwapped: 'window-swapped',
   SessionStateChanged: 'session-state-changed',
+  MfaOpenIdComplete: 'mfa-openid-complete',
+  MfaOpenIdError: 'mfa-openid-error',
+  MfaMobileComplete: 'mfa-mobile-complete',
+  MfaMobileError: 'mfa-mobile-error',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];
@@ -320,7 +338,6 @@ export type SaveDeviceConfigResponse = {
 export type ConnectionArgs = {
   locationId: number;
   connectionType: ConnectionType;
-  presharedKey?: string;
 };
 
 export type RoutingArgs = {
@@ -390,3 +407,105 @@ export type SessionState = {
 };
 
 export type SessionStatePatch = Partial<SessionState>;
+
+/** User information returned by enrollment_start.
+ *
+ * Mirrors `InitialUserInfo` from `client_types.proto`. */
+export type EnrollmentUserInfo = {
+  first_name: string;
+  last_name: string;
+  login: string;
+  email: string;
+  phone_number: string | null;
+  is_active: boolean;
+  device_names: string[];
+  enrolled: boolean;
+  is_admin: boolean;
+  password_management_disabled: boolean;
+};
+
+/** Administrator information returned by enrollment_start.
+ *
+ * Mirrors `AdminInfo` from `client_types.proto`. */
+export type EnrollmentAdminInfo = {
+  name: string;
+  phone_number: string | null;
+  email: string;
+};
+
+/** Enrollment settings returned by enrollment_start.
+ *
+ * Mirrors `EnrollmentSettings` from `client_types.proto`. */
+export type EnrollmentSettings = {
+  vpn_setup_optional: boolean;
+  only_client_activation: boolean;
+  admin_device_management: boolean;
+  smtp_configured: boolean;
+  mfa_required: boolean;
+};
+
+/** Instance info returned by enrollment_start.
+ *
+ * Mirrors `InstanceInfo` from `client_types.proto`. */
+export type EnrollmentInstanceInfo = {
+  id: string;
+  name: string;
+  url: string;
+  proxy_url: string;
+  username: string;
+  enterprise_enabled: boolean;
+  openid_display_name: string | null;
+};
+
+/** Full result from the enrollment_start Tauri command. */
+export type EnrollmentStartResult = {
+  session_id: string;
+  user: EnrollmentUserInfo;
+  admin: EnrollmentAdminInfo;
+  settings: EnrollmentSettings;
+  instance: EnrollmentInstanceInfo;
+  deadline_timestamp: number;
+  final_page_content: string;
+};
+
+/** Result from enrollment_register_mfa_start. */
+export type EnrollmentMfaStartResult = {
+  totp_secret: string | null;
+};
+
+/** Result from enrollment_register_mfa_finish. */
+export type EnrollmentMfaFinishResult = {
+  recovery_codes: string[];
+};
+
+/** Result from mfa_start Tauri command. */
+export type MfaStartResult = {
+  token: string;
+  challenge: string | null;
+};
+
+/** Payload for mfa-openid-error / mfa-mobile-error events. */
+export type MfaErrorPayload = {
+  error: string;
+};
+
+/** `network`: the request could not be sent, most likely a bad URL.
+ *  `unauthorized`: the server responded 401, the token is invalid.
+ *  `server`: any other failure response. */
+export type EnrollmentErrorKind = 'network' | 'unauthorized' | 'server';
+
+export type AddInstanceRequest = { url: string; token: string; name: string };
+
+export type AddInstanceResult = {
+  startResponse?: EnrollmentStartResult;
+  session_id?: string;
+  error?: string;
+  errorKind?: EnrollmentErrorKind;
+};
+
+export type UpdateInstanceRequest = { instanceId: number; url: string; token: string };
+
+export type UpdateInstanceResult = {
+  error?: string;
+  errorKind?: EnrollmentErrorKind;
+};

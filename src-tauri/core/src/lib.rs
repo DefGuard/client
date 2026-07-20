@@ -16,9 +16,13 @@ use serde::{Deserialize, Serialize};
 pub mod app_config;
 pub mod connection;
 pub mod database;
+pub mod enrollment;
 pub mod error;
 pub mod events;
+pub mod mfa;
 pub mod proxy;
+#[cfg(test)]
+mod test_helpers;
 pub mod version;
 pub mod wg_config;
 

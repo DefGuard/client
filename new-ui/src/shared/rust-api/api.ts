@@ -1,15 +1,22 @@
 import { invoke } from '@tauri-apps/api/core';
+import { mfaToApi } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
   AppConfig,
   AppConfigPatch,
   Connection,
   ConnectionArgs,
+  CreateDeviceResponse,
+  EnrollmentMfaFinishResult,
+  EnrollmentMfaStartResult,
+  EnrollmentStartResult,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaMethodValue,
+  MfaStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -133,6 +140,93 @@ const getSessionState = (): Promise<SessionState> => invoke(TauriCommand.GetSess
 const patchSessionState = (patch: SessionStatePatch): Promise<SessionState> =>
   invoke(TauriCommand.PatchSessionState, { patch });
 
+// Enrollment
+
+const enrollmentStart = (
+  proxyUrl: string,
+  token: string,
+): Promise<EnrollmentStartResult> =>
+  invoke(TauriCommand.EnrollmentStart, { proxyUrl, token });
+
+const enrollmentCreateDevice = (
+  sessionId: string,
+  name: string,
+  pubkey: string,
+): Promise<CreateDeviceResponse> =>
+  invoke(TauriCommand.EnrollmentCreateDevice, { sessionId, name, pubkey });
+
+const enrollmentActivateUser = (
+  sessionId: string,
+  password?: string | null,
+  phoneNumber?: string | null,
+): Promise<void> =>
+  invoke(TauriCommand.EnrollmentActivateUser, { sessionId, password, phoneNumber });
+
+const enrollmentRegisterMfaStart = (
+  sessionId: string,
+  method: MfaMethodValue,
+): Promise<EnrollmentMfaStartResult> =>
+  invoke(TauriCommand.EnrollmentRegisterMfaStart, {
+    sessionId,
+    method: mfaToApi(method),
+  });
+
+const enrollmentRegisterMfaFinish = (
+  sessionId: string,
+  code: string,
+  method: MfaMethodValue,
+): Promise<EnrollmentMfaFinishResult> =>
+  invoke(TauriCommand.EnrollmentRegisterMfaFinish, {
+    sessionId,
+    code,
+    method: mfaToApi(method),
+  });
+
+const enrollmentNetworkInfo = (
+  sessionId: string,
+  pubkey: string,
+): Promise<CreateDeviceResponse> =>
+  invoke(TauriCommand.EnrollmentNetworkInfo, { sessionId, pubkey });
+
+const enrollmentFinish = (sessionId: string): Promise<void> =>
+  invoke(TauriCommand.EnrollmentFinish, { sessionId });
+
+// MFA (connect-time)
+
+const mfaStart = (
+  instanceId: number,
+  locationId: number,
+  method: string,
+): Promise<MfaStartResult> =>
+  invoke(TauriCommand.MfaStart, { instanceId, locationId, method });
+
+// Completes MFA and brings up the connection in the backend; the preshared key
+// never crosses back to the frontend.
+const mfaFinishCode = (
+  instanceId: number,
+  locationId: number,
+  token: string,
+  code: string,
+): Promise<void> =>
+  invoke(TauriCommand.MfaFinishCode, { instanceId, locationId, token, code });
+
+const mfaPollOpenId = (
+  instanceId: number,
+  locationId: number,
+  token: string,
+): Promise<string> =>
+  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token });
+
+const mfaConnectMobileApprove = (
+  instanceId: number,
+  locationId: number,
+  token: string,
+): Promise<string> =>
+  invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
+
+const cancelMfa = (taskId: string): Promise<void> =>
+  invoke(TauriCommand.CancelMfa, { taskId });
+
 export const api = {
   closeWelcomeWindow,
   // Instances
@@ -180,4 +274,18 @@ export const api = {
   // Session state
   getSessionState,
   patchSessionState,
+  // Enrollment
+  enrollmentStart,
+  enrollmentCreateDevice,
+  enrollmentActivateUser,
+  enrollmentRegisterMfaStart,
+  enrollmentRegisterMfaFinish,
+  enrollmentNetworkInfo,
+  enrollmentFinish,
+  // MFA
+  mfaStart,
+  mfaFinishCode,
+  mfaPollOpenId,
+  mfaConnectMobileApprove,
+  cancelMfa,
 };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
@@ -10,7 +11,6 @@ import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
 import { SizedBox } from '../../../SizedBox/SizedBox';
-import { MfaStartMethod } from '../../api/startClientMfaSession';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
@@ -23,7 +23,7 @@ export const LocationCardMfaTotpView = () => {
   const { setView, location, setPostureError } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location,
-    MfaStartMethod.Totp,
+    MfaMethod.Totp,
     {
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),

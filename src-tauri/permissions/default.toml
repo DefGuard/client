@@ -2,6 +2,18 @@
 identifier = "allow-app-commands"
 description = "Allow all application commands for both UI windows (old-ui and new-ui)."
 commands.allow = [
+  "enrollment_start",
+  "enrollment_create_device",
+  "enrollment_activate_user",
+  "enrollment_register_mfa_start",
+  "enrollment_register_mfa_finish",
+  "enrollment_network_info",
+  "enrollment_finish",
+  "mfa_start",
+  "mfa_finish_code",
+  "mfa_poll_openid",
+  "mfa_connect_mobile_approve",
+  "cancel_mfa",
   "all_locations",
   "has_any_visible_locations",
   "save_device_config",

@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { error as logError } from '@tauri-apps/plugin-log';
 import { useEffect, useMemo, useState } from 'react';
 import z from 'zod';
 import { Button } from '../../../../../shared/components/Button/Button';
@@ -133,7 +134,8 @@ const ModalContent = ({ data }: { data: OpenUpdateTunnelModalData }) => {
         Snackbar.default('Tunnel updated.');
         closeModal(modalNameKey);
       } catch (e) {
-        Snackbar.error(String(e));
+        void logError(`Tunnel update failed: ${e}`);
+        Snackbar.error('Failed to update tunnel.');
       }
     },
   });

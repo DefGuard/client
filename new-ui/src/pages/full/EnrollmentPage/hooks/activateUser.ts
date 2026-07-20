@@ -1,10 +1,10 @@
-import { edgeApi } from '../../../../shared/edge-api/api';
+import { api } from '../../../../shared/rust-api/api';
 import { useEnrollmentStore } from './useEnrollmentStore';
 
 /**
- * Activate the enrolling user by calling the proxy activation API.
+ * Activate the enrolling user by calling the enrollment Tauri command.
  *
- * Reads proxy URL, cookie, skipPassword, and userPassword from the store via
+ * Reads sessionId, skipPassword, and userPassword from the store via
  * {@linkcode useEnrollmentStore.getState} so every invocation uses the latest
  * values (no stale-closure risk after in-flight {@linkcode setState} updates).
  *
@@ -12,9 +12,8 @@ import { useEnrollmentStore } from './useEnrollmentStore';
  * body instead of sending `null` or an empty string.
  */
 export const activateUser = async () => {
-  const { proxyUrl, sessionCookie, skipPassword, userPassword } =
-    useEnrollmentStore.getState();
-  const body = skipPassword ? {} : { password: userPassword ?? '' };
-  // biome-ignore lint/style/noNonNullAssertion: proxy and cookie are set in start()
-  return edgeApi.activateUser(proxyUrl!, sessionCookie!, body);
+  const { sessionId, skipPassword, userPassword } = useEnrollmentStore.getState();
+  const password = skipPassword ? null : (userPassword ?? '');
+  // biome-ignore lint/style/noNonNullAssertion: sessionId is set in start(), called before this
+  return api.enrollmentActivateUser(sessionId!, password, null);
 };

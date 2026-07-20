@@ -12,6 +12,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         // Make all messages serde-serializable.
         .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
+        // Use proto defaults for missing fields in enrollment types that
+        // may differ across proxy versions.
+        .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")
+        .type_attribute(
+            ".defguard.client_types.InitialUserInfo",
+            "#[serde(default)]",
+        )
+        .type_attribute(
+            ".defguard.client_types.EnrollmentSettings",
+            "#[serde(default)]",
+        )
+        .type_attribute(".defguard.client_types.InstanceInfo", "#[serde(default)]")
+        .type_attribute(
+            ".defguard.client_types.EnrollmentStartResponse",
+            "#[serde(default)]",
+        )
         .compile_protos(
             &[
                 "../proto/v1/client/client.proto",

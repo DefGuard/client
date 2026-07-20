@@ -1,13 +1,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
-import { useShallow } from 'zustand/shallow';
+import { error as logError } from '@tauri-apps/plugin-log';
 import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
 import { CopyField } from '../../../../../shared/components/CopyField/CopyField';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { QrCard } from '../../../../../shared/components/QrCard/QrCard';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
-import { edgeApi } from '../../../../../shared/edge-api/api';
+import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
@@ -15,43 +15,57 @@ import { EnrollmentControls } from '../../components/EnrollmentControls/Enrollme
 import { activateUser } from '../../hooks/activateUser';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
+/**
+ * Map a register-mfa-finish error to a user-facing message. The proxy rejects
+ * a wrong code with a `proxy_error` (HTTP 400) whose message contains "invalid"
+ * (core returns "Code invalid" / "Email code invalid"); anything else is
+ * unexpected and gets a generic message.
+ */
+const mfaFinishErrorMessage = (err: unknown): string => {
+  try {
+    const parsed = JSON.parse(String(err)) as { type?: string; message?: string };
+    if (
+      parsed.type === 'proxy_error' &&
+      parsed.message?.toLowerCase().includes('invalid')
+    ) {
+      return 'Invalid code';
+    }
+  } catch {
+    // Non-JSON error: fall through to the generic message.
+  }
+  return 'MFA setup failed. Please try again.';
+};
+
 export const MfaConfigurationStep = () => {
+  const sessionId = useEnrollmentStore((s) => s.sessionId);
   const method = useEnrollmentStore((s) => s.userMfaChoice);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [proxyUrl, cookie] = useEnrollmentStore(
-    // biome-ignore lint/style/noNonNullAssertion: safe
-    useShallow((s) => [s.proxyUrl!, s.sessionCookie!]),
-  );
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
-      const resp = await edgeApi.finishMfaSetup(proxyUrl, cookie, {
-        // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
-        code: code!,
-        method,
-      });
+      // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
+      const resp = await api.enrollmentRegisterMfaFinish(sessionId!, code!, method);
       await activateUser();
       return resp;
     },
-    onError: () => {},
+    onError: (err) => {
+      void logError(`MFA configuration failed: ${err}`);
+      setError(mfaFinishErrorMessage(err));
+    },
     onSuccess: (resp) => {
-      if (resp.result) {
-        useEnrollmentStore.setState({
-          userRecoveryCodes: resp.result.recovery_codes,
-          deadline: null,
-        });
-        useEnrollmentStore.getState().next();
-      }
-      if (resp.error) {
-        setError('Enter a valid code');
-      }
+      useEnrollmentStore.setState({
+        userRecoveryCodes: resp.recovery_codes,
+        deadline: null,
+      });
+      useEnrollmentStore.getState().next();
     },
   });
 
   const handleSubmit = useCallback(() => {
     if (code?.trim().length !== 6) {
-      setError('');
+      setError('Enter a valid code');
+      return;
     }
     mutate();
   }, [code, mutate]);

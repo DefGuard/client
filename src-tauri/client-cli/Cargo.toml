@@ -29,8 +29,10 @@ serde_json.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+url.workspace = true
 webbrowser.workspace = true
 http.workspace = true
 qrcode.workspace = true

@@ -18,8 +18,6 @@ mod resolve;
 mod state;
 #[cfg(all(test, target_os = "linux"))]
 mod tests_daemon;
-#[cfg(test)]
-mod tests_proxy;
 
 use cli::{Cli, InstanceCommand, LocationCommand, TunnelCommand};
 
