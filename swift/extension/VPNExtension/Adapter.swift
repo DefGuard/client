@@ -231,8 +231,8 @@ enum State {
         log.info("Creating keep-alive timer")
         let timer = DispatchSource.makeTimerSource(queue: ioQueue)
         timer.schedule(
-            deadline: .now() + .milliseconds(250),
-            repeating: .milliseconds(250),
+            deadline: .now() + .seconds(1),
+            repeating: .seconds(1),
             leeway: .milliseconds(25)
         )
         timer.setEventHandler { [weak self] in

@@ -13,7 +13,7 @@ pushd boringtun
 
 for TARGET in aarch64-apple-darwin x86_64-apple-darwin; do
     ${RUSTUP} target add "${TARGET}"
-    ${CARGO} build --lib --locked --release --target ${TARGET}
+    ${CARGO} build --features=bindgen --lib --locked --release --target ${TARGET}
 done
 
 # Create universal library.
@@ -23,8 +23,8 @@ lipo -create \
     ${TARGET_DIR}/x86_64-apple-darwin/release/libdefguard_boringtun.a \
     -output ${TARGET_DIR}/universal/release/libdefguard_boringtun.a
 
-rm -f -r target/uniffi
-${CARGO} run --release --bin uniffi-bindgen -- \
+rm -f -r ${TARGET_DIR}/uniffi
+${CARGO} run --features=bindgen --release --bin uniffi-bindgen -- \
     --xcframework --headers --modulemap --swift-sources \
     ${TARGET_DIR}/aarch64-apple-darwin/release/libdefguard_boringtun.a ${TARGET_DIR}/uniffi
 

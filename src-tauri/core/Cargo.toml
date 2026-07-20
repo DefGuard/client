@@ -36,8 +36,8 @@ tokio-tungstenite.workspace = true
 tokio-util = "0.7"
 tonic.workspace = true
 tower = "0.5"
-tracing = { workspace = true }
-x25519-dalek = { version = "2", features = ["getrandom", "serde", "static_secrets"] }
+tracing.workspace = true
+x25519-dalek.workspace = true
 
 [dev-dependencies]
 futures-util.workspace = true

@@ -10,7 +10,7 @@ version.workspace = true
 
 [dependencies]
 anyhow = "1.0"
-clap = { workspace = true }
+clap.workspace = true
 defguard-client-common = { path = "../common" }
 defguard-client-proto = { path = "../client-proto" }
 defguard-client-posture = { path = "../enterprise/posture" }
@@ -18,11 +18,11 @@ defguard-client-service-locations = { path = "../enterprise/service-locations" }
 defguard_wireguard_rs.workspace = true
 log.workspace = true
 serde.workspace = true
-thiserror = { workspace = true }
+thiserror.workspace = true
 tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-stream = { version = "0.1", features = ["net"] }
-tonic = { workspace = true }
-tracing = { workspace = true }
+tonic.workspace = true
+tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber = { workspace = true }
 
