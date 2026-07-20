@@ -9,11 +9,12 @@ import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { MfaMethod } from '../../../rust-api/types';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
-import { MfaStartMethod, useMfaConnect } from '../../hooks/useMfaConnect';
+import { useMfaConnect } from '../../hooks/useMfaConnect';
 import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/LocationCardMfaStartLoader';
 
 const MIN_POSTURE_LOADER_MS = 500;
@@ -22,7 +23,7 @@ export const LocationCardMfaEmailView = () => {
   const { setView, location, setPostureError } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location,
-    MfaStartMethod.Email,
+    MfaMethod.Email,
     {
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),

@@ -11,26 +11,9 @@ import {
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { LocationInfo } from '../../../rust-api/types';
-import { MfaMethod } from '../../../rust-api/types';
+import type { LocationInfo, MfaMethod } from '../../../rust-api/types';
 
-/** MFA method identifiers matching the proxy proto enum (numeric).
- *  Used by TOTP/email view callers that pass the method to useMfaConnect. */
-export const MfaStartMethod = {
-  Totp: 0,
-  Email: 1,
-  Oidc: 2,
-  MobileApprove: 4,
-} as const;
-
-export type MfaStartMethod = (typeof MfaStartMethod)[keyof typeof MfaStartMethod];
-
-type CodeMfaStartMethod = Extract<MfaStartMethod, 0 | 1>;
-
-const MFA_METHOD_MAP: Record<number, string> = {
-  [MfaStartMethod.Totp]: MfaMethod.Totp,
-  [MfaStartMethod.Email]: MfaMethod.Email,
-};
+type CodeMfaMethod = typeof MfaMethod.Totp | typeof MfaMethod.Email;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
@@ -49,7 +32,7 @@ const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
 
 export const useMfaConnect = (
   location: LocationInfo,
-  method: CodeMfaStartMethod,
+  method: CodeMfaMethod,
   {
     debounceMs = 0,
     onConnected,
@@ -80,16 +63,9 @@ export const useMfaConnect = (
 
     setIsStarting(true);
 
-    const methodString = MFA_METHOD_MAP[method];
-    if (!methodString) {
-      setStartError('Unsupported MFA method');
-      setIsStarting(false);
-      return;
-    }
-
     (async () => {
       try {
-        const info = await api.mfaStart(instance.id, location.id, methodString);
+        const info = await api.mfaStart(instance.id, location.id, method);
         await waitForMinimumDuration(startedAt, debounceMs);
         setToken(info.token);
       } catch (err) {
