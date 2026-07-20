@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
@@ -9,7 +10,6 @@ import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
-import { MfaMethod } from '../../../rust-api/types';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
