@@ -126,10 +126,18 @@ NO_STRIP=1 pnpm tauri build
 
 ## Blank screen
 
-The app launches but the window is blank. Set the `WEBKIT_DISABLE_DMABUF_RENDERER` environment variable:
+On NVIDIA + Wayland setups, the app automatically applies the WebKitGTK graphics workarounds
+`__NV_DISABLE_EXPLICIT_SYNC=1` and `WEBKIT_DISABLE_DMABUF_RENDERER=1` before the webview
+starts. If the app still launches with a blank window, set the DMA-BUF workaround manually:
 
 ```
 WEBKIT_DISABLE_DMABUF_RENDERER=1 defguard-client
+```
+
+As a last resort for resize crashes or persistent rendering issues, disable accelerated compositing:
+
+```
+WEBKIT_DISABLE_COMPOSITING_MODE=1 defguard-client
 ```
 
 ## Failed to run `pnpm tauri dev`

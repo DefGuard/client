@@ -12,6 +12,8 @@ use std::{env, str::FromStr, sync::LazyLock};
 
 #[cfg(unix)]
 use defguard_client::set_perms;
+#[cfg(target_os = "linux")]
+use defguard_client::utils::set_webkitgtk_variables;
 #[cfg(windows)]
 use defguard_client::utils::sync_connections;
 use defguard_client::{
@@ -172,6 +174,9 @@ async fn startup(app_handle: &AppHandle) {
 fn main() {
     // Handle --version / -V before starting the GUI.
     check_version_flag("defguard-client");
+
+    #[cfg(target_os = "linux")]
+    set_webkitgtk_variables();
 
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
