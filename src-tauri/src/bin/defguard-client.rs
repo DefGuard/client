@@ -11,6 +11,9 @@ fn main() {
     // Handle --version / -V before starting the GUI.
     defguard_client::check_version_flag("defguard-client");
 
+    #[cfg(target_os = "linux")]
+    defguard_client::utils::set_webkitgtk_variables();
+
     // Without any arguments, launch the user interface.
     if env::args().count() <= 1 {
         defguard_client::gui::run_app();

@@ -36,13 +36,13 @@ use crate::{
 fn into_cli(err: mfa::MfaError) -> CliError {
     let msg = err.to_string();
     match err {
-        mfa::MfaError::NetworkError { .. } => CliError::Other(msg),
-        mfa::MfaError::ProxyError { .. } => CliError::Other(msg),
-        mfa::MfaError::MfaRejected { .. } => CliError::MfaFailed(msg),
-        mfa::MfaError::PostureRejected { .. } => CliError::MfaFailed(msg),
-        mfa::MfaError::Timeout => CliError::MfaFailed(msg),
+        mfa::MfaError::NetworkError { .. }
+        | mfa::MfaError::ProxyError { .. }
+        | mfa::MfaError::Other { .. } => CliError::Other(msg),
+        mfa::MfaError::MfaRejected { .. }
+        | mfa::MfaError::PostureRejected { .. }
+        | mfa::MfaError::Timeout => CliError::MfaFailed(msg),
         mfa::MfaError::Cancelled => CliError::Cancelled(msg),
-        mfa::MfaError::Other { .. } => CliError::Other(msg),
     }
 }
 

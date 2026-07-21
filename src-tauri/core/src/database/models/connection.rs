@@ -63,8 +63,8 @@ pub struct ConnectionInfo {
     pub location_id: Id,
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
-    pub upload: Option<i32>,
-    pub download: Option<i32>,
+    pub upload: Option<i64>,
+    pub download: Option<i64>,
 }
 
 impl From<ConnectionInfo> for CommonConnectionInfo {
