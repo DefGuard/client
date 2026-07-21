@@ -1,4 +1,5 @@
 import './style.scss';
+import { error } from '@tauri-apps/plugin-log';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { InfoBanner } from '../../../../../shared/components/InfoBanner/InfoBanner';
@@ -52,7 +53,13 @@ export const WelcomeStep = () => {
         onNext={async () => {
           if (skipPassword && skipMfa) {
             setActivating(true);
-            await activateUser();
+            try {
+              await activateUser();
+            } catch (err) {
+              void error(`Welcome step activation failed: ${err}`);
+              setActivating(false);
+              return;
+            }
           }
           useEnrollmentStore.getState().next();
         }}

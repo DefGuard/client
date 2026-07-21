@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: sessionId is set in start(), called before */
 import { useMutation } from '@tanstack/react-query';
 import './style.scss';
+import { error as logError } from '@tauri-apps/plugin-log';
 import clsx from 'clsx';
 import { useState } from 'react';
 import {
@@ -34,6 +35,9 @@ export const MfaChoiceStep = () => {
         useEnrollmentStore.setState({ userMfaChoice: mfa });
       }
       useEnrollmentStore.getState().next();
+    },
+    onError: (err) => {
+      void logError(`MFA start failed: ${err}`);
     },
   });
 

@@ -1,5 +1,6 @@
 import './style.scss';
 import { useNavigate } from '@tanstack/react-router';
+import { error } from '@tauri-apps/plugin-log';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
@@ -36,9 +37,11 @@ export const FinishStep = () => {
             onClick={() => {
               // Release the enrollment session now that the wizard is done.
               // Best-effort: enrollment_finish errors if the session is already
-              // gone, so swallow failures and leave the wizard regardless.
+              // gone, so we log and exit the wizard regardless.
               if (isPresent(sessionId)) {
-                void api.enrollmentFinish(sessionId).catch(() => {});
+                void api.enrollmentFinish(sessionId).catch((err) => {
+                  void error(`enrollmentFinish failed: ${err}`);
+                });
               }
               navigate({ to: '/full/overview', replace: true });
             }}
