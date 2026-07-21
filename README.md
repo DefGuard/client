@@ -126,9 +126,10 @@ NO_STRIP=1 pnpm tauri build
 
 ## Blank screen
 
-On NVIDIA + Wayland setups, the app automatically applies the WebKitGTK graphics workarounds
-`__NV_DISABLE_EXPLICIT_SYNC=1` and `WEBKIT_DISABLE_DMABUF_RENDERER=1` before the webview
-starts. If the app still launches with a blank window, set the DMA-BUF workaround manually:
+On Linux NVIDIA setups, the app automatically applies the WebKitGTK DMA-BUF workaround
+`WEBKIT_DISABLE_DMABUF_RENDERER=1` before the webview starts. On NVIDIA + Wayland setups,
+it also applies `__NV_DISABLE_EXPLICIT_SYNC=1`. If the app still launches with a blank window,
+set the DMA-BUF workaround manually:
 
 ```
 WEBKIT_DISABLE_DMABUF_RENDERER=1 defguard-client

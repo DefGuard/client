@@ -64,21 +64,32 @@ const WEBKIT_DMABUF_ENV: &str = "WEBKIT_DISABLE_DMABUF_RENDERER";
 /// https://v2.tauri.app/develop/debug/linux-graphics
 #[cfg(target_os = "linux")]
 pub fn set_webkitgtk_variables() {
-    if has_nvidia_driver() {
+    let (should_set_dmabuf, should_set_explicit_sync) = should_set_webkit_variables();
+    if should_set_dmabuf {
         env::set_var(WEBKIT_DMABUF_ENV, "1");
-        info!(
+        eprintln!(
             "Applied Linux WebKitGTK NVIDIA environment variable: \
             {WEBKIT_DMABUF_ENV}=1"
         );
-
-        if is_wayland_session() {
-            env::set_var(NVIDIA_EXPLICIT_SYNC_ENV, "1");
-            info!(
-                "Applied Linux WebKitGTK NVIDIA on Wayland environment variable: \
-                {NVIDIA_EXPLICIT_SYNC_ENV}=1"
-            );
-        }
     }
+    if should_set_explicit_sync {
+        env::set_var(NVIDIA_EXPLICIT_SYNC_ENV, "1");
+        eprintln!(
+            "Applied Linux WebKitGTK NVIDIA on Wayland environment variable: \
+            {NVIDIA_EXPLICIT_SYNC_ENV}=1"
+        );
+    }
+}
+
+/// Encodes the decision on which webkitgtk-related variables should be set.
+/// Returns (should_set_dmabuf, should_set_explicit_sync) bool pair.
+#[cfg(target_os = "linux")]
+fn should_set_webkit_variables() -> (bool, bool) {
+    let nvidia_driver = has_nvidia_driver();
+    (
+        nvidia_driver && env::var_os(WEBKIT_DMABUF_ENV).is_none(),
+        nvidia_driver && is_wayland_session() && env::var_os(NVIDIA_EXPLICIT_SYNC_ENV).is_none(),
+    )
 }
 
 #[cfg(target_os = "linux")]
