@@ -1,4 +1,4 @@
-use std::process::ExitCode;
+use std::{env, process::ExitCode};
 
 use clap::Parser;
 use common::check_version_flag;
@@ -27,8 +27,7 @@ use crate::{
     state::State,
 };
 
-#[tokio::main]
-async fn main() -> ExitCode {
+pub async fn cli_main() -> ExitCode {
     // Handle --version / -V before any other work.
     check_version_flag("defguard-cli");
 
@@ -145,22 +144,15 @@ async fn main() -> ExitCode {
     }
 }
 
-/// Show the brand banner (logo + copyright + project version) on
-/// the two surfaces that need branding: `defguard-cli` with no args
-/// (clap prints help; we banner first), and `defguard-cli --help` /
-/// `-h`. Suppressed for `--version` / `-V` -- that surface must stay
-/// grep-friendly (`defguard-cli --version | head -1`).
+/// Show the brand banner (logo + copyright + project version) on the two surfaces that need
+/// branding: `defguard-cli` with no args (clap prints help; we banner first), and
+/// `defguard-cli --help` / `-h`. Don't check for `--version` / `-V` -- that is handled in
+/// `check_version_flag`, which should be called before calling this function.
 fn show_banner_if_appropriate() {
-    let args = std::env::args().collect::<Vec<_>>();
     // Skip argv[0]. If user supplied any subcommand or flag other
     // than --help / -h, do not print the banner.
-    let user_args = &args[1..];
-    let no_args = user_args.is_empty();
-    let asked_help = user_args.iter().any(|a| a == "--help" || a == "-h");
-    let asked_version = user_args.iter().any(|a| a == "--version" || a == "-V");
-    if asked_version {
-        return;
-    }
+    let no_args = env::args().count() <= 1;
+    let asked_help = env::args().skip(1).any(|a| a == "--help" || a == "-h");
     if no_args || asked_help {
         brand::print_banner();
     }

@@ -1409,8 +1409,7 @@ pub async fn enrollment_start(
     let login = response
         .user
         .as_ref()
-        .map(|u| u.login.as_str())
-        .unwrap_or("<unknown>");
+        .map_or("<unknown>", |u| u.login.as_str());
     info!("Enrollment started for user {login}, session {session_id}");
     Ok(EnrollmentStartResult {
         session_id,
