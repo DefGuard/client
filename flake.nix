@@ -68,13 +68,6 @@
             mkdir -p $out/bin
             cp ${defguard-client}/bin/dg $out/bin/
           '';
-        defguard-cli =
-          pkgs.runCommand "defguard-cli" {
-            nativeBuildInputs = [pkgs.makeWrapper];
-          } ''
-            mkdir -p $out/bin
-            cp ${defguard-client}/bin/defguard-cli $out/bin/
-          '';
       };
 
       checks.default = defguard-client;
