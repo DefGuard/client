@@ -3,6 +3,8 @@ use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
 use std::{env, process::Command};
+#[cfg(target_os = "linux")]
+use std::{fs, path::Path};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -52,6 +54,67 @@ use crate::{
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]
 static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
+
+#[cfg(target_os = "linux")]
+const NVIDIA_EXPLICIT_SYNC_ENV: &str = "__NV_DISABLE_EXPLICIT_SYNC";
+#[cfg(target_os = "linux")]
+const WEBKIT_DMABUF_ENV: &str = "WEBKIT_DISABLE_DMABUF_RENDERER";
+
+/// Sets relevant environment variables to workaround webkitgtk on nvidia and wayland issues.
+/// https://v2.tauri.app/develop/debug/linux-graphics
+#[cfg(target_os = "linux")]
+pub fn set_webkitgtk_variables() {
+    let (should_set_dmabuf, should_set_explicit_sync) = should_set_webkit_variables();
+    if should_set_dmabuf {
+        env::set_var(WEBKIT_DMABUF_ENV, "1");
+        eprintln!(
+            "Applied Linux WebKitGTK NVIDIA environment variable: \
+            {WEBKIT_DMABUF_ENV}=1"
+        );
+    }
+    if should_set_explicit_sync {
+        env::set_var(NVIDIA_EXPLICIT_SYNC_ENV, "1");
+        eprintln!(
+            "Applied Linux WebKitGTK NVIDIA on Wayland environment variable: \
+            {NVIDIA_EXPLICIT_SYNC_ENV}=1"
+        );
+    }
+}
+
+/// Encodes the decision on which webkitgtk-related variables should be set.
+/// Returns (should_set_dmabuf, should_set_explicit_sync) bool pair.
+#[cfg(target_os = "linux")]
+fn should_set_webkit_variables() -> (bool, bool) {
+    let nvidia_driver = has_nvidia_driver();
+    (
+        nvidia_driver && env::var_os(WEBKIT_DMABUF_ENV).is_none(),
+        nvidia_driver && is_wayland_session() && env::var_os(NVIDIA_EXPLICIT_SYNC_ENV).is_none(),
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn is_wayland_session() -> bool {
+    env::var("XDG_SESSION_TYPE")
+        .is_ok_and(|session_type| session_type.eq_ignore_ascii_case("wayland"))
+        || env::var_os("WAYLAND_DISPLAY").is_some()
+}
+
+#[cfg(target_os = "linux")]
+fn has_nvidia_driver() -> bool {
+    Path::new("/sys/module/nvidia").exists()
+        || Path::new("/proc/driver/nvidia/version").exists()
+        || fs::read_to_string("/proc/modules")
+            .is_ok_and(|modules| proc_modules_has_nvidia(&modules))
+}
+
+#[cfg(target_os = "linux")]
+fn proc_modules_has_nvidia(modules: &str) -> bool {
+    modules.lines().any(|line| {
+        line.split_whitespace()
+            .next()
+            .is_some_and(|name| name == "nvidia" || name.starts_with("nvidia_"))
+    })
+}
 
 #[cfg(target_os = "macos")]
 pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
