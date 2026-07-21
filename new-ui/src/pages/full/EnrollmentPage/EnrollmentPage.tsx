@@ -1,6 +1,7 @@
 import { type ReactNode, useMemo } from 'react';
 import type { WizardPageStep } from '../../../shared/components/wizard/types';
 import { WizardPage } from '../../../shared/components/wizard/WizardPage/WizardPage';
+import { EnrollmentErrorModal } from './components/EnrollmentErrorModal/EnrollmentErrorModal';
 import { EnrollmentTimeoutProvider } from './components/EnrollmentTimeoutProvider';
 import { useEnrollmentStore } from './hooks/useEnrollmentStore';
 import { FinishStep } from './steps/FinishStep/FinishStep';
@@ -68,6 +69,7 @@ export const EnrollmentPage = () => {
       <WizardPage title="Enrollment" subtitle="" activeStep={activeStep} steps={steps}>
         {stepComponents[activeStep]}
       </WizardPage>
+      <EnrollmentErrorModal />
     </EnrollmentTimeoutProvider>
   );
 };
