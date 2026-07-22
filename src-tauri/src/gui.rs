@@ -1,9 +1,12 @@
-#[cfg(target_os = "macos")]
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
 use std::{env, str::FromStr, sync::LazyLock};
+#[cfg(target_os = "macos")]
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::spawn,
+};
 
 #[cfg(unix)]
 use crate::set_perms;
@@ -117,9 +120,8 @@ async fn startup(app_handle: &AppHandle) {
 
         let (tunnels, locations) = get_all_tunnels_locations().await;
         let handle = app_handle.clone();
-        // Observer thread is blocking, so its better not to mess with the tauri runtime,
-        // hence std::thread::spawn.
-        std::thread::spawn(move || {
+        // Observer thread is blocking, so its better not to mess with the tauri runtime.
+        spawn(move || {
             observer_thread(get_managers_for_tunnels_and_locations(&tunnels, &locations));
             error!("VPN observer thread has exited unexpectedly, quitting the app.");
             handle.exit(0);
@@ -219,7 +221,7 @@ pub fn run_app() {
         .on_window_event(|window, event| {
             if let WindowEvent::ThemeChanged(_theme) = event {
                 let app = window.app_handle().clone();
-                tauri::async_runtime::spawn(async move {
+                async_runtime::spawn(async move {
                     if let Err(err) = configure_tray_icon(&app).await {
                         error!("Failed to reconfigure tray icon on theme change: {err}");
                     }

@@ -173,29 +173,7 @@ pub async fn handle(
         ResolvedTarget::Tunnel(tun) => ConnectionTarget::Tunnel(tun),
     };
 
-    #[cfg(not(target_os = "macos"))]
     bring_up(conn_target, psk, mtu, &state.pool, routing_override).await?;
-
-    #[cfg(target_os = "macos")]
-    {
-        use std::sync::{atomic::AtomicBool, Arc};
-
-        use defguard_core::connection::apple::spawn_runloop_and_wait_for;
-
-        let semaphore = Arc::new(AtomicBool::new(false));
-        let semaphore_clone = Arc::clone(&semaphore);
-        let pool = state.pool.clone();
-        let handle = tokio::spawn(async move {
-            use std::sync::atomic::Ordering;
-
-            let result = bring_up(conn_target, psk, mtu, &pool, routing_override).await;
-            semaphore_clone.store(true, Ordering::Release);
-
-            result
-        });
-        spawn_runloop_and_wait_for(&semaphore);
-        let _ = handle.await.unwrap()?;
-    }
 
     Ok(ConnectResult::Connected { name: target_name })
 }

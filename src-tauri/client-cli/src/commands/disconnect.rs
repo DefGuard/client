@@ -1,13 +1,3 @@
-#[cfg(target_os = "macos")]
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
-
-#[cfg(target_os = "macos")]
-use defguard_core::connection::{
-    active_state::ActiveConnectionInfo, apple::spawn_runloop_and_wait_for,
-};
 use defguard_core::{
     connection::{active_state::active_state, tear_down},
     ConnectionType,
@@ -20,20 +10,6 @@ use crate::{
     resolve::{resolve_disconnect_target, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
-
-/// Wrap `tear_down` in RunLoop.
-#[cfg(target_os = "macos")]
-async fn macos_tear_down(conn: ActiveConnectionInfo) -> Result<(), defguard_core::error::Error> {
-    let semaphore = Arc::new(AtomicBool::new(false));
-    let semaphore_clone = Arc::clone(&semaphore);
-    let handle = tokio::spawn(async move {
-        let result = tear_down(&conn).await;
-        semaphore_clone.store(true, Ordering::Release);
-        result
-    });
-    spawn_runloop_and_wait_for(&semaphore);
-    handle.await.unwrap()
-}
 
 pub async fn handle(
     state: &State,
@@ -60,15 +36,7 @@ pub async fn handle(
                 "Disconnecting {name} on interface {}...",
                 connection.interface_name
             );
-            let result;
-            #[cfg(not(target_os = "macos"))]
-            {
-                result = tear_down(connection).await;
-            }
-            #[cfg(target_os = "macos")]
-            {
-                result = macos_tear_down(connection.clone()).await;
-            }
+            let result = tear_down(connection).await;
             match result {
                 Ok(()) => {
                     info!("Disconnected {name} ({})", connection.interface_name);
@@ -101,10 +69,7 @@ pub async fn handle(
                     let name = connection.name.clone();
                     info!("Disconnecting sole active connection {name} on interface {ifname}...");
 
-                    #[cfg(not(target_os = "macos"))]
                     tear_down(connection).await?;
-                    #[cfg(target_os = "macos")]
-                    macos_tear_down(connection.clone()).await?;
 
                     return Ok(DisconnectResult::Single {
                         name,
@@ -150,10 +115,7 @@ pub async fn handle(
 
         info!("Disconnecting {target_name} on interface {ifname}...");
 
-        #[cfg(not(target_os = "macos"))]
         tear_down(connection).await?;
-        #[cfg(target_os = "macos")]
-        macos_tear_down(connection.clone()).await?;
 
         Ok(DisconnectResult::Single {
             name: target_name,
