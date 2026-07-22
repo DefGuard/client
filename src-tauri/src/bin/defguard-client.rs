@@ -13,18 +13,22 @@ use std::{
     thread::spawn,
 };
 
+#[cfg(target_os = "macos")]
+use defguard_client::connection::apple::spawn_runloop_and_wait_for;
+#[cfg(target_os = "linux")]
+use defguard_client::utils::set_webkitgtk_variables;
+use defguard_client::{check_version_flag, gui::run_app};
 use tauri::async_runtime::block_on;
 
 fn main() {
-    // Handle --version / -V before starting the GUI.
-    defguard_client::check_version_flag("defguard-client");
-
-    #[cfg(target_os = "linux")]
-    defguard_client::utils::set_webkitgtk_variables();
+    // Handle --version / -V before starting the client.
+    check_version_flag("defguard-client");
 
     // Without any arguments, launch the user interface.
     if env::args().count() <= 1 {
-        defguard_client::gui::run_app();
+        #[cfg(target_os = "linux")]
+        set_webkitgtk_variables();
+        run_app();
     } else {
         #[cfg(target_os = "macos")]
         {
@@ -36,7 +40,7 @@ fn main() {
                 let _code = block_on(defguard_cli::cli_main());
                 done_clone.store(true, Ordering::Release);
             });
-            defguard_client::connection::apple::spawn_runloop_and_wait_for(&done);
+            spawn_runloop_and_wait_for(&done);
             let _ = worker.join();
         }
         #[cfg(not(target_os = "macos"))]
