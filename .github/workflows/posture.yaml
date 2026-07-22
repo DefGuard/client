@@ -5,7 +5,7 @@ on:
       - main
       - dev
       - 'release/**'
-      - linux-ci-posture
+      - linux-posture-ci
     paths-ignore:
       - '*.md'
       - 'LICENSE'
