@@ -1,6 +1,7 @@
 use std::{
     env,
     fs::{create_dir_all, File},
+    path::PathBuf,
     str::FromStr,
     sync::LazyLock,
     time::Duration,
@@ -29,6 +30,31 @@ pub static DB_POOL: LazyLock<SqlitePool> = LazyLock::new(|| {
     debug!("Connecting to database: {db_url} with options: {opts:?}");
     SqlitePool::connect_lazy_with(opts)
 });
+
+/// Extracts a filesystem path from a SQLite connection URL, returning `None` for
+/// non-file databases (e.g. `:memory:`) or empty paths.
+fn sqlite_url_to_path(url: &str) -> Option<PathBuf> {
+    let path = url
+        .strip_prefix("sqlite://")
+        .or_else(|| url.strip_prefix("sqlite:"))
+        .unwrap_or(url);
+    let path = path.split('?').next().unwrap_or(path);
+    if path.is_empty() || path == ":memory:" {
+        return None;
+    }
+    Some(PathBuf::from(path))
+}
+
+/// Returns the filesystem path of the client's SQLite database file.
+/// Mirrors the resolution used by [`prepare_db_url`].
+#[must_use]
+pub fn db_file_path() -> Option<PathBuf> {
+    if let Ok(url) = env::var("DATABASE_URL") {
+        sqlite_url_to_path(&url)
+    } else {
+        Some(app_data_dir()?.join(DB_NAME))
+    }
+}
 
 /// Returns database URL. Checks for custom URL in `DATABASE_URL` environment variable.
 /// Handles creating appropriate directories if they don't exist.
