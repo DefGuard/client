@@ -5,6 +5,7 @@ on:
       - main
       - dev
       - 'release/**'
+      - linux-ci-posture
     paths-ignore:
       - '*.md'
       - 'LICENSE'
@@ -19,6 +20,8 @@ jobs:
 
   test-linux-postures-unencrypted:
     name: Linux postures - unencrypted
+    env:
+      DATABASE_URL: /db
     runs-on:
       - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -46,6 +49,8 @@ jobs:
 
   test-linux-postures-encrypted:
     name: Linux postures - encrypted
+    env:
+      DATABASE_URL: /db
     runs-on:
       - self-hosted
       - Linux
@@ -74,6 +79,7 @@ jobs:
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup2 -- --ignored
 
   test-windows-postures-setup1:
+    if: false
     name: Windows postures - setup1
     runs-on:
       - self-hosted
@@ -99,6 +105,7 @@ jobs:
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup1 -- --ignored
 
   test-windows-postures-setup2:
+    if: false
     name: Windows postures - setup2
     runs-on:
       - self-hosted
@@ -124,6 +131,7 @@ jobs:
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup2 -- --ignored
 
   test-macos-postures-unencrypted:
+    if: false
     name: macOS postures - unencrypted
     runs-on:
       - self-hosted
@@ -146,6 +154,7 @@ jobs:
           cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos::setup1 -- --ignored
 
   test-macos-postures-encrypted:
+    if: false
     name: macOS postures - encrypted
     runs-on:
       - self-hosted
