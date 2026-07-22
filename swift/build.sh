@@ -2,7 +2,7 @@
 set -e
 
 DST="${PWD}/extension/BoringTun"
-CARGO="${HOME}/.cargo/bin/cargo"
+CARGO="${CARGO:-${HOME}/.cargo/bin/cargo}"
 RUSTUP="${HOME}/.cargo/bin/rustup"
 TARGET_DIR="${CARGO_TARGET_DIR:-./target}"
 
@@ -12,7 +12,9 @@ export MACOSX_DEPLOYMENT_TARGET=13.5
 pushd boringtun
 
 for TARGET in aarch64-apple-darwin x86_64-apple-darwin; do
-    ${RUSTUP} target add "${TARGET}"
+    if [ -x "${RUSTUP}" ]; then
+        ${RUSTUP} target add "${TARGET}"
+    fi
     ${CARGO} build --features=bindgen --lib --locked --release --target ${TARGET}
 done
 

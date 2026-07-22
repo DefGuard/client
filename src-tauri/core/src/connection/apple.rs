@@ -136,7 +136,6 @@ pub fn observer_thread(
     debug!("Exiting VPN connection observer thread");
 }
 
-/// Tunnel statistics shared with VPNExtension (written in Swift).
 /// Run [`NSRunLoop`] until semaphore becomes `true`.
 pub fn spawn_runloop_and_wait_for(semaphore: &Arc<AtomicBool>) {
     const ONE_SECOND: f64 = 1.;

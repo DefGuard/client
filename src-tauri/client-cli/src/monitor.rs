@@ -41,42 +41,12 @@ pub async fn tear_down_stale_connections(state: &State) {
 
     let peer_alive_period = state.app_config.peer_alive_period;
 
-    #[cfg(target_os = "macos")]
-    {
-        use std::sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        };
-
-        use defguard_core::connection::apple::spawn_runloop_and_wait_for;
-
-        let semaphore = Arc::new(AtomicBool::new(false));
-        let semaphore_clone = Arc::clone(&semaphore);
-        let handle = tokio::spawn(async move {
-            for connection in connections {
-                if is_stale(&connection, peer_alive_period) {
-                    eprintln!("Removing stale connection {}", connection.name);
-                    let result = tear_down(&connection).await;
-                    if let Err(err) = result {
-                        error!("Error removing stale connection {}: {err}", connection.name);
-                    }
-                }
-            }
-            semaphore_clone.store(true, Ordering::Release);
-        });
-        spawn_runloop_and_wait_for(&semaphore);
-        let () = handle.await.unwrap();
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        for connection in connections {
-            if is_stale(&connection, peer_alive_period) {
-                eprintln!("Removing stale connection {}", connection.name);
-                let result = tear_down(&connection).await;
-                if let Err(err) = result {
-                    error!("Error removing stale connection {}: {err}", connection.name);
-                }
+    for connection in connections {
+        if is_stale(&connection, peer_alive_period) {
+            eprintln!("Removing stale connection {}", connection.name);
+            let result = tear_down(&connection).await;
+            if let Err(err) = result {
+                error!("Error removing stale connection {}: {err}", connection.name);
             }
         }
     }

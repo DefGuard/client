@@ -45,7 +45,7 @@ pub fn print_banner() {
     let logo = if use_color { LOGO_COLOR } else { LOGO_MONO };
     println!("{logo}");
 
-    let project = common::version_string("defguard-cli");
+    let project = common::version_string("defguard-client");
     if use_color {
         println!("    {}", project.bright_yellow().bold());
         println!("    {}", COPYRIGHT.dimmed());
@@ -61,7 +61,7 @@ pub fn print_banner() {
 /// console fonts can't render, and the console may not interpret ANSI.
 #[cfg(windows)]
 pub fn print_banner() {
-    let project = common::version_string("defguard-cli");
+    let project = common::version_string("defguard-client");
     println!();
     println!("    {project}");
     println!("    {COPYRIGHT}");

@@ -1,0 +1,555 @@
+use std::{env, str::FromStr, sync::LazyLock};
+#[cfg(target_os = "macos")]
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::spawn,
+};
+
+#[cfg(unix)]
+use crate::set_perms;
+#[cfg(windows)]
+use crate::utils::sync_connections;
+use crate::{
+    app_config::AppConfig,
+    appstate::AppState,
+    commands::*,
+    database::{
+        handle_db_migrations,
+        models::{location_stats::LocationStats, tunnel::TunnelStats},
+        DB_POOL,
+    },
+    events::handle_deep_link,
+    periodic::run_periodic_tasks,
+    provisioning::handle_client_initialization,
+    session_state,
+    tray::{configure_tray_icon, setup_tray},
+    utils::{load_log_targets, DEFAULT_SERVICE_LOG_DIR},
+    window_manager::*,
+    LOG_FILENAME, VERSION,
+};
+#[cfg(target_os = "macos")]
+use crate::{
+    apple::{connection_state_update_thread, get_managers_for_tunnels_and_locations},
+    connection::apple::{observer_thread, spawn_runloop_and_wait_for},
+    database::models::get_all_tunnels_locations,
+};
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+use crate::{connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension};
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::sync_locations_and_tunnels;
+use defguard_client_core::{
+    connection::active_connections::close_all_connections,
+    version::{check_app_version, VersionCheckResult},
+};
+use log::{Level, LevelFilter};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_log::{Target, TargetKind};
+
+const ENABLE_WELCOME_SCREEN: bool = false;
+
+// For tauri logging plugin:
+// if found in metadata target name it will ignore the log if it was below info level.
+const LOGGING_TARGET_IGNORE_LIST: [&str; 5] = ["tauri", "sqlx", "hyper", "h2", "tower"];
+
+static LOG_INCLUDES: LazyLock<Vec<String>> = LazyLock::new(load_log_targets);
+
+async fn startup(app_handle: &AppHandle) {
+    debug!("Purging old stats from the database.");
+    if let Err(err) = LocationStats::purge(&*DB_POOL).await {
+        error!("Failed to purge location stats: {err}");
+    } else {
+        debug!("Old location stats have been purged successfully.");
+    }
+    if let Err(err) = TunnelStats::purge(&*DB_POOL).await {
+        error!("Failed to purge tunnel stats: {err}");
+    } else {
+        debug!("Old tunnel stats have been purged successfully.");
+    }
+
+    // Sync already active connections on windows.
+    // When windows is restarted, the app doesn't close the active connections
+    // and they are still running after the restart. We sync them here to
+    // reflect the real system's state.
+    // TODO: Find a way to intercept the shutdown event and close all connections
+    #[cfg(windows)]
+    {
+        match sync_connections(app_handle).await {
+            Ok(()) => {
+                info!(
+                    "Synchronized application's active connections with the connections \
+                    already open on the system, if there were any."
+                );
+            }
+            Err(err) => {
+                warn!(
+                    "Failed to synchronize application's active connections with the connections \
+                    already open on the system. \
+                    The connections' state in the application may not reflect system's state. \
+                    Reconnect manually to reset them. Error: {err}"
+                );
+            }
+        };
+    }
+    #[cfg(all(target_os = "macos", feature = "macos_installer"))]
+    activate_system_extension(PLUGIN_BUNDLE_ID);
+
+    #[cfg(target_os = "macos")]
+    {
+        let semaphore = Arc::new(AtomicBool::new(false));
+        let semaphore_clone = Arc::clone(&semaphore);
+
+        // Retrieve MTU from `AppConfig`.
+        let app_state = app_handle.state::<AppState>();
+        let mtu = app_state
+            .app_config
+            .lock()
+            .expect("failed to lock app state")
+            .mtu();
+        let handle = async_runtime::spawn(async move {
+            if let Err(err) = sync_locations_and_tunnels(mtu).await {
+                error!("Failed to sync locations and tunnels: {err}");
+            }
+            semaphore_clone.store(true, Ordering::Release);
+        });
+        spawn_runloop_and_wait_for(&semaphore);
+        let _ = handle.await;
+
+        let (tunnels, locations) = get_all_tunnels_locations().await;
+        let handle = app_handle.clone();
+        // Observer thread is blocking, so its better not to mess with the tauri runtime.
+        spawn(move || {
+            observer_thread(get_managers_for_tunnels_and_locations(&tunnels, &locations));
+            error!("VPN observer thread has exited unexpectedly, quitting the app.");
+            handle.exit(0);
+        });
+
+        let handle = app_handle.clone();
+        async_runtime::spawn(async move {
+            connection_state_update_thread(&handle).await;
+            error!("Connection state update thread has exited unexpectedly, quitting the app.");
+            handle.exit(0);
+        });
+    }
+
+    // Run periodic tasks.
+    let periodic_tasks_handle = app_handle.clone();
+    async_runtime::spawn(async move {
+        run_periodic_tasks(&periodic_tasks_handle).await;
+        // One of the tasks exited, so something went wrong, quit the app
+        error!("One of the periodic tasks has stopped unexpectedly. Exiting the application.");
+        periodic_tasks_handle.exit(0);
+    });
+    debug!("Periodic tasks have been started.");
+
+    // Load tray menu after database initialization, so all instance and locations can be shown.
+    debug!(
+        "Re-generating tray menu to show all available instances and locations as we have \
+        connected to the database."
+    );
+    if let Err(err) = setup_tray(app_handle).await {
+        error!("Failed to setup system tray: {err}");
+    }
+    match configure_tray_icon(app_handle).await {
+        Ok(()) => info!("System tray configured."),
+        Err(err) => error!("Failed to configure system tray: {err}"),
+    }
+    debug!("Tray menu has been re-generated successfully.");
+}
+
+pub fn run_app() {
+    info!("Starting Defguard client version {VERSION}");
+
+    let app = Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            all_locations,
+            has_any_visible_locations,
+            save_device_config,
+            all_instances,
+            connect,
+            disconnect,
+            update_instance,
+            location_stats,
+            location_interface_details,
+            all_connections,
+            last_connection,
+            active_connection,
+            update_location_routing,
+            delete_instance,
+            parse_tunnel_config,
+            save_tunnel,
+            all_tunnels,
+            open_link,
+            tunnel_details,
+            update_tunnel,
+            delete_tunnel,
+            get_latest_app_version,
+            start_global_logwatcher,
+            stop_global_logwatcher,
+            command_get_app_config,
+            command_set_app_config,
+            get_provisioning_config,
+            get_platform_header,
+            get_posture_data,
+            set_location_mfa_method,
+            open_tray_window,
+            open_full_view_window,
+            swap_to_tray,
+            swap_to_full_view,
+            close_tray_window,
+            close_welcome_window,
+            all_active_connections,
+            disconnect_locations,
+            enrollment_start,
+            enrollment_create_device,
+            enrollment_activate_user,
+            enrollment_register_mfa_start,
+            enrollment_register_mfa_finish,
+            enrollment_network_info,
+            enrollment_finish,
+            mfa_start,
+            mfa_finish_code,
+            mfa_poll_openid,
+            mfa_connect_mobile_approve,
+            cancel_mfa,
+            session_state::get_session_state,
+            session_state::patch_session_state,
+        ])
+        .on_window_event(|window, event| {
+            if let WindowEvent::ThemeChanged(_theme) = event {
+                let app = window.app_handle().clone();
+                async_runtime::spawn(async move {
+                    if let Err(err) = configure_tray_icon(&app).await {
+                        error!("Failed to reconfigure tray icon on theme change: {err}");
+                    }
+                });
+            }
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let label = window.label();
+                if label == COMPACT_WINDOW_ID || label == FULL_VIEW_WINDOW_ID {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
+        })
+        // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
+        // Single instance plugin should always be the first to register.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let is_deep_link = argv.iter().any(|a| a.starts_with("defguard://"));
+            // User tried to spawn second instance, mirror tray left click path.
+            if !is_deep_link {
+                show_tray_or_full_view(app);
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            // Create Help menu on macOS.
+            // https://github.com/tauri-apps/tauri/issues/9371
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_opener::OpenerExt;
+
+                const DOC_ITEM_ID: &str = "doc";
+                const REPORT_ITEM_ID: &str = "issue";
+                const DOC_URL: &str = "https://docs.defguard.net/using-defguard-for-end-users/desktop-client";
+                const REPORT_URL: &str = "https://github.com/DefGuard/client/issues/new?labels=bug&template=bug_report.md";
+                if let Some(menu) = app.menu() {
+                    if let Some(help_submenu) = menu.get(tauri::menu::HELP_SUBMENU_ID) {
+                        let report_item = tauri::menu::MenuItem::with_id(
+                            app,
+                            REPORT_ITEM_ID,
+                            "Report an issue",
+                            true,
+                            None::<&str>,
+                        )?;
+                        let _ = help_submenu.as_submenu_unchecked().append(&report_item);
+                        let doc_item = tauri::menu::MenuItem::with_id(
+                            app,
+                            DOC_ITEM_ID,
+                            "Defguard Desktop Client Help",
+                            true,
+                            None::<&str>,
+                        )?;
+                        let _ = help_submenu.as_submenu_unchecked().append(&doc_item);
+                    }
+                }
+                app.on_menu_event(move |app, event| {
+                    let id = event.id();
+                    if id == DOC_ITEM_ID {
+                        let _ = app.opener().open_url(DOC_URL, None::<&str>);
+                    } else if id == REPORT_ITEM_ID {
+                        let _ = app.opener().open_url(REPORT_URL, None::<&str>);
+                    }
+                });
+
+                app.set_dock_visibility(false);
+            }
+
+            // Register for Linux and debug Windows builds.
+            #[cfg(any(target_os = "linux", windows))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                app.deep_link().register_all()?;
+            }
+
+            let app_handle = app.app_handle();
+
+            // Single Rust-side entry point for all deep link events (runtime).
+            {
+                let handle = app_handle.clone();
+                app.deep_link().on_open_url(move |event| {
+                    handle_deep_link(&handle, &event.urls());
+                });
+            }
+
+            // Prepare `AppConfig`.
+            let config_dir = app_handle
+                .path()
+                .app_data_dir()
+                .expect("Failed to access app data");
+            let config = AppConfig::new(&config_dir);
+            let current_version = app_handle.package_info().version.clone();
+            let mut open_welcome_view = match check_app_version(&config_dir, &current_version) {
+                VersionCheckResult::Init => {
+                    debug!("No previous version recorded; initializing at {current_version}.");
+                    true
+                }
+                VersionCheckResult::Unchanged => {
+                    debug!("Application version unchanged ({current_version}).");
+                     false
+                }
+                VersionCheckResult::Upgraded { previous, current } => {
+                    info!("Application upgraded from {previous} to {current}.");
+                     true
+                }
+            };
+            if !ENABLE_WELCOME_SCREEN {
+                open_welcome_view = false;
+            }
+
+            // Setup logging.
+
+            // If deriving from env value fails, use config default (env overrides config file).
+            let config_log_level = config.log_level;
+            let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
+                Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
+                Err(_) => config_log_level,
+            };
+            app_handle.plugin(
+                tauri_plugin_log::Builder::new()
+                    .format(move |out, message, record| {
+                        out.finish(format_args!(
+                            "{}[{}][{}] {}",
+                            tauri_plugin_log::TimezoneStrategy::UseUtc
+                                .get_now()
+                                // Sets the time format. Service's logs have a subsecond part, so we
+                                // also need to include it here, otherwise the logs couldn't be sorted
+                                // correctly when displayed together in the UI.
+                                .format(&time::macros::format_description!(
+                                "[[[year]-[month]-[day]][[[hour]:[minute]:[second].[subsecond]]"
+                            ))
+                                .unwrap(),
+                            record.level(),
+                            record.target(),
+                            message
+                        ));
+                    })
+                    .targets([
+                        Target::new(TargetKind::Stdout),
+                        Target::new(TargetKind::LogDir { file_name: Some(LOG_FILENAME.to_string()) }),
+                    ])
+                    .level(log_level)
+                    .filter(|metadata| {
+                        if metadata.level() == Level::Error {
+                            return true;
+                        }
+                        if !LOG_INCLUDES.is_empty() {
+                            for target in &*LOG_INCLUDES {
+                                if metadata.target().contains(target) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        true
+                    })
+                    .filter(|metadata| {
+                        // Log all errors, warnings and infos.
+                        let level = metadata.level();
+                        if level == LevelFilter::Error
+                            || level == LevelFilter::Warn
+                            || level == LevelFilter::Info
+                        {
+                            return true;
+                        }
+                        // Otherwise do not log these targets.
+                        for target in &LOGGING_TARGET_IGNORE_LIST {
+                            if metadata.target().contains(target) {
+                                return false;
+                            }
+                        }
+                        true
+                    })
+                    .build(),
+            )?;
+
+            // run DB migrations
+            async_runtime::block_on(handle_db_migrations());
+
+            // Check if client needs to be initialized
+            // and try to load provisioning config if necessary
+            let provisioning_config =
+                async_runtime::block_on(handle_client_initialization(app_handle));
+
+            let state = AppState::new(config, provisioning_config);
+            app.manage(state);
+
+            // Pre-build windows hidden so they can be shown/hidden without recreation.
+            if let Err(e) = WindowManager::build_tray_window(app_handle) {
+                warn!("Failed to pre-build tray window: {e}");
+            }
+            if let Err(e) = WindowManager::build_full_view_window(app_handle) {
+                warn!("Failed to pre-build full window: {e}");
+            }
+            if let Err(e) = WindowManager::build_welcome_window(app_handle) {
+                warn!("Failed to pre-build welcome window: {e}");
+            }
+
+            // Decide which window to show based on available locations.
+            // If the app was cold-launched by a deep-link, the full view must open, not the
+            // tray.
+            let launched_by_deep_link = app_handle
+                .deep_link()
+                .get_current()
+                .ok()
+                .flatten()
+                .is_some();
+            if launched_by_deep_link {
+                info!("App launched via deep link, opening full view directly.");
+                let _ = WindowManager::open_full_view(app_handle);
+            } else if open_welcome_view {
+                info!("Opening welcome view.");
+                let _ = WindowManager::open_welcome_view(app_handle);
+            } else {
+                show_tray_or_full_view(app_handle);
+            }
+
+            info!("App setup completed, log level: {log_level}");
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("Failed to build Tauri application");
+
+    info!("Starting Defguard client version {VERSION}");
+
+    // Run application.
+    debug!("Starting the main application event loop.");
+    app.run(|app_handle, event| match event {
+        // Startup tasks
+        RunEvent::Ready => {
+            let data_dir = app_handle
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| "UNDEFINED DATA DIRECTORY".into());
+            let log_dir = app_handle
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| "UNDEFINED LOG DIRECTORY".into());
+
+            // Ensure directories have appropriate permissions (dg25-28).
+            #[cfg(unix)]
+            {
+                set_perms(&data_dir);
+                set_perms(&log_dir);
+            }
+
+            info!(
+                "Application data (database file) will be stored in: {} and application logs in: \
+                {}. Logs of the background Defguard service responsible for managing VPN \
+                connections at the network level will be stored in: {}.",
+                data_dir.display(),
+                log_dir.display(),
+                DEFAULT_SERVICE_LOG_DIR
+            );
+            async_runtime::block_on(startup(app_handle));
+
+            // Handle a deep link that launched the app (startup case).
+            if let Ok(Some(urls)) = app_handle.deep_link().get_current() {
+                handle_deep_link(app_handle, &urls);
+            }
+
+            // Handle Ctrl-C.
+            debug!("Setting up Ctrl-C handler.");
+            let app_handle_clone = app_handle.clone();
+            async_runtime::spawn(async move {
+                tokio::signal::ctrl_c()
+                    .await
+                    .expect("Signal handler failure");
+                debug!("Ctrl-C handler: quitting the app");
+                app_handle_clone.exit(0);
+            });
+            debug!("Ctrl-C handler has been set up successfully");
+        }
+        RunEvent::ExitRequested { code, api, .. } => {
+            debug!("Received exit request");
+            // `code` is `None` when the exit is requested by user interaction.
+            if code.is_none() {
+                // Prevent shutdown on window close.
+                api.prevent_exit();
+            }
+        }
+        // Handle shutdown.
+        RunEvent::Exit => {
+            debug!("Exiting the application's main event loop.");
+            #[cfg(target_os = "macos")]
+            {
+                let semaphore = Arc::new(AtomicBool::new(false));
+                let semaphore_clone = Arc::clone(&semaphore);
+
+                let handle = async_runtime::spawn(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                    semaphore_clone.store(true, Ordering::Release);
+                });
+                // Obj-C API needs a runtime, but at this point Tauri has closed its runtime, so
+                // create a temporary one.
+                spawn_runloop_and_wait_for(&semaphore);
+                async_runtime::block_on(async move {
+                    let _ = handle.await;
+                });
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                async_runtime::block_on(async move {
+                    let _ = close_all_connections().await;
+                    // This will clean the database file, pruning write-ahead log.
+                    DB_POOL.close().await;
+                });
+            }
+        }
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } => {
+            if !has_visible_windows {
+                show_tray_or_full_view(app_handle);
+            }
+        }
+        _ => {
+            trace!("Received event: {event:?}");
+        }
+    });
+}

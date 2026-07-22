@@ -1,4 +1,8 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
+use std::{
+    env,
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
+    process,
+};
 
 /// Package version from the workspace (shared across all binaries).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -29,9 +33,9 @@ pub fn version_string(binary_name: &str) -> String {
 /// Check for `--version` / `-V` in command-line arguments and exit with the version
 /// string if found. Call this early in `main()` before argument parsing.
 pub fn check_version_flag(binary_name: &str) {
-    if std::env::args().any(|a| a == "--version" || a == "-V") {
+    if env::args().any(|a| a == "--version" || a == "-V") {
         println!("{}", version_string(binary_name));
-        std::process::exit(0);
+        process::exit(0);
     }
 }
 
@@ -132,14 +136,14 @@ mod tests {
 
     #[test]
     fn test_dns_owned_none_and_empty() {
-        assert_eq!(dns_owned(&None), (vec![], vec![]));
-        assert_eq!(dns_owned(&Some(String::new())), (vec![], vec![]));
+        assert_eq!(dns_owned(&None), (Vec::new(), Vec::new()));
+        assert_eq!(dns_owned(&Some(String::new())), (Vec::new(), Vec::new()));
     }
 
     #[test]
     fn test_dns_owned_ipv4_only() {
         let (ips, domains) = dns_owned(&Some("10.0.0.2".to_string()));
-        assert_eq!(ips, vec![ip("10.0.0.2")]);
+        assert_eq!(ips, [ip("10.0.0.2")]);
         assert!(domains.is_empty());
     }
 
@@ -154,31 +158,31 @@ mod tests {
     fn test_dns_owned_domains_only() {
         let (ips, domains) = dns_owned(&Some("tnt,teonite.net".to_string()));
         assert!(ips.is_empty());
-        assert_eq!(domains, vec!["tnt".to_string(), "teonite.net".to_string()]);
+        assert_eq!(domains, ["tnt".to_string(), "teonite.net".to_string()]);
     }
 
     #[test]
     fn test_dns_owned_mixed_with_whitespace() {
         // Entries are trimmed; parseable ones become resolver IPs, the rest search domains.
         let (ips, domains) = dns_owned(&Some("10.0.0.2, tnt , teonite.net".to_string()));
-        assert_eq!(ips, vec![ip("10.0.0.2")]);
-        assert_eq!(domains, vec!["tnt".to_string(), "teonite.net".to_string()]);
+        assert_eq!(ips, [ip("10.0.0.2")]);
+        assert_eq!(domains, ["tnt".to_string(), "teonite.net".to_string()]);
     }
 
     #[test]
     fn test_dns_owned_trailing_comma_yields_empty_domains() {
         // Pins current behavior: empty entries between commas are treated as (empty) domains.
         let (ips, domains) = dns_owned(&Some("10.0.0.2,,".to_string()));
-        assert_eq!(ips, vec![ip("10.0.0.2")]);
-        assert_eq!(domains, vec![String::new(), String::new()]);
+        assert_eq!(ips, [ip("10.0.0.2")]);
+        assert_eq!(domains, [String::new(), String::new()]);
     }
 
     #[test]
     fn test_dns_borrow_mixed_with_whitespace() {
         let config = Some("10.0.0.2, tnt , teonite.net".to_string());
         let (ips, domains) = dns_borrow(&config);
-        assert_eq!(ips, vec![ip("10.0.0.2")]);
-        assert_eq!(domains, vec!["tnt", "teonite.net"]);
+        assert_eq!(ips, [ip("10.0.0.2")]);
+        assert_eq!(domains, ["tnt", "teonite.net"]);
     }
 
     #[test]

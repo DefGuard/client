@@ -6,6 +6,7 @@ pub mod apple;
 pub mod appstate;
 pub mod commands;
 pub mod events;
+pub mod gui;
 pub mod log_watcher;
 pub mod periodic;
 pub mod provisioning;
