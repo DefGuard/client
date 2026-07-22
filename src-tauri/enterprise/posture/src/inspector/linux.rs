@@ -39,11 +39,14 @@ struct LsblkOutput {
     blockdevices: Vec<LsblkDevice>,
 }
 
-/// A single mount table entry: its mount point and backing device source.
+/// A single mount table entry: its mount point, filesystem type and backing
+/// device source.
 struct MountEntry {
     mount_point: String,
-    /// The mount source as reported by the kernel, e.g. `/dev/mapper/cryptroot`.
-    /// For non-block filesystems this may not be a device path (e.g. `tmpfs`).
+    /// Filesystem type, e.g. `ext4`, `btrfs`, `zfs`.
+    fstype: String,
+    /// The mount source as reported by the kernel, e.g. `/dev/mapper/cryptroot`
+    /// for a block device or a dataset name like `rpool/USERDATA/x` for ZFS.
     source: String,
 }
 
@@ -74,17 +77,20 @@ fn unescape_mountinfo(field: &str) -> String {
 ///
 /// Each line has the form
 /// `<id> <parent> <maj:min> <root> <mount_point> <opts> <optional...> - <fstype> <source> <super_opts>`.
-/// The mount point is field index 4 (before the `-` separator); the backing
-/// device source is the second field after ` - `.
+/// The mount point is field index 4 (before the `-` separator); the filesystem
+/// type and backing device source are the first two fields after ` - `.
 fn parse_mountinfo(content: &str) -> Vec<MountEntry> {
     content
         .lines()
         .filter_map(|line| {
             let (fields, rest) = line.split_once(" - ")?;
             let mount_point = fields.split(' ').nth(4)?;
-            let source = rest.split(' ').nth(1)?;
+            let mut post = rest.split(' ');
+            let fstype = post.next()?;
+            let source = post.next()?;
             Some(MountEntry {
                 mount_point: unescape_mountinfo(mount_point),
+                fstype: fstype.to_owned(),
                 source: unescape_mountinfo(source),
             })
         })
@@ -149,6 +155,36 @@ fn source_kname(source: &str) -> Option<String> {
         .map(|name| name.to_string_lossy().into_owned())
 }
 
+/// Interprets the value of a ZFS `encryption` property.
+///
+/// `off` -> not encrypted; a cipher name (e.g. `aes-256-gcm`) or `on` ->
+/// encrypted; an empty or `-` value (unknown/unsupported) -> `None`.
+fn parse_zfs_encryption(value: &str) -> Option<bool> {
+    match value.trim() {
+        "" | "-" => None,
+        "off" => Some(false),
+        _ => Some(true),
+    }
+}
+
+/// Reports whether a ZFS dataset uses native encryption.
+///
+/// ZFS encryption is a per-dataset filesystem property with no block-layer
+/// (dm-crypt) representation, so it is queried directly via the `zfs` CLI rather
+/// than through `lsblk`. A mounted dataset implies its key is loaded, so the
+/// `encryption` property alone is sufficient (no separate `keystatus` check).
+fn zfs_dataset_encrypted(dataset: &str) -> Result<bool, UnavailableReason> {
+    let output = Command::new("zfs")
+        .args(["get", "-H", "-o", "value", "encryption", dataset])
+        .output()
+        .map_err(|_| UnavailableReason::DetectionFailed)?;
+    if !output.status.success() {
+        return Err(UnavailableReason::DetectionFailed);
+    }
+    let value = String::from_utf8_lossy(&output.stdout);
+    parse_zfs_encryption(&value).ok_or(UnavailableReason::DetectionFailed)
+}
+
 /// Runs `lsblk` and returns the parsed block device tree.
 fn read_block_devices() -> Result<Vec<LsblkDevice>, UnavailableReason> {
     let output = Command::new("lsblk")
@@ -167,10 +203,18 @@ fn read_block_devices() -> Result<Vec<LsblkDevice>, UnavailableReason> {
 /// encrypted.
 ///
 /// Unlike a global "is any device encrypted?" check, this resolves the specific
-/// device that backs the database file and inspects only that device's stack, so
-/// unrelated encrypted loop/removable/test volumes do not produce a false
-/// positive. Only LUKS/dm-crypt (via `lsblk`) is recognized; non-block-backed
-/// filesystems (e.g. ZFS, tmpfs, overlay) resolve to `DetectionFailed`.
+/// filesystem that backs the database file and inspects only that, so unrelated
+/// encrypted loop/removable/test volumes do not produce a false positive.
+///
+/// Two encryption mechanisms are recognized:
+/// - **LUKS/dm-crypt** for block-backed filesystems (ext4/xfs/btrfs/LVM/…), via
+///   the device stack reported by `lsblk`;
+/// - **native ZFS encryption**, via the dataset's `encryption` property.
+///
+/// Other filesystem-internal encryption schemes that are invisible to the block
+/// layer — bcachefs native encryption, fscrypt on ext4/f2fs, eCryptfs — are not
+/// detected and resolve to `DetectionFailed`. This is fail-safe: a required
+/// posture rule fails rather than falsely passing.
 pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     // Resolve the database file and the mount that backs it.
     let db_path = db_file_path().ok_or(UnavailableReason::DetectionFailed)?;
@@ -182,7 +226,14 @@ pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     let backing =
         find_backing_mount(&mounts, &db_path).ok_or(UnavailableReason::DetectionFailed)?;
 
-    // Map the mount source to its kernel device name and inspect only that stack.
+    // ZFS encryption is a dataset property, not a block-layer device; the mount
+    // source is the dataset name rather than a `/dev` path.
+    if backing.fstype == "zfs" {
+        return zfs_dataset_encrypted(&backing.source);
+    }
+
+    // Otherwise map the mount source to its kernel device name and inspect only
+    // that stack for a LUKS/dm-crypt layer.
     let kname = source_kname(&backing.source).ok_or(UnavailableReason::DetectionFailed)?;
     let devices = read_block_devices()?;
     device_is_encrypted(&devices, &kname).ok_or(UnavailableReason::DetectionFailed)
@@ -207,22 +258,22 @@ mod unit_tests {
     }
 
     #[test]
-    fn parse_mountinfo_extracts_mount_point_and_source() {
+    fn parse_mountinfo_extracts_mount_point_fstype_and_source() {
         let content = "\
 36 35 0:30 / / rw,noatime shared:1 - btrfs /dev/mapper/cryptroot rw,subvol=/
-37 36 0:31 /home /home rw shared:2 - btrfs /dev/mapper/cryptroot rw,subvol=/home
-38 36 0:32 / /mnt/my\\040disk rw shared:3 - ext4 /dev/sdb1 rw";
+38 36 0:32 / /mnt/my\\040disk rw shared:3 - ext4 /dev/sdb1 rw
+39 36 0:33 / /data rw shared:4 - zfs rpool/USERDATA/x rw";
         let mounts = parse_mountinfo(content);
-        let pairs: Vec<(&str, &str)> = mounts
+        let rows: Vec<(&str, &str, &str)> = mounts
             .iter()
-            .map(|m| (m.mount_point.as_str(), m.source.as_str()))
+            .map(|m| (m.mount_point.as_str(), m.fstype.as_str(), m.source.as_str()))
             .collect();
         assert_eq!(
-            pairs,
+            rows,
             vec![
-                ("/", "/dev/mapper/cryptroot"),
-                ("/home", "/dev/mapper/cryptroot"),
-                ("/mnt/my disk", "/dev/sdb1"),
+                ("/", "btrfs", "/dev/mapper/cryptroot"),
+                ("/mnt/my disk", "ext4", "/dev/sdb1"),
+                ("/data", "zfs", "rpool/USERDATA/x"),
             ]
         );
     }
@@ -230,8 +281,19 @@ mod unit_tests {
     fn mount(mount_point: &str, source: &str) -> MountEntry {
         MountEntry {
             mount_point: mount_point.to_owned(),
+            fstype: "ext4".to_owned(),
             source: source.to_owned(),
         }
+    }
+
+    #[test]
+    fn parse_zfs_encryption_interprets_property() {
+        assert_eq!(parse_zfs_encryption("off"), Some(false));
+        assert_eq!(parse_zfs_encryption("on"), Some(true));
+        assert_eq!(parse_zfs_encryption("aes-256-gcm"), Some(true));
+        assert_eq!(parse_zfs_encryption("aes-256-gcm\n"), Some(true));
+        assert_eq!(parse_zfs_encryption("-"), None);
+        assert_eq!(parse_zfs_encryption(""), None);
     }
 
     #[test]
