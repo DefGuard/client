@@ -202,19 +202,10 @@ fn read_block_devices() -> Result<Vec<LsblkDevice>, UnavailableReason> {
 /// Reports whether the partition that stores the client's database file is
 /// encrypted.
 ///
-/// Unlike a global "is any device encrypted?" check, this resolves the specific
-/// filesystem that backs the database file and inspects only that, so unrelated
-/// encrypted loop/removable/test volumes do not produce a false positive.
-///
 /// Two encryption mechanisms are recognized:
 /// - **LUKS/dm-crypt** for block-backed filesystems (ext4/xfs/btrfs/LVM/…), via
 ///   the device stack reported by `lsblk`;
 /// - **native ZFS encryption**, via the dataset's `encryption` property.
-///
-/// Other filesystem-internal encryption schemes that are invisible to the block
-/// layer — bcachefs native encryption, fscrypt on ext4/f2fs, eCryptfs — are not
-/// detected and resolve to `DetectionFailed`. This is fail-safe: a required
-/// posture rule fails rather than falsely passing.
 pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
     // Resolve the database file and the mount that backs it.
     let db_path = db_file_path().ok_or(UnavailableReason::DetectionFailed)?;
