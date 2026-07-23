@@ -21,7 +21,7 @@ jobs:
   test-linux-postures-unencrypted:
     name: Linux postures - unencrypted
     env:
-      DATABASE_URL: /db
+      DATABASE_URL: sqlite:///db
     runs-on:
       - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -50,7 +50,7 @@ jobs:
   test-linux-postures-encrypted:
     name: Linux postures - encrypted
     env:
-      DATABASE_URL: /db
+      DATABASE_URL: sqlite:///db
     runs-on:
       - self-hosted
       - Linux
