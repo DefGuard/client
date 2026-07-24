@@ -15,10 +15,13 @@ import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { EnrollmentErrorCopy } from '../../errorCopy';
+import { useEnrollmentErrorHandler } from '../../hooks/useEnrollmentErrorHandler';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const MfaChoiceStep = () => {
   const sessionId = useEnrollmentStore((s) => s.sessionId);
+  const handleError = useEnrollmentErrorHandler();
   const [mfa, setMfa] = useState<MfaMethodValue>(
     useEnrollmentStore.getState().userMfaChoice,
   );
@@ -38,6 +41,7 @@ export const MfaChoiceStep = () => {
     },
     onError: (err) => {
       void logError(`MFA start failed: ${err}`);
+      handleError(err, EnrollmentErrorCopy.mfa);
     },
   });
 

@@ -7,7 +7,9 @@ import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { formatDuration } from '../../../../../shared/utils/formatDuration';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { EnrollmentErrorCopy } from '../../errorCopy';
 import { activateUser } from '../../hooks/activateUser';
+import { useEnrollmentErrorHandler } from '../../hooks/useEnrollmentErrorHandler';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const WelcomeStep = () => {
@@ -15,6 +17,7 @@ export const WelcomeStep = () => {
   const [activating, setActivating] = useState(false);
   const skipPassword = useEnrollmentStore((s) => s.skipPassword);
   const skipMfa = useEnrollmentStore((s) => s.skipMfa);
+  const handleError = useEnrollmentErrorHandler();
 
   const timeLeft = useMemo(() => {
     const deadline = enrollData?.deadline_timestamp;
@@ -57,6 +60,7 @@ export const WelcomeStep = () => {
               await activateUser();
             } catch (err) {
               void error(`Welcome step activation failed: ${err}`);
+              handleError(err, EnrollmentErrorCopy.generic);
               setActivating(false);
               return;
             }

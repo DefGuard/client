@@ -14,7 +14,9 @@ import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { EnrollmentErrorCopy } from '../../errorCopy';
 import { activateUser } from '../../hooks/activateUser';
+import { useEnrollmentErrorHandler } from '../../hooks/useEnrollmentErrorHandler';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 import {
   type PasswordErrorCodeValue,
@@ -60,6 +62,7 @@ const defaultValues: FormFields = {
 
 export const PasswordStep = () => {
   const sessionId = useEnrollmentStore((s) => s.sessionId);
+  const handleError = useEnrollmentErrorHandler();
   const { mutateAsync: startMfa } = useMutation({
     mutationFn: () => api.enrollmentRegisterMfaStart(sessionId!, MfaMethod.Totp),
   });
@@ -89,6 +92,7 @@ export const PasswordStep = () => {
         useEnrollmentStore.getState().next();
       } catch (err) {
         void error(`Password step failed: ${err}`);
+        handleError(err, EnrollmentErrorCopy.generic);
       }
     },
   });
