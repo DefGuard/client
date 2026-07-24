@@ -20,7 +20,7 @@ export const EnrollmentErrorModal = () => {
       isOpen={isOpen}
       title={title}
       onClose={() => {
-        useEnrollmentErrorModal.setState({ visible: false });
+        useEnrollmentErrorModal.getState().close();
       }}
       afterClose={() => {
         useEnrollmentErrorModal.getState().reset();
@@ -43,7 +43,7 @@ const ModalContent = () => {
             text="Got it"
             variant={ButtonVariant.Primary}
             onClick={() => {
-              useEnrollmentErrorModal.setState({ visible: false });
+              useEnrollmentErrorModal.getState().close();
             }}
           />
         </div>

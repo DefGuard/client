@@ -1,3 +1,5 @@
+export type EnrollmentErrorCopyEntry = { title: string; message: string };
+
 export const EnrollmentErrorCopy = {
   mfa: {
     title: 'Verification Failed',
