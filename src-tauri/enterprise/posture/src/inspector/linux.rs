@@ -1,43 +1,19 @@
 use std::{
+    collections::HashSet,
     fs::read_to_string,
     path::{Path, PathBuf},
     process::Command,
 };
 
 use defguard_client_core::database::db_file_path;
-use serde::Deserialize;
 
 use super::UnavailableReason;
 
 /// Path to the kernel's mount table for the current process.
 const MOUNTINFO_PATH: &str = "/proc/self/mountinfo";
 
-#[derive(Deserialize)]
-struct LsblkDevice {
-    /// Kernel device name (e.g. `dm-0`, `nvme0n1p2`), stable across `lsblk`
-    /// versions and matching the basename of the canonicalized device path.
-    kname: Option<String>,
-    #[serde(rename = "type")]
-    device_type: Option<String>,
-    fstype: Option<String>,
-    children: Option<Vec<LsblkDevice>>,
-}
-
-impl LsblkDevice {
-    /// Whether this device is itself an encryption layer that any data stacked
-    /// on top of it passes through: an opened dm-crypt mapping (`type == "crypt"`)
-    /// or a LUKS container partition (`fstype == "crypto_LUKS"`).
-    #[must_use]
-    fn is_encryption_layer(&self) -> bool {
-        self.device_type.as_deref() == Some("crypt")
-            || self.fstype.as_deref() == Some("crypto_LUKS")
-    }
-}
-
-#[derive(Deserialize)]
-struct LsblkOutput {
-    blockdevices: Vec<LsblkDevice>,
-}
+/// sysfs directory exposing every block device by kernel name.
+const SYS_BLOCK: &str = "/sys/class/block";
 
 /// A single mount table entry: its mount point, filesystem type and backing
 /// device source.
@@ -48,6 +24,43 @@ struct MountEntry {
     /// The mount source as reported by the kernel, e.g. `/dev/mapper/cryptroot`
     /// for a block device or a dataset name like `rpool/USERDATA/x` for ZFS.
     source: String,
+}
+
+/// Reports whether the partition that stores the client's database file is
+/// encrypted.
+///
+/// It resolves the specific device backing the database file and inspects only
+/// that device's stack, so unrelated encrypted loop/removable/test volumes do
+/// not produce a false positive. Two encryption mechanisms are recognized:
+/// - **LUKS/dm-crypt** for block-backed filesystems (ext4/xfs/btrfs/LVM/…), via
+///   the sysfs device dependency chain (`/sys/class/block/<dev>/slaves`);
+/// - **native ZFS encryption**, via the dataset's `encryption` property.
+///
+/// Other filesystem-internal encryption schemes that leave no block-layer trace
+/// (bcachefs native encryption, fscrypt on ext4/f2fs, eCryptfs) are not detected
+/// and resolve to `DetectionFailed` - fail-safe: a required posture rule fails
+/// rather than falsely passing.
+pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
+    // Resolve the database file and the mount that backs it.
+    let db_path = db_file_path().ok_or(UnavailableReason::DetectionFailed)?;
+    let db_path = canonicalize_on_disk(&db_path).ok_or(UnavailableReason::DetectionFailed)?;
+
+    let mountinfo =
+        read_to_string(MOUNTINFO_PATH).map_err(|_| UnavailableReason::DetectionFailed)?;
+    let mounts = parse_mountinfo(&mountinfo);
+    let backing =
+        find_backing_mount(&mounts, &db_path).ok_or(UnavailableReason::DetectionFailed)?;
+
+    // ZFS encryption is a dataset property, not a block-layer device; the mount
+    // source is the dataset name rather than a `/dev` path.
+    if backing.fstype == "zfs" {
+        return zfs_dataset_encrypted(&backing.source);
+    }
+
+    // Otherwise map the mount source to its kernel device name and inspect only
+    // that device's stack for a LUKS/dm-crypt layer.
+    let kname = source_kname(&backing.source).ok_or(UnavailableReason::DetectionFailed)?;
+    device_is_encrypted(&kname).ok_or(UnavailableReason::DetectionFailed)
 }
 
 /// Un-escapes the octal sequences (`\040` space, `\011` tab, `\012` newline,
@@ -108,40 +121,75 @@ fn find_backing_mount<'a>(mounts: &'a [MountEntry], path: &Path) -> Option<&'a M
         .max_by_key(|entry| entry.mount_point.len())
 }
 
-/// Walks a single `lsblk` device subtree looking for the device with kernel
-/// name `kname`. Returns `Some(true)`/`Some(false)` for whether that device (or
-/// any ancestor it stacks on) is an encryption layer, or `None` when `kname` is
-/// not found in this subtree.
-fn walk_device(device: &LsblkDevice, kname: &str, encrypted_ancestor: bool) -> Option<bool> {
-    let encrypted = encrypted_ancestor || device.is_encryption_layer();
-    if device.kname.as_deref() == Some(kname) {
-        return Some(encrypted);
+/// Whether the device `kname` is an opened dm-crypt mapping, per its sysfs
+/// `dm/uuid` (dm-crypt devices carry a `CRYPT-` prefix, e.g. `CRYPT-LUKS2-…`).
+fn dm_uuid_is_crypt(kname: &str) -> bool {
+    read_to_string(Path::new(SYS_BLOCK).join(kname).join("dm/uuid"))
+        .is_ok_and(|uuid| uuid.trim_start().starts_with("CRYPT-"))
+}
+
+/// Kernel names of the devices `kname` is stacked on top of (its sysfs
+/// `slaves/`): e.g. an LVM LV's slave is its dm-crypt device, whose slave is the
+/// LUKS partition. Empty when the device has no lower devices (e.g. a plain
+/// partition) or the directory is absent.
+fn slaves_of(kname: &str) -> Vec<String> {
+    let slaves_dir = Path::new(SYS_BLOCK).join(kname).join("slaves");
+    let Ok(entries) = std::fs::read_dir(slaves_dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect()
+}
+
+/// Returns whether `kname`, or any device it stacks on, is a dm-crypt mapping,
+/// walking the dependency chain via `slaves`. The `is_crypt` and `slaves`
+/// readers are injected so the traversal is testable without real sysfs.
+fn stack_has_crypt(
+    kname: &str,
+    is_crypt: &impl Fn(&str) -> bool,
+    slaves: &impl Fn(&str) -> Vec<String>,
+    visited: &mut HashSet<String>,
+) -> bool {
+    if !visited.insert(kname.to_owned()) {
+        return false;
     }
-    if let Some(children) = &device.children {
-        for child in children {
-            if let Some(result) = walk_device(child, kname, encrypted) {
-                return Some(result);
-            }
+    is_crypt(kname)
+        || slaves(kname)
+            .iter()
+            .any(|slave| stack_has_crypt(slave, is_crypt, slaves, visited))
+}
+
+/// Returns whether the block device with kernel name `kname` is encrypted
+/// (backed by dm-crypt/LUKS anywhere in its stack), or `None` if the device is
+/// not present in sysfs (e.g. a non-block-backed filesystem such as
+/// tmpfs/overlay/zfs).
+fn device_is_encrypted(kname: &str) -> Option<bool> {
+    if !Path::new(SYS_BLOCK).join(kname).exists() {
+        return None;
+    }
+    Some(stack_has_crypt(
+        kname,
+        &dm_uuid_is_crypt,
+        &slaves_of,
+        &mut HashSet::new(),
+    ))
+}
+
+/// Canonicalizes `path`, or its nearest existing ancestor when the file/dirs do
+/// not exist yet. The nearest existing ancestor lives on the same partition the
+/// database will be created on (intermediate dirs are created there; mount
+/// points must already exist), so it identifies the correct backing device.
+fn canonicalize_on_disk(path: &Path) -> Option<PathBuf> {
+    let mut current = Some(path);
+    while let Some(p) = current {
+        if let Ok(canonical) = p.canonicalize() {
+            return Some(canonical);
         }
+        current = p.parent();
     }
     None
-}
-
-/// Returns whether the block device with kernel name `kname` is encrypted, or
-/// `None` if it is not present in the tree (e.g. a non-block-backed filesystem
-/// such as tmpfs/overlay/zfs that `lsblk` does not represent).
-fn device_is_encrypted(devices: &[LsblkDevice], kname: &str) -> Option<bool> {
-    devices
-        .iter()
-        .find_map(|device| walk_device(device, kname, false))
-}
-
-/// Canonicalizes `path`, falling back to its parent directory when the file does
-/// not exist yet (the parent lives on the same mount).
-fn canonicalize_on_disk(path: &Path) -> Option<PathBuf> {
-    path.canonicalize()
-        .ok()
-        .or_else(|| path.parent().and_then(|parent| parent.canonicalize().ok()))
 }
 
 /// Resolves a mount source to the kernel device name of its block device, e.g.
@@ -171,7 +219,7 @@ fn parse_zfs_encryption(value: &str) -> Option<bool> {
 ///
 /// ZFS encryption is a per-dataset filesystem property with no block-layer
 /// (dm-crypt) representation, so it is queried directly via the `zfs` CLI rather
-/// than through `lsblk`. A mounted dataset implies its key is loaded, so the
+/// than through sysfs. A mounted dataset implies its key is loaded, so the
 /// `encryption` property alone is sufficient (no separate `keystatus` check).
 fn zfs_dataset_encrypted(dataset: &str) -> Result<bool, UnavailableReason> {
     let output = Command::new("zfs")
@@ -185,60 +233,11 @@ fn zfs_dataset_encrypted(dataset: &str) -> Result<bool, UnavailableReason> {
     parse_zfs_encryption(&value).ok_or(UnavailableReason::DetectionFailed)
 }
 
-/// Runs `lsblk` and returns the parsed block device tree.
-fn read_block_devices() -> Result<Vec<LsblkDevice>, UnavailableReason> {
-    let output = Command::new("lsblk")
-        .args(["-J", "-o", "KNAME,TYPE,FSTYPE"])
-        .output()
-        .map_err(|_| UnavailableReason::DetectionFailed)?;
-    if !output.status.success() {
-        return Err(UnavailableReason::DetectionFailed);
-    }
-    let parsed: LsblkOutput =
-        serde_json::from_slice(&output.stdout).map_err(|_| UnavailableReason::DetectionFailed)?;
-    Ok(parsed.blockdevices)
-}
-
-/// Reports whether the partition that stores the client's database file is
-/// encrypted.
-///
-/// Two encryption mechanisms are recognized:
-/// - **LUKS/dm-crypt** for block-backed filesystems (ext4/xfs/btrfs/LVM/…), via
-///   the device stack reported by `lsblk`;
-/// - **native ZFS encryption**, via the dataset's `encryption` property.
-pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
-    // Resolve the database file and the mount that backs it.
-    let db_path = db_file_path().ok_or(UnavailableReason::DetectionFailed)?;
-    let db_path = canonicalize_on_disk(&db_path).ok_or(UnavailableReason::DetectionFailed)?;
-
-    let mountinfo =
-        read_to_string(MOUNTINFO_PATH).map_err(|_| UnavailableReason::DetectionFailed)?;
-    let mounts = parse_mountinfo(&mountinfo);
-    let backing =
-        find_backing_mount(&mounts, &db_path).ok_or(UnavailableReason::DetectionFailed)?;
-
-    // ZFS encryption is a dataset property, not a block-layer device; the mount
-    // source is the dataset name rather than a `/dev` path.
-    if backing.fstype == "zfs" {
-        return zfs_dataset_encrypted(&backing.source);
-    }
-
-    // Otherwise map the mount source to its kernel device name and inspect only
-    // that stack for a LUKS/dm-crypt layer.
-    let kname = source_kname(&backing.source).ok_or(UnavailableReason::DetectionFailed)?;
-    let devices = read_block_devices()?;
-    device_is_encrypted(&devices, &kname).ok_or(UnavailableReason::DetectionFailed)
-}
-
 #[cfg(test)]
 mod unit_tests {
-    use super::*;
+    use std::collections::HashMap;
 
-    fn devices(json: &str) -> Vec<LsblkDevice> {
-        serde_json::from_str::<LsblkOutput>(json)
-            .expect("invalid lsblk fixture")
-            .blockdevices
-    }
+    use super::*;
 
     #[test]
     fn unescape_handles_octal_sequences() {
@@ -319,67 +318,67 @@ mod unit_tests {
         );
     }
 
+    /// Runs `stack_has_crypt` over an in-memory device graph: `crypt` is the set
+    /// of dm-crypt kernel names, `slaves` maps each device to the devices it
+    /// stacks on (its lower devices).
+    fn stack_encrypted(start: &str, crypt: &[&str], slaves: &[(&str, &[&str])]) -> bool {
+        let crypt: HashSet<&str> = crypt.iter().copied().collect();
+        let slaves: HashMap<&str, Vec<String>> = slaves
+            .iter()
+            .map(|(k, v)| (*k, v.iter().map(|s| (*s).to_owned()).collect()))
+            .collect();
+        let is_crypt = |k: &str| crypt.contains(k);
+        let slaves_of = |k: &str| slaves.get(k).cloned().unwrap_or_default();
+        stack_has_crypt(start, &is_crypt, &slaves_of, &mut HashSet::new())
+    }
+
     #[test]
     fn plain_luks_device_is_encrypted() {
         // Mounted device is the opened crypt mapping itself.
-        let json = r#"{"blockdevices":[
-            {"kname":"sda","type":"disk","fstype":null,"children":[
-                {"kname":"sda2","type":"part","fstype":"crypto_LUKS","children":[
-                    {"kname":"dm-0","type":"crypt","fstype":"btrfs","children":null}
-                ]}
-            ]}
-        ]}"#;
-        assert_eq!(device_is_encrypted(&devices(json), "dm-0"), Some(true));
+        let slaves = [("dm-0", &["sda2"][..]), ("sda2", &["sda"][..])];
+        assert!(stack_encrypted("dm-0", &["dm-0"], &slaves));
     }
 
     #[test]
     fn luks_under_lvm_device_is_encrypted() {
-        // Mounted LVM logical volume stacks on top of a crypt ancestor.
-        let json = r#"{"blockdevices":[
-            {"kname":"sda","type":"disk","fstype":null,"children":[
-                {"kname":"sda2","type":"part","fstype":"crypto_LUKS","children":[
-                    {"kname":"dm-0","type":"crypt","fstype":"LVM2_member","children":[
-                        {"kname":"dm-1","type":"lvm","fstype":"ext4","children":null}
-                    ]}
-                ]}
-            ]}
-        ]}"#;
-        assert_eq!(device_is_encrypted(&devices(json), "dm-1"), Some(true));
+        // Mounted LVM logical volume stacks on top of a crypt ancestor (dm-0).
+        // This is the layered case the previous flat-lsblk walk missed.
+        let slaves = [
+            ("dm-1", &["dm-0"][..]),
+            ("dm-0", &["vda4"][..]),
+            ("vda4", &["vda"][..]),
+        ];
+        assert!(stack_encrypted("dm-1", &["dm-0"], &slaves));
     }
 
     #[test]
     fn plaintext_device_is_not_encrypted() {
-        let json = r#"{"blockdevices":[
-            {"kname":"sda","type":"disk","fstype":null,"children":[
-                {"kname":"sda2","type":"part","fstype":"ext4","children":null}
-            ]}
-        ]}"#;
-        assert_eq!(device_is_encrypted(&devices(json), "sda2"), Some(false));
+        let slaves = [("sda2", &["sda"][..])];
+        assert!(!stack_encrypted("sda2", &[], &slaves));
     }
 
     #[test]
     fn unrelated_encrypted_device_does_not_leak() {
-        // An encrypted loop device must not make the plaintext root device report
-        // as encrypted (the regression this hardening targets).
-        let json = r#"{"blockdevices":[
-            {"kname":"loop0","type":"loop","fstype":"crypto_LUKS","children":[
-                {"kname":"dm-9","type":"crypt","fstype":"ext4","children":null}
-            ]},
-            {"kname":"sda","type":"disk","fstype":null,"children":[
-                {"kname":"sda2","type":"part","fstype":"ext4","children":null}
-            ]}
-        ]}"#;
-        assert_eq!(device_is_encrypted(&devices(json), "sda2"), Some(false));
-        assert_eq!(device_is_encrypted(&devices(json), "dm-9"), Some(true));
+        // Only the target device's own stack is inspected; an encrypted device in
+        // a separate stack must not leak (the regression this hardening targets).
+        let slaves = [("sda2", &["sda"][..]), ("dm-9", &["loop0"][..])];
+        assert!(!stack_encrypted("sda2", &["dm-9"], &slaves));
+        assert!(stack_encrypted("dm-9", &["dm-9"], &slaves));
     }
 
     #[test]
-    fn missing_device_returns_none() {
-        let json = r#"{"blockdevices":[
-            {"kname":"sda","type":"disk","fstype":null,"children":[
-                {"kname":"sda2","type":"part","fstype":"ext4","children":null}
-            ]}
-        ]}"#;
-        assert_eq!(device_is_encrypted(&devices(json), "dm-42"), None);
+    fn stack_walk_terminates_on_cycles() {
+        // A pathological slaves cycle must not loop forever.
+        let slaves = [("a", &["b"][..]), ("b", &["a"][..])];
+        assert!(!stack_encrypted("a", &[], &slaves));
+    }
+
+    #[test]
+    fn canonicalize_ascends_to_nearest_existing_ancestor() {
+        // A deep non-existent DB path resolves to its nearest existing ancestor
+        // (the default app dir does not exist before first run).
+        let base = std::env::temp_dir();
+        let deep = base.join("defguard-posture-nonexistent-xyz/a/b/defguard.db");
+        assert_eq!(canonicalize_on_disk(&deep), base.canonicalize().ok());
     }
 }
