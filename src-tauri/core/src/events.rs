@@ -21,6 +21,7 @@ pub enum EventKey {
     MfaOpenIdError,
     MfaMobileComplete,
     MfaMobileError,
+    TunnelsDisabled,
 }
 
 impl From<EventKey> for &'static str {
@@ -45,6 +46,7 @@ impl From<EventKey> for &'static str {
             EventKey::MfaOpenIdError => "mfa-openid-error",
             EventKey::MfaMobileComplete => "mfa-mobile-complete",
             EventKey::MfaMobileError => "mfa-mobile-error",
+            EventKey::TunnelsDisabled => "tunnel-disabled-by-policy",
         }
     }
 }

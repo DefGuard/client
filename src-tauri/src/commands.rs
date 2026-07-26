@@ -56,6 +56,7 @@ use crate::{
     },
     error::Error,
     events::EventKey,
+    events::TunnelsDisabledPayload,
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
@@ -270,6 +271,41 @@ pub async fn disconnect(
         );
         Err(Error::NotFound)
     }
+}
+
+pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
+    let state = handle.state::<AppState>();
+    let tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
+    if tunnel_ids.is_empty() {
+        return Ok(());
+    }
+
+    let mut names = Vec::new();
+    for tunnel_id in &tunnel_ids {
+        let name = get_tunnel_or_location_name(*tunnel_id, ConnectionType::Tunnel).await;
+        debug!("Tunnels are disabled, disconnecting tunnel {name}(ID: {tunnel_id})");
+        if let Some(connection) = state
+            .remove_connection(*tunnel_id, ConnectionType::Tunnel)
+            .await
+        {
+            disconnect_interface(&connection).await?;
+            stop_log_watcher_task(handle, &connection.interface_name)?;
+            info!("Tunnel {name}(ID: {tunnel_id}) disconnected (disabled by server administrator)");
+            names.push(name);
+        }
+    }
+
+    if names.is_empty() {
+        return Ok(());
+    }
+
+    TunnelsDisabledPayload::emit(handle, names);
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    reload_tray_menu(handle).await;
+    configure_tray_icon(handle).await?;
+    Ok(())
 }
 
 #[tauri::command(async)]
