@@ -166,6 +166,9 @@ pub async fn connect(
             return Err(Error::NotFound.into());
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
+        if Instance::tunnels_disabled(&*DB_POOL).await? {
+            return Err(Error::TunnelsDisabled.into());
+        }
         debug!(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
@@ -1043,6 +1046,9 @@ pub fn parse_tunnel_config(filename: &str, config: &str) -> Result<Tunnel, Error
 
 #[tauri::command(async)]
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        return Err(Error::TunnelsDisabled);
+    }
     debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
@@ -1054,6 +1060,9 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
 
 #[tauri::command(async)]
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        return Err(Error::TunnelsDisabled);
+    }
     debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
@@ -1076,6 +1085,9 @@ pub struct TunnelInfo<I = NoId> {
 
 #[tauri::command(async)]
 pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        return Ok(vec![]);
+    }
     trace!("Getting information about all tunnels");
 
     let tunnels = Tunnel::all(&*DB_POOL).await?;
@@ -1104,6 +1116,9 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
 
 #[tauri::command(async)]
 pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        return Err(Error::NotFound);
+    }
     debug!("Retrieving details about tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, tunnel_id).await? {

@@ -42,6 +42,8 @@ pub enum Error {
     CommandError(String),
     #[error("Core is not enterprise")]
     CoreNotEnterprise,
+    #[error("Tunnels are disabled by the server administrator")]
+    TunnelsDisabled,
     #[error("Instance has no config polling token")]
     NoToken,
     #[error("Failed to lock app state member.")]
