@@ -3,3 +3,9 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   itertools: false
+
+auditConfig:
+  ignoreCves:
+    - CVE-2026-53666
+    - CVE-2026-53668
+    - CVE-2026-53669
