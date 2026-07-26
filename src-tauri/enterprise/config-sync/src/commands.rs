@@ -68,6 +68,7 @@ pub async fn do_update_instance(
     }
     instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
+    instance.disable_tunnels = instance_info.disable_tunnels.unwrap_or(false);
     instance.uuid = instance_info.id;
     if response.token.is_some() {
         instance.token = response.token;
