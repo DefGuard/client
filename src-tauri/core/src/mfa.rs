@@ -193,12 +193,12 @@ const OIDC_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 #[cfg(not(test))]
-const OIDC_POLL_TIMEOUT: Duration = Duration::from_secs(300);
+const OIDC_POLL_TIMEOUT: Duration = Duration::from_mins(5);
 #[cfg(test)]
 const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
 
 #[cfg(not(test))]
-const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(120);
+const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 

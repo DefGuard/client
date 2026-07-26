@@ -1,4 +1,6 @@
 use std::{
+    cmp::Ordering,
+    env,
     fs::{create_dir_all, File, OpenOptions},
     path::{Path, PathBuf},
 };
@@ -86,15 +88,11 @@ pub enum VersionCheckResult {
 }
 
 fn welcome_force_enabled() -> bool {
-    std::env::var(WELCOME_FORCE_ENV_VAR)
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
+    env::var(WELCOME_FORCE_ENV_VAR).is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
 }
 
 fn welcome_skip_enabled() -> bool {
-    std::env::var(WELCOME_SKIP_ENV_VAR)
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
+    env::var(WELCOME_SKIP_ENV_VAR).is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
 }
 
 /// Checks the last known app version (persisted in `config_dir`) against `current_version`,
@@ -126,10 +124,8 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
     let file = get_version_state_file(config_dir, false);
     match serde_json::from_reader::<_, VersionState>(file) {
         Ok(state) => match state.version.cmp(current_version) {
-            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
-                VersionCheckResult::Unchanged
-            }
-            std::cmp::Ordering::Less => {
+            Ordering::Equal | Ordering::Greater => VersionCheckResult::Unchanged,
+            Ordering::Less => {
                 let previous = state.version;
                 VersionState {
                     version: current_version.clone(),
@@ -154,7 +150,7 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{env, fs};
 
     use tempfile::tempdir;
 
@@ -263,9 +259,9 @@ mod tests {
         let _ = check_app_version(dir.path(), &current);
 
         for value in ["1", "true", "TRUE"] {
-            std::env::set_var(WELCOME_FORCE_ENV_VAR, value);
+            env::set_var(WELCOME_FORCE_ENV_VAR, value);
             let result = check_app_version(dir.path(), &current);
-            std::env::remove_var(WELCOME_FORCE_ENV_VAR);
+            env::remove_var(WELCOME_FORCE_ENV_VAR);
 
             assert_eq!(
                 result,
@@ -289,9 +285,9 @@ mod tests {
 
         let current = Version::new(1, 3, 0);
         for value in ["1", "true", "TRUE"] {
-            std::env::set_var(WELCOME_SKIP_ENV_VAR, value);
+            env::set_var(WELCOME_SKIP_ENV_VAR, value);
             let result = check_app_version(dir.path(), &current);
-            std::env::remove_var(WELCOME_SKIP_ENV_VAR);
+            env::remove_var(WELCOME_SKIP_ENV_VAR);
 
             assert_eq!(result, VersionCheckResult::Unchanged);
         }

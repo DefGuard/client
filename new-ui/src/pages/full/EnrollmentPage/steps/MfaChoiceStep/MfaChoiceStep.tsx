@@ -46,7 +46,7 @@ export const MfaChoiceStep = () => {
   });
 
   return (
-    <div id="mfa-choice-step">
+    <div id="mfa-choice-step" className="step-content">
       <header>
         <h1>Enable Multi-Factor Authentication</h1>
         <p>

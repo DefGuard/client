@@ -85,13 +85,14 @@ redundant_closure = "warn"
 anyhow = "1.0"
 base64.workspace = true
 chrono.workspace = true
-defguard-client-proto = { path = "client-proto" }
-defguard-client-core = { path = "core" }
-defguard-client-posture = { path = "enterprise/posture" }
-defguard-client-config-sync = { path = "enterprise/config-sync" }
-defguard-client-service-locations = { path = "enterprise/service-locations" }
-defguard-client-provisioning = { path = "enterprise/provisioning" }
-defguard-client-common = { path = "common" }
+defguard-cli.path = "client-cli"
+defguard-client-proto.path = "client-proto"
+defguard-client-core.path = "core"
+defguard-client-posture.path = "enterprise/posture"
+defguard-client-config-sync.path = "enterprise/config-sync"
+defguard-client-service-locations.path = "enterprise/service-locations"
+defguard-client-provisioning.path = "enterprise/provisioning"
+defguard-client-common.path = "common"
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
