@@ -11,7 +11,6 @@
 
   svcCfg = config.services.defguard-client-daemon;
   clientCfg = config.programs.defguard-client;
-  cliCfg = config.programs.defguard-cli;
 in {
   options.services.defguard-client-daemon = {
     enable = mkEnableOption "Defguard VPN client background service (required by both the desktop client and CLI)";
@@ -51,30 +50,19 @@ in {
     };
   };
 
-  options.programs.defguard-cli = {
-    enable = mkEnableOption "Defguard VPN CLI client (headless)";
-
-    package = mkOption {
-      type = types.package;
-      default = defguard-client;
-      description = "Package that provides the defguard-cli binary.";
-    };
-  };
-
   config = mkMerge [
-    # Auto-enable the daemon when the desktop client or CLI is enabled.
+    # Auto-enable the daemon when the desktop client is enabled.
     # Users can override with services.defguard-client-daemon.enable = false.
     {
-      services.defguard-client-daemon.enable = mkDefault (clientCfg.enable || cliCfg.enable);
+      services.defguard-client-daemon.enable = mkDefault clientCfg.enable;
     }
 
     # Add the relevant packages to the system PATH.
-    (mkIf (svcCfg.enable || clientCfg.enable || cliCfg.enable) {
+    (mkIf (svcCfg.enable || clientCfg.enable) {
       environment.systemPackages =
         []
         ++ optional svcCfg.enable svcCfg.package
-        ++ optional clientCfg.enable clientCfg.package
-        ++ optional cliCfg.enable cliCfg.package;
+        ++ optional clientCfg.enable clientCfg.package;
     })
 
     # Daemon-only configuration: systemd service and dedicated group.
