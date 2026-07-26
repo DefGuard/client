@@ -562,6 +562,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             pubkey: keys.pubkey,
             client_traffic_policy: instance.client_traffic_policy,
             enterprise_enabled: instance.enterprise_enabled,
+            disable_tunnels: instance.disable_tunnels,
             openid_display_name: instance.openid_display_name,
         });
     }

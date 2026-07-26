@@ -234,6 +234,7 @@ pub struct InstanceInfo<I = NoId> {
     pub pubkey: String,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
+    pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
 }
 
