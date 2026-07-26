@@ -20,7 +20,7 @@
     categories = ["Network" "Security"];
   };
 
-  pnpm = pkgs.pnpm_10;
+  pnpm = pkgs.pnpm_11;
 
   buildInputs = with pkgs; [
     at-spi2-atk
@@ -90,7 +90,7 @@
     inherit pname version pnpm;
     src = ../.;
     fetcherVersion = 3;
-    hash = "sha256-wHUC14/bATR1HZ1SN+XJKZ64wFirXnSHL2aHblddOes=";
+    hash = "sha256-CqWUwzsTw6NlM96kPobXFuyS2kIM1oHVbun/F7SqgK8=";
   };
 
   # Prefetch pnpm dependencies for the new UI (separate pnpm project).
@@ -99,7 +99,7 @@
     inherit version pnpm;
     src = ../new-ui;
     fetcherVersion = 3;
-    hash = "sha256-1ChpZFG8gJ1ciwfNB1ynOuwRWsMiOs7Ol3BU5rcuaN8=";
+    hash = "sha256-MGwjt5tV4Uhn0VvEouAij6ldgLR7Qj47TzbUVOTtlx8=";
   };
 
   # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
