@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use crate::commands::disconnect_all_tunnels;
 pub use defguard_client_config_sync::commands::{
     disable_enterprise_features, do_update_instance, locations_changed,
 };
@@ -103,6 +104,13 @@ pub async fn poll_config(handle: AppHandle) {
         if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
         }
+
+        if Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false) {
+            if let Err(err) = disconnect_all_tunnels(&handle).await {
+                error!("Failed to disconnect tunnels after tunnels were disabled: {err}");
+            }
+        }
+
         if config_retrieved > 0 {
             info!(
                 "Automatically retrieved the newest instance configuration from core for {config_retrieved} instances, sleeping for {}s",

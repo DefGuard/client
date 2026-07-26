@@ -489,6 +489,10 @@ pub async fn save_device_config(
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        disconnect_all_tunnels(&handle).await?;
+    }
+
     let locations = push_service_locations(&instance, keys).await?;
 
     handle
