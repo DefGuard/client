@@ -17,6 +17,7 @@ pub struct Instance<I = NoId> {
     pub token: Option<String>,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
+    pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
 }
 
@@ -39,6 +40,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             token: None,
             client_traffic_policy,
             enterprise_enabled: instance_info.enterprise_enabled,
+            disable_tunnels: instance_info.disable_tunnels.unwrap_or(false),
             openid_display_name: instance_info.openid_display_name,
         }
     }
@@ -51,9 +53,9 @@ impl Instance<Id> {
     {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
-            client_traffic_policy = $6, enterprise_enabled = $7, token = $8, \
-            openid_display_name = $9 \
-            WHERE id = $10;",
+            client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
+            openid_display_name = $10 \
+            WHERE id = $11;",
             self.name,
             self.uuid,
             self.url,
@@ -61,6 +63,7 @@ impl Instance<Id> {
             self.username,
             self.client_traffic_policy,
             self.enterprise_enabled,
+            self.disable_tunnels,
             self.token,
             self.openid_display_name,
             self.id
@@ -77,7 +80,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -92,7 +95,7 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance WHERE id = $1;",
             id
         )
@@ -108,7 +111,7 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance WHERE name = $1;",
             name
         )
@@ -143,7 +146,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -164,6 +167,7 @@ impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
             && self.username == other.username
             && self.client_traffic_policy == other_policy
             && self.enterprise_enabled == other.enterprise_enabled
+            && self.disable_tunnels == other.disable_tunnels.unwrap_or(false)
             && self.openid_display_name == other.openid_display_name
     }
 }
@@ -177,8 +181,8 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy , enterprise_enabled) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+            client_traffic_policy , enterprise_enabled, disable_tunnels) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -186,7 +190,8 @@ impl Instance<NoId> {
             self.username,
             self.token,
             self.client_traffic_policy,
-            self.enterprise_enabled
+            self.enterprise_enabled,
+            self.disable_tunnels
         )
         .fetch_one(executor)
         .await?;
@@ -200,6 +205,7 @@ impl Instance<NoId> {
             token: self.token,
             client_traffic_policy: self.client_traffic_policy,
             enterprise_enabled: self.enterprise_enabled,
+            disable_tunnels: self.disable_tunnels,
             openid_display_name: self.openid_display_name,
         })
     }
@@ -295,6 +301,7 @@ mod tests {
             token: Some("token".into()),
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
+            disable_tunnels: false,
             openid_display_name: None,
         }
     }

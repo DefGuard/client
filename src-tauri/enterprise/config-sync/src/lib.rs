@@ -520,6 +520,7 @@ mod tests {
             token: token.map(str::to_string),
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
+            disable_tunnels: false,
             openid_display_name: None,
         }
     }
@@ -600,6 +601,7 @@ mod tests {
             token: token.map(str::to_string),
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: true,
+            disable_tunnels: false,
             openid_display_name: None,
         }
         .save(pool)

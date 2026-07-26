@@ -170,6 +170,7 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         token: None,
         client_traffic_policy: ClientTrafficPolicy::None,
         enterprise_enabled: false,
+        disable_tunnels: false,
         openid_display_name: None,
     }
     .save(&pool)
