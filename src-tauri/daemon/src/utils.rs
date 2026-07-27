@@ -10,7 +10,7 @@ use tracing_subscriber::{
     Layer,
 };
 
-static SERVICE_LOG_PREFIX: &str = "defguard-service.log";
+static SERVICE_LOG_PREFIX: &str = "defguard-service";
 
 pub fn logging_setup(
     log_dir: &str,
@@ -20,7 +20,8 @@ pub fn logging_setup(
     // prepare log file appender
     let mut appender_builder = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
-        .filename_prefix(SERVICE_LOG_PREFIX);
+        .filename_prefix(SERVICE_LOG_PREFIX)
+        .filename_suffix("log");
     if log_max_files > 0 {
         appender_builder = appender_builder.max_log_files(log_max_files);
     }
