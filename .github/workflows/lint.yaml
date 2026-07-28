@@ -28,20 +28,16 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
-
       - uses: pnpm/action-setup@v6
         with:
-          cache: true
           version: 11.11
           run_install: false
 
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+          cache: 'pnpm'
+          cache-dependency-path: new-ui/pnpm-lock.yaml
 
       # Change to '--frozen-lockfile' once this gets fixed:
       # https://github.com/pnpm/action-setup/issues/40
