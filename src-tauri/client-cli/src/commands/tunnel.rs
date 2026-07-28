@@ -1,4 +1,4 @@
-use defguard_core::database::models::{tunnel::Tunnel, Id};
+use defguard_core::database::models::{instance::Instance, tunnel::Tunnel, Id};
 use serde_json::{json, Value};
 
 use crate::{
@@ -11,11 +11,29 @@ const MIN_ADDR_COL_WIDTH: usize = 7;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 
 pub async fn handle_list(state: &State) -> Result<TunnelListResult, CliError> {
+    if Instance::tunnels_disabled(&state.pool)
+        .await
+        .map_err(|e| CliError::Other(format!("Failed to check tunnel policy: {e}")))?
+    {
+        return Err(CliError::Other(
+            "WireGuard tunnels have been disabled by your organization's administrator."
+                .to_string(),
+        ));
+    }
     let tunnels = Tunnel::all(&state.pool).await?;
     Ok(TunnelListResult { tunnels })
 }
 
 pub async fn handle_show(state: &State, name: &str) -> Result<TunnelShowResult, CliError> {
+    if Instance::tunnels_disabled(&state.pool)
+        .await
+        .map_err(|e| CliError::Other(format!("Failed to check tunnel policy: {e}")))?
+    {
+        return Err(CliError::Other(
+            "WireGuard tunnels have been disabled by your organization's administrator."
+                .to_string(),
+        ));
+    }
     let tunnels = Tunnel::find_by_name(&state.pool, name).await?;
     let tunnel = match tunnels.len() {
         0 => {

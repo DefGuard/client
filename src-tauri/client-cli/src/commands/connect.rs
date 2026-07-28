@@ -53,6 +53,17 @@ pub async fn handle(
 
     let target = resolve_connect_target(&spec, &state.pool).await?;
 
+    if matches!(&target, ResolvedTarget::Tunnel(_))
+        && Instance::tunnels_disabled(&state.pool)
+            .await
+            .map_err(|e| CliError::Other(format!("Failed to check tunnel policy: {e}")))?
+    {
+        return Err(CliError::Other(
+            "WireGuard tunnels have been disabled by your organization's administrator."
+                .to_string(),
+        ));
+    }
+
     // Idempotency: if the target is already connected, report and exit 0.
     let (target_id, target_connection_type, target_name) = match &target {
         ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.as_str()),
