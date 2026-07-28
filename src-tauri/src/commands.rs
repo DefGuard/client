@@ -55,8 +55,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::EventKey,
-    events::TunnelsDisabledPayload,
+    events::{EventKey, TunnelsDisabledPayload},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},

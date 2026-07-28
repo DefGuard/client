@@ -4,8 +4,6 @@ use std::{
     time::Duration,
 };
 
-use crate::commands::disconnect_all_tunnels;
-use crate::events::TunnelsEnabledPayload;
 pub use defguard_client_config_sync::commands::{
     disable_enterprise_features, do_update_instance, locations_changed,
 };
@@ -26,6 +24,8 @@ use log::{debug, error, info};
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
+
+use crate::{commands::disconnect_all_tunnels, events::TunnelsEnabledPayload};
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 
