@@ -275,7 +275,7 @@ pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
     let tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
     if tunnel_ids.is_empty() {
         debug!("No active tunnels to disconnect, emitting TunnelsDisabled event anyway");
-        TunnelsDisabledPayload::emit(handle, vec![]);
+        TunnelsDisabledPayload::emit(handle, Vec::new());
         return Ok(());
     }
 
@@ -1113,7 +1113,7 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
     // Soft-hide: report no tunnels (rather than erroring) so callers render an empty
     // list. Mutating/connecting commands hard-refuse via `ensure_tunnels_enabled`.
     if Instance::tunnels_disabled(&*DB_POOL).await? {
-        return Ok(vec![]);
+        return Ok(Vec::new());
     }
     trace!("Getting information about all tunnels");
 

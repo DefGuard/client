@@ -17,7 +17,7 @@ pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
     let locations = Location::all(&state.pool, false).await?;
     let tunnels = if Instance::tunnels_disabled(&state.pool).await? {
-        vec![]
+        Vec::new()
     } else {
         Tunnel::all(&state.pool).await?
     };
