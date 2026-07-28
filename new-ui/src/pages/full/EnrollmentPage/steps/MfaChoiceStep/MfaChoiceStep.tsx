@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: sessionId is set in start(), called before */
 import { useMutation } from '@tanstack/react-query';
 import './style.scss';
+import { error as logError } from '@tauri-apps/plugin-log';
 import clsx from 'clsx';
 import { useState } from 'react';
 import {
@@ -14,10 +15,13 @@ import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { EnrollmentErrorCopy } from '../../errorCopy';
+import { useEnrollmentErrorHandler } from '../../hooks/useEnrollmentErrorHandler';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 export const MfaChoiceStep = () => {
   const sessionId = useEnrollmentStore((s) => s.sessionId);
+  const handleError = useEnrollmentErrorHandler();
   const [mfa, setMfa] = useState<MfaMethodValue>(
     useEnrollmentStore.getState().userMfaChoice,
   );
@@ -35,10 +39,14 @@ export const MfaChoiceStep = () => {
       }
       useEnrollmentStore.getState().next();
     },
+    onError: (err) => {
+      void logError(`MFA start failed: ${err}`);
+      handleError(err, EnrollmentErrorCopy.mfa);
+    },
   });
 
   return (
-    <div id="mfa-choice-step">
+    <div id="mfa-choice-step" className="step-content">
       <header>
         <h1>Enable Multi-Factor Authentication</h1>
         <p>

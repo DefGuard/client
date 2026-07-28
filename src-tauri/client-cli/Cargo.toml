@@ -8,9 +8,6 @@ license-file = "../../LICENSE.md"
 rust-version.workspace = true
 version.workspace = true
 
-[[bin]]
-name = "defguard-cli"
-
 [dependencies]
 chrono.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env"] }

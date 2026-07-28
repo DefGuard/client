@@ -83,7 +83,7 @@ jobs:
 
       - name: Run cargo deny
         working-directory: ./src-tauri
-        run: cargo deny check
+        run: cargo deny check --hide-inclusion-graph
 
       - name: Run tests
         run: cargo nextest run --workspace --locked --no-fail-fast
