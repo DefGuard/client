@@ -22,6 +22,7 @@ const isWindows = platform() === 'windows';
 
 export const OverviewPage = () => {
   const { instances, tunnels } = useAppData();
+  const tunnelsDisabled = instances.some((i) => i.disable_tunnels);
   const { viewSelection: selection } = useAppData();
 
   const selectedTunnel = useMemo(
@@ -59,7 +60,10 @@ export const OverviewPage = () => {
     <Fragment>
       <FullPage id="overview-page" hideScrollContainer>
         <div className="page-grid">
-          <OverviewSelection instances={instances} tunnels={tunnels} />
+          <OverviewSelection
+            instances={instances}
+            tunnels={tunnelsDisabled ? [] : tunnels}
+          />
           <div
             className={clsx('overview-content', {
               windows: isWindows,
@@ -96,7 +100,7 @@ export const OverviewPage = () => {
         </div>
       </FullPage>
       <ConnectModal />
-      <UpdateTunnelModal />
+      {!tunnelsDisabled && <UpdateTunnelModal />}
       <UpdateInstanceModal />
     </Fragment>
   );

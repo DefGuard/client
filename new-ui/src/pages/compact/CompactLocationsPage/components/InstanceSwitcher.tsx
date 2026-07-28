@@ -18,6 +18,7 @@ export const InstanceSwitcher = () => {
 
   const { data: tunnels } = useQuery(getTunnelsQueryOptions);
   const { data: instances } = useQuery(getInstancesQueryOptions);
+  const tunnelsDisabled = (instances ?? []).some((i) => i.disable_tunnels);
 
   const groups = useMemo((): readonly SelectOptionGroup<OverviewViewSelection>[] => {
     if (!isPresent(instances) || !isPresent(tunnels)) return [];
@@ -35,18 +36,23 @@ export const InstanceSwitcher = () => {
       })),
     };
 
-    const tunnelGroup: SelectOptionGroup<OverviewViewSelection> = {
-      key: 'tunnels',
-      label: 'Tunnels',
-      options: tunnels.map((tunnel) => ({
-        key: `tunnel-${tunnel.id ?? tunnel.name}`,
-        label: tunnel.name,
-        value: { kind: 'tunnel', id: tunnel.id },
-      })),
-    };
+    const tunnelGroup: SelectOptionGroup<OverviewViewSelection> | undefined =
+      !tunnelsDisabled && tunnels.length > 0
+        ? {
+            key: 'tunnels',
+            label: 'Tunnels',
+            options: tunnels.map((tunnel) => ({
+              key: `tunnel-${tunnel.id ?? tunnel.name}`,
+              label: tunnel.name,
+              value: { kind: 'tunnel', id: tunnel.id },
+            })),
+          }
+        : undefined;
 
-    return [instanceGroup, tunnelGroup];
-  }, [instances, tunnels]);
+    const result: SelectOptionGroup<OverviewViewSelection>[] = [instanceGroup];
+    if (tunnelGroup) result.push(tunnelGroup);
+    return result;
+  }, [instances, tunnels, tunnelsDisabled]);
 
   const totalOptions = useMemo(
     () => groups.reduce((acc, g) => acc + g.options.length, 0),
