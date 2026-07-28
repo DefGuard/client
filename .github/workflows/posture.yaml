@@ -21,7 +21,9 @@ jobs:
   test-linux-postures-unencrypted:
     name: Linux postures - unencrypted
     runs-on:
-      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - self-hosted
+      - Linux
+      - virtual
     steps:
       - uses: actions/checkout@v7
         with:
