@@ -5,10 +5,11 @@
 //! MFA, and finishing the enrollment.
 
 use defguard_client_proto::defguard::client_types::{
-    DeviceConfigResponse, EnrollmentStartResponse,
+    CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
+    EnrollmentStartResponse,
 };
 use reqwest::{Client, Response, StatusCode, Url};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use thiserror::Error;
 
@@ -46,18 +47,6 @@ pub struct EnrollmentSession {
     pub cookie: String,
     pub proxy_url: Url,
     pub client: Client,
-}
-
-/// Response from `POST /api/v1/enrollment/register-mfa/code/start`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct MfaStartResponse {
-    pub totp_secret: Option<String>,
-}
-
-/// Response from `POST /api/v1/enrollment/register-mfa/code/finish`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct MfaFinishResponse {
-    pub recovery_codes: Vec<String>,
 }
 
 /// Send a JSON POST request to an enrollment endpoint with the session
@@ -242,7 +231,7 @@ pub async fn enrollment_activate_user(
 pub async fn enrollment_register_mfa_start(
     session: EnrollmentSession,
     method: String,
-) -> Result<MfaStartResponse, EnrollmentError> {
+) -> Result<CodeMfaSetupStartResponse, EnrollmentError> {
     let response = enrollment_post(
         &session,
         "api/v1/enrollment/register-mfa/code/start",
@@ -264,7 +253,7 @@ pub async fn enrollment_register_mfa_finish(
     session: EnrollmentSession,
     code: String,
     method: String,
-) -> Result<MfaFinishResponse, EnrollmentError> {
+) -> Result<CodeMfaSetupFinishResponse, EnrollmentError> {
     let response = enrollment_post(
         &session,
         "api/v1/enrollment/register-mfa/code/finish",

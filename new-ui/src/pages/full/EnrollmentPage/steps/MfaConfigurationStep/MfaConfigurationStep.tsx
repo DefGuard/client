@@ -8,32 +8,27 @@ import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { QrCard } from '../../../../../shared/components/QrCard/QrCard';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { api } from '../../../../../shared/rust-api/api';
+import { parseEnrollmentError } from '../../../../../shared/rust-api/enrollment';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { EnrollmentControls } from '../../components/EnrollmentControls/EnrollmentControls';
+import { EnrollmentErrorCopy } from '../../errorCopy';
 import { activateUser } from '../../hooks/activateUser';
+import { useEnrollmentErrorHandler } from '../../hooks/useEnrollmentErrorHandler';
 import { useEnrollmentStore } from '../../hooks/useEnrollmentStore';
 
 /**
- * Map a register-mfa-finish error to a user-facing message. The proxy rejects
- * a wrong code with a `proxy_error` (HTTP 400) whose message contains "invalid"
- * (core returns "Code invalid" / "Email code invalid"); anything else is
- * unexpected and gets a generic message.
+ * True when the error is a proxy rejecting an invalid MFA code (HTTP 400
+ * with "invalid" in the message), which should show the inline CodeInput
+ * error rather than the error modal.
  */
-const mfaFinishErrorMessage = (err: unknown): string => {
-  try {
-    const parsed = JSON.parse(String(err)) as { type?: string; message?: string };
-    if (
-      parsed.type === 'proxy_error' &&
-      parsed.message?.toLowerCase().includes('invalid')
-    ) {
-      return 'Invalid code';
-    }
-  } catch {
-    // Non-JSON error: fall through to the generic message.
-  }
-  return 'MFA setup failed. Please try again.';
+const isInvalidMfaCode = (err: unknown): boolean => {
+  const parsed = parseEnrollmentError(err);
+  return (
+    parsed.errorKind === 'server' &&
+    parsed.error?.toLowerCase().includes('invalid') === true
+  );
 };
 
 export const MfaConfigurationStep = () => {
@@ -41,6 +36,7 @@ export const MfaConfigurationStep = () => {
   const method = useEnrollmentStore((s) => s.userMfaChoice);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const handleError = useEnrollmentErrorHandler();
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
@@ -51,7 +47,11 @@ export const MfaConfigurationStep = () => {
     },
     onError: (err) => {
       void logError(`MFA configuration failed: ${err}`);
-      setError(mfaFinishErrorMessage(err));
+      if (isInvalidMfaCode(err)) {
+        setError('Invalid code');
+        return;
+      }
+      handleError(err, EnrollmentErrorCopy.mfa);
     },
     onSuccess: (resp) => {
       useEnrollmentStore.setState({

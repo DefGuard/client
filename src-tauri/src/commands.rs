@@ -9,7 +9,7 @@ use defguard_client_core::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
         disconnect_interface,
     },
-    enrollment::{self, MfaFinishResponse, MfaStartResponse},
+    enrollment::{self},
     mfa,
 };
 use defguard_client_posture::authorize_posture_session;
@@ -20,8 +20,8 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::{
         AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
-        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
-        InstanceInfo as ProtoInstanceInfo, MfaMethod,
+        CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
+        EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -365,23 +365,6 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
         .emit(EventKey::InstanceUpdate.into(), ())
         .map_err(tauri_err_to_app_err)?;
     Ok(())
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Device {
-    pub id: Id,
-    pub name: String,
-    pub pubkey: String,
-    pub user_id: Id,
-    pub created_at: i64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct InstanceResponse {
-    // uuid
-    pub id: String,
-    pub name: String,
-    pub url: String,
 }
 
 #[derive(Serialize)]
@@ -1467,7 +1450,7 @@ pub async fn enrollment_register_mfa_start(
     session_id: String,
     method: String,
     state: State<'_, AppState>,
-) -> Result<MfaStartResponse, String> {
+) -> Result<CodeMfaSetupStartResponse, String> {
     debug!("Starting MFA setup");
     let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_register_mfa_start(session, method)
@@ -1481,7 +1464,7 @@ pub async fn enrollment_register_mfa_finish(
     code: String,
     method: String,
     state: State<'_, AppState>,
-) -> Result<MfaFinishResponse, String> {
+) -> Result<CodeMfaSetupFinishResponse, String> {
     debug!("Finishing MFA setup");
     let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_register_mfa_finish(session, code, method)
