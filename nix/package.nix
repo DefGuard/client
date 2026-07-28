@@ -104,10 +104,11 @@
       runHook preBuild
       pnpm tsc -b
       pnpm vite build --outDir "$out"
-      # Create entry points for compact and full view windows.
-      mkdir -p "$out"/compact "$out"/full
+      # Create entry points for compact, full, and welcome view windows.
+      mkdir -p "$out"/compact "$out"/full "$out"/welcome
       cp "$out"/index.html "$out"/compact/
       cp "$out"/index.html "$out"/full/
+      cp "$out"/index.html "$out"/welcome/
       runHook postBuild
     '';
     installPhase = "true";
