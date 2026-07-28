@@ -52,6 +52,9 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.10
 
@@ -80,6 +83,7 @@ jobs:
           # https://github.com/tauri-apps/tauri-action/issues/1003
           TAURI_BUNDLER_DMG_IGNORE_CI: "false"
         with:
+          tauriScript: cargo tauri
           args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
       - name: Upload DMG
