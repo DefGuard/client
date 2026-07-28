@@ -81,7 +81,7 @@ impl TunnelsDisabledPayload {
                 .notification()
                 .builder()
                 .title(format!("Tunnel {name} disconnected"))
-                .body("Disabled by your organization.")
+                .body("WireGuard tunnels have been disabled by the administrator.")
                 .show()
             {
                 warn!("Tunnels disabled notification not shown. Reason: {err}");
