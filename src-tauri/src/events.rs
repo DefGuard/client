@@ -98,7 +98,7 @@ pub struct TunnelsEnabledPayload;
 
 impl TunnelsEnabledPayload {
     pub fn emit(app_handle: &AppHandle) {
-        if let Err(err) = app_handle.emit(EventKey::TunnelsEnabled.into(), ()) {
+        if let Err(err) = app_handle.emit(EventKey::TunnelsEnabled.into(), Self) {
             error!("Event TunnelsEnabled was not emitted. Reason: {err}");
         }
     }

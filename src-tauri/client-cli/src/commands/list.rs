@@ -16,10 +16,7 @@ const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
     let locations = Location::all(&state.pool, false).await?;
-    let tunnels = if Instance::tunnels_disabled(&state.pool)
-        .await
-        .map_err(|e| CliError::Other(format!("Failed to check tunnel policy: {e}")))?
-    {
+    let tunnels = if Instance::tunnels_disabled(&state.pool).await? {
         vec![]
     } else {
         Tunnel::all(&state.pool).await?

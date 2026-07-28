@@ -166,6 +166,18 @@ impl Instance<Id> {
             .await?;
         Ok(!flags.is_empty() && flags.iter().any(|v| *v))
     }
+
+    /// Hard-refuse guard for tunnel operations: returns `Error::TunnelsDisabled`
+    /// when any enrolled instance disables tunnels, `Ok(())` otherwise.
+    pub async fn ensure_tunnels_enabled<'e, E>(executor: E) -> Result<(), crate::error::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        if Self::tunnels_disabled(executor).await? {
+            return Err(crate::error::Error::TunnelsDisabled);
+        }
+        Ok(())
+    }
 }
 
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below

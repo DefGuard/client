@@ -166,9 +166,7 @@ pub async fn connect(
             return Err(Error::NotFound.into());
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
-        if Instance::tunnels_disabled(&*DB_POOL).await? {
-            return Err(Error::TunnelsDisabled.into());
-        }
+        Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
         debug!(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
@@ -1084,9 +1082,7 @@ pub fn parse_tunnel_config(filename: &str, config: &str) -> Result<Tunnel, Error
 
 #[tauri::command(async)]
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
-    if Instance::tunnels_disabled(&*DB_POOL).await? {
-        return Err(Error::TunnelsDisabled);
-    }
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
@@ -1098,9 +1094,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
 
 #[tauri::command(async)]
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
-    if Instance::tunnels_disabled(&*DB_POOL).await? {
-        return Err(Error::TunnelsDisabled);
-    }
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
@@ -1123,6 +1117,8 @@ pub struct TunnelInfo<I = NoId> {
 
 #[tauri::command(async)]
 pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
+    // Soft-hide: report no tunnels (rather than erroring) so callers render an empty
+    // list. Mutating/connecting commands hard-refuse via `ensure_tunnels_enabled`.
     if Instance::tunnels_disabled(&*DB_POOL).await? {
         return Ok(vec![]);
     }
@@ -1154,9 +1150,7 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
 
 #[tauri::command(async)]
 pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
-    if Instance::tunnels_disabled(&*DB_POOL).await? {
-        return Err(Error::NotFound);
-    }
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Retrieving details about tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, tunnel_id).await? {
