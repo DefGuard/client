@@ -12,9 +12,10 @@ import { useConnectModal } from '../../../pages/full/OverviewPage/components/Con
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
-import { ConnectionType, LocationMfaMode, MfaMethod } from '../../rust-api/types';
+import { MfaMethod } from '../../rust-api/types';
 import { ThemeSpacing } from '../../types';
 import { isPresent } from '../../utils/isPresent';
+import { shouldStartMfa } from '../../utils/mfa';
 import { Divider } from '../Divider/Divider';
 import { parseConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
@@ -78,10 +79,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
       return;
     }
 
-    if (
-      location.connection_type !== ConnectionType.Tunnel &&
-      location.location_mfa_mode !== LocationMfaMode.Disabled
-    ) {
+    if (shouldStartMfa(location)) {
       useConnectModal.getState().open({
         view: mfaMethodToConnectModalView(location.mfa_method ?? MfaMethod.Totp),
         location,

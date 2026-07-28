@@ -2,7 +2,19 @@ import { queryOptions, skipToken } from '@tanstack/react-query';
 
 import { isPresent } from '../utils/isPresent';
 import { api } from './api';
-import type { ConnectionArgs, LocationDetailsArgs, StatsArgs } from './types';
+import type {
+  ConnectionArgs,
+  InstanceInfo,
+  LocationDetailsArgs,
+  StatsArgs,
+} from './types';
+
+/**
+ * Single source of truth for the OR-across-instances "tunnels disabled" rule:
+ * tunnels are disabled when any enrolled instance has the flag set.
+ */
+export const tunnelsDisabled = (instances: InstanceInfo[]): boolean =>
+  instances.some((i) => i.disable_tunnels);
 
 export const getAllActiveConnectionQueryOptions = queryOptions({
   queryKey: ['alive-connections'] as const,

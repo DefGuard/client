@@ -1,4 +1,10 @@
-import { MfaMethod, type MfaMethodValue } from '../rust-api/types';
+import {
+  ConnectionType,
+  type LocationInfo,
+  LocationMfaMode,
+  MfaMethod,
+  type MfaMethodValue,
+} from '../rust-api/types';
 
 const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Email]: 'Email',
@@ -19,3 +25,13 @@ export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
 };
 
 export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];
+
+/**
+ * Whether connecting this location should trigger the MFA flow: only for
+ * server-managed locations (never bare tunnels) that have MFA enabled.
+ */
+export const shouldStartMfa = (
+  location: Pick<LocationInfo, 'connection_type' | 'location_mfa_mode'>,
+): boolean =>
+  location.connection_type !== ConnectionType.Tunnel &&
+  location.location_mfa_mode !== LocationMfaMode.Disabled;

@@ -9,6 +9,7 @@ import { useAppData } from '../../../../shared/providers/AppDataContext';
 import {
   getInstancesQueryOptions,
   getTunnelsQueryOptions,
+  tunnelsDisabled,
 } from '../../../../shared/rust-api/query';
 import type { OverviewViewSelection } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
@@ -18,7 +19,6 @@ export const InstanceSwitcher = () => {
 
   const { data: tunnels } = useQuery(getTunnelsQueryOptions);
   const { data: instances } = useQuery(getInstancesQueryOptions);
-  const tunnelsDisabled = (instances ?? []).some((i) => i.disable_tunnels);
 
   const groups = useMemo((): readonly SelectOptionGroup<OverviewViewSelection>[] => {
     if (!isPresent(instances) || !isPresent(tunnels)) return [];
@@ -37,7 +37,7 @@ export const InstanceSwitcher = () => {
     };
 
     const tunnelGroup: SelectOptionGroup<OverviewViewSelection> | undefined =
-      !tunnelsDisabled && tunnels.length > 0
+      !tunnelsDisabled(instances ?? []) && tunnels.length > 0
         ? {
             key: 'tunnels',
             label: 'Tunnels',
@@ -52,7 +52,7 @@ export const InstanceSwitcher = () => {
     const result: SelectOptionGroup<OverviewViewSelection>[] = [instanceGroup];
     if (tunnelGroup) result.push(tunnelGroup);
     return result;
-  }, [instances, tunnels, tunnelsDisabled]);
+  }, [instances, tunnels]);
 
   const totalOptions = useMemo(
     () => groups.reduce((acc, g) => acc + g.options.length, 0),

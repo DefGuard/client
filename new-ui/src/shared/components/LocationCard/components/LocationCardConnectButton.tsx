@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../../rust-api/api';
-import { ConnectionType, LocationMfaMode } from '../../../rust-api/types';
+import { shouldStartMfa } from '../../../utils/mfa';
 import { parseConnectError } from '../api/connectError';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
@@ -46,10 +46,7 @@ export const LocationCardConnectButton = () => {
         connectionType: location.connection_type,
         locationId: location.id,
       });
-    } else if (
-      location.connection_type !== ConnectionType.Tunnel &&
-      location.location_mfa_mode !== LocationMfaMode.Disabled
-    ) {
+    } else if (shouldStartMfa(location)) {
       startMfa();
     } else {
       connect({

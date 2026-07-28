@@ -8,7 +8,10 @@ import { ScrollContainer } from '../../../shared/components/ScrollContainer/Scro
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { useAppData } from '../../../shared/providers/AppDataContext';
-import { getLocationsQueryOptions } from '../../../shared/rust-api/query';
+import {
+  getLocationsQueryOptions,
+  tunnelsDisabled,
+} from '../../../shared/rust-api/query';
 import type { InstanceInfo } from '../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
@@ -22,7 +25,6 @@ const isWindows = platform() === 'windows';
 
 export const OverviewPage = () => {
   const { instances, tunnels } = useAppData();
-  const tunnelsDisabled = instances.some((i) => i.disable_tunnels);
   const { viewSelection: selection } = useAppData();
 
   const selectedTunnel = useMemo(
@@ -62,7 +64,7 @@ export const OverviewPage = () => {
         <div className="page-grid">
           <OverviewSelection
             instances={instances}
-            tunnels={tunnelsDisabled ? [] : tunnels}
+            tunnels={tunnelsDisabled(instances) ? [] : tunnels}
           />
           <div
             className={clsx('overview-content', {
@@ -100,7 +102,7 @@ export const OverviewPage = () => {
         </div>
       </FullPage>
       <ConnectModal />
-      {!tunnelsDisabled && <UpdateTunnelModal />}
+      {!tunnelsDisabled(instances) && <UpdateTunnelModal />}
       <UpdateInstanceModal />
     </Fragment>
   );
