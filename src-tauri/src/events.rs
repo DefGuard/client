@@ -93,6 +93,17 @@ impl TunnelsDisabledPayload {
     }
 }
 
+#[derive(Clone, Serialize)]
+pub struct TunnelsEnabledPayload;
+
+impl TunnelsEnabledPayload {
+    pub fn emit(app_handle: &AppHandle) {
+        if let Err(err) = app_handle.emit(EventKey::TunnelsEnabled.into(), ()) {
+            error!("Event TunnelsEnabled was not emitted. Reason: {err}");
+        }
+    }
+}
+
 /// Handle deep-link URLs.
 pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
     debug!("Deep link received.");

@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::commands::disconnect_all_tunnels;
+use crate::events::TunnelsEnabledPayload;
 pub use defguard_client_config_sync::commands::{
     disable_enterprise_features, do_update_instance, locations_changed,
 };
@@ -40,6 +41,7 @@ pub async fn poll_config(handle: AppHandle) {
     debug!("Starting the configuration polling loop.");
     // Polling starts sooner than app's frontend may load in dev builds, causing events (toasts)
     // to be lost; you may want to wait here before starting if you want to debug it.
+    let mut last_tunnels_disabled = false;
     loop {
         let active_instance_ids = match active_instance_ids().await {
             Ok(ids) => ids,
@@ -105,11 +107,22 @@ pub async fn poll_config(handle: AppHandle) {
             error!("Failed to emit instance update event to the frontend: {err}");
         }
 
-        if Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false) {
-            if let Err(err) = disconnect_all_tunnels(&handle).await {
-                error!("Failed to disconnect tunnels after tunnels were disabled: {err}");
+        let currently_disabled = Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false);
+
+        match (last_tunnels_disabled, currently_disabled) {
+            (false, true) => {
+                info!("Tunnels disabled by server administrator, disconnecting any active tunnels");
+                if let Err(err) = disconnect_all_tunnels(&handle).await {
+                    error!("Failed to disconnect tunnels after tunnels were disabled: {err}");
+                }
             }
+            (true, false) => {
+                info!("Tunnels re-enabled by server administrator");
+                TunnelsEnabledPayload::emit(&handle);
+            }
+            _ => {}
         }
+        last_tunnels_disabled = currently_disabled;
 
         if config_retrieved > 0 {
             info!(

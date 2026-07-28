@@ -277,6 +277,8 @@ pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
     let state = handle.state::<AppState>();
     let tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
     if tunnel_ids.is_empty() {
+        debug!("No active tunnels to disconnect, emitting TunnelsDisabled event anyway");
+        TunnelsDisabledPayload::emit(handle, vec![]);
         return Ok(());
     }
 
@@ -293,10 +295,6 @@ pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
             info!("Tunnel {name}(ID: {tunnel_id}) disconnected (disabled by server administrator)");
             names.push(name);
         }
-    }
-
-    if names.is_empty() {
-        return Ok(());
     }
 
     TunnelsDisabledPayload::emit(handle, names);

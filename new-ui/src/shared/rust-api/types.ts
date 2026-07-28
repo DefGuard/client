@@ -167,6 +167,7 @@ export const TauriEvent = {
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
+  TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];
