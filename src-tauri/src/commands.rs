@@ -55,7 +55,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::{EventKey, TunnelsDisabledPayload},
+    events::{EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
@@ -977,9 +977,14 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
         }
     }
 
+    let was_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
+        TunnelsEnabledPayload::emit(&handle);
+    }
 
     reload_tray_menu(&handle).await;
 
@@ -1041,9 +1046,14 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             );
         }
     }
+    let was_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
+        TunnelsEnabledPayload::emit(&handle);
+    }
 
     client
         .delete_service_locations(DeleteServiceLocationsRequest {
