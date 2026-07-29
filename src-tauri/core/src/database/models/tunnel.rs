@@ -381,9 +381,9 @@ impl TunnelStats<Id> {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             TunnelStats,
-            "SELECT id, tunnel_id, \
-            CAST(COALESCE(SUM(MAX(upload_diff, 0)), 0) AS INTEGER) \"upload!: i64\", \
-            CAST(COALESCE(SUM(MAX(download_diff, 0)), 0) AS INTEGER) \"download!: i64\", \
+            "SELECT id \"id!\", tunnel_id, \
+            SUM(MAX(upload_diff, 0)) \"upload!: i64\", \
+            SUM(MAX(download_diff, 0)) \"download!: i64\", \
             0 \"upload_diff!: i64\", \
             0 \"download_diff!: i64\", \
             last_handshake \"last_handshake!: i64\", \

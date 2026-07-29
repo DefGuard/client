@@ -243,7 +243,7 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                     .peers
                     .into_iter()
                     .map(Into::into)
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<Peer>>();
                 let mut pending_totals = Vec::new();
                 for peer in peers {
                     let current_totals = (peer.tx_bytes.cast_signed(), peer.rx_bytes.cast_signed());
