@@ -20,7 +20,7 @@
     categories = ["Network" "Security"];
   };
 
-  pnpm = pkgs.pnpm_11;
+  inherit (import ./versions.nix pkgs) nodejs pnpm;
 
   buildInputs = with pkgs; [
     at-spi2-atk
@@ -98,7 +98,7 @@
     pname = "defguard-client-new-ui";
     inherit version;
     src = ../new-ui;
-    nativeBuildInputs = [pkgs.nodejs_24 pnpm pnpmConfigHook];
+    nativeBuildInputs = [nodejs pnpm pnpmConfigHook];
     pnpmDeps = newUiPnpmDeps;
     buildPhase = ''
       runHook preBuild

@@ -26,6 +26,8 @@
       --config imports_granularity=Crate,group_imports=StdExternalCrate
   '';
 
+  inherit (import ./versions.nix pkgs) nodejs pnpm;
+
   craneLib = crane.mkLib pkgs;
 
   defguard-client = pkgs.callPackage ./package.nix {
@@ -55,6 +57,8 @@ in
       desktop-file-utils
       xdg-utils
       just
+      nodejs
+      pnpm
     ];
 
     shellHook = with pkgs; ''
