@@ -14,7 +14,7 @@ pub type Id = i64;
 #[derive(Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct NoId;
 
-const PURGE_DURATION: chrono::Duration = chrono::Duration::days(30);
+const PURGE_DURATION: chrono::Duration = chrono::Duration::hours(28);
 
 #[cfg(target_os = "macos")]
 use self::{location::Location, tunnel::Tunnel};
