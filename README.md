@@ -36,13 +36,14 @@ Make sure you have [protoc](https://grpc.io/docs/protoc-installation/) available
 ### Install pnpm and node deps
 
 ```bash
+cd new-ui
 pnpm install
 ```
 
 ### Sqlx and local database file
 
 To work with sqlx on a local db file, you'll have to set `DATABASE_URL` env variable.
-It's best to set it to absolute path since `pnpm tauri dev` runs with weird paths.
+It's best to set it to absolute path since `cargo tauri dev` runs with weird paths.
 
 Init the file with:
 
@@ -56,14 +57,19 @@ Then keep the `$DATABASE_URL` set during development (use direnv etc.)
 
 ### Dev server command
 
+Run the new UI's dev server and the Tauri app in parallel (see `justfile`'s `dev` recipe for a one-liner):
+
 ```bash
-pnpm tauri dev
+cd new-ui && pnpm dev
+# in another terminal
+cargo tauri dev
 ```
 
 ### Build command
 
 ```bash
-pnpm tauri build
+cd new-ui && pnpm build
+cargo tauri build
 ```
 
 Built packages are available after in `src-tauri/target/release/bundle`.
@@ -117,11 +123,11 @@ For details, see:
 
 ## Failed to bundle project
 
-`pnpm tauri build` may fail with error: `Error failed to bundle project: error running appimage.sh`. To
+`cargo tauri build` may fail with error: `Error failed to bundle project: error running appimage.sh`. To
 fix this set the NO_STRIP environment variable:
 
 ```
-NO_STRIP=1 pnpm tauri build
+NO_STRIP=1 cargo tauri build
 ```
 
 ## Blank screen
@@ -141,9 +147,9 @@ As a last resort for resize crashes or persistent rendering issues, disable acce
 WEBKIT_DISABLE_COMPOSITING_MODE=1 defguard-client
 ```
 
-## Failed to run `pnpm tauri dev`
+## Failed to run `cargo tauri dev`
 
-`pnpm tauri dev` command may result in the following error:
+`cargo tauri dev` command may result in the following error if `new-ui`'s node_modules are stale:
 
 ```
 Error [ERR_REQUIRE_ESM]: require() of ES Module /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js from /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js not supported.
@@ -159,4 +165,4 @@ Node.js v22.7.0
  ELIFECYCLE  Command failed with exit code 1.
 ```
 
-To fix this remove node_modules and rerun `pnpm install`.
+To fix this remove `new-ui/node_modules` and rerun `pnpm install` in `new-ui`.

@@ -38,9 +38,22 @@ jobs:
 
       - uses: pnpm/action-setup@v6
         with:
-          cache: true
           run_install: false
           version: 11.11
+
+      - name: Get pnpm store directory
+        run: |
+          STORE_PATH=$(pnpm store path --silent)
+          mkdir -p "$STORE_PATH"
+          echo "STORE_PATH=$STORE_PATH" >> ${GITHUB_ENV}
+
+      - name: Restore pnpm store cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('new-ui/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
 
       - name: Install Node dependencies for New UI
         run: |
@@ -51,6 +64,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.10
@@ -80,6 +96,7 @@ jobs:
           # https://github.com/tauri-apps/tauri-action/issues/1003
           TAURI_BUNDLER_DMG_IGNORE_CI: "false"
         with:
+          tauriScript: cargo tauri
           args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
       - name: Upload DMG
