@@ -1,7 +1,7 @@
-#[cfg(not(target_os = "macos"))]
-use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
+#[cfg(not(target_os = "macos"))]
+use std::{collections::HashMap, str::FromStr};
 use std::{env, process::Command};
 #[cfg(target_os = "linux")]
 use std::{fs, path::Path};
@@ -54,6 +54,15 @@ use crate::{
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]
 static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
+
+fn stats_diffs(previous_totals: Option<(i64, i64)>, current_totals: (i64, i64)) -> (i64, i64) {
+    previous_totals.map_or((0, 0), |(previous_upload, previous_download)| {
+        (
+            current_totals.0.saturating_sub(previous_upload).max(0),
+            current_totals.1.saturating_sub(previous_download).max(0),
+        )
+    })
+}
 
 #[cfg(target_os = "linux")]
 const NVIDIA_EXPLICIT_SYNC_ENV: &str = "__NV_DISABLE_EXPLICIT_SYNC";
@@ -126,6 +135,7 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
 
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     let pool = DB_POOL.clone();
+    let mut previous_totals = None;
 
     loop {
         debug!("Waiting for the next stats collection interval for ID {id} and connection type {connection_type:?}");
@@ -135,6 +145,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
         let Some(stats) = stats else {
             continue;
         };
+        let current_totals = (stats.tx_bytes.cast_signed(), stats.rx_bytes.cast_signed());
+        let (upload_diff, download_diff) = stats_diffs(previous_totals, current_totals);
 
         let mut transaction = match pool.begin().await {
             Ok(transactions) => transactions,
@@ -145,6 +157,7 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 continue;
             }
         };
+        let mut saved = false;
 
         if connection_type == ConnectionType::Location {
             let location_stats = LocationStats::new(
@@ -154,10 +167,12 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 stats.last_handshake.cast_signed(),
                 0,
                 None,
-            );
+            )
+            .with_diffs(upload_diff, download_diff);
             match location_stats.save(&mut *transaction).await {
                 Ok(_) => {
                     debug!("Saved network usage stats for location ID {id}");
+                    saved = true;
                 }
                 Err(err) => {
                     error!("Failed to save network usage stats for location ID {id}: {err}");
@@ -172,10 +187,12 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 chrono::Utc::now().naive_utc(),
                 0,
                 0,
-            );
+            )
+            .with_diffs(upload_diff, download_diff);
             match tunnel_stats.save(&mut *transaction).await {
                 Ok(_) => {
                     debug!("Saved network usage stats for tunnel ID {id}");
+                    saved = true;
                 }
                 Err(err) => {
                     error!("Failed to save network usage stats for tunnel ID {id}: {err}");
@@ -185,6 +202,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
 
         if let Err(err) = transaction.commit().await {
             error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        } else if saved {
+            previous_totals = Some(current_totals);
         }
     }
 }
@@ -201,6 +220,7 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
         .await
         .expect("Failed to connect to interface stats stream for interface {interface_name}")
         .into_inner();
+    let mut previous_totals = HashMap::new();
 
     loop {
         match stream.message().await {
@@ -224,7 +244,9 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                     .into_iter()
                     .map(Into::into)
                     .collect::<Vec<_>>();
+                let mut pending_totals = Vec::new();
                 for peer in peers {
+                    let current_totals = (peer.tx_bytes.cast_signed(), peer.rx_bytes.cast_signed());
                     if connection_type.eq(&ConnectionType::Location) {
                         let location_stats = match peer_to_location_stats(
                             &peer,
@@ -249,9 +271,14 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                             (interface {interface_name})."
                         );
                         trace!("Stats: {location_stats:?}");
+                        let location_id = location_stats.location_id;
+                        let (upload_diff, download_diff) =
+                            stats_diffs(previous_totals.get(&location_id).copied(), current_totals);
+                        let location_stats = location_stats.with_diffs(upload_diff, download_diff);
                         match location_stats.save(&mut *transaction).await {
                             Ok(_) => {
                                 debug!("Saved network usage stats for location {location_name}");
+                                pending_totals.push((location_id, current_totals));
                             }
                             Err(err) => {
                                 error!(
@@ -282,9 +309,14 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                             "Saving network usage stats related to tunnel {tunnel_name} \
                             (interface {interface_name}): {tunnel_stats:?}"
                         );
+                        let tunnel_id = tunnel_stats.tunnel_id;
+                        let (upload_diff, download_diff) =
+                            stats_diffs(previous_totals.get(&tunnel_id).copied(), current_totals);
+                        let tunnel_stats = tunnel_stats.with_diffs(upload_diff, download_diff);
                         match tunnel_stats.save(&mut *transaction).await {
                             Ok(_) => {
                                 debug!("Saved stats for tunnel {tunnel_name}");
+                                pending_totals.push((tunnel_id, current_totals));
                             }
                             Err(err) => {
                                 error!("Failed to save stats for tunnel {tunnel_name}: {err}");
@@ -299,6 +331,8 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                         "Failed to commit database transaction for saving location/tunnel stats: \
                         {err}",
                     );
+                } else {
+                    previous_totals.extend(pending_totals);
                 }
             }
             Ok(None) => {
@@ -685,6 +719,26 @@ pub(crate) async fn handle_connection_for_location(
     .await?;
     debug!("Service log watcher for location {location} spawned.");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stats_diffs;
+
+    #[test]
+    fn stats_diffs_returns_zero_for_first_sample() {
+        assert_eq!(stats_diffs(None, (100, 200)), (0, 0));
+    }
+
+    #[test]
+    fn stats_diffs_returns_counter_increments() {
+        assert_eq!(stats_diffs(Some((100, 200)), (150, 275)), (50, 75));
+    }
+
+    #[test]
+    fn stats_diffs_clamps_counter_resets_to_zero() {
+        assert_eq!(stats_diffs(Some((100, 200)), (50, 125)), (0, 0));
+    }
 }
 
 /// Setup new connection for tunnel

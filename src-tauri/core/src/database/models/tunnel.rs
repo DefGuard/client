@@ -281,6 +281,8 @@ pub struct TunnelStats<I = NoId> {
     pub tunnel_id: Id,
     upload: i64,
     download: i64,
+    upload_diff: i64,
+    download_diff: i64,
     pub last_handshake: i64,
     pub collected_at: NaiveDateTime,
     listen_port: u32,
@@ -314,6 +316,8 @@ impl TunnelStats<NoId> {
             tunnel_id,
             upload,
             download,
+            upload_diff: 0,
+            download_diff: 0,
             last_handshake,
             collected_at,
             listen_port,
@@ -321,17 +325,26 @@ impl TunnelStats<NoId> {
         }
     }
 
+    #[must_use]
+    pub fn with_diffs(mut self, upload_diff: i64, download_diff: i64) -> Self {
+        self.upload_diff = upload_diff;
+        self.download_diff = download_diff;
+        self
+    }
+
     pub async fn save<'e, E>(self, executor: E) -> sqlx::Result<TunnelStats<Id>>
     where
         E: SqliteExecutor<'e>,
     {
         let id = query_scalar!(
-            "INSERT INTO tunnel_stats (tunnel_id, upload, download, last_handshake, collected_at, \
-            listen_port, persistent_keepalive_interval) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id \"id!\"",
+            "INSERT INTO tunnel_stats (tunnel_id, upload, download, upload_diff, download_diff, \
+            last_handshake, collected_at, listen_port, persistent_keepalive_interval) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id \"id!\"",
             self.tunnel_id,
             self.upload,
             self.download,
+            self.upload_diff,
+            self.download_diff,
             self.last_handshake,
             self.collected_at,
             self.listen_port,
@@ -345,6 +358,8 @@ impl TunnelStats<NoId> {
             tunnel_id: self.tunnel_id,
             upload: self.upload,
             download: self.download,
+            upload_diff: self.upload_diff,
+            download_diff: self.download_diff,
             last_handshake: self.last_handshake,
             collected_at: self.collected_at,
             listen_port: self.listen_port,
@@ -366,20 +381,18 @@ impl TunnelStats<Id> {
         let aggregation = aggregation.fstring();
         let stats = query_as!(
             TunnelStats,
-            "WITH cte AS (\
-            SELECT id, tunnel_id, \
-            COALESCE(upload - LAG(upload) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) upload, \
-            COALESCE(download - LAG(download) OVER (PARTITION BY tunnel_id ORDER BY collected_at), 0) download, \
-            last_handshake, strftime($1, collected_at) collected_at, listen_port, persistent_keepalive_interval \
-            FROM tunnel_stats ORDER BY collected_at LIMIT -1 OFFSET 1) \
-            SELECT id, tunnel_id, \
-            SUM(MAX(upload, 0)) \"upload!: i64\", \
-            SUM(MAX(download, 0)) \"download!: i64\", \
-            last_handshake, collected_at \"collected_at!: NaiveDateTime\", \
+            "SELECT id, tunnel_id, \
+            CAST(COALESCE(SUM(MAX(upload_diff, 0)), 0) AS INTEGER) \"upload!: i64\", \
+            CAST(COALESCE(SUM(MAX(download_diff, 0)), 0) AS INTEGER) \"download!: i64\", \
+            0 \"upload_diff!: i64\", \
+            0 \"download_diff!: i64\", \
+            last_handshake \"last_handshake!: i64\", \
+            strftime($1, collected_at) \"collected_at!: NaiveDateTime\", \
             listen_port \"listen_port!: u32\", \
             persistent_keepalive_interval \"persistent_keepalive_interval!: u16\" \
-            FROM cte WHERE tunnel_id = $2 AND collected_at >= $3 \
-            GROUP BY collected_at ORDER BY collected_at",
+            FROM tunnel_stats \
+            WHERE tunnel_id = $2 AND collected_at >= datetime(strftime($1, $3)) \
+            GROUP BY strftime($1, collected_at) ORDER BY collected_at",
             aggregation,
             tunnel_id,
             from
@@ -409,6 +422,8 @@ impl TunnelStats<Id> {
             ts.tunnel_id,
             ts.upload \"upload!: i64\",
             ts.download \"download!: i64\",
+            ts.upload_diff,
+            ts.download_diff,
             ts.last_handshake,
             ts.collected_at \"collected_at!: NaiveDateTime\",
             ts.listen_port \"listen_port!: u32\",
@@ -456,6 +471,8 @@ where
         tunnel_id: tunnel.id,
         upload: peer.tx_bytes.cast_signed(),
         download: peer.rx_bytes.cast_signed(),
+        upload_diff: 0,
+        download_diff: 0,
         last_handshake: peer.last_handshake.map_or(0, |ts| {
             ts.duration_since(SystemTime::UNIX_EPOCH)
                 .map_or(0, |duration| duration.as_secs().cast_signed())
