@@ -77,7 +77,7 @@ pub enum DaemonError {
     WindowsServiceError(#[from] windows_service::Error),
     #[cfg(windows)]
     #[error(transparent)]
-    LogAppenderInitError(#[from] tracing_appender::rolling::InitError),
+    LogSetupError(#[from] crate::utils::LoggingSetupError),
 }
 
 type IfName = String;

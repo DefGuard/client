@@ -183,8 +183,7 @@ impl<'a> ServiceLogWatcher<'a> {
 
     /// Find the latest log file in directory
     ///
-    /// Log files are rotated daily and have a knows naming format,
-    /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
+    /// Log files are rotated daily and include the date in their filename.
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         trace!(
             "Getting latest log file from directory: {}",

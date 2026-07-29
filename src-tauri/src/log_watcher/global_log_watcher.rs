@@ -91,8 +91,7 @@ impl LogDirs {
 
     /// Find the latest log file in directory for the service
     ///
-    /// Log files are rotated daily and have a known naming format,
-    /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
+    /// Log files are rotated daily and include the date in their filename.
     #[cfg(not(target_os = "macos"))]
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         debug!(
