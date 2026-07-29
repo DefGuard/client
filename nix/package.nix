@@ -89,7 +89,7 @@
     pname = "defguard-client-new-ui";
     inherit version pnpm;
     src = ../new-ui;
-    fetcherVersion = 3;
+    fetcherVersion = 4;
     hash = "sha256-MGwjt5tV4Uhn0VvEouAij6ldgLR7Qj47TzbUVOTtlx8=";
   };
 
