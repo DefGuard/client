@@ -4,7 +4,7 @@
   "description": "Capability for the main window",
   "local": true,
   "remote": {
-    "urls": ["http://localhost:5071/*", "http://localhost:5072/*"]
+    "urls": ["http://localhost:5072/*"]
   },
   "windows": ["compact-view", "full-view", "welcome"],
   "permissions": [

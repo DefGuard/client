@@ -84,15 +84,6 @@
     SQLX_OFFLINE = "true";
   };
 
-  # Prefetch pnpm dependencies.
-  # Explicit pnpm_10 keeps fetchPnpmDeps and pnpmConfigHook on the same major version.
-  pnpmDeps = fetchPnpmDeps {
-    inherit pname version pnpm;
-    src = ../.;
-    fetcherVersion = 3;
-    hash = "sha256-CqWUwzsTw6NlM96kPobXFuyS2kIM1oHVbun/F7SqgK8=";
-  };
-
   # Prefetch pnpm dependencies for the new UI (separate pnpm project).
   newUiPnpmDeps = fetchPnpmDeps {
     pname = "defguard-client-new-ui";
@@ -113,17 +104,18 @@
       runHook preBuild
       pnpm tsc -b
       pnpm vite build --outDir "$out"
-      # Create entry points for compact and full view windows.
-      mkdir -p "$out"/compact "$out"/full
+      # Create entry points for compact, full, and welcome view windows.
+      mkdir -p "$out"/compact "$out"/full "$out"/welcome
       cp "$out"/index.html "$out"/compact/
       cp "$out"/index.html "$out"/full/
+      cp "$out"/index.html "$out"/welcome/
       runHook postBuild
     '';
     installPhase = "true";
   };
 in
   craneLib.mkCargoDerivation {
-    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps newUiDist;
+    inherit pname version buildInputs cargoArtifacts cargoVendorDir newUiDist;
 
     src = ../.;
 
@@ -132,9 +124,6 @@ in
       ++ [
         pkgs.makeWrapper
         pkgs.wrapGAppsHook3
-        pkgs.nodejs_24
-        pnpm
-        pnpmConfigHook
       ];
 
     # Pin CARGO_TARGET_DIR before crane's inheritCargoArtifacts hook runs so
@@ -169,13 +158,13 @@ in
     buildPhase = ''
       runHook preBuild
 
-      # Build the old frontend and copy in the pre-built new UI.
-      pnpm build
+      # Copy in the pre-built new UI frontend.
+      mkdir -p dist
       cp -r ${newUiDist}/* dist/
       chmod -R u+w dist/
 
       # --config replaces the build section from tauri.linux.conf.json.
-      pnpm tauri build \
+      cargo tauri build \
         --config '{"build":{"beforeBuildCommand":""}}'
 
       runHook postBuild
@@ -218,13 +207,11 @@ in
     doInstallCargoArtifacts = false;
 
     # passthru attrs are ignored by the build but addressable by external tools.
-    # There are TWO pnpm lockfiles, each with its own pinned hash that must be kept
-    # current when the corresponding lockfile changes:
-    #   pnpmDeps       - root pnpm project (../pnpm-lock.yaml)
-    #   newUiPnpmDeps  - new-ui pnpm project (../new-ui/pnpm-lock.yaml)
-    # Any hash-refresh automation (e.g. an update-pnpm-hash workflow) must update both.
+    # newUiPnpmDeps has its own pinned hash that must be kept current when
+    # new-ui/pnpm-lock.yaml changes. Any hash-refresh automation (e.g. an
+    # update-pnpm-hash workflow) must update it.
     passthru = {
-      inherit pnpmDeps newUiPnpmDeps;
+      inherit newUiPnpmDeps;
     };
 
     meta = with lib; {

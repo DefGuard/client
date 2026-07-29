@@ -47,14 +47,28 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          cache: true
           version: 11.11
           run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          STORE_PATH=$(pnpm store path --silent)
+          mkdir -p "$STORE_PATH"
+          echo "STORE_PATH=$STORE_PATH" >> $GITHUB_ENV
+
+      - name: Restore pnpm store cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('new-ui/pnpm-lock.yaml', 'e2e/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -65,12 +79,15 @@ jobs:
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
 
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
+
       - name: Build new-ui
         run: pnpm install --no-frozen-lockfile && pnpm build
         working-directory: new-ui
 
       - name: Build client
-        run: pnpm install --no-frozen-lockfile && pnpm tauri build
+        run: cargo tauri build
 
       - name: Prepare e2e environment
         run: |
@@ -116,7 +133,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6

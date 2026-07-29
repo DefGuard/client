@@ -1,6 +1,6 @@
 [[permission]]
 identifier = "allow-app-commands"
-description = "Allow all application commands for both UI windows (old-ui and new-ui)."
+description = "Allow all application commands for both UI windows."
 commands.allow = [
   "enrollment_start",
   "enrollment_create_device",

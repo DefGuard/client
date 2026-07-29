@@ -3,7 +3,6 @@ name: Update pnpm deps Nix hash
 on:
   pull_request:
     paths:
-      - pnpm-lock.yaml
       - new-ui/pnpm-lock.yaml
 
 concurrency:
@@ -41,7 +40,7 @@ jobs:
           # Helper: extract the hash for a given attribute, swap in FAKE,
           # build it, capture the real hash, and write it back.
           update_hash() {
-            local attr="$1"       # e.g. "pnpmDeps" or "newUiPnpmDeps"
+            local attr="$1"       # e.g. "newUiPnpmDeps"
             local label="$2"      # human-readable label for logging
 
             # Extract the current hash for this attribute.
@@ -91,17 +90,10 @@ jobs:
             fi
           }
 
-          # Always attempt both hashes - the workflow trigger already ensures
-          # at least one lockfile was modified. The commit step below only
-          # fires when a hash actually changed, so there's no harm in
-          # computing both every time.
-          update_hash "pnpmDeps" "pnpm root"
           update_hash "newUiPnpmDeps" "pnpm new-ui"
 
       - name: Commit updated hashes
-        if: >
-          steps.hash.outputs.pnpmDeps_changed == 'true' ||
-          steps.hash.outputs.newUiPnpmDeps_changed == 'true'
+        if: steps.hash.outputs.newUiPnpmDeps_changed == 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -109,14 +101,7 @@ jobs:
             const content = fs.readFileSync('nix/package.nix', 'utf8');
             const encoded = Buffer.from(content).toString('base64');
 
-            const parts = [];
-            if ('${{ steps.hash.outputs.pnpmDeps_changed }}' === 'true') {
-              parts.push('pnpm');
-            }
-            if ('${{ steps.hash.outputs.newUiPnpmDeps_changed }}' === 'true') {
-              parts.push('new-ui pnpm');
-            }
-            const headline = `chore(nix): update ${parts.join(' and ')} deps hash`;
+            const headline = 'chore(nix): update new-ui pnpm deps hash';
 
             await github.graphql(`
               mutation CreateCommit($input: CreateCommitOnBranchInput!) {
