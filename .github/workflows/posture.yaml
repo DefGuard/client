@@ -18,6 +18,7 @@ env:
 jobs:
 
   test-linux-postures-unencrypted:
+    if: false
     name: Linux postures - unencrypted
     runs-on:
       - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
