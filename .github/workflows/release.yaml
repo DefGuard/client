@@ -64,7 +64,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 26
+          node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -181,7 +181,7 @@ jobs:
           echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
       - uses: actions/setup-node@v6
         with:
-          node-version: 26
+          node-version-file: new-ui/.nvmrc
 
       - uses: pnpm/action-setup@v6
         with:
