@@ -721,26 +721,6 @@ pub(crate) async fn handle_connection_for_location(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::stats_diffs;
-
-    #[test]
-    fn stats_diffs_returns_zero_for_first_sample() {
-        assert_eq!(stats_diffs(None, (100, 200)), (0, 0));
-    }
-
-    #[test]
-    fn stats_diffs_returns_counter_increments() {
-        assert_eq!(stats_diffs(Some((100, 200)), (150, 275)), (50, 75));
-    }
-
-    #[test]
-    fn stats_diffs_clamps_counter_resets_to_zero() {
-        assert_eq!(stats_diffs(Some((100, 200)), (50, 125)), (0, 0));
-    }
-}
-
 /// Setup new connection for tunnel
 pub(crate) async fn handle_connection_for_tunnel(
     tunnel: Tunnel<Id>,
@@ -977,4 +957,24 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     debug!("Active connections synchronized with the system state");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stats_diffs;
+
+    #[test]
+    fn stats_diffs_returns_zero_for_first_sample() {
+        assert_eq!(stats_diffs(None, (100, 200)), (0, 0));
+    }
+
+    #[test]
+    fn stats_diffs_returns_counter_increments() {
+        assert_eq!(stats_diffs(Some((100, 200)), (150, 275)), (50, 75));
+    }
+
+    #[test]
+    fn stats_diffs_clamps_counter_resets_to_zero() {
+        assert_eq!(stats_diffs(Some((100, 200)), (50, 125)), (0, 0));
+    }
 }
