@@ -9,6 +9,7 @@ import { useAppData } from '../../../../shared/providers/AppDataContext';
 import {
   getInstancesQueryOptions,
   getTunnelsQueryOptions,
+  tunnelsDisabled,
 } from '../../../../shared/rust-api/query';
 import type { OverviewViewSelection } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
@@ -35,17 +36,22 @@ export const InstanceSwitcher = () => {
       })),
     };
 
-    const tunnelGroup: SelectOptionGroup<OverviewViewSelection> = {
-      key: 'tunnels',
-      label: 'Tunnels',
-      options: tunnels.map((tunnel) => ({
-        key: `tunnel-${tunnel.id ?? tunnel.name}`,
-        label: tunnel.name,
-        value: { kind: 'tunnel', id: tunnel.id },
-      })),
-    };
+    const tunnelGroup: SelectOptionGroup<OverviewViewSelection> | undefined =
+      !tunnelsDisabled(instances ?? []) && tunnels.length > 0
+        ? {
+            key: 'tunnels',
+            label: 'Tunnels',
+            options: tunnels.map((tunnel) => ({
+              key: `tunnel-${tunnel.id ?? tunnel.name}`,
+              label: tunnel.name,
+              value: { kind: 'tunnel', id: tunnel.id },
+            })),
+          }
+        : undefined;
 
-    return [instanceGroup, tunnelGroup];
+    const result: SelectOptionGroup<OverviewViewSelection>[] = [instanceGroup];
+    if (tunnelGroup) result.push(tunnelGroup);
+    return result;
   }, [instances, tunnels]);
 
   const totalOptions = useMemo(

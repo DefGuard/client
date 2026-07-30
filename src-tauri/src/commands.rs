@@ -55,7 +55,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::EventKey,
+    events::{EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
@@ -166,6 +166,7 @@ pub async fn connect(
             return Err(Error::NotFound.into());
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
+        Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
         debug!(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
@@ -267,6 +268,39 @@ pub async fn disconnect(
         );
         Err(Error::NotFound)
     }
+}
+
+pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
+    let state = handle.state::<AppState>();
+    let tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
+    if tunnel_ids.is_empty() {
+        debug!("No active tunnels to disconnect, emitting TunnelsDisabled event anyway");
+        TunnelsDisabledPayload::emit(handle, Vec::new());
+        return Ok(());
+    }
+
+    let mut names = Vec::new();
+    for tunnel_id in &tunnel_ids {
+        let name = get_tunnel_or_location_name(*tunnel_id, ConnectionType::Tunnel).await;
+        debug!("Tunnels are disabled, disconnecting tunnel {name}(ID: {tunnel_id})");
+        if let Some(connection) = state
+            .remove_connection(*tunnel_id, ConnectionType::Tunnel)
+            .await
+        {
+            disconnect_interface(&connection).await?;
+            stop_log_watcher_task(handle, &connection.interface_name)?;
+            info!("Tunnel {name}(ID: {tunnel_id}) disconnected (disabled by server administrator)");
+            names.push(name);
+        }
+    }
+
+    TunnelsDisabledPayload::emit(handle, names);
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    reload_tray_menu(handle).await;
+    configure_tray_icon(handle).await?;
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -433,6 +467,10 @@ pub async fn save_device_config(
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        disconnect_all_tunnels(&handle).await?;
+    }
+
     let locations = push_service_locations(&instance, keys).await?;
 
     handle
@@ -542,6 +580,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             pubkey: keys.pubkey,
             client_traffic_policy: instance.client_traffic_policy,
             enterprise_enabled: instance.enterprise_enabled,
+            disable_tunnels: instance.disable_tunnels,
             openid_display_name: instance.openid_display_name,
         });
     }
@@ -921,9 +960,14 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
         }
     }
 
+    let was_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
+        TunnelsEnabledPayload::emit(&handle);
+    }
 
     reload_tray_menu(&handle).await;
 
@@ -985,9 +1029,14 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             );
         }
     }
+    let was_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
+        TunnelsEnabledPayload::emit(&handle);
+    }
 
     client
         .delete_service_locations(DeleteServiceLocationsRequest {
@@ -1026,6 +1075,7 @@ pub fn parse_tunnel_config(filename: &str, config: &str) -> Result<Tunnel, Error
 
 #[tauri::command(async)]
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
@@ -1037,6 +1087,7 @@ pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<
 
 #[tauri::command(async)]
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
@@ -1059,6 +1110,11 @@ pub struct TunnelInfo<I = NoId> {
 
 #[tauri::command(async)]
 pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
+    // Soft-hide: report no tunnels (rather than erroring) so callers render an empty
+    // list. Mutating/connecting commands hard-refuse via `ensure_tunnels_enabled`.
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        return Ok(Vec::new());
+    }
     trace!("Getting information about all tunnels");
 
     let tunnels = Tunnel::all(&*DB_POOL).await?;
@@ -1087,6 +1143,7 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
 
 #[tauri::command(async)]
 pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Retrieving details about tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, tunnel_id).await? {

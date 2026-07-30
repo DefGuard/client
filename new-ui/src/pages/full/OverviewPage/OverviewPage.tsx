@@ -8,7 +8,10 @@ import { ScrollContainer } from '../../../shared/components/ScrollContainer/Scro
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { useAppData } from '../../../shared/providers/AppDataContext';
-import { getLocationsQueryOptions } from '../../../shared/rust-api/query';
+import {
+  getLocationsQueryOptions,
+  tunnelsDisabled,
+} from '../../../shared/rust-api/query';
 import type { InstanceInfo } from '../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
@@ -59,7 +62,10 @@ export const OverviewPage = () => {
     <Fragment>
       <FullPage id="overview-page" hideScrollContainer>
         <div className="page-grid">
-          <OverviewSelection instances={instances} tunnels={tunnels} />
+          <OverviewSelection
+            instances={instances}
+            tunnels={tunnelsDisabled(instances) ? [] : tunnels}
+          />
           <div
             className={clsx('overview-content', {
               windows: isWindows,
@@ -96,7 +102,7 @@ export const OverviewPage = () => {
         </div>
       </FullPage>
       <ConnectModal />
-      <UpdateTunnelModal />
+      {!tunnelsDisabled(instances) && <UpdateTunnelModal />}
       <UpdateInstanceModal />
     </Fragment>
   );

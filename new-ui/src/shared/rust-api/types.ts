@@ -166,6 +166,8 @@ export const TauriEvent = {
   MfaOpenIdError: 'mfa-openid-error',
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
+  TunnelsDisabled: 'tunnel-disabled-by-policy',
+  TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];
@@ -188,6 +190,11 @@ export type DeadConnectionReconnectedPayload = {
 export type AddInstanceEventPayload = {
   token: string;
   url: string;
+};
+
+/** Payload for the `tunnel-disabled-by-policy` event. Mirrors `TunnelsDisabled` in events.rs. */
+export type TunnelsDisabledPayload = {
+  names: string[];
 };
 
 export type ActiveConnectionSummary = {
@@ -222,6 +229,7 @@ export type InstanceInfo = {
   pubkey: string;
   client_traffic_policy: ClientTrafficPolicy;
   enterprise_enabled: boolean;
+  disable_tunnels: boolean;
   openid_display_name: string | null;
 };
 

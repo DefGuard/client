@@ -53,6 +53,10 @@ pub async fn handle(
 
     let target = resolve_connect_target(&spec, &state.pool).await?;
 
+    if matches!(&target, ResolvedTarget::Tunnel(_)) {
+        Instance::ensure_tunnels_enabled(&state.pool).await?;
+    }
+
     // Idempotency: if the target is already connected, report and exit 0.
     let (target_id, target_connection_type, target_name) = match &target {
         ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.as_str()),

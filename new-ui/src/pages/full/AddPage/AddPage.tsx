@@ -1,12 +1,18 @@
 import './style.scss';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
+import {
+  getInstancesQueryOptions,
+  tunnelsDisabled,
+} from '../../../shared/rust-api/query';
 import { ThemeSpacing } from '../../../shared/types';
 import { AddCard } from './components/AddCard/AddCard';
 
 export const AddPage = () => {
   const navigate = useNavigate();
+  const { data: instances } = useQuery(getInstancesQueryOptions);
   return (
     <FullPage id="add-page-view">
       <FullPageTitle title="Add Defguard items" spacing={ThemeSpacing.Xl} />
@@ -22,17 +28,19 @@ export const AddPage = () => {
           actionText="Add instance"
           description={`Establish a secure connection to your Defguard instance effortlessly by configuring it with a single token—no manual setup.`}
         />
-        <AddCard
-          image="wireguard"
-          onClick={() => {
-            navigate({
-              to: '/full/add/tunnel',
-            });
-          }}
-          title="Add WireGuard Tunnel"
-          actionText="Add tunnel"
-          description={`Add and configure a WireGuard tunnel to securely route traffic through an encrypted connection using predefined configuration.`}
-        />
+        {!tunnelsDisabled(instances ?? []) && (
+          <AddCard
+            image="wireguard"
+            onClick={() => {
+              navigate({
+                to: '/full/add/tunnel',
+              });
+            }}
+            title="Add WireGuard Tunnel"
+            actionText="Add tunnel"
+            description={`Add and configure a WireGuard tunnel to securely route traffic through an encrypted connection using predefined configuration.`}
+          />
+        )}
       </div>
     </FullPage>
   );

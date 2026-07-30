@@ -68,6 +68,42 @@ pub struct AddInstancePayload<'a> {
     pub url: &'a str,
 }
 
+#[derive(Clone, Serialize)]
+pub struct TunnelsDisabledPayload {
+    pub names: Vec<String>,
+}
+
+impl TunnelsDisabledPayload {
+    pub fn emit(app_handle: &AppHandle, names: Vec<String>) {
+        let payload = Self { names };
+        for name in &payload.names {
+            if let Err(err) = app_handle
+                .notification()
+                .builder()
+                .title(format!("Tunnel {name} disconnected"))
+                .body("WireGuard tunnels have been disabled by the administrator.")
+                .show()
+            {
+                warn!("Tunnels disabled notification not shown. Reason: {err}");
+            }
+        }
+        if let Err(err) = app_handle.emit(EventKey::TunnelsDisabled.into(), payload) {
+            error!("Event TunnelsDisabled was not emitted. Reason: {err}");
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct TunnelsEnabledPayload;
+
+impl TunnelsEnabledPayload {
+    pub fn emit(app_handle: &AppHandle) {
+        if let Err(err) = app_handle.emit(EventKey::TunnelsEnabled.into(), Self) {
+            error!("Event TunnelsEnabled was not emitted. Reason: {err}");
+        }
+    }
+}
+
 /// Handle deep-link URLs.
 pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
     debug!("Deep link received.");

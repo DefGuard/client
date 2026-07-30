@@ -194,6 +194,19 @@ pub async fn poll_instance(
     );
 
     if has_active_connections {
+        // add dedicated override to disable tunnels without waiting for a disconnect
+        if let Some(ref info) = device_config.instance {
+            let new_tunnels_disabled = info.disable_tunnels.unwrap_or(false);
+            if new_tunnels_disabled && !instance.disable_tunnels {
+                debug!(
+                    "Tunnels were disabled for instance {}({}) while a connection is active, \
+                    persisting the flag immediately.",
+                    instance.name, instance.id
+                );
+                instance.disable_tunnels = true;
+                instance.save(transaction.as_mut()).await?;
+            }
+        }
         return Ok(PollInstanceResult::ChangedWhileActive { version_mismatch });
     }
 
@@ -520,6 +533,7 @@ mod tests {
             token: token.map(str::to_string),
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
+            disable_tunnels: false,
             openid_display_name: None,
         }
     }
@@ -600,6 +614,7 @@ mod tests {
             token: token.map(str::to_string),
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: true,
+            disable_tunnels: false,
             openid_display_name: None,
         }
         .save(pool)

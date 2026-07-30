@@ -25,6 +25,8 @@ use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
 
+use crate::{commands::disconnect_all_tunnels, events::TunnelsEnabledPayload};
+
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 
 /// Tracks instance IDs for which we already sent a version-mismatch notification,
@@ -39,6 +41,7 @@ pub async fn poll_config(handle: AppHandle) {
     debug!("Starting the configuration polling loop.");
     // Polling starts sooner than app's frontend may load in dev builds, causing events (toasts)
     // to be lost; you may want to wait here before starting if you want to debug it.
+    let mut last_tunnels_disabled = false;
     loop {
         let active_instance_ids = match active_instance_ids().await {
             Ok(ids) => ids,
@@ -103,6 +106,24 @@ pub async fn poll_config(handle: AppHandle) {
         if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
         }
+
+        let currently_disabled = Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false);
+
+        match (last_tunnels_disabled, currently_disabled) {
+            (false, true) => {
+                info!("Tunnels disabled by server administrator, disconnecting any active tunnels");
+                if let Err(err) = disconnect_all_tunnels(&handle).await {
+                    error!("Failed to disconnect tunnels after tunnels were disabled: {err}");
+                }
+            }
+            (true, false) => {
+                info!("Tunnels re-enabled by server administrator");
+                TunnelsEnabledPayload::emit(&handle);
+            }
+            _ => {}
+        }
+        last_tunnels_disabled = currently_disabled;
+
         if config_retrieved > 0 {
             info!(
                 "Automatically retrieved the newest instance configuration from core for {config_retrieved} instances, sleeping for {}s",

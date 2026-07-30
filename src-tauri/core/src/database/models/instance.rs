@@ -1,7 +1,7 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 
 use super::{Id, NoId};
 use crate::proto;
@@ -17,6 +17,7 @@ pub struct Instance<I = NoId> {
     pub token: Option<String>,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
+    pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
 }
 
@@ -39,6 +40,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             token: None,
             client_traffic_policy,
             enterprise_enabled: instance_info.enterprise_enabled,
+            disable_tunnels: instance_info.disable_tunnels.unwrap_or(false),
             openid_display_name: instance_info.openid_display_name,
         }
     }
@@ -51,9 +53,9 @@ impl Instance<Id> {
     {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
-            client_traffic_policy = $6, enterprise_enabled = $7, token = $8, \
-            openid_display_name = $9 \
-            WHERE id = $10;",
+            client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
+            openid_display_name = $10 \
+            WHERE id = $11;",
             self.name,
             self.uuid,
             self.url,
@@ -61,6 +63,7 @@ impl Instance<Id> {
             self.username,
             self.client_traffic_policy,
             self.enterprise_enabled,
+            self.disable_tunnels,
             self.token,
             self.openid_display_name,
             self.id
@@ -77,7 +80,7 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -92,7 +95,7 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance WHERE id = $1;",
             id
         )
@@ -108,7 +111,7 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance WHERE name = $1;",
             name
         )
@@ -143,13 +146,37 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy, enterprise_enabled, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
         .fetch_all(executor)
         .await?;
         Ok(instances)
+    }
+
+    /// True if ANY enrolled instance has `disable_tunnels = true`.
+    /// False when there are 0 instances (no policy delivery path, so tunnels are available).
+    pub async fn tunnels_disabled<'e, E>(executor: E) -> Result<bool, sqlx::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let flags = query_scalar!(r#"SELECT disable_tunnels as "disable_tunnels!" FROM instance"#)
+            .fetch_all(executor)
+            .await?;
+        Ok(!flags.is_empty() && flags.iter().any(|v| *v))
+    }
+
+    /// Hard-refuse guard for tunnel operations: returns `Error::TunnelsDisabled`
+    /// when any enrolled instance disables tunnels, `Ok(())` otherwise.
+    pub async fn ensure_tunnels_enabled<'e, E>(executor: E) -> Result<(), crate::error::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        if Self::tunnels_disabled(executor).await? {
+            return Err(crate::error::Error::TunnelsDisabled);
+        }
+        Ok(())
     }
 }
 
@@ -164,6 +191,7 @@ impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
             && self.username == other.username
             && self.client_traffic_policy == other_policy
             && self.enterprise_enabled == other.enterprise_enabled
+            && self.disable_tunnels == other.disable_tunnels.unwrap_or(false)
             && self.openid_display_name == other.openid_display_name
     }
 }
@@ -177,8 +205,8 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy , enterprise_enabled) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+            client_traffic_policy , enterprise_enabled, disable_tunnels) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -186,7 +214,8 @@ impl Instance<NoId> {
             self.username,
             self.token,
             self.client_traffic_policy,
-            self.enterprise_enabled
+            self.enterprise_enabled,
+            self.disable_tunnels
         )
         .fetch_one(executor)
         .await?;
@@ -200,6 +229,7 @@ impl Instance<NoId> {
             token: self.token,
             client_traffic_policy: self.client_traffic_policy,
             enterprise_enabled: self.enterprise_enabled,
+            disable_tunnels: self.disable_tunnels,
             openid_display_name: self.openid_display_name,
         })
     }
@@ -216,6 +246,7 @@ pub struct InstanceInfo<I = NoId> {
     pub pubkey: String,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
+    pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
 }
 
@@ -295,6 +326,7 @@ mod tests {
             token: Some("token".into()),
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
+            disable_tunnels: false,
             openid_display_name: None,
         }
     }
@@ -416,5 +448,97 @@ mod tests {
         assert!(instance.enterprise_enabled);
         assert_eq!(instance.openid_display_name, Some("OIDC".to_string()));
         assert_eq!(instance.client_traffic_policy, ClientTrafficPolicy::None);
+        assert!(!instance.disable_tunnels);
+    }
+
+    fn new_instance_with_tunnels_disabled(disable: bool) -> Instance<NoId> {
+        let mut inst = new_instance();
+        inst.disable_tunnels = disable;
+        inst
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnels_disabled_zero_instances(pool: SqlitePool) {
+        assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnels_disabled_one_on(pool: SqlitePool) {
+        new_instance_with_tunnels_disabled(true)
+            .save(&pool)
+            .await
+            .unwrap();
+        assert!(Instance::tunnels_disabled(&pool).await.unwrap());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnels_disabled_one_off(pool: SqlitePool) {
+        new_instance_with_tunnels_disabled(false)
+            .save(&pool)
+            .await
+            .unwrap();
+        assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnels_disabled_mixed(pool: SqlitePool) {
+        new_instance_with_tunnels_disabled(true)
+            .save(&pool)
+            .await
+            .unwrap();
+        new_instance_with_tunnels_disabled(false)
+            .save(&pool)
+            .await
+            .unwrap();
+        assert!(Instance::tunnels_disabled(&pool).await.unwrap());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_tunnels_disabled_all_off(pool: SqlitePool) {
+        new_instance_with_tunnels_disabled(false)
+            .save(&pool)
+            .await
+            .unwrap();
+        new_instance_with_tunnels_disabled(false)
+            .save(&pool)
+            .await
+            .unwrap();
+        assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
+    }
+
+    #[test]
+    fn test_instance_from_proto_disable_tunnels_none() {
+        let info = base_info();
+        let instance: Instance<NoId> = info.into();
+        assert!(!instance.disable_tunnels);
+    }
+
+    #[test]
+    fn test_instance_from_proto_disable_tunnels_true() {
+        let mut info = base_info();
+        info.disable_tunnels = Some(true);
+        let instance: Instance<NoId> = info.into();
+        assert!(instance.disable_tunnels);
+    }
+
+    #[test]
+    fn test_instance_partial_eq_detect_disable_tunnels_flip() {
+        let mut info = base_info();
+        info.disable_tunnels = Some(true);
+        let instance = Instance::<Id> {
+            id: 1,
+            name: info.name.clone(),
+            uuid: info.id.clone(),
+            url: info.url.clone(),
+            proxy_url: info.proxy_url.clone(),
+            username: info.username.clone(),
+            token: Some("tok".into()),
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: info.enterprise_enabled,
+            disable_tunnels: false,
+            openid_display_name: info.openid_display_name.clone(),
+        };
+        // Model has false, proto has true → not equal.
+        assert_ne!(instance, info);
     }
 }

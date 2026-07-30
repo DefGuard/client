@@ -593,6 +593,7 @@ mod tests {
             token: None,
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
+            disable_tunnels: false,
             openid_display_name: None,
         }
     }

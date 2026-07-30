@@ -17,6 +17,7 @@ import {
   type LocationInfo,
   MfaMethod,
   TauriEvent,
+  type TunnelsDisabledPayload,
 } from '../rust-api/types';
 import { useAppStore } from '../store/useAppStore';
 import { decideLocationMfaMethod } from '../utils/decideLocationMfaMethod';
@@ -161,6 +162,18 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
 
       listen(TauriEvent.SessionStateChanged, () => {
         void queryClient.invalidateQueries({ queryKey: ['session-state'] });
+      }),
+
+      listen<TunnelsDisabledPayload>(TauriEvent.TunnelsDisabled, (event) => {
+        void debug(`UI Received event TunnelsDisabled: ${JSON.stringify(event.payload)}`);
+        void queryClient.invalidateQueries({ queryKey: ['instances'] });
+        void queryClient.invalidateQueries({ queryKey: ['tunnels'] });
+      }),
+
+      listen(TauriEvent.TunnelsEnabled, () => {
+        void debug('UI Received event TunnelsEnabled');
+        void queryClient.invalidateQueries({ queryKey: ['instances'] });
+        void queryClient.invalidateQueries({ queryKey: ['tunnels'] });
       }),
     ]);
 

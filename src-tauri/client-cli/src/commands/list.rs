@@ -16,7 +16,11 @@ const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
     let locations = Location::all(&state.pool, false).await?;
-    let tunnels = Tunnel::all(&state.pool).await?;
+    let tunnels = if Instance::tunnels_disabled(&state.pool).await? {
+        Vec::new()
+    } else {
+        Tunnel::all(&state.pool).await?
+    };
     Ok(ListResult {
         instances,
         locations,
@@ -194,6 +198,7 @@ mod tests {
             token: None,
             client_traffic_policy: ClientTrafficPolicy::None,
             enterprise_enabled: false,
+            disable_tunnels: false,
             openid_display_name: None,
         }
     }
