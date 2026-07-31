@@ -50,7 +50,7 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
     debug!("Sending posture check request to {proxy_url}");
     let response = post_with_headers(proxy_url, &request)
         .await
-        .map_err(|e| Error::HttpError(e.to_string()))?;
+        .map_err(|e| Error::ServiceUnavailable(e.to_string()))?;
 
     match response.status() {
         StatusCode::OK => {
@@ -76,7 +76,7 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
             );
             Err(Error::PostureCheckFailed(body.error))
         }
-        status => Err(Error::HttpError(format!(
+        status => Err(Error::ServiceUnavailable(format!(
             "Unexpected proxy response: {status}"
         ))),
     }

@@ -56,6 +56,8 @@ pub enum Error {
     HttpError(String),
     #[error("Posture check failed: {0}")]
     PostureCheckFailed(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
 }
 
 // we must manually implement serde::Serialize
