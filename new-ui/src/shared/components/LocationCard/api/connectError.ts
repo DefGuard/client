@@ -6,6 +6,10 @@ const connectErrorSchema = z.discriminatedUnion('kind', [
     message: z.string(),
   }),
   z.object({
+    kind: z.literal('serviceUnavailable'),
+    message: z.string(),
+  }),
+  z.object({
     kind: z.literal('other'),
     message: z.string(),
   }),

@@ -23,6 +23,8 @@ export const LocationCardConnectButton = () => {
       ) {
         setPostureError(connectError.message);
         setView(LocationCardViews.PostureCheckFail);
+      } else if (connectError?.kind === 'serviceUnavailable') {
+        setView(LocationCardViews.ConnectionError);
       }
     },
     meta: {
