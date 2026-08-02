@@ -76,7 +76,10 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
             );
             Err(Error::PostureCheckFailed(body.error))
         }
-        status => Err(Error::ServiceUnavailable(format!(
+        status if status.is_server_error() => Err(Error::ServiceUnavailable(format!(
+            "Unexpected proxy response: {status}"
+        ))),
+        status => Err(Error::HttpError(format!(
             "Unexpected proxy response: {status}"
         ))),
     }
