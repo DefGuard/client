@@ -78,6 +78,8 @@ use crate::{
 pub enum ConnectError {
     #[error("Posture check failed: {0}")]
     PostureCheckFailed(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
     #[error("{0}")]
     Other(String),
 }
@@ -86,6 +88,7 @@ impl From<Error> for ConnectError {
     fn from(error: Error) -> Self {
         match error {
             Error::PostureCheckFailed(message) => Self::PostureCheckFailed(message),
+            Error::ServiceUnavailable(message) => Self::ServiceUnavailable(message),
             error => Self::Other(error.to_string()),
         }
     }

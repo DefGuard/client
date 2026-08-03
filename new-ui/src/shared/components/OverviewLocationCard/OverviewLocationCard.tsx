@@ -53,6 +53,11 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           view: ConnectModalView.PostureCheckFail,
           postureError: connectError.message,
         });
+      } else if (connectError?.kind === 'serviceUnavailable') {
+        useConnectModal.getState().open({
+          location,
+          view: ConnectModalView.ConnectionError,
+        });
       }
     },
     meta: {
