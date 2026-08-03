@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - new-ui/pnpm-lock.yaml
+      - new-ui/.nvmrc
+      - nix/package.nix
+      - nix/versions.nix
 
 concurrency:
   group: pnpm-hash-${{ github.event.pull_request.number }}
