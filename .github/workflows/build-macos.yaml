@@ -72,11 +72,11 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - name: Install tauri-cli
-        run: cargo install tauri-cli --locked
-
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
 
       - name: Set build number
         run: |
