@@ -119,7 +119,8 @@ jobs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
-      APPLE_SIGNING_IDENTITY_INSTALLER: "Developer ID Installer: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -140,7 +141,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           run_install: false
-          version: 11.11
+          version: 11
 
       - name: Get pnpm store directory
         run: |
@@ -190,25 +191,19 @@ jobs:
       - name: Build app
         uses: tauri-apps/tauri-action@v1
         env:
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_SIGNING_IDENTITY: "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: cargo tauri
-          args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin --bundles app
+          args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
 
-      - name: Build and notarize installation package
+      # Same as in build-macos.yaml, without the altool --upload-app that sends
+      # the build to App Store Connect - nightlies must not go there.
+      - name: Build installation package
         run: |
           xcrun productbuild --keychain build.keychain \
             --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
             --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
             /Applications defguard-client.pkg
-          xcrun notarytool submit defguard-client.pkg \
-            --key-id ${{ secrets.APPLE_API_KEY }} \
-            --issuer ${{ secrets.APPLE_API_ISSUER }} \
-            --wait
-          xcrun stapler staple defguard-client.pkg
 
       - name: Upload PKG to S3
         env:
@@ -269,6 +264,11 @@ jobs:
         run: |
           cd new-ui
           pnpm build
+
+      # Sign-Binaries.ps1 (beforeBundleCommand) and the WiX fragments expect
+      # defguard-cli.exe and defguard-service.exe to already be in target/release
+      - name: Build service and CLI binaries
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml -p defguard-cli -p defguard-client-service
 
       - name: Build MSI
         uses: tauri-apps/tauri-action@v0.5.23
