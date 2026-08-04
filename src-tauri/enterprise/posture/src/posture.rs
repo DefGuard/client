@@ -34,12 +34,20 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
             ))
         })?;
 
+    // Posture checks are authenticated with the instance's config polling token.
+    let token = instance
+        .token
+        .clone()
+        .filter(|token| !token.is_empty())
+        .ok_or(Error::NoToken)?;
+
     let posture_data = get_posture_data().await?;
 
     let request = DevicePostureCheckRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
         device_posture_data: Some(posture_data),
+        token: Some(token),
     };
 
     let proxy_url = Url::parse(&instance.proxy_url)
