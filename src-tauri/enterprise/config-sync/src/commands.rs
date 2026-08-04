@@ -212,15 +212,18 @@ pub async fn sync_service_locations(
 
         #[cfg(not(target_os = "macos"))]
         {
-            let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
+            let keys = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
                 .await?
-                .ok_or(Error::NotFound)?
-                .prvkey;
+                .ok_or(Error::NotFound)?;
 
             let save_request = SaveServiceLocationsRequest {
                 service_locations: service_locations.clone(),
                 instance_id: instance.uuid.clone(),
-                private_key,
+                private_key: keys.prvkey,
+                proxy_url: instance.proxy_url.clone(),
+                // The device's own public key, not a remote peer's key.
+                device_pubkey: keys.pubkey,
+                token: instance.token.clone(),
             };
 
             debug!(

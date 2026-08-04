@@ -8,7 +8,9 @@ use std::{
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::{ServiceLocation, ServiceLocationMode};
+use defguard_client_proto::defguard::client::v1::{
+    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode,
+};
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
@@ -63,10 +65,10 @@ impl ServiceLocationManager {
     /// is reset. All resets are attempted before returning an aggregate error.
     pub fn save_service_locations(
         &mut self,
-        service_locations: &[ServiceLocation],
-        instance_id: &str,
-        private_key: &str,
+        request: &SaveServiceLocationsRequest,
     ) -> Result<(), ServiceLocationError> {
+        let instance_id = request.instance_id.as_str();
+        let service_locations = request.service_locations.as_slice();
         debug!(
             "Received a request to save {} service location(s) for instance {instance_id}",
             service_locations.len(),
@@ -91,11 +93,8 @@ impl ServiceLocationManager {
             .map(|location| location.pubkey.clone())
             .collect::<HashSet<_>>();
 
-        let service_location_data = ServiceLocationData {
-            service_locations: service_locations.clone(),
-            instance_id: instance_id.to_string(),
-            private_key: private_key.to_string(),
-        };
+        let service_location_data =
+            ServiceLocationData::from_save_request(request, service_locations.clone());
 
         ensure_shared_directory()?;
         let instance_file_path = get_instance_file_path(instance_id);
@@ -119,7 +118,8 @@ impl ServiceLocationManager {
 
         let mut reset_failed = false;
         for location in &service_locations {
-            if let Err(err) = self.reset_service_location_state(instance_id, location, private_key)
+            if let Err(err) =
+                self.reset_service_location_state(instance_id, location, &request.private_key)
             {
                 warn!(
                     "Failed to reset Linux service location '{}' after saving: {err}",

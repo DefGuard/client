@@ -2,6 +2,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=../proto");
 
     tonic_prost_build::configure()
+        // These types contain sensitive data.
+        .skip_debug([
+            "AuthorizePostureSessionRequest",
+            "SaveServiceLocationsRequest",
+        ])
         // Enable optional fields.
         .protoc_arg("--experimental_allow_proto3_optional")
         // Make sure empty DNS is deserialized correctly as `None`.
@@ -12,6 +17,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         // Make all messages serde-serializable.
         .type_attribute(".", "#[derive(serde::Serialize,serde::Deserialize)]")
+        // `ServiceLocation` is persisted as JSON by the daemon. Tolerate these fields being absent
+        // in files written by older clients. Deliberately per-field rather than a container-level
+        // `#[serde(default)]`, so a truncated or corrupt file still fails to deserialize instead of
+        // quietly becoming "no locations".
+        .field_attribute(
+            ".defguard.client.v1.ServiceLocation.network_id",
+            "#[serde(default)]",
+        )
+        .field_attribute(
+            ".defguard.client.v1.ServiceLocation.posture_check_required",
+            "#[serde(default)]",
+        )
         // Use proto defaults for missing fields in enrollment types that
         // may differ across proxy versions.
         .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")

@@ -15,9 +15,9 @@ use defguard_client_posture::inspector::device_posture_data;
 use defguard_client_proto::defguard::{
     client::v1::{
         desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
-        ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
-        RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        AuthorizePostureSessionRequest, AuthorizePostureSessionResponse, CreateInterfaceRequest,
+        DeleteServiceLocationsRequest, InterfaceData, ListInterfacesResponse, ManagedInterfaceData,
+        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -217,11 +217,7 @@ impl DesktopDaemonService for DaemonService {
         self.service_location_manager
             .write()
             .unwrap()
-            .save_service_locations(
-                service_location.service_locations.as_slice(),
-                &service_location.instance_id,
-                &service_location.private_key,
-            )
+            .save_service_locations(&service_location)
             .map_err(|err| {
                 let msg = format!("Failed to save service locations: {err}");
                 error!(msg);
@@ -230,6 +226,21 @@ impl DesktopDaemonService for DaemonService {
 
         debug!("Service locations saved successfully");
         Ok(Response::new(()))
+    }
+
+    // TODO: authorize posture sessions on behalf of the service, using the proxy URL, device
+    // public key and polling token persisted alongside the service locations.
+    async fn authorize_posture_session(
+        &self,
+        _request: tonic::Request<AuthorizePostureSessionRequest>,
+    ) -> Result<Response<AuthorizePostureSessionResponse>, Status> {
+        // `warn` is only imported on non-Windows targets, so qualify it here.
+        tracing::warn!(
+            "Received a request to authorize a posture session, which is not implemented yet"
+        );
+        Err(Status::unimplemented(
+            "Posture session authorization is not implemented yet",
+        ))
     }
 
     #[cfg(not(windows))]

@@ -11,7 +11,9 @@ use std::{
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::{ServiceLocation, ServiceLocationMode};
+use defguard_client_proto::defguard::client::v1::{
+    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode,
+};
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
@@ -821,10 +823,10 @@ impl ServiceLocationManager {
 
     pub fn save_service_locations(
         &mut self,
-        service_locations: &[ServiceLocation],
-        instance_id: &str,
-        private_key: &str,
+        request: &SaveServiceLocationsRequest,
     ) -> Result<(), ServiceLocationError> {
+        let instance_id = request.instance_id.as_str();
+        let service_locations = request.service_locations.as_slice();
         debug!(
             "Received a request to save {} service location(s) for instance {instance_id}",
             service_locations.len(),
@@ -847,11 +849,8 @@ impl ServiceLocationManager {
 
         let instance_file_path = get_instance_file_path(instance_id)?;
 
-        let service_location_data = ServiceLocationData {
-            service_locations: service_locations.to_vec(),
-            instance_id: instance_id.to_string(),
-            private_key: private_key.to_string(),
-        };
+        let service_location_data =
+            ServiceLocationData::from_save_request(request, service_locations.to_vec());
 
         let json = serde_json::to_string_pretty(&service_location_data)?;
 

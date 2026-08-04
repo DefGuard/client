@@ -13,7 +13,7 @@ use defguard_client_core::{
     error::Error as CoreError,
 };
 use defguard_client_proto::defguard::client::v1::{
-    ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
+    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
 };
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 #[cfg(any(windows, target_os = "linux"))]
@@ -60,12 +60,29 @@ pub struct ServiceLocationManager {
     connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
 }
 
+/// Current schema version of the on-disk service location JSON file.
+///
+/// Files written by older clients predate versioning and deserialize with `schema_version == 0`
+/// (see the `#[serde(default)]` on [`ServiceLocationData::schema_version`]).
+pub const SERVICE_LOCATION_SCHEMA_VERSION: u32 = 1;
+
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 pub struct ServiceLocationData {
     pub service_locations: Vec<ServiceLocation>,
     pub instance_id: String,
     pub private_key: String,
+    #[serde(default)]
+    pub proxy_url: String,
+    /// The *device's* WireGuard public key (`WireguardKeys.pubkey`), used to identify this device
+    /// to the proxy. This is **not** [`ServiceLocation::pubkey`], which is the remote peer key.
+    #[serde(default)]
+    pub device_pubkey: String,
+    /// Device polling token, used to authenticate posture requests made by the service.
+    #[serde(default)]
+    pub token: Option<String>,
+    #[serde(default)]
+    pub schema_version: u32,
 }
 
 #[allow(dead_code)]
@@ -81,7 +98,37 @@ impl fmt::Debug for ServiceLocationData {
             .field("service_locations", &self.service_locations)
             .field("instance_id", &self.instance_id)
             .field("private_key", &"***")
+            .field("proxy_url", &self.proxy_url)
+            .field("device_pubkey", &self.device_pubkey)
+            .field("token", &self.token.as_ref().map(|_| "***"))
+            .field("schema_version", &self.schema_version)
             .finish()
+    }
+}
+
+impl ServiceLocationData {
+    /// Builds the on-disk representation from a daemon save request.
+    ///
+    /// `service_locations` is passed separately rather than taken from the request because each
+    /// platform first filters the requested set down to the modes it supports.
+    ///
+    /// Every other field is copied from the request here and nowhere else, so a field added to
+    /// `SaveServiceLocationsRequest` has exactly one place to be wired in — it cannot be silently
+    /// dropped on the way to disk by one platform but not the other.
+    #[must_use]
+    pub fn from_save_request(
+        request: &SaveServiceLocationsRequest,
+        service_locations: Vec<ServiceLocation>,
+    ) -> Self {
+        Self {
+            service_locations,
+            instance_id: request.instance_id.clone(),
+            private_key: request.private_key.clone(),
+            proxy_url: request.proxy_url.clone(),
+            device_pubkey: request.device_pubkey.clone(),
+            token: request.token.clone(),
+            schema_version: SERVICE_LOCATION_SCHEMA_VERSION,
+        }
     }
 }
 
@@ -129,6 +176,8 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
         dns: location.dns.clone().unwrap_or_default(),
         keepalive_interval: location.keepalive_interval.try_into().unwrap_or(0),
         mode,
+        network_id: location.network_id,
+        posture_check_required: location.posture_check_required,
     })
 }
 
@@ -168,4 +217,157 @@ pub async fn connect_service_locations(
     }
 
     info!("Service location auto-connect task finished");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// JSON exactly as written by a client that predates posture checks: no `proxy_url`,
+    /// `device_pubkey`, `token` or `schema_version` at the top level, and no `network_id` or
+    /// `posture_check_required` inside the locations. This is the upgrade path.
+    const LEGACY_JSON: &str = r#"{
+      "service_locations": [
+        {
+          "name": "Office",
+          "address": "10.0.0.2/24",
+          "pubkey": "remote-peer-pubkey",
+          "endpoint": "vpn.example.com:51820",
+          "allowed_ips": "10.0.0.0/24",
+          "keepalive_interval": 25,
+          "dns": "10.0.0.1",
+          "mode": 2
+        }
+      ],
+      "instance_id": "d3a5b1f0-0000-0000-0000-000000000001",
+      "private_key": "device-private-key"
+    }"#;
+
+    #[test]
+    fn legacy_json_without_new_fields_deserializes_with_defaults() {
+        let data: ServiceLocationData = serde_json::from_str(LEGACY_JSON)
+            .expect("legacy service location file must still load");
+
+        assert_eq!(data.instance_id, "d3a5b1f0-0000-0000-0000-000000000001");
+        assert_eq!(data.private_key, "device-private-key");
+        assert_eq!(data.proxy_url, "");
+        assert_eq!(data.device_pubkey, "");
+        assert_eq!(data.token, None);
+        // 0 marks a file written before schema versioning existed.
+        assert_eq!(data.schema_version, 0);
+
+        assert_eq!(data.service_locations.len(), 1);
+        let location = &data.service_locations[0];
+        assert_eq!(location.name, "Office");
+        assert_eq!(location.pubkey, "remote-peer-pubkey");
+        assert_eq!(location.network_id, 0);
+        assert!(!location.posture_check_required);
+    }
+
+    #[test]
+    fn truncated_json_still_fails_to_deserialize() {
+        // A container-level `#[serde(default)]` on `ServiceLocation` would let malformed entries
+        // silently vanish; make sure missing required keys are still an error.
+        let json = r#"{
+          "service_locations": [{ "network_id": 7 }],
+          "instance_id": "id",
+          "private_key": "key"
+        }"#;
+
+        assert!(serde_json::from_str::<ServiceLocationData>(json).is_err());
+    }
+
+    #[test]
+    fn round_trip_preserves_new_fields() {
+        let data = ServiceLocationData {
+            service_locations: vec![ServiceLocation {
+                name: "Office".into(),
+                address: "10.0.0.2/24".into(),
+                pubkey: "remote-peer-pubkey".into(),
+                endpoint: "vpn.example.com:51820".into(),
+                allowed_ips: "10.0.0.0/24".into(),
+                keepalive_interval: 25,
+                dns: "10.0.0.1".into(),
+                mode: ProtoServiceLocationMode::AlwaysOn as i32,
+                network_id: 42,
+                posture_check_required: true,
+            }],
+            instance_id: "instance-uuid".into(),
+            private_key: "device-private-key".into(),
+            proxy_url: "https://proxy.example.com".into(),
+            device_pubkey: "device-public-key".into(),
+            token: Some("polling-token".into()),
+            schema_version: SERVICE_LOCATION_SCHEMA_VERSION,
+        };
+
+        let json = serde_json::to_string(&data).expect("serialization must succeed");
+        let restored: ServiceLocationData =
+            serde_json::from_str(&json).expect("deserialization must succeed");
+
+        assert_eq!(restored.proxy_url, "https://proxy.example.com");
+        assert_eq!(restored.device_pubkey, "device-public-key");
+        assert_eq!(restored.token.as_deref(), Some("polling-token"));
+        assert_eq!(restored.schema_version, SERVICE_LOCATION_SCHEMA_VERSION);
+        assert_eq!(restored.service_locations[0].network_id, 42);
+        assert!(restored.service_locations[0].posture_check_required);
+        // The remote peer key must not be confused with the device key.
+        assert_eq!(restored.service_locations[0].pubkey, "remote-peer-pubkey");
+    }
+
+    #[test]
+    fn debug_masks_private_key_and_token() {
+        let data = ServiceLocationData {
+            service_locations: Vec::new(),
+            instance_id: "instance-uuid".into(),
+            private_key: "super-secret-private-key".into(),
+            proxy_url: "https://proxy.example.com".into(),
+            device_pubkey: "device-public-key".into(),
+            token: Some("super-secret-token".into()),
+            schema_version: SERVICE_LOCATION_SCHEMA_VERSION,
+        };
+
+        let debug = format!("{data:?}");
+        assert!(!debug.contains("super-secret-private-key"), "{debug}");
+        assert!(!debug.contains("super-secret-token"), "{debug}");
+        // Non-secret fields are still visible for diagnostics.
+        assert!(debug.contains("https://proxy.example.com"), "{debug}");
+        assert!(debug.contains("device-public-key"), "{debug}");
+    }
+
+    #[test]
+    fn debug_of_absent_token_is_not_masked_as_present() {
+        let data = ServiceLocationData {
+            service_locations: Vec::new(),
+            instance_id: "instance-uuid".into(),
+            private_key: "private".into(),
+            proxy_url: String::new(),
+            device_pubkey: String::new(),
+            token: None,
+            schema_version: SERVICE_LOCATION_SCHEMA_VERSION,
+        };
+
+        assert!(format!("{data:?}").contains("token: None"));
+    }
+
+    #[test]
+    fn single_service_location_debug_masks_private_key() {
+        let data = SingleServiceLocationData {
+            service_location: ServiceLocation {
+                name: "Office".into(),
+                address: "10.0.0.2/24".into(),
+                pubkey: "remote-peer-pubkey".into(),
+                endpoint: "vpn.example.com:51820".into(),
+                allowed_ips: "10.0.0.0/24".into(),
+                keepalive_interval: 25,
+                dns: "10.0.0.1".into(),
+                mode: ProtoServiceLocationMode::AlwaysOn as i32,
+                network_id: 42,
+                posture_check_required: true,
+            },
+            instance_id: "instance-uuid".into(),
+            private_key: "super-secret-private-key".into(),
+        };
+
+        assert!(!format!("{data:?}").contains("super-secret-private-key"));
+    }
 }

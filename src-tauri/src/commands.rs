@@ -523,6 +523,10 @@ async fn push_service_locations(
             service_locations: service_locations.clone(),
             instance_id: instance.uuid.clone(),
             private_key: keys.prvkey,
+            proxy_url: instance.proxy_url.clone(),
+            // The device's own public key, not a remote peer's key.
+            device_pubkey: keys.pubkey,
+            token: instance.token.clone(),
         };
         debug!(
             "Saving {} service locations to the daemon for instance {}({}).",
