@@ -4,6 +4,10 @@ on:
     branches:
       - nightly-builds
 
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   SQLX_OFFLINE: "1"
   # TODO: move to repository variables/secrets
@@ -162,11 +166,11 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - name: Install tauri-cli
-        run: cargo install tauri-cli --locked
-
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
 
       - name: Set build number
         run: |
@@ -222,13 +226,15 @@ jobs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
+    defaults:
+      run:
+        shell: powershell
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Write build version
-        shell: pwsh
         run: |
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           echo "Version: $version"
@@ -273,10 +279,46 @@ jobs:
           args: "--bundles msi"
 
       - name: Upload MSI to S3
-        shell: pwsh
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_APT }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_APT }}
         run: |
           aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/Defguard_${env:VERSION}_x64_en-US.msi" `
             "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/defguard-client-${env:BRANCH}-x64-nightly.msi"
+
+  update-index:
+    needs:
+      - build-linux
+      - build-macos-pkg
+      - build-windows-msi
+    if: always()
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+    steps:
+      - name: Install awscli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Generate and upload index.html
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_APT }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_APT }}
+        run: |
+          {
+            echo '<!doctype html>'
+            echo '<meta charset="utf-8">'
+            echo '<title>defguard-client nightly builds</title>'
+            echo '<h1>defguard-client nightly builds</h1>'
+            echo '<table><tr><th align="left">File</th><th align="right">Size</th><th align="left">Last modified (UTC)</th></tr>'
+            aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" --recursive \
+              | grep -v '/$' \
+              | sort -k4 \
+              | awk '{printf "<tr><td><a href=\"/%s\">%s</a></td><td align=\"right\">%.1f MiB</td><td>%s %s</td></tr>\n", $4, $4, $3/1048576, $1, $2}'
+            echo '</table>'
+          } > index.html
+          cat index.html
+          aws s3 cp --acl public-read --content-type text/html \
+            index.html "s3://${S3_BUCKET}/index.html"
