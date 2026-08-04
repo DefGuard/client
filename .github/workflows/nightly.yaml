@@ -4,9 +4,9 @@ on:
     branches:
       - nightly-builds
 
-concurrency:
-  group: nightly-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: nightly-${{ github.ref }}
+#   cancel-in-progress: true
 
 env:
   SQLX_OFFLINE: "1"
