@@ -195,8 +195,6 @@ jobs:
           tauriScript: cargo tauri
           args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
 
-      # Same as in build-macos.yaml, without the altool --upload-app that sends
-      # the build to App Store Connect - nightlies must not go there.
       - name: Build installation package
         run: |
           xcrun productbuild --keychain build.keychain \
@@ -209,87 +207,86 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
+          export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
           aws s3 cp --acl public-read defguard-client.pkg \
             "s3://${S3_BUCKET}/${S3_PREFIX}/defguard-client-${BRANCH}-universal-nightly.pkg"
 
-  build-windows-msi:
-    runs-on:
-      - self-hosted
-      - Windows
-      - X64
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
-    defaults:
-      run:
-        shell: powershell
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
+  # build-windows-msi:
+  #   runs-on:
+  #     - self-hosted
+  #     - Windows
+  #     - X64
+  #   env:
+  #     SCCACHE_GHA_ENABLED: "true"
+  #     RUSTC_WRAPPER: "sccache"
+  #   defaults:
+  #     run:
+  #       shell: powershell
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         submodules: recursive
 
-      - name: Write build version
-        run: |
-          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          echo "Version: $version"
-          echo "VERSION=$version" >> $env:GITHUB_ENV
-          echo "DEFGUARD_CLIENT_BUILD_VERSION=$version-nightly" >> $env:GITHUB_ENV
-          echo "BRANCH=$($env:GITHUB_REF_NAME -replace '/','-')" >> $env:GITHUB_ENV
+  #     - name: Write build version
+  #       run: |
+  #         $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+  #         echo "Version: $version"
+  #         echo "VERSION=$version" >> $env:GITHUB_ENV
+  #         echo "DEFGUARD_CLIENT_BUILD_VERSION=$version-nightly" >> $env:GITHUB_ENV
+  #         echo "BRANCH=$($env:GITHUB_REF_NAME -replace '/','-')" >> $env:GITHUB_ENV
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: new-ui/.nvmrc
+  #     - uses: actions/setup-node@v6
+  #       with:
+  #         node-version-file: new-ui/.nvmrc
 
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.11
-          run_install: false
+  #     - uses: pnpm/action-setup@v6
+  #       with:
+  #         version: 11.11
+  #         run_install: false
 
-      - name: Install Node dependencies for new UI
-        run: |
-          cd new-ui
-          pnpm install --no-frozen-lockfile
+  #     - name: Install Node dependencies for new UI
+  #       run: |
+  #         cd new-ui
+  #         pnpm install --no-frozen-lockfile
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+  #     - name: Install Rust stable
+  #       uses: dtolnay/rust-toolchain@stable
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+  #     - name: Run sccache-cache
+  #       uses: mozilla-actions/sccache-action@v0.0.10
 
-      - name: Install tauri-cli
-        run: cargo install tauri-cli --locked
+  #     - name: Install tauri-cli
+  #       run: cargo install tauri-cli --locked
 
-      - name: Build new UI
-        run: |
-          cd new-ui
-          pnpm build
+  #     - name: Build new UI
+  #       run: |
+  #         cd new-ui
+  #         pnpm build
 
-      # Sign-Binaries.ps1 (beforeBundleCommand) and the WiX fragments expect
-      # defguard-cli.exe and defguard-service.exe to already be in target/release
-      - name: Build service and CLI binaries
-        run: cargo build --release --manifest-path src-tauri/Cargo.toml -p defguard-cli -p defguard-client-service
+  #     - name: Build service and CLI binaries
+  #       run: cargo build --release --manifest-path src-tauri/Cargo.toml -p defguard-cli -p defguard-client-service
 
-      - name: Build MSI
-        uses: tauri-apps/tauri-action@v0.5.23
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tauriScript: cargo tauri
-          args: "--bundles msi"
+  #     - name: Build MSI
+  #       uses: tauri-apps/tauri-action@v0.5.23
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         tauriScript: cargo tauri
+  #         args: "--bundles msi"
 
-      - name: Upload MSI to S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
-        run: |
-          aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/Defguard_${env:VERSION}_x64_en-US.msi" `
-            "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/defguard-client-${env:BRANCH}-x64-nightly.msi"
+  #     - name: Upload MSI to S3
+  #       env:
+  #         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
+  #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
+  #       run: |
+  #         aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/Defguard_${env:VERSION}_x64_en-US.msi" `
+  #           "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/defguard-client-${env:BRANCH}-x64-nightly.msi"
 
   update-index:
     needs:
       - build-linux
       - build-macos-pkg
-      - build-windows-msi
+      # - build-windows-msi
     if: always()
     runs-on:
       - self-hosted
@@ -311,7 +308,7 @@ jobs:
             echo '<meta charset="utf-8">'
             echo '<title>defguard-client nightly builds</title>'
             echo '<h1>defguard-client nightly builds</h1>'
-            echo '<table><tr><th align="left">File</th><th align="right">Size</th><th align="left">Last modified (UTC)</th></tr>'
+            echo '<table><tr><th align="left">File</th><th align="right">Size</th><th align="left">Uploaded on (UTC)</th></tr>'
             aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" --recursive \
               | grep -v '/$' \
               | sort -k4 \
