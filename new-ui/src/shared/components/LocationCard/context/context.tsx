@@ -58,7 +58,7 @@ export const LocationCardProvider = ({
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
   const [mfaMethod, setMfaMethod] = useState<MfaMethodValue>(
-    location.mfa_method ?? MfaMethod.Totp,
+    location.user_mfa_preference?.[0] ?? MfaMethod.Totp,
   );
 
   const setView = useCallback(

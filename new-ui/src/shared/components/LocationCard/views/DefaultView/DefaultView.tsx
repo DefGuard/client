@@ -18,7 +18,7 @@ import { LocationCardViews } from '../../context/types';
 export const DefaultView = () => {
   const { location, instance, setView } = useLocationCardContext();
 
-  const mfaMethod = location.mfa_method ?? MfaMethod.Totp;
+  const mfaMethod = location.user_mfa_preference?.[0] ?? MfaMethod.Totp;
 
   const { mutate: updateRouting } = useMutation({
     mutationFn: api.updateLocationRouting,

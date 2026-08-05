@@ -598,7 +598,8 @@ pub async fn get_tunnel_interface_details(
             allowed_ips: tunnel.allowed_ips.unwrap_or_default(),
             persistent_keepalive_interval,
             last_handshake,
-            mfa_method: None,
+            user_mfa_preference: None,
+            mfa_steps: None,
         })
     } else {
         error!("Error while fetching tunnel details for ID {tunnel_id}: tunnel not found");
@@ -667,7 +668,8 @@ pub async fn get_location_interface_details(
             allowed_ips: location.allowed_ips,
             persistent_keepalive_interval,
             last_handshake,
-            mfa_method: location.mfa_method,
+            user_mfa_preference: location.user_mfa_preference,
+            mfa_steps: location.mfa_steps,
         })
     } else {
         error!("Error while fetching location details for ID {location_id}: location not found");

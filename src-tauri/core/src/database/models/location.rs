@@ -5,7 +5,7 @@ use std::str::FromStr;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
@@ -121,7 +121,11 @@ pub struct Location<I = NoId> {
     pub keepalive_interval: i64,
     pub location_mfa_mode: LocationMfaMode,
     pub service_location_mode: ServiceLocationMode,
-    pub mfa_method: Option<LocationMfaMethod>,
+    /// User's preferred MFA method per step (index `i` is the preference for step `i`).
+    pub user_mfa_preference: Option<Json<Vec<LocationMfaMethod>>>,
+    /// MFA methods available at each step (minimum 1 option per step). Not yet
+    /// populated from the backend; only settable by hand for now.
+    pub mfa_steps: Option<Json<Vec<Vec<LocationMfaMethod>>>>,
     #[serde(default)]
     pub posture_check_required: bool,
 }
@@ -152,7 +156,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required \
+            user_mfa_preference \"user_mfa_preference: _\", mfa_steps \"mfa_steps: _\", \
+            posture_check_required \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC",
             max_service_location_mode
@@ -190,7 +195,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required \
+            user_mfa_preference \"user_mfa_preference: _\", mfa_steps \"mfa_steps: _\", \
+            posture_check_required \
             FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
             name,
             max,
@@ -208,8 +214,8 @@ impl Location<Id> {
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
             keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12, \
-            mfa_method = $13, posture_check_required = $14 \
-            WHERE id = $15",
+            user_mfa_preference = $13, mfa_steps = $14, posture_check_required = $15 \
+            WHERE id = $16",
             self.instance_id,
             self.name,
             self.address,
@@ -222,7 +228,8 @@ impl Location<Id> {
             self.keepalive_interval,
             self.location_mfa_mode,
             self.service_location_mode,
-            self.mfa_method,
+            self.user_mfa_preference,
+            self.mfa_steps,
             self.posture_check_required,
             self.id,
         )
@@ -242,7 +249,8 @@ impl Location<Id> {
             network_id, route_all_traffic,  keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            user_mfa_preference \"user_mfa_preference: _\", mfa_steps \"mfa_steps: _\", \
+            posture_check_required \
             FROM location WHERE id = $1",
             location_id
         )
@@ -266,7 +274,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            user_mfa_preference \"user_mfa_preference: _\", mfa_steps \"mfa_steps: _\", \
+            posture_check_required \
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
@@ -286,7 +295,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            user_mfa_preference \"user_mfa_preference: _\", mfa_steps \"mfa_steps: _\", \
+            posture_check_required \
             FROM location WHERE pubkey = $1",
             pubkey
         )
@@ -433,18 +443,17 @@ impl Location<Id> {
         Ok(interface_config)
     }
 
-    /// Persist a per-location MFA method override, clamped via [`infer_mfa_method`]
-    /// against the location's MFA mode (`location_mfa_mode`).
-    pub async fn set_mfa_method(
+    /// Persist the user's per-step MFA method preference, replacing whatever was
+    /// stored before (index `i` is the preference for step `i`).
+    pub async fn set_mfa_preference(
         pool: &DbPool,
         location_id: Id,
-        method: LocationMfaMethod,
+        methods: Vec<LocationMfaMethod>,
     ) -> Result<(), Error> {
         let mut location = Self::find_by_id(pool, location_id)
             .await?
             .ok_or(Error::NotFound)?;
-        let inferred = infer_mfa_method(location.location_mfa_mode, Some(method));
-        location.mfa_method = inferred;
+        location.user_mfa_preference = Some(Json(methods));
         location.save(pool).await?;
         Ok(())
     }
@@ -505,8 +514,8 @@ impl Location<NoId> {
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
             dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, \
-            service_location_mode, mfa_method, posture_check_required) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) \
+            service_location_mode, user_mfa_preference, mfa_steps, posture_check_required) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -520,7 +529,8 @@ impl Location<NoId> {
             self.keepalive_interval,
             self.location_mfa_mode,
             self.service_location_mode,
-            self.mfa_method,
+            self.user_mfa_preference,
+            self.mfa_steps,
             self.posture_check_required,
         )
         .fetch_one(executor)
@@ -540,7 +550,8 @@ impl Location<NoId> {
             keepalive_interval: self.keepalive_interval,
             location_mfa_mode: self.location_mfa_mode,
             service_location_mode: self.service_location_mode,
-            mfa_method: self.mfa_method,
+            user_mfa_preference: self.user_mfa_preference,
+            mfa_steps: self.mfa_steps,
             posture_check_required: self.posture_check_required,
         })
     }
@@ -569,7 +580,8 @@ impl From<Location<Id>> for Location {
             keepalive_interval: location.keepalive_interval,
             location_mfa_mode: location.location_mfa_mode,
             service_location_mode: location.service_location_mode,
-            mfa_method: location.mfa_method,
+            user_mfa_preference: location.user_mfa_preference,
+            mfa_steps: location.mfa_steps,
             posture_check_required: location.posture_check_required,
         }
     }
@@ -613,7 +625,8 @@ mod tests {
             keepalive_interval: 25,
             location_mfa_mode: LocationMfaMode::Disabled,
             service_location_mode: ServiceLocationMode::Disabled,
-            mfa_method: None,
+            user_mfa_preference: None,
+            mfa_steps: None,
             posture_check_required: false,
         }
     }
@@ -635,6 +648,41 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_mfa_preference_and_steps_round_trip(pool: SqlitePool) {
+        use LocationMfaMethod::{Email, MobileApprove, Oidc, Totp};
+
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.user_mfa_preference = Some(Json(vec![Totp, Oidc]));
+        location.mfa_steps = Some(Json(vec![vec![Totp, Email], vec![Oidc, MobileApprove]]));
+        let location = location.save(&pool).await.unwrap();
+
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert_eq!(found.user_mfa_preference, Some(Json(vec![Totp, Oidc])));
+        assert_eq!(
+            found.mfa_steps,
+            Some(Json(vec![vec![Totp, Email], vec![Oidc, MobileApprove]]))
+        );
+
+        Location::set_mfa_preference(&pool, location.id, vec![Email])
+            .await
+            .unwrap();
+        let updated = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert_eq!(updated.user_mfa_preference, Some(Json(vec![Email])));
+        // set_mfa_preference must not touch mfa_steps.
+        assert_eq!(
+            updated.mfa_steps,
+            Some(Json(vec![vec![Totp, Email], vec![Oidc, MobileApprove]]))
+        );
     }
 
     #[test]

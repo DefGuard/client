@@ -70,7 +70,7 @@ impl CommandOutput for ListResult {
                 address: l.address.clone(),
                 endpoint: l.endpoint.clone(),
                 mfa_enabled: Some(l.mfa_enabled()),
-                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                mfa_method: Some(mfa_label(l.user_mfa_preference.as_deref().map(Vec::as_slice))),
                 route_all_traffic: Some(l.route_all_traffic),
             })
             .collect::<Vec<_>>();
@@ -218,7 +218,8 @@ mod tests {
             keepalive_interval: 25,
             location_mfa_mode: LocationMfaMode::Disabled,
             service_location_mode: ServiceLocationMode::Disabled,
-            mfa_method: None,
+            user_mfa_preference: None,
+            mfa_steps: None,
             posture_check_required: false,
         }
     }

@@ -342,7 +342,11 @@ fn parse_method(raw: &str) -> Result<MfaMethod, CliError> {
 /// is respected - an External-mode location always uses OIDC, while an
 /// Internal-mode location respects the stored preference (defaulting to TOTP).
 fn infer_method(location: &Location<Id>) -> MfaMethod {
-    let method = infer_mfa_method(location.location_mfa_mode, location.mfa_method);
+    let current = location
+        .user_mfa_preference
+        .as_deref()
+        .and_then(|methods| methods.first().copied());
+    let method = infer_mfa_method(location.location_mfa_mode, current);
     match method {
         Some(LocationMfaMethod::Totp) => MfaMethod::Totp,
         Some(LocationMfaMethod::Email) => MfaMethod::Email,
@@ -413,7 +417,8 @@ mod tests {
             keepalive_interval: 25,
             location_mfa_mode: mode,
             service_location_mode: ServiceLocationMode::Disabled,
-            mfa_method: None,
+            user_mfa_preference: None,
+            mfa_steps: None,
             posture_check_required: false,
         }
     }

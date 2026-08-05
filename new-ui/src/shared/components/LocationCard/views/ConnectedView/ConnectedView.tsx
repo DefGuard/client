@@ -15,7 +15,7 @@ export const ConnectedView = () => {
   // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect
   useEffect(() => {
     if (!location.active) {
-      setMfaMethod(location.mfa_method ?? MfaMethod.Totp);
+      setMfaMethod(location.user_mfa_preference?.[0] ?? MfaMethod.Totp);
       setView(LocationCardViews.Default);
     }
   }, [location.active]);

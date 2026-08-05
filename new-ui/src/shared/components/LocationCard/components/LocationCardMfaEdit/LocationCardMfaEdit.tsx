@@ -12,14 +12,15 @@ interface Props {
 }
 
 export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
-  if (location.location_mfa_mode === 'disabled' || !location.mfa_method) return null;
+  const mfaMethod = location.user_mfa_preference?.[0];
+  if (location.location_mfa_mode === 'disabled' || !mfaMethod) return null;
 
   return (
     <div className={clsx('location-card-mfa-edit', `variant-${variant}`)}>
       <div className="mfa-badge">
         <p>MFA</p>
       </div>
-      <p className="name">{mfaToText(location.mfa_method)}</p>
+      <p className="name">{mfaToText(mfaMethod)}</p>
       {location.location_mfa_mode === 'internal' && !location.active && (
         <IconButton
           variant={IconButtonVariant.SmallSelected}

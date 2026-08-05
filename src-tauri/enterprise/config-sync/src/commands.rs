@@ -13,6 +13,7 @@ use defguard_client_core::{
     error::Error,
     into_location,
 };
+use sqlx::types::Json;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, SaveServiceLocationsRequest,
@@ -32,7 +33,11 @@ pub async fn locations_changed(
         .map(|location| {
             let mut new_location = Location::<NoId>::from(location);
             new_location.route_all_traffic = false;
-            new_location.mfa_method = infer_mfa_method(new_location.location_mfa_mode, None);
+            // Neither field is backend-driven yet; normalize both sides identically
+            // (mirroring `into_location`) so neither ever triggers a false "changed".
+            new_location.user_mfa_preference =
+                infer_mfa_method(new_location.location_mfa_mode, None).map(|m| Json(vec![m]));
+            new_location.mfa_steps = None;
             new_location
         })
         .collect::<HashSet<_>>();
@@ -112,10 +117,9 @@ pub async fn do_update_instance(
                 current_location.dns = new_location.dns;
                 current_location.location_mfa_mode = new_location.location_mfa_mode;
                 current_location.service_location_mode = new_location.service_location_mode;
-                current_location.mfa_method = infer_mfa_method(
-                    current_location.location_mfa_mode,
-                    current_location.mfa_method,
-                );
+                // `user_mfa_preference`/`mfa_steps` are not backend-driven yet, so they
+                // are intentionally left untouched here — this preserves any
+                // hand-set preference or steps across poll cycles.
                 current_location.posture_check_required = new_location.posture_check_required;
                 current_location.save(transaction.as_mut()).await?;
                 info!("Location {current_location} configuration updated for instance {instance}");

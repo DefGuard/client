@@ -86,10 +86,10 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
 
     if (shouldStartMfa(location)) {
       useConnectModal.getState().open({
-        view: mfaMethodToConnectModalView(location.mfa_method ?? MfaMethod.Totp),
+        view: mfaMethodToConnectModalView(location.user_mfa_preference?.[0] ?? MfaMethod.Totp),
         location,
         autoStartOpenId: appConfig.auto_start_openid_mfa,
-        mfaMethod: location.mfa_method,
+        mfaMethod: location.user_mfa_preference?.[0],
       });
       return;
     }
@@ -155,7 +155,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
                     view: ConnectModalView.MfaSettings,
                     location: location,
                     perviousView: null,
-                    mfaMethod: location.mfa_method,
+                    mfaMethod: location.user_mfa_preference?.[0],
                   });
                 }
               }}

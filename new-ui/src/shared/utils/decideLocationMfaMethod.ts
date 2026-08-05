@@ -6,12 +6,12 @@ export const decideLocationMfaMethod = (
 ): MfaMethodValue | null => {
   switch (location.location_mfa_mode) {
     case 'disabled':
-      return location.mfa_method ?? null;
+      return location.user_mfa_preference?.[0] ?? null;
     case 'external':
       return MfaMethod.Oidc;
     case 'internal':
       if (currentMethod === MfaMethod.Oidc || !currentMethod)
-        return location.mfa_method ?? null;
+        return location.user_mfa_preference?.[0] ?? null;
       return currentMethod;
   }
 };

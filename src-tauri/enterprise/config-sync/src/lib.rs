@@ -643,7 +643,8 @@ mod tests {
             keepalive_interval: 25,
             location_mfa_mode: LocationMfaMode::Disabled,
             service_location_mode: ServiceLocationMode::Disabled,
-            mfa_method: None,
+            user_mfa_preference: None,
+            mfa_steps: None,
             posture_check_required: false,
         }
         .save(pool)

@@ -70,7 +70,8 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             void (async () => {
               const appConfig = await api.getAppConfig();
               const mfaMethod =
-                decideLocationMfaMethod(location, location.mfa_method) ?? MfaMethod.Totp;
+                decideLocationMfaMethod(location, location.user_mfa_preference?.[0]) ??
+                MfaMethod.Totp;
 
               await navigate({ to: '/full/overview' });
               useConnectModal.getState().open({

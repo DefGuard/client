@@ -21,8 +21,8 @@ import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
 export const ConnectModalMfaSettings = () => {
-  const { mutate: setMfaMethod } = useMutation({
-    mutationFn: api.setLocationMfaMethod,
+  const { mutate: setMfaPreference } = useMutation({
+    mutationFn: api.setLocationMfaPreference,
     meta: { invalidate: [['locations']] },
   });
 
@@ -37,7 +37,7 @@ export const ConnectModalMfaSettings = () => {
     }),
   );
 
-  const locationDefaultMfaMethod = locationDetails?.mfa_method ?? MfaMethod.Totp;
+  const locationDefaultMfaMethod = locationDetails?.user_mfa_preference?.[0] ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(currentMethod);
 
@@ -54,7 +54,7 @@ export const ConnectModalMfaSettings = () => {
     if (!location) return;
     useConnectModal.setState({ mfaMethod: selectedMethod });
     if (setAsDefault && selectedMethod !== locationDefaultMfaMethod && location) {
-      setMfaMethod({ locationId: location.id, mfaMethod: selectedMethod });
+      setMfaPreference({ locationId: location.id, methods: [selectedMethod] });
     }
     if (perviousView === null) {
       useConnectModal.setState({ visible: false });

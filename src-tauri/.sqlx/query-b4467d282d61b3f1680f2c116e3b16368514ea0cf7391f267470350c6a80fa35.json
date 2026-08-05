@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\",\n            mfa_method \"mfa_method: _\", posture_check_required FROM location WHERE pubkey = $1",
+  "query": "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\", user_mfa_preference \"user_mfa_preference: _\", mfa_steps \"mfa_steps: _\", posture_check_required FROM location WHERE service_location_mode <= $1 ORDER BY name ASC",
   "describe": {
     "columns": [
       {
-        "name": "id: _",
+        "name": "id",
         "ordinal": 0,
         "type_info": "Integer"
       },
@@ -69,13 +69,18 @@
         "type_info": "Integer"
       },
       {
-        "name": "mfa_method: _",
+        "name": "user_mfa_preference: _",
         "ordinal": 13,
-        "type_info": "Integer"
+        "type_info": "Text"
+      },
+      {
+        "name": "mfa_steps: _",
+        "ordinal": 14,
+        "type_info": "Text"
       },
       {
         "name": "posture_check_required",
-        "ordinal": 14,
+        "ordinal": 15,
         "type_info": "Bool"
       }
     ],
@@ -97,8 +102,9 @@
       false,
       false,
       true,
+      true,
       false
     ]
   },
-  "hash": "97a52a8bbf020b77afe5dc427efb66abfdc6b571d1631a4f77fbf4fa5cfbe7e7"
+  "hash": "b4467d282d61b3f1680f2c116e3b16368514ea0cf7391f267470350c6a80fa35"
 }

@@ -23,8 +23,8 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
 export const LocationCardMfaSettings = () => {
-  const { mutate: setMfaMethod } = useMutation({
-    mutationFn: api.setLocationMfaMethod,
+  const { mutate: setMfaPreference } = useMutation({
+    mutationFn: api.setLocationMfaPreference,
     meta: {
       invalidate: [['locations']],
     },
@@ -38,7 +38,7 @@ export const LocationCardMfaSettings = () => {
     setMfaMethod: setContextMethod,
   } = useLocationCardContext();
 
-  const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
+  const locationDefaultMfaMethod = location.user_mfa_preference?.[0] ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(currentMethod);
 
@@ -55,9 +55,9 @@ export const LocationCardMfaSettings = () => {
   const handleSubmit = () => {
     setContextMethod(selectedMethod);
     if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
-      setMfaMethod({
+      setMfaPreference({
         locationId: location.id,
-        mfaMethod: selectedMethod,
+        methods: [selectedMethod],
       });
     }
     if (isFromDefault) {

@@ -105,7 +105,7 @@ export const TauriCommand = {
   HasAnyVisibleLocations: 'has_any_visible_locations',
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
-  SetLocationMfaMethod: 'set_location_mfa_method',
+  SetLocationMfaPreference: 'set_location_mfa_preference',
   // Connections
   Connect: 'connect',
   Disconnect: 'disconnect',
@@ -245,7 +245,10 @@ export type LocationInfo = {
   pubkey: string;
   network_id: number;
   location_mfa_mode: LocationMfaMode;
-  mfa_method?: MfaMethodValue;
+  /** User's preferred MFA method per step (index `i` is the preference for step `i`). */
+  user_mfa_preference?: MfaMethodValue[] | null;
+  /** MFA methods available at each step. Not yet populated by the backend. */
+  mfa_steps?: MfaMethodValue[][] | null;
   posture_check_required: boolean;
 };
 
@@ -300,7 +303,8 @@ export type LocationDetails = {
   allowed_ips: string;
   persistent_keepalive_interval?: number;
   last_handshake?: number;
-  mfa_method?: MfaMethodValue;
+  user_mfa_preference?: MfaMethodValue[] | null;
+  mfa_steps?: MfaMethodValue[][] | null;
 };
 
 export type NewAppVersionInfo = {
@@ -399,9 +403,9 @@ export type UpdateInstanceArgs = {
   response: CreateDeviceResponse;
 };
 
-export type SetLocationMfaMethodArgs = {
+export type SetLocationMfaPreferenceArgs = {
   locationId: number;
-  mfaMethod: MfaMethodValue;
+  methods: MfaMethodValue[];
 };
 
 export type OverviewViewSelection = {

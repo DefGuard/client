@@ -194,7 +194,7 @@ pub fn run_app() {
             get_provisioning_config,
             get_platform_header,
             get_posture_data,
-            set_location_mfa_method,
+            set_location_mfa_preference,
             open_tray_window,
             open_full_view_window,
             swap_to_tray,

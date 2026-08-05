@@ -30,6 +30,7 @@ use defguard_client_provisioning::ProvisioningConfig;
 use defguard_client_service_locations::to_service_location;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio_util::sync::CancellationToken;
@@ -609,7 +610,8 @@ pub struct LocationInfo {
     pub network_id: Id,
     pub location_mfa_mode: LocationMfaMode,
     pub posture_check_required: bool,
-    pub mfa_method: Option<LocationMfaMethod>,
+    pub user_mfa_preference: Option<Json<Vec<LocationMfaMethod>>>,
+    pub mfa_steps: Option<Json<Vec<Vec<LocationMfaMethod>>>>,
 }
 
 impl LocationInfo {
@@ -663,7 +665,8 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             network_id: location.network_id,
             location_mfa_mode: location.location_mfa_mode,
             posture_check_required: location.posture_check_required,
-            mfa_method: location.mfa_method,
+            user_mfa_preference: location.user_mfa_preference,
+            mfa_steps: location.mfa_steps,
         };
         location_info.push(info);
     }
@@ -711,7 +714,8 @@ pub struct LocationInterfaceDetails {
     pub allowed_ips: String,
     pub persistent_keepalive_interval: Option<u16>,
     pub last_handshake: Option<i64>,
-    pub mfa_method: Option<LocationMfaMethod>,
+    pub user_mfa_preference: Option<Json<Vec<LocationMfaMethod>>>,
+    pub mfa_steps: Option<Json<Vec<Vec<LocationMfaMethod>>>>,
 }
 
 #[tauri::command(async)]
@@ -916,14 +920,14 @@ pub async fn update_location_routing(
 }
 
 #[tauri::command(async)]
-pub async fn set_location_mfa_method(
+pub async fn set_location_mfa_preference(
     location_id: Id,
-    mfa_method: LocationMfaMethod,
+    methods: Vec<LocationMfaMethod>,
     handle: AppHandle,
 ) -> Result<(), Error> {
-    debug!("Received command to set MFA method for location {location_id}");
-    Location::set_mfa_method(&DB_POOL, location_id, mfa_method).await?;
-    debug!("MFA method updated for location (ID: {location_id})");
+    debug!("Received command to set MFA preference for location {location_id}");
+    Location::set_mfa_preference(&DB_POOL, location_id, methods).await?;
+    debug!("MFA preference updated for location (ID: {location_id})");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
         .map_err(tauri_err_to_app_err)?;

@@ -12,6 +12,7 @@ use database::models::{
 };
 use defguard_client_proto::defguard::client_types::DeviceConfig;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 
 pub mod app_config;
 pub mod connection;
@@ -188,7 +189,8 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         keepalive_interval: dev_config.keepalive_interval.into(),
         location_mfa_mode,
         service_location_mode,
-        mfa_method: infer_mfa_method(location_mfa_mode, None),
+        user_mfa_preference: infer_mfa_method(location_mfa_mode, None).map(|m| Json(vec![m])),
+        mfa_steps: None, // not yet sent by the backend
         posture_check_required: dev_config.posture_check_required.unwrap_or_default(),
     }
 }
@@ -197,6 +199,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
 mod tests {
     use chrono::{Duration, Utc};
     use defguard_client_proto::defguard::client_types::DeviceConfig;
+    use sqlx::types::Json;
 
     use super::{get_aggregation, into_location, DateTimeAggregation};
     use crate::database::models::location::{LocationMfaMethod, LocationMfaMode};
@@ -266,7 +269,10 @@ mod tests {
         let location = into_location(cfg, 1);
         assert_eq!(location.location_mfa_mode, LocationMfaMode::Internal);
         // Internal mode with no configured method resolves to Totp.
-        assert_eq!(location.mfa_method, Some(LocationMfaMethod::Totp));
+        assert_eq!(
+            location.user_mfa_preference,
+            Some(Json(vec![LocationMfaMethod::Totp]))
+        );
     }
 
     #[test]
@@ -276,6 +282,9 @@ mod tests {
         let location = into_location(cfg, 1);
         assert_eq!(location.location_mfa_mode, LocationMfaMode::External);
         // External mode always resolves to OIDC.
-        assert_eq!(location.mfa_method, Some(LocationMfaMethod::Oidc));
+        assert_eq!(
+            location.user_mfa_preference,
+            Some(Json(vec![LocationMfaMethod::Oidc]))
+        );
     }
 }

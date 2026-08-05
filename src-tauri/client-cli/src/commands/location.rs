@@ -59,7 +59,7 @@ pub async fn handle_set(
 
     if let Some(method_str) = mfa_method {
         let method = parse_mfa_method(method_str)?;
-        Location::set_mfa_method(&state.pool, location_id, method).await?;
+        Location::set_mfa_preference(&state.pool, location_id, vec![method]).await?;
         changed.push(format!("MFA method → {method_str}"));
     }
 
@@ -101,7 +101,7 @@ pub async fn handle_show(
         pubkey: location.pubkey.clone(),
         allowed_ips: location.allowed_ips.clone(),
         dns: location.dns.clone(),
-        mfa_method: mfa_label(location.mfa_method).to_string(),
+        mfa_method: mfa_label(location.user_mfa_preference.as_deref().map(Vec::as_slice)),
         route_all_traffic: location.route_all_traffic,
         keepalive_interval: location.keepalive_interval,
     })
@@ -120,10 +120,14 @@ fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
     }
 }
 
-pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
-    match method {
-        Some(method) => method.as_str(),
-        None => "none",
+pub(crate) fn mfa_label(methods: Option<&[LocationMfaMethod]>) -> String {
+    match methods {
+        Some(methods) if !methods.is_empty() => methods
+            .iter()
+            .map(LocationMfaMethod::as_str)
+            .collect::<Vec<_>>()
+            .join(", "),
+        _ => "none".to_string(),
     }
 }
 
@@ -152,7 +156,7 @@ impl CommandOutput for LocationListResult {
                 address: l.address.clone(),
                 endpoint: l.endpoint.clone(),
                 mfa_enabled: None,
-                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                mfa_method: Some(mfa_label(l.user_mfa_preference.as_deref().map(Vec::as_slice))),
                 route_all_traffic: Some(l.route_all_traffic),
             })
             .collect::<Vec<_>>();
@@ -202,7 +206,7 @@ fn format_location_list_table(
             location.address,
             location.endpoint,
             instance,
-            mfa_label(location.mfa_method),
+            mfa_label(location.user_mfa_preference.as_deref().map(Vec::as_slice)),
             if location.route_all_traffic {
                 "All-traffic"
             } else {
@@ -317,7 +321,8 @@ mod tests {
                 LocationMfaMode::Disabled
             },
             service_location_mode: ServiceLocationMode::Disabled,
-            mfa_method: None,
+            user_mfa_preference: None,
+            mfa_steps: None,
             posture_check_required: false,
         }
     }
