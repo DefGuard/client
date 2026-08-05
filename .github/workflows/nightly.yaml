@@ -10,7 +10,6 @@ on:
 
 env:
   SQLX_OFFLINE: "1"
-  # TODO: move to repository variables/secrets
   S3_BUCKET: defguard-nightly
   S3_PREFIX: defguard-client
   AWS_DEFAULT_REGION: eu-central-1
