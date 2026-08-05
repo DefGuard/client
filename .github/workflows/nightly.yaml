@@ -3,19 +3,34 @@ on:
   push:
     branches:
       - nightly-builds
-
-# concurrency:
-#   group: nightly-${{ github.ref }}
-#   cancel-in-progress: true
+  schedule:
+    - cron: "0 23 * * *"
+  workflow_dispatch:
 
 env:
   SQLX_OFFLINE: "1"
-  S3_BUCKET: defguard-nightly
+  S3_BUCKET: nightly.defguard.net
   S3_PREFIX: defguard-client
   AWS_DEFAULT_REGION: eu-central-1
 
 jobs:
+  prepare:
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+    outputs:
+      branches: ${{ steps.set.outputs.branches }}
+      stamp: ${{ steps.set.outputs.stamp }}
+    steps:
+      - name: Set branches and timestamp
+        id: set
+        run: |
+          echo 'branches=["release/2.1"]' >> ${GITHUB_OUTPUT}
+          echo "stamp=$(date -u +%H-%M_%d-%m-%Y)" >> ${GITHUB_OUTPUT}
+
   build-linux:
+    needs: prepare
     runs-on:
       - self-hosted
       - Linux
@@ -23,6 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        branch: ${{ fromJSON(needs.prepare.outputs.branches) }}
         architecture: [ARM64, X64]
         include:
           - architecture: ARM64
@@ -34,6 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ matrix.branch }}
           submodules: recursive
 
       - uses: actions/setup-node@v6
@@ -82,7 +99,8 @@ jobs:
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
           echo "DEFGUARD_CLIENT_BUILD_VERSION=${VERSION}-nightly" >> ${GITHUB_ENV}
-          echo "BRANCH=${GITHUB_REF_NAME//\//-}" >> ${GITHUB_ENV}
+          BRANCH="${{ matrix.branch }}"
+          echo "BRANCH=${BRANCH//\//-}" >> ${GITHUB_ENV}
 
       - name: Build new UI
         run: |
@@ -101,20 +119,26 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
+          STAMP: ${{ needs.prepare.outputs.stamp }}
         run: |
-          NAME="defguard-client-${BRANCH}-${{ matrix.binary_arch }}-nightly"
+          NAME="defguard-client-${{ matrix.binary_arch }}-${STAMP}"
           aws s3 cp --acl public-read \
             "src-tauri/target/release/bundle/deb/defguard-client_${VERSION}_${{ matrix.deb_arch }}.deb" \
-            "s3://${S3_BUCKET}/${S3_PREFIX}/${NAME}.deb"
+            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/${NAME}.deb"
           aws s3 cp --acl public-read \
             "src-tauri/target/release/bundle/rpm/defguard-client-${VERSION}-1.${{ matrix.binary_arch }}.rpm" \
-            "s3://${S3_BUCKET}/${S3_PREFIX}/${NAME}.rpm"
+            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/${NAME}.rpm"
 
   build-macos-pkg:
+    needs: prepare
     runs-on:
       - self-hosted
       - macOS
       - native
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJSON(needs.prepare.outputs.branches) }}
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
@@ -123,6 +147,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ matrix.branch }}
           submodules: recursive
 
       - name: Write build version
@@ -131,7 +156,8 @@ jobs:
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
           echo "DEFGUARD_CLIENT_BUILD_VERSION=${VERSION}-nightly" >> ${GITHUB_ENV}
-          echo "BRANCH=${GITHUB_REF_NAME//\//-}" >> ${GITHUB_ENV}
+          BRANCH="${{ matrix.branch }}"
+          echo "BRANCH=${BRANCH//\//-}" >> ${GITHUB_ENV}
 
       - uses: actions/setup-node@v6
         with:
@@ -206,16 +232,22 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
+          STAMP: ${{ needs.prepare.outputs.stamp }}
         run: |
           export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
           aws s3 cp --acl public-read defguard-client.pkg \
-            "s3://${S3_BUCKET}/${S3_PREFIX}/defguard-client-${BRANCH}-universal-nightly.pkg"
+            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/defguard-client-universal-${STAMP}.pkg"
 
   # build-windows-msi:
+  #   needs: prepare
   #   runs-on:
   #     - self-hosted
   #     - Windows
   #     - X64
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       branch: ${{ fromJSON(needs.prepare.outputs.branches) }}
   #   env:
   #     SCCACHE_GHA_ENABLED: "true"
   #     RUSTC_WRAPPER: "sccache"
@@ -225,6 +257,7 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@v7
   #       with:
+  #         ref: ${{ matrix.branch }}
   #         submodules: recursive
 
   #     - name: Write build version
@@ -233,7 +266,7 @@ jobs:
   #         echo "Version: $version"
   #         echo "VERSION=$version" >> $env:GITHUB_ENV
   #         echo "DEFGUARD_CLIENT_BUILD_VERSION=$version-nightly" >> $env:GITHUB_ENV
-  #         echo "BRANCH=$($env:GITHUB_REF_NAME -replace '/','-')" >> $env:GITHUB_ENV
+  #         echo "BRANCH=$('${{ matrix.branch }}' -replace '/','-')" >> $env:GITHUB_ENV
 
   #     - uses: actions/setup-node@v6
   #       with:
@@ -278,9 +311,10 @@ jobs:
   #       env:
   #         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
   #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
+  #         STAMP: ${{ needs.prepare.outputs.stamp }}
   #       run: |
   #         aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/Defguard_${env:VERSION}_x64_en-US.msi" `
-  #           "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/defguard-client-${env:BRANCH}-x64-nightly.msi"
+  #           "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/${env:BRANCH}/defguard-client-x64-${env:STAMP}.msi"
 
   update-index:
     needs:
@@ -296,24 +330,33 @@ jobs:
       - name: Install awscli
         run: |
           sudo apt-get update
-          sudo apt-get install -y awscli
+          sudo apt-get install -y awscli jq
 
       - name: Generate and upload index.html
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
+          aws s3api list-objects-v2 \
+            --bucket "${S3_BUCKET}" \
+            --prefix "${S3_PREFIX}/" \
+            --query 'Contents[?Size > `0`].{key: Key, size: Size, modified: LastModified}' \
+            --output json > objects.json
+
           {
             echo '<!doctype html>'
             echo '<meta charset="utf-8">'
             echo '<title>defguard-client nightly builds</title>'
             echo '<h1>defguard-client nightly builds</h1>'
-            echo '<table><tr><th align="left">File</th><th align="right">Size</th><th align="left">Uploaded on (UTC)</th></tr>'
-            aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" --recursive \
-              | grep -v '/$' \
-              | sort -k4 \
-              | awk '{printf "<tr><td><a href=\"/%s\">%s</a></td><td align=\"right\">%.1f MiB</td><td>%s %s</td></tr>\n", $4, $4, $3/1048576, $1, $2}'
-            echo '</table>'
+            jq -r '
+              (. // [])
+              | group_by(.key | split("/")[1])[]
+              | sort_by(.modified) | reverse
+              | "<h2>\(.[0].key | split("/")[1])</h2>",
+                "<table><tr><th align=\"left\">File</th><th align=\"right\">Size</th><th align=\"left\">Uploaded on (UTC)</th></tr>",
+                (.[] | "<tr><td><a href=\"/\(.key)\">\(.key | split("/")[2])</a></td><td align=\"right\">\((.size / 104857.6 | round) / 10) MiB</td><td>\(.modified)</td></tr>"),
+                "</table>"
+            ' objects.json
           } > index.html
           cat index.html
           aws s3 cp --acl public-read --content-type text/html \
