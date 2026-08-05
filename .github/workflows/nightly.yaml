@@ -100,8 +100,8 @@ jobs:
 
       - name: Upload DEB and RPM to S3
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_APT }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_APT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
           NAME="defguard-client-${BRANCH}-${{ matrix.binary_arch }}-nightly"
           aws s3 cp --acl public-read \
@@ -207,8 +207,8 @@ jobs:
 
       - name: Upload PKG to S3
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_APT }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_APT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
           aws s3 cp --acl public-read defguard-client.pkg \
             "s3://${S3_BUCKET}/${S3_PREFIX}/defguard-client-${BRANCH}-universal-nightly.pkg"
@@ -280,8 +280,8 @@ jobs:
 
       - name: Upload MSI to S3
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_APT }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_APT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
           aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/Defguard_${env:VERSION}_x64_en-US.msi" `
             "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/defguard-client-${env:BRANCH}-x64-nightly.msi"
@@ -304,8 +304,8 @@ jobs:
 
       - name: Generate and upload index.html
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_APT }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_APT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
           {
             echo '<!doctype html>'
