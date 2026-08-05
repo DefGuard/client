@@ -23,12 +23,27 @@
   transition-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
   transition-property: border-color, background, color, box-shadow;
   background-clip: padding-box;
+  position: relative;
 
   &:hover {
     --bg: var(--bg-white-5);
     --color: var(--fg-white-100);
     --border: var(--border-action-disabled);
     --icon: var(--fg-white-100);
+
+    > .icon-track:not(.active) {
+      > .factor-icon {
+        opacity: 0;
+      }
+
+      > .checkbox-indicator {
+        opacity: 1;
+      }
+    }
+
+    > .configure-label {
+      opacity: 1;
+    }
   }
 
   &.selected {
@@ -37,6 +52,39 @@
     --border: var(--border-action-disabled);
     --icon: var(--fg-white-100);
     --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 5%);
+  }
+
+  > .icon-track {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    height: 20px;
+    width: 20px;
+    position: relative;
+
+    > .factor-icon,
+    > .checkbox-indicator {
+      grid-area: 1 / 1;
+      transition: opacity 120ms ease-out;
+    }
+
+    > .factor-icon {
+      opacity: 1;
+    }
+
+    > .checkbox-indicator {
+      opacity: 0;
+    }
+
+    &.active {
+      > .factor-icon {
+        opacity: 0;
+      }
+
+      > .checkbox-indicator {
+        opacity: 1;
+      }
+    }
   }
 
   > .middle {
@@ -61,6 +109,19 @@
       line-height: normal;
       letter-spacing: -0.11px;
     }
+  }
+
+  .configure-label {
+    font: var(--t-body-xxs-400);
+    color: var(--c-white-40);
+    user-select: none;
+    pointer-events: none;
+    position: absolute;
+    right: 17px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 120ms ease-out;
   }
 
   .factor-icon {

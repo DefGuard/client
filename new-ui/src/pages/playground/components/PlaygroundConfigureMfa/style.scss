@@ -1,0 +1,36 @@
+#configure-mfa-playground {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .debug-header {
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgb(127 127 127 / 12%);
+    font-family: monospace;
+    font-size: 12px;
+
+    p {
+      margin: 0;
+      word-break: break-all;
+    }
+  }
+
+  .steps {
+    display: flex;
+    gap: 16px;
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+
+      p {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+    }
+  }
+}

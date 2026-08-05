@@ -37,7 +37,8 @@ export const ConnectModalMfaSettings = () => {
     }),
   );
 
-  const locationDefaultMfaMethod = locationDetails?.user_mfa_preference?.[0] ?? MfaMethod.Totp;
+  const locationDefaultMfaMethod =
+    locationDetails?.user_mfa_preference?.[0] ?? MfaMethod.Totp;
 
   const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(currentMethod);
 

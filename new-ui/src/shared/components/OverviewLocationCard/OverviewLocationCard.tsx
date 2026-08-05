@@ -86,7 +86,9 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
 
     if (shouldStartMfa(location)) {
       useConnectModal.getState().open({
-        view: mfaMethodToConnectModalView(location.user_mfa_preference?.[0] ?? MfaMethod.Totp),
+        view: mfaMethodToConnectModalView(
+          location.user_mfa_preference?.[0] ?? MfaMethod.Totp,
+        ),
         location,
         autoStartOpenId: appConfig.auto_start_openid_mfa,
         mfaMethod: location.user_mfa_preference?.[0],

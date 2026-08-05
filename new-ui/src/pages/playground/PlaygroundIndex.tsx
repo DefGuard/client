@@ -1,4 +1,5 @@
 import './style.scss';
+import { PlaygroundConfigureMfa } from './components/PlaygroundConfigureMfa/PlaygroundConfigureMfa';
 import { PlaygroundSnackbarTest } from './components/PlaygroundSnackbarTest/PlaygroundSnackbarTest';
 import { PlaygroundTestMenu } from './components/PlaygroundTestMenu/PlaygroundTestMenu';
 import { PlaygroundTestSelect } from './components/PlaygroundTestSelect';
@@ -13,6 +14,7 @@ export const PlaygroundIndex = () => {
         <PlaygroundTestSelect />
         <PlaygroundSnackbarTest />
         <PlaygroundTestMenu />
+        <PlaygroundConfigureMfa />
       </div>
     </main>
   );
