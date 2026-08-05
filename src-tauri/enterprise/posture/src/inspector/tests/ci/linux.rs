@@ -1,6 +1,8 @@
 use std::{fs::read_to_string, process::Command};
 
-use super::super::super::{disk_encryption_status, linux_kernel_version, os_name, os_version};
+use super::super::super::{
+    disk_encryption_status, linux_kernel_version, os_name, os_version, DiskEncryptionTarget,
+};
 
 fn expected_kernel_version() -> String {
     let output = Command::new("uname")
@@ -73,7 +75,7 @@ mod setup1 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert!(!disk_encryption_status().unwrap());
+        assert!(!disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
     }
 }
 
@@ -101,6 +103,6 @@ mod setup2 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_encrypted() {
-        assert!(disk_encryption_status().unwrap());
+        assert!(disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
     }
 }

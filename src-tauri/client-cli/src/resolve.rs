@@ -20,10 +20,37 @@ pub enum ResolvedTarget {
 }
 
 /// Resolve a target for the `connect` command.
+///
+/// Rejects service locations. They belong to the daemon, which brings them up with no user session at
+/// all, so letting a user act on one puts two managers on a single tunnel: core keeps one session per
+/// (device, location), so each side's authorization supersedes the other's preshared key and the two
+/// take turns breaking each other. The app treats them the same way, hiding them from its location
+/// list and skipping them when disconnecting.
+///
+/// Note `--name` was already safe: `Location::find_by_name` filters service locations out in SQL, so it
+/// reports them as not found. `--id` goes through `Location::find_by_id`, which takes no such filter,
+/// and that is the gap this closes. The check sits here rather than in the `--id` branch so a future
+/// resolution path cannot reintroduce it.
 pub async fn resolve_connect_target(
     spec: &TargetSpec,
     pool: &DbPool,
 ) -> Result<ResolvedTarget, CliError> {
+    let target = resolve_user_target(spec, pool).await?;
+
+    if let ResolvedTarget::Location(location) = &target {
+        if location.is_service_location() {
+            return Err(CliError::InvalidInput(format!(
+                "'{}' is a service location and is managed by the defguard service",
+                location.name
+            )));
+        }
+    }
+
+    Ok(target)
+}
+
+/// Resolution proper, without the service-location check its callers rely on.
+async fn resolve_user_target(spec: &TargetSpec, pool: &DbPool) -> Result<ResolvedTarget, CliError> {
     // --id fast path
     if let Some(id) = spec.id {
         if spec.tunnel {
@@ -246,6 +273,71 @@ mod tests {
                 assert_eq!(l.name, "office");
                 assert_eq!(l.instance_id, i.id);
             }
+            _ => panic!("expected Location"),
+        }
+    }
+
+    /// Service locations are the daemon's: connecting to one would make the app and the daemon
+    /// supersede each other's session indefinitely. `--name` was already safe because
+    /// `Location::find_by_name` filters them out in SQL; `--id` was not, and that is the gap.
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_service_location_is_not_resolvable(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        let mut location = sample_location("headless", i.id);
+        location.service_location_mode = ServiceLocationMode::AlwaysOn;
+        let location = location.save(&pool).await.unwrap();
+
+        let by_name = TargetSpec {
+            name: Some("headless".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        // Already filtered in SQL, so this reports "not found" rather than reaching the guard.
+        let err = expect_err(resolve_connect_target(&by_name, &pool).await);
+        assert!(
+            matches!(err, CliError::NotFound(_)),
+            "expected NotFound for a service location by name, got {err:?}"
+        );
+
+        let by_id = TargetSpec {
+            name: None,
+            tunnel: false,
+            id: Some(location.id),
+            instance: None,
+        };
+        let err = expect_err(resolve_connect_target(&by_id, &pool).await);
+        assert!(
+            matches!(err, CliError::InvalidInput(_)),
+            "expected InvalidInput for a service location by id, got {err:?}"
+        );
+
+        // Disconnect resolves through the same function, so it is covered too.
+        let err = expect_err(resolve_disconnect_target(&by_id, &pool).await);
+        assert!(
+            matches!(err, CliError::InvalidInput(_)),
+            "expected InvalidInput when disconnecting a service location, got {err:?}"
+        );
+    }
+
+    /// A regular location on the same instance must still resolve, so the check above is not simply
+    /// rejecting everything.
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_regular_location_still_resolves_alongside_a_service_location(pool: DbPool) {
+        let i = sample_instance("acme").save(&pool).await.unwrap();
+        let mut service = sample_location("headless", i.id);
+        service.service_location_mode = ServiceLocationMode::AlwaysOn;
+        service.save(&pool).await.unwrap();
+        sample_location("office", i.id).save(&pool).await.unwrap();
+
+        let spec = TargetSpec {
+            name: Some("office".into()),
+            tunnel: false,
+            id: None,
+            instance: None,
+        };
+        match expect_ok(resolve_connect_target(&spec, &pool).await) {
+            ResolvedTarget::Location(l) => assert_eq!(l.name, "office"),
             _ => panic!("expected Location"),
         }
     }

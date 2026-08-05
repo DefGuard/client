@@ -15,11 +15,14 @@ use reqwest::{StatusCode, Url};
 use serde::Deserialize;
 
 #[cfg(not(windows))]
-use crate::inspector::device_posture_data;
+use crate::inspector::{device_posture_data, DiskEncryptionTarget};
 
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
 /// Collects device posture data, sends it to the proxy, and returns the runtime preshared key.
+///
+/// The app's entry point: reads the instance, keys and token from the local database. The daemon has
+/// no database, so it calls [`request_posture_authorization`] directly with values from its RPC.
 pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String, Error> {
     let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
         .await?
@@ -43,20 +46,45 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
 
     let posture_data = get_posture_data().await?;
 
+    request_posture_authorization(
+        &instance.proxy_url,
+        keys.pubkey,
+        location.network_id,
+        token,
+        posture_data,
+    )
+    .await
+}
+
+/// Sends a posture check to the proxy and returns the runtime preshared key on approval.
+///
+/// Every input is passed explicitly so this works for both callers: the app, which reads them from its
+/// database, and the daemon, which has none and reads them from the service-location file it persists.
+///
+/// Note `device_pubkey` is the *device's* WireGuard public key, not a remote peer key, and
+/// `location_id` is core's `WireguardNetwork` id (`Location::network_id`), not the client-local
+/// location id.
+pub async fn request_posture_authorization(
+    proxy_url: &str,
+    device_pubkey: String,
+    location_id: Id,
+    token: String,
+    posture_data: DevicePostureData,
+) -> Result<String, Error> {
     let request = DevicePostureCheckRequest {
-        location_id: location.network_id,
-        pubkey: keys.pubkey,
+        location_id,
+        pubkey: device_pubkey,
         device_posture_data: Some(posture_data),
         token: Some(token),
     };
 
-    let proxy_url = Url::parse(&instance.proxy_url)
+    let url = Url::parse(proxy_url)
         .map_err(|e| Error::InternalError(format!("Invalid proxy URL: {e}")))?
         .join(POSTURE_ENDPOINT)
         .map_err(|e| Error::InternalError(format!("Failed to build posture URL: {e}")))?;
 
-    debug!("Sending posture check request to {proxy_url}");
-    let response = post_with_headers(proxy_url, &request)
+    debug!("Sending posture check request to {url}");
+    let response = post_with_headers(url, &request)
         .await
         .map_err(|e| Error::ServiceUnavailable(e.to_string()))?;
 
@@ -66,7 +94,7 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
                 .json()
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
-            info!("Posture check approved for location {}", location.id);
+            info!("Posture check approved for location {location_id}");
             Ok(body.preshared_key)
         }
         StatusCode::FORBIDDEN => {
@@ -79,8 +107,8 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
             error!(
-                "Posture check rejected for location {}: {}",
-                location.id, body.error
+                "Posture check rejected for location {location_id}: {}",
+                body.error
             );
             Err(Error::PostureCheckFailed(body.error))
         }
@@ -93,6 +121,11 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
     }
 }
 
+/// Collects this device's posture data for a *user-initiated* check.
+///
+/// Windows asks the daemon, because only SYSTEM can query the WMI encryption namespace. Everywhere
+/// else the app can answer for itself, and should: this is the user's check, so `disk_encryption` is
+/// evaluated against the partition holding the client database rather than against `/`.
 pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     #[cfg(windows)]
     {
@@ -108,6 +141,6 @@ pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     }
     #[cfg(not(windows))]
     {
-        Ok(device_posture_data())
+        Ok(device_posture_data(DiskEncryptionTarget::ClientDatabase))
     }
 }

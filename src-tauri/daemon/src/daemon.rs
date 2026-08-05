@@ -11,13 +11,13 @@ use std::{fs, path::Path};
 
 use defguard_client_common::dns_borrow;
 #[cfg(windows)]
-use defguard_client_posture::inspector::device_posture_data;
+use defguard_client_posture::inspector::{device_posture_data, DiskEncryptionTarget};
 use defguard_client_proto::defguard::{
     client::v1::{
         desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-        AuthorizePostureSessionRequest, AuthorizePostureSessionResponse, CreateInterfaceRequest,
-        DeleteServiceLocationsRequest, InterfaceData, ListInterfacesResponse, ManagedInterfaceData,
-        ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
+        ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
+        RemoveInterfaceRequest, SaveServiceLocationsRequest,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -228,31 +228,17 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(()))
     }
 
-    // TODO: authorize posture sessions on behalf of the service, using the proxy URL, device
-    // public key and polling token persisted alongside the service locations.
-    async fn authorize_posture_session(
-        &self,
-        _request: tonic::Request<AuthorizePostureSessionRequest>,
-    ) -> Result<Response<AuthorizePostureSessionResponse>, Status> {
-        // `warn` is only imported on non-Windows targets, so qualify it here.
-        tracing::warn!(
-            "Received a request to authorize a posture session, which is not implemented yet"
-        );
-        Err(Status::unimplemented(
-            "Posture session authorization is not implemented yet",
-        ))
-    }
-
     #[cfg(not(windows))]
     async fn get_posture_data(
         &self,
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         warn!(
-            "Daemon service received a get_posture_data request. Daemon posture requests are only supported on windows systems. Unix systems perform client-side posture checks."
+            "Received a get_posture_data request. Only Windows needs the service to collect posture \
+            data; elsewhere the app evaluates it itself."
         );
         Err(Status::unimplemented(
-            "Service-side posture checks are only supported on Unix systems",
+            "Service-side posture checks are not supported on this platform",
         ))
     }
 
@@ -555,13 +541,20 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(ListInterfacesResponse { interfaces }))
     }
 
+    /// Collects this device's posture data on the app's behalf.
+    ///
+    /// Windows-only, because only SYSTEM can query the WMI encryption namespace. This answers a
+    /// *user-initiated* check, hence `ClientDatabase` - inert on Windows, where the probe reports on
+    /// the system volume regardless, but it states which question is being answered.
     #[cfg(windows)]
     async fn get_posture_data(
         &self,
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         debug!("Get posture data request received");
-        Ok(Response::new(device_posture_data()))
+        Ok(Response::new(device_posture_data(
+            DiskEncryptionTarget::ClientDatabase,
+        )))
     }
 }
 

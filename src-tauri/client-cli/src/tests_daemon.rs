@@ -13,9 +13,8 @@ use std::{
 
 use defguard_client_proto::defguard::client::v1::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-    AuthorizePostureSessionRequest, AuthorizePostureSessionResponse, CreateInterfaceRequest,
-    DeleteServiceLocationsRequest, InterfaceData, ManagedInterfaceData, Peer,
-    ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+    CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ManagedInterfaceData,
+    Peer, ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
 use defguard_core::{
     connection::active_state::active_state,
@@ -107,13 +106,6 @@ impl DesktopDaemonService for MockDaemon {
         &self,
         _req: Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
-        Err(Status::unimplemented("not mocked"))
-    }
-
-    async fn authorize_posture_session(
-        &self,
-        _req: Request<AuthorizePostureSessionRequest>,
-    ) -> Result<Response<AuthorizePostureSessionResponse>, Status> {
         Err(Status::unimplemented("not mocked"))
     }
 

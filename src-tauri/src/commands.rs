@@ -150,6 +150,24 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
+            // A service location is the daemon's to manage: it brings the tunnel up with no user
+            // session at all. Connecting from here would put two managers on one tunnel, and since
+            // core keeps a single session per (device, location), each side's authorization
+            // supersedes the other's preshared key - so the app and the daemon would take turns
+            // breaking each other's tunnel indefinitely. The same reasoning is why service locations
+            // are already skipped by `disconnect_locations` and hidden from `all_active_connections`
+            // and `all_locations`; without this check they were still reachable by id.
+            if location.is_service_location() {
+                error!(
+                    "Refusing to connect location {location} from the app: it is a service \
+                    location, managed by the background service"
+                );
+                return Err(Error::InvalidInput(format!(
+                    "Location \"{}\" is a service location and is managed by the defguard service",
+                    location.name
+                ))
+                .into());
+            }
             // Connect-time MFA brings the tunnel up itself (keeping the preshared
             // key backend-side), so the only preshared key resolved here is for
             // posture-only locations.
