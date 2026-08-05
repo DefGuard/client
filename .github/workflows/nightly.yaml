@@ -347,6 +347,7 @@ jobs:
             echo '<!doctype html>'
             echo '<meta charset="utf-8">'
             echo '<title>defguard-client nightly builds</title>'
+            echo '<style>body{font-family:sans-serif;margin:2rem}table{border-collapse:collapse;margin-bottom:2rem}th,td{padding:.3rem 1.5rem .3rem 0;border-bottom:1px solid #ddd;white-space:nowrap}</style>'
             echo '<h1>defguard-client nightly builds</h1>'
             jq -r '
               (. // [])
