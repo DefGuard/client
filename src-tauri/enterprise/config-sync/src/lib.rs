@@ -20,7 +20,7 @@ use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 
-use crate::commands::{disable_enterprise_features, do_update_instance};
+use crate::commands::{disable_enterprise_features, do_update_instance, sync_service_locations};
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -250,6 +250,28 @@ pub async fn poll_instances(
     }
 
     transaction.commit().await?;
+
+    // Push to the daemon only after committing: `sync_service_locations` makes gRPC calls that
+    // would otherwise hold this write transaction open, and a failure here must not undo config
+    // that is already correct in the database - which would also discard a freshly rotated
+    // polling token.
+    //
+    // Pushed for *every* instance on *every* cycle, not just those the poll changed. That is what
+    // makes a failed push self-healing: the next cycle simply pushes again, with no record of the
+    // failure to keep. It costs nothing when nothing changed, because the daemon compares the
+    // request against what it already has and returns without touching any tunnel.
+    for instance in &instances {
+        if let Err(err) = sync_service_locations(pool, instance).await {
+            // Deliberately not propagated: the database is already committed and correct, and one
+            // unavailable daemon must not discard the polling outcomes of every other instance.
+            // The next cycle retries.
+            error!(
+                "Failed to push service locations to the daemon for instance {}({}): {err}.",
+                instance.name, instance.id
+            );
+        }
+    }
+
     Ok(outcomes)
 }
 

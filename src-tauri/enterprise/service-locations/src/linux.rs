@@ -16,7 +16,9 @@ use defguard_wireguard_rs::{
 };
 use log::{debug, error, warn};
 
-use crate::{ServiceLocationData, ServiceLocationError, ServiceLocationManager};
+use crate::{
+    is_unchanged_on_disk, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
+};
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
@@ -60,9 +62,14 @@ impl ServiceLocationManager {
 
     /// Persists Linux-supported service locations and resets their runtime connection state.
     ///
+    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection, so
+    /// this returns early when the data it would write matches what is already on disk, leaving the
+    /// running tunnels alone. Only a real change proceeds to the reset loop below.
+    ///
     /// Linux supports Always-on service locations only. Unsupported modes are filtered out before
-    /// storage, stale previously-saved locations are disconnected, and every saved Always-on location
-    /// is reset. All resets are attempted before returning an aggregate error.
+    /// storage - and before the comparison, so a PreLogon location does not read as a change on every
+    /// push. Stale previously-saved locations are disconnected, and every saved Always-on location is
+    /// reset. All resets are attempted before returning an aggregate error.
     pub fn save_service_locations(
         &mut self,
         request: &SaveServiceLocationsRequest,
@@ -99,6 +106,23 @@ impl ServiceLocationManager {
         ensure_shared_directory()?;
         let instance_file_path = get_instance_file_path(instance_id);
         let json = serde_json::to_string_pretty(&service_location_data)?;
+
+        // Saving is pushed unconditionally on every poll cycle, so nothing having changed is the
+        // normal case. Return before the reset loop below, which disconnects and reconnects every
+        // tunnel: proceeding would drop working tunnels at the poll interval forever. Permissions
+        // are still reapplied, so a file whose mode drifted is repaired even on this path.
+        if is_unchanged_on_disk(&instance_file_path, &json) {
+            debug!(
+                "Service locations for instance {instance_id} are unchanged, leaving {} and the \
+                existing tunnels untouched",
+                instance_file_path.display()
+            );
+            set_permissions(
+                &instance_file_path,
+                fs::Permissions::from_mode(SERVICE_LOCATION_FILE_PERMS),
+            )?;
+            return Ok(());
+        }
 
         debug!(
             "Writing service location data to file: {}",

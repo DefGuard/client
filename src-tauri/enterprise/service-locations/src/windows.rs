@@ -30,7 +30,8 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    ServiceLocationData, ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
+    is_unchanged_on_disk, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
+    SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -821,6 +822,11 @@ impl ServiceLocationManager {
         Ok(all_connected)
     }
 
+    /// Persists service locations and resets their runtime connection state.
+    ///
+    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection, so
+    /// this returns early when the data it would write matches what is already on disk, leaving the
+    /// running tunnels alone. Only a real change proceeds to the reset loop below.
     pub fn save_service_locations(
         &mut self,
         request: &SaveServiceLocationsRequest,
@@ -853,6 +859,27 @@ impl ServiceLocationManager {
             ServiceLocationData::from_save_request(request, service_locations.to_vec());
 
         let json = serde_json::to_string_pretty(&service_location_data)?;
+
+        // Saving is pushed unconditionally on every poll cycle, so nothing having changed is the
+        // normal case. Return before the reset loop below, which disconnects and reconnects every
+        // tunnel: proceeding would drop working tunnels at the poll interval forever. ACLs are
+        // still reapplied, so a file whose ACLs drifted is repaired even on this path.
+        if is_unchanged_on_disk(&instance_file_path, &json) {
+            debug!(
+                "Service locations for instance {instance_id} are unchanged, leaving {} and the \
+                existing tunnels untouched",
+                instance_file_path.display()
+            );
+            if let Some(file_path_str) = instance_file_path.to_str() {
+                if let Err(err) = set_protected_acls(file_path_str) {
+                    warn!(
+                        "Failed to reapply ACLs on unchanged service location file \
+                        {file_path_str}: {err}"
+                    );
+                }
+            }
+            return Ok(());
+        }
 
         debug!(
             "Writing service location data to file: {}",

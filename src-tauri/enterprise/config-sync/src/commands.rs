@@ -5,10 +5,13 @@ use defguard_client_core::{
     connection::daemon_client::DAEMON_CLIENT, database::models::wireguard_keys::WireguardKeys,
 };
 use defguard_client_core::{
-    database::models::{
-        instance::{ClientTrafficPolicy, Instance},
-        location::{infer_mfa_method, Location},
-        Id, NoId,
+    database::{
+        models::{
+            instance::{ClientTrafficPolicy, Instance},
+            location::{infer_mfa_method, Location},
+            Id, NoId,
+        },
+        DbPool,
     },
     error::Error,
     into_location,
@@ -45,6 +48,7 @@ pub async fn locations_changed(
     Ok(db_locations != core_locations)
 }
 
+/// Applies a fetched configuration to the local database. Returns whether the location set changed.
 pub async fn do_update_instance(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
@@ -143,8 +147,6 @@ pub async fn do_update_instance(
 			);
         }
         debug!("Finished updating locations for instance {instance}");
-
-        sync_service_locations(transaction, instance).await?;
     } else {
         info!("Locations for instance {instance} didn't change. Not updating them.");
     }
@@ -154,16 +156,17 @@ pub async fn do_update_instance(
 
 /// Synchronizes the daemon's persisted service-location state from the current database state.
 ///
-/// This is called after location config changes have been applied locally. It sends all currently
-/// persisted service locations for the instance to the daemon, or asks the daemon to delete its
-/// service-location state when none remain.
-pub async fn sync_service_locations(
-    transaction: &mut Transaction<'_, Sqlite>,
-    instance: &Instance<Id>,
-) -> Result<(), Error> {
+/// Sends all currently persisted service locations for the instance to the daemon, or asks the
+/// daemon to delete its service-location state when none remain. This is the **only** place that
+/// builds a `SaveServiceLocationsRequest`, so every caller pushes the same field set.
+///
+/// Takes a pool rather than a transaction deliberately: this performs gRPC calls that can each take
+/// seconds, and holding a SQLite write transaction open across them would block every other writer.
+/// **Call it after the surrounding transaction has committed**, so what is pushed is committed state
+/// and a slow or unavailable daemon cannot roll back the database.
+pub async fn sync_service_locations(pool: &DbPool, instance: &Instance<Id>) -> Result<(), Error> {
     let mut service_locations = Vec::new();
-    let current_locations =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
+    let current_locations = Location::find_by_instance_id(pool, instance.id, true).await?;
     for location in current_locations {
         if location.is_service_location() {
             debug!(
@@ -212,7 +215,7 @@ pub async fn sync_service_locations(
 
         #[cfg(not(target_os = "macos"))]
         {
-            let keys = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
+            let keys = WireguardKeys::find_by_instance_id(pool, instance.id)
                 .await?
                 .ok_or(Error::NotFound)?;
 

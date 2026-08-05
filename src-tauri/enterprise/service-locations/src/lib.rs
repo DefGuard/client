@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, fs, path::Path};
 #[cfg(any(windows, target_os = "linux"))]
 use std::{
     sync::{Arc, RwLock},
@@ -142,6 +142,20 @@ impl fmt::Debug for SingleServiceLocationData {
     }
 }
 
+/// Whether the file at `path` already holds exactly `contents`.
+///
+/// This is what makes a save idempotent. Service locations are pushed on **every** poll cycle so a
+/// failed push retries without any bookkeeping, which means the overwhelmingly common case is that
+/// nothing changed. Saving is not a cheap no-op by default: it ends by disconnecting and
+/// reconnecting every tunnel, so a save that proceeded regardless would drop working tunnels at the
+/// poll interval forever. Comparing here lets the caller return before any of that.
+///
+/// A read failure counts as "differs", so a missing or unreadable file is simply rewritten.
+#[must_use]
+pub fn is_unchanged_on_disk(path: &Path, contents: &str) -> bool {
+    fs::read_to_string(path).is_ok_and(|existing| existing == contents)
+}
+
 pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, CoreError> {
     if !location.is_service_location() {
         warn!("Location {location} is not a service location, so it can't be converted to one.");
@@ -222,6 +236,33 @@ pub async fn connect_service_locations(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A save is a no-op only if this comparison is exact: getting it wrong does not merely cost a
+    /// disk write, it drops and rebuilds every tunnel on the box.
+    #[test]
+    fn unchanged_contents_are_detected() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().join("locations.json");
+
+        assert!(
+            !is_unchanged_on_disk(&path, "first"),
+            "a missing file must count as changed"
+        );
+
+        fs::write(&path, "first").expect("failed to write");
+        assert!(
+            is_unchanged_on_disk(&path, "first"),
+            "identical contents must be detected as unchanged"
+        );
+        assert!(
+            !is_unchanged_on_disk(&path, "second"),
+            "different contents must be detected as changed"
+        );
+        assert!(
+            !is_unchanged_on_disk(&path, "first "),
+            "a trailing-whitespace difference must still count as changed"
+        );
+    }
 
     /// JSON exactly as written by a client that predates posture checks: no `proxy_url`,
     /// `device_pubkey`, `token` or `schema_version` at the top level, and no `network_id` or
