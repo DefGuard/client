@@ -23,6 +23,8 @@ jobs:
     secrets: inherit
 
   main:
+    needs: release-2-1
+    if: always()
     uses: ./.github/workflows/nightly-build-1x.yaml
     with:
       branch: main
