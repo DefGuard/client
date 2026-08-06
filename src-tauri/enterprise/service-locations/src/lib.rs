@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt, fs, path::Path};
 #[cfg(any(windows, target_os = "linux"))]
 use std::{
     sync::{Arc, RwLock},
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use defguard_client_core::{
@@ -63,6 +63,14 @@ pub struct ServiceLocationManager {
     wgapis: HashMap<String, WGApi>,
     // Instance ID: Service locations connected under that instance
     connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
+    // (Instance ID, location public key): when its posture session was last approved.
+    //
+    // Kept beside `connected_service_locations` rather than folded into it: the alternative meant
+    // changing that map's element type at every one of its call sites, most of them in Windows code
+    // that cannot be compiled here. Entries for locations that are no longer connected are pruned
+    // during the health check, so the two cannot drift apart for long.
+    #[cfg(any(windows, target_os = "linux"))]
+    posture_sessions: HashMap<(String, String), SystemTime>,
 }
 
 /// Current schema version of the on-disk service location JSON file.
@@ -200,6 +208,47 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
     })
 }
 
+/// How long a posture session may go without evidence of life before it is renewed.
+///
+/// Deliberately below core's default `peer_disconnect_threshold` of 300s, so a session is refreshed
+/// before core would drop the peer rather than after. A deployment that lowers that threshold below
+/// this one would need this plumbed through (D21).
+#[cfg(any(windows, target_os = "linux"))]
+pub const POSTURE_SESSION_STALE_AFTER: Duration = Duration::from_secs(180);
+
+/// Whether a posture session needs renewing.
+///
+/// The interface is the only honest source here. A location the daemon believes it connected can be
+/// dead: while a machine sleeps, core's `peer_disconnect_threshold` elapses and the gateway drops the
+/// peer, leaving an interface that looks perfectly healthy and passes nothing. A handshake is the
+/// evidence that the far side still has us.
+///
+/// `authorized_at` covers the case where no handshake has happened yet, which is normal immediately
+/// after connecting and suspicious a few minutes later. It is the one thing here that cannot be
+/// recovered from the interface, which is why it has to be remembered.
+#[cfg(any(windows, target_os = "linux"))]
+#[must_use]
+pub fn posture_session_is_stale(
+    last_handshake: Option<SystemTime>,
+    authorized_at: Option<SystemTime>,
+    now: SystemTime,
+) -> bool {
+    let beyond_threshold = |moment: SystemTime| {
+        now.duration_since(moment)
+            .is_ok_and(|elapsed| elapsed > POSTURE_SESSION_STALE_AFTER)
+    };
+
+    match (last_handshake, authorized_at) {
+        // A handshake is the strongest evidence available, so it wins whenever there is one.
+        (Some(handshake), _) => beyond_threshold(handshake),
+        // Never handshaken: expected just after connecting, suspicious much later.
+        (None, Some(authorized)) => beyond_threshold(authorized),
+        // Neither, so the daemon has no record of authorizing this at all. Renewing is the safe
+        // reading: at worst it is redundant, whereas assuming health leaves a dead tunnel up.
+        (None, None) => true,
+    }
+}
+
 /// A location that cannot be connected until a posture check approves it.
 ///
 /// Carries everything the request needs, so authorization can happen with no lock held. Note
@@ -285,6 +334,24 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
     keys
 }
 
+#[cfg(any(windows, target_os = "linux"))]
+impl ServiceLocationManager {
+    /// Forgets posture sessions for locations that are no longer connected.
+    ///
+    /// Keeps this map from being a second, drifting source of truth: a location that is removed or
+    /// disconnected would otherwise leave its timestamp behind forever, and a location reconnected
+    /// later would inherit it and look healthier than it is.
+    pub(crate) fn prune_posture_sessions(&mut self) {
+        self.posture_sessions.retain(|(instance_id, pubkey), _| {
+            self.connected_service_locations
+                .get(instance_id)
+                .is_some_and(|locations| {
+                    locations.iter().any(|location| location.pubkey == *pubkey)
+                })
+        });
+    }
+}
+
 /// Signal used to wake the reconciler before its next tick.
 ///
 /// `notify_one` is callable from synchronous code, which matters because the Windows watchers are
@@ -353,6 +420,73 @@ pub async fn run_reconciler(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(windows, target_os = "linux"))]
+    mod staleness {
+        use super::*;
+
+        fn ago(seconds: u64) -> SystemTime {
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000 - seconds)
+        }
+
+        fn now() -> SystemTime {
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000)
+        }
+
+        #[test]
+        fn a_recent_handshake_is_healthy() {
+            assert!(!posture_session_is_stale(
+                Some(ago(10)),
+                Some(ago(10_000)),
+                now()
+            ));
+        }
+
+        /// A handshake outranks `authorized_at`: the far side has stopped answering, and having
+        /// authorized recently does not make the tunnel work.
+        #[test]
+        fn an_old_handshake_is_stale_even_if_just_authorized() {
+            assert!(posture_session_is_stale(
+                Some(ago(1_000)),
+                Some(ago(1)),
+                now()
+            ));
+        }
+
+        /// Expected right after connecting - there has been no traffic to handshake for yet.
+        #[test]
+        fn no_handshake_yet_is_healthy_if_authorized_recently() {
+            assert!(!posture_session_is_stale(None, Some(ago(10)), now()));
+        }
+
+        /// The suspend case: authorized long ago, never handshaken, so nothing says it works.
+        #[test]
+        fn no_handshake_long_after_authorizing_is_stale() {
+            assert!(posture_session_is_stale(None, Some(ago(1_000)), now()));
+        }
+
+        /// No record at all. Renewing is redundant at worst; assuming health leaves a dead tunnel up.
+        #[test]
+        fn no_evidence_at_all_is_stale() {
+            assert!(posture_session_is_stale(None, None, now()));
+        }
+
+        /// A clock that moved backwards must not read as "ancient", which would renew every pass.
+        #[test]
+        fn a_handshake_in_the_future_is_not_stale() {
+            let future = now() + Duration::from_secs(60);
+            assert!(!posture_session_is_stale(Some(future), None, now()));
+        }
+
+        #[test]
+        fn the_threshold_boundary_is_not_yet_stale() {
+            assert!(!posture_session_is_stale(
+                Some(now() - POSTURE_SESSION_STALE_AFTER),
+                None,
+                now()
+            ));
+        }
+    }
 
     /// A save is a no-op only if this comparison is exact: getting it wrong does not merely cost a
     /// disk write, it drops and rebuilds every tunnel on the box.

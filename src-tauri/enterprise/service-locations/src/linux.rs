@@ -5,6 +5,7 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::PathBuf,
     str::FromStr,
+    time::SystemTime,
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
@@ -14,11 +15,11 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk, PostureAuthorizationRequest, PostureKeys, ServiceLocationData,
-    ServiceLocationError, ServiceLocationManager,
+    is_unchanged_on_disk, posture_session_is_stale, PostureAuthorizationRequest, PostureKeys,
+    ServiceLocationData, ServiceLocationError, ServiceLocationManager,
 };
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
@@ -452,11 +453,110 @@ impl ServiceLocationManager {
     ///
     /// Returns `Ok(true)` when every supported location is connected or already connected, and
     /// `Ok(false)` when at least one supported location failed so the caller can retry later.
+    /// Whether a connected location's posture session has stopped showing signs of life.
+    ///
+    /// Reads the handshake from the interface itself, because the daemon's own record of having
+    /// connected proves nothing: a suspend outlasts core's `peer_disconnect_threshold`, the gateway
+    /// drops the peer, and the interface carries on looking healthy while passing nothing.
+    fn posture_session_needs_renewal(&self, instance_id: &str, location_pubkey: &str) -> bool {
+        let authorized_at = self
+            .posture_sessions
+            .get(&(instance_id.to_string(), location_pubkey.to_string()))
+            .copied();
+        let last_handshake = self.read_last_handshake(location_pubkey);
+
+        let stale = posture_session_is_stale(last_handshake, authorized_at, SystemTime::now());
+        if stale {
+            debug!(
+                "Posture session for peer {location_pubkey} looks stale (last handshake: \
+                {last_handshake:?}), it will be renewed"
+            );
+        }
+        stale
+    }
+
+    /// Reads the last handshake for a peer from the interface carrying it.
+    ///
+    /// `None` means either no interface was found or the peer has never completed a handshake. The
+    /// staleness rule treats both the same, falling back to when the session was authorized.
+    fn read_last_handshake(&self, location_pubkey: &str) -> Option<SystemTime> {
+        let ifname = self.find_interface_by_peer_pubkey(location_pubkey)?;
+        let wgapi = self.wgapis.get(&ifname)?;
+        let host = wgapi
+            .read_interface_data()
+            .inspect_err(|err| {
+                warn!("Failed to read data for service location interface {ifname}: {err}");
+            })
+            .ok()?;
+        let peer_key = Key::from_str(location_pubkey).ok()?;
+        host.peers.get(&peer_key)?.last_handshake
+    }
+
+    /// Applies a freshly obtained preshared key to an already-running interface.
+    ///
+    /// Uses `configure_peer` rather than rebuilding the interface: on Linux that is a single netlink
+    /// call carrying the new key, so the tunnel keeps its listen port and the gap in traffic is as
+    /// short as it can be.
+    fn reapply_preshared_key(
+        &mut self,
+        instance_id: &str,
+        location: &ServiceLocation,
+        preshared_key: &str,
+    ) -> Result<(), ServiceLocationError> {
+        let Some(ifname) = self.find_interface_by_peer_pubkey(&location.pubkey) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "No interface found for service location '{}' while renewing its posture session",
+                location.name
+            )));
+        };
+        let Some(wgapi) = self.wgapis.get(&ifname) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "No WireGuard API for interface {ifname} while renewing a posture session"
+            )));
+        };
+
+        let mut peer = Peer::new(Key::from_str(&location.pubkey)?);
+        peer.set_endpoint(&location.endpoint)?;
+        peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
+        peer.preshared_key = Some(Key::from_str(preshared_key)?);
+        for allowed_ip in location.allowed_ips.split(',').map(str::trim) {
+            if allowed_ip.is_empty() {
+                continue;
+            }
+            match IpAddrMask::from_str(allowed_ip) {
+                Ok(addr) => peer.allowed_ips.push(addr),
+                Err(err) => error!(
+                    "Error parsing allowed IP {allowed_ip} while renewing service location {}: \
+                    {err}",
+                    location.name
+                ),
+            }
+        }
+
+        wgapi.configure_peer(&peer)?;
+        self.record_posture_session(instance_id, &location.pubkey);
+        info!(
+            "Renewed the posture session for Linux service location '{}'",
+            location.name
+        );
+        Ok(())
+    }
+
+    /// Notes that a location's posture session was just approved.
+    fn record_posture_session(&mut self, instance_id: &str, location_pubkey: &str) {
+        self.posture_sessions.insert(
+            (instance_id.to_string(), location_pubkey.to_string()),
+            SystemTime::now(),
+        );
+    }
+
     /// Brings the running tunnels in line with what is on disk.
     ///
     /// On Linux that is only ever "connect what is missing": the save path filters out everything but
     /// Always-on locations, so nothing persisted here should ever be deliberately down.
     pub fn reconcile(&mut self, keys: &PostureKeys) -> Result<bool, ServiceLocationError> {
+        self.prune_posture_sessions();
+
         self.connect_to_service_locations(keys)
     }
 
@@ -476,8 +576,15 @@ impl ServiceLocationManager {
             for location in instance_data.service_locations {
                 if !location.posture_check_required
                     || location.mode != ServiceLocationMode::AlwaysOn as i32
-                    || self
-                        .is_service_location_connected(&instance_data.instance_id, &location.pubkey)
+                {
+                    continue;
+                }
+
+                // A connected location is left alone unless its session has gone stale. Renewing a
+                // healthy one would supersede it in core for no reason.
+                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
+                    && !self
+                        .posture_session_needs_renewal(&instance_data.instance_id, &location.pubkey)
                 {
                     continue;
                 }
@@ -545,6 +652,26 @@ impl ServiceLocationManager {
                     None
                 };
 
+                // Already up and merely stale: swap the key in place rather than rebuilding, which
+                // would drop traffic for no reason.
+                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
+                {
+                    if let Some(preshared_key) = preshared_key {
+                        if let Err(err) = self.reapply_preshared_key(
+                            &instance_data.instance_id,
+                            &location,
+                            preshared_key,
+                        ) {
+                            warn!(
+                                "Failed to renew the posture session for '{}': {err}",
+                                location.name
+                            );
+                            all_connected = false;
+                        }
+                    }
+                    continue;
+                }
+
                 if let Err(err) = self.connect_service_location(
                     &instance_data.instance_id,
                     &location,
@@ -556,6 +683,8 @@ impl ServiceLocationManager {
                         location.name
                     );
                     all_connected = false;
+                } else if preshared_key.is_some() {
+                    self.record_posture_session(&instance_data.instance_id, &location.pubkey);
                 }
             }
         }
