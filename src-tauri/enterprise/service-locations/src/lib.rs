@@ -12,13 +12,18 @@ use defguard_client_core::{
     },
     error::Error as CoreError,
 };
+#[cfg(any(windows, target_os = "linux"))]
+use defguard_client_posture::{
+    inspector::{device_posture_data, DiskEncryptionTarget},
+    request_posture_authorization,
+};
 use defguard_client_proto::defguard::client::v1::{
     SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
 };
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 use log::warn;
 #[cfg(any(windows, target_os = "linux"))]
-use log::{debug, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
@@ -195,6 +200,91 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
     })
 }
 
+/// A location that cannot be connected until a posture check approves it.
+///
+/// Carries everything the request needs, so authorization can happen with no lock held. Note
+/// `network_id` is core's id for the location, which is what the posture endpoint expects, and
+/// `device_pubkey` is this device's key rather than the remote peer's.
+#[cfg(any(windows, target_os = "linux"))]
+#[derive(Debug)]
+pub struct PostureAuthorizationRequest {
+    pub instance_id: String,
+    pub location_pubkey: String,
+    pub location_name: String,
+    pub network_id: i64,
+    pub proxy_url: String,
+    pub device_pubkey: String,
+    pub token: Option<String>,
+}
+
+/// Preshared keys obtained this pass, keyed by (instance id, location public key).
+///
+/// A location whose key is absent is left alone rather than connected without one: connecting a
+/// posture-gated location with no key produces a tunnel that cannot pass traffic, which is worse
+/// than staying down, because it looks connected.
+#[cfg(any(windows, target_os = "linux"))]
+pub type PostureKeys = HashMap<(String, String), String>;
+
+/// Obtains a preshared key for each location that needs one.
+///
+/// Posture data is collected once per pass rather than once per location: on Windows that is a WMI
+/// query, and every location on a machine reports the same posture anyway.
+///
+/// Failures are logged and skipped, never propagated. A rejected device and an unreachable proxy are
+/// treated alike - the location simply is not connected, and the next pass tries again.
+#[cfg(any(windows, target_os = "linux"))]
+async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> PostureKeys {
+    let mut keys = PostureKeys::new();
+    if pending.is_empty() {
+        return keys;
+    }
+
+    debug!(
+        "{} service location(s) need a posture check before they can be connected",
+        pending.len()
+    );
+    let posture_data = device_posture_data(DiskEncryptionTarget::RootFilesystem);
+
+    for request in pending {
+        let Some(token) = request.token.clone().filter(|token| !token.is_empty()) else {
+            error!(
+                "Cannot run a posture check for service location '{}': no polling token was stored \
+                for its instance. Re-enrolling the device will store one.",
+                request.location_name
+            );
+            continue;
+        };
+
+        match request_posture_authorization(
+            &request.proxy_url,
+            request.device_pubkey.clone(),
+            request.network_id,
+            token,
+            posture_data.clone(),
+        )
+        .await
+        {
+            Ok(preshared_key) => {
+                info!(
+                    "Posture check approved for service location '{}'",
+                    request.location_name
+                );
+                keys.insert(
+                    (request.instance_id, request.location_pubkey),
+                    preshared_key,
+                );
+            }
+            Err(err) => error!(
+                "Posture check failed for service location '{}': {err}. It will stay disconnected \
+                and be retried.",
+                request.location_name
+            ),
+        }
+    }
+
+    keys
+}
+
 /// Signal used to wake the reconciler before its next tick.
 ///
 /// `notify_one` is callable from synchronous code, which matters because the Windows watchers are
@@ -225,12 +315,22 @@ pub async fn run_reconciler(
     info!("Service location reconciler started, reconciling every {tick:?}");
 
     loop {
-        // Scoped so the guard is dropped before the await below: a `std` guard is `!Send` and cannot
-        // be held across one. That is deliberate - it is what stops a slow operation from being
-        // performed while every other user of the manager waits.
+        // Authorize first, mutate second. Working out what needs a posture check takes only a read
+        // guard, the checks themselves are HTTP round trips of up to 5s each and are made with no
+        // guard at all, and only the final step takes the write guard.
+        //
+        // The ordering is enforced rather than merely intended: these are `std` guards, so they are
+        // `!Send` and holding one across the await below would not compile.
+        let pending = {
+            let manager = manager.read().unwrap();
+            manager.locations_needing_authorization()
+        };
+
+        let keys = authorize_pending(pending).await;
+
         let outcome = {
             let mut manager = manager.write().unwrap();
-            manager.reconcile()
+            manager.reconcile(&keys)
         };
 
         match outcome {

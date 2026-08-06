@@ -17,7 +17,8 @@ use defguard_wireguard_rs::{
 use log::{debug, error, warn};
 
 use crate::{
-    is_unchanged_on_disk, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
+    is_unchanged_on_disk, PostureAuthorizationRequest, PostureKeys, ServiceLocationData,
+    ServiceLocationError, ServiceLocationManager,
 };
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
@@ -162,7 +163,12 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Reconnects one Linux always-on service location.
+    /// Reconnects one Linux always-on service location after its configuration changed.
+    ///
+    /// A posture-gated location is only torn down here, not brought back: obtaining a preshared key
+    /// means an HTTP round trip, and this runs inside the gRPC save handler while the manager write
+    /// guard is held. The reconciler authorizes and reconnects it on its next pass instead, so the
+    /// location is down for at most one interval.
     fn reset_service_location_state(
         &mut self,
         instance_id: &str,
@@ -175,7 +181,17 @@ impl ServiceLocationManager {
         );
 
         self.disconnect_service_location(instance_id, &location.pubkey)?;
-        self.connect_service_location(instance_id, location, private_key)?;
+
+        if location.posture_check_required {
+            debug!(
+                "Leaving Linux service location '{}' disconnected: it needs a posture check, which \
+                the reconciler will run",
+                location.name
+            );
+            return Ok(());
+        }
+
+        self.connect_service_location(instance_id, location, private_key, None)?;
 
         debug!(
             "Linux service location '{}' state reset successfully",
@@ -325,10 +341,15 @@ impl ServiceLocationManager {
         &mut self,
         location: &ServiceLocation,
         private_key: &str,
+        preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
         let peer_key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
         peer.set_endpoint(&location.endpoint)?;
+        // Held only by the running interface. It is never written to the service location file,
+        // which already holds two long-lived secrets, and a session key is reconstructible by
+        // authorizing again.
+        peer.preshared_key = preshared_key.map(Key::from_str).transpose()?;
         peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
 
         for allowed_ip in location.allowed_ips.split(',').map(str::trim) {
@@ -399,6 +420,7 @@ impl ServiceLocationManager {
         instance_id: &str,
         location: &ServiceLocation,
         private_key: &str,
+        preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
         if self.is_service_location_connected(instance_id, &location.pubkey) {
             debug!(
@@ -420,7 +442,7 @@ impl ServiceLocationManager {
             return Ok(());
         }
 
-        self.setup_service_location_interface(location, private_key)?;
+        self.setup_service_location_interface(location, private_key, preshared_key)?;
         self.add_connected_service_location(instance_id, location);
         debug!("Connected Linux service location '{}'", location.name);
         Ok(())
@@ -434,11 +456,51 @@ impl ServiceLocationManager {
     ///
     /// On Linux that is only ever "connect what is missing": the save path filters out everything but
     /// Always-on locations, so nothing persisted here should ever be deliberately down.
-    pub fn reconcile(&mut self) -> Result<bool, ServiceLocationError> {
-        self.connect_to_service_locations()
+    pub fn reconcile(&mut self, keys: &PostureKeys) -> Result<bool, ServiceLocationError> {
+        self.connect_to_service_locations(keys)
     }
 
-    pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
+    /// Lists the locations that need a posture check before the next pass can connect them.
+    ///
+    /// Read-only, so the caller can hold a read guard briefly, release it, and do the network calls
+    /// unlocked. Locations that are already connected are excluded: re-authorizing a working tunnel
+    /// would supersede its session in core for no reason.
+    pub fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
+        let Ok(data) = self.load_service_locations() else {
+            warn!("Failed to load service locations while looking for posture checks to run");
+            return Vec::new();
+        };
+
+        let mut pending = Vec::new();
+        for instance_data in data {
+            for location in instance_data.service_locations {
+                if !location.posture_check_required
+                    || location.mode != ServiceLocationMode::AlwaysOn as i32
+                    || self
+                        .is_service_location_connected(&instance_data.instance_id, &location.pubkey)
+                {
+                    continue;
+                }
+
+                pending.push(PostureAuthorizationRequest {
+                    instance_id: instance_data.instance_id.clone(),
+                    location_pubkey: location.pubkey.clone(),
+                    location_name: location.name.clone(),
+                    network_id: location.network_id,
+                    proxy_url: instance_data.proxy_url.clone(),
+                    device_pubkey: instance_data.device_pubkey.clone(),
+                    token: instance_data.token.clone(),
+                });
+            }
+        }
+
+        pending
+    }
+
+    pub fn connect_to_service_locations(
+        &mut self,
+        keys: &PostureKeys,
+    ) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect Linux Always-on service locations");
 
         let data = self.load_service_locations()?;
@@ -463,10 +525,31 @@ impl ServiceLocationManager {
                     continue;
                 }
 
+                // A posture-gated location is only connected once a check has approved it. Without
+                // a key the tunnel would come up and pass nothing, which is worse than staying down
+                // because it looks healthy.
+                let preshared_key = if location.posture_check_required {
+                    let key =
+                        keys.get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
+                    if key.is_none() {
+                        debug!(
+                            "Leaving Linux service location '{}' disconnected: no posture check has \
+                            approved it yet",
+                            location.name
+                        );
+                        all_connected = false;
+                        continue;
+                    }
+                    key.map(String::as_str)
+                } else {
+                    None
+                };
+
                 if let Err(err) = self.connect_service_location(
                     &instance_data.instance_id,
                     &location,
                     &instance_data.private_key,
+                    preshared_key,
                 ) {
                     warn!(
                         "Failed to setup Linux service location interface for '{}': {err:?}",

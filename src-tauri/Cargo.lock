@@ -1745,6 +1745,7 @@ dependencies = [
  "base64 0.22.1",
  "defguard-client-common",
  "defguard-client-core",
+ "defguard-client-posture",
  "defguard-client-proto",
  "defguard_wireguard_rs",
  "known-folders",

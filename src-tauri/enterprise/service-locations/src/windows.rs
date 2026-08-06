@@ -29,8 +29,8 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, ReconcileSignal, ServiceLocationData, ServiceLocationError,
-    ServiceLocationManager, SingleServiceLocationData,
+    is_unchanged_on_disk, PostureAuthorizationRequest, PostureKeys, ReconcileSignal,
+    ServiceLocationData, ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -428,6 +428,22 @@ impl ServiceLocationManager {
             service_location_data.service_location.name
         );
 
+        // A posture-gated location is only torn down here, not brought back: obtaining a preshared
+        // key means an HTTP round trip, and this runs inside the gRPC save handler while the manager
+        // write guard is held. The reconciler authorizes and reconnects it on its next pass instead,
+        // so the location is down for at most one interval.
+        if service_location_data
+            .service_location
+            .posture_check_required
+        {
+            debug!(
+                "Leaving service location '{}' disconnected: it needs a posture check, which the \
+                reconciler will run",
+                service_location_data.service_location.name
+            );
+            return Ok(());
+        }
+
         // We should reconnect only if:
         // 1. It's an always on location
         // 2. It's a pre-logon location and the user is not logged in
@@ -550,11 +566,16 @@ impl ServiceLocationManager {
         &mut self,
         location: &ServiceLocation,
         private_key: &str,
+        preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
         let peer_key = Key::from_str(&location.pubkey)?;
 
         let mut peer = Peer::new(peer_key.clone());
         peer.set_endpoint(&location.endpoint)?;
+        // Held only by the running interface. It is never written to the service location file,
+        // which already holds two long-lived secrets, and a session key is reconstructible by
+        // authorizing again.
+        peer.preshared_key = preshared_key.map(Key::from_str).transpose()?;
 
         peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
 
@@ -657,6 +678,7 @@ impl ServiceLocationManager {
         self.setup_service_location_interface(
             &location_data.service_location,
             &location_data.private_key,
+            None,
         )?;
         self.add_connected_service_location(
             &location_data.instance_id,
@@ -736,16 +758,59 @@ impl ServiceLocationManager {
     /// having observed the event. Deriving it from `is_user_logged_in()` instead makes the pass
     /// correct on its own, so the watchers can be reduced to "something happened, look again" and a
     /// missed event costs a tick rather than leaving a tunnel up that should be down.
-    pub fn reconcile(&mut self) -> Result<bool, ServiceLocationError> {
+    pub fn reconcile(&mut self, keys: &PostureKeys) -> Result<bool, ServiceLocationError> {
         if is_user_logged_in() {
             debug!("A user is logged in, disconnecting any connected pre-logon service locations");
             self.disconnect_service_locations(ServiceLocationMode::PreLogon)?;
         }
 
-        self.connect_to_service_locations()
+        self.connect_to_service_locations(keys)
     }
 
-    pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
+    /// Lists the locations that need a posture check before the next pass can connect them.
+    ///
+    /// Read-only, so the caller can hold a read guard briefly, release it, and do the network calls
+    /// unlocked. Excludes anything already connected, and anything that should not be up right now -
+    /// re-authorizing a working tunnel would supersede its session in core for no reason, and
+    /// authorizing a pre-logon location while a user is logged in would be wasted work.
+    pub fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
+        let Ok(data) = self.load_service_locations() else {
+            warn!("Failed to load service locations while looking for posture checks to run");
+            return Vec::new();
+        };
+
+        let user_logged_in = is_user_logged_in();
+        let mut pending = Vec::new();
+
+        for instance_data in data {
+            for location in instance_data.service_locations {
+                if !location.posture_check_required
+                    || self
+                        .is_service_location_connected(&instance_data.instance_id, &location.pubkey)
+                    || (location.mode == ServiceLocationMode::PreLogon as i32 && user_logged_in)
+                {
+                    continue;
+                }
+
+                pending.push(PostureAuthorizationRequest {
+                    instance_id: instance_data.instance_id.clone(),
+                    location_pubkey: location.pubkey.clone(),
+                    location_name: location.name.clone(),
+                    network_id: location.network_id,
+                    proxy_url: instance_data.proxy_url.clone(),
+                    device_pubkey: instance_data.device_pubkey.clone(),
+                    token: instance_data.token.clone(),
+                });
+            }
+        }
+
+        pending
+    }
+
+    pub fn connect_to_service_locations(
+        &mut self,
+        keys: &PostureKeys,
+    ) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect to VPN...");
 
         let data = self.load_service_locations()?;
@@ -789,9 +854,31 @@ impl ServiceLocationManager {
                     continue;
                 }
 
-                if let Err(err) =
-                    self.setup_service_location_interface(&location, &instance_data.private_key)
-                {
+                // A posture-gated location is only connected once a check has approved it. Without
+                // a key the tunnel would come up and pass nothing, which is worse than staying down
+                // because it looks healthy.
+                let preshared_key = if location.posture_check_required {
+                    let key =
+                        keys.get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
+                    if key.is_none() {
+                        debug!(
+                            "Leaving service location '{}' disconnected: no posture check has \
+                            approved it yet",
+                            location.name
+                        );
+                        all_connected = false;
+                        continue;
+                    }
+                    key.map(String::as_str)
+                } else {
+                    None
+                };
+
+                if let Err(err) = self.setup_service_location_interface(
+                    &location,
+                    &instance_data.private_key,
+                    preshared_key,
+                ) {
                     warn!(
                         "Failed to setup service location interface for '{}': {err:?}",
                         location.name
