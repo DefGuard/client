@@ -83,8 +83,10 @@ pub fn watch_for_network_change(wake: ReconcileSignal) {
 /// logged in for itself, so a logon and a logoff are both simply "look again". That is what lets this
 /// thread stay out of the manager entirely.
 ///
-/// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall.
-pub fn watch_for_login_logoff(wake: &ReconcileSignal) -> Result<(), ServiceLocationError> {
+/// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall. It never
+/// returns: a failed wait is retried after a delay rather than reported, since there is nothing a
+/// caller could usefully do about it.
+pub fn watch_for_login_logoff(wake: &ReconcileSignal) -> ! {
     loop {
         let mut event_flags: u32 = 0;
         let success = unsafe {
@@ -666,9 +668,14 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    /// Disconnects every connected service location in `mode`.
+    ///
+    /// Takes the mode directly rather than an `Option` meaning "all modes": the only caller is the
+    /// reconcile pass tearing down pre-logon locations once a user logs in, and an all-modes teardown
+    /// has never been asked for. `disconnect_service_locations_by_instance` covers the other case.
     pub(crate) fn disconnect_service_locations(
         &mut self,
-        mode: Option<ServiceLocationMode>,
+        mode: ServiceLocationMode,
     ) -> Result<(), ServiceLocationError> {
         debug!("Disconnecting service locations with mode: {mode:?}");
 
@@ -679,16 +686,14 @@ impl ServiceLocationManager {
                     location_pubkey: {}",
                     location.pubkey
                 );
-                if let Some(m) = mode {
-                    let location_mode: ServiceLocationMode = location.mode.try_into()?;
-                    if location_mode != m {
-                        debug!(
+                let location_mode: ServiceLocationMode = location.mode.try_into()?;
+                if location_mode != mode {
+                    debug!(
                         "Skipping interface {} due to the service location mode doesn't match the \
-                        requested mode (expected {m:?}, found {:?})",
+                        requested mode (expected {mode:?}, found {:?})",
                         location.name, location.mode
                     );
-                        continue;
-                    }
+                    continue;
                 }
 
                 let ifname = get_interface_name(&location.name);
@@ -706,15 +711,12 @@ impl ServiceLocationManager {
         }
 
         self.remove_connected_service_locations(|_, location| {
-            if let Some(m) = mode {
-                let location_mode: ServiceLocationMode = location
-                    .mode
-                    .try_into()
-                    .unwrap_or(ServiceLocationMode::AlwaysOn);
-                location_mode == m
-            } else {
-                true
-            }
+            // An unparseable mode is left in place rather than removed: dropping the record of a
+            // tunnel that is still up would leak it.
+            location
+                .mode
+                .try_into()
+                .is_ok_and(|location_mode: ServiceLocationMode| location_mode == mode)
         })?;
 
         debug!("Service locations disconnected.");
@@ -737,7 +739,7 @@ impl ServiceLocationManager {
     pub fn reconcile(&mut self) -> Result<bool, ServiceLocationError> {
         if is_user_logged_in() {
             debug!("A user is logged in, disconnecting any connected pre-logon service locations");
-            self.disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
+            self.disconnect_service_locations(ServiceLocationMode::PreLogon)?;
         }
 
         self.connect_to_service_locations()

@@ -30,7 +30,6 @@ use crate::{
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
-const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
@@ -163,25 +162,7 @@ fn run_service() -> Result<(), DaemonError> {
             .name("login-logoff-monitor".to_string())
             .spawn(move || {
                 info!("Starting login/logoff event monitoring");
-                loop {
-                    match watch_for_login_logoff(&wake) {
-                        Ok(()) => {
-                            warn!(
-                                "Login/logoff event monitoring ended unexpectedly. Restarting in \
-                                {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
-                            );
-                            std::thread::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS);
-                        }
-                        Err(e) => {
-                            error!(
-                                "Error in login/logoff event monitoring: {e}. Restarting in \
-                                {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
-                            );
-                            std::thread::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS);
-                            info!("Restarting login/logoff event monitoring");
-                        }
-                    }
-                }
+                watch_for_login_logoff(&wake);
             })
             .expect("Failed to spawn login/logoff monitor thread");
 
