@@ -430,6 +430,14 @@ impl ServiceLocationManager {
     ///
     /// Returns `Ok(true)` when every supported location is connected or already connected, and
     /// `Ok(false)` when at least one supported location failed so the caller can retry later.
+    /// Brings the running tunnels in line with what is on disk.
+    ///
+    /// On Linux that is only ever "connect what is missing": the save path filters out everything but
+    /// Always-on locations, so nothing persisted here should ever be deliberately down.
+    pub fn reconcile(&mut self) -> Result<bool, ServiceLocationError> {
+        self.connect_to_service_locations()
+    }
+
     pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect Linux Always-on service locations");
 

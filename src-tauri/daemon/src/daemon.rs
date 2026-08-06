@@ -23,7 +23,7 @@ use defguard_client_proto::defguard::{
 };
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
-use defguard_client_service_locations::ServiceLocationManager;
+use defguard_client_service_locations::{ReconcileSignal, ServiceLocationManager};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -57,10 +57,12 @@ pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 #[cfg(target_os = "linux")]
 pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
+/// How often the reconciler brings running tunnels back in line with what is on disk.
+///
+/// On Windows this is a backstop, since the watchers wake it on network, logon and resume events. On
+/// Linux nothing wakes it, so this is the only trigger and sets the worst-case recovery time.
 #[cfg(any(windows, target_os = "linux"))]
-pub(crate) const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
-#[cfg(any(windows, target_os = "linux"))]
-pub(crate) const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
+pub(crate) const SERVICE_LOCATION_RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
@@ -564,14 +566,14 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     #[cfg(target_os = "linux")]
     let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
+    // Nothing wakes the reconciler on Linux - there are no network, logon or resume watchers - so
+    // the tick is its only trigger.
     #[cfg(target_os = "linux")]
-    tokio::spawn(
-        defguard_client_service_locations::connect_service_locations(
-            service_location_manager.clone(),
-            SERVICE_LOCATION_CONNECT_RETRY_COUNT,
-            SERVICE_LOCATION_CONNECT_RETRY_DELAY,
-        ),
-    );
+    tokio::spawn(defguard_client_service_locations::run_reconciler(
+        service_location_manager.clone(),
+        ReconcileSignal::default(),
+        SERVICE_LOCATION_RECONCILE_INTERVAL,
+    ));
 
     let daemon_service = DaemonService::new(
         &config,

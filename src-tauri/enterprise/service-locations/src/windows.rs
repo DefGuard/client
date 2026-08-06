@@ -5,7 +5,6 @@ use std::{
     path::PathBuf,
     result::Result,
     str::FromStr,
-    sync::{Arc, RwLock},
     thread::sleep,
     time::Duration,
 };
@@ -30,8 +29,8 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
-    SingleServiceLocationData,
+    is_unchanged_on_disk, ReconcileSignal, ServiceLocationData, ServiceLocationError,
+    ServiceLocationManager, SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -50,11 +49,12 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 /// yet available. When the network comes up and an IP is assigned, this watcher fires and
 /// retries the connection.
 ///
-/// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is
-/// harmless because `connect_to_service_locations` skips already-connected locations.
+/// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is harmless
+/// because a reconcile pass leaves already-correct locations alone.
 ///
-/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall.
-pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLocationManager>>) {
+/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall. It only wakes the
+/// reconciler and never touches the manager itself, so tunnel state has a single owner.
+pub fn watch_for_network_change(wake: ReconcileSignal) {
     loop {
         // NotifyAddrChange blocks until any IP address is added or removed on any interface.
         // Passing NULL for both handle and overlapped selects the synchronous (blocking) mode.
@@ -72,29 +72,19 @@ pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLoca
         );
         sleep(NETWORK_STABILIZATION_DELAY);
 
-        debug!("Attempting to connect to service locations after network change");
-        let connect_result = service_location_manager
-            .write()
-            .unwrap()
-            .connect_to_service_locations();
-        match connect_result {
-            Ok(_) => {
-                debug!("Service location connect attempt after network change completed");
-            }
-            Err(err) => {
-                warn!("Failed to connect to service locations after network change: {err}");
-            }
-        }
+        debug!("Waking the service location reconciler after a network change");
+        wake.notify_one();
     }
 }
 
-/// Watches for user logon/logoff events and connects/disconnects pre-logon service locations
-/// accordingly.
+/// Watches for user logon and logoff events and wakes the reconciler.
+///
+/// Which event occurred is deliberately not passed on: the reconciler establishes whether a user is
+/// logged in for itself, so a logon and a logoff are both simply "look again". That is what lets this
+/// thread stay out of the manager entirely.
 ///
 /// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall.
-pub fn watch_for_login_logoff(
-    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
-) -> Result<(), ServiceLocationError> {
+pub fn watch_for_login_logoff(wake: &ReconcileSignal) -> Result<(), ServiceLocationError> {
     loop {
         let mut event_flags: u32 = 0;
         let success = unsafe {
@@ -116,19 +106,9 @@ pub fn watch_for_login_logoff(
             }
         };
 
-        if event_flags & WTS_EVENT_LOGON != 0 {
-            debug!("Detected user logon, attempting to auto-disconnect from service locations.");
-            service_location_manager
-                .write()
-                .unwrap()
-                .disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
-        }
-        if event_flags & WTS_EVENT_LOGOFF != 0 {
-            debug!("Detected user logoff, attempting to auto-connect to service locations.");
-            service_location_manager
-                .write()
-                .unwrap()
-                .connect_to_service_locations()?;
+        if event_flags & (WTS_EVENT_LOGON | WTS_EVENT_LOGOFF) != 0 {
+            debug!("Detected a logon or logoff, waking the service location reconciler");
+            wake.notify_one();
         }
     }
 }
@@ -747,6 +727,22 @@ impl ServiceLocationManager {
     /// Returns `Ok(true)` if every location is now connected (either it was already connected or
     /// it was successfully connected during this call), and `Ok(false)` if at least one location
     /// failed to connect (indicating that a retry may be worthwhile).
+    /// Brings the running tunnels in line with what is on disk and who is logged in.
+    ///
+    /// Both directions, unlike `connect_to_service_locations` alone. Tearing down a pre-logon location
+    /// once a user logs in used to happen only in the logon event handler, which meant it depended on
+    /// having observed the event. Deriving it from `is_user_logged_in()` instead makes the pass
+    /// correct on its own, so the watchers can be reduced to "something happened, look again" and a
+    /// missed event costs a tick rather than leaving a tunnel up that should be down.
+    pub fn reconcile(&mut self) -> Result<bool, ServiceLocationError> {
+        if is_user_logged_in() {
+            debug!("A user is logged in, disconnecting any connected pre-logon service locations");
+            self.disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
+        }
+
+        self.connect_to_service_locations()
+    }
+
     pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect to VPN...");
 

@@ -16,9 +16,9 @@ use defguard_client_proto::defguard::client::v1::{
     SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
 };
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
-#[cfg(any(windows, target_os = "linux"))]
-use log::info;
 use log::warn;
+#[cfg(any(windows, target_os = "linux"))]
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
@@ -195,42 +195,59 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
     })
 }
 
-/// Repeatedly attempts to auto-connect all persisted service locations until every location
-/// connects or `retry_count` attempts are exhausted, sleeping `retry_delay` between attempts.
+/// Signal used to wake the reconciler before its next tick.
 ///
-/// Safe to call at startup: `connect_to_service_locations` skips already-connected locations, so
-/// retrying is idempotent. Intended to be spawned as a background task by the daemon, which owns
-/// the retry policy and passes it in.
+/// `notify_one` is callable from synchronous code, which matters because the Windows watchers are
+/// plain OS threads wrapping blocking syscalls. A wake that arrives while a pass is already running
+/// is remembered rather than dropped, so an event can never be missed by arriving at a bad moment.
 #[cfg(any(windows, target_os = "linux"))]
-pub async fn connect_service_locations(
+pub type ReconcileSignal = std::sync::Arc<tokio::sync::Notify>;
+
+/// Brings the running tunnels in line with what is on disk, forever.
+///
+/// Replaces a retry loop that gave up permanently after a fixed number of attempts, which left a
+/// machine that booted before its network was ready disconnected until the service restarted. This
+/// never gives up: every tick it looks at what should be running and fixes the difference.
+///
+/// Each pass is idempotent - already-correct locations are left alone - so waking it spuriously
+/// costs nothing, and callers are free to wake it whenever something *might* have changed rather
+/// than working out whether it did.
+///
+/// `wake` is the only way to react faster than `tick`. On Windows it is signalled by the network,
+/// logon and resume watchers. **On Linux nothing signals it**, so there the tick is the sole trigger
+/// and recovery from any disruption takes up to one interval.
+#[cfg(any(windows, target_os = "linux"))]
+pub async fn run_reconciler(
     manager: Arc<RwLock<ServiceLocationManager>>,
-    retry_count: u32,
-    retry_delay: Duration,
+    wake: ReconcileSignal,
+    tick: Duration,
 ) {
-    for attempt in 1..=retry_count {
-        info!("Attempting to auto-connect service locations (attempt {attempt}/{retry_count})");
-        match manager.write().unwrap().connect_to_service_locations() {
-            Ok(true) => {
-                info!(
-                    "All service locations connected successfully (attempt {attempt}/{retry_count})"
-                );
-                break;
-            }
+    info!("Service location reconciler started, reconciling every {tick:?}");
+
+    loop {
+        // Scoped so the guard is dropped before the await below: a `std` guard is `!Send` and cannot
+        // be held across one. That is deliberate - it is what stops a slow operation from being
+        // performed while every other user of the manager waits.
+        let outcome = {
+            let mut manager = manager.write().unwrap();
+            manager.reconcile()
+        };
+
+        match outcome {
+            Ok(true) => debug!("Service locations reconciled, everything is as it should be"),
             Ok(false) => warn!(
-                "Service location auto-connect attempt {attempt}/{retry_count} completed with some \
-                failures"
+                "Service location reconcile pass completed with failures, retrying in {tick:?}"
             ),
             Err(err) => {
-                warn!("Service location auto-connect attempt {attempt}/{retry_count} failed: {err}")
+                warn!("Service location reconcile pass failed: {err}. Retrying in {tick:?}");
             }
         }
 
-        if attempt < retry_count {
-            tokio::time::sleep(retry_delay).await;
+        tokio::select! {
+            () = tokio::time::sleep(tick) => {}
+            () = wake.notified() => debug!("Service location reconciler woken early by an event"),
         }
     }
-
-    info!("Service location auto-connect task finished");
 }
 
 #[cfg(test)]
