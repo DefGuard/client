@@ -19,18 +19,7 @@ pub enum ResolvedTarget {
     Tunnel(Tunnel<Id>),
 }
 
-/// Resolve a target for the `connect` command.
-///
-/// Rejects service locations. They belong to the daemon, which brings them up with no user session at
-/// all, so letting a user act on one puts two managers on a single tunnel: core keeps one session per
-/// (device, location), so each side's authorization supersedes the other's preshared key and the two
-/// take turns breaking each other. The app treats them the same way, hiding them from its location
-/// list and skipping them when disconnecting.
-///
-/// Note `--name` was already safe: `Location::find_by_name` filters service locations out in SQL, so it
-/// reports them as not found. `--id` goes through `Location::find_by_id`, which takes no such filter,
-/// and that is the gap this closes. The check sits here rather than in the `--id` branch so a future
-/// resolution path cannot reintroduce it.
+/// Resolve a target for the `connect` command. Rejects service locations.
 pub async fn resolve_connect_target(
     spec: &TargetSpec,
     pool: &DbPool,
@@ -277,9 +266,9 @@ mod tests {
         }
     }
 
-    /// Service locations are the daemon's: connecting to one would make the app and the daemon
-    /// supersede each other's session indefinitely. `--name` was already safe because
-    /// `Location::find_by_name` filters them out in SQL; `--id` was not, and that is the gap.
+    /// Service locations belong to the daemon: connecting to one would make the app and the daemon
+    /// supersede each other's session indefinitely. `--name` is safe because
+    /// `Location::find_by_name` filters them out in SQL; `--id` is not safe.
     #[sqlx::test(migrations = "../migrations")]
     async fn test_service_location_is_not_resolvable(pool: DbPool) {
         let i = sample_instance("acme").save(&pool).await.unwrap();
@@ -323,7 +312,7 @@ mod tests {
     /// A regular location on the same instance must still resolve, so the check above is not simply
     /// rejecting everything.
     #[sqlx::test(migrations = "../migrations")]
-    async fn test_regular_location_still_resolves_alongside_a_service_location(pool: DbPool) {
+    async fn test_regular_location_resolves_alongside_a_service_location(pool: DbPool) {
         let i = sample_instance("acme").save(&pool).await.unwrap();
         let mut service = sample_location("headless", i.id);
         service.service_location_mode = ServiceLocationMode::AlwaysOn;

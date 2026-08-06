@@ -319,10 +319,7 @@ impl ServiceLocationManager {
             warn!("Failed to convert path to string for ACL setting");
         }
 
-        let manager = Self {
-            wgapis: HashMap::new(),
-            connected_service_locations: HashMap::new(),
-        };
+        let manager = Self::default();
 
         debug!("ServiceLocationApi initialized successfully");
         Ok(manager)
