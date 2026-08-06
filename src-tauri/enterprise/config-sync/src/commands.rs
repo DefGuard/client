@@ -157,8 +157,7 @@ pub async fn do_update_instance(
 /// Synchronizes the daemon's persisted service-location state from the current database state.
 ///
 /// Sends all currently persisted service locations for the instance to the daemon, or asks the
-/// daemon to delete its service-location state when none remain. This is the **only** place that
-/// builds a `SaveServiceLocationsRequest`, so every caller pushes the same field set.
+/// daemon to delete its service-location state when none remain.
 ///
 /// Takes a pool rather than a transaction deliberately: this performs gRPC calls that can each take
 /// seconds, and holding a SQLite write transaction open across them would block every other writer.

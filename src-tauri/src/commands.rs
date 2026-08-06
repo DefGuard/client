@@ -150,13 +150,8 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
-            // A service location is the daemon's to manage: it brings the tunnel up with no user
-            // session at all. Connecting from here would put two managers on one tunnel, and since
-            // core keeps a single session per (device, location), each side's authorization
-            // supersedes the other's preshared key - so the app and the daemon would take turns
-            // breaking each other's tunnel indefinitely. The same reasoning is why service locations
-            // are already skipped by `disconnect_locations` and hidden from `all_active_connections`
-            // and `all_locations`; without this check they were still reachable by id.
+
+            // Avoid connecting a service location - they should be managed by the background service.
             if location.is_service_location() {
                 error!(
                     "Refusing to connect location {location} from the app: it is a service \
@@ -415,8 +410,6 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
 
-    // `do_update_instance` no longer pushes to the daemon itself, so every path that applies a
-    // fetched config has to do it here, after the commit.
     if let Err(err) = sync_service_locations(&DB_POOL, &instance).await {
         error!(
             "Failed to push service locations to the daemon for instance {instance} after polling \
@@ -525,9 +518,7 @@ async fn push_service_locations(_instance: &Instance<Id>) -> Result<Vec<Location
 /// Pushes the instance's service locations to the daemon and returns all of its locations.
 ///
 /// Delegates to [`sync_service_locations`] rather than building its own request, so the pushed
-/// field set cannot drift from the config-sync path. Note this means an instance with no service
-/// locations now asks the daemon to clear its state, which the previous inline version skipped -
-/// correct on re-enrollment, where stale daemon state would otherwise survive.
+/// field set cannot drift from the config-sync path.
 #[cfg(not(target_os = "macos"))]
 async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
@@ -728,8 +719,6 @@ pub async fn update_instance(
             do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        // After the commit, and unconditionally: `locations_changed` is blind to a `proxy_url` or
-        // polling-token change, and this is the path a re-enrollment takes (D23).
         if let Err(err) = sync_service_locations(&DB_POOL, &instance).await {
             error!(
                 "Failed to push service locations to the daemon for instance {instance} after \

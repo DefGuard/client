@@ -51,9 +51,7 @@ fn run_service() -> Result<(), DaemonError> {
     let (shutdown_tx, shutdown_rx) = mpsc::channel::<u32>();
     let shutdown_tx_server = shutdown_tx.clone();
 
-    // One signal, shared by everything that can notice the world changed. Created here because the
-    // control handler below is registered before the service location manager exists, and a
-    // `Notify` remembers a wake that arrives before anyone is listening.
+    // One signal, shared by everything that can notice wake/suspend etc. events.
     let wake_reconciler = ReconcileSignal::default();
     let wake_on_power_event = wake_reconciler.clone();
 
@@ -72,8 +70,7 @@ fn run_service() -> Result<(), DaemonError> {
 
             // Resuming from sleep leaves tunnels that were established before the suspend looking
             // alive but no longer passing traffic, so wake the reconciler rather than waiting up to a
-            // full tick. This arrives here and not through `WTSWaitSystemEvent`, which has no power
-            // event; the service control handler is the only place a service is told.
+            // full tick.
             ServiceControl::PowerEvent(param) => {
                 debug!("Received power event: {param:?}");
                 if matches!(

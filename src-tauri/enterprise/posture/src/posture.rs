@@ -21,9 +21,6 @@ const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
 /// Collects device posture data, sends it to the proxy, and returns the optional runtime preshared
 /// key. Core approves without a key when posture checks were removed from the location.
-///
-/// The app's entry point: reads the instance, keys and token from the local database. The daemon has
-/// no database, so it calls [`request_posture_authorization`] directly with values from its RPC.
 pub async fn authorize_posture_session(location: &Location<Id>) -> Result<Option<String>, Error> {
     let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
         .await?
@@ -58,9 +55,6 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<Option
 }
 
 /// Sends a posture check to the proxy and returns the optional runtime preshared key on approval.
-///
-/// Every input is passed explicitly so this works for both callers: the app, which reads them from its
-/// database, and the daemon, which has none and reads them from the service-location file it persists.
 ///
 /// Note `device_pubkey` is the *device's* WireGuard public key, not a remote peer key, and
 /// `location_id` is core's `WireguardNetwork` id (`Location::network_id`), not the client-local
@@ -123,10 +117,6 @@ pub async fn request_posture_authorization(
 }
 
 /// Collects this device's posture data for a *user-initiated* check.
-///
-/// Windows asks the daemon, because only SYSTEM can query the WMI encryption namespace. Everywhere
-/// else the app can answer for itself, and should: this is the user's check, so `disk_encryption` is
-/// evaluated against the partition holding the client database rather than against `/`.
 pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     #[cfg(windows)]
     {

@@ -76,9 +76,6 @@ pub struct ServiceLocationManager {
 }
 
 /// Current schema version of the on-disk service location JSON file.
-///
-/// Files written by older clients predate versioning and deserialize with `schema_version == 0`
-/// (see the `#[serde(default)]` on [`ServiceLocationData::schema_version`]).
 pub const SERVICE_LOCATION_SCHEMA_VERSION: u32 = 1;
 
 #[allow(dead_code)]
@@ -157,13 +154,8 @@ impl fmt::Debug for SingleServiceLocationData {
     }
 }
 
-/// Whether the file at `path` already holds exactly `contents`.
-///
-/// This is what makes a save idempotent. Service locations are pushed on **every** poll cycle so a
-/// failed push retries without any bookkeeping, which means the overwhelmingly common case is that
-/// nothing changed. Saving is not a cheap no-op by default: it ends by disconnecting and
-/// reconnecting every tunnel, so a save that proceeded regardless would drop working tunnels at the
-/// poll interval forever. Comparing here lets the caller return before any of that.
+/// Whether the file at `path` already holds exactly `contents`. Makes a save idempotent thus
+/// allowing pushing service locations on every poll cycle.
 ///
 /// A read failure counts as "differs", so a missing or unreadable file is simply rewritten.
 #[must_use]

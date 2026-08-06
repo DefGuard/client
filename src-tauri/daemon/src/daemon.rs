@@ -236,8 +236,7 @@ impl DesktopDaemonService for DaemonService {
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         warn!(
-            "Received a get_posture_data request. Only Windows needs the service to collect posture \
-            data; elsewhere the app evaluates it itself."
+            "Daemon service received a get_posture_data request. Daemon posture requests are only supported on windows systems. Unix systems perform client-side posture checks."
         );
         Err(Status::unimplemented(
             "Service-side posture checks are not supported on this platform",
@@ -544,10 +543,6 @@ impl DesktopDaemonService for DaemonService {
     }
 
     /// Collects this device's posture data on the app's behalf.
-    ///
-    /// Windows-only, because only SYSTEM can query the WMI encryption namespace. This answers a
-    /// *user-initiated* check, hence `ClientDatabase` - inert on Windows, where the probe reports on
-    /// the system volume regardless, but it states which question is being answered.
     #[cfg(windows)]
     async fn get_posture_data(
         &self,

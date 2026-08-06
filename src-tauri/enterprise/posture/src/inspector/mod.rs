@@ -16,11 +16,6 @@ use defguard_client_proto::defguard::enterprise::posture::v2::{
 use sysinfo::System;
 
 /// Which filesystem the disk-encryption check should be evaluated against.
-///
-/// Only matters on Linux, whose probe inspects the device stack backing a specific path; Windows and
-/// macOS query the system volume regardless. It exists because the two callers legitimately mean
-/// different things, and the previous parameterless probe silently answered for whichever process
-/// happened to call it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DiskEncryptionTarget {
     /// The partition backing the client's own database, i.e. the logged-in user's data. What a
@@ -66,9 +61,6 @@ fn linux_kernel_version() -> Result<String, UnavailableReason> {
 }
 
 /// Returns the disk encryption status for `target`.
-///
-/// `target` is only consulted on Linux; Windows and macOS report on the system volume whatever is
-/// asked for.
 fn disk_encryption_status(target: DiskEncryptionTarget) -> Result<bool, UnavailableReason> {
     // Only the Linux probe is path-sensitive.
     #[cfg(not(target_os = "linux"))]
