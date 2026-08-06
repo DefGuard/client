@@ -1,8 +1,5 @@
 name: "Nightly builds"
 on:
-  push:
-    branches:
-      - build-nightly
   schedule:
     - cron: "0 23 * * *"
   workflow_dispatch:
