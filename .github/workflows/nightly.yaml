@@ -1,8 +1,5 @@
 name: "Nightly builds"
 on:
-  push:
-    branches:
-      - nightly-builds
   schedule:
     - cron: "0 23 * * *"
   workflow_dispatch:
@@ -73,7 +70,7 @@ jobs:
               | .[]
               | "<h2>\(.[0].key | split("/")[1])</h2>",
                 "<table><tr><th align=\"left\">File</th><th align=\"right\">Size</th><th align=\"left\">Uploaded on (UTC)</th></tr>",
-                (.[] | "<tr><td><a href=\"/\(.key)\">\(.key | split("/")[2])</a></td><td align=\"right\">\((.size / 104857.6 | round) / 10) MiB</td><td>\(.modified)</td></tr>"),
+                (.[] | "<tr><td><a href=\"/\(.key)\">\(.key | split("/")[2])</a></td><td align=\"right\">\((.size / 104857.6 | round) / 10) MiB</td><td>\(.modified[0:10]) \(.modified[11:16])</td></tr>"),
                 "</table>"
             ' objects.json
           } > index.html
