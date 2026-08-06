@@ -29,9 +29,9 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, posture_session_is_stale, PostureAuthorizationRequest, PostureKeys,
-    ReconcileSignal, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
-    SingleServiceLocationData,
+    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
+    PostureAuthorizations, ReconcileAction, ReconcileSignal, ServiceLocationData,
+    ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -121,6 +121,48 @@ fn setup_wgapi(ifname: &str) -> Result<WGApi, ServiceLocationError> {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         ServiceLocationError::InterfaceError(msg)
+    })
+}
+
+fn interface_configuration(
+    location: &ServiceLocation,
+    private_key: &str,
+    preshared_key: Option<&str>,
+    port: u16,
+) -> Result<InterfaceConfiguration, ServiceLocationError> {
+    let mut peer = Peer::new(Key::from_str(&location.pubkey)?);
+    peer.set_endpoint(&location.endpoint)?;
+    // Held only by the running interface. It is never written to the service location file,
+    // which already holds two long-lived secrets, and a session key is reconstructible by
+    // authorizing again.
+    peer.preshared_key = preshared_key.map(Key::from_str).transpose()?;
+    peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
+
+    for allowed_ip in location.allowed_ips.split(',') {
+        match IpAddrMask::from_str(allowed_ip) {
+            Ok(addr) => peer.allowed_ips.push(addr),
+            Err(err) => error!(
+                "Error parsing IP address {allowed_ip} while setting up interface for location \
+                {location:?}, error details: {err}"
+            ),
+        }
+    }
+
+    let addresses = location
+        .address
+        .split(',')
+        .map(str::trim)
+        .map(IpAddrMask::from_str)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(InterfaceConfiguration {
+        name: location.name.clone(),
+        prvkey: private_key.to_string(),
+        addresses,
+        port,
+        peers: vec![peer],
+        mtu: None,
+        fwmark: None, // TODO: add
     })
 }
 
@@ -566,52 +608,12 @@ impl ServiceLocationManager {
         private_key: &str,
         preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
-        let peer_key = Key::from_str(&location.pubkey)?;
-
-        let mut peer = Peer::new(peer_key.clone());
-        peer.set_endpoint(&location.endpoint)?;
-        // Held only by the running interface. It is never written to the service location file,
-        // which already holds two long-lived secrets, and a session key is reconstructible by
-        // authorizing again.
-        peer.preshared_key = preshared_key.map(Key::from_str).transpose()?;
-
-        peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
-
-        let allowed_ips = location
-            .allowed_ips
-            .split(',')
-            .map(str::to_string)
-            .collect::<Vec<String>>();
-
-        for allowed_ip in &allowed_ips {
-            match IpAddrMask::from_str(allowed_ip) {
-                Ok(addr) => {
-                    peer.allowed_ips.push(addr);
-                }
-                Err(err) => {
-                    error!(
-                        "Error parsing IP address {allowed_ip} while setting up interface for \
-                        location {location:?}, error details: {err}"
-                    );
-                }
-            }
-        }
-
-        let mut addresses = Vec::new();
-
-        for address in location.address.split(',') {
-            addresses.push(IpAddrMask::from_str(address.trim())?);
-        }
-
-        let config = InterfaceConfiguration {
-            name: location.name.clone(),
-            prvkey: private_key.to_string(),
-            addresses,
-            port: find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
-            peers: vec![peer.clone()],
-            mtu: None,
-            fwmark: None, // TODO: add
-        };
+        let config = interface_configuration(
+            location,
+            private_key,
+            preshared_key,
+            find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
+        )?;
 
         let ifname = location.name.clone();
         let ifname = get_interface_name(&ifname);
@@ -792,16 +794,24 @@ impl ServiceLocationManager {
     /// Applies a freshly obtained preshared key to an already-running interface.
     ///
     /// Reconfigures the whole interface rather than the single peer, because `configure_peer` does
-    /// nothing on Windows. `configure_interface` reuses the existing adapter, so this is still an
-    /// in-place update rather than a teardown.
+    /// nothing on Windows. The tracked API owns the existing adapter, so renewal configures that
+    /// adapter directly without opening/creating an interface or replacing the API handle.
     fn reapply_preshared_key(
         &mut self,
         instance_id: &str,
         location: &ServiceLocation,
         private_key: &str,
-        preshared_key: &str,
+        preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
-        self.setup_service_location_interface(location, private_key, Some(preshared_key))?;
+        let ifname = get_interface_name(&location.name);
+        let Some(wgapi) = self.wgapis.get(&ifname) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "No WireGuard API for interface {ifname} while renewing a posture session"
+            )));
+        };
+        let port = wgapi.read_interface_data()?.listen_port;
+        let config = interface_configuration(location, private_key, preshared_key, port)?;
+        wgapi.configure_interface(&config)?;
         self.record_posture_session(instance_id, &location.pubkey);
         info!(
             "Renewed the posture session for service location '{}'",
@@ -825,7 +835,10 @@ impl ServiceLocationManager {
     /// having observed the event. Deriving it from `is_user_logged_in()` instead makes the pass
     /// correct on its own, so the watchers can be reduced to "something happened, look again" and a
     /// missed event costs a tick rather than leaving a tunnel up that should be down.
-    pub fn reconcile(&mut self, keys: &PostureKeys) -> Result<bool, ServiceLocationError> {
+    pub fn reconcile(
+        &mut self,
+        authorizations: &PostureAuthorizations,
+    ) -> Result<bool, ServiceLocationError> {
         self.prune_posture_sessions();
 
         if is_user_logged_in() {
@@ -833,7 +846,7 @@ impl ServiceLocationManager {
             self.disconnect_service_locations(ServiceLocationMode::PreLogon)?;
         }
 
-        self.connect_to_service_locations(keys)
+        self.connect_to_service_locations(authorizations)
     }
 
     /// Lists the locations that need a posture check before the next pass can connect them.
@@ -875,6 +888,7 @@ impl ServiceLocationManager {
                     proxy_url: instance_data.proxy_url.clone(),
                     device_pubkey: instance_data.device_pubkey.clone(),
                     token: instance_data.token.clone(),
+                    configuration_generation: self.configuration_generation,
                 });
             }
         }
@@ -884,7 +898,7 @@ impl ServiceLocationManager {
 
     pub fn connect_to_service_locations(
         &mut self,
-        keys: &PostureKeys,
+        authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect to VPN...");
 
@@ -920,40 +934,36 @@ impl ServiceLocationManager {
                     );
                 }
 
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                {
-                    debug!(
-                        "Skipping service location '{}' because it's already connected",
-                        location.name
-                    );
-                    continue;
-                }
+                let authorization = authorizations
+                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
+                let action = reconcile_action(
+                    self.is_service_location_connected(
+                        &instance_data.instance_id,
+                        &location.pubkey,
+                    ),
+                    location.posture_check_required,
+                    authorization,
+                    self.configuration_generation,
+                );
 
-                // A posture-gated location is only connected once a check has approved it. Without
-                // a key the tunnel would come up and pass nothing, which is worse than staying down
-                // because it looks healthy.
-                let preshared_key = if location.posture_check_required {
-                    let key =
-                        keys.get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
-                    if key.is_none() {
+                match action {
+                    ReconcileAction::LeaveConnected => {
+                        debug!(
+                            "Skipping service location '{}' because it's already connected",
+                            location.name
+                        );
+                        continue;
+                    }
+                    ReconcileAction::WaitForAuthorization => {
                         debug!(
                             "Leaving service location '{}' disconnected: no posture check has \
-                            approved it yet",
+							approved it yet",
                             location.name
                         );
                         all_connected = false;
                         continue;
                     }
-                    key.map(String::as_str)
-                } else {
-                    None
-                };
-
-                // Already up and merely stale: swap the key in place rather than rebuilding, which
-                // would drop traffic for no reason.
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                {
-                    if let Some(preshared_key) = preshared_key {
+                    ReconcileAction::Renew(preshared_key) => {
                         if let Err(err) = self.reapply_preshared_key(
                             &instance_data.instance_id,
                             &location,
@@ -966,39 +976,44 @@ impl ServiceLocationManager {
                             );
                             all_connected = false;
                         }
+                        continue;
                     }
-                    continue;
-                }
+                    ReconcileAction::Connect(preshared_key) => {
+                        if let Err(err) = self.setup_service_location_interface(
+                            &location,
+                            &instance_data.private_key,
+                            preshared_key,
+                        ) {
+                            warn!(
+                                "Failed to setup service location interface for '{}': {err:?}",
+                                location.name
+                            );
+                            all_connected = false;
+                            continue;
+                        }
 
-                if let Err(err) = self.setup_service_location_interface(
-                    &location,
-                    &instance_data.private_key,
-                    preshared_key,
-                ) {
-                    warn!(
-                        "Failed to setup service location interface for '{}': {err:?}",
-                        location.name
-                    );
-                    all_connected = false;
-                    continue;
-                }
+                        if let Err(err) = self
+                            .add_connected_service_location(&instance_data.instance_id, &location)
+                        {
+                            debug!(
+                                "Failed to persist connected service location after auto-connect: \
+								{err:?}"
+                            );
+                        }
 
-                if let Err(err) =
-                    self.add_connected_service_location(&instance_data.instance_id, &location)
-                {
-                    debug!(
-                        "Failed to persist connected service location after auto-connect: {err:?}"
-                    );
-                }
+                        if authorization.is_some() {
+                            self.record_posture_session(
+                                &instance_data.instance_id,
+                                &location.pubkey,
+                            );
+                        }
 
-                if preshared_key.is_some() {
-                    self.record_posture_session(&instance_data.instance_id, &location.pubkey);
+                        debug!(
+                            "Successfully connected to service location '{}'",
+                            location.name
+                        );
+                    }
                 }
-
-                debug!(
-                    "Successfully connected to service location '{}'",
-                    location.name
-                );
             }
         }
 
@@ -1072,6 +1087,7 @@ impl ServiceLocationManager {
         );
 
         fs::write(&instance_file_path, &json)?;
+        self.note_configuration_changed();
 
         if let Some(file_path_str) = instance_file_path.to_str() {
             debug!("Setting ACLs on service location file: {file_path_str}");

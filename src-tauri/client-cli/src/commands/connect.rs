@@ -159,7 +159,7 @@ pub async fn handle(
                 let psk = authorize_posture_session(location)
                     .await
                     .map_err(|e| CliError::Other(e.to_string()))?;
-                (location.name.clone(), Some(psk), state.app_config.mtu())
+                (location.name.clone(), psk, state.app_config.mtu())
             } else {
                 (location.name.clone(), None, state.app_config.mtu())
             }

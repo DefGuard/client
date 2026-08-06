@@ -19,11 +19,12 @@ use crate::inspector::{device_posture_data, DiskEncryptionTarget};
 
 const POSTURE_ENDPOINT: &str = "/api/v1/posture/connect";
 
-/// Collects device posture data, sends it to the proxy, and returns the runtime preshared key.
+/// Collects device posture data, sends it to the proxy, and returns the optional runtime preshared
+/// key. Core approves without a key when posture checks were removed from the location.
 ///
 /// The app's entry point: reads the instance, keys and token from the local database. The daemon has
 /// no database, so it calls [`request_posture_authorization`] directly with values from its RPC.
-pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String, Error> {
+pub async fn authorize_posture_session(location: &Location<Id>) -> Result<Option<String>, Error> {
     let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
         .await?
         .ok_or(Error::NotFound)?;
@@ -56,7 +57,7 @@ pub async fn authorize_posture_session(location: &Location<Id>) -> Result<String
     .await
 }
 
-/// Sends a posture check to the proxy and returns the runtime preshared key on approval.
+/// Sends a posture check to the proxy and returns the optional runtime preshared key on approval.
 ///
 /// Every input is passed explicitly so this works for both callers: the app, which reads them from its
 /// database, and the daemon, which has none and reads them from the service-location file it persists.
@@ -70,7 +71,7 @@ pub async fn request_posture_authorization(
     location_id: Id,
     token: String,
     posture_data: DevicePostureData,
-) -> Result<String, Error> {
+) -> Result<Option<String>, Error> {
     let request = DevicePostureCheckRequest {
         location_id,
         pubkey: device_pubkey,
@@ -95,7 +96,7 @@ pub async fn request_posture_authorization(
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
             info!("Posture check approved for location {location_id}");
-            Ok(body.preshared_key)
+            Ok((!body.preshared_key.is_empty()).then_some(body.preshared_key))
         }
         StatusCode::FORBIDDEN => {
             #[derive(Deserialize)]

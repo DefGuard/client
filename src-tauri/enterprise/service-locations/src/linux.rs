@@ -18,8 +18,9 @@ use defguard_wireguard_rs::{
 use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk, posture_session_is_stale, PostureAuthorizationRequest, PostureKeys,
-    ServiceLocationData, ServiceLocationError, ServiceLocationManager,
+    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
+    PostureAuthorizations, ReconcileAction, ServiceLocationData, ServiceLocationError,
+    ServiceLocationManager,
 };
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
@@ -53,6 +54,15 @@ fn remove_created_interface(wgapi: &WGApi, ifname: &str) {
             "Failed to remove Linux service location interface {ifname} after setup failure: {err}"
         );
     }
+}
+
+fn preshared_key_update(preshared_key: Option<&str>) -> Result<Key, ServiceLocationError> {
+    // Netlink interprets an omitted attribute as "leave unchanged". WireGuard's explicit all-zero
+    // key removes the PSK from an existing peer.
+    Ok(match preshared_key {
+        Some(preshared_key) => Key::from_str(preshared_key)?,
+        None => Key::default(),
+    })
 }
 
 impl ServiceLocationManager {
@@ -131,6 +141,7 @@ impl ServiceLocationManager {
             instance_file_path.display()
         );
         fs::write(&instance_file_path, json)?;
+        self.note_configuration_changed();
         set_permissions(
             &instance_file_path,
             fs::Permissions::from_mode(SERVICE_LOCATION_FILE_PERMS),
@@ -501,7 +512,7 @@ impl ServiceLocationManager {
         &mut self,
         instance_id: &str,
         location: &ServiceLocation,
-        preshared_key: &str,
+        preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
         let Some(ifname) = self.find_interface_by_peer_pubkey(&location.pubkey) else {
             return Err(ServiceLocationError::InterfaceError(format!(
@@ -518,7 +529,7 @@ impl ServiceLocationManager {
         let mut peer = Peer::new(Key::from_str(&location.pubkey)?);
         peer.set_endpoint(&location.endpoint)?;
         peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
-        peer.preshared_key = Some(Key::from_str(preshared_key)?);
+        peer.preshared_key = Some(preshared_key_update(preshared_key)?);
         for allowed_ip in location.allowed_ips.split(',').map(str::trim) {
             if allowed_ip.is_empty() {
                 continue;
@@ -554,10 +565,13 @@ impl ServiceLocationManager {
     ///
     /// On Linux that is only ever "connect what is missing": the save path filters out everything but
     /// Always-on locations, so nothing persisted here should ever be deliberately down.
-    pub fn reconcile(&mut self, keys: &PostureKeys) -> Result<bool, ServiceLocationError> {
+    pub fn reconcile(
+        &mut self,
+        authorizations: &PostureAuthorizations,
+    ) -> Result<bool, ServiceLocationError> {
         self.prune_posture_sessions();
 
-        self.connect_to_service_locations(keys)
+        self.connect_to_service_locations(authorizations)
     }
 
     /// Lists the locations that need a posture check before the next pass can connect them.
@@ -597,6 +611,7 @@ impl ServiceLocationManager {
                     proxy_url: instance_data.proxy_url.clone(),
                     device_pubkey: instance_data.device_pubkey.clone(),
                     token: instance_data.token.clone(),
+                    configuration_generation: self.configuration_generation,
                 });
             }
         }
@@ -606,7 +621,7 @@ impl ServiceLocationManager {
 
     pub fn connect_to_service_locations(
         &mut self,
-        keys: &PostureKeys,
+        authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect Linux Always-on service locations");
 
@@ -623,40 +638,36 @@ impl ServiceLocationManager {
                     continue;
                 }
 
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                {
-                    debug!(
-                        "Skipping Linux service location '{}' because it's already connected",
-                        location.name
-                    );
-                    continue;
-                }
+                let authorization = authorizations
+                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
+                let action = reconcile_action(
+                    self.is_service_location_connected(
+                        &instance_data.instance_id,
+                        &location.pubkey,
+                    ),
+                    location.posture_check_required,
+                    authorization,
+                    self.configuration_generation,
+                );
 
-                // A posture-gated location is only connected once a check has approved it. Without
-                // a key the tunnel would come up and pass nothing, which is worse than staying down
-                // because it looks healthy.
-                let preshared_key = if location.posture_check_required {
-                    let key =
-                        keys.get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
-                    if key.is_none() {
+                match action {
+                    ReconcileAction::LeaveConnected => {
                         debug!(
-                            "Leaving Linux service location '{}' disconnected: no posture check has \
-                            approved it yet",
+                            "Skipping Linux service location '{}' because it's already connected",
                             location.name
                         );
+                        continue;
+                    }
+                    ReconcileAction::WaitForAuthorization => {
+                        debug!(
+							"Leaving Linux service location '{}' disconnected: no posture check has \
+							approved it yet",
+							location.name
+						);
                         all_connected = false;
                         continue;
                     }
-                    key.map(String::as_str)
-                } else {
-                    None
-                };
-
-                // Already up and merely stale: swap the key in place rather than rebuilding, which
-                // would drop traffic for no reason.
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                {
-                    if let Some(preshared_key) = preshared_key {
+                    ReconcileAction::Renew(preshared_key) => {
                         if let Err(err) = self.reapply_preshared_key(
                             &instance_data.instance_id,
                             &location,
@@ -668,23 +679,27 @@ impl ServiceLocationManager {
                             );
                             all_connected = false;
                         }
+                        continue;
                     }
-                    continue;
-                }
-
-                if let Err(err) = self.connect_service_location(
-                    &instance_data.instance_id,
-                    &location,
-                    &instance_data.private_key,
-                    preshared_key,
-                ) {
-                    warn!(
-                        "Failed to setup Linux service location interface for '{}': {err:?}",
-                        location.name
-                    );
-                    all_connected = false;
-                } else if preshared_key.is_some() {
-                    self.record_posture_session(&instance_data.instance_id, &location.pubkey);
+                    ReconcileAction::Connect(preshared_key) => {
+                        if let Err(err) = self.connect_service_location(
+                            &instance_data.instance_id,
+                            &location,
+                            &instance_data.private_key,
+                            preshared_key,
+                        ) {
+                            warn!(
+								"Failed to setup Linux service location interface for '{}': {err:?}",
+								location.name
+							);
+                            all_connected = false;
+                        } else if authorization.is_some() {
+                            self.record_posture_session(
+                                &instance_data.instance_id,
+                                &location.pubkey,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -751,5 +766,15 @@ impl ServiceLocationManager {
 
         let data = fs::read_to_string(instance_file_path)?;
         Ok(Some(serde_json::from_str::<ServiceLocationData>(&data)?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removing_a_preshared_key_emits_an_explicit_zero_key() {
+        assert_eq!(preshared_key_update(None).unwrap(), Key::default());
     }
 }

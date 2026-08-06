@@ -63,6 +63,8 @@ pub struct ServiceLocationManager {
     wgapis: HashMap<String, WGApi>,
     // Instance ID: Service locations connected under that instance
     connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
+    #[cfg(any(windows, target_os = "linux"))]
+    configuration_generation: u64,
     // (Instance ID, location public key): when its posture session was last approved.
     //
     // Kept beside `connected_service_locations` rather than folded into it: the alternative meant
@@ -264,15 +266,57 @@ pub struct PostureAuthorizationRequest {
     pub proxy_url: String,
     pub device_pubkey: String,
     pub token: Option<String>,
+    pub configuration_generation: u64,
 }
 
-/// Preshared keys obtained this pass, keyed by (instance id, location public key).
+/// Posture approvals obtained this pass, keyed by (instance id, location public key).
 ///
-/// A location whose key is absent is left alone rather than connected without one: connecting a
-/// posture-gated location with no key produces a tunnel that cannot pass traffic, which is worse
-/// than staying down, because it looks connected.
+/// An absent map entry means authorization failed and leaves the location alone. A present entry
+/// with no key means core approved connecting without a PSK because posture checks were removed.
 #[cfg(any(windows, target_os = "linux"))]
-pub type PostureKeys = HashMap<(String, String), String>;
+pub struct PostureAuthorization {
+    configuration_generation: u64,
+    preshared_key: Option<String>,
+}
+
+#[cfg(any(windows, target_os = "linux"))]
+pub type PostureAuthorizations = HashMap<(String, String), PostureAuthorization>;
+
+/// What one reconcile pass should do with a persisted service location.
+///
+/// An authorization is present only when posture authorization succeeded during this pass. Its key
+/// may be absent when posture checks were removed from the location.
+#[cfg(any(windows, target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReconcileAction<'a> {
+    LeaveConnected,
+    WaitForAuthorization,
+    Renew(Option<&'a str>),
+    Connect(Option<&'a str>),
+}
+
+#[cfg(any(windows, target_os = "linux"))]
+#[must_use]
+pub(crate) fn reconcile_action(
+    is_connected: bool,
+    posture_check_required: bool,
+    authorization: Option<&PostureAuthorization>,
+    configuration_generation: u64,
+) -> ReconcileAction<'_> {
+    let authorization = authorization
+        .filter(|authorization| authorization.configuration_generation == configuration_generation)
+        .map(|authorization| authorization.preshared_key.as_deref());
+
+    if is_connected {
+        return authorization.map_or(ReconcileAction::LeaveConnected, ReconcileAction::Renew);
+    }
+
+    if posture_check_required && authorization.is_none() {
+        ReconcileAction::WaitForAuthorization
+    } else {
+        ReconcileAction::Connect(authorization.flatten())
+    }
+}
 
 /// Obtains a preshared key for each location that needs one.
 ///
@@ -282,10 +326,10 @@ pub type PostureKeys = HashMap<(String, String), String>;
 /// Failures are logged and skipped, never propagated. A rejected device and an unreachable proxy are
 /// treated alike - the location simply is not connected, and the next pass tries again.
 #[cfg(any(windows, target_os = "linux"))]
-async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> PostureKeys {
-    let mut keys = PostureKeys::new();
+async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> PostureAuthorizations {
+    let mut authorizations = PostureAuthorizations::new();
     if pending.is_empty() {
-        return keys;
+        return authorizations;
     }
 
     debug!(
@@ -318,9 +362,12 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
                     "Posture check approved for service location '{}'",
                     request.location_name
                 );
-                keys.insert(
+                authorizations.insert(
                     (request.instance_id, request.location_pubkey),
-                    preshared_key,
+                    PostureAuthorization {
+                        configuration_generation: request.configuration_generation,
+                        preshared_key,
+                    },
                 );
             }
             Err(err) => error!(
@@ -331,11 +378,15 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
         }
     }
 
-    keys
+    authorizations
 }
 
 #[cfg(any(windows, target_os = "linux"))]
 impl ServiceLocationManager {
+    pub(crate) fn note_configuration_changed(&mut self) {
+        self.configuration_generation = self.configuration_generation.wrapping_add(1);
+    }
+
     /// Forgets posture sessions for locations that are no longer connected.
     ///
     /// Keeps this map from being a second, drifting source of truth: a location that is removed or
@@ -393,11 +444,11 @@ pub async fn run_reconciler(
             manager.locations_needing_authorization()
         };
 
-        let keys = authorize_pending(pending).await;
+        let authorizations = authorize_pending(pending).await;
 
         let outcome = {
             let mut manager = manager.write().unwrap();
-            manager.reconcile(&keys)
+            manager.reconcile(&authorizations)
         };
 
         match outcome {
@@ -485,6 +536,65 @@ mod tests {
                 None,
                 now()
             ));
+        }
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    mod reconciliation {
+        use super::*;
+
+        fn authorization(
+            configuration_generation: u64,
+            preshared_key: Option<&str>,
+        ) -> PostureAuthorization {
+            PostureAuthorization {
+                configuration_generation,
+                preshared_key: preshared_key.map(str::to_string),
+            }
+        }
+
+        #[test]
+        fn connected_location_with_fresh_key_is_renewed() {
+            let authorization = authorization(1, Some("fresh-key"));
+            assert_eq!(
+                reconcile_action(true, true, Some(&authorization), 1),
+                ReconcileAction::Renew(Some("fresh-key"))
+            );
+        }
+
+        #[test]
+        fn approval_without_a_key_connects_without_a_key() {
+            let authorization = authorization(1, None);
+            assert_eq!(
+                reconcile_action(false, true, Some(&authorization), 1),
+                ReconcileAction::Connect(None)
+            );
+        }
+
+        #[test]
+        fn approval_without_a_key_removes_the_old_key_from_a_connected_location() {
+            let authorization = authorization(1, None);
+            assert_eq!(
+                reconcile_action(true, true, Some(&authorization), 1),
+                ReconcileAction::Renew(None)
+            );
+        }
+
+        #[test]
+        fn authorization_failure_keeps_a_posture_location_disconnected() {
+            assert_eq!(
+                reconcile_action(false, true, None, 1),
+                ReconcileAction::WaitForAuthorization
+            );
+        }
+
+        #[test]
+        fn authorization_from_an_older_configuration_is_discarded() {
+            let authorization = authorization(1, Some("stale-key"));
+            assert_eq!(
+                reconcile_action(false, true, Some(&authorization), 2),
+                ReconcileAction::WaitForAuthorization
+            );
         }
     }
 

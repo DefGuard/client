@@ -172,7 +172,7 @@ pub async fn connect(
             // key backend-side), so the only preshared key resolved here is for
             // posture-only locations.
             let preshared_key = if location.posture_check_required {
-                Some(authorize_posture_session(&location).await?)
+                authorize_posture_session(&location).await?
             } else {
                 None
             };
