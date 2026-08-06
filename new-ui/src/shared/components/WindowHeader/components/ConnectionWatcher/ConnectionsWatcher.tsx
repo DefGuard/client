@@ -14,7 +14,8 @@ import {
 } from '@floating-ui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Snackbar } from '../../../../providers/snackbar/snackbar';
 import { api } from '../../../../rust-api/api';
 import { Direction, ThemeSpacing, ThemeVariable } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
@@ -28,7 +29,10 @@ type Props = {
 
 export const ConnectionWatcher = ({ placement = 'bottom-start' }: Props) => {
   const { mutate: disconnect } = useMutation({
-    mutationFn: api.disconnectLocations,
+    mutationFn: api.disconnect,
+    onError: () => {
+      Snackbar.error('Failed to disconnect.');
+    },
   });
 
   const { data: connections } = useQuery({
@@ -40,6 +44,25 @@ export const ConnectionWatcher = ({ placement = 'bottom-start' }: Props) => {
   const connected = (connections?.length ?? 0) > 0;
 
   const [floatingOpen, setFloatingOpen] = useState(false);
+
+  const disconnectAllPromise = useMemo(() => {
+    return () =>
+      Promise.all(
+        (connections ?? []).map((connection) =>
+          api.disconnect({
+            locationId: connection.id,
+            connectionType: connection.connection_type,
+          }),
+        ),
+      );
+  }, [connections]);
+
+  const { mutate: disconnectAll } = useMutation({
+    mutationFn: disconnectAllPromise,
+    onError: () => {
+      Snackbar.error('Failed to disconnect all locations.');
+    },
+  });
 
   useEffect(() => {
     if (!connected) {
@@ -114,7 +137,10 @@ export const ConnectionWatcher = ({ placement = 'bottom-start' }: Props) => {
                 className="connection"
                 key={con.id}
                 onClick={() => {
-                  disconnect([con.id]);
+                  disconnect({
+                    locationId: con.id,
+                    connectionType: con.connection_type,
+                  });
                 }}
               >
                 <svg
@@ -133,10 +159,7 @@ export const ConnectionWatcher = ({ placement = 'bottom-start' }: Props) => {
             <button
               className="disconnect"
               onClick={() => {
-                const ids = connections?.map((c) => c.id);
-                if (ids) {
-                  disconnect(ids);
-                }
+                void disconnectAll();
               }}
             >
               <Icon size={16} icon="disconnect-all" />

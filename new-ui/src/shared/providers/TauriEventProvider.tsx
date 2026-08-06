@@ -94,6 +94,8 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         void queryClient.invalidateQueries({ queryKey: ['instances'] });
         void queryClient.invalidateQueries({ queryKey: ['location-details'] });
         void queryClient.invalidateQueries({ queryKey: ['last-connection'] });
+        void queryClient.invalidateQueries({ queryKey: ['tunnels'] });
+        void queryClient.invalidateQueries({ queryKey: ['tunnel-details'] });
       }),
 
       listen(TauriEvent.InstanceUpdate, (event) => {
