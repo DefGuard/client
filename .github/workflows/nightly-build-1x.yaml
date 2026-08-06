@@ -125,6 +125,7 @@ jobs:
     runs-on:
       - self-hosted
       - macOS
+      - native
     steps:
       - uses: actions/checkout@v6
         with:
@@ -170,7 +171,7 @@ jobs:
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
 
       - name: Unlock keychain
-        run: security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
+        run: security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
 
       - name: Build app
         uses: tauri-apps/tauri-action@v0
@@ -181,8 +182,10 @@ jobs:
 
       - name: Build installation package
         run: |
-          security -v unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" login.keychain
-          xcrun productbuild --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" /Applications defguard-client.pkg
+          xcrun productbuild --keychain build.keychain \
+            --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
+            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
+            /Applications defguard-client.pkg
 
       - name: Upload PKG to S3
         env:
