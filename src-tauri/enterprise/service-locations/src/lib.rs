@@ -258,7 +258,6 @@ pub struct PostureAuthorizationRequest {
     pub proxy_url: String,
     pub device_pubkey: String,
     pub token: Option<String>,
-    pub configuration_generation: u64,
 }
 
 /// Posture approvals obtained this pass, keyed by (instance id, location public key).
@@ -266,13 +265,7 @@ pub struct PostureAuthorizationRequest {
 /// An absent map entry means authorization failed and leaves the location alone. A present entry
 /// with no key means core approved connecting without a PSK because posture checks were removed.
 #[cfg(any(windows, target_os = "linux"))]
-pub struct PostureAuthorization {
-    configuration_generation: u64,
-    preshared_key: Option<String>,
-}
-
-#[cfg(any(windows, target_os = "linux"))]
-pub type PostureAuthorizations = HashMap<(String, String), PostureAuthorization>;
+pub type PostureAuthorizations = HashMap<(String, String), Option<String>>;
 
 /// What one reconcile pass should do with a persisted service location.
 ///
@@ -292,13 +285,8 @@ pub(crate) enum ReconcileAction<'a> {
 pub(crate) fn reconcile_action(
     is_connected: bool,
     posture_check_required: bool,
-    authorization: Option<&PostureAuthorization>,
-    configuration_generation: u64,
+    authorization: Option<Option<&str>>,
 ) -> ReconcileAction<'_> {
-    let authorization = authorization
-        .filter(|authorization| authorization.configuration_generation == configuration_generation)
-        .map(|authorization| authorization.preshared_key.as_deref());
-
     if is_connected {
         return authorization.map_or(ReconcileAction::LeaveConnected, ReconcileAction::Renew);
     }
@@ -356,10 +344,7 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
                 );
                 authorizations.insert(
                     (request.instance_id, request.location_pubkey),
-                    PostureAuthorization {
-                        configuration_generation: request.configuration_generation,
-                        preshared_key,
-                    },
+                    preshared_key,
                 );
             }
             Err(err) => error!(
@@ -431,15 +416,26 @@ pub async fn run_reconciler(
         //
         // The ordering is enforced rather than merely intended: these are `std` guards, so they are
         // `!Send` and holding one across the await below would not compile.
-        let pending = {
+        let (configuration_generation, pending) = {
             let manager = manager.read().unwrap();
-            manager.locations_needing_authorization()
+            (
+                manager.configuration_generation,
+                manager.locations_needing_authorization(),
+            )
         };
 
-        let authorizations = authorize_pending(pending).await;
+        let mut authorizations = authorize_pending(pending).await;
 
         let outcome = {
             let mut manager = manager.write().unwrap();
+            if manager.configuration_generation != configuration_generation {
+                debug!(
+                    "Service location configuration changed while posture checks were running; \
+                    discarding {} stale authorization result(s)",
+                    authorizations.len()
+                );
+                authorizations.clear();
+            }
             manager.reconcile(&authorizations)
         };
 
@@ -535,39 +531,26 @@ mod tests {
     mod reconciliation {
         use super::*;
 
-        fn authorization(
-            configuration_generation: u64,
-            preshared_key: Option<&str>,
-        ) -> PostureAuthorization {
-            PostureAuthorization {
-                configuration_generation,
-                preshared_key: preshared_key.map(str::to_string),
-            }
-        }
-
         #[test]
         fn connected_location_with_fresh_key_is_renewed() {
-            let authorization = authorization(1, Some("fresh-key"));
             assert_eq!(
-                reconcile_action(true, true, Some(&authorization), 1),
+                reconcile_action(true, true, Some(Some("fresh-key"))),
                 ReconcileAction::Renew(Some("fresh-key"))
             );
         }
 
         #[test]
         fn approval_without_a_key_connects_without_a_key() {
-            let authorization = authorization(1, None);
             assert_eq!(
-                reconcile_action(false, true, Some(&authorization), 1),
+                reconcile_action(false, true, Some(None)),
                 ReconcileAction::Connect(None)
             );
         }
 
         #[test]
         fn approval_without_a_key_removes_the_old_key_from_a_connected_location() {
-            let authorization = authorization(1, None);
             assert_eq!(
-                reconcile_action(true, true, Some(&authorization), 1),
+                reconcile_action(true, true, Some(None)),
                 ReconcileAction::Renew(None)
             );
         }
@@ -575,16 +558,7 @@ mod tests {
         #[test]
         fn authorization_failure_keeps_a_posture_location_disconnected() {
             assert_eq!(
-                reconcile_action(false, true, None, 1),
-                ReconcileAction::WaitForAuthorization
-            );
-        }
-
-        #[test]
-        fn authorization_from_an_older_configuration_is_discarded() {
-            let authorization = authorization(1, Some("stale-key"));
-            assert_eq!(
-                reconcile_action(false, true, Some(&authorization), 2),
+                reconcile_action(false, true, None),
                 ReconcileAction::WaitForAuthorization
             );
         }

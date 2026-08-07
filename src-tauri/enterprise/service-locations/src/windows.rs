@@ -888,7 +888,6 @@ impl ServiceLocationManager {
                     proxy_url: instance_data.proxy_url.clone(),
                     device_pubkey: instance_data.device_pubkey.clone(),
                     token: instance_data.token.clone(),
-                    configuration_generation: self.configuration_generation,
                 });
             }
         }
@@ -935,7 +934,8 @@ impl ServiceLocationManager {
                 }
 
                 let authorization = authorizations
-                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
+                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()))
+                    .map(|preshared_key| preshared_key.as_deref());
                 let action = reconcile_action(
                     self.is_service_location_connected(
                         &instance_data.instance_id,
@@ -943,7 +943,6 @@ impl ServiceLocationManager {
                     ),
                     location.posture_check_required,
                     authorization,
-                    self.configuration_generation,
                 );
 
                 match action {
