@@ -7,8 +7,9 @@ use std::{
 
 use clap::Parser;
 use defguard_client_service_locations::{
+    reconciler::{run_reconciler, ReconcileSignal},
     windows::{watch_for_login_logoff, watch_for_network_change},
-    ReconcileSignal, ServiceLocationError, ServiceLocationManager,
+    ServiceLocationError, ServiceLocationManager,
 };
 use tokio::runtime::Runtime;
 use tracing::{debug, error, info, warn};
@@ -146,7 +147,7 @@ fn run_service() -> Result<(), DaemonError> {
         // Spawn the reconciler. Each pass leaves already-correct locations alone, so waking it is
         // always safe. Its tick covers startup before the network is ready - typically DNS not yet
         // resolving - and backstops any event the watchers miss.
-        runtime.spawn(defguard_client_service_locations::run_reconciler(
+        runtime.spawn(run_reconciler(
             service_location_manager.clone(),
             wake_reconciler.clone(),
             SERVICE_LOCATION_RECONCILE_INTERVAL,

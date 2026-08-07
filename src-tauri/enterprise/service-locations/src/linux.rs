@@ -18,9 +18,12 @@ use defguard_wireguard_rs::{
 use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, ConnectedServiceLocation,
-    PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction, ServiceLocationData,
-    ServiceLocationError, ServiceLocationManager,
+    is_unchanged_on_disk,
+    reconciler::{
+        posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
+        PostureAuthorizations, ReconcileAction,
+    },
+    ConnectedServiceLocation, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
 };
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
@@ -580,7 +583,7 @@ impl ServiceLocationManager {
     /// Brings the running tunnels in line with what is on disk.
     /// On Linux that is only ever "connect what is missing": the save path filters out everything but
     /// Always-on locations, so nothing persisted here should ever be deliberately down.
-    pub fn reconcile(
+    pub(crate) fn reconcile(
         &mut self,
         authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
@@ -590,7 +593,7 @@ impl ServiceLocationManager {
     /// Lists the locations that need a posture check before the next pass can connect them.
     /// Locations that are already connected are excluded: re-authorizing a working tunnel
     /// would supersede its session in core for no reason.
-    pub fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
+    pub(crate) fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
         let Ok(data) = self.load_service_locations() else {
             warn!("Failed to load service locations while looking for posture checks to run");
             return Vec::new();

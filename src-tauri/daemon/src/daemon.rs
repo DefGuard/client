@@ -23,7 +23,10 @@ use defguard_client_proto::defguard::{
 };
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
-use defguard_client_service_locations::{ReconcileSignal, ServiceLocationManager};
+use defguard_client_service_locations::{
+    reconciler::{run_reconciler, ReconcileSignal},
+    ServiceLocationManager,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -564,7 +567,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     // Nothing wakes the reconciler on Linux - there are no network, logon or resume watchers - so
     // the tick is its only trigger.
     #[cfg(target_os = "linux")]
-    tokio::spawn(defguard_client_service_locations::run_reconciler(
+    tokio::spawn(run_reconciler(
         service_location_manager.clone(),
         ReconcileSignal::default(),
         SERVICE_LOCATION_RECONCILE_INTERVAL,

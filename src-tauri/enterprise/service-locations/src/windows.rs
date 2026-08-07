@@ -29,9 +29,13 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, ConnectedServiceLocation,
-    PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction, ReconcileSignal,
-    ServiceLocationData, ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
+    is_unchanged_on_disk,
+    reconciler::{
+        posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
+        PostureAuthorizations, ReconcileAction, ReconcileSignal,
+    },
+    ConnectedServiceLocation, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
+    SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -852,7 +856,7 @@ impl ServiceLocationManager {
     /// having observed the event. Deriving it from `is_user_logged_in()` instead makes the pass
     /// correct on its own, so the watchers can be reduced to "something happened, look again" and a
     /// missed event costs a tick rather than leaving a tunnel up that should be down.
-    pub fn reconcile(
+    pub(crate) fn reconcile(
         &mut self,
         authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
@@ -870,7 +874,7 @@ impl ServiceLocationManager {
     /// unlocked. Excludes anything already connected, and anything that should not be up right now -
     /// re-authorizing a working tunnel would supersede its session in core for no reason, and
     /// authorizing a pre-logon location while a user is logged in would be wasted work.
-    pub fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
+    pub(crate) fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
         let Ok(data) = self.load_service_locations() else {
             warn!("Failed to load service locations while looking for posture checks to run");
             return Vec::new();
