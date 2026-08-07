@@ -574,7 +574,7 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     // Nothing wakes the reconciler on Linux - there are no network, logon or resume watchers - so
     // the tick is its only trigger.
     #[cfg(target_os = "linux")]
-    tokio::spawn(run_reconciler(
+    let reconciler_handle = tokio::spawn(run_reconciler(
         service_location_manager.clone(),
         ReconcileSignal::default(),
         SERVICE_LOCATION_RECONCILE_INTERVAL,
@@ -622,11 +622,26 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("Defguard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
     debug!("Defguard daemon configuration: {config:?}");
 
-    Server::builder()
+    let server = Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_client_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        .serve_with_incoming(uds_stream)
-        .await?;
+        .serve_with_incoming(uds_stream);
+
+    #[cfg(target_os = "linux")]
+    tokio::select! {
+        result = server => result?,
+        result = reconciler_handle => {
+            let message = match result {
+                Ok(()) => "Service location reconciler ended unexpectedly".to_string(),
+                Err(err) => format!("Service location reconciler task failed: {err}"),
+            };
+            error!("{message}");
+            return Err(anyhow::anyhow!(message));
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    server.await?;
 
     Ok(())
 }

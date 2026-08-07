@@ -51,6 +51,7 @@ fn run_service() -> Result<(), DaemonError> {
     // Create a channel to be able to poll a stop event from the service worker loop.
     let (shutdown_tx, shutdown_rx) = mpsc::channel::<u32>();
     let shutdown_tx_server = shutdown_tx.clone();
+    let shutdown_tx_reconciler = shutdown_tx.clone();
 
     // One signal, shared by everything that can notice wake/suspend etc. events.
     let wake_reconciler = ReconcileSignal::default();
@@ -70,8 +71,8 @@ fn run_service() -> Result<(), DaemonError> {
             }
 
             // Resuming from sleep leaves tunnels that were established before the suspend looking
-            // alive but no longer passing traffic, so wake the reconciler rather than waiting up to a
-            // full tick.
+            // alive but no longer passing traffic, so wake the reconciler rather than waiting up
+            // to a full tick.
             ServiceControl::PowerEvent(param) => {
                 debug!("Received power event: {param:?}");
                 if matches!(
@@ -147,11 +148,18 @@ fn run_service() -> Result<(), DaemonError> {
         // Spawn the reconciler. Each pass leaves already-correct locations alone, so waking it is
         // always safe. Its tick covers startup before the network is ready - typically DNS not yet
         // resolving - and backstops any event the watchers miss.
-        runtime.spawn(run_reconciler(
+        let reconciler_handle = runtime.spawn(run_reconciler(
             service_location_manager.clone(),
             wake_reconciler.clone(),
             SERVICE_LOCATION_RECONCILE_INTERVAL,
         ));
+        runtime.spawn(async move {
+            match reconciler_handle.await {
+                Ok(()) => error!("Service location reconciler ended unexpectedly"),
+                Err(err) => error!("Service location reconciler task failed: {err}"),
+            }
+            let _ = shutdown_tx_reconciler.send(2);
+        });
 
         // Spawn login/logoff monitoring on a dedicated OS thread so the blocking
         // WTSWaitSystemEvent syscall does not stall Tokio's async worker threads.
