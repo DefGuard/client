@@ -11,7 +11,7 @@ use std::{fs, path::Path};
 
 use defguard_client_common::dns_borrow;
 #[cfg(windows)]
-use defguard_client_posture::inspector::device_posture_data;
+use defguard_client_posture::inspector::{device_posture_data, DiskEncryptionTarget};
 use defguard_client_proto::defguard::{
     client::v1::{
         desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
@@ -23,7 +23,10 @@ use defguard_client_proto::defguard::{
 };
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
-use defguard_client_service_locations::ServiceLocationManager;
+use defguard_client_service_locations::{
+    reconciler::{run_reconciler, ReconcileSignal},
+    ServiceLocationManager,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -57,10 +60,12 @@ pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
 #[cfg(target_os = "linux")]
 pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
+/// How often the reconciler brings running tunnels back in line with what is on disk.
+///
+/// On Windows this is a backstop, since the watchers wake it on network, logon and resume events.
+/// On Linux nothing wakes it, so this is the only trigger and sets the worst-case recovery time.
 #[cfg(any(windows, target_os = "linux"))]
-pub(crate) const SERVICE_LOCATION_CONNECT_RETRY_COUNT: u32 = 5;
-#[cfg(any(windows, target_os = "linux"))]
-pub(crate) const SERVICE_LOCATION_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(30);
+pub(crate) const SERVICE_LOCATION_RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
@@ -193,7 +198,10 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Save service location request received, this is currently not supported on Unix systems");
+        debug!(
+            "Save service location request received, this is currently not supported on Unix \
+            systems"
+        );
         Ok(Response::new(()))
     }
 
@@ -202,7 +210,10 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Delete service location request received, this is currently not supported on Unix systems");
+        debug!(
+            "Delete service location request received, this is currently not supported on Unix \
+            systems"
+        );
         Ok(Response::new(()))
     }
 
@@ -217,11 +228,7 @@ impl DesktopDaemonService for DaemonService {
         self.service_location_manager
             .write()
             .unwrap()
-            .save_service_locations(
-                service_location.service_locations.as_slice(),
-                &service_location.instance_id,
-                &service_location.private_key,
-            )
+            .save_service_locations(&service_location)
             .map_err(|err| {
                 let msg = format!("Failed to save service locations: {err}");
                 error!(msg);
@@ -238,10 +245,11 @@ impl DesktopDaemonService for DaemonService {
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         warn!(
-            "Daemon service received a get_posture_data request. Daemon posture requests are only supported on windows systems. Unix systems perform client-side posture checks."
+            "Daemon service received a get_posture_data request. Daemon posture requests are only \
+            supported on windows systems. Unix systems perform client-side posture checks."
         );
         Err(Status::unimplemented(
-            "Service-side posture checks are only supported on Unix systems",
+            "Service-side posture checks are not supported on this platform",
         ))
     }
 
@@ -544,13 +552,16 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(ListInterfacesResponse { interfaces }))
     }
 
+    /// Collects this device's posture data on the app's behalf.
     #[cfg(windows)]
     async fn get_posture_data(
         &self,
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         debug!("Get posture data request received");
-        Ok(Response::new(device_posture_data()))
+        Ok(Response::new(device_posture_data(
+            DiskEncryptionTarget::ClientDatabase,
+        )))
     }
 }
 
@@ -560,14 +571,14 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     #[cfg(target_os = "linux")]
     let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
+    // Nothing wakes the reconciler on Linux - there are no network, logon or resume watchers - so
+    // the tick is its only trigger.
     #[cfg(target_os = "linux")]
-    tokio::spawn(
-        defguard_client_service_locations::connect_service_locations(
-            service_location_manager.clone(),
-            SERVICE_LOCATION_CONNECT_RETRY_COUNT,
-            SERVICE_LOCATION_CONNECT_RETRY_DELAY,
-        ),
-    );
+    let reconciler_handle = tokio::spawn(run_reconciler(
+        service_location_manager.clone(),
+        ReconcileSignal::default(),
+        SERVICE_LOCATION_RECONCILE_INTERVAL,
+    ));
 
     let daemon_service = DaemonService::new(
         &config,
@@ -594,7 +605,10 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
         })?;
 
         // change ownership - keep current user, change group
-        debug!("Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group {DAEMON_SOCKET_GROUP}");
+        debug!(
+            "Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group \
+            {DAEMON_SOCKET_GROUP}"
+        );
         chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
 
         // Set socket permissions to allow client access
@@ -608,11 +622,26 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     info!("Defguard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
     debug!("Defguard daemon configuration: {config:?}");
 
-    Server::builder()
+    let server = Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_client_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        .serve_with_incoming(uds_stream)
-        .await?;
+        .serve_with_incoming(uds_stream);
+
+    #[cfg(target_os = "linux")]
+    tokio::select! {
+        result = server => result?,
+        result = reconciler_handle => {
+            let message = match result {
+                Ok(()) => "Service location reconciler ended unexpectedly".to_string(),
+                Err(err) => format!("Service location reconciler task failed: {err}"),
+            };
+            error!("{message}");
+            return Err(anyhow::anyhow!(message));
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    server.await?;
 
     Ok(())
 }

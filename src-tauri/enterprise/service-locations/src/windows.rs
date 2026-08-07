@@ -1,22 +1,22 @@
 use std::{
-    collections::{HashMap, HashSet},
-    ffi::OsStr,
+    collections::HashSet,
     fs::{self, create_dir_all},
     path::PathBuf,
     result::Result,
     str::FromStr,
-    sync::{Arc, RwLock},
     thread::sleep,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::{ServiceLocation, ServiceLocationMode};
+use defguard_client_proto::defguard::client::v1::{
+    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode,
+};
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 use known_folders::get_known_folder_path;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use windows::{
     core::PSTR,
     Win32::System::RemoteDesktop::{
@@ -28,6 +28,11 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
+    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
+    reconciler::{
+        reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
+        ReconcileSignal,
+    },
     ServiceLocationData, ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
 };
 
@@ -47,11 +52,12 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 /// yet available. When the network comes up and an IP is assigned, this watcher fires and
 /// retries the connection.
 ///
-/// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is
-/// harmless because `connect_to_service_locations` skips already-connected locations.
+/// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is harmless
+/// because a reconcile pass leaves already-correct locations alone.
 ///
-/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall.
-pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLocationManager>>) {
+/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall. It only wakes
+/// the reconciler and never touches the manager itself, so tunnel state has a single owner.
+pub fn watch_for_network_change(wake: ReconcileSignal) {
     loop {
         // NotifyAddrChange blocks until any IP address is added or removed on any interface.
         // Passing NULL for both handle and overlapped selects the synchronous (blocking) mode.
@@ -69,29 +75,18 @@ pub fn watch_for_network_change(service_location_manager: Arc<RwLock<ServiceLoca
         );
         sleep(NETWORK_STABILIZATION_DELAY);
 
-        debug!("Attempting to connect to service locations after network change");
-        let connect_result = service_location_manager
-            .write()
-            .unwrap()
-            .connect_to_service_locations();
-        match connect_result {
-            Ok(_) => {
-                debug!("Service location connect attempt after network change completed");
-            }
-            Err(err) => {
-                warn!("Failed to connect to service locations after network change: {err}");
-            }
-        }
+        debug!("Waking the service location reconciler after a network change");
+        wake.notify_one();
     }
 }
 
-/// Watches for user logon/logoff events and connects/disconnects pre-logon service locations
-/// accordingly.
+/// Watches for user logon and logoff events and wakes the reconciler.
+///
+/// Which event occurred is deliberately not passed on: the reconciler establishes whether a user is
+/// logged in for itself, so a logon and a logoff are both simply "look again".
 ///
 /// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall.
-pub fn watch_for_login_logoff(
-    service_location_manager: Arc<RwLock<ServiceLocationManager>>,
-) -> Result<(), ServiceLocationError> {
+pub fn watch_for_login_logoff(wake: &ReconcileSignal) -> ! {
     loop {
         let mut event_flags: u32 = 0;
         let success = unsafe {
@@ -113,19 +108,9 @@ pub fn watch_for_login_logoff(
             }
         };
 
-        if event_flags & WTS_EVENT_LOGON != 0 {
-            debug!("Detected user logon, attempting to auto-disconnect from service locations.");
-            service_location_manager
-                .write()
-                .unwrap()
-                .disconnect_service_locations(Some(ServiceLocationMode::PreLogon))?;
-        }
-        if event_flags & WTS_EVENT_LOGOFF != 0 {
-            debug!("Detected user logoff, attempting to auto-connect to service locations.");
-            service_location_manager
-                .write()
-                .unwrap()
-                .connect_to_service_locations()?;
+        if event_flags & (WTS_EVENT_LOGON | WTS_EVENT_LOGOFF) != 0 {
+            debug!("Detected a logon or logoff, waking the service location reconciler");
+            wake.notify_one();
         }
     }
 }
@@ -135,6 +120,52 @@ fn setup_wgapi(ifname: &str) -> Result<WGApi, ServiceLocationError> {
         let msg = format!("Failed to setup WireGuard API for interface {ifname}: {err}");
         error!("{msg}");
         ServiceLocationError::InterfaceError(msg)
+    })
+}
+
+/// Builds the Windows WireGuard configuration for one service location.
+///
+/// Initial setup supplies a free listen port, while posture-session renewal supplies the running
+/// interface's current port so applying a new preshared key does not change its local endpoint.
+fn interface_configuration(
+    location: &ServiceLocation,
+    private_key: &str,
+    preshared_key: Option<&str>,
+    port: u16,
+) -> Result<InterfaceConfiguration, ServiceLocationError> {
+    let mut peer = Peer::new(Key::from_str(&location.pubkey)?);
+    peer.set_endpoint(&location.endpoint)?;
+    // Held only by the running interface. It is never written to the service location file,
+    // which already holds two long-lived secrets, and a session key is reconstructible by
+    // authorizing again.
+    peer.preshared_key = preshared_key.map(Key::from_str).transpose()?;
+    peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
+
+    for allowed_ip in location.allowed_ips.split(',') {
+        match IpAddrMask::from_str(allowed_ip) {
+            Ok(addr) => peer.allowed_ips.push(addr),
+            Err(err) => error!(
+                "Error parsing IP address {allowed_ip} while setting up interface for location \
+                {location:?}, error details: {err}"
+            ),
+        }
+    }
+
+    let addresses = location
+        .address
+        .split(',')
+        .map(str::trim)
+        .map(IpAddrMask::from_str)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(InterfaceConfiguration {
+        name: location.name.clone(),
+        prvkey: private_key.to_string(),
+        addresses,
+        port,
+        peers: vec![peer],
+        mtu: None,
+        fwmark: None,
     })
 }
 
@@ -333,43 +364,10 @@ impl ServiceLocationManager {
             warn!("Failed to convert path to string for ACL setting");
         }
 
-        let manager = Self {
-            wgapis: HashMap::new(),
-            connected_service_locations: HashMap::new(),
-        };
+        let manager = Self::default();
 
         debug!("ServiceLocationApi initialized successfully");
         Ok(manager)
-    }
-
-    /// Check if a specific service location is already connected
-    fn is_service_location_connected(&self, instance_id: &str, location_pubkey: &str) -> bool {
-        if let Some(locations) = self.connected_service_locations.get(instance_id) {
-            for location in locations {
-                if location.pubkey == location_pubkey {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    /// Add a connected service location
-    fn add_connected_service_location(
-        &mut self,
-        instance_id: &str,
-        location: &ServiceLocation,
-    ) -> Result<(), ServiceLocationError> {
-        self.connected_service_locations
-            .entry(instance_id.to_string())
-            .or_default()
-            .push(location.clone());
-
-        debug!(
-            "Added connected service location for instance '{instance_id}', location '{}'",
-            location.name
-        );
-        Ok(())
     }
 
     /// Remove connected service locations by filter (write disk-first, then memory)
@@ -384,7 +382,7 @@ impl ServiceLocationManager {
         let mut instances_to_remove = Vec::new();
 
         for (instance_id, locations) in self.connected_service_locations.iter_mut() {
-            locations.retain(|location| !filter(instance_id, location));
+            locations.retain(|connected| !filter(instance_id, &connected.location));
 
             // Mark instance for removal if it has no more locations
             if locations.is_empty() {
@@ -443,6 +441,22 @@ impl ServiceLocationManager {
             service_location_data.service_location.name
         );
 
+        // A posture-gated location is only torn down here, not brought back: obtaining a preshared
+        // key means an HTTP round trip, and this runs inside the gRPC save handler while the
+        // manager write guard is held. The reconciler authorizes and reconnects it on its next pass
+        // instead, so the location is down for at most one interval.
+        if service_location_data
+            .service_location
+            .posture_check_required
+        {
+            debug!(
+                "Leaving service location '{}' disconnected: it needs a posture check, which the \
+                reconciler will run",
+                service_location_data.service_location.name
+            );
+            return Ok(());
+        }
+
         // We should reconnect only if:
         // 1. It's an always on location
         // 2. It's a pre-logon location and the user is not logged in
@@ -473,7 +487,8 @@ impl ServiceLocationManager {
             // Collect locations to disconnect to avoid borrowing issues
             let locations_to_disconnect = locations.to_vec();
 
-            for location in locations_to_disconnect {
+            for connected in locations_to_disconnect {
+                let location = connected.location;
                 let ifname = get_interface_name(&location.name);
                 debug!("Tearing down interface: {ifname}");
                 if let Some(mut wgapi) = self.wgapis.remove(&ifname) {
@@ -500,7 +515,8 @@ impl ServiceLocationManager {
             self.connected_service_locations.remove(instance_id);
         } else {
             debug!(
-                "No connected service locations found for instance_id: {instance_id}. Skipping disconnect"
+                "No connected service locations found for instance_id: {instance_id}. Skipping \
+                disconnect"
             );
             return Ok(());
         }
@@ -523,9 +539,9 @@ impl ServiceLocationManager {
         if let Some(locations) = self.connected_service_locations.get_mut(instance_id) {
             if let Some(pos) = locations
                 .iter()
-                .position(|loc| loc.pubkey == location_pubkey)
+                .position(|connected| connected.location.pubkey == location_pubkey)
             {
-                let location = locations.remove(pos);
+                let location = locations.remove(pos).location;
                 let ifname = get_interface_name(&location.name);
                 debug!("Tearing down interface: {ifname}");
                 if let Some(mut wgapi) = self.wgapis.remove(&ifname) {
@@ -565,49 +581,14 @@ impl ServiceLocationManager {
         &mut self,
         location: &ServiceLocation,
         private_key: &str,
+        preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
-        let peer_key = Key::from_str(&location.pubkey)?;
-
-        let mut peer = Peer::new(peer_key.clone());
-        peer.set_endpoint(&location.endpoint)?;
-
-        peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
-
-        let allowed_ips = location
-            .allowed_ips
-            .split(',')
-            .map(str::to_string)
-            .collect::<Vec<String>>();
-
-        for allowed_ip in &allowed_ips {
-            match IpAddrMask::from_str(allowed_ip) {
-                Ok(addr) => {
-                    peer.allowed_ips.push(addr);
-                }
-                Err(err) => {
-                    error!(
-                        "Error parsing IP address {allowed_ip} while setting up interface for \
-                        location {location:?}, error details: {err}"
-                    );
-                }
-            }
-        }
-
-        let mut addresses = Vec::new();
-
-        for address in location.address.split(',') {
-            addresses.push(IpAddrMask::from_str(address.trim())?);
-        }
-
-        let config = InterfaceConfiguration {
-            name: location.name.clone(),
-            prvkey: private_key.to_string(),
-            addresses,
-            port: find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
-            peers: vec![peer.clone()],
-            mtu: None,
-            fwmark: None, // TODO: add
-        };
+        let config = interface_configuration(
+            location,
+            private_key,
+            preshared_key,
+            find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
+        )?;
 
         let ifname = location.name.clone();
         let ifname = get_interface_name(&ifname);
@@ -672,40 +653,41 @@ impl ServiceLocationManager {
         self.setup_service_location_interface(
             &location_data.service_location,
             &location_data.private_key,
+            None,
         )?;
         self.add_connected_service_location(
             &location_data.instance_id,
             &location_data.service_location,
-        )?;
+        );
         let ifname = get_interface_name(&location_data.service_location.name);
         debug!("Successfully connected to service location '{ifname}'");
 
         Ok(())
     }
 
+    /// Disconnects every connected service location in `mode`.
     pub(crate) fn disconnect_service_locations(
         &mut self,
-        mode: Option<ServiceLocationMode>,
+        mode: ServiceLocationMode,
     ) -> Result<(), ServiceLocationError> {
         debug!("Disconnecting service locations with mode: {mode:?}");
 
         for (instance, locations) in &self.connected_service_locations {
-            for location in locations {
+            for connected in locations {
+                let location = &connected.location;
                 debug!(
                     "Found connected service location for instance_id: {instance}, \
                     location_pubkey: {}",
                     location.pubkey
                 );
-                if let Some(m) = mode {
-                    let location_mode: ServiceLocationMode = location.mode.try_into()?;
-                    if location_mode != m {
-                        debug!(
+                let location_mode: ServiceLocationMode = location.mode.try_into()?;
+                if location_mode != mode {
+                    debug!(
                         "Skipping interface {} due to the service location mode doesn't match the \
-                        requested mode (expected {m:?}, found {:?})",
+                        requested mode (expected {mode:?}, found {:?})",
                         location.name, location.mode
                     );
-                        continue;
-                    }
+                    continue;
                 }
 
                 let ifname = get_interface_name(&location.name);
@@ -723,15 +705,12 @@ impl ServiceLocationManager {
         }
 
         self.remove_connected_service_locations(|_, location| {
-            if let Some(m) = mode {
-                let location_mode: ServiceLocationMode = location
-                    .mode
-                    .try_into()
-                    .unwrap_or(ServiceLocationMode::AlwaysOn);
-                location_mode == m
-            } else {
-                true
-            }
+            // An unparseable mode is left in place rather than removed: dropping the record of a
+            // tunnel that is still up would leak it.
+            location
+                .mode
+                .try_into()
+                .is_ok_and(|location_mode: ServiceLocationMode| location_mode == mode)
         })?;
 
         debug!("Service locations disconnected.");
@@ -739,12 +718,100 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Attempts to connect to all service locations that are not already connected.
+    /// Reads the last handshake for a location from the interface carrying it.
     ///
-    /// Returns `Ok(true)` if every location is now connected (either it was already connected or
-    /// it was successfully connected during this call), and `Ok(false)` if at least one location
-    /// failed to connect (indicating that a retry may be worthwhile).
-    pub fn connect_to_service_locations(&mut self) -> Result<bool, ServiceLocationError> {
+    /// Goes through the stored `WGApi` deliberately: on Windows `read_interface_data` needs the
+    /// very instance that created the adapter, so a freshly built one would fail with
+    /// `AdapterNotFound`.
+    fn read_last_handshake(&self, location: &ServiceLocation) -> Option<SystemTime> {
+        let ifname = get_interface_name(&location.name);
+        let wgapi = self.wgapis.get(&ifname)?;
+        let host = wgapi
+            .read_interface_data()
+            .inspect_err(|err| {
+                warn!("Failed to read data for service location interface {ifname}: {err}");
+            })
+            .ok()?;
+        let peer_key = Key::from_str(&location.pubkey).ok()?;
+        host.peers.get(&peer_key)?.last_handshake
+    }
+
+    /// Applies a freshly obtained preshared key to an already-running interface.
+    ///
+    /// Reconfigures the whole interface rather than the single peer, because `configure_peer` does
+    /// nothing on Windows. The tracked API owns the existing adapter, so renewal configures that
+    /// adapter directly without opening/creating an interface or replacing the API handle.
+    fn reapply_preshared_key(
+        &mut self,
+        instance_id: &str,
+        location: &ServiceLocation,
+        private_key: &str,
+        preshared_key: Option<&str>,
+    ) -> Result<(), ServiceLocationError> {
+        let ifname = get_interface_name(&location.name);
+        let Some(wgapi) = self.wgapis.get(&ifname) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "No WireGuard API for interface {ifname} while renewing a posture session"
+            )));
+        };
+        let port = wgapi.read_interface_data()?.listen_port;
+        let config = interface_configuration(location, private_key, preshared_key, port)?;
+        wgapi.configure_interface(&config)?;
+        self.record_posture_session(instance_id, &location.pubkey);
+        info!(
+            "Renewed the posture session for service location '{}'",
+            location.name
+        );
+        Ok(())
+    }
+
+    /// Brings the running tunnels in line with what is on disk and who is logged in.
+    ///
+    /// Both directions, unlike `connect_to_service_locations` alone. Tearing down a pre-logon
+    /// location once a user logs in used to happen only in the logon event handler, which meant it
+    /// depended on having observed the event. Deriving it from `is_user_logged_in()` instead makes
+    /// the pass correct on its own, so the watchers can be reduced to "something happened, look
+    /// again" and a missed event costs a tick rather than leaving a tunnel up that should be down.
+    pub(crate) fn reconcile(
+        &mut self,
+        authorizations: &PostureAuthorizations,
+    ) -> Result<bool, ServiceLocationError> {
+        if is_user_logged_in() {
+            debug!("A user is logged in, disconnecting any connected pre-logon service locations");
+            self.disconnect_service_locations(ServiceLocationMode::PreLogon)?;
+        }
+
+        self.connect_to_service_locations(authorizations)
+    }
+
+    /// Lists the locations that need a posture check before the next pass can connect them.
+    ///
+    /// Read-only, so the caller can hold a read guard briefly, release it, and do the network calls
+    /// unlocked. Healthy connected locations are excluded, while stale connected locations are
+    /// included for in-place authorization and key renewal. Locations that should not currently be
+    /// up are also excluded, such as a pre-logon location while a user is logged in.
+    pub(crate) fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
+        let Ok(data) = self.load_service_locations() else {
+            warn!("Failed to load service locations while looking for posture checks to run");
+            return Vec::new();
+        };
+
+        let user_logged_in = is_user_logged_in();
+        self.collect_posture_authorization_requests(
+            &data,
+            |location| location.mode != ServiceLocationMode::PreLogon as i32 || !user_logged_in,
+            |location| self.read_last_handshake(location),
+        )
+    }
+
+    /// Attempts to connect every persisted service location that should currently be up.
+    ///
+    /// Returns `Ok(true)` when every eligible location is connected or already connected, and
+    /// `Ok(false)` when at least one eligible location failed so the caller can retry later.
+    pub fn connect_to_service_locations(
+        &mut self,
+        authorizations: &PostureAuthorizations,
+    ) -> Result<bool, ServiceLocationError> {
         debug!("Attempting to auto-connect to VPN...");
 
         let data = self.load_service_locations()?;
@@ -779,38 +846,79 @@ impl ServiceLocationManager {
                     );
                 }
 
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                {
-                    debug!(
-                        "Skipping service location '{}' because it's already connected",
-                        location.name
-                    );
-                    continue;
-                }
-
-                if let Err(err) =
-                    self.setup_service_location_interface(&location, &instance_data.private_key)
-                {
-                    warn!(
-                        "Failed to setup service location interface for '{}': {err:?}",
-                        location.name
-                    );
-                    all_connected = false;
-                    continue;
-                }
-
-                if let Err(err) =
-                    self.add_connected_service_location(&instance_data.instance_id, &location)
-                {
-                    debug!(
-                        "Failed to persist connected service location after auto-connect: {err:?}"
-                    );
-                }
-
-                debug!(
-                    "Successfully connected to service location '{}'",
-                    location.name
+                let authorization = authorizations
+                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()))
+                    .map(|preshared_key| preshared_key.as_deref());
+                let action = reconcile_action(
+                    self.is_service_location_connected(
+                        &instance_data.instance_id,
+                        &location.pubkey,
+                    ),
+                    location.posture_check_required,
+                    authorization,
                 );
+
+                match action {
+                    ReconcileAction::LeaveConnected => {
+                        debug!(
+                            "Skipping service location '{}' because it's already connected",
+                            location.name
+                        );
+                        continue;
+                    }
+                    ReconcileAction::WaitForAuthorization => {
+                        debug!(
+                            "Leaving service location '{}' disconnected: no posture check has \
+                            approved it yet",
+                            location.name
+                        );
+                        all_connected = false;
+                        continue;
+                    }
+                    ReconcileAction::Renew(preshared_key) => {
+                        if let Err(err) = self.reapply_preshared_key(
+                            &instance_data.instance_id,
+                            &location,
+                            &instance_data.private_key,
+                            preshared_key,
+                        ) {
+                            warn!(
+                                "Failed to renew the posture session for '{}': {err}",
+                                location.name
+                            );
+                            all_connected = false;
+                        }
+                        continue;
+                    }
+                    ReconcileAction::Connect(preshared_key) => {
+                        if let Err(err) = self.setup_service_location_interface(
+                            &location,
+                            &instance_data.private_key,
+                            preshared_key,
+                        ) {
+                            warn!(
+                                "Failed to setup service location interface for '{}': {err:?}",
+                                location.name
+                            );
+                            all_connected = false;
+                            continue;
+                        }
+
+                        self.add_connected_service_location(&instance_data.instance_id, &location);
+
+                        if authorization.is_some() {
+                            self.record_posture_session(
+                                &instance_data.instance_id,
+                                &location.pubkey,
+                            );
+                        }
+
+                        debug!(
+                            "Successfully connected to service location '{}'",
+                            location.name
+                        );
+                    }
+                }
             }
         }
 
@@ -819,12 +927,17 @@ impl ServiceLocationManager {
         Ok(all_connected)
     }
 
+    /// Persists service locations and resets their runtime connection state.
+    ///
+    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection,
+    /// so this returns early when the data it would write matches what is already on disk, leaving
+    /// the running tunnels alone. Only a real change proceeds to the reset loop below.
     pub fn save_service_locations(
         &mut self,
-        service_locations: &[ServiceLocation],
-        instance_id: &str,
-        private_key: &str,
+        request: &SaveServiceLocationsRequest,
     ) -> Result<(), ServiceLocationError> {
+        let instance_id = request.instance_id.as_str();
+        let service_locations = request.service_locations.as_slice();
         debug!(
             "Received a request to save {} service location(s) for instance {instance_id}",
             service_locations.len(),
@@ -847,13 +960,31 @@ impl ServiceLocationManager {
 
         let instance_file_path = get_instance_file_path(instance_id)?;
 
-        let service_location_data = ServiceLocationData {
-            service_locations: service_locations.to_vec(),
-            instance_id: instance_id.to_string(),
-            private_key: private_key.to_string(),
-        };
+        let service_location_data =
+            ServiceLocationData::from_save_request(request, service_locations.to_vec());
 
         let json = serde_json::to_string_pretty(&service_location_data)?;
+
+        // Saving is pushed unconditionally on every poll cycle, so nothing having changed is the
+        // normal case. Return before the reset loop below, which disconnects and reconnects every
+        // tunnel: proceeding would drop working tunnels at the poll interval forever. ACLs are
+        // still reapplied, so a file whose ACLs drifted is repaired even on this path.
+        if is_unchanged_on_disk(&instance_file_path, &json) {
+            debug!(
+                "Service locations for instance {instance_id} are unchanged, leaving {} and the \
+                existing tunnels untouched",
+                instance_file_path.display()
+            );
+            if let Some(file_path_str) = instance_file_path.to_str() {
+                if let Err(err) = set_protected_acls(file_path_str) {
+                    warn!(
+                        "Failed to reapply ACLs on unchanged service location file \
+                        {file_path_str}: {err}"
+                    );
+                }
+            }
+            return Ok(());
+        }
 
         debug!(
             "Writing service location data to file: {}",
@@ -915,36 +1046,7 @@ impl ServiceLocationManager {
 
     fn load_service_locations(&self) -> Result<Vec<ServiceLocationData>, ServiceLocationError> {
         let base_dir = get_shared_directory()?;
-        let mut all_locations_data = Vec::new();
-
-        if base_dir.exists() {
-            for entry in fs::read_dir(base_dir)? {
-                let entry = entry?;
-                let file_path = entry.path();
-
-                if file_path.is_file() && file_path.extension() == Some(OsStr::new("json")) {
-                    match fs::read_to_string(&file_path) {
-                        Ok(data) => match serde_json::from_str::<ServiceLocationData>(&data) {
-                            Ok(locations_data) => {
-                                all_locations_data.push(locations_data);
-                            }
-                            Err(err) => {
-                                error!(
-                                    "Failed to parse service locations from file {}: {err}",
-                                    file_path.display()
-                                );
-                            }
-                        },
-                        Err(err) => {
-                            error!(
-                                "Failed to read service locations file {}: {err}",
-                                file_path.display()
-                            );
-                        }
-                    }
-                }
-            }
-        }
+        let all_locations_data = load_service_locations_from_directory(&base_dir)?;
 
         debug!(
             "Loaded service locations data for {} instances",
@@ -961,33 +1063,30 @@ impl ServiceLocationManager {
         debug!("Loading service location for instance {instance_id} and pubkey {location_pubkey}");
 
         let instance_file_path = get_instance_file_path(instance_id)?;
-
-        if instance_file_path.exists() {
-            let data = fs::read_to_string(&instance_file_path)?;
-            let service_location_data = serde_json::from_str::<ServiceLocationData>(&data)?;
-
-            for location in service_location_data.service_locations {
-                if location.pubkey == location_pubkey {
-                    debug!(
-                        "Successfully loaded service location for instance {instance_id} and \
-                        pubkey {location_pubkey}"
-                    );
-                    return Ok(Some(SingleServiceLocationData {
-                        service_location: location,
-                        instance_id: service_location_data.instance_id,
-                        private_key: service_location_data.private_key,
-                    }));
-                }
-            }
-
-            debug!(
-                "No service location found for instance {instance_id} with pubkey {location_pubkey}"
-            );
-            Ok(None)
-        } else {
+        let Some(service_location_data) = load_service_locations_from_file(&instance_file_path)?
+        else {
             debug!("No service location file found for instance {instance_id}");
-            Ok(None)
+            return Ok(None);
+        };
+
+        for location in service_location_data.service_locations {
+            if location.pubkey == location_pubkey {
+                debug!(
+                    "Successfully loaded service location for instance {instance_id} and pubkey \
+                    {location_pubkey}"
+                );
+                return Ok(Some(SingleServiceLocationData {
+                    service_location: location,
+                    instance_id: service_location_data.instance_id,
+                    private_key: service_location_data.private_key,
+                }));
+            }
         }
+
+        debug!(
+            "No service location found for instance {instance_id} with pubkey {location_pubkey}"
+        );
+        Ok(None)
     }
 
     fn load_service_locations_for_instance(
@@ -995,12 +1094,7 @@ impl ServiceLocationManager {
         instance_id: &str,
     ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
         let instance_file_path = get_instance_file_path(instance_id)?;
-        if !instance_file_path.exists() {
-            return Ok(None);
-        }
-
-        let data = fs::read_to_string(instance_file_path)?;
-        Ok(Some(serde_json::from_str::<ServiceLocationData>(&data)?))
+        load_service_locations_from_file(&instance_file_path)
     }
 
     pub fn delete_all_service_locations_for_instance(

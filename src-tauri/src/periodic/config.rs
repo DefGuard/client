@@ -5,7 +5,8 @@ use std::{
 };
 
 pub use defguard_client_config_sync::commands::{
-    disable_enterprise_features, do_update_instance, locations_changed,
+    disable_enterprise_features, do_update_instance, locations_changed, sync_service_locations,
+    sync_service_locations_best_effort,
 };
 use defguard_client_config_sync::{
     poll_instance, poll_instances, PollInstanceResult, VersionMismatchPayload,

@@ -1,4 +1,4 @@
-use super::super::{disk_encryption_status, os_name, os_version};
+use super::super::{disk_encryption_status, os_name, os_version, DiskEncryptionTarget};
 
 #[test]
 fn test_os_name() {
@@ -13,5 +13,5 @@ fn test_os_version() {
 #[test]
 #[ignore = "development machine only"]
 fn test_disk_encryption() {
-    assert!(!disk_encryption_status().unwrap());
+    assert!(!disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
 }

@@ -7,16 +7,17 @@ use std::{
 
 use clap::Parser;
 use defguard_client_service_locations::{
+    reconciler::{run_reconciler, ReconcileSignal},
     windows::{watch_for_login_logoff, watch_for_network_change},
     ServiceLocationError, ServiceLocationManager,
 };
 use tokio::runtime::Runtime;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use windows_service::{
     define_windows_service,
     service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
-        ServiceType,
+        PowerEventParam, ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
+        ServiceStatus, ServiceType,
     },
     service_control_handler::{register, ServiceControlHandlerResult},
     service_dispatcher,
@@ -24,16 +25,12 @@ use windows_service::{
 
 use crate::{
     config::Config,
-    daemon::{
-        run_server, DaemonError, SERVICE_LOCATION_CONNECT_RETRY_COUNT,
-        SERVICE_LOCATION_CONNECT_RETRY_DELAY,
-    },
+    daemon::{run_server, DaemonError, SERVICE_LOCATION_RECONCILE_INTERVAL},
     utils::logging_setup,
 };
 
 static SERVICE_NAME: &str = "DefguardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
-const LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS: Duration = Duration::from_secs(5);
 
 pub fn run() -> Result<(), windows_service::Error> {
     // Register generated `ffi_service_main` with the system and start the service, blocking
@@ -54,6 +51,11 @@ fn run_service() -> Result<(), DaemonError> {
     // Create a channel to be able to poll a stop event from the service worker loop.
     let (shutdown_tx, shutdown_rx) = mpsc::channel::<u32>();
     let shutdown_tx_server = shutdown_tx.clone();
+    let shutdown_tx_reconciler = shutdown_tx.clone();
+
+    // One signal, shared by everything that can notice wake/suspend etc. events.
+    let wake_reconciler = ReconcileSignal::default();
+    let wake_on_power_event = wake_reconciler.clone();
 
     // Define system service event handler that will be receiving service events.
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
@@ -65,6 +67,21 @@ fn run_service() -> Result<(), DaemonError> {
             // Handle stop
             ServiceControl::Stop => {
                 let _ = shutdown_tx.send(1);
+                ServiceControlHandlerResult::NoError
+            }
+
+            // Resuming from sleep leaves tunnels that were established before the suspend looking
+            // alive but no longer passing traffic, so wake the reconciler rather than waiting up
+            // to a full tick.
+            ServiceControl::PowerEvent(param) => {
+                debug!("Received power event: {param:?}");
+                if matches!(
+                    param,
+                    PowerEventParam::ResumeAutomatic | PowerEventParam::ResumeSuspend
+                ) {
+                    info!("Resumed from sleep, waking the service location reconciler");
+                    wake_on_power_event.notify_one();
+                }
                 ServiceControlHandlerResult::NoError
             }
 
@@ -82,7 +99,7 @@ fn run_service() -> Result<(), DaemonError> {
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
             current_state: ServiceState::Running,
-            controls_accepted: ServiceControlAccept::STOP,
+            controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::POWER_EVENT,
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: Duration::default(),
@@ -118,55 +135,40 @@ fn run_service() -> Result<(), DaemonError> {
         // NotifyAddrChange syscall does not stall Tokio's async worker threads.
         // Register it first so no network event can be missed before the watcher is listening;
         // the retry loop below is the backstop for any event that slips through the startup window.
-        let service_location_manager_clone = service_location_manager.clone();
+        let wake = wake_reconciler.clone();
         std::thread::Builder::new()
             .name("network-change-monitor".to_string())
             .spawn(move || {
                 info!("Starting network change monitoring");
-                watch_for_network_change(service_location_manager_clone);
+                watch_for_network_change(wake);
                 error!("Network change monitoring ended unexpectedly.");
             })
             .expect("Failed to spawn network change monitor thread");
 
-        // Spawn the service location auto-connect task with retries. Each attempt skips locations
-        // that are already connected, so it is safe to call repeatedly. The retry loop handles the
-        // case where the connection fails initially at startup because the network (e.g. Wi-Fi) is
-        // not yet available (mainly DNS resolution issues), and serves as a backstop for any
-        // network events missed by the watcher above.
-        runtime.spawn(
-            defguard_client_service_locations::connect_service_locations(
-                service_location_manager.clone(),
-                SERVICE_LOCATION_CONNECT_RETRY_COUNT,
-                SERVICE_LOCATION_CONNECT_RETRY_DELAY,
-            ),
-        );
+        // Spawn the reconciler. Each pass leaves already-correct locations alone, so waking it is
+        // always safe. Its tick covers startup before the network is ready - typically DNS not yet
+        // resolving - and backstops any event the watchers miss.
+        let reconciler_handle = runtime.spawn(run_reconciler(
+            service_location_manager.clone(),
+            wake_reconciler.clone(),
+            SERVICE_LOCATION_RECONCILE_INTERVAL,
+        ));
+        runtime.spawn(async move {
+            match reconciler_handle.await {
+                Ok(()) => error!("Service location reconciler ended unexpectedly"),
+                Err(err) => error!("Service location reconciler task failed: {err}"),
+            }
+            let _ = shutdown_tx_reconciler.send(2);
+        });
 
         // Spawn login/logoff monitoring on a dedicated OS thread so the blocking
         // WTSWaitSystemEvent syscall does not stall Tokio's async worker threads.
-        let service_location_manager_clone = service_location_manager.clone();
+        let wake = wake_reconciler.clone();
         std::thread::Builder::new()
             .name("login-logoff-monitor".to_string())
             .spawn(move || {
                 info!("Starting login/logoff event monitoring");
-                loop {
-                    match watch_for_login_logoff(service_location_manager_clone.clone()) {
-                        Ok(()) => {
-                            warn!(
-                                "Login/logoff event monitoring ended unexpectedly. Restarting in \
-                                {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}..."
-                            );
-                            std::thread::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS);
-                        }
-                        Err(e) => {
-                            error!(
-                                "Error in login/logoff event monitoring: {e}. Restarting in \
-                                {LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS:?}...",
-                            );
-                            std::thread::sleep(LOGIN_LOGOFF_MONITORING_RESTART_DELAY_SECS);
-                            info!("Restarting login/logoff event monitoring");
-                        }
-                    }
-                }
+                watch_for_login_logoff(&wake);
             })
             .expect("Failed to spawn login/logoff monitor thread");
 

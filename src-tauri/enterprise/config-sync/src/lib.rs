@@ -20,7 +20,9 @@ use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 
-use crate::commands::{disable_enterprise_features, do_update_instance};
+use crate::commands::{
+    disable_enterprise_features, do_update_instance, sync_service_locations_best_effort,
+};
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -250,6 +252,12 @@ pub async fn poll_instances(
     }
 
     transaction.commit().await?;
+
+    // Push to the daemon only after committing to avoid hanging transactions across grpc calls.
+    for instance in &instances {
+        sync_service_locations_best_effort(pool, instance).await;
+    }
+
     Ok(outcomes)
 }
 

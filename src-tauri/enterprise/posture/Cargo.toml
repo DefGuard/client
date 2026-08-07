@@ -27,3 +27,7 @@ sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 time = { version = "0.3", features = ["formatting", "macros", "serde"] }
 wmi = { version = "0.18", default-features = false }
+
+[dev-dependencies]
+tokio.workspace = true
+wiremock.workspace = true

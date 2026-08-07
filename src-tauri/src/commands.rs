@@ -15,7 +15,7 @@ use defguard_client_core::{
 use defguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
-    DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
+    DeleteServiceLocationsRequest, RemoveInterfaceRequest,
 };
 use defguard_client_proto::defguard::{
     client_types::{
@@ -26,8 +26,6 @@ use defguard_client_proto::defguard::{
     enterprise::posture::v2::DevicePostureData,
 };
 use defguard_client_provisioning::ProvisioningConfig;
-#[cfg(not(target_os = "macos"))]
-use defguard_client_service_locations::to_service_location;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
@@ -61,7 +59,10 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    periodic::config::{do_update_instance, poll_instance_with_events},
+    periodic::config::{
+        do_update_instance, poll_instance_with_events, sync_service_locations,
+        sync_service_locations_best_effort,
+    },
     proxy::construct_platform_header,
     tauri_err_to_app_err,
     tray::{configure_tray_icon, reload_tray_menu},
@@ -152,11 +153,24 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
+
+            // Avoid connecting a service location - they should be managed by the background service.
+            if location.is_service_location() {
+                error!(
+                    "Refusing to connect location {location} from the app: it is a service \
+                    location, managed by the background service"
+                );
+                return Err(Error::InvalidInput(format!(
+                    "Location \"{}\" is a service location and is managed by the defguard service",
+                    location.name
+                ))
+                .into());
+            }
             // Connect-time MFA brings the tunnel up itself (keeping the preshared
             // key backend-side), so the only preshared key resolved here is for
             // posture-only locations.
             let preshared_key = if location.posture_check_required {
-                Some(authorize_posture_session(&location).await?)
+                authorize_posture_session(&location).await?
             } else {
                 None
             };
@@ -398,6 +412,9 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     };
     poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
+
+    sync_service_locations_best_effort(&DB_POOL, &instance).await;
+
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
         .map_err(tauri_err_to_app_err)?;
@@ -474,7 +491,7 @@ pub async fn save_device_config(
         disconnect_all_tunnels(&handle).await?;
     }
 
-    let locations = push_service_locations(&instance, keys).await?;
+    let locations = push_service_locations(&instance).await?;
 
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
@@ -489,63 +506,22 @@ pub async fn save_device_config(
 }
 
 #[cfg(target_os = "macos")]
-async fn push_service_locations(
-    _instance: &Instance<Id>,
-    _keys: WireguardKeys<Id>,
-) -> Result<Vec<Location<Id>>, Error> {
+async fn push_service_locations(_instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     // Nothing here... yet
 
     Ok(Vec::new())
 }
 
+/// Pushes the instance's service locations to the daemon and returns all of its locations.
+///
+/// Delegates to [`sync_service_locations`] rather than building its own request, so the pushed
+/// field set cannot drift from the config-sync path.
 #[cfg(not(target_os = "macos"))]
-async fn push_service_locations(
-    instance: &Instance<Id>,
-    keys: WireguardKeys<Id>,
-) -> Result<Vec<Location<Id>>, Error> {
+async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
-    let mut service_locations = Vec::new();
-
-    for saved_location in &locations {
-        if saved_location.is_service_location() {
-            debug!(
-                "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
-                saved_location.name, saved_location.id, instance.name, instance.id,
-            );
-            service_locations.push(to_service_location(saved_location)?);
-        }
-    }
-
-    if !service_locations.is_empty() {
-        let save_request = SaveServiceLocationsRequest {
-            service_locations: service_locations.clone(),
-            instance_id: instance.uuid.clone(),
-            private_key: keys.prvkey,
-        };
-        debug!(
-            "Saving {} service locations to the daemon for instance {}({}).",
-            save_request.service_locations.len(),
-            instance.name,
-            instance.id,
-        );
-        DAEMON_CLIENT
-            .clone()
-            .save_service_locations(save_request)
-            .await
-            .map_err(|err| {
-                error!(
-                    "Error while saving service locations to the daemon for instance {}({}): {err}",
-                    instance.name, instance.id,
-                );
-                Error::InternalError(err.to_string())
-            })?;
-        debug!(
-            "Saved service locations to the daemon for instance {}({}).",
-            instance.name, instance.id,
-        );
-    }
+    sync_service_locations(&DB_POOL, instance).await?;
 
     Ok(locations)
 }
@@ -739,6 +715,8 @@ pub async fn update_instance(
         let locations_changed =
             do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
+
+        sync_service_locations_best_effort(&DB_POOL, &instance).await;
 
         if locations_changed {
             if let Err(err) = app_handle.emit(EventKey::InstanceUpdated.into(), ()) {

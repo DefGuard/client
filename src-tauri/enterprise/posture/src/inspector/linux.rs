@@ -5,8 +5,6 @@ use std::{
     process::Command,
 };
 
-use defguard_client_core::database::db_file_path;
-
 use super::UnavailableReason;
 
 /// Path to the kernel's mount table for the current process.
@@ -40,10 +38,14 @@ struct MountEntry {
 /// (bcachefs native encryption, fscrypt on ext4/f2fs, eCryptfs) are not detected
 /// and resolve to `DetectionFailed` - fail-safe: a required posture rule fails
 /// rather than falsely passing.
-pub(super) fn disk_encryption_status() -> Result<bool, UnavailableReason> {
-    // Resolve the database file and the mount that backs it.
-    let db_path = db_file_path().ok_or(UnavailableReason::DetectionFailed)?;
-    let db_path = canonicalize_on_disk(&db_path).ok_or(UnavailableReason::DetectionFailed)?;
+/// Reports whether the device stack backing `path` includes an encryption layer.
+///
+/// `path` is supplied by the caller rather than derived here, because who is asking changes the
+/// answer: a user-initiated check means the partition holding the client database, while the service
+/// means `/`. Deriving it internally would silently answer for whichever process happened to call.
+pub(super) fn disk_encryption_status(path: &Path) -> Result<bool, UnavailableReason> {
+    // Resolve the target and the mount that backs it.
+    let db_path = canonicalize_on_disk(path).ok_or(UnavailableReason::DetectionFailed)?;
 
     let mountinfo =
         read_to_string(MOUNTINFO_PATH).map_err(|_| UnavailableReason::DetectionFailed)?;
