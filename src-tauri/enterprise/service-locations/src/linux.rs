@@ -102,6 +102,7 @@ impl ServiceLocationManager {
             .map(|location| location.pubkey.clone())
             .collect::<HashSet<_>>();
 
+        // Only AlwaysOn service locations are supported on linux
         let service_locations = service_locations
             .iter()
             .filter(|location| location.mode == ServiceLocationMode::AlwaysOn as i32)
@@ -577,7 +578,6 @@ impl ServiceLocationManager {
     }
 
     /// Brings the running tunnels in line with what is on disk.
-    ///
     /// On Linux that is only ever "connect what is missing": the save path filters out everything but
     /// Always-on locations, so nothing persisted here should ever be deliberately down.
     pub fn reconcile(
@@ -588,9 +588,7 @@ impl ServiceLocationManager {
     }
 
     /// Lists the locations that need a posture check before the next pass can connect them.
-    ///
-    /// Read-only, so the caller can hold a read guard briefly, release it, and do the network calls
-    /// unlocked. Locations that are already connected are excluded: re-authorizing a working tunnel
+    /// Locations that are already connected are excluded: re-authorizing a working tunnel
     /// would supersede its session in core for no reason.
     pub fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
         let Ok(data) = self.load_service_locations() else {

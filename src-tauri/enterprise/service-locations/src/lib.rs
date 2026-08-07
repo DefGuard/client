@@ -31,6 +31,15 @@ pub mod linux;
 #[cfg(windows)]
 pub mod windows;
 
+/// Current schema version of the on-disk service location JSON file.
+pub const SERVICE_LOCATION_SCHEMA_VERSION: u32 = 1;
+
+/// How long a posture session may go without evidence of life before it is renewed.
+/// Deliberately below core's default `peer_disconnect_threshold` of 300s, so a session is refreshed
+/// before core would drop the peer rather than after.
+#[cfg(any(windows, target_os = "linux"))]
+pub const POSTURE_SESSION_STALE_AFTER: Duration = Duration::from_secs(180);
+
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceLocationError {
     #[error("Error occurred while initializing service location API: {0}")]
@@ -73,9 +82,6 @@ struct ConnectedServiceLocation {
     authorized_at: Option<SystemTime>,
 }
 
-/// Current schema version of the on-disk service location JSON file.
-pub const SERVICE_LOCATION_SCHEMA_VERSION: u32 = 1;
-
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 pub struct ServiceLocationData {
@@ -84,8 +90,6 @@ pub struct ServiceLocationData {
     pub private_key: String,
     #[serde(default)]
     pub proxy_url: String,
-    /// The *device's* WireGuard public key (`WireguardKeys.pubkey`), used to identify this device
-    /// to the proxy. This is **not** [`ServiceLocation::pubkey`], which is the remote peer key.
     #[serde(default)]
     pub device_pubkey: String,
     /// Device polling token, used to authenticate posture requests made by the service.
@@ -121,10 +125,6 @@ impl ServiceLocationData {
     ///
     /// `service_locations` is passed separately rather than taken from the request because each
     /// platform first filters the requested set down to the modes it supports.
-    ///
-    /// Every other field is copied from the request here and nowhere else, so a field added to
-    /// `SaveServiceLocationsRequest` has exactly one place to be wired in — it cannot be silently
-    /// dropped on the way to disk by one platform but not the other.
     #[must_use]
     pub fn from_save_request(
         request: &SaveServiceLocationsRequest,
@@ -200,14 +200,6 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
     })
 }
 
-/// How long a posture session may go without evidence of life before it is renewed.
-///
-/// Deliberately below core's default `peer_disconnect_threshold` of 300s, so a session is refreshed
-/// before core would drop the peer rather than after. A deployment that lowers that threshold below
-/// this one would need this plumbed through (D21).
-#[cfg(any(windows, target_os = "linux"))]
-pub const POSTURE_SESSION_STALE_AFTER: Duration = Duration::from_secs(180);
-
 /// Whether a posture session needs renewing.
 ///
 /// The interface is the only honest source here. A location the daemon believes it connected can be
@@ -242,10 +234,6 @@ pub fn posture_session_is_stale(
 }
 
 /// A location that cannot be connected until a posture check approves it.
-///
-/// Carries everything the request needs, so authorization can happen with no lock held. Note
-/// `network_id` is core's id for the location, which is what the posture endpoint expects, and
-/// `device_pubkey` is this device's key rather than the remote peer's.
 #[cfg(any(windows, target_os = "linux"))]
 #[derive(Debug)]
 pub struct PostureAuthorizationRequest {
@@ -257,13 +245,6 @@ pub struct PostureAuthorizationRequest {
     pub device_pubkey: String,
     pub token: Option<String>,
 }
-
-/// Posture approvals obtained this pass, keyed by (instance id, location public key).
-///
-/// An absent map entry means authorization failed and leaves the location alone. A present entry
-/// with no key means core approved connecting without a PSK because posture checks were removed.
-#[cfg(any(windows, target_os = "linux"))]
-pub type PostureAuthorizations = HashMap<(String, String), Option<String>>;
 
 /// What one reconcile pass should do with a persisted service location.
 ///
@@ -296,13 +277,14 @@ pub(crate) fn reconcile_action(
     }
 }
 
+/// Posture approvals obtained this pass, keyed by (instance id, location public key).
+///
+/// An absent map entry means authorization failed and leaves the location alone. A present entry
+/// with no key means core approved connecting without a PSK because posture checks were removed.
+#[cfg(any(windows, target_os = "linux"))]
+pub type PostureAuthorizations = HashMap<(String, String), Option<String>>;
+
 /// Obtains a preshared key for each location that needs one.
-///
-/// Posture data is collected once per pass rather than once per location: on Windows that is a WMI
-/// query, and every location on a machine reports the same posture anyway.
-///
-/// Failures are logged and skipped, never propagated. A rejected device and an unreachable proxy are
-/// treated alike - the location simply is not connected, and the next pass tries again.
 #[cfg(any(windows, target_os = "linux"))]
 async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> PostureAuthorizations {
     let mut authorizations = PostureAuthorizations::new();
@@ -364,11 +346,7 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
 #[cfg(any(windows, target_os = "linux"))]
 pub type ReconcileSignal = std::sync::Arc<tokio::sync::Notify>;
 
-/// Brings the running tunnels in line with what is on disk, forever.
-///
-/// Replaces a retry loop that gave up permanently after a fixed number of attempts, which left a
-/// machine that booted before its network was ready disconnected until the service restarted. This
-/// never gives up: every tick it looks at what should be running and fixes the difference.
+/// Runs a loop that brings the running tunnels in line with what is on disk, forever.
 ///
 /// Each pass is idempotent - already-correct locations are left alone - so waking it spuriously
 /// costs nothing, and callers are free to wake it whenever something *might* have changed rather
@@ -386,12 +364,7 @@ pub async fn run_reconciler(
     info!("Service location reconciler started, reconciling every {tick:?}");
 
     loop {
-        // Authorize first, mutate second. Working out what needs a posture check takes only a read
-        // guard, the checks themselves are HTTP round trips of up to 5s each and are made with no
-        // guard at all, and only the final step takes the write guard.
-        //
-        // The ordering is enforced rather than merely intended: these are `std` guards, so they are
-        // `!Send` and holding one across the await below would not compile.
+        // Authorize first, mutate second.
         let pending = {
             let manager = manager.read().unwrap();
             manager.locations_needing_authorization()
@@ -405,12 +378,12 @@ pub async fn run_reconciler(
         };
 
         match outcome {
-            Ok(true) => debug!("Service locations reconciled, everything is as it should be"),
+            Ok(true) => debug!("Service locations reconciled"),
             Ok(false) => warn!(
                 "Service location reconcile pass completed with failures, retrying in {tick:?}"
             ),
             Err(err) => {
-                warn!("Service location reconcile pass failed: {err}. Retrying in {tick:?}");
+                error!("Service location reconcile pass failed: {err}. Retrying in {tick:?}");
             }
         }
 
