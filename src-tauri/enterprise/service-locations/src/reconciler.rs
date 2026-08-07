@@ -16,9 +16,10 @@ use defguard_client_posture::{
     inspector::{device_posture_data, DiskEncryptionTarget},
     request_posture_authorization,
 };
+use defguard_client_proto::defguard::client::v1::ServiceLocation;
 use log::{debug, error, info, warn};
 
-use crate::ServiceLocationManager;
+use crate::{ServiceLocationData, ServiceLocationManager};
 
 /// How long a posture session may go without evidence of life before it is renewed.
 /// Deliberately below core's default `peer_disconnect_threshold` of 300s, so a session is refreshed
@@ -67,6 +68,66 @@ pub(crate) struct PostureAuthorizationRequest {
     pub proxy_url: String,
     pub device_pubkey: String,
     pub token: Option<String>,
+}
+
+impl PostureAuthorizationRequest {
+    fn new(instance: &ServiceLocationData, location: &ServiceLocation) -> Self {
+        Self {
+            instance_id: instance.instance_id.clone(),
+            location_pubkey: location.pubkey.clone(),
+            location_name: location.name.clone(),
+            network_id: location.network_id,
+            proxy_url: instance.proxy_url.clone(),
+            device_pubkey: instance.device_pubkey.clone(),
+            token: instance.token.clone(),
+        }
+    }
+}
+
+impl ServiceLocationManager {
+    /// Collects posture-gated locations that should currently be connected and need authorization.
+    ///
+    /// Platform modules supply connection eligibility and handshake lookup while this method owns
+    /// the common persisted-data traversal and posture-session staleness policy.
+    pub(crate) fn collect_posture_authorization_requests(
+        &self,
+        data: &[ServiceLocationData],
+        should_be_connected: impl Fn(&ServiceLocation) -> bool,
+        last_handshake: impl Fn(&ServiceLocation) -> Option<SystemTime>,
+    ) -> Vec<PostureAuthorizationRequest> {
+        let mut pending = Vec::new();
+
+        for instance in data {
+            for location in &instance.service_locations {
+                if !location.posture_check_required || !should_be_connected(location) {
+                    continue;
+                }
+
+                if let Some(connected) =
+                    self.connected_service_location(&instance.instance_id, &location.pubkey)
+                {
+                    let handshake = last_handshake(location);
+                    if !posture_session_is_stale(
+                        handshake,
+                        connected.authorized_at,
+                        SystemTime::now(),
+                    ) {
+                        continue;
+                    }
+
+                    debug!(
+                        "Posture session for service location '{}' looks stale (last handshake: \
+                        {handshake:?}), it will be renewed",
+                        location.name
+                    );
+                }
+
+                pending.push(PostureAuthorizationRequest::new(instance, location));
+            }
+        }
+
+        pending
+    }
 }
 
 /// What one reconcile pass should do with a persisted service location.
@@ -306,6 +367,14 @@ mod tests {
         assert_eq!(
             reconcile_action(false, true, None),
             ReconcileAction::WaitForAuthorization
+        );
+    }
+
+    #[test]
+    fn regular_location_connects_without_authorization() {
+        assert_eq!(
+            reconcile_action(false, false, None),
+            ReconcileAction::Connect(None)
         );
     }
 }

@@ -11,6 +11,8 @@ use defguard_client_proto::defguard::client::v1::{
     SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
 };
 use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
+#[cfg(any(windows, target_os = "linux"))]
+use log::debug;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
@@ -64,6 +66,57 @@ struct ConnectedServiceLocation {
     location: ServiceLocation,
     /// Records when a posture-gated service location was authorized for staleness detection.
     authorized_at: Option<SystemTime>,
+}
+
+#[cfg(any(windows, target_os = "linux"))]
+impl ServiceLocationManager {
+    fn connected_service_location(
+        &self,
+        instance_id: &str,
+        location_pubkey: &str,
+    ) -> Option<&ConnectedServiceLocation> {
+        self.connected_service_locations
+            .get(instance_id)?
+            .iter()
+            .find(|connected| connected.location.pubkey == location_pubkey)
+    }
+
+    fn connected_service_location_mut(
+        &mut self,
+        instance_id: &str,
+        location_pubkey: &str,
+    ) -> Option<&mut ConnectedServiceLocation> {
+        self.connected_service_locations
+            .get_mut(instance_id)?
+            .iter_mut()
+            .find(|connected| connected.location.pubkey == location_pubkey)
+    }
+
+    fn is_service_location_connected(&self, instance_id: &str, location_pubkey: &str) -> bool {
+        self.connected_service_location(instance_id, location_pubkey)
+            .is_some()
+    }
+
+    fn add_connected_service_location(&mut self, instance_id: &str, location: &ServiceLocation) {
+        self.connected_service_locations
+            .entry(instance_id.to_string())
+            .or_default()
+            .push(ConnectedServiceLocation {
+                location: location.clone(),
+                authorized_at: None,
+            });
+
+        debug!(
+            "Added connected service location for instance '{instance_id}', location '{}'",
+            location.name
+        );
+    }
+
+    fn record_posture_session(&mut self, instance_id: &str, location_pubkey: &str) {
+        if let Some(connected) = self.connected_service_location_mut(instance_id, location_pubkey) {
+            connected.authorized_at = Some(SystemTime::now());
+        }
+    }
 }
 
 #[allow(dead_code)]

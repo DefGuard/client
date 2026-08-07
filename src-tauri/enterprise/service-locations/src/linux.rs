@@ -20,10 +20,9 @@ use log::{debug, error, info, warn};
 use crate::{
     is_unchanged_on_disk,
     reconciler::{
-        posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
-        PostureAuthorizations, ReconcileAction,
+        reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
     },
-    ConnectedServiceLocation, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
+    ServiceLocationData, ServiceLocationError, ServiceLocationManager,
 };
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
@@ -213,32 +212,6 @@ impl ServiceLocationManager {
             location.name
         );
         Ok(())
-    }
-
-    /// Records a service location as connected in the in-memory daemon state.
-    fn add_connected_service_location(&mut self, instance_id: &str, location: &ServiceLocation) {
-        self.connected_service_locations
-            .entry(instance_id.to_string())
-            .or_default()
-            .push(ConnectedServiceLocation {
-                location: location.clone(),
-                authorized_at: None,
-            });
-
-        debug!(
-            "Added connected Linux service location for instance '{instance_id}', location '{}'",
-            location.name
-        );
-    }
-
-    fn is_service_location_connected(&self, instance_id: &str, location_pubkey: &str) -> bool {
-        self.connected_service_locations
-            .get(instance_id)
-            .is_some_and(|locations| {
-                locations
-                    .iter()
-                    .any(|connected| connected.location.pubkey == location_pubkey)
-            })
     }
 
     fn find_interface_by_peer_pubkey(&self, location_pubkey: &str) -> Option<String> {
@@ -464,29 +437,6 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Whether a connected location's posture session has stopped showing signs of life.
-    fn posture_session_needs_renewal(&self, instance_id: &str, location_pubkey: &str) -> bool {
-        let authorized_at = self
-            .connected_service_locations
-            .get(instance_id)
-            .and_then(|locations| {
-                locations
-                    .iter()
-                    .find(|connected| connected.location.pubkey == location_pubkey)
-            })
-            .and_then(|connected| connected.authorized_at);
-        let last_handshake = self.read_last_handshake(location_pubkey);
-
-        let stale = posture_session_is_stale(last_handshake, authorized_at, SystemTime::now());
-        if stale {
-            debug!(
-                "Posture session for peer {location_pubkey} looks stale (last handshake: \
-                {last_handshake:?}), it will be renewed"
-            );
-        }
-        stale
-    }
-
     /// Reads the last handshake for a peer from the interface carrying it.
     ///
     /// `None` means either no interface was found or the peer has never completed a handshake. The
@@ -554,21 +504,6 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Notes that a location's posture session was just approved.
-    fn record_posture_session(&mut self, instance_id: &str, location_pubkey: &str) {
-        if let Some(connected) = self
-            .connected_service_locations
-            .get_mut(instance_id)
-            .and_then(|locations| {
-                locations
-                    .iter_mut()
-                    .find(|connected| connected.location.pubkey == location_pubkey)
-            })
-        {
-            connected.authorized_at = Some(SystemTime::now());
-        }
-    }
-
     /// Brings the running tunnels in line with what is on disk.
     pub(crate) fn reconcile(
         &mut self,
@@ -586,37 +521,11 @@ impl ServiceLocationManager {
             return Vec::new();
         };
 
-        let mut pending = Vec::new();
-        for instance_data in data {
-            for location in instance_data.service_locations {
-                if !location.posture_check_required
-                    || location.mode != ServiceLocationMode::AlwaysOn as i32
-                {
-                    continue;
-                }
-
-                // A connected location is left alone unless its session has gone stale. Renewing a
-                // healthy one would supersede it in core for no reason.
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                    && !self
-                        .posture_session_needs_renewal(&instance_data.instance_id, &location.pubkey)
-                {
-                    continue;
-                }
-
-                pending.push(PostureAuthorizationRequest {
-                    instance_id: instance_data.instance_id.clone(),
-                    location_pubkey: location.pubkey.clone(),
-                    location_name: location.name.clone(),
-                    network_id: location.network_id,
-                    proxy_url: instance_data.proxy_url.clone(),
-                    device_pubkey: instance_data.device_pubkey.clone(),
-                    token: instance_data.token.clone(),
-                });
-            }
-        }
-
-        pending
+        self.collect_posture_authorization_requests(
+            &data,
+            |location| location.mode == ServiceLocationMode::AlwaysOn as i32,
+            |location| self.read_last_handshake(&location.pubkey),
+        )
     }
 
     /// Attempts to connect all persisted Linux always-on service locations.

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     ffi::OsStr,
     fs::{self, create_dir_all},
     path::PathBuf,
@@ -31,11 +31,10 @@ use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 use crate::{
     is_unchanged_on_disk,
     reconciler::{
-        posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
-        PostureAuthorizations, ReconcileAction, ReconcileSignal,
+        reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
+        ReconcileSignal,
     },
-    ConnectedServiceLocation, ServiceLocationData, ServiceLocationError, ServiceLocationManager,
-    SingleServiceLocationData,
+    ServiceLocationData, ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -372,39 +371,6 @@ impl ServiceLocationManager {
         Ok(manager)
     }
 
-    /// Check if a specific service location is already connected
-    fn is_service_location_connected(&self, instance_id: &str, location_pubkey: &str) -> bool {
-        if let Some(locations) = self.connected_service_locations.get(instance_id) {
-            for connected in locations {
-                if connected.location.pubkey == location_pubkey {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    /// Add a connected service location
-    fn add_connected_service_location(
-        &mut self,
-        instance_id: &str,
-        location: &ServiceLocation,
-    ) -> Result<(), ServiceLocationError> {
-        self.connected_service_locations
-            .entry(instance_id.to_string())
-            .or_default()
-            .push(ConnectedServiceLocation {
-                location: location.clone(),
-                authorized_at: None,
-            });
-
-        debug!(
-            "Added connected service location for instance '{instance_id}', location '{}'",
-            location.name
-        );
-        Ok(())
-    }
-
     /// Remove connected service locations by filter (write disk-first, then memory)
     fn remove_connected_service_locations<F>(
         &mut self,
@@ -692,7 +658,7 @@ impl ServiceLocationManager {
         self.add_connected_service_location(
             &location_data.instance_id,
             &location_data.service_location,
-        )?;
+        );
         let ifname = get_interface_name(&location_data.service_location.name);
         debug!("Successfully connected to service location '{ifname}'");
 
@@ -752,30 +718,6 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Whether a connected location's posture session has stopped showing signs of life.
-    fn posture_session_needs_renewal(&self, instance_id: &str, location: &ServiceLocation) -> bool {
-        let authorized_at = self
-            .connected_service_locations
-            .get(instance_id)
-            .and_then(|locations| {
-                locations
-                    .iter()
-                    .find(|connected| connected.location.pubkey == location.pubkey)
-            })
-            .and_then(|connected| connected.authorized_at);
-        let last_handshake = self.read_last_handshake(location);
-
-        let stale = posture_session_is_stale(last_handshake, authorized_at, SystemTime::now());
-        if stale {
-            debug!(
-                "Posture session for service location '{}' looks stale (last handshake: \
-                {last_handshake:?}), it will be renewed",
-                location.name
-            );
-        }
-        stale
-    }
-
     /// Reads the last handshake for a location from the interface carrying it.
     ///
     /// Goes through the stored `WGApi` deliberately: on Windows `read_interface_data` needs the very
@@ -822,21 +764,6 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Notes that a location's posture session was just approved.
-    fn record_posture_session(&mut self, instance_id: &str, location_pubkey: &str) {
-        if let Some(connected) = self
-            .connected_service_locations
-            .get_mut(instance_id)
-            .and_then(|locations| {
-                locations
-                    .iter_mut()
-                    .find(|connected| connected.location.pubkey == location_pubkey)
-            })
-        {
-            connected.authorized_at = Some(SystemTime::now());
-        }
-    }
-
     /// Brings the running tunnels in line with what is on disk and who is logged in.
     ///
     /// Both directions, unlike `connect_to_service_locations` alone. Tearing down a pre-logon location
@@ -869,37 +796,11 @@ impl ServiceLocationManager {
         };
 
         let user_logged_in = is_user_logged_in();
-        let mut pending = Vec::new();
-
-        for instance_data in data {
-            for location in instance_data.service_locations {
-                if !location.posture_check_required
-                    || (location.mode == ServiceLocationMode::PreLogon as i32 && user_logged_in)
-                {
-                    continue;
-                }
-
-                // A connected location is left alone unless its session has gone stale. Renewing a
-                // healthy one would supersede it in core for no reason.
-                if self.is_service_location_connected(&instance_data.instance_id, &location.pubkey)
-                    && !self.posture_session_needs_renewal(&instance_data.instance_id, &location)
-                {
-                    continue;
-                }
-
-                pending.push(PostureAuthorizationRequest {
-                    instance_id: instance_data.instance_id.clone(),
-                    location_pubkey: location.pubkey.clone(),
-                    location_name: location.name.clone(),
-                    network_id: location.network_id,
-                    proxy_url: instance_data.proxy_url.clone(),
-                    device_pubkey: instance_data.device_pubkey.clone(),
-                    token: instance_data.token.clone(),
-                });
-            }
-        }
-
-        pending
+        self.collect_posture_authorization_requests(
+            &data,
+            |location| location.mode != ServiceLocationMode::PreLogon as i32 || !user_logged_in,
+            |location| self.read_last_handshake(location),
+        )
     }
 
     /// Attempts to connect every persisted service location that should currently be up.
@@ -1002,14 +903,7 @@ impl ServiceLocationManager {
                             continue;
                         }
 
-                        if let Err(err) = self
-                            .add_connected_service_location(&instance_data.instance_id, &location)
-                        {
-                            debug!(
-                                "Failed to persist connected service location after auto-connect: \
-								{err:?}"
-                            );
-                        }
+                        self.add_connected_service_location(&instance_data.instance_id, &location);
 
                         if authorization.is_some() {
                             self.record_posture_session(
