@@ -1086,7 +1086,6 @@ impl ServiceLocationManager {
         );
 
         fs::write(&instance_file_path, &json)?;
-        self.note_configuration_changed();
 
         if let Some(file_path_str) = instance_file_path.to_str() {
             debug!("Setting ACLs on service location file: {file_path_str}");

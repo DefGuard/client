@@ -63,8 +63,6 @@ pub struct ServiceLocationManager {
     wgapis: HashMap<String, WGApi>,
     // Instance ID: Service locations connected under that instance
     connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
-    #[cfg(any(windows, target_os = "linux"))]
-    configuration_generation: u64,
     // (Instance ID, location public key): when its posture session was last approved.
     //
     // Kept beside `connected_service_locations` rather than folded into it: the alternative meant
@@ -360,10 +358,6 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
 
 #[cfg(any(windows, target_os = "linux"))]
 impl ServiceLocationManager {
-    pub(crate) fn note_configuration_changed(&mut self) {
-        self.configuration_generation = self.configuration_generation.wrapping_add(1);
-    }
-
     /// Forgets posture sessions for locations that are no longer connected.
     ///
     /// Keeps this map from being a second, drifting source of truth: a location that is removed or
@@ -416,26 +410,15 @@ pub async fn run_reconciler(
         //
         // The ordering is enforced rather than merely intended: these are `std` guards, so they are
         // `!Send` and holding one across the await below would not compile.
-        let (configuration_generation, pending) = {
+        let pending = {
             let manager = manager.read().unwrap();
-            (
-                manager.configuration_generation,
-                manager.locations_needing_authorization(),
-            )
+            manager.locations_needing_authorization()
         };
 
-        let mut authorizations = authorize_pending(pending).await;
+        let authorizations = authorize_pending(pending).await;
 
         let outcome = {
             let mut manager = manager.write().unwrap();
-            if manager.configuration_generation != configuration_generation {
-                debug!(
-                    "Service location configuration changed while posture checks were running; \
-                    discarding {} stale authorization result(s)",
-                    authorizations.len()
-                );
-                authorizations.clear();
-            }
             manager.reconcile(&authorizations)
         };
 

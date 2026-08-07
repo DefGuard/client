@@ -141,7 +141,6 @@ impl ServiceLocationManager {
             instance_file_path.display()
         );
         fs::write(&instance_file_path, json)?;
-        self.note_configuration_changed();
         set_permissions(
             &instance_file_path,
             fs::Permissions::from_mode(SERVICE_LOCATION_FILE_PERMS),
