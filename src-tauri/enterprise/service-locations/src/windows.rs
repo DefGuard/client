@@ -85,12 +85,9 @@ pub fn watch_for_network_change(wake: ReconcileSignal) {
 /// Watches for user logon and logoff events and wakes the reconciler.
 ///
 /// Which event occurred is deliberately not passed on: the reconciler establishes whether a user is
-/// logged in for itself, so a logon and a logoff are both simply "look again". That is what lets this
-/// thread stay out of the manager entirely.
+/// logged in for itself, so a logon and a logoff are both simply "look again".
 ///
-/// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall. It never
-/// returns: a failed wait is retried after a delay rather than reported, since there is nothing a
-/// caller could usefully do about it.
+/// Runs on a dedicated OS thread because `WTSWaitSystemEvent` is a blocking syscall.
 pub fn watch_for_login_logoff(wake: &ReconcileSignal) -> ! {
     loop {
         let mut event_flags: u32 = 0;
@@ -128,6 +125,10 @@ fn setup_wgapi(ifname: &str) -> Result<WGApi, ServiceLocationError> {
     })
 }
 
+/// Builds the Windows WireGuard configuration for one service location.
+///
+/// Initial setup supplies a free listen port, while posture-session renewal supplies the running
+/// interface's current port so applying a new preshared key does not change its local endpoint.
 fn interface_configuration(
     location: &ServiceLocation,
     private_key: &str,
@@ -166,7 +167,7 @@ fn interface_configuration(
         port,
         peers: vec![peer],
         mtu: None,
-        fwmark: None, // TODO: add
+        fwmark: None,
     })
 }
 
@@ -699,10 +700,6 @@ impl ServiceLocationManager {
     }
 
     /// Disconnects every connected service location in `mode`.
-    ///
-    /// Takes the mode directly rather than an `Option` meaning "all modes": the only caller is the
-    /// reconcile pass tearing down pre-logon locations once a user logs in, and an all-modes teardown
-    /// has never been asked for. `disconnect_service_locations_by_instance` covers the other case.
     pub(crate) fn disconnect_service_locations(
         &mut self,
         mode: ServiceLocationMode,
@@ -755,16 +752,7 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Attempts to connect to all service locations that are not already connected.
-    ///
-    /// Returns `Ok(true)` if every location is now connected (either it was already connected or
-    /// it was successfully connected during this call), and `Ok(false)` if at least one location
-    /// failed to connect (indicating that a retry may be worthwhile).
     /// Whether a connected location's posture session has stopped showing signs of life.
-    ///
-    /// Reads the handshake from the interface itself, because the daemon's own record of having
-    /// connected proves nothing: a suspend outlasts core's `peer_disconnect_threshold`, the gateway
-    /// drops the peer, and the interface carries on looking healthy while passing nothing.
     fn posture_session_needs_renewal(&self, instance_id: &str, location: &ServiceLocation) -> bool {
         let authorized_at = self
             .connected_service_locations
@@ -914,6 +902,10 @@ impl ServiceLocationManager {
         pending
     }
 
+    /// Attempts to connect every persisted service location that should currently be up.
+    ///
+    /// Returns `Ok(true)` when every eligible location is connected or already connected, and
+    /// `Ok(false)` when at least one eligible location failed so the caller can retry later.
     pub fn connect_to_service_locations(
         &mut self,
         authorizations: &PostureAuthorizations,

@@ -365,9 +365,6 @@ impl ServiceLocationManager {
         let peer_key = Key::from_str(&location.pubkey)?;
         let mut peer = Peer::new(peer_key);
         peer.set_endpoint(&location.endpoint)?;
-        // Held only by the running interface. It is never written to the service location file,
-        // which already holds two long-lived secrets, and a session key is reconstructible by
-        // authorizing again.
         peer.preshared_key = preshared_key.map(Key::from_str).transpose()?;
         peer.persistent_keepalive_interval = location.keepalive_interval.try_into().ok();
 
@@ -467,15 +464,7 @@ impl ServiceLocationManager {
         Ok(())
     }
 
-    /// Attempts to connect all persisted Linux always-on service locations.
-    ///
-    /// Returns `Ok(true)` when every supported location is connected or already connected, and
-    /// `Ok(false)` when at least one supported location failed so the caller can retry later.
     /// Whether a connected location's posture session has stopped showing signs of life.
-    ///
-    /// Reads the handshake from the interface itself, because the daemon's own record of having
-    /// connected proves nothing: a suspend outlasts core's `peer_disconnect_threshold`, the gateway
-    /// drops the peer, and the interface carries on looking healthy while passing nothing.
     fn posture_session_needs_renewal(&self, instance_id: &str, location_pubkey: &str) -> bool {
         let authorized_at = self
             .connected_service_locations
@@ -581,8 +570,6 @@ impl ServiceLocationManager {
     }
 
     /// Brings the running tunnels in line with what is on disk.
-    /// On Linux that is only ever "connect what is missing": the save path filters out everything but
-    /// Always-on locations, so nothing persisted here should ever be deliberately down.
     pub(crate) fn reconcile(
         &mut self,
         authorizations: &PostureAuthorizations,
@@ -632,6 +619,10 @@ impl ServiceLocationManager {
         pending
     }
 
+    /// Attempts to connect all persisted Linux always-on service locations.
+    ///
+    /// Returns `Ok(true)` when every supported location is connected or already connected, and
+    /// `Ok(false)` when at least one supported location failed so the caller can retry later.
     pub fn connect_to_service_locations(
         &mut self,
         authorizations: &PostureAuthorizations,
@@ -686,7 +677,7 @@ impl ServiceLocationManager {
                             &location,
                             preshared_key,
                         ) {
-                            warn!(
+                            error!(
                                 "Failed to renew the posture session for '{}': {err}",
                                 location.name
                             );
@@ -701,7 +692,7 @@ impl ServiceLocationManager {
                             &instance_data.private_key,
                             preshared_key,
                         ) {
-                            warn!(
+                            error!(
 								"Failed to setup Linux service location interface for '{}': {err:?}",
 								location.name
 							);
