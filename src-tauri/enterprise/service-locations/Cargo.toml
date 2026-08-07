@@ -15,6 +15,7 @@ defguard-client-posture = { path = "../posture" }
 defguard-client-proto = { path = "../../client-proto" }
 defguard_wireguard_rs.workspace = true
 base64.workspace = true
+futures-util.workspace = true
 log.workspace = true
 prost.workspace = true
 serde.workspace = true

@@ -17,6 +17,7 @@ use defguard_client_posture::{
     request_posture_authorization,
 };
 use defguard_client_proto::defguard::client::v1::ServiceLocation;
+use futures_util::{stream, StreamExt};
 use log::{debug, error, info, warn};
 
 use crate::{ServiceLocationData, ServiceLocationManager};
@@ -25,6 +26,8 @@ use crate::{ServiceLocationData, ServiceLocationManager};
 /// Deliberately below core's default `peer_disconnect_threshold` of 300s, so a session is refreshed
 /// before core would drop the peer rather than after.
 pub const POSTURE_SESSION_STALE_AFTER: Duration = Duration::from_secs(180);
+/// Prevents a large configuration from flooding the proxy while avoiding serial timeout delays.
+const MAX_CONCURRENT_POSTURE_AUTHORIZATIONS: usize = 8;
 
 /// Whether a posture session needs renewing.
 ///
@@ -180,40 +183,55 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
     );
     let posture_data = device_posture_data(DiskEncryptionTarget::RootFilesystem);
 
-    for request in pending {
-        let Some(token) = request.token.clone().filter(|token| !token.is_empty()) else {
-            error!(
-                "Cannot run a posture check for service location '{}': no polling token was stored \
-                for its instance. Re-enrolling the device will store one.",
-                request.location_name
-            );
-            continue;
-        };
-
-        match request_posture_authorization(
-            &request.proxy_url,
-            request.device_pubkey.clone(),
-            request.network_id,
-            token,
-            posture_data.clone(),
-        )
-        .await
-        {
-            Ok(preshared_key) => {
-                info!(
-                    "Posture check approved for service location '{}'",
+    // Run checks concurrently so one slow proxy does not delay every posture-gated location.
+    let requests = stream::iter(pending.into_iter().map(|request| {
+        let posture_data = posture_data.clone();
+        async move {
+            let Some(token) = request.token.clone().filter(|token| !token.is_empty()) else {
+                error!(
+                    "Cannot run a posture check for service location '{}': no polling token was \
+                    stored for its instance. Re-enrolling the device will store one.",
                     request.location_name
                 );
-                authorizations.insert(
-                    (request.instance_id, request.location_pubkey),
-                    preshared_key,
-                );
+                return None;
+            };
+
+            match request_posture_authorization(
+                &request.proxy_url,
+                request.device_pubkey.clone(),
+                request.network_id,
+                token,
+                posture_data,
+            )
+            .await
+            {
+                Ok(preshared_key) => {
+                    info!(
+                        "Posture check approved for service location '{}'",
+                        request.location_name
+                    );
+                    Some((
+                        (request.instance_id, request.location_pubkey),
+                        preshared_key,
+                    ))
+                }
+                Err(err) => {
+                    error!(
+                        "Posture check failed for service location '{}': {err}. It will stay \
+                        disconnected and be retried.",
+                        request.location_name
+                    );
+                    None
+                }
             }
-            Err(err) => error!(
-                "Posture check failed for service location '{}': {err}. It will stay disconnected \
-                and be retried.",
-                request.location_name
-            ),
+        }
+    }))
+    .buffer_unordered(MAX_CONCURRENT_POSTURE_AUTHORIZATIONS);
+    futures_util::pin_mut!(requests);
+
+    while let Some(authorization) = requests.next().await {
+        if let Some((location, preshared_key)) = authorization {
+            authorizations.insert(location, preshared_key);
         }
     }
 
@@ -244,15 +262,22 @@ pub async fn run_reconciler(
     info!("Service location reconciler started, reconciling every {tick:?}");
 
     loop {
-        // Authorize first, mutate second.
+        // Reconcile regular locations and login-dependent teardown before posture HTTP calls. With
+        // no authorizations, connected posture locations are left alone and disconnected ones wait.
+        let initial_outcome = {
+            let mut manager = manager.write().unwrap();
+            manager.reconcile(&PostureAuthorizations::new())
+        };
+
         let pending = {
             let manager = manager.read().unwrap();
             manager.locations_needing_authorization()
         };
 
-        let authorizations = authorize_pending(pending).await;
-
-        let outcome = {
+        let outcome = if pending.is_empty() {
+            initial_outcome
+        } else {
+            let authorizations = authorize_pending(pending).await;
             let mut manager = manager.write().unwrap();
             manager.reconcile(&authorizations)
         };

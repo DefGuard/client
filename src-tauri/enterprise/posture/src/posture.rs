@@ -135,3 +135,129 @@ pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
         Ok(device_posture_data(DiskEncryptionTarget::ClientDatabase))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use wiremock::{
+        matchers::{body_partial_json, method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    use super::*;
+
+    async fn request(server: &MockServer) -> Result<Option<String>, Error> {
+        request_posture_authorization(
+            &server.uri(),
+            "device-key".into(),
+            42,
+            "polling-token".into(),
+            DevicePostureData::default(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn approved_posture_returns_preshared_key() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(POSTURE_ENDPOINT))
+            .and(body_partial_json(json!({
+                "location_id": 42,
+                "pubkey": "device-key",
+                "token": "polling-token",
+                "device_posture_data": {},
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "preshared_key": "session-key",
+            })))
+            .mount(&server)
+            .await;
+
+        assert_eq!(
+            request(&server).await.unwrap().as_deref(),
+            Some("session-key")
+        );
+    }
+
+    #[tokio::test]
+    async fn approval_with_empty_key_returns_none() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(POSTURE_ENDPOINT))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "preshared_key": "",
+            })))
+            .mount(&server)
+            .await;
+
+        assert_eq!(request(&server).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn forbidden_response_is_a_posture_failure() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(POSTURE_ENDPOINT))
+            .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+                "error": "disk encryption required",
+            })))
+            .mount(&server)
+            .await;
+
+        let err = request(&server).await.unwrap_err();
+        assert!(matches!(
+            err,
+            Error::PostureCheckFailed(message) if message == "disk encryption required"
+        ));
+    }
+
+    #[tokio::test]
+    async fn server_error_is_service_unavailable() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(POSTURE_ENDPOINT))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&server)
+            .await;
+
+        assert!(matches!(
+            request(&server).await.unwrap_err(),
+            Error::ServiceUnavailable(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn malformed_success_response_is_an_http_error() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(POSTURE_ENDPOINT))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "unexpected": true })))
+            .mount(&server)
+            .await;
+
+        assert!(matches!(
+            request(&server).await.unwrap_err(),
+            Error::HttpError(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn transport_failure_is_service_unavailable() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let unavailable_url = format!("http://{}", listener.local_addr().unwrap());
+        drop(listener);
+
+        let err = request_posture_authorization(
+            &unavailable_url,
+            "device-key".into(),
+            42,
+            "polling-token".into(),
+            DevicePostureData::default(),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(err, Error::ServiceUnavailable(_)));
+    }
+}

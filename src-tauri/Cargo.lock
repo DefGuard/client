@@ -1750,6 +1750,7 @@ dependencies = [
  "defguard-client-posture",
  "defguard-client-proto",
  "defguard_wireguard_rs",
+ "futures-util",
  "known-folders",
  "log",
  "prost",
