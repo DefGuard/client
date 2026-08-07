@@ -42,6 +42,8 @@ pub(crate) fn posture_session_is_stale(
     authorized_at: Option<SystemTime>,
     now: SystemTime,
 ) -> bool {
+    // Linux represents a peer that has never handshaken as the Unix epoch.
+    let last_handshake = last_handshake.filter(|handshake| *handshake != SystemTime::UNIX_EPOCH);
     let beyond_threshold = |moment: SystemTime| {
         now.duration_since(moment)
             .is_ok_and(|elapsed| elapsed > POSTURE_SESSION_STALE_AFTER)
@@ -308,6 +310,15 @@ mod tests {
     #[test]
     fn no_handshake_yet_is_healthy_if_authorized_recently() {
         assert!(!posture_session_is_stale(None, Some(ago(10)), now()));
+    }
+
+    #[test]
+    fn epoch_handshake_falls_back_to_recent_authorization() {
+        assert!(!posture_session_is_stale(
+            Some(SystemTime::UNIX_EPOCH),
+            Some(ago(10)),
+            now()
+        ));
     }
 
     /// The suspend case: authorized long ago, never handshaken, so nothing says it works.
