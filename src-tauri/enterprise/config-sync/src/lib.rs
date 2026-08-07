@@ -251,11 +251,11 @@ pub async fn poll_instances(
 
     transaction.commit().await?;
 
-    // Push to the daemon only after committing to avoid hangind transactions across grpc calls.
+    // Push to the daemon only after committing to avoid hanging transactions across grpc calls.
     for instance in &instances {
         if let Err(err) = sync_service_locations(pool, instance).await {
             // Deliberately not propagated: the database is already committed and correct, and one
-            // unavailable daemon must not discard the polling outcomes of every other instance.
+            // failed instance sync must not discard the polling outcomes of other instances.
             // The next cycle retries.
             error!(
                 "Failed to push service locations to the daemon for instance {}({}): {err}.",
