@@ -787,9 +787,9 @@ impl ServiceLocationManager {
     /// Lists the locations that need a posture check before the next pass can connect them.
     ///
     /// Read-only, so the caller can hold a read guard briefly, release it, and do the network calls
-    /// unlocked. Excludes anything already connected, and anything that should not be up right
-    /// now - re-authorizing a working tunnel would supersede its session in core for no reason,
-    /// and authorizing a pre-logon location while a user is logged in would be wasted work.
+    /// unlocked. Healthy connected locations are excluded, while stale connected locations are
+    /// included for in-place authorization and key renewal. Locations that should not currently be
+    /// up are also excluded, such as a pre-logon location while a user is logged in.
     pub(crate) fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
         let Ok(data) = self.load_service_locations() else {
             warn!("Failed to load service locations while looking for posture checks to run");

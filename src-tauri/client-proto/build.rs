@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `#[serde(default)]`, so a truncated or corrupt file still fails to deserialize instead of
         // quietly becoming "no locations".
         .field_attribute(
-            ".defguard.client.v1.ServiceLocation.network_id",
+            ".defguard.client.v1.ServiceLocation.core_location_id",
             "#[serde(default)]",
         )
         .field_attribute(

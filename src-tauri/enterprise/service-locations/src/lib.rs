@@ -271,7 +271,7 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
         dns: location.dns.clone().unwrap_or_default(),
         keepalive_interval: location.keepalive_interval.try_into().unwrap_or(0),
         mode,
-        network_id: location.network_id,
+        core_location_id: location.network_id,
         posture_check_required: location.posture_check_required,
     })
 }
@@ -308,7 +308,7 @@ mod tests {
     }
 
     /// JSON exactly as written by a client that predates posture checks: no `proxy_url`,
-    /// `device_pubkey`, `token` or `schema_version` at the top level, and no `network_id` or
+    /// `device_pubkey`, `token` or `schema_version` at the top level, and no `core_location_id` or
     /// `posture_check_required` inside the locations. This is the upgrade path.
     const LEGACY_JSON: &str = r#"{
       "service_locations": [
@@ -390,7 +390,7 @@ mod tests {
         let location = &data.service_locations[0];
         assert_eq!(location.name, "Office");
         assert_eq!(location.pubkey, "remote-peer-pubkey");
-        assert_eq!(location.network_id, 0);
+        assert_eq!(location.core_location_id, 0);
         assert!(!location.posture_check_required);
     }
 
@@ -399,7 +399,7 @@ mod tests {
         // A container-level `#[serde(default)]` on `ServiceLocation` would let malformed entries
         // silently vanish; make sure missing required keys are still an error.
         let json = r#"{
-          "service_locations": [{ "network_id": 7 }],
+          "service_locations": [{ "core_location_id": 7 }],
           "instance_id": "id",
           "private_key": "key"
         }"#;
@@ -419,7 +419,7 @@ mod tests {
                 keepalive_interval: 25,
                 dns: "10.0.0.1".into(),
                 mode: ProtoServiceLocationMode::AlwaysOn as i32,
-                network_id: 42,
+                core_location_id: 42,
                 posture_check_required: true,
             }],
             instance_id: "instance-uuid".into(),
@@ -438,7 +438,7 @@ mod tests {
         assert_eq!(restored.device_pubkey, "device-public-key");
         assert_eq!(restored.token.as_deref(), Some("polling-token"));
         assert_eq!(restored.schema_version, SERVICE_LOCATION_SCHEMA_VERSION);
-        assert_eq!(restored.service_locations[0].network_id, 42);
+        assert_eq!(restored.service_locations[0].core_location_id, 42);
         assert!(restored.service_locations[0].posture_check_required);
         // The remote peer key must not be confused with the device key.
         assert_eq!(restored.service_locations[0].pubkey, "remote-peer-pubkey");
@@ -491,7 +491,7 @@ mod tests {
                 keepalive_interval: 25,
                 dns: "10.0.0.1".into(),
                 mode: ProtoServiceLocationMode::AlwaysOn as i32,
-                network_id: 42,
+                core_location_id: 42,
                 posture_check_required: true,
             },
             instance_id: "instance-uuid".into(),

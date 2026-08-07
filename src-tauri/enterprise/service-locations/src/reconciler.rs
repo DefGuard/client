@@ -69,7 +69,7 @@ pub(crate) struct PostureAuthorizationRequest {
     pub instance_id: String,
     pub location_pubkey: String,
     pub location_name: String,
-    pub network_id: i64,
+    pub core_location_id: i64,
     pub proxy_url: String,
     pub device_pubkey: String,
     pub token: Option<String>,
@@ -81,7 +81,7 @@ impl PostureAuthorizationRequest {
             instance_id: instance.instance_id.clone(),
             location_pubkey: location.pubkey.clone(),
             location_name: location.name.clone(),
-            network_id: location.network_id,
+            core_location_id: location.core_location_id,
             proxy_url: instance.proxy_url.clone(),
             device_pubkey: instance.device_pubkey.clone(),
             token: instance.token.clone(),
@@ -199,7 +199,7 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
             match request_posture_authorization(
                 &request.proxy_url,
                 request.device_pubkey.clone(),
-                request.network_id,
+                request.core_location_id,
                 token,
                 posture_data,
             )
