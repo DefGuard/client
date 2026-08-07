@@ -1,8 +1,8 @@
-use std::{collections::HashMap, fmt, fs, path::Path};
+use std::{collections::HashMap, fmt, fs, path::Path, time::SystemTime};
 #[cfg(any(windows, target_os = "linux"))]
 use std::{
     sync::{Arc, RwLock},
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use defguard_client_core::{
@@ -62,15 +62,15 @@ pub struct ServiceLocationManager {
     // Interface name: WireGuard API instance
     wgapis: HashMap<String, WGApi>,
     // Instance ID: Service locations connected under that instance
-    connected_service_locations: HashMap<String, Vec<ServiceLocation>>,
-    // (Instance ID, location public key): when its posture session was last approved.
-    //
-    // Kept beside `connected_service_locations` rather than folded into it: the alternative meant
-    // changing that map's element type at every one of its call sites, most of them in Windows code
-    // that cannot be compiled here. Entries for locations that are no longer connected are pruned
-    // during the health check, so the two cannot drift apart for long.
-    #[cfg(any(windows, target_os = "linux"))]
-    posture_sessions: HashMap<(String, String), SystemTime>,
+    connected_service_locations: HashMap<String, Vec<ConnectedServiceLocation>>,
+}
+
+/// Runtime state for a connected location.
+#[derive(Clone)]
+struct ConnectedServiceLocation {
+    location: ServiceLocation,
+    /// Records when a posture-gated service location was authorized for staleness detection.
+    authorized_at: Option<SystemTime>,
 }
 
 /// Current schema version of the on-disk service location JSON file.
@@ -354,24 +354,6 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
     }
 
     authorizations
-}
-
-#[cfg(any(windows, target_os = "linux"))]
-impl ServiceLocationManager {
-    /// Forgets posture sessions for locations that are no longer connected.
-    ///
-    /// Keeps this map from being a second, drifting source of truth: a location that is removed or
-    /// disconnected would otherwise leave its timestamp behind forever, and a location reconnected
-    /// later would inherit it and look healthier than it is.
-    pub(crate) fn prune_posture_sessions(&mut self) {
-        self.posture_sessions.retain(|(instance_id, pubkey), _| {
-            self.connected_service_locations
-                .get(instance_id)
-                .is_some_and(|locations| {
-                    locations.iter().any(|location| location.pubkey == *pubkey)
-                })
-        });
-    }
 }
 
 /// Signal used to wake the reconciler before its next tick.

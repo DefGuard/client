@@ -29,9 +29,9 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
-    PostureAuthorizations, ReconcileAction, ReconcileSignal, ServiceLocationData,
-    ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
+    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, ConnectedServiceLocation,
+    PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction, ReconcileSignal,
+    ServiceLocationData, ServiceLocationError, ServiceLocationManager, SingleServiceLocationData,
 };
 
 const LOGIN_LOGOFF_EVENT_RETRY_DELAY_SECS: u64 = 5;
@@ -370,8 +370,8 @@ impl ServiceLocationManager {
     /// Check if a specific service location is already connected
     fn is_service_location_connected(&self, instance_id: &str, location_pubkey: &str) -> bool {
         if let Some(locations) = self.connected_service_locations.get(instance_id) {
-            for location in locations {
-                if location.pubkey == location_pubkey {
+            for connected in locations {
+                if connected.location.pubkey == location_pubkey {
                     return true;
                 }
             }
@@ -388,7 +388,10 @@ impl ServiceLocationManager {
         self.connected_service_locations
             .entry(instance_id.to_string())
             .or_default()
-            .push(location.clone());
+            .push(ConnectedServiceLocation {
+                location: location.clone(),
+                authorized_at: None,
+            });
 
         debug!(
             "Added connected service location for instance '{instance_id}', location '{}'",
@@ -409,7 +412,7 @@ impl ServiceLocationManager {
         let mut instances_to_remove = Vec::new();
 
         for (instance_id, locations) in self.connected_service_locations.iter_mut() {
-            locations.retain(|location| !filter(instance_id, location));
+            locations.retain(|connected| !filter(instance_id, &connected.location));
 
             // Mark instance for removal if it has no more locations
             if locations.is_empty() {
@@ -514,7 +517,8 @@ impl ServiceLocationManager {
             // Collect locations to disconnect to avoid borrowing issues
             let locations_to_disconnect = locations.to_vec();
 
-            for location in locations_to_disconnect {
+            for connected in locations_to_disconnect {
+                let location = connected.location;
                 let ifname = get_interface_name(&location.name);
                 debug!("Tearing down interface: {ifname}");
                 if let Some(mut wgapi) = self.wgapis.remove(&ifname) {
@@ -564,9 +568,9 @@ impl ServiceLocationManager {
         if let Some(locations) = self.connected_service_locations.get_mut(instance_id) {
             if let Some(pos) = locations
                 .iter()
-                .position(|loc| loc.pubkey == location_pubkey)
+                .position(|connected| connected.location.pubkey == location_pubkey)
             {
-                let location = locations.remove(pos);
+                let location = locations.remove(pos).location;
                 let ifname = get_interface_name(&location.name);
                 debug!("Tearing down interface: {ifname}");
                 if let Some(mut wgapi) = self.wgapis.remove(&ifname) {
@@ -702,7 +706,8 @@ impl ServiceLocationManager {
         debug!("Disconnecting service locations with mode: {mode:?}");
 
         for (instance, locations) in &self.connected_service_locations {
-            for location in locations {
+            for connected in locations {
+                let location = &connected.location;
                 debug!(
                     "Found connected service location for instance_id: {instance}, \
                     location_pubkey: {}",
@@ -758,9 +763,14 @@ impl ServiceLocationManager {
     /// drops the peer, and the interface carries on looking healthy while passing nothing.
     fn posture_session_needs_renewal(&self, instance_id: &str, location: &ServiceLocation) -> bool {
         let authorized_at = self
-            .posture_sessions
-            .get(&(instance_id.to_string(), location.pubkey.clone()))
-            .copied();
+            .connected_service_locations
+            .get(instance_id)
+            .and_then(|locations| {
+                locations
+                    .iter()
+                    .find(|connected| connected.location.pubkey == location.pubkey)
+            })
+            .and_then(|connected| connected.authorized_at);
         let last_handshake = self.read_last_handshake(location);
 
         let stale = posture_session_is_stale(last_handshake, authorized_at, SystemTime::now());
@@ -822,10 +832,17 @@ impl ServiceLocationManager {
 
     /// Notes that a location's posture session was just approved.
     fn record_posture_session(&mut self, instance_id: &str, location_pubkey: &str) {
-        self.posture_sessions.insert(
-            (instance_id.to_string(), location_pubkey.to_string()),
-            SystemTime::now(),
-        );
+        if let Some(connected) = self
+            .connected_service_locations
+            .get_mut(instance_id)
+            .and_then(|locations| {
+                locations
+                    .iter_mut()
+                    .find(|connected| connected.location.pubkey == location_pubkey)
+            })
+        {
+            connected.authorized_at = Some(SystemTime::now());
+        }
     }
 
     /// Brings the running tunnels in line with what is on disk and who is logged in.
@@ -839,8 +856,6 @@ impl ServiceLocationManager {
         &mut self,
         authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
-        self.prune_posture_sessions();
-
         if is_user_logged_in() {
             debug!("A user is logged in, disconnecting any connected pre-logon service locations");
             self.disconnect_service_locations(ServiceLocationMode::PreLogon)?;

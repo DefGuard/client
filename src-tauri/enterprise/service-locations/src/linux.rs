@@ -18,9 +18,9 @@ use defguard_wireguard_rs::{
 use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, PostureAuthorizationRequest,
-    PostureAuthorizations, ReconcileAction, ServiceLocationData, ServiceLocationError,
-    ServiceLocationManager,
+    is_unchanged_on_disk, posture_session_is_stale, reconcile_action, ConnectedServiceLocation,
+    PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction, ServiceLocationData,
+    ServiceLocationError, ServiceLocationManager,
 };
 
 const DEFGUARD_DIR: &str = "/etc/defguard";
@@ -216,7 +216,10 @@ impl ServiceLocationManager {
         self.connected_service_locations
             .entry(instance_id.to_string())
             .or_default()
-            .push(location.clone());
+            .push(ConnectedServiceLocation {
+                location: location.clone(),
+                authorized_at: None,
+            });
 
         debug!(
             "Added connected Linux service location for instance '{instance_id}', location '{}'",
@@ -230,7 +233,7 @@ impl ServiceLocationManager {
             .is_some_and(|locations| {
                 locations
                     .iter()
-                    .any(|location| location.pubkey == location_pubkey)
+                    .any(|connected| connected.location.pubkey == location_pubkey)
             })
     }
 
@@ -273,7 +276,8 @@ impl ServiceLocationManager {
             return Ok(());
         };
 
-        for location in locations {
+        for connected in locations {
+            let location = connected.location;
             if let Some(ifname) = self.find_interface_by_peer_pubkey(&location.pubkey) {
                 debug!("Tearing down Linux service location interface: {ifname}");
                 if let Some(wgapi) = self.wgapis.remove(&ifname) {
@@ -309,7 +313,7 @@ impl ServiceLocationManager {
                 .and_then(|locations| {
                     locations
                         .iter()
-                        .position(|location| location.pubkey == location_pubkey)
+                        .position(|connected| connected.location.pubkey == location_pubkey)
                 })
         else {
             debug!("No connected Linux service locations found for instance {instance_id}");
@@ -322,7 +326,7 @@ impl ServiceLocationManager {
             warn!("Linux service location for instance {instance_id} disappeared before removal");
             return Ok(());
         };
-        let location = locations.remove(position);
+        let location = locations.remove(position).location;
         if locations.is_empty() {
             self.connected_service_locations.remove(instance_id);
         }
@@ -470,9 +474,14 @@ impl ServiceLocationManager {
     /// drops the peer, and the interface carries on looking healthy while passing nothing.
     fn posture_session_needs_renewal(&self, instance_id: &str, location_pubkey: &str) -> bool {
         let authorized_at = self
-            .posture_sessions
-            .get(&(instance_id.to_string(), location_pubkey.to_string()))
-            .copied();
+            .connected_service_locations
+            .get(instance_id)
+            .and_then(|locations| {
+                locations
+                    .iter()
+                    .find(|connected| connected.location.pubkey == location_pubkey)
+            })
+            .and_then(|connected| connected.authorized_at);
         let last_handshake = self.read_last_handshake(location_pubkey);
 
         let stale = posture_session_is_stale(last_handshake, authorized_at, SystemTime::now());
@@ -554,10 +563,17 @@ impl ServiceLocationManager {
 
     /// Notes that a location's posture session was just approved.
     fn record_posture_session(&mut self, instance_id: &str, location_pubkey: &str) {
-        self.posture_sessions.insert(
-            (instance_id.to_string(), location_pubkey.to_string()),
-            SystemTime::now(),
-        );
+        if let Some(connected) = self
+            .connected_service_locations
+            .get_mut(instance_id)
+            .and_then(|locations| {
+                locations
+                    .iter_mut()
+                    .find(|connected| connected.location.pubkey == location_pubkey)
+            })
+        {
+            connected.authorized_at = Some(SystemTime::now());
+        }
     }
 
     /// Brings the running tunnels in line with what is on disk.
@@ -568,8 +584,6 @@ impl ServiceLocationManager {
         &mut self,
         authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
-        self.prune_posture_sessions();
-
         self.connect_to_service_locations(authorizations)
     }
 
