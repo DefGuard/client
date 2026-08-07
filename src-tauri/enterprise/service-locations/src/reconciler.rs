@@ -1,10 +1,10 @@
 //! Keeps runtime service-location tunnels aligned with persisted configuration.
 //!
-//! A one-shot connection attempt is insufficient: the daemon may start before networking or DNS is
-//! ready, a suspend may leave an interface up after the gateway has discarded its peer, and platform
-//! event watchers may miss notifications. Posture-gated locations also need periodic authorization
-//! renewal. The reconciler therefore retries forever on a timer and can be woken early by platform
-//! events. Each pass is idempotent, so redundant wakeups are harmless.
+//! A one-shot connection attempt is insufficient: the daemon may start before networking or DNS
+//! is ready, a suspend may leave an interface up after the gateway has discarded its peer, and
+//! platform event watchers may miss notifications. Posture-gated locations also need periodic
+//! authorization renewal. The reconciler therefore retries forever on a timer and can be woken
+//! early by platform events. Each pass is idempotent, so redundant wakeups are harmless.
 
 use std::{
     collections::HashMap,
@@ -31,10 +31,10 @@ const MAX_CONCURRENT_POSTURE_AUTHORIZATIONS: usize = 8;
 
 /// Whether a posture session needs renewing.
 ///
-/// The interface is the only honest source here. A location the daemon believes it connected can be
-/// dead: while a machine sleeps, core's `peer_disconnect_threshold` elapses and the gateway drops the
-/// peer, leaving an interface that looks perfectly healthy and passes nothing. A handshake is the
-/// evidence that the far side still has us.
+/// The interface is the only honest source here. A location the daemon believes it connected can
+/// be dead: while a machine sleeps, core's `peer_disconnect_threshold` elapses and the gateway
+/// drops the peer, leaving an interface that looks perfectly healthy and passes nothing. A
+/// handshake is the evidence that the far side still has us.
 ///
 /// `authorized_at` covers the case where no handshake has happened yet, which is normal immediately
 /// after connecting and suspicious a few minutes later. It is the one thing here that cannot be
@@ -252,8 +252,8 @@ pub type ReconcileSignal = Arc<tokio::sync::Notify>;
 /// than working out whether it did.
 ///
 /// `wake` is the only way to react faster than `tick`. On Windows it is signalled by the network,
-/// logon and resume watchers. **On Linux nothing signals it**, so there the tick is the sole trigger
-/// and recovery from any disruption takes up to one interval.
+/// logon and resume watchers. **On Linux nothing signals it**, so there the tick is the sole
+/// trigger and recovery from any disruption takes up to one interval.
 pub async fn run_reconciler(
     manager: Arc<RwLock<ServiceLocationManager>>,
     wake: ReconcileSignal,
@@ -265,21 +265,27 @@ pub async fn run_reconciler(
         // Reconcile regular locations and login-dependent teardown before posture HTTP calls. With
         // no authorizations, connected posture locations are left alone and disconnected ones wait.
         let initial_outcome = {
-            let mut manager = manager.write().unwrap();
-            manager.reconcile(&PostureAuthorizations::new())
+            let mut manager_guard = manager
+                .write()
+                .expect("Failed to write-lock service location manager");
+            manager_guard.reconcile(&PostureAuthorizations::new())
         };
 
         let pending = {
-            let manager = manager.read().unwrap();
-            manager.locations_needing_authorization()
+            let manager_guard = manager
+                .read()
+                .expect("Failed to read-lock service location manager");
+            manager_guard.locations_needing_authorization()
         };
 
         let outcome = if pending.is_empty() {
             initial_outcome
         } else {
             let authorizations = authorize_pending(pending).await;
-            let mut manager = manager.write().unwrap();
-            manager.reconcile(&authorizations)
+            let mut manager_guard = manager
+                .write()
+                .expect("Failed to write-lock service location manager");
+            manager_guard.reconcile(&authorizations)
         };
 
         match outcome {
@@ -312,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn a_recent_handshake_is_healthy() {
+    fn test_a_recent_handshake_is_healthy() {
         assert!(!posture_session_is_stale(
             Some(ago(10)),
             Some(ago(10_000)),
@@ -323,7 +329,7 @@ mod tests {
     /// A handshake outranks `authorized_at`: the far side has stopped answering, and having
     /// authorized recently does not make the tunnel work.
     #[test]
-    fn an_old_handshake_is_stale_even_if_just_authorized() {
+    fn test_an_old_handshake_is_stale_even_if_just_authorized() {
         assert!(posture_session_is_stale(
             Some(ago(1_000)),
             Some(ago(1)),
@@ -333,12 +339,12 @@ mod tests {
 
     /// Expected right after connecting - there has been no traffic to handshake for yet.
     #[test]
-    fn no_handshake_yet_is_healthy_if_authorized_recently() {
+    fn test_no_handshake_yet_is_healthy_if_authorized_recently() {
         assert!(!posture_session_is_stale(None, Some(ago(10)), now()));
     }
 
     #[test]
-    fn epoch_handshake_falls_back_to_recent_authorization() {
+    fn test_epoch_handshake_falls_back_to_recent_authorization() {
         assert!(!posture_session_is_stale(
             Some(SystemTime::UNIX_EPOCH),
             Some(ago(10)),
@@ -348,25 +354,25 @@ mod tests {
 
     /// The suspend case: authorized long ago, never handshaken, so nothing says it works.
     #[test]
-    fn no_handshake_long_after_authorizing_is_stale() {
+    fn test_no_handshake_long_after_authorizing_is_stale() {
         assert!(posture_session_is_stale(None, Some(ago(1_000)), now()));
     }
 
     /// No record at all. Renewing is redundant at worst; assuming health leaves a dead tunnel up.
     #[test]
-    fn no_evidence_at_all_is_stale() {
+    fn test_no_evidence_at_all_is_stale() {
         assert!(posture_session_is_stale(None, None, now()));
     }
 
     /// A clock that moved backwards must not read as "ancient", which would renew every pass.
     #[test]
-    fn a_handshake_in_the_future_is_not_stale() {
+    fn test_a_handshake_in_the_future_is_not_stale() {
         let future = now() + Duration::from_secs(60);
         assert!(!posture_session_is_stale(Some(future), None, now()));
     }
 
     #[test]
-    fn the_threshold_boundary_is_not_yet_stale() {
+    fn test_the_threshold_boundary_is_not_yet_stale() {
         assert!(!posture_session_is_stale(
             Some(now() - POSTURE_SESSION_STALE_AFTER),
             None,
@@ -375,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn connected_location_with_fresh_key_is_renewed() {
+    fn test_connected_location_with_fresh_key_is_renewed() {
         assert_eq!(
             reconcile_action(true, true, Some(Some("fresh-key"))),
             ReconcileAction::Renew(Some("fresh-key"))
@@ -383,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn approval_without_a_key_connects_without_a_key() {
+    fn test_approval_without_a_key_connects_without_a_key() {
         assert_eq!(
             reconcile_action(false, true, Some(None)),
             ReconcileAction::Connect(None)
@@ -391,7 +397,7 @@ mod tests {
     }
 
     #[test]
-    fn approval_without_a_key_removes_the_old_key_from_a_connected_location() {
+    fn test_approval_without_a_key_removes_the_old_key_from_a_connected_location() {
         assert_eq!(
             reconcile_action(true, true, Some(None)),
             ReconcileAction::Renew(None)
@@ -399,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn authorization_failure_keeps_a_posture_location_disconnected() {
+    fn test_authorization_failure_keeps_a_posture_location_disconnected() {
         assert_eq!(
             reconcile_action(false, true, None),
             ReconcileAction::WaitForAuthorization
@@ -407,7 +413,7 @@ mod tests {
     }
 
     #[test]
-    fn regular_location_connects_without_authorization() {
+    fn test_regular_location_connects_without_authorization() {
         assert_eq!(
             reconcile_action(false, false, None),
             ReconcileAction::Connect(None)

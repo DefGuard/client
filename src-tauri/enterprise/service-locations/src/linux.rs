@@ -76,14 +76,14 @@ impl ServiceLocationManager {
 
     /// Persists Linux-supported service locations and resets their runtime connection state.
     ///
-    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection, so
-    /// this returns early when the data it would write matches what is already on disk, leaving the
-    /// running tunnels alone. Only a real change proceeds to the reset loop below.
+    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection,
+    /// so this returns early when the data it would write matches what is already on disk, leaving
+    /// the running tunnels alone. Only a real change proceeds to the reset loop below.
     ///
     /// Linux supports Always-on service locations only. Unsupported modes are filtered out before
-    /// storage - and before the comparison, so a PreLogon location does not read as a change on every
-    /// push. Stale previously-saved locations are disconnected, and every saved Always-on location is
-    /// reset. All resets are attempted before returning an aggregate error.
+    /// storage - and before the comparison, so a PreLogon location does not read as a change on
+    /// every push. Stale previously-saved locations are disconnected, and every saved Always-on
+    /// location is reset. All resets are attempted before returning an aggregate error.
     pub fn save_service_locations(
         &mut self,
         request: &SaveServiceLocationsRequest,
@@ -233,9 +233,9 @@ impl ServiceLocationManager {
                     }
                 }
                 Err(err) => warn!(
-					"Failed to read Linux service location interface {ifname} while looking for peer \
-					{location_pubkey}: {err}"
-				),
+                    "Failed to read Linux service location interface {ifname} while looking for \
+                    peer {location_pubkey}: {err}"
+                ),
             }
         }
 
@@ -270,9 +270,10 @@ impl ServiceLocationManager {
                 }
             } else {
                 debug!(
-					"No Linux service location interface found for instance {instance_id}, location '{}'",
-					location.name
-				);
+                    "No Linux service location interface found for instance {instance_id}, \
+                    location '{}'",
+                    location.name
+                );
             }
         }
 
@@ -321,9 +322,10 @@ impl ServiceLocationManager {
             }
         } else {
             debug!(
-				"No Linux service location interface found for instance {instance_id}, location '{}'",
-				location.name
-			);
+                "No Linux service location interface found for instance {instance_id}, location \
+                '{}'",
+                location.name
+            );
         }
 
         Ok(())
@@ -348,9 +350,10 @@ impl ServiceLocationManager {
             match IpAddrMask::from_str(allowed_ip) {
                 Ok(addr) => peer.allowed_ips.push(addr),
                 Err(err) => error!(
-					"Error parsing allowed IP {allowed_ip} while setting up Linux service location {}: {err}",
-					location.name
-				),
+                    "Error parsing allowed IP {allowed_ip} while setting up Linux service location \
+                    {}: {err}",
+                    location.name
+                ),
             }
         }
 
@@ -383,8 +386,9 @@ impl ServiceLocationManager {
         let dns_config = Some(location.dns.clone());
         let (dns, search_domains) = dns_borrow(&dns_config);
         debug!(
-			"Configuring Linux service location interface {ifname} with DNS: {dns:?} and search domains: {search_domains:?}"
-		);
+            "Configuring Linux service location interface {ifname} with DNS: {dns:?} and search \
+            domains: {search_domains:?}"
+        );
         if let Err(err) = wgapi.configure_interface(&config) {
             remove_created_interface(&wgapi, &ifname);
             return Err(err.into());
@@ -456,9 +460,9 @@ impl ServiceLocationManager {
 
     /// Applies a freshly obtained preshared key to an already-running interface.
     ///
-    /// Uses `configure_peer` rather than rebuilding the interface: on Linux that is a single netlink
-    /// call carrying the new key, so the tunnel keeps its listen port and the gap in traffic is as
-    /// short as it can be.
+    /// Uses `configure_peer` rather than rebuilding the interface: on Linux that is a single
+    /// netlink call carrying the new key, so the tunnel keeps its listen port and the gap in
+    /// traffic is as short as it can be.
     fn reapply_preshared_key(
         &mut self,
         instance_id: &str,
@@ -573,10 +577,10 @@ impl ServiceLocationManager {
                     }
                     ReconcileAction::WaitForAuthorization => {
                         debug!(
-							"Leaving Linux service location '{}' disconnected: no posture check has \
-							approved it yet",
-							location.name
-						);
+                            "Leaving Linux service location '{}' disconnected: no posture check \
+                            has approved it yet",
+                            location.name
+                        );
                         all_connected = false;
                         continue;
                     }
@@ -602,9 +606,10 @@ impl ServiceLocationManager {
                             preshared_key,
                         ) {
                             error!(
-								"Failed to setup Linux service location interface for '{}': {err:?}",
-								location.name
-							);
+                                "Failed to setup Linux service location interface for '{}': \
+                                {err:?}",
+                                location.name
+                            );
                             all_connected = false;
                         } else if authorization.is_some() {
                             self.record_posture_session(
@@ -687,7 +692,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn removing_a_preshared_key_emits_an_explicit_zero_key() {
+    fn test_removing_a_preshared_key_emits_an_explicit_zero_key() {
         assert_eq!(preshared_key_update(None).unwrap(), Key::default());
     }
 }

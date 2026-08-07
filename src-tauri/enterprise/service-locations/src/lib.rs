@@ -244,7 +244,7 @@ mod tests {
     /// A save is a no-op only if this comparison is exact: getting it wrong does not merely cost a
     /// disk write, it drops and rebuilds every tunnel on the box.
     #[test]
-    fn unchanged_contents_are_detected() {
+    fn test_unchanged_contents_are_detected() {
         let dir = tempfile::tempdir().expect("failed to create temp dir");
         let path = dir.path().join("locations.json");
 
@@ -289,7 +289,7 @@ mod tests {
     }"#;
 
     #[test]
-    fn legacy_json_without_new_fields_deserializes_with_defaults() {
+    fn test_legacy_json_without_new_fields_deserializes_with_defaults() {
         let data: ServiceLocationData = serde_json::from_str(LEGACY_JSON)
             .expect("legacy service location file must still load");
 
@@ -310,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn truncated_json_still_fails_to_deserialize() {
+    fn test_truncated_json_still_fails_to_deserialize() {
         // A container-level `#[serde(default)]` on `ServiceLocation` would let malformed entries
         // silently vanish; make sure missing required keys are still an error.
         let json = r#"{
@@ -323,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn round_trip_preserves_new_fields() {
+    fn test_round_trip_preserves_new_fields() {
         let data = ServiceLocationData {
             service_locations: vec![ServiceLocation {
                 name: "Office".into(),
@@ -360,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn debug_masks_private_key_and_token() {
+    fn test_debug_masks_private_key_and_token() {
         let data = ServiceLocationData {
             service_locations: Vec::new(),
             instance_id: "instance-uuid".into(),
@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn debug_of_absent_token_is_not_masked_as_present() {
+    fn test_debug_of_absent_token_is_not_masked_as_present() {
         let data = ServiceLocationData {
             service_locations: Vec::new(),
             instance_id: "instance-uuid".into(),
@@ -395,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn single_service_location_debug_masks_private_key() {
+    fn test_single_service_location_debug_masks_private_key() {
         let data = SingleServiceLocationData {
             service_location: ServiceLocation {
                 name: "Office".into(),

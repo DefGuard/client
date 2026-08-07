@@ -62,8 +62,8 @@ pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 
 /// How often the reconciler brings running tunnels back in line with what is on disk.
 ///
-/// On Windows this is a backstop, since the watchers wake it on network, logon and resume events. On
-/// Linux nothing wakes it, so this is the only trigger and sets the worst-case recovery time.
+/// On Windows this is a backstop, since the watchers wake it on network, logon and resume events.
+/// On Linux nothing wakes it, so this is the only trigger and sets the worst-case recovery time.
 #[cfg(any(windows, target_os = "linux"))]
 pub(crate) const SERVICE_LOCATION_RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 
@@ -198,7 +198,10 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Save service location request received, this is currently not supported on Unix systems");
+        debug!(
+            "Save service location request received, this is currently not supported on Unix \
+            systems"
+        );
         Ok(Response::new(()))
     }
 
@@ -207,7 +210,10 @@ impl DesktopDaemonService for DaemonService {
         &self,
         _request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        debug!("Delete service location request received, this is currently not supported on Unix systems");
+        debug!(
+            "Delete service location request received, this is currently not supported on Unix \
+            systems"
+        );
         Ok(Response::new(()))
     }
 
@@ -239,7 +245,8 @@ impl DesktopDaemonService for DaemonService {
         _request: tonic::Request<()>,
     ) -> Result<Response<DevicePostureData>, Status> {
         warn!(
-            "Daemon service received a get_posture_data request. Daemon posture requests are only supported on windows systems. Unix systems perform client-side posture checks."
+            "Daemon service received a get_posture_data request. Daemon posture requests are only \
+            supported on windows systems. Unix systems perform client-side posture checks."
         );
         Err(Status::unimplemented(
             "Service-side posture checks are not supported on this platform",
@@ -598,7 +605,10 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
         })?;
 
         // change ownership - keep current user, change group
-        debug!("Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group {DAEMON_SOCKET_GROUP}");
+        debug!(
+            "Changing owner group of socket file at {DAEMON_SOCKET_PATH} to group \
+            {DAEMON_SOCKET_GROUP}"
+        );
         chown(DAEMON_SOCKET_PATH, None, Some(group.gid))?;
 
         // Set socket permissions to allow client access

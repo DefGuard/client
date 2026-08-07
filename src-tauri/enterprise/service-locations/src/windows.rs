@@ -56,8 +56,8 @@ const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 /// Note: `NotifyAddrChange` also fires when WireGuard interfaces are created. This is harmless
 /// because a reconcile pass leaves already-correct locations alone.
 ///
-/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall. It only wakes the
-/// reconciler and never touches the manager itself, so tunnel state has a single owner.
+/// Runs on a dedicated OS thread because `NotifyAddrChange` is a blocking syscall. It only wakes
+/// the reconciler and never touches the manager itself, so tunnel state has a single owner.
 pub fn watch_for_network_change(wake: ReconcileSignal) {
     loop {
         // NotifyAddrChange blocks until any IP address is added or removed on any interface.
@@ -443,9 +443,9 @@ impl ServiceLocationManager {
         );
 
         // A posture-gated location is only torn down here, not brought back: obtaining a preshared
-        // key means an HTTP round trip, and this runs inside the gRPC save handler while the manager
-        // write guard is held. The reconciler authorizes and reconnects it on its next pass instead,
-        // so the location is down for at most one interval.
+        // key means an HTTP round trip, and this runs inside the gRPC save handler while the
+        // manager write guard is held. The reconciler authorizes and reconnects it on its next pass
+        // instead, so the location is down for at most one interval.
         if service_location_data
             .service_location
             .posture_check_required
@@ -516,7 +516,8 @@ impl ServiceLocationManager {
             self.connected_service_locations.remove(instance_id);
         } else {
             debug!(
-                "No connected service locations found for instance_id: {instance_id}. Skipping disconnect"
+                "No connected service locations found for instance_id: {instance_id}. Skipping \
+                disconnect"
             );
             return Ok(());
         }
@@ -720,8 +721,9 @@ impl ServiceLocationManager {
 
     /// Reads the last handshake for a location from the interface carrying it.
     ///
-    /// Goes through the stored `WGApi` deliberately: on Windows `read_interface_data` needs the very
-    /// instance that created the adapter, so a freshly built one would fail with `AdapterNotFound`.
+    /// Goes through the stored `WGApi` deliberately: on Windows `read_interface_data` needs the
+    /// very instance that created the adapter, so a freshly built one would fail with
+    /// `AdapterNotFound`.
     fn read_last_handshake(&self, location: &ServiceLocation) -> Option<SystemTime> {
         let ifname = get_interface_name(&location.name);
         let wgapi = self.wgapis.get(&ifname)?;
@@ -766,11 +768,11 @@ impl ServiceLocationManager {
 
     /// Brings the running tunnels in line with what is on disk and who is logged in.
     ///
-    /// Both directions, unlike `connect_to_service_locations` alone. Tearing down a pre-logon location
-    /// once a user logs in used to happen only in the logon event handler, which meant it depended on
-    /// having observed the event. Deriving it from `is_user_logged_in()` instead makes the pass
-    /// correct on its own, so the watchers can be reduced to "something happened, look again" and a
-    /// missed event costs a tick rather than leaving a tunnel up that should be down.
+    /// Both directions, unlike `connect_to_service_locations` alone. Tearing down a pre-logon
+    /// location once a user logs in used to happen only in the logon event handler, which meant it
+    /// depended on having observed the event. Deriving it from `is_user_logged_in()` instead makes
+    /// the pass correct on its own, so the watchers can be reduced to "something happened, look
+    /// again" and a missed event costs a tick rather than leaving a tunnel up that should be down.
     pub(crate) fn reconcile(
         &mut self,
         authorizations: &PostureAuthorizations,
@@ -786,9 +788,9 @@ impl ServiceLocationManager {
     /// Lists the locations that need a posture check before the next pass can connect them.
     ///
     /// Read-only, so the caller can hold a read guard briefly, release it, and do the network calls
-    /// unlocked. Excludes anything already connected, and anything that should not be up right now -
-    /// re-authorizing a working tunnel would supersede its session in core for no reason, and
-    /// authorizing a pre-logon location while a user is logged in would be wasted work.
+    /// unlocked. Excludes anything already connected, and anything that should not be up right
+    /// now - re-authorizing a working tunnel would supersede its session in core for no reason,
+    /// and authorizing a pre-logon location while a user is logged in would be wasted work.
     pub(crate) fn locations_needing_authorization(&self) -> Vec<PostureAuthorizationRequest> {
         let Ok(data) = self.load_service_locations() else {
             warn!("Failed to load service locations while looking for posture checks to run");
@@ -868,7 +870,7 @@ impl ServiceLocationManager {
                     ReconcileAction::WaitForAuthorization => {
                         debug!(
                             "Leaving service location '{}' disconnected: no posture check has \
-							approved it yet",
+                            approved it yet",
                             location.name
                         );
                         all_connected = false;
@@ -928,9 +930,9 @@ impl ServiceLocationManager {
 
     /// Persists service locations and resets their runtime connection state.
     ///
-    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection, so
-    /// this returns early when the data it would write matches what is already on disk, leaving the
-    /// running tunnels alone. Only a real change proceeds to the reset loop below.
+    /// **Idempotent.** Callers push on every poll cycle without doing their own change detection,
+    /// so this returns early when the data it would write matches what is already on disk, leaving
+    /// the running tunnels alone. Only a real change proceeds to the reset loop below.
     pub fn save_service_locations(
         &mut self,
         request: &SaveServiceLocationsRequest,

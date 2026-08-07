@@ -158,7 +158,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn approved_posture_returns_preshared_key() {
+    async fn test_approved_posture_returns_preshared_key() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path(POSTURE_ENDPOINT))
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn approval_with_empty_key_returns_none() {
+    async fn test_approval_with_empty_key_returns_none() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path(POSTURE_ENDPOINT))
@@ -195,7 +195,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn forbidden_response_is_a_posture_failure() {
+    async fn test_forbidden_response_is_a_posture_failure() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path(POSTURE_ENDPOINT))
@@ -213,7 +213,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn server_error_is_service_unavailable() {
+    async fn test_server_error_is_service_unavailable() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path(POSTURE_ENDPOINT))
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn malformed_success_response_is_an_http_error() {
+    async fn test_malformed_success_response_is_an_http_error() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path(POSTURE_ENDPOINT))
@@ -243,7 +243,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn transport_failure_is_service_unavailable() {
+    async fn test_transport_failure_is_service_unavailable() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let unavailable_url = format!("http://{}", listener.local_addr().unwrap());
         drop(listener);
