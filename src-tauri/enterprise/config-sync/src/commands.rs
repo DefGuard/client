@@ -265,6 +265,17 @@ pub async fn sync_service_locations(pool: &DbPool, instance: &Instance<Id>) -> R
     Ok(())
 }
 
+/// Synchronizes service locations without failing the operation that committed their configuration.
+/// A later polling cycle retries any failed daemon update.
+pub async fn sync_service_locations_best_effort(pool: &DbPool, instance: &Instance<Id>) {
+    if let Err(err) = sync_service_locations(pool, instance).await {
+        error!(
+            "Failed to push service locations to the daemon for instance {instance}: {err}. The \
+            daemon keeps its previous service-location state until the next successful sync."
+        );
+    }
+}
+
 pub async fn disable_enterprise_features<'e, E>(
     instance: &mut Instance<Id>,
     executor: E,

@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    ffi::OsStr,
     fs::{self, create_dir_all},
     path::PathBuf,
     result::Result,
@@ -29,7 +28,7 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk,
+    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
     reconciler::{
         reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
         ReconcileSignal,
@@ -1047,36 +1046,7 @@ impl ServiceLocationManager {
 
     fn load_service_locations(&self) -> Result<Vec<ServiceLocationData>, ServiceLocationError> {
         let base_dir = get_shared_directory()?;
-        let mut all_locations_data = Vec::new();
-
-        if base_dir.exists() {
-            for entry in fs::read_dir(base_dir)? {
-                let entry = entry?;
-                let file_path = entry.path();
-
-                if file_path.is_file() && file_path.extension() == Some(OsStr::new("json")) {
-                    match fs::read_to_string(&file_path) {
-                        Ok(data) => match serde_json::from_str::<ServiceLocationData>(&data) {
-                            Ok(locations_data) => {
-                                all_locations_data.push(locations_data);
-                            }
-                            Err(err) => {
-                                error!(
-                                    "Failed to parse service locations from file {}: {err}",
-                                    file_path.display()
-                                );
-                            }
-                        },
-                        Err(err) => {
-                            error!(
-                                "Failed to read service locations file {}: {err}",
-                                file_path.display()
-                            );
-                        }
-                    }
-                }
-            }
-        }
+        let all_locations_data = load_service_locations_from_directory(&base_dir)?;
 
         debug!(
             "Loaded service locations data for {} instances",
@@ -1093,33 +1063,30 @@ impl ServiceLocationManager {
         debug!("Loading service location for instance {instance_id} and pubkey {location_pubkey}");
 
         let instance_file_path = get_instance_file_path(instance_id)?;
-
-        if instance_file_path.exists() {
-            let data = fs::read_to_string(&instance_file_path)?;
-            let service_location_data = serde_json::from_str::<ServiceLocationData>(&data)?;
-
-            for location in service_location_data.service_locations {
-                if location.pubkey == location_pubkey {
-                    debug!(
-                        "Successfully loaded service location for instance {instance_id} and \
-                        pubkey {location_pubkey}"
-                    );
-                    return Ok(Some(SingleServiceLocationData {
-                        service_location: location,
-                        instance_id: service_location_data.instance_id,
-                        private_key: service_location_data.private_key,
-                    }));
-                }
-            }
-
-            debug!(
-                "No service location found for instance {instance_id} with pubkey {location_pubkey}"
-            );
-            Ok(None)
-        } else {
+        let Some(service_location_data) = load_service_locations_from_file(&instance_file_path)?
+        else {
             debug!("No service location file found for instance {instance_id}");
-            Ok(None)
+            return Ok(None);
+        };
+
+        for location in service_location_data.service_locations {
+            if location.pubkey == location_pubkey {
+                debug!(
+                    "Successfully loaded service location for instance {instance_id} and pubkey \
+                    {location_pubkey}"
+                );
+                return Ok(Some(SingleServiceLocationData {
+                    service_location: location,
+                    instance_id: service_location_data.instance_id,
+                    private_key: service_location_data.private_key,
+                }));
+            }
         }
+
+        debug!(
+            "No service location found for instance {instance_id} with pubkey {location_pubkey}"
+        );
+        Ok(None)
     }
 
     fn load_service_locations_for_instance(
@@ -1127,12 +1094,7 @@ impl ServiceLocationManager {
         instance_id: &str,
     ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
         let instance_file_path = get_instance_file_path(instance_id)?;
-        if !instance_file_path.exists() {
-            return Ok(None);
-        }
-
-        let data = fs::read_to_string(instance_file_path)?;
-        Ok(Some(serde_json::from_str::<ServiceLocationData>(&data)?))
+        load_service_locations_from_file(&instance_file_path)
     }
 
     pub fn delete_all_service_locations_for_instance(

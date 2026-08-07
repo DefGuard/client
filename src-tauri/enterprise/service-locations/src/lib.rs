@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, fs, path::Path, time::SystemTime};
+use std::{collections::HashMap, ffi::OsStr, fmt, fs, path::Path, time::SystemTime};
 
 use defguard_client_core::{
     database::models::{
@@ -198,6 +198,45 @@ pub fn is_unchanged_on_disk(path: &Path, contents: &str) -> bool {
     fs::read_to_string(path).is_ok_and(|existing| existing == contents)
 }
 
+fn load_service_locations_from_file(
+    path: &Path,
+) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let data = fs::read_to_string(path)?;
+    Ok(Some(serde_json::from_str(&data)?))
+}
+
+fn load_service_locations_from_directory(
+    directory: &Path,
+) -> Result<Vec<ServiceLocationData>, ServiceLocationError> {
+    if !directory.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut instances = Vec::new();
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() || path.extension() != Some(OsStr::new("json")) {
+            continue;
+        }
+
+        match load_service_locations_from_file(&path) {
+            Ok(Some(data)) => instances.push(data),
+            Ok(None) => {}
+            Err(err) => warn!(
+                "Failed to load service locations from file {}: {err}",
+                path.display()
+            ),
+        }
+    }
+
+    Ok(instances)
+}
+
 pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, CoreError> {
     if !location.is_service_location() {
         warn!("Location {location} is not a service location, so it can't be converted to one.");
@@ -287,6 +326,52 @@ mod tests {
       "instance_id": "d3a5b1f0-0000-0000-0000-000000000001",
       "private_key": "device-private-key"
     }"#;
+
+    #[test]
+    fn test_load_service_locations_from_file_handles_missing_and_valid_files() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().join("locations.json");
+
+        assert!(load_service_locations_from_file(&path).unwrap().is_none());
+
+        fs::write(&path, LEGACY_JSON).expect("failed to write service locations");
+        let data = load_service_locations_from_file(&path)
+            .unwrap()
+            .expect("service location file should load");
+
+        assert_eq!(data.instance_id, "d3a5b1f0-0000-0000-0000-000000000001");
+        assert_eq!(data.service_locations.len(), 1);
+    }
+
+    #[test]
+    fn test_load_service_locations_from_file_rejects_malformed_json() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().join("locations.json");
+        fs::write(&path, "{").expect("failed to write malformed service locations");
+
+        assert!(matches!(
+            load_service_locations_from_file(&path),
+            Err(ServiceLocationError::JsonError(_))
+        ));
+    }
+
+    #[test]
+    fn test_load_service_locations_from_directory_isolates_invalid_entries() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        fs::write(dir.path().join("valid.json"), LEGACY_JSON)
+            .expect("failed to write valid service locations");
+        fs::write(dir.path().join("invalid.json"), "{")
+            .expect("failed to write malformed service locations");
+        fs::write(dir.path().join("ignored.txt"), LEGACY_JSON)
+            .expect("failed to write ignored service locations");
+        fs::create_dir(dir.path().join("directory.json"))
+            .expect("failed to create ignored directory");
+
+        let data = load_service_locations_from_directory(dir.path()).unwrap();
+
+        assert_eq!(data.len(), 1);
+        assert_eq!(data[0].instance_id, "d3a5b1f0-0000-0000-0000-000000000001");
+    }
 
     #[test]
     fn test_legacy_json_without_new_fields_deserializes_with_defaults() {

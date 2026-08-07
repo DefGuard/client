@@ -59,7 +59,10 @@ use crate::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    periodic::config::{do_update_instance, poll_instance_with_events, sync_service_locations},
+    periodic::config::{
+        do_update_instance, poll_instance_with_events, sync_service_locations,
+        sync_service_locations_best_effort,
+    },
     proxy::construct_platform_header,
     tauri_err_to_app_err,
     tray::{configure_tray_icon, reload_tray_menu},
@@ -410,13 +413,7 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
     poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
 
-    if let Err(err) = sync_service_locations(&DB_POOL, &instance).await {
-        error!(
-            "Failed to push service locations to the daemon for instance {instance} after polling \
-            its config: {err}. The daemon keeps its previous service-location state until the next \
-            successful sync."
-        );
-    }
+    sync_service_locations_best_effort(&DB_POOL, &instance).await;
 
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
@@ -719,13 +716,7 @@ pub async fn update_instance(
             do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        if let Err(err) = sync_service_locations(&DB_POOL, &instance).await {
-            error!(
-                "Failed to push service locations to the daemon for instance {instance} after \
-                update: {err}. The daemon keeps its previous service-location state until the next \
-                successful sync."
-            );
-        }
+        sync_service_locations_best_effort(&DB_POOL, &instance).await;
 
         if locations_changed {
             if let Err(err) = app_handle.emit(EventKey::InstanceUpdated.into(), ()) {

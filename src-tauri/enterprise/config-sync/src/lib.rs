@@ -20,7 +20,9 @@ use semver::Version;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 
-use crate::commands::{disable_enterprise_features, do_update_instance, sync_service_locations};
+use crate::commands::{
+    disable_enterprise_features, do_update_instance, sync_service_locations_best_effort,
+};
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
@@ -253,15 +255,7 @@ pub async fn poll_instances(
 
     // Push to the daemon only after committing to avoid hanging transactions across grpc calls.
     for instance in &instances {
-        if let Err(err) = sync_service_locations(pool, instance).await {
-            // Deliberately not propagated: the database is already committed and correct, and one
-            // failed instance sync must not discard the polling outcomes of other instances.
-            // The next cycle retries.
-            error!(
-                "Failed to push service locations to the daemon for instance {}({}): {err}.",
-                instance.name, instance.id
-            );
-        }
+        sync_service_locations_best_effort(pool, instance).await;
     }
 
     Ok(outcomes)

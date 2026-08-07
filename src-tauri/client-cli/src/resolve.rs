@@ -24,7 +24,7 @@ pub async fn resolve_connect_target(
     spec: &TargetSpec,
     pool: &DbPool,
 ) -> Result<ResolvedTarget, CliError> {
-    let target = resolve_user_target(spec, pool).await?;
+    let target = resolve_target(spec, pool).await?;
 
     if let ResolvedTarget::Location(location) = &target {
         if location.is_service_location() {
@@ -38,8 +38,8 @@ pub async fn resolve_connect_target(
     Ok(target)
 }
 
-/// Resolution proper, without the service-location check its callers rely on.
-async fn resolve_user_target(spec: &TargetSpec, pool: &DbPool) -> Result<ResolvedTarget, CliError> {
+/// Resolves the CLI target before applying command-specific validation.
+async fn resolve_target(spec: &TargetSpec, pool: &DbPool) -> Result<ResolvedTarget, CliError> {
     // --id fast path
     if let Some(id) = spec.id {
         if spec.tunnel {

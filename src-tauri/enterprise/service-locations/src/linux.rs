@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    ffi::OsStr,
     fs::{self, create_dir_all, set_permissions},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
@@ -18,7 +17,7 @@ use defguard_wireguard_rs::{
 use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk,
+    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
     reconciler::{
         reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
     },
@@ -242,6 +241,19 @@ impl ServiceLocationManager {
         None
     }
 
+    fn remove_tracked_interface(&mut self, ifname: &str) {
+        debug!("Tearing down Linux service location interface: {ifname}");
+        if let Some(wgapi) = self.wgapis.remove(ifname) {
+            if let Err(err) = wgapi.remove_interface() {
+                error!("Failed to remove Linux service location interface {ifname}: {err}");
+            } else {
+                debug!("Linux service location interface {ifname} removed successfully");
+            }
+        } else {
+            debug!("Linux service location interface {ifname} was not tracked as connected");
+        }
+    }
+
     pub fn disconnect_service_locations_by_instance(
         &mut self,
         instance_id: &str,
@@ -256,18 +268,7 @@ impl ServiceLocationManager {
         for connected in locations {
             let location = connected.location;
             if let Some(ifname) = self.find_interface_by_peer_pubkey(&location.pubkey) {
-                debug!("Tearing down Linux service location interface: {ifname}");
-                if let Some(wgapi) = self.wgapis.remove(&ifname) {
-                    if let Err(err) = wgapi.remove_interface() {
-                        error!("Failed to remove Linux service location interface {ifname}: {err}");
-                    } else {
-                        debug!("Linux service location interface {ifname} removed successfully");
-                    }
-                } else {
-                    debug!(
-                        "Linux service location interface {ifname} was not tracked as connected"
-                    );
-                }
+                self.remove_tracked_interface(&ifname);
             } else {
                 debug!(
                     "No Linux service location interface found for instance {instance_id}, \
@@ -310,16 +311,7 @@ impl ServiceLocationManager {
         }
 
         if let Some(ifname) = ifname {
-            debug!("Tearing down Linux service location interface: {ifname}");
-            if let Some(wgapi) = self.wgapis.remove(&ifname) {
-                if let Err(err) = wgapi.remove_interface() {
-                    error!("Failed to remove Linux service location interface {ifname}: {err}");
-                } else {
-                    debug!("Linux service location interface {ifname} removed successfully");
-                }
-            } else {
-                debug!("Linux service location interface {ifname} was not tracked as connected");
-            }
+            self.remove_tracked_interface(&ifname);
         } else {
             debug!(
                 "No Linux service location interface found for instance {instance_id}, location \
@@ -646,30 +638,7 @@ impl ServiceLocationManager {
     /// Loads persisted service-location data for all Linux instances.
     fn load_service_locations(&self) -> Result<Vec<ServiceLocationData>, ServiceLocationError> {
         let base_dir = ensure_shared_directory()?;
-        let mut all_locations_data = Vec::new();
-
-        for entry in fs::read_dir(base_dir)? {
-            let entry = entry?;
-            let file_path = entry.path();
-
-            if file_path.is_file() && file_path.extension() == Some(OsStr::new("json")) {
-                match fs::read_to_string(&file_path) {
-                    Ok(data) => match serde_json::from_str::<ServiceLocationData>(&data) {
-                        Ok(locations_data) => all_locations_data.push(locations_data),
-                        Err(err) => warn!(
-                            "Failed to parse Linux service locations from file {}: {err}",
-                            file_path.display()
-                        ),
-                    },
-                    Err(err) => warn!(
-                        "Failed to read Linux service locations file {}: {err}",
-                        file_path.display()
-                    ),
-                }
-            }
-        }
-
-        Ok(all_locations_data)
+        load_service_locations_from_directory(&base_dir)
     }
 
     /// Loads persisted service-location data for one Linux instance, if present.
@@ -678,12 +647,7 @@ impl ServiceLocationManager {
         instance_id: &str,
     ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
         let instance_file_path = get_instance_file_path(instance_id);
-        if !instance_file_path.exists() {
-            return Ok(None);
-        }
-
-        let data = fs::read_to_string(instance_file_path)?;
-        Ok(Some(serde_json::from_str::<ServiceLocationData>(&data)?))
+        load_service_locations_from_file(&instance_file_path)
     }
 }
 
