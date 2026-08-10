@@ -1,7 +1,8 @@
 use std::{
     collections::HashSet,
-    fs::{self, create_dir_all, set_permissions},
-    os::unix::fs::PermissionsExt,
+    fs::{self, create_dir_all, set_permissions, OpenOptions},
+    io::Write,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::PathBuf,
     str::FromStr,
     time::SystemTime,
@@ -142,7 +143,13 @@ impl ServiceLocationManager {
             "Writing service location data to file: {}",
             instance_file_path.display()
         );
-        fs::write(&instance_file_path, json)?;
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(SERVICE_LOCATION_FILE_PERMS)
+            .open(&instance_file_path)?
+            .write_all(json.as_bytes())?;
         set_permissions(
             &instance_file_path,
             fs::Permissions::from_mode(SERVICE_LOCATION_FILE_PERMS),
