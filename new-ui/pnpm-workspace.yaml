@@ -6,3 +6,5 @@ minimumReleaseAgeExclude:
   - react-dom@19.2.7
   - react@19.2.7
   - vite@8.0.16
+  - fast-uri@3.1.4 || 3.1.5
+  - js-yaml@4.3.1
