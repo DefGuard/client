@@ -241,17 +241,17 @@ impl ServiceLocationManager {
         None
     }
 
-    fn remove_tracked_interface(&mut self, ifname: &str) {
+    fn remove_tracked_interface(&mut self, ifname: &str) -> Result<(), ServiceLocationError> {
         debug!("Tearing down Linux service location interface: {ifname}");
-        if let Some(wgapi) = self.wgapis.remove(ifname) {
-            if let Err(err) = wgapi.remove_interface() {
-                error!("Failed to remove Linux service location interface {ifname}: {err}");
-            } else {
-                debug!("Linux service location interface {ifname} removed successfully");
-            }
-        } else {
-            debug!("Linux service location interface {ifname} was not tracked as connected");
-        }
+        let Some(wgapi) = self.wgapis.get(ifname) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "Linux service location interface {ifname} is not tracked"
+            )));
+        };
+        wgapi.remove_interface()?;
+        self.wgapis.remove(ifname);
+        info!("Linux service location interface {ifname} removed successfully");
+        Ok(())
     }
 
     pub fn disconnect_service_locations_by_instance(
@@ -260,22 +260,17 @@ impl ServiceLocationManager {
     ) -> Result<(), ServiceLocationError> {
         debug!("Disconnecting Linux service locations for instance {instance_id}");
 
-        let Some(locations) = self.connected_service_locations.remove(instance_id) else {
+        let Some(locations) = self.connected_service_locations.get(instance_id) else {
             debug!("No connected Linux service locations found for instance {instance_id}");
             return Ok(());
         };
+        let location_pubkeys = locations
+            .iter()
+            .map(|connected| connected.location.pubkey.clone())
+            .collect::<Vec<_>>();
 
-        for connected in locations {
-            let location = connected.location;
-            if let Some(ifname) = self.find_interface_by_peer_pubkey(&location.pubkey) {
-                self.remove_tracked_interface(&ifname);
-            } else {
-                debug!(
-                    "No Linux service location interface found for instance {instance_id}, \
-                    location '{}'",
-                    location.name
-                );
-            }
+        for location_pubkey in location_pubkeys {
+            self.disconnect_service_location(instance_id, &location_pubkey)?;
         }
 
         Ok(())
@@ -299,25 +294,25 @@ impl ServiceLocationManager {
             return Ok(());
         };
 
-        let ifname = self.find_interface_by_peer_pubkey(location_pubkey);
+        let location = self.connected_service_locations[instance_id][position]
+            .location
+            .clone();
+        let Some(ifname) = self.find_interface_by_peer_pubkey(location_pubkey) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "No service location interface found for location '{}' and peer \
+                 {location_pubkey}",
+                location.name
+            )));
+        };
+        self.remove_tracked_interface(&ifname)?;
 
         let Some(locations) = self.connected_service_locations.get_mut(instance_id) else {
             warn!("Linux service location for instance {instance_id} disappeared before removal");
             return Ok(());
         };
-        let location = locations.remove(position).location;
+        locations.remove(position);
         if locations.is_empty() {
             self.connected_service_locations.remove(instance_id);
-        }
-
-        if let Some(ifname) = ifname {
-            self.remove_tracked_interface(&ifname);
-        } else {
-            debug!(
-                "No Linux service location interface found for instance {instance_id}, location \
-                '{}'",
-                location.name
-            );
         }
 
         Ok(())
@@ -528,7 +523,7 @@ impl ServiceLocationManager {
     ///
     /// Returns `Ok(true)` when every supported location is connected or already connected, and
     /// `Ok(false)` when at least one supported location failed so the caller can retry later.
-    pub fn connect_to_service_locations(
+    pub(crate) fn connect_to_service_locations(
         &mut self,
         authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
@@ -548,8 +543,7 @@ impl ServiceLocationManager {
                 }
 
                 let authorization = authorizations
-                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()))
-                    .map(|preshared_key| preshared_key.as_deref());
+                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
                 let action = reconcile_action(
                     self.is_service_location_connected(
                         &instance_data.instance_id,
@@ -567,6 +561,7 @@ impl ServiceLocationManager {
                         );
                         continue;
                     }
+                    ReconcileAction::LeaveDisconnected => continue,
                     ReconcileAction::WaitForAuthorization => {
                         debug!(
                             "Leaving Linux service location '{}' disconnected: no posture check \
@@ -574,6 +569,20 @@ impl ServiceLocationManager {
                             location.name
                         );
                         all_connected = false;
+                        continue;
+                    }
+                    ReconcileAction::Disconnect => {
+                        if let Err(err) = self.disconnect_service_location(
+                            &instance_data.instance_id,
+                            &location.pubkey,
+                        ) {
+                            error!(
+                                "Failed to disconnect rejected Linux service location '{}': \
+                                {err}",
+                                location.name
+                            );
+                            all_connected = false;
+                        }
                         continue;
                     }
                     ReconcileAction::Renew(preshared_key) => {

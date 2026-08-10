@@ -483,42 +483,20 @@ impl ServiceLocationManager {
     ) -> Result<(), ServiceLocationError> {
         debug!("Disconnecting all service locations for instance_id: {instance_id}");
 
-        if let Some(locations) = self.connected_service_locations.get(instance_id) {
-            // Collect locations to disconnect to avoid borrowing issues
-            let locations_to_disconnect = locations.to_vec();
-
-            for connected in locations_to_disconnect {
-                let location = connected.location;
-                let ifname = get_interface_name(&location.name);
-                debug!("Tearing down interface: {ifname}");
-                if let Some(mut wgapi) = self.wgapis.remove(&ifname) {
-                    if let Err(err) = wgapi.remove_interface() {
-                        error!("Failed to remove interface {ifname}: {err}");
-                    } else {
-                        debug!("Interface {ifname} removed successfully");
-                    }
-                    debug!(
-                        "Removing connected service location for instance_id: {instance_id}, \
-                        location_pubkey: {}",
-                        location.pubkey
-                    );
-                    debug!(
-                        "Disconnected service location for instance_id: {instance_id}, \
-                        location_pubkey: {}",
-                        location.pubkey
-                    );
-                } else {
-                    error!("Failed to find WireGuard API for interface {ifname}");
-                }
-            }
-
-            self.connected_service_locations.remove(instance_id);
-        } else {
+        let Some(locations) = self.connected_service_locations.get(instance_id) else {
             debug!(
                 "No connected service locations found for instance_id: {instance_id}. Skipping \
                 disconnect"
             );
             return Ok(());
+        };
+        let location_pubkeys = locations
+            .iter()
+            .map(|connected| connected.location.pubkey.clone())
+            .collect::<Vec<_>>();
+
+        for location_pubkey in location_pubkeys {
+            self.disconnect_service_location(instance_id, &location_pubkey)?;
         }
 
         debug!("Disconnected all service locations for instance_id: {instance_id}");
@@ -536,36 +514,40 @@ impl ServiceLocationManager {
             {location_pubkey}"
         );
 
-        if let Some(locations) = self.connected_service_locations.get_mut(instance_id) {
-            if let Some(pos) = locations
-                .iter()
-                .position(|connected| connected.location.pubkey == location_pubkey)
-            {
-                let location = locations.remove(pos).location;
-                let ifname = get_interface_name(&location.name);
-                debug!("Tearing down interface: {ifname}");
-                if let Some(mut wgapi) = self.wgapis.remove(&ifname) {
-                    if let Err(err) = wgapi.remove_interface() {
-                        error!("Failed to remove interface {ifname}: {err}");
-                    } else {
-                        debug!("Interface {ifname} removed successfully.");
-                    }
-                } else {
-                    error!("Failed to find WireGuard API for interface {ifname}. ");
-                }
-            } else {
-                debug!(
-                    "Service location with pubkey {location_pubkey} for instance {instance_id} is \
-                    not connected, skipping disconnect"
-                );
-                return Ok(());
-            }
-        } else {
+        let Some((position, location)) = self
+            .connected_service_locations
+            .get(instance_id)
+            .and_then(|locations| {
+                locations
+                    .iter()
+                    .enumerate()
+                    .find(|(_, connected)| connected.location.pubkey == location_pubkey)
+                    .map(|(position, connected)| (position, connected.location.clone()))
+            })
+        else {
             debug!(
                 "No connected service locations found for instance_id: {instance_id}, skipping \
                 disconnect"
             );
             return Ok(());
+        };
+
+        let ifname = get_interface_name(&location.name);
+        debug!("Tearing down interface: {ifname}");
+        let Some(wgapi) = self.wgapis.get_mut(&ifname) else {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "Failed to find WireGuard API for interface {ifname}"
+            )));
+        };
+        wgapi.remove_interface()?;
+        self.wgapis.remove(&ifname);
+
+        let Some(locations) = self.connected_service_locations.get_mut(instance_id) else {
+            return Ok(());
+        };
+        locations.remove(position);
+        if locations.is_empty() {
+            self.connected_service_locations.remove(instance_id);
         }
 
         debug!(
@@ -808,7 +790,7 @@ impl ServiceLocationManager {
     ///
     /// Returns `Ok(true)` when every eligible location is connected or already connected, and
     /// `Ok(false)` when at least one eligible location failed so the caller can retry later.
-    pub fn connect_to_service_locations(
+    pub(crate) fn connect_to_service_locations(
         &mut self,
         authorizations: &PostureAuthorizations,
     ) -> Result<bool, ServiceLocationError> {
@@ -847,8 +829,7 @@ impl ServiceLocationManager {
                 }
 
                 let authorization = authorizations
-                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()))
-                    .map(|preshared_key| preshared_key.as_deref());
+                    .get(&(instance_data.instance_id.clone(), location.pubkey.clone()));
                 let action = reconcile_action(
                     self.is_service_location_connected(
                         &instance_data.instance_id,
@@ -866,6 +847,7 @@ impl ServiceLocationManager {
                         );
                         continue;
                     }
+                    ReconcileAction::LeaveDisconnected => continue,
                     ReconcileAction::WaitForAuthorization => {
                         debug!(
                             "Leaving service location '{}' disconnected: no posture check has \
@@ -873,6 +855,19 @@ impl ServiceLocationManager {
                             location.name
                         );
                         all_connected = false;
+                        continue;
+                    }
+                    ReconcileAction::Disconnect => {
+                        if let Err(err) = self.disconnect_service_location(
+                            &instance_data.instance_id,
+                            &location.pubkey,
+                        ) {
+                            warn!(
+                                "Failed to disconnect rejected service location '{}': {err}",
+                                location.name
+                            );
+                            all_connected = false;
+                        }
                         continue;
                     }
                     ReconcileAction::Renew(preshared_key) => {

@@ -12,6 +12,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use defguard_client_core::error::Error as CoreError;
 use defguard_client_posture::{
     inspector::{device_posture_data, DiskEncryptionTarget},
     request_posture_authorization,
@@ -137,40 +138,62 @@ impl ServiceLocationManager {
 
 /// What one reconcile pass should do with a persisted service location.
 ///
-/// An authorization is present only when posture authorization succeeded during this pass. Its key
-/// may be absent when posture checks were removed from the location.
+/// An authorization records a definitive posture outcome from this pass. An absent outcome means
+/// the request failed transiently, while an approval key may be absent when posture checks were
+/// removed from the location.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ReconcileAction<'a> {
     LeaveConnected,
+    LeaveDisconnected,
     WaitForAuthorization,
+    Disconnect,
     Renew(Option<&'a str>),
     Connect(Option<&'a str>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PostureAuthorization {
+    Approved(Option<String>),
+    Rejected,
 }
 
 #[must_use]
 pub(crate) fn reconcile_action(
     is_connected: bool,
     posture_check_required: bool,
-    authorization: Option<Option<&str>>,
+    authorization: Option<&PostureAuthorization>,
 ) -> ReconcileAction<'_> {
-    if is_connected {
-        return authorization.map_or(ReconcileAction::LeaveConnected, ReconcileAction::Renew);
+    if posture_check_required && matches!(authorization, Some(PostureAuthorization::Rejected)) {
+        return if is_connected {
+            ReconcileAction::Disconnect
+        } else {
+            ReconcileAction::LeaveDisconnected
+        };
     }
 
-    if posture_check_required && authorization.is_none() {
+    let approved_key = match authorization {
+        Some(PostureAuthorization::Approved(preshared_key)) => Some(preshared_key.as_deref()),
+        Some(PostureAuthorization::Rejected) | None => None,
+    };
+
+    if is_connected {
+        return approved_key.map_or(ReconcileAction::LeaveConnected, ReconcileAction::Renew);
+    }
+
+    if posture_check_required && approved_key.is_none() {
         ReconcileAction::WaitForAuthorization
     } else {
-        ReconcileAction::Connect(authorization.flatten())
+        ReconcileAction::Connect(approved_key.flatten())
     }
 }
 
-/// Posture approvals obtained this pass, keyed by (instance id, location public key).
+/// Posture outcomes obtained this pass, keyed by (instance id, location public key).
 ///
-/// An absent map entry means authorization failed and leaves the location alone. A present entry
-/// with no key means core approved connecting without a PSK because posture checks were removed.
-pub(crate) type PostureAuthorizations = HashMap<(String, String), Option<String>>;
+/// An absent map entry means a transient failure and leaves an existing location alone. An approval
+/// with no key means core removed posture checks; a rejection tears an existing location down.
+pub(crate) type PostureAuthorizations = HashMap<(String, String), PostureAuthorization>;
 
-/// Obtains a preshared key for each location that needs one.
+/// Obtains a definitive posture outcome for each location that needs one.
 async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> PostureAuthorizations {
     let mut authorizations = PostureAuthorizations::new();
     if pending.is_empty() {
@@ -212,13 +235,24 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
                     );
                     Some((
                         (request.instance_id, request.location_pubkey),
-                        preshared_key,
+                        PostureAuthorization::Approved(preshared_key),
+                    ))
+                }
+                Err(CoreError::PostureCheckFailed(reason)) => {
+                    error!(
+                        "Posture check rejected for service location '{}': {reason}. Any existing \
+                        tunnel will be disconnected.",
+                        request.location_name
+                    );
+                    Some((
+                        (request.instance_id, request.location_pubkey),
+                        PostureAuthorization::Rejected,
                     ))
                 }
                 Err(err) => {
                     error!(
-                        "Posture check failed for service location '{}': {err}. It will stay \
-                        disconnected and be retried.",
+                        "Posture check could not be completed for service location '{}': {err}. \
+                        Existing tunnel state will be preserved and the check retried.",
                         request.location_name
                     );
                     None
@@ -230,8 +264,8 @@ async fn authorize_pending(pending: Vec<PostureAuthorizationRequest>) -> Posture
     futures_util::pin_mut!(requests);
 
     while let Some(authorization) = requests.next().await {
-        if let Some((location, preshared_key)) = authorization {
-            authorizations.insert(location, preshared_key);
+        if let Some((location, outcome)) = authorization {
+            authorizations.insert(location, outcome);
         }
     }
 
@@ -382,25 +416,52 @@ mod tests {
 
     #[test]
     fn test_connected_location_with_fresh_key_is_renewed() {
+        let authorization = PostureAuthorization::Approved(Some("fresh-key".to_string()));
         assert_eq!(
-            reconcile_action(true, true, Some(Some("fresh-key"))),
+            reconcile_action(true, true, Some(&authorization)),
             ReconcileAction::Renew(Some("fresh-key"))
         );
     }
 
     #[test]
     fn test_approval_without_a_key_connects_without_a_key() {
+        let authorization = PostureAuthorization::Approved(None);
         assert_eq!(
-            reconcile_action(false, true, Some(None)),
+            reconcile_action(false, true, Some(&authorization)),
             ReconcileAction::Connect(None)
         );
     }
 
     #[test]
     fn test_approval_without_a_key_removes_the_old_key_from_a_connected_location() {
+        let authorization = PostureAuthorization::Approved(None);
         assert_eq!(
-            reconcile_action(true, true, Some(None)),
+            reconcile_action(true, true, Some(&authorization)),
             ReconcileAction::Renew(None)
+        );
+    }
+
+    #[test]
+    fn test_posture_rejection_disconnects_a_connected_location() {
+        assert_eq!(
+            reconcile_action(true, true, Some(&PostureAuthorization::Rejected)),
+            ReconcileAction::Disconnect
+        );
+    }
+
+    #[test]
+    fn test_transient_failure_leaves_a_connected_location_unchanged() {
+        assert_eq!(
+            reconcile_action(true, true, None),
+            ReconcileAction::LeaveConnected
+        );
+    }
+
+    #[test]
+    fn test_posture_rejection_keeps_a_disconnected_location_down() {
+        assert_eq!(
+            reconcile_action(false, true, Some(&PostureAuthorization::Rejected)),
+            ReconcileAction::LeaveDisconnected
         );
     }
 
