@@ -21,12 +21,11 @@ use defguard_client_proto::defguard::{
     },
     enterprise::posture::v2::DevicePostureData,
 };
+#[cfg(target_os = "linux")]
+use defguard_client_service_locations::reconciler::{run_reconciler, ReconcileSignal};
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
-use defguard_client_service_locations::{
-    reconciler::{run_reconciler, ReconcileSignal},
-    ServiceLocationManager,
-};
+use defguard_client_service_locations::ServiceLocationManager;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
