@@ -276,8 +276,22 @@ impl ServiceLocationManager {
             .map(|connected| connected.location.pubkey.clone())
             .collect::<Vec<_>>();
 
+        let mut disconnect_failed = false;
         for location_pubkey in location_pubkeys {
-            self.disconnect_service_location(instance_id, &location_pubkey)?;
+            if let Err(err) = self.disconnect_service_location(instance_id, &location_pubkey) {
+                error!(
+                    "Failed to disconnect Linux service location peer {location_pubkey} for \
+                    instance {instance_id}: {err}"
+                );
+                disconnect_failed = true;
+            }
+        }
+
+        if disconnect_failed {
+            return Err(ServiceLocationError::InterfaceError(format!(
+                "Failed to disconnect one or more Linux service locations for instance \
+                {instance_id}"
+            )));
         }
 
         Ok(())
