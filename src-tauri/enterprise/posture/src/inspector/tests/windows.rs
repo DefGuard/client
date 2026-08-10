@@ -1,6 +1,6 @@
 use super::super::{
     anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
-    security_update_age_days,
+    security_update_age_days, DiskEncryptionTarget,
 };
 
 #[test]
@@ -16,7 +16,7 @@ fn test_os_version() {
 #[test]
 #[ignore = "development machine only"]
 fn test_disk_encryption() {
-    assert!(!disk_encryption_status().unwrap());
+    assert!(!disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
 }
 
 #[test]

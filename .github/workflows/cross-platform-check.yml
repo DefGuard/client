@@ -60,4 +60,4 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check compilation
-        run: cargo check --workspace
+        run: cargo check --workspace --all-targets

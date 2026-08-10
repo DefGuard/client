@@ -1,6 +1,8 @@
 use std::process::Command;
 
-use super::super::super::{device_integrity, disk_encryption_status, os_name, os_version};
+use super::super::super::{
+    device_integrity, disk_encryption_status, os_name, os_version, DiskEncryptionTarget,
+};
 
 fn expected_os_version() -> String {
     let output = Command::new("sw_vers")
@@ -41,7 +43,7 @@ mod setup1 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert!(!disk_encryption_status().unwrap());
+        assert!(!disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
     }
 }
 
@@ -69,6 +71,6 @@ mod setup2 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert!(disk_encryption_status().unwrap());
+        assert!(disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
     }
 }
