@@ -2,7 +2,7 @@ use std::process::Command;
 
 use super::super::super::{
     anti_virus_status, disk_encryption_status, os_name, os_version, part_of_domain,
-    security_update_age_days,
+    security_update_age_days, DiskEncryptionTarget,
 };
 
 fn expected_security_update_age_days() -> i32 {
@@ -71,7 +71,7 @@ mod setup1 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_unencrypted() {
-        assert!(!disk_encryption_status().unwrap());
+        assert!(!disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
     }
 }
 
@@ -114,6 +114,6 @@ mod setup2 {
     #[test]
     #[ignore = "CI posture testing only"]
     fn test_disk_encryption_status_encrypted() {
-        assert!(disk_encryption_status().unwrap());
+        assert!(disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
     }
 }
