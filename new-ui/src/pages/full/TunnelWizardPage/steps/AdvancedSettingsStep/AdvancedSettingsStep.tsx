@@ -74,19 +74,19 @@ export const AdvancedSettingsStep = () => {
         <form.AppForm>
           <Split>
             <form.AppField name="pre_up">
-              {(field) => <field.FormInput label="Pre-up" />}
+              {(field) => <field.FormInput notNull label="Pre-up" />}
             </form.AppField>
             <form.AppField name="post_up">
-              {(field) => <field.FormInput label="Post-up" />}
+              {(field) => <field.FormInput notNull label="Post-up" />}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl2} />
           <Split>
             <form.AppField name="pre_down">
-              {(field) => <field.FormInput label="Pre-down" />}
+              {(field) => <field.FormInput notNull label="Pre-down" />}
             </form.AppField>
             <form.AppField name="post_down">
-              {(field) => <field.FormInput label="Post-down" />}
+              {(field) => <field.FormInput notNull label="Post-down" />}
             </form.AppField>
           </Split>
         </form.AppForm>
