@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 ///
 /// Shares the same database as the desktop client.
 #[derive(Parser)]
-#[command(name = "defguard-cli", version, about)]
+#[command(name = "defguard-client", version, about)]
 pub struct Cli {
     /// Output machine-readable JSON instead of human-readable tables.
     #[arg(long, global = true)]

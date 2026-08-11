@@ -38,7 +38,6 @@ if (-not $signtoolPath) {
 }
 
 $binaries = @(
-    'target\release\defguard-cli.exe',
     'target\release\defguard-service.exe'
 )
 
