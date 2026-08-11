@@ -199,7 +199,13 @@ const ModalContent = ({ data }: { data: OpenUpdateTunnelModalData }) => {
           </form.AppField>
           <SizedBox height={ThemeSpacing.Xl} />
           <form.AppField name="persistent_keep_alive">
-            {(field) => <field.FormInput required label="Persistent keep alive (sec)" />}
+            {(field) => (
+              <field.FormInput
+                required
+                type="number"
+                label="Persistent keep alive (sec)"
+              />
+            )}
           </form.AppField>
           <SizedBox height={ThemeSpacing.Xl} />
           <Split>
