@@ -65,16 +65,15 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - name: Install tauri-cli
-        run: cargo install tauri-cli --locked
-
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
 
       - name: Set build number
         run: |
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," swift/extension/VPNExtension.xcodeproj/project.pbxproj
-          sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/client-cli/Info.plist
           sed -i '' "s,@BUILD_NUMBER@,${{ github.run_number }}," src-tauri/tauri.macos.conf.json
 
       - name: Build new UI

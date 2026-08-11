@@ -28,7 +28,7 @@ const COPYRIGHT: &str = "Copyright (C) 2026 Defguard Sp. z o.o.";
 
 /// Print logo + copyright + project name/version to stdout. Picks the
 /// colored logo variant on an interactive TTY and the mono fallback
-/// otherwise (so `defguard-cli --help | cat` stays clean ASCII).
+/// otherwise (so `defguard-client --help | cat` stays clean ASCII).
 #[cfg(not(windows))]
 pub fn print_banner() {
     // owo-colors' supports-colors detection drives the choice: if
