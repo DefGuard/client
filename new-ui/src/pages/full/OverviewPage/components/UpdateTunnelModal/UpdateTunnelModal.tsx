@@ -174,7 +174,9 @@ const ModalContent = ({ data }: { data: OpenUpdateTunnelModalData }) => {
               {(field) => <field.FormInput required label="VPN server public key" />}
             </form.AppField>
             <form.AppField name="preshared_key">
-              {(field) => <field.FormInput label="Preshared key" type="password" />}
+              {(field) => (
+                <field.FormInput notNull label="Preshared key" type="password" />
+              )}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl} />
@@ -183,13 +185,16 @@ const ModalContent = ({ data }: { data: OpenUpdateTunnelModalData }) => {
               {(field) => <field.FormInput required label="VPN server address:port" />}
             </form.AppField>
             <form.AppField name="dns">
-              {(field) => <field.FormInput label="DNS" />}
+              {(field) => <field.FormInput notNull label="DNS" />}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl} />
           <form.AppField name="allowed_ips">
             {(field) => (
-              <field.FormInput label="Allowed IPs (add multiple separated by coma)" />
+              <field.FormInput
+                notNull
+                label="Allowed IPs (add multiple separated by coma)"
+              />
             )}
           </form.AppField>
           <SizedBox height={ThemeSpacing.Xl} />
@@ -199,19 +204,19 @@ const ModalContent = ({ data }: { data: OpenUpdateTunnelModalData }) => {
           <SizedBox height={ThemeSpacing.Xl} />
           <Split>
             <form.AppField name="pre_up">
-              {(field) => <field.FormInput label="Pre-up" />}
+              {(field) => <field.FormInput notNull label="Pre-up" />}
             </form.AppField>
             <form.AppField name="post_up">
-              {(field) => <field.FormInput label="Post-up" />}
+              {(field) => <field.FormInput notNull label="Post-up" />}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl} />
           <Split>
             <form.AppField name="pre_down">
-              {(field) => <field.FormInput label="Pre-down" />}
+              {(field) => <field.FormInput notNull label="Pre-down" />}
             </form.AppField>
             <form.AppField name="post_down">
-              {(field) => <field.FormInput label="Post-down" />}
+              {(field) => <field.FormInput notNull label="Post-down" />}
             </form.AppField>
           </Split>
           <Controls>

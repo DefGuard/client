@@ -17,6 +17,7 @@ export const generateWireguardKeys = () => {
 
 export type TunnelConfig = {
 	name: string;
+	deviceId: number;
 	prvkey: string;
 	pubkey: string;
 	address: string;
@@ -33,23 +34,21 @@ export const provisionTunnel = async (
 	name: string,
 ): Promise<TunnelConfig> => {
 	const keys = generateWireguardKeys();
-	const ip = await core.findAvailableIp(networkId);
-	const conf = await core.addNetworkDevice(
-		networkId,
-		name,
-		[ip],
-		keys.publicKey,
-	);
-	const field = (re: RegExp) => conf.match(re)?.[1]?.trim() ?? "";
+	const { deviceId, configs } = await core.addUserDevice(name, keys.publicKey);
+	const config = configs.find((item) => item.network_id === networkId);
+	if (!config) {
+		throw new Error(`Device ${name} was not added to location ${networkId}`);
+	}
 	return {
 		name,
+		deviceId,
 		prvkey: keys.privateKey,
 		pubkey: keys.publicKey,
-		address: field(/Address\s*=\s*(.+)/),
-		serverPubkey: field(/PublicKey\s*=\s*(.+)/),
-		allowedIps: field(/AllowedIPs\s*=\s*(.+)/),
-		endpoint: field(/Endpoint\s*=\s*(.+)/),
-		dns: field(/DNS\s*=\s*(.+)/),
-		keepalive: field(/PersistentKeepalive\s*=\s*(.+)/) || "25",
+		address: config.address.join(","),
+		serverPubkey: config.pubkey,
+		allowedIps: config.allowed_ips.join(","),
+		endpoint: config.endpoint,
+		dns: config.dns ?? "",
+		keepalive: String(config.keepalive_interval),
 	};
 };

@@ -82,7 +82,9 @@ export const VpnServerStep = () => {
               {(field) => <field.FormInput required label="Public key" />}
             </form.AppField>
             <form.AppField name="preshared_key">
-              {(field) => <field.FormInput label="Preshared key" type="password" />}
+              {(field) => (
+                <field.FormInput notNull label="Preshared key" type="password" />
+              )}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl2} />
@@ -91,13 +93,16 @@ export const VpnServerStep = () => {
               {(field) => <field.FormInput required label="VPN server address:port" />}
             </form.AppField>
             <form.AppField name="dns">
-              {(field) => <field.FormInput label="DNS" />}
+              {(field) => <field.FormInput notNull label="DNS" />}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl2} />
           <form.AppField name="allowed_ips">
             {(field) => (
-              <field.FormInput label="Allowed IPs (add multiple separated by coma)" />
+              <field.FormInput
+                notNull
+                label="Allowed IPs (add multiple separated by coma)"
+              />
             )}
           </form.AppField>
           <SizedBox height={ThemeSpacing.Xl2} />

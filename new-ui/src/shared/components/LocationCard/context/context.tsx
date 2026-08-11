@@ -104,7 +104,11 @@ export const LocationCardProvider = ({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side-effect on location.active
   useEffect(() => {
-    if (location.active && !conTypeSetOnce.current) {
+    if (
+      location.active &&
+      location.connection_type !== ConnectionType.Tunnel &&
+      !conTypeSetOnce.current
+    ) {
       conTypeSetOnce.current = true;
       setConnectionMethod(location.id, location.connection_type, mfaMethod);
     }
