@@ -107,7 +107,13 @@ export const VpnServerStep = () => {
           </form.AppField>
           <SizedBox height={ThemeSpacing.Xl2} />
           <form.AppField name="persistent_keep_alive">
-            {(field) => <field.FormInput required label="Persistent keep alive (sec)" />}
+            {(field) => (
+              <field.FormInput
+                required
+                type="number"
+                label="Persistent keep alive (sec)"
+              />
+            )}
           </form.AppField>
         </form.AppForm>
       </form>
