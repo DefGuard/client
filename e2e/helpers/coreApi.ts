@@ -13,6 +13,23 @@ const proxyUrl = (): string => requireEnv("PROXY_URL");
 
 export type LocationMfaMode = "disabled" | "internal" | "external";
 
+export interface DeviceConfig {
+	network_id: number;
+	network_name: string;
+	config: string;
+	address: string[];
+	endpoint: string;
+	allowed_ips: string[];
+	pubkey: string;
+	dns: string | null;
+	keepalive_interval: number;
+}
+
+export interface AddedUserDevice {
+	deviceId: number;
+	configs: DeviceConfig[];
+}
+
 export interface EnrollmentFixture {
 	username: string;
 	enrollmentToken: string;
@@ -93,30 +110,21 @@ export class CoreApi {
 		}>;
 	}
 
-	async findAvailableIp(networkId: number): Promise<string> {
-		const response = await this.request(
-			"GET",
-			`/api/v1/device/network/ip/${networkId}`,
-		);
-		const ips = (await response.json()) as Array<{ ip: string }>;
-		return ips[0].ip;
-	}
-
-	async addNetworkDevice(
-		networkId: number,
-		name: string,
-		assignedIps: string[],
-		pubkey: string,
-	): Promise<string> {
-		const response = await this.request("POST", "/api/v1/device/network", {
+	async addUserDevice(name: string, pubkey: string): Promise<AddedUserDevice> {
+		const username = process.env.CORE_ADMIN_USER ?? "admin";
+		const response = await this.request("POST", `/api/v1/device/${username}`, {
 			name,
-			description: null,
-			location_id: networkId,
-			assigned_ips: assignedIps,
 			wireguard_pubkey: pubkey,
 		});
-		const data = (await response.json()) as { config: { config: string } };
-		return data.config.config;
+		const data = (await response.json()) as {
+			configs: DeviceConfig[];
+			device: { id: number };
+		};
+		return { deviceId: data.device.id, configs: data.configs };
+	}
+
+	async deleteDevice(deviceId: number): Promise<void> {
+		await this.request("DELETE", `/api/v1/device/${deviceId}`);
 	}
 
 	async setLocationMfaMode(
