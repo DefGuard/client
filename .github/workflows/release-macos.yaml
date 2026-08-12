@@ -85,8 +85,10 @@ jobs:
           pnpm build
 
       - name: Unlock keychain
-        run: |
-          security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
+        run: security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
+
+      - name: Debug keychain
+        run: security default-keychain
 
       - name: Build app
         uses: tauri-apps/tauri-action@v1
