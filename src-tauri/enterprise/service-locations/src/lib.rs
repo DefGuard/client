@@ -1,4 +1,6 @@
-use std::{collections::HashMap, ffi::OsStr, fmt, fs, path::Path, time::SystemTime};
+#[cfg(any(windows, target_os = "linux", test))]
+use std::ffi::OsStr;
+use std::{collections::HashMap, fmt, fs, path::Path, time::SystemTime};
 
 use defguard_client_core::{
     database::models::{
@@ -198,6 +200,7 @@ pub fn is_unchanged_on_disk(path: &Path, contents: &str) -> bool {
     fs::read_to_string(path).is_ok_and(|existing| existing == contents)
 }
 
+#[cfg(any(windows, target_os = "linux", test))]
 fn load_service_locations_from_file(
     path: &Path,
 ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
@@ -209,6 +212,7 @@ fn load_service_locations_from_file(
     Ok(Some(serde_json::from_str(&data)?))
 }
 
+#[cfg(any(windows, target_os = "linux", test))]
 fn load_service_locations_from_directory(
     directory: &Path,
 ) -> Result<Vec<ServiceLocationData>, ServiceLocationError> {

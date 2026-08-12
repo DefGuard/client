@@ -91,14 +91,14 @@ pub(crate) fn render_qr(
 
 #[cfg(test)]
 pub(crate) fn render_qr(
-    _payload: &str,
+    payload: &str,
     qr_file: Option<&str>,
     _json_mode: bool,
 ) -> Result<(), CliError> {
     // Test mode: never render to the terminal.  Write to --qr-file
     // only so that integration tests can verify the file was produced.
     if let Some(path) = qr_file {
-        let code = QrCode::new(_payload.as_bytes())
+        let code = QrCode::new(payload.as_bytes())
             .map_err(|e| CliError::Other(format!("Failed to generate QR code: {e}")))?;
         let image = code.render::<Luma<u8>>().build();
         image

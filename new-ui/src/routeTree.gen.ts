@@ -9,35 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WelcomeRouteImport } from './routes/welcome'
-import { Route as FullRouteImport } from './routes/full'
-import { Route as EmptyRouteImport } from './routes/empty'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
-import { Route as FullIndexRouteImport } from './routes/full/index'
+import { Route as EmptyRouteImport } from './routes/empty'
+import { Route as FullRouteImport } from './routes/full'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as CompactIndexRouteImport } from './routes/compact/index'
-import { Route as FullTunnelWizardRouteImport } from './routes/full/tunnel-wizard'
-import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
-import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
+import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
-import { Route as FullDefaultUpdateRouteImport } from './routes/full/_default/update'
-import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
-import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/settings'
-import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
-import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
+import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
+import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
+import { Route as FullTunnelWizardRouteImport } from './routes/full/tunnel-wizard'
+import { Route as PlaygroundIndexRouteImport } from './routes/playground/index'
 import { Route as FullDefaultLocationDetailsRouteImport } from './routes/full/_default/location-details'
+import { Route as FullDefaultLogRouteImport } from './routes/full/_default/log'
+import { Route as FullDefaultOverviewRouteImport } from './routes/full/_default/overview'
+import { Route as FullDefaultSettingsRouteImport } from './routes/full/_default/settings'
+import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/support'
+import { Route as FullDefaultUpdateRouteImport } from './routes/full/_default/update'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
-import { Route as FullDefaultAddTunnelRouteImport } from './routes/full/_default/add/tunnel'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
+import { Route as FullDefaultAddTunnelRouteImport } from './routes/full/_default/add/tunnel'
 
-const WelcomeRoute = WelcomeRouteImport.update({
-  id: '/welcome',
-  path: '/welcome',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FullRoute = FullRouteImport.update({
-  id: '/full',
-  path: '/full',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmptyRoute = EmptyRouteImport.update({
@@ -45,14 +40,19 @@ const EmptyRoute = EmptyRouteImport.update({
   path: '/empty',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const FullRoute = FullRouteImport.update({
+  id: '/full',
+  path: '/full',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PlaygroundIndexRoute = PlaygroundIndexRouteImport.update({
-  id: '/playground/',
-  path: '/playground/',
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompactIndexRoute = CompactIndexRouteImport.update({
+  id: '/compact/',
+  path: '/compact/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FullIndexRoute = FullIndexRouteImport.update({
@@ -60,19 +60,8 @@ const FullIndexRoute = FullIndexRouteImport.update({
   path: '/',
   getParentRoute: () => FullRoute,
 } as any)
-const CompactIndexRoute = CompactIndexRouteImport.update({
-  id: '/compact/',
-  path: '/compact/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FullTunnelWizardRoute = FullTunnelWizardRouteImport.update({
-  id: '/tunnel-wizard',
-  path: '/tunnel-wizard',
-  getParentRoute: () => FullRoute,
-} as any)
-const FullSessionTimeoutRoute = FullSessionTimeoutRouteImport.update({
-  id: '/session-timeout',
-  path: '/session-timeout',
+const FullDefaultRoute = FullDefaultRouteImport.update({
+  id: '/_default',
   getParentRoute: () => FullRoute,
 } as any)
 const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
@@ -80,34 +69,20 @@ const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
   path: '/enrollment',
   getParentRoute: () => FullRoute,
 } as any)
-const FullDefaultRoute = FullDefaultRouteImport.update({
-  id: '/_default',
+const FullSessionTimeoutRoute = FullSessionTimeoutRouteImport.update({
+  id: '/session-timeout',
+  path: '/session-timeout',
   getParentRoute: () => FullRoute,
 } as any)
-const FullDefaultUpdateRoute = FullDefaultUpdateRouteImport.update({
-  id: '/update',
-  path: '/update',
-  getParentRoute: () => FullDefaultRoute,
+const FullTunnelWizardRoute = FullTunnelWizardRouteImport.update({
+  id: '/tunnel-wizard',
+  path: '/tunnel-wizard',
+  getParentRoute: () => FullRoute,
 } as any)
-const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => FullDefaultRoute,
-} as any)
-const FullDefaultSettingsRoute = FullDefaultSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => FullDefaultRoute,
-} as any)
-const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
-  id: '/overview',
-  path: '/overview',
-  getParentRoute: () => FullDefaultRoute,
-} as any)
-const FullDefaultLogRoute = FullDefaultLogRouteImport.update({
-  id: '/log',
-  path: '/log',
-  getParentRoute: () => FullDefaultRoute,
+const PlaygroundIndexRoute = PlaygroundIndexRouteImport.update({
+  id: '/playground/',
+  path: '/playground/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const FullDefaultLocationDetailsRoute =
   FullDefaultLocationDetailsRouteImport.update({
@@ -115,19 +90,44 @@ const FullDefaultLocationDetailsRoute =
     path: '/location-details',
     getParentRoute: () => FullDefaultRoute,
   } as any)
+const FullDefaultLogRoute = FullDefaultLogRouteImport.update({
+  id: '/log',
+  path: '/log',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultOverviewRoute = FullDefaultOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultSettingsRoute = FullDefaultSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultSupportRoute = FullDefaultSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultUpdateRoute = FullDefaultUpdateRouteImport.update({
+  id: '/update',
+  path: '/update',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultAddIndexRoute = FullDefaultAddIndexRouteImport.update({
   id: '/add/',
   path: '/add/',
   getParentRoute: () => FullDefaultRoute,
 } as any)
-const FullDefaultAddTunnelRoute = FullDefaultAddTunnelRouteImport.update({
-  id: '/add/tunnel',
-  path: '/add/tunnel',
-  getParentRoute: () => FullDefaultRoute,
-} as any)
 const FullDefaultAddInstanceRoute = FullDefaultAddInstanceRouteImport.update({
   id: '/add/instance',
   path: '/add/instance',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
+const FullDefaultAddTunnelRoute = FullDefaultAddTunnelRouteImport.update({
+  id: '/add/tunnel',
+  path: '/add/tunnel',
   getParentRoute: () => FullDefaultRoute,
 } as any)
 
@@ -272,18 +272,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/welcome': {
-      id: '/welcome'
-      path: '/welcome'
-      fullPath: '/welcome'
-      preLoaderRoute: typeof WelcomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/full': {
-      id: '/full'
-      path: '/full'
-      fullPath: '/full'
-      preLoaderRoute: typeof FullRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/empty': {
@@ -293,18 +286,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmptyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/full': {
+      id: '/full'
+      path: '/full'
+      fullPath: '/full'
+      preLoaderRoute: typeof FullRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/playground/': {
-      id: '/playground/'
-      path: '/playground'
-      fullPath: '/playground/'
-      preLoaderRoute: typeof PlaygroundIndexRouteImport
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compact/': {
+      id: '/compact/'
+      path: '/compact'
+      fullPath: '/compact/'
+      preLoaderRoute: typeof CompactIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/full/': {
@@ -314,25 +314,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullIndexRouteImport
       parentRoute: typeof FullRoute
     }
-    '/compact/': {
-      id: '/compact/'
-      path: '/compact'
-      fullPath: '/compact/'
-      preLoaderRoute: typeof CompactIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/full/tunnel-wizard': {
-      id: '/full/tunnel-wizard'
-      path: '/tunnel-wizard'
-      fullPath: '/full/tunnel-wizard'
-      preLoaderRoute: typeof FullTunnelWizardRouteImport
-      parentRoute: typeof FullRoute
-    }
-    '/full/session-timeout': {
-      id: '/full/session-timeout'
-      path: '/session-timeout'
-      fullPath: '/full/session-timeout'
-      preLoaderRoute: typeof FullSessionTimeoutRouteImport
+    '/full/_default': {
+      id: '/full/_default'
+      path: ''
+      fullPath: '/full'
+      preLoaderRoute: typeof FullDefaultRouteImport
       parentRoute: typeof FullRoute
     }
     '/full/enrollment': {
@@ -342,39 +328,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullEnrollmentRouteImport
       parentRoute: typeof FullRoute
     }
-    '/full/_default': {
-      id: '/full/_default'
-      path: ''
-      fullPath: '/full'
-      preLoaderRoute: typeof FullDefaultRouteImport
+    '/full/session-timeout': {
+      id: '/full/session-timeout'
+      path: '/session-timeout'
+      fullPath: '/full/session-timeout'
+      preLoaderRoute: typeof FullSessionTimeoutRouteImport
       parentRoute: typeof FullRoute
     }
-    '/full/_default/update': {
-      id: '/full/_default/update'
-      path: '/update'
-      fullPath: '/full/update'
-      preLoaderRoute: typeof FullDefaultUpdateRouteImport
-      parentRoute: typeof FullDefaultRoute
+    '/full/tunnel-wizard': {
+      id: '/full/tunnel-wizard'
+      path: '/tunnel-wizard'
+      fullPath: '/full/tunnel-wizard'
+      preLoaderRoute: typeof FullTunnelWizardRouteImport
+      parentRoute: typeof FullRoute
     }
-    '/full/_default/support': {
-      id: '/full/_default/support'
-      path: '/support'
-      fullPath: '/full/support'
-      preLoaderRoute: typeof FullDefaultSupportRouteImport
-      parentRoute: typeof FullDefaultRoute
+    '/playground/': {
+      id: '/playground/'
+      path: '/playground'
+      fullPath: '/playground/'
+      preLoaderRoute: typeof PlaygroundIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/full/_default/settings': {
-      id: '/full/_default/settings'
-      path: '/settings'
-      fullPath: '/full/settings'
-      preLoaderRoute: typeof FullDefaultSettingsRouteImport
-      parentRoute: typeof FullDefaultRoute
-    }
-    '/full/_default/overview': {
-      id: '/full/_default/overview'
-      path: '/overview'
-      fullPath: '/full/overview'
-      preLoaderRoute: typeof FullDefaultOverviewRouteImport
+    '/full/_default/location-details': {
+      id: '/full/_default/location-details'
+      path: '/location-details'
+      fullPath: '/full/location-details'
+      preLoaderRoute: typeof FullDefaultLocationDetailsRouteImport
       parentRoute: typeof FullDefaultRoute
     }
     '/full/_default/log': {
@@ -384,11 +363,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultLogRouteImport
       parentRoute: typeof FullDefaultRoute
     }
-    '/full/_default/location-details': {
-      id: '/full/_default/location-details'
-      path: '/location-details'
-      fullPath: '/full/location-details'
-      preLoaderRoute: typeof FullDefaultLocationDetailsRouteImport
+    '/full/_default/overview': {
+      id: '/full/_default/overview'
+      path: '/overview'
+      fullPath: '/full/overview'
+      preLoaderRoute: typeof FullDefaultOverviewRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/settings': {
+      id: '/full/_default/settings'
+      path: '/settings'
+      fullPath: '/full/settings'
+      preLoaderRoute: typeof FullDefaultSettingsRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/support': {
+      id: '/full/_default/support'
+      path: '/support'
+      fullPath: '/full/support'
+      preLoaderRoute: typeof FullDefaultSupportRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/update': {
+      id: '/full/_default/update'
+      path: '/update'
+      fullPath: '/full/update'
+      preLoaderRoute: typeof FullDefaultUpdateRouteImport
       parentRoute: typeof FullDefaultRoute
     }
     '/full/_default/add/': {
@@ -398,18 +398,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultAddIndexRouteImport
       parentRoute: typeof FullDefaultRoute
     }
-    '/full/_default/add/tunnel': {
-      id: '/full/_default/add/tunnel'
-      path: '/add/tunnel'
-      fullPath: '/full/add/tunnel'
-      preLoaderRoute: typeof FullDefaultAddTunnelRouteImport
-      parentRoute: typeof FullDefaultRoute
-    }
     '/full/_default/add/instance': {
       id: '/full/_default/add/instance'
       path: '/add/instance'
       fullPath: '/full/add/instance'
       preLoaderRoute: typeof FullDefaultAddInstanceRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
+    '/full/_default/add/tunnel': {
+      id: '/full/_default/add/tunnel'
+      path: '/add/tunnel'
+      fullPath: '/full/add/tunnel'
+      preLoaderRoute: typeof FullDefaultAddTunnelRouteImport
       parentRoute: typeof FullDefaultRoute
     }
   }

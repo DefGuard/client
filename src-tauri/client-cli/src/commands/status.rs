@@ -167,7 +167,7 @@ mod tests {
                     listen_port: 51820,
                     tx_bytes: 1024,
                     rx_bytes: 2048,
-                    last_handshake: Some(1700000000),
+                    last_handshake: Some(1_700_000_000),
                 }),
                 ConnectionType::Location,
             )],
@@ -201,7 +201,7 @@ mod tests {
                         listen_port: 51820,
                         tx_bytes: 1024,
                         rx_bytes: 2048,
-                        last_handshake: Some(1700000000),
+                        last_handshake: Some(1_700_000_000),
                     }),
                     ConnectionType::Location,
                 ),
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(active[0]["listen_port"], 51820);
         assert_eq!(active[0]["tx_bytes"], 1024);
         assert_eq!(active[0]["rx_bytes"], 2048);
-        assert_eq!(active[0]["last_handshake_secs"], 1700000000);
+        assert_eq!(active[0]["last_handshake_secs"], 1_700_000_000);
 
         assert_eq!(active[1]["name"], "data-center");
         assert_eq!(active[1]["connection_type"], "tunnel");
