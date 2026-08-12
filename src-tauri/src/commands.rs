@@ -35,8 +35,6 @@ use uuid::Uuid;
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
-#[cfg(not(target_os = "macos"))]
-use crate::utils::execute_command;
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
@@ -60,8 +58,7 @@ use crate::{
         service_log_watcher::stop_log_watcher_task,
     },
     periodic::config::{
-        do_update_instance, poll_instance_with_events, sync_service_locations,
-        sync_service_locations_best_effort,
+        do_update_instance, poll_instance_with_events, sync_service_locations_best_effort,
     },
     proxy::construct_platform_header,
     tauri_err_to_app_err,
@@ -73,6 +70,8 @@ use crate::{
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
+#[cfg(not(target_os = "macos"))]
+use crate::{periodic::config::sync_service_locations, utils::execute_command};
 
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]
