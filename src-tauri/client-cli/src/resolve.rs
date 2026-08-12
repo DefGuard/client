@@ -262,7 +262,7 @@ mod tests {
                 assert_eq!(l.name, "office");
                 assert_eq!(l.instance_id, i.id);
             }
-            _ => panic!("expected Location"),
+            ResolvedTarget::Tunnel(_) => panic!("expected Location"),
         }
     }
 
@@ -327,7 +327,7 @@ mod tests {
         };
         match expect_ok(resolve_connect_target(&spec, &pool).await) {
             ResolvedTarget::Location(l) => assert_eq!(l.name, "office"),
-            _ => panic!("expected Location"),
+            ResolvedTarget::Tunnel(_) => panic!("expected Location"),
         }
     }
 
@@ -344,7 +344,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Tunnel(t) => assert_eq!(t.name, "gateway"),
-            _ => panic!("expected Tunnel"),
+            ResolvedTarget::Location(_) => panic!("expected Tunnel"),
         }
     }
 
@@ -375,7 +375,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Tunnel(t) => assert_eq!(t.name, "office"),
-            _ => panic!("expected Tunnel"),
+            ResolvedTarget::Location(_) => panic!("expected Tunnel"),
         }
     }
 
@@ -407,7 +407,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Location(l) => assert_eq!(l.instance_id, i1.id),
-            _ => panic!("expected Location"),
+            ResolvedTarget::Tunnel(_) => panic!("expected Location"),
         }
 
         let spec = TargetSpec {
@@ -419,7 +419,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Location(l) => assert_eq!(l.instance_id, i2.id),
-            _ => panic!("expected Location"),
+            ResolvedTarget::Tunnel(_) => panic!("expected Location"),
         }
     }
 
@@ -437,7 +437,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Location(l) => assert_eq!(l.id, saved.id),
-            _ => panic!("expected Location"),
+            ResolvedTarget::Tunnel(_) => panic!("expected Location"),
         }
     }
 
@@ -454,7 +454,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Tunnel(tun) => assert_eq!(tun.id, t.id),
-            _ => panic!("expected Tunnel"),
+            ResolvedTarget::Location(_) => panic!("expected Tunnel"),
         }
     }
 
@@ -491,7 +491,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Tunnel(tun) => assert_eq!(tun.id, t.id),
-            _ => panic!("expected Tunnel"),
+            ResolvedTarget::Location(_) => panic!("expected Tunnel"),
         }
     }
 
@@ -521,7 +521,7 @@ mod tests {
         let result = expect_ok(resolve_connect_target(&spec, &pool).await);
         match result {
             ResolvedTarget::Location(l) => assert_eq!(l.name, "office"),
-            _ => panic!("expected Location"),
+            ResolvedTarget::Tunnel(_) => panic!("expected Location"),
         }
     }
 
