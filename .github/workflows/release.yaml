@@ -112,12 +112,12 @@ jobs:
           pnpm build
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: cargo tauri
-          args: "--bundles deb"
+          args: --ignore-version-mismatches --bundles deb
 
       - name: Upload DEB
         uses: shogo82148/actions-upload-release-asset@v1
@@ -224,12 +224,12 @@ jobs:
           pnpm build
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: cargo tauri
-          args: "--bundles deb,rpm"
+          args: --ignore-version-mismatches --bundles deb,rpm
 
       - name: Calculate DEB SHA256
         id: calculate-sha256
@@ -444,7 +444,7 @@ jobs:
   #       with:
   #         repo-token: ${{ secrets.GITHUB_TOKEN }}
   #     - name: Build packages
-  #       uses: tauri-apps/tauri-action@v0.5.23 # 0.5.24 - 0.6.1 give: Error: Could not find workspace directory, but version and/or name specifies to use workspace package
+  #       uses: tauri-apps/tauri-action@v1
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #     - name: Upload unsigned bundle
