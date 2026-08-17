@@ -11,6 +11,7 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
 use crate::{
+    contains_default_route,
     database::{
         models::instance::{ClientTrafficPolicy, Instance},
         DbPool,
@@ -329,6 +330,36 @@ impl Location<Id> {
         }
     }
 
+    pub async fn effective_route_all_traffic(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<bool, Error> {
+        let Some(instance) = Instance::find_by_id(pool, self.instance_id).await? else {
+            error!("Instance {} not found", self.instance_id);
+            return Err(Error::InternalError(format!(
+                "Instance {} not found",
+                self.instance_id
+            )));
+        };
+        Ok(match instance.client_traffic_policy {
+            ClientTrafficPolicy::ForceAllTraffic => true,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::None => route_all_traffic.unwrap_or(self.route_all_traffic),
+        })
+    }
+
+    pub async fn holds_default_route(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<bool, Error> {
+        Ok(self
+            .effective_route_all_traffic(pool, route_all_traffic)
+            .await?
+            || contains_default_route(&self.allowed_ips))
+    }
+
     #[cfg(not(target_os = "macos"))]
     pub async fn interface_configuration(
         &self,
@@ -338,8 +369,6 @@ impl Location<Id> {
         mtu: Option<u32>,
         route_all_traffic: Option<bool>,
     ) -> Result<InterfaceConfiguration, Error> {
-        use crate::database::models::instance::{ClientTrafficPolicy, Instance};
-
         debug!("Looking for WireGuard keys for location {self} instance");
         let Some(keys) = WireguardKeys::find_by_instance_id(pool, self.instance_id).await? else {
             error!("No keys found for instance: {}", self.instance_id);
@@ -368,18 +397,9 @@ impl Location<Id> {
         }
 
         debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
-        let Some(instance) = Instance::find_by_id(pool, self.instance_id).await? else {
-            error!("Instance {} not found", self.instance_id);
-            return Err(Error::InternalError(format!(
-                "Instance {} not found",
-                self.instance_id
-            )));
-        };
-        let route_all_traffic = match instance.client_traffic_policy {
-            ClientTrafficPolicy::ForceAllTraffic => true,
-            ClientTrafficPolicy::DisableAllTraffic => false,
-            ClientTrafficPolicy::None => route_all_traffic.unwrap_or(self.route_all_traffic),
-        };
+        let route_all_traffic = self
+            .effective_route_all_traffic(pool, route_all_traffic)
+            .await?;
         let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
@@ -676,6 +696,65 @@ mod tests {
             LocationMfaMode::from(ProtoLocationMfaMode::External),
             LocationMfaMode::External
         );
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_effective_route_all_traffic(pool: SqlitePool) {
+        use ClientTrafficPolicy::{DisableAllTraffic, ForceAllTraffic, None as NoPolicy};
+
+        // (policy, stored flag, per-call override, expected)
+        let cases = [
+            (NoPolicy, false, None, false),
+            (NoPolicy, false, Some(true), true),
+            (NoPolicy, true, None, true),
+            (NoPolicy, true, Some(false), false),
+            (ForceAllTraffic, false, None, true),
+            (ForceAllTraffic, false, Some(false), true),
+            (DisableAllTraffic, true, None, false),
+            (DisableAllTraffic, true, Some(true), false),
+        ];
+
+        let mut instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id).save(&pool).await.unwrap();
+
+        for (policy, route_all_traffic, override_value, expected) in cases {
+            instance.client_traffic_policy = policy.clone();
+            instance.save(&pool).await.unwrap();
+            location.route_all_traffic = route_all_traffic;
+
+            let effective = location
+                .effective_route_all_traffic(&pool, override_value)
+                .await
+                .unwrap();
+            assert_eq!(
+                effective, expected,
+                "policy {policy:?}, flag {route_all_traffic}, override {override_value:?}"
+            );
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_holds_default_route_detects_default_route_in_allowed_ips(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.allowed_ips = "10.0.0.0/8, 0.0.0.0/0".into();
+        let location = location.save(&pool).await.unwrap();
+
+        assert!(!location
+            .effective_route_all_traffic(&pool, None)
+            .await
+            .unwrap());
+        assert!(location.holds_default_route(&pool, None).await.unwrap());
+
+        let mut location = new_location(instance.id);
+        location.allowed_ips = "10.0.0.0/8, 192.168.1.0/24".into();
+        let location = location.save(&pool).await.unwrap();
+
+        assert!(!location.holds_default_route(&pool, None).await.unwrap());
+        assert!(location
+            .holds_default_route(&pool, Some(true))
+            .await
+            .unwrap());
     }
 
     #[test]

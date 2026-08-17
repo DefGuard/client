@@ -53,6 +53,12 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           view: ConnectModalView.PostureCheckFail,
           postureError: connectError.message,
         });
+      } else if (connectError?.kind === 'allTrafficConflict') {
+        useConnectModal.getState().open({
+          location,
+          view: ConnectModalView.ConnectionError,
+          connectionError: connectError.message,
+        });
       } else if (connectError?.kind === 'serviceUnavailable') {
         useConnectModal.getState().open({
           location,

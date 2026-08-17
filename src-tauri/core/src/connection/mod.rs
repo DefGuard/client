@@ -20,11 +20,13 @@ pub use setup::{setup_interface, setup_interface_tunnel};
 use tokio::time::sleep;
 
 use crate::{
+    connection::active_connections::active_connection_ids,
     database::{
         models::{connection::ActiveConnection, location::Location, tunnel::Tunnel, Id},
         DbPool,
     },
     error::Error,
+    ConnectionType,
 };
 
 #[cfg(target_os = "macos")]
@@ -36,8 +38,81 @@ pub enum ConnectionTarget {
     Tunnel(Tunnel<Id>),
 }
 
+impl ConnectionTarget {
+    pub async fn ensure_single_all_traffic_connection(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<(), Error> {
+        let (id, connection_type, name, holds_default_route) = match self {
+            Self::Location(location) => (
+                location.id,
+                ConnectionType::Location,
+                &location.name,
+                location
+                    .holds_default_route(pool, route_all_traffic)
+                    .await?,
+            ),
+            Self::Tunnel(tunnel) => (
+                tunnel.id,
+                ConnectionType::Tunnel,
+                &tunnel.name,
+                tunnel.holds_default_route(route_all_traffic),
+            ),
+        };
+
+        if !holds_default_route {
+            return Ok(());
+        }
+
+        if let Some((active_type, active_name)) =
+            find_default_route_owner(pool, (id, connection_type)).await?
+        {
+            error!(
+                "Refusing to connect {connection_type} \"{name}\" (ID {id}): it routes all \
+                traffic, but {active_type} \"{active_name}\" already holds the default route."
+            );
+            return Err(Error::AllTrafficConflict(format!(
+                "Can't connect to {connection_type} \"{name}\": {active_type} \"{active_name}\" \
+                is already routing all traffic. Only one connection can route all traffic at a \
+                time, so disconnect it first or turn off \"route all traffic\" for one of them."
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+async fn find_default_route_owner(
+    pool: &DbPool,
+    exclude: (Id, ConnectionType),
+) -> Result<Option<(ConnectionType, String)>, Error> {
+    for (id, connection_type) in active_connection_ids().await {
+        if (id, connection_type) == exclude {
+            continue;
+        }
+        let owner = match connection_type {
+            ConnectionType::Location => match Location::find_by_id(pool, id).await? {
+                Some(location) => location
+                    .holds_default_route(pool, None)
+                    .await?
+                    .then_some(location.name),
+                None => None,
+            },
+            ConnectionType::Tunnel => match Tunnel::find_by_id(pool, id).await? {
+                Some(tunnel) => tunnel.holds_default_route(None).then_some(tunnel.name),
+                None => None,
+            },
+        };
+        if let Some(name) = owner {
+            return Ok(Some((connection_type, name)));
+        }
+    }
+
+    Ok(None)
+}
+
 /// Bring a WireGuard interface up for the given target.
-#[cfg_attr(target_os = "macos", allow(unused_variables))]
 pub async fn bring_up(
     target: ConnectionTarget,
     psk: Option<String>,
@@ -45,6 +120,10 @@ pub async fn bring_up(
     pool: &DbPool,
     route_all_traffic: Option<bool>,
 ) -> Result<String, Error> {
+    target
+        .ensure_single_all_traffic_connection(pool, route_all_traffic)
+        .await?;
+
     #[cfg(not(target_os = "macos"))]
     {
         match target {

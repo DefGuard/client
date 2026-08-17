@@ -20,10 +20,11 @@ interface LocationCardContextValue {
   currentView: LocationCardViewsValue;
   previousView: LocationCardViewsValue | null;
   postureError: string | null;
+  connectionError: string | null;
   autoConnectOpenid: boolean;
   mfaMethod: MfaMethodValue;
   setMfaMethod: (value: MfaMethodValue) => void;
-  setView: (view: LocationCardViewsValue) => void;
+  setView: (view: LocationCardViewsValue, connectionError?: string) => void;
   setPostureError: (error: string | null) => void;
   startMfa: () => void;
 }
@@ -54,6 +55,7 @@ export const LocationCardProvider = ({
   const [autoConnectOpenid, setAutoConnectOpenid] = useState(false);
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
@@ -62,9 +64,10 @@ export const LocationCardProvider = ({
   );
 
   const setView = useCallback(
-    (view: LocationCardViewsValue) => {
+    (view: LocationCardViewsValue, connectionError?: string) => {
       setPreviousView(currentView);
       setCurrentView(view);
+      setConnectionError(connectionError ?? null);
     },
     [currentView],
   );
@@ -123,6 +126,7 @@ export const LocationCardProvider = ({
         currentView,
         previousView,
         postureError,
+        connectionError,
         autoConnectOpenid,
         location,
         instance,

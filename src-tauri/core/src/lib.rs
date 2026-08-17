@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf};
+use std::{fmt, path::PathBuf, str::FromStr};
 #[cfg(unix)]
 use std::{
     fs::{set_permissions, Permissions},
@@ -123,6 +123,14 @@ pub struct CommonConnectionInfo {
 
 pub const DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub const DEFAULT_ROUTE_IPV6: &str = "::/0";
+
+#[must_use]
+pub fn contains_default_route(allowed_ips: &str) -> bool {
+    allowed_ips
+        .split(',')
+        .filter_map(|entry| defguard_wireguard_rs::net::IpAddrMask::from_str(entry.trim()).ok())
+        .any(|addr| addr.address.is_unspecified() && addr.cidr == 0)
+}
 
 pub enum DateTimeAggregation {
     Hour,
