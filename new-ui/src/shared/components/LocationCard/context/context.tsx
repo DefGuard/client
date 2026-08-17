@@ -61,6 +61,17 @@ export const LocationCardProvider = ({
     location.mfa_method ?? MfaMethod.Totp,
   );
 
+  // Other location updates must not undo an optimistic connection transition.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: synchronize only on active state
+  useEffect(() => {
+    if (location.active) {
+      setCurrentView(LocationCardViews.Connected);
+    } else {
+      setMfaMethod(location.mfa_method ?? MfaMethod.Totp);
+      setCurrentView(LocationCardViews.Default);
+    }
+  }, [location.active]);
+
   const setView = useCallback(
     (view: LocationCardViewsValue) => {
       setPreviousView(currentView);
