@@ -68,6 +68,7 @@ export const MfaMethod = {
   Oidc: 'oidc',
   Biometric: 'biometric',
   MobileApprove: 'mobileapprove',
+  Fido2: 'fido2',
 } as const;
 
 export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
@@ -94,6 +95,7 @@ export const TauriCommand = {
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
+  MfaFido2Pin: 'mfa_fido2_pin',
   CancelMfa: 'cancel_mfa',
   // Instances
   AllInstances: 'all_instances',

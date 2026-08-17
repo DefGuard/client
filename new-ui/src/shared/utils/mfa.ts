@@ -12,6 +12,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Oidc]: 'OpenID',
   [MfaMethod.Totp]: 'Authenticator app',
   [MfaMethod.Biometric]: 'Biometric',
+  [MfaMethod.Fido2]: 'Security key (FIDO2)',
 };
 
 export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
@@ -22,6 +23,7 @@ export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
   [MfaMethod.Oidc]: 'Oidc',
   [MfaMethod.Totp]: 'Totp',
   [MfaMethod.Biometric]: 'Biometric',
+  [MfaMethod.Fido2]: 'Fido2',
 };
 
 export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];

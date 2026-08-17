@@ -349,6 +349,12 @@ fn infer_method(location: &Location<Id>) -> MfaMethod {
         Some(LocationMfaMethod::Oidc) => MfaMethod::Oidc,
         Some(LocationMfaMethod::Biometric) => MfaMethod::Biometric,
         Some(LocationMfaMethod::MobileApprove) => MfaMethod::MobileApprove,
+        Some(LocationMfaMethod::Fido2) => {
+            // FIDO2 needs a security key present, so it is only available in the
+            // GUI client. Fall back to TOTP, which every user can complete.
+            warn!("FIDO2 MFA is not supported by the CLI, falling back to TOTP");
+            MfaMethod::Totp
+        }
         None => {
             // infer_mfa_method only returns None for Disabled mode, but this is
             // only called when MFA is enabled. Default to TOTP as a safe fallback.

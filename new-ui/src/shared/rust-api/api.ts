@@ -224,6 +224,15 @@ const mfaConnectMobileApprove = (
 ): Promise<string> =>
   invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
 
+// Sends the security key PIN to the backend. The FIDO2 flow is a stub on the
+// Rust side for now - it acknowledges the PIN but does not establish a
+// connection yet.
+const mfaFido2Pin = (
+  instanceId: number,
+  locationId: number,
+  pin: string,
+): Promise<string> => invoke(TauriCommand.MfaFido2Pin, { instanceId, locationId, pin });
+
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
@@ -287,5 +296,6 @@ export const api = {
   mfaFinishCode,
   mfaPollOpenId,
   mfaConnectMobileApprove,
+  mfaFido2Pin,
   cancelMfa,
 };

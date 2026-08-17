@@ -32,6 +32,8 @@ export const MfaSelector = ({
         return 'lock-closed';
       case 'biometric':
         return 'biometric';
+      case 'fido2':
+        return 'yubi-keys';
     }
   }, [factor]);
 

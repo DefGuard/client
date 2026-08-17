@@ -47,7 +47,7 @@ export const LocationCardMfaSettings = () => {
 
   const MfaFactorsList = useMemo((): MfaMethodValue[] => {
     if (location.location_mfa_mode === LocationMfaMode.Internal) {
-      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove];
+      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove, MfaMethod.Fido2];
     }
     return [MfaMethod.Oidc];
   }, [location.location_mfa_mode]);
@@ -76,6 +76,9 @@ export const LocationCardMfaSettings = () => {
         break;
       case 'oidc':
         setView(LocationCardViews.MfaOidc);
+        break;
+      case 'fido2':
+        setView(LocationCardViews.MfaFido2);
         break;
       default:
         setView(LocationCardViews.Default);

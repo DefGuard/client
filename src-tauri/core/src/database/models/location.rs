@@ -65,7 +65,8 @@ impl From<ProtoServiceLocationMode> for ServiceLocationMode {
     }
 }
 
-/// Discriminants match the proto `MfaMethod` enum.
+/// Discriminants match the proto `MfaMethod` enum, except for `Fido2` which is
+/// client-side only for now and has no proto counterpart.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
 #[serde(rename_all = "lowercase")]
@@ -75,6 +76,7 @@ pub enum LocationMfaMethod {
     Oidc = 2,
     Biometric = 3,
     MobileApprove = 4,
+    Fido2 = 5,
 }
 
 impl LocationMfaMethod {
@@ -86,6 +88,7 @@ impl LocationMfaMethod {
             Self::Oidc => "oidc",
             Self::Biometric => "biometric",
             Self::MobileApprove => "mobile",
+            Self::Fido2 => "fido2",
         }
     }
 }

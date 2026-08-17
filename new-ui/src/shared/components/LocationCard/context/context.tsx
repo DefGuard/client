@@ -85,6 +85,9 @@ export const LocationCardProvider = ({
       case MfaMethod.MobileApprove:
         setView(LocationCardViews.MfaMobile);
         break;
+      case MfaMethod.Fido2:
+        setView(LocationCardViews.MfaFido2);
+        break;
     }
   }, [setView, mfaMethod]);
 

@@ -4,6 +4,7 @@ export const LocationCardViews = {
   MfaEmail: 'mfa-email',
   MfaOidc: 'mfa-oidc',
   MfaMobile: 'mfa-mobile',
+  MfaFido2: 'mfa-fido2',
   MfaSettings: 'mfa-settings',
   Connecting: 'connecting',
   Connected: 'connected',

@@ -45,7 +45,7 @@ export const ConnectModalMfaSettings = () => {
 
   const MfaFactorsList = useMemo((): MfaMethodValue[] => {
     if (location?.location_mfa_mode === LocationMfaMode.Internal) {
-      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove];
+      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove, MfaMethod.Fido2];
     }
     return [MfaMethod.Oidc];
   }, [location?.location_mfa_mode]);
@@ -71,6 +71,9 @@ export const ConnectModalMfaSettings = () => {
           break;
         case 'oidc':
           useConnectModal.setState({ view: ConnectModalView.MfaOidc });
+          break;
+        case 'fido2':
+          useConnectModal.setState({ view: ConnectModalView.MfaFido2 });
           break;
         default:
           useConnectModal.setState({ visible: false });

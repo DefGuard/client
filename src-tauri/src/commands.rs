@@ -20,8 +20,9 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::{
         AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
-        CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
-        EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
+        ClientMfaStartResponse, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
+        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -1585,7 +1586,7 @@ pub async fn mfa_start(
     instance_id: Id,
     location_id: Id,
     method: String,
-) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
+) -> Result<ClientMfaStartResponse, String> {
     debug!("Starting MFA session for location {location_id}");
     let method = parse_mfa_method(&method)?;
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
@@ -1761,6 +1762,29 @@ pub async fn mfa_connect_mobile_approve(
         EventKey::MfaMobileError,
         move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
     ))
+}
+
+/// Dummy FIDO2 MFA handler.
+///
+/// Receives the security key PIN entered in the frontend. Actual FIDO2
+/// assertion against the security key and the proxy is not implemented yet, so
+/// this only validates that a PIN was provided and reports back what would
+/// happen. The PIN itself is never logged.
+#[tauri::command(async)]
+pub async fn mfa_fido2_pin(
+    instance_id: Id,
+    location_id: Id,
+    pin: String,
+) -> Result<String, String> {
+    debug!(
+        "Received FIDO2 PIN ({} characters) for location {location_id} of instance {instance_id}",
+        pin.chars().count()
+    );
+    if pin.trim().is_empty() {
+        return Err("PIN is required".to_string());
+    }
+    info!("FIDO2 MFA for location {location_id} is not implemented yet, ignoring the PIN");
+    Ok("FIDO2 PIN received by the client. This method is not implemented yet.".to_string())
 }
 
 #[tauri::command(async)]
