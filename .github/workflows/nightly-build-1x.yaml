@@ -92,11 +92,11 @@ jobs:
           echo "SHA=$(git rev-parse --short HEAD)" >> ${GITHUB_ENV}
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--bundles deb,rpm"
+          args: --bundles deb,rpm --ignore-version-mismatches
 
       - name: Upload DEB and RPM to S3
         env:
@@ -174,11 +174,11 @@ jobs:
         run: security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
 
       - name: Build app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target universal-apple-darwin
+          args: --target universal-apple-darwin --ignore-version-mismatches
 
       - name: Build installation package
         run: |

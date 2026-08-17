@@ -101,12 +101,12 @@ jobs:
           pnpm build
 
       - name: Build packages
-        uses: tauri-apps/tauri-action@v0.5.23 # .24 seems broken, TODO: update when fixed
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: cargo tauri
-          args: "--bundles deb,rpm"
+          args: --bundles deb,rpm --ignore-version-mismatches
 
       - name: Upload DEB and RPM to S3
         env:
@@ -206,7 +206,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: cargo tauri
-          args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin
+          args: --config src-tauri/tauri.app.conf.json --target universal-apple-darwin --ignore-version-mismatches
 
       - name: Build installation package
         run: |
