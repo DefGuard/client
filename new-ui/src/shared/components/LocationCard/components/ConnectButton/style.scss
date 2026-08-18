@@ -36,6 +36,15 @@
     }
   }
 
+  &:disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+
+    --bg: var(--bg-white-20);
+    --color: var(--fg-white-40);
+    --border: var(--bg);
+  }
+
   p {
     font: var(--t-body-sm-600);
     color: inherit;
