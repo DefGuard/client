@@ -12,6 +12,7 @@ import { api } from '../../../rust-api/api';
 import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
 import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
 import { useAppStore } from '../../../store/useAppStore';
+import { isPresent } from '../../../utils/isPresent';
 import { LocationCardViews, type LocationCardViewsValue } from './types';
 
 interface LocationCardContextValue {
@@ -50,7 +51,8 @@ export const LocationCardProvider = ({
   children,
 }: LocationCardProviderProps) => {
   const conTypeSetOnce = useRef(false);
-  const { setConnectionMethod } = useAppData();
+  const mfaStarted = useRef(false);
+  const { connectionMfaMethod, setConnectionMethod } = useAppData();
   const [autoConnectOpenid, setAutoConnectOpenid] = useState(false);
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
@@ -81,6 +83,7 @@ export const LocationCardProvider = ({
   );
 
   const startMfa = useCallback(async () => {
+    mfaStarted.current = true;
     const appConfig = await api.getAppConfig();
     setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
     switch (mfaMethod) {
@@ -120,11 +123,15 @@ export const LocationCardProvider = ({
       location.connection_type !== ConnectionType.Tunnel &&
       !conTypeSetOnce.current
     ) {
-      conTypeSetOnce.current = true;
-      setConnectionMethod(location.id, location.connection_type, mfaMethod);
+      const key = `${location.connection_type.toLowerCase()}-${location.id}`;
+      if (mfaStarted.current || !isPresent(connectionMfaMethod[key])) {
+        conTypeSetOnce.current = true;
+        setConnectionMethod(location.id, location.connection_type, mfaMethod);
+      }
     }
     if (!location.active) {
       conTypeSetOnce.current = false;
+      mfaStarted.current = false;
     }
   }, [location.active]);
 
