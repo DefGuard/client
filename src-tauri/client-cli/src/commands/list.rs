@@ -70,6 +70,13 @@ impl CommandOutput for ListResult {
             .iter()
             .map(|l| {
                 let instance = instances_by_id.get(&l.instance_id);
+                let route_all_traffic = match instance
+                    .map_or(&ClientTrafficPolicy::None, |i| &i.client_traffic_policy)
+                {
+                    ClientTrafficPolicy::None => l.route_all_traffic,
+                    ClientTrafficPolicy::DisableAllTraffic => false,
+                    ClientTrafficPolicy::ForceAllTraffic => true,
+                };
                 LocationEntry {
                     id: l.id,
                     name: l.name.clone(),
@@ -78,15 +85,7 @@ impl CommandOutput for ListResult {
                     endpoint: l.endpoint.clone(),
                     mfa_enabled: Some(l.mfa_enabled()),
                     mfa_method: Some(mfa_label(l.mfa_method).to_string()),
-                    route_all_traffic: Some(
-                        match instance
-                            .map_or(&ClientTrafficPolicy::None, |i| &i.client_traffic_policy)
-                        {
-                            ClientTrafficPolicy::None => l.route_all_traffic,
-                            ClientTrafficPolicy::DisableAllTraffic => false,
-                            ClientTrafficPolicy::ForceAllTraffic => true,
-                        },
-                    ),
+                    route_all_traffic: Some(route_all_traffic),
                 }
             })
             .collect::<Vec<_>>();
@@ -147,16 +146,16 @@ fn format_list_table(
             ));
             for location in locations {
                 let mfa = if location.mfa_enabled() { "yes" } else { "no" };
-                let route_label = if location.route_all_traffic {
+                let route_all_traffic = match instance.client_traffic_policy {
+                    ClientTrafficPolicy::None => location.route_all_traffic,
+                    ClientTrafficPolicy::DisableAllTraffic => false,
+                    ClientTrafficPolicy::ForceAllTraffic => true,
+                };
+
+                let route_label = if route_all_traffic {
                     "All-traffic"
                 } else {
                     "Predefined"
-                };
-
-                let route_label = match instance.client_traffic_policy {
-                    ClientTrafficPolicy::None => route_label,
-                    ClientTrafficPolicy::DisableAllTraffic => "Predefined",
-                    ClientTrafficPolicy::ForceAllTraffic => "All-traffic",
                 };
 
                 lines.push(format!(
