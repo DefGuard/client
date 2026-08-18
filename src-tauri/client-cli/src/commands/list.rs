@@ -49,10 +49,10 @@ impl CommandOutput for ListResult {
     }
 
     fn json(&self) -> Value {
-        let instance_names = self
+        let instances_by_id = self
             .instances
             .iter()
-            .map(|i| (i.id, i.name.clone()))
+            .map(|i| (i.id, i))
             .collect::<HashMap<_, _>>();
 
         let instances = self
@@ -68,15 +68,26 @@ impl CommandOutput for ListResult {
         let locations = self
             .locations
             .iter()
-            .map(|l| LocationEntry {
-                id: l.id,
-                name: l.name.clone(),
-                instance: instance_names.get(&l.instance_id).cloned(),
-                address: l.address.clone(),
-                endpoint: l.endpoint.clone(),
-                mfa_enabled: Some(l.mfa_enabled()),
-                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
-                route_all_traffic: Some(l.route_all_traffic),
+            .map(|l| {
+                let instance = instances_by_id.get(&l.instance_id);
+                LocationEntry {
+                    id: l.id,
+                    name: l.name.clone(),
+                    instance: instance.map(|i| i.name.clone()),
+                    address: l.address.clone(),
+                    endpoint: l.endpoint.clone(),
+                    mfa_enabled: Some(l.mfa_enabled()),
+                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    route_all_traffic: Some(
+                        match instance
+                            .map_or(&ClientTrafficPolicy::None, |i| &i.client_traffic_policy)
+                        {
+                            ClientTrafficPolicy::None => l.route_all_traffic,
+                            ClientTrafficPolicy::DisableAllTraffic => false,
+                            ClientTrafficPolicy::ForceAllTraffic => true,
+                        },
+                    ),
+                }
             })
             .collect::<Vec<_>>();
 

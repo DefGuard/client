@@ -101,6 +101,11 @@ pub async fn handle_show(
     let ResolvedTarget::Location(location) = &target else {
         return Err(CliError::NotFound(format!("Location '{name}' not found")));
     };
+    let client_traffic_policy = Instance::find_by_id(&state.pool, location.instance_id)
+        .await?
+        .map_or(ClientTrafficPolicy::None, |instance| {
+            instance.client_traffic_policy
+        });
 
     Ok(LocationShowResult {
         name: location.name.clone(),
@@ -110,7 +115,11 @@ pub async fn handle_show(
         allowed_ips: location.allowed_ips.clone(),
         dns: location.dns.clone(),
         mfa_method: mfa_label(location.mfa_method).to_string(),
-        route_all_traffic: location.route_all_traffic,
+        route_all_traffic: match client_traffic_policy {
+            ClientTrafficPolicy::None => location.route_all_traffic,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::ForceAllTraffic => true,
+        },
         keepalive_interval: location.keepalive_interval,
     })
 }
@@ -158,18 +167,26 @@ impl CommandOutput for LocationListResult {
         let locations = self
             .locations
             .iter()
-            .map(|l| LocationEntry {
-                id: l.id,
-                name: l.name.clone(),
-                instance: self
-                    .instance_details
-                    .get(&l.instance_id)
-                    .map(|details| details.name.clone()),
-                address: l.address.clone(),
-                endpoint: l.endpoint.clone(),
-                mfa_enabled: None,
-                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
-                route_all_traffic: Some(l.route_all_traffic),
+            .map(|l| {
+                let details = self.instance_details.get(&l.instance_id);
+                LocationEntry {
+                    id: l.id,
+                    name: l.name.clone(),
+                    instance: details.map(|details| details.name.clone()),
+                    address: l.address.clone(),
+                    endpoint: l.endpoint.clone(),
+                    mfa_enabled: None,
+                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    route_all_traffic: Some(
+                        match details.map_or(&ClientTrafficPolicy::None, |details| {
+                            &details.client_traffic_policy
+                        }) {
+                            ClientTrafficPolicy::None => l.route_all_traffic,
+                            ClientTrafficPolicy::DisableAllTraffic => false,
+                            ClientTrafficPolicy::ForceAllTraffic => true,
+                        },
+                    ),
+                }
             })
             .collect::<Vec<_>>();
         json!({ "locations": locations })
