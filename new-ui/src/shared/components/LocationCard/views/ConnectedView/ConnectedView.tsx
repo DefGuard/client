@@ -7,12 +7,16 @@ import { LocationCardConnectionTiles } from '../../components/LocationCardConnec
 import { useLocationCardContext } from '../../context/context';
 
 export const ConnectedView = () => {
-  const { location } = useLocationCardContext();
+  const { location, instance } = useLocationCardContext();
 
   return (
     <div className="location-view-connected">
       <SizedBox height={ThemeSpacing.Md} />
-      <LocationCardConnectionTiles location={location} variant="compact" />
+      <LocationCardConnectionTiles
+        location={location}
+        instance={instance}
+        variant="compact"
+      />
       <Divider spacing={ThemeSpacing.Xl} />
       <LocationCardConnectionInfo location={location} />
       <SizedBox height={ThemeSpacing.Xl2} />

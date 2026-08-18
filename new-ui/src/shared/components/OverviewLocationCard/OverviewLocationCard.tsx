@@ -128,7 +128,11 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
       <Divider spacing={ThemeSpacing.Lg} />
       <div className="controls">
         {location.active && (
-          <LocationCardConnectionTiles location={location} variant="full" />
+          <LocationCardConnectionTiles
+            location={location}
+            instance={instance}
+            variant="full"
+          />
         )}
         {!location.active && (
           <Fragment>
