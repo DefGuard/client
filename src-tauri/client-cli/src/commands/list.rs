@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
+use defguard_core::database::models::{
+    instance::{ClientTrafficPolicy, Instance},
+    location::Location,
+    tunnel::Tunnel,
+    Id,
+};
 use serde_json::{json, Value};
 
 use crate::{
@@ -136,6 +141,13 @@ fn format_list_table(
                 } else {
                     "Predefined"
                 };
+
+                let route_label = match instance.client_traffic_policy {
+                    ClientTrafficPolicy::None => route_label,
+                    ClientTrafficPolicy::DisableAllTraffic => "Predefined",
+                    ClientTrafficPolicy::ForceAllTraffic => "All-traffic",
+                };
+
                 lines.push(format!(
                     "  {:>4}  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {mfa:>3}  {route_label:<11}",
                     location.id, location.name, location.address, location.endpoint
