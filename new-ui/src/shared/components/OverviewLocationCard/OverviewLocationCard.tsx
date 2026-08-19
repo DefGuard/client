@@ -40,7 +40,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     },
   });
 
-  const { mutate: connect } = useMutation({
+  const { mutate: connect, isPending: isConnecting } = useMutation({
     mutationFn: api.connect,
     onError: (err) => {
       const connectError = parseConnectError(err);
@@ -65,7 +65,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     },
   });
 
-  const { mutate: disconnect } = useMutation({
+  const { mutate: disconnect, isPending: isDisconnecting } = useMutation({
     mutationFn: api.disconnect,
     meta: {
       invalidate: [
@@ -76,6 +76,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
       ],
     },
   });
+
+  const isBusy = isConnecting || isDisconnecting;
 
   const handleConnectClick = () => {
     if (!appConfig) return;
@@ -122,7 +124,11 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           }
         />
         <div className="right">
-          <ConnectButton active={location.active} onClick={handleConnectClick} />
+          <ConnectButton
+            active={location.active}
+            onClick={handleConnectClick}
+            disabled={isBusy}
+          />
         </div>
       </div>
       <Divider spacing={ThemeSpacing.Lg} />

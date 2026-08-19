@@ -9,7 +9,7 @@ import { ConnectButton } from './ConnectButton/ConnectButton';
 export const LocationCardConnectButton = () => {
   const { location, setPostureError, setView, startMfa } = useLocationCardContext();
 
-  const { mutate: connect } = useMutation({
+  const { mutate: connect, isPending: isConnecting } = useMutation({
     mutationFn: api.connect,
     onSuccess: () => {
       setView(LocationCardViews.Connected);
@@ -32,7 +32,7 @@ export const LocationCardConnectButton = () => {
     },
   });
 
-  const { mutate: disconnect } = useMutation({
+  const { mutate: disconnect, isPending: isDisconnecting } = useMutation({
     mutationFn: api.disconnect,
     onSuccess: () => {
       setView(LocationCardViews.Default);
@@ -41,6 +41,8 @@ export const LocationCardConnectButton = () => {
       invalidate: ['locations'],
     },
   });
+
+  const isBusy = isConnecting || isDisconnecting;
 
   const handleClick = () => {
     if (location.active) {
@@ -58,5 +60,7 @@ export const LocationCardConnectButton = () => {
     }
   };
 
-  return <ConnectButton active={location.active} onClick={handleClick} />;
+  return (
+    <ConnectButton active={location.active} onClick={handleClick} disabled={isBusy} />
+  );
 };
