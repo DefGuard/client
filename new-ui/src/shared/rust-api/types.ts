@@ -106,6 +106,7 @@ export const TauriCommand = {
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
   SetLocationMfaMethod: 'set_location_mfa_method',
+  SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
   Disconnect: 'disconnect',
@@ -233,6 +234,15 @@ export type InstanceInfo = {
   openid_display_name: string | null;
 };
 
+export type MfaStepMethod = {
+  method: MfaMethodValue;
+  configured: boolean;
+};
+
+export type MfaStep = {
+  methods: MfaStepMethod[];
+};
+
 export type LocationInfo = {
   id: number;
   instance_id: number;
@@ -247,6 +257,8 @@ export type LocationInfo = {
   location_mfa_mode: LocationMfaMode;
   mfa_method?: MfaMethodValue;
   posture_check_required: boolean;
+  mfa_steps: MfaStep[];
+  mfa_step_plan: MfaMethodValue[];
 };
 
 export type LocationStats = {
@@ -402,6 +414,11 @@ export type UpdateInstanceArgs = {
 export type SetLocationMfaMethodArgs = {
   locationId: number;
   mfaMethod: MfaMethodValue;
+};
+
+export type SetLocationMfaStepPlanArgs = {
+  locationId: number;
+  mfaStepPlan: MfaMethodValue[];
 };
 
 export type OverviewViewSelection = {

@@ -25,6 +25,7 @@ import type {
   SessionState,
   SessionStatePatch,
   SetLocationMfaMethodArgs,
+  SetLocationMfaStepPlanArgs,
   StatsArgs,
   TunnelInfo,
   TunnelRequest,
@@ -58,6 +59,9 @@ const updateLocationRouting = (args: RoutingArgs): Promise<Connection> =>
 
 const setLocationMfaMethod = (args: SetLocationMfaMethodArgs): Promise<void> =>
   invoke(TauriCommand.SetLocationMfaMethod, args);
+
+const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void> =>
+  invoke(TauriCommand.SetLocationMfaStepPlan, args);
 
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
@@ -240,6 +244,7 @@ export const api = {
   getLocationDetails,
   updateLocationRouting,
   setLocationMfaMethod,
+  setLocationMfaStepPlan,
   // Connections
   connect,
   disconnect,
