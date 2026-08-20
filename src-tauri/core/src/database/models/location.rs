@@ -5,7 +5,7 @@ use std::str::FromStr;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
@@ -17,7 +17,8 @@ use crate::{
     },
     error::Error,
     proto::client_types::{
-        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+        LocationMfaMode as ProtoLocationMfaMode, MfaMethod as ProtoMfaMethod,
+        MfaStep as ProtoMfaStep, ServiceLocationMode as ProtoServiceLocationMode,
     },
 };
 #[cfg(not(target_os = "macos"))]
@@ -90,6 +91,44 @@ impl LocationMfaMethod {
     }
 }
 
+impl From<ProtoMfaMethod> for LocationMfaMethod {
+    fn from(value: ProtoMfaMethod) -> Self {
+        match value {
+            ProtoMfaMethod::Totp => LocationMfaMethod::Totp,
+            ProtoMfaMethod::Email => LocationMfaMethod::Email,
+            ProtoMfaMethod::Oidc => LocationMfaMethod::Oidc,
+            ProtoMfaMethod::Biometric => LocationMfaMethod::Biometric,
+            ProtoMfaMethod::MobileApprove => LocationMfaMethod::MobileApprove,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
+pub struct LocationMfaStepMethod {
+    pub method: LocationMfaMethod,
+    pub configured: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
+pub struct LocationMfaStep {
+    pub methods: Vec<LocationMfaStepMethod>,
+}
+
+impl From<ProtoMfaStep> for LocationMfaStep {
+    fn from(value: ProtoMfaStep) -> Self {
+        Self {
+            methods: value
+                .methods
+                .iter()
+                .map(|entry| LocationMfaStepMethod {
+                    method: entry.method().into(),
+                    configured: entry.configured,
+                })
+                .collect(),
+        }
+    }
+}
+
 #[must_use]
 pub fn infer_mfa_method(
     mode: LocationMfaMode,
@@ -124,6 +163,8 @@ pub struct Location<I = NoId> {
     pub mfa_method: Option<LocationMfaMethod>,
     #[serde(default)]
     pub posture_check_required: bool,
+    #[serde(default)]
+    pub mfa_steps: Json<Vec<LocationMfaStep>>,
 }
 
 impl fmt::Display for Location<Id> {
@@ -152,7 +193,7 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC",
             max_service_location_mode
@@ -190,7 +231,7 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
             FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
             name,
             max,
@@ -208,8 +249,8 @@ impl Location<Id> {
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
             keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12, \
-            mfa_method = $13, posture_check_required = $14 \
-            WHERE id = $15",
+            mfa_method = $13, posture_check_required = $14, mfa_steps = $15 \
+            WHERE id = $16",
             self.instance_id,
             self.name,
             self.address,
@@ -224,6 +265,7 @@ impl Location<Id> {
             self.service_location_mode,
             self.mfa_method,
             self.posture_check_required,
+            self.mfa_steps,
             self.id,
         )
         .execute(executor)
@@ -242,7 +284,7 @@ impl Location<Id> {
             network_id, route_all_traffic,  keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
             FROM location WHERE id = $1",
             location_id
         )
@@ -266,7 +308,7 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
@@ -286,7 +328,7 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
             FROM location WHERE pubkey = $1",
             pubkey
         )
@@ -505,8 +547,8 @@ impl Location<NoId> {
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
             dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, \
-            service_location_mode, mfa_method, posture_check_required) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) \
+            service_location_mode, mfa_method, posture_check_required, mfa_steps) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -522,6 +564,7 @@ impl Location<NoId> {
             self.service_location_mode,
             self.mfa_method,
             self.posture_check_required,
+            self.mfa_steps,
         )
         .fetch_one(executor)
         .await?;
@@ -542,6 +585,7 @@ impl Location<NoId> {
             service_location_mode: self.service_location_mode,
             mfa_method: self.mfa_method,
             posture_check_required: self.posture_check_required,
+            mfa_steps: self.mfa_steps,
         })
     }
 }
@@ -571,6 +615,7 @@ impl From<Location<Id>> for Location {
             service_location_mode: location.service_location_mode,
             mfa_method: location.mfa_method,
             posture_check_required: location.posture_check_required,
+            mfa_steps: location.mfa_steps,
         }
     }
 }
@@ -615,6 +660,7 @@ mod tests {
             service_location_mode: ServiceLocationMode::Disabled,
             mfa_method: None,
             posture_check_required: false,
+            mfa_steps: Default::default(),
         }
     }
 

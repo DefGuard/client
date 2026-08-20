@@ -7,11 +7,12 @@ use std::{
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use database::models::{
-    location::{infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode},
+    location::{infer_mfa_method, Location, LocationMfaMode, LocationMfaStep, ServiceLocationMode},
     Id,
 };
 use defguard_client_proto::defguard::client_types::DeviceConfig;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 
 pub mod app_config;
 pub mod connection;
@@ -190,6 +191,13 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         service_location_mode,
         mfa_method: infer_mfa_method(location_mfa_mode, None),
         posture_check_required: dev_config.posture_check_required.unwrap_or_default(),
+        mfa_steps: Json(
+            dev_config
+                .steps
+                .into_iter()
+                .map(LocationMfaStep::from)
+                .collect::<Vec<_>>(),
+        ),
     }
 }
 

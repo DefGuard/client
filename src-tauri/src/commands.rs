@@ -42,7 +42,7 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
             instance::{Instance, InstanceInfo},
-            location::{Location, LocationMfaMethod, LocationMfaMode},
+            location::{Location, LocationMfaMethod, LocationMfaMode, LocationMfaStep},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -585,6 +585,7 @@ pub struct LocationInfo {
     pub location_mfa_mode: LocationMfaMode,
     pub posture_check_required: bool,
     pub mfa_method: Option<LocationMfaMethod>,
+    pub mfa_steps: Vec<LocationMfaStep>,
 }
 
 impl LocationInfo {
@@ -639,6 +640,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             location_mfa_mode: location.location_mfa_mode,
             posture_check_required: location.posture_check_required,
             mfa_method: location.mfa_method,
+            mfa_steps: location.mfa_steps.0,
         };
         location_info.push(info);
     }
@@ -1616,6 +1618,8 @@ pub async fn mfa_start(
         pubkey: keys.pubkey,
         method: method as i32,
         posture_data,
+        // TODO(multi-step-mfa): empty = legacy path; send one method per step
+        selected_methods: Vec::new(),
     };
     mfa::mfa_start(proxy_url, request)
         .await

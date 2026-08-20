@@ -18,7 +18,11 @@ const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_INST_COL_WIDTH: usize = 8;
 
 pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
-    let locations = Location::all(&state.pool, false).await?;
+    let locations = Location::all(&state.pool, false)
+        .await?
+        .into_iter()
+        .filter(|location| location.mfa_steps.len() <= 1)
+        .collect::<Vec<_>>();
 
     let instance_details = Instance::all(&state.pool)
         .await?
@@ -345,6 +349,7 @@ mod tests {
         mfa: bool,
     ) -> Location<Id> {
         Location {
+            mfa_steps: Default::default(),
             id,
             instance_id,
             network_id: 1,

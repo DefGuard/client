@@ -279,6 +279,7 @@ mod tests {
             service_location_mode: ServiceLocationMode::Disabled,
             mfa_method: None,
             posture_check_required: false,
+            mfa_steps: Default::default(),
         }
         .save(pool)
         .await

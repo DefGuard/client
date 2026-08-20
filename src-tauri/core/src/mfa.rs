@@ -130,9 +130,7 @@ pub async fn mfa_start(
         Ok(response) => response,
         Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
     };
-    // TODO(multi-step-mfa): a non-empty `rejections` in the response means the sent
-    // plan was refused and no session was created. Surface it instead of returning
-    // the response as if it were a success.
+    // TODO(multi-step-mfa): non-empty `rejections` means the plan was refused
     response.json().await.map_err(|e| MfaError::Other {
         message: format!("Invalid MFA start response: {e}"),
     })
