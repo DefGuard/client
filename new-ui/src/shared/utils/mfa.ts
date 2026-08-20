@@ -12,7 +12,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.MobileApprove]: 'Mobile Client',
   [MfaMethod.Oidc]: 'OpenID',
   [MfaMethod.Totp]: 'Authenticator app',
-  [MfaMethod.Biometric]: 'Biometric',
+  [MfaMethod.Biometric]: 'Biometrics',
 };
 
 export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
