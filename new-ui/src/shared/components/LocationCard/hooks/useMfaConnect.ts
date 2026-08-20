@@ -17,11 +17,15 @@ type CodeMfaMethod = typeof MfaMethod.Totp | typeof MfaMethod.Email;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
+  onStepPassed?: () => void;
   onConnected?: () => void;
   onSessionExpired?: () => void;
   onPostureError?: (message: string) => void;
   onServiceUnavailable?: () => void;
 };
+
+// TODO: delete this
+const MOCK_STEP_TOKEN = 'mock-step-token';
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
   const remainingMs = Math.max(minimumMs - (performance.now() - startedAt), 0);
@@ -35,6 +39,7 @@ export const useMfaConnect = (
   method: CodeMfaMethod,
   {
     debounceMs = 0,
+    onStepPassed,
     onConnected,
     onSessionExpired,
     onPostureError,
@@ -65,6 +70,12 @@ export const useMfaConnect = (
 
     (async () => {
       try {
+        // TODO(mock): drop this branch and always call mfaStart with the step's method
+        if (onStepPassed) {
+          await waitForMinimumDuration(startedAt, debounceMs);
+          setToken(MOCK_STEP_TOKEN);
+          return;
+        }
         const info = await api.mfaStart(instance.id, location.id, method);
         await waitForMinimumDuration(startedAt, debounceMs);
         setToken(info.token);
@@ -94,6 +105,12 @@ export const useMfaConnect = (
       setVerifyError(null);
 
       try {
+        // TODO(mock): call mfaFinishCode here too and advance only on MfaAdvanced,
+        // falling through to onConnected on MfaCompleted
+        if (onStepPassed) {
+          onStepPassed();
+          return;
+        }
         // mfaFinishCode completes MFA and brings up the connection in the
         // backend; the preshared key never reaches the frontend.
         await api.mfaFinishCode(instance.id, location.id, token, code);
@@ -114,7 +131,7 @@ export const useMfaConnect = (
         setIsVerifying(false);
       }
     },
-    [token, instance, location, onConnected, onSessionExpired],
+    [token, instance, location, onStepPassed, onConnected, onSessionExpired],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

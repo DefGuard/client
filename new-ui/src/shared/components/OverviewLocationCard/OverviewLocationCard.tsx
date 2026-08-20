@@ -15,7 +15,7 @@ import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
 import { MfaMethod } from '../../rust-api/types';
 import { ThemeSpacing } from '../../types';
 import { isPresent } from '../../utils/isPresent';
-import { shouldStartMfa } from '../../utils/mfa';
+import { hasUnpassableMfaStep, shouldStartMfa } from '../../utils/mfa';
 import { Divider } from '../Divider/Divider';
 import { parseConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
@@ -127,7 +127,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           <ConnectButton
             active={location.active}
             onClick={handleConnectClick}
-            disabled={isBusy}
+            disabled={isBusy || hasUnpassableMfaStep(location)}
           />
         </div>
       </div>

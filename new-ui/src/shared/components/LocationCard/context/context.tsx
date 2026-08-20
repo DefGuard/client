@@ -4,16 +4,22 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { useAppData } from '../../../providers/AppDataContext';
 import { api } from '../../../rust-api/api';
-import type { InstanceInfo, LocationInfo } from '../../../rust-api/types';
+import type { InstanceInfo, LocationInfo, MfaStep } from '../../../rust-api/types';
 import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
 import { useAppStore } from '../../../store/useAppStore';
 import { isPresent } from '../../../utils/isPresent';
-import { LocationCardViews, type LocationCardViewsValue } from './types';
+import { isMfaMethodUsable, mfaToText, shouldStartMfa } from '../../../utils/mfa';
+import {
+  LocationCardViews,
+  type LocationCardViewsValue,
+  mfaMethodToLocationCardView,
+} from './types';
 
 interface LocationCardContextValue {
   location: LocationInfo;
@@ -23,7 +29,13 @@ interface LocationCardContextValue {
   postureError: string | null;
   autoConnectOpenid: boolean;
   mfaMethod: MfaMethodValue;
+  canPickOtherMethod: boolean;
+  stepPlan: MfaMethodValue[];
+  stepIndex: number;
+  stepLabel: string | null;
+  onStepPassed?: () => void;
   setMfaMethod: (value: MfaMethodValue) => void;
+  setStepPlanOnce: (plan: MfaMethodValue[]) => void;
   setView: (view: LocationCardViewsValue) => void;
   setPostureError: (error: string | null) => void;
   startMfa: () => void;
@@ -63,6 +75,27 @@ export const LocationCardProvider = ({
     location.mfa_method ?? MfaMethod.Totp,
   );
 
+  const mfaSteps = useMemo<MfaStep[]>(
+    () => (shouldStartMfa(location) ? location.mfa_steps : []),
+    [location],
+  );
+  const isMultiStep = mfaSteps.length > 1;
+
+  // one-off choice made through "Other methods", dropped when a new flow starts
+  const [stepPlanOnce, setStepPlanOnce] = useState<MfaMethodValue[]>([]);
+  const stepPlan = useMemo<MfaMethodValue[]>(
+    () =>
+      mfaSteps.map((step, index) => {
+        const usable = step.methods.filter(isMfaMethodUsable);
+        const chosen = [stepPlanOnce[index], location.mfa_step_plan[index]].find(
+          (method) => usable.some((entry) => entry.method === method),
+        );
+        return chosen ?? (usable[0] ?? step.methods[0]).method;
+      }),
+    [mfaSteps, stepPlanOnce, location.mfa_step_plan],
+  );
+  const [stepIndex, setStepIndex] = useState(0);
+
   // Other location updates must not undo an optimistic connection transition.
   // biome-ignore lint/correctness/useExhaustiveDependencies: synchronize only on active state
   useEffect(() => {
@@ -71,6 +104,7 @@ export const LocationCardProvider = ({
     } else {
       setMfaMethod(location.mfa_method ?? MfaMethod.Totp);
       setCurrentView(LocationCardViews.Default);
+      setStepIndex(0);
     }
   }, [location.active]);
 
@@ -82,25 +116,33 @@ export const LocationCardProvider = ({
     [currentView],
   );
 
+  const passStep = useCallback(() => {
+    const next = stepIndex + 1;
+    if (next < stepPlan.length) {
+      setStepIndex(next);
+      setView(mfaMethodToLocationCardView(stepPlan[next]));
+      return;
+    }
+    setStepIndex(0);
+    // TODO(mock): the last step ends the flow without connecting; connect here once
+    // MfaCompleted brings up the tunnel
+    setView(LocationCardViews.Default);
+  }, [setView, stepPlan, stepIndex]);
+
+  const onStepPassed = isMultiStep ? passStep : undefined;
+
   const startMfa = useCallback(async () => {
     mfaStarted.current = true;
     const appConfig = await api.getAppConfig();
     setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
-    switch (mfaMethod) {
-      case MfaMethod.Totp:
-        setView(LocationCardViews.MfaTotp);
-        break;
-      case MfaMethod.Email:
-        setView(LocationCardViews.MfaEmail);
-        break;
-      case MfaMethod.Oidc:
-        setView(LocationCardViews.MfaOidc);
-        break;
-      case MfaMethod.MobileApprove:
-        setView(LocationCardViews.MfaMobile);
-        break;
+    if (isMultiStep) {
+      setStepPlanOnce([]);
+      setStepIndex(0);
+      setView(mfaMethodToLocationCardView(stepPlan[0]));
+      return;
     }
-  }, [setView, mfaMethod]);
+    setView(mfaMethodToLocationCardView(mfaMethod));
+  }, [setView, mfaMethod, isMultiStep, stepPlan]);
 
   const mfaAutoStartRequested = useAppStore(
     (s) => s.mfaAutoStartLocationId === location.id,
@@ -135,6 +177,17 @@ export const LocationCardProvider = ({
     }
   }, [location.active]);
 
+  const usableStepMethods = (mfaSteps[stepIndex]?.methods ?? []).filter(
+    isMfaMethodUsable,
+  );
+  const canPickOtherMethod = !isMultiStep || usableStepMethods.length > 1;
+
+  const stepMethod = stepPlan[stepIndex];
+  const showStepLabel = isMultiStep && isPresent(stepMethod);
+  const stepLabel = showStepLabel
+    ? `Step ${stepIndex + 1}/${mfaSteps.length}: ${mfaToText(stepMethod)}`
+    : null;
+
   return (
     <LocationCardContext.Provider
       value={{
@@ -145,10 +198,16 @@ export const LocationCardProvider = ({
         location,
         instance,
         mfaMethod,
+        canPickOtherMethod,
+        stepPlan,
+        stepIndex,
+        stepLabel,
+        onStepPassed,
         setView,
         setPostureError,
         startMfa,
         setMfaMethod,
+        setStepPlanOnce,
       }}
     >
       {children}

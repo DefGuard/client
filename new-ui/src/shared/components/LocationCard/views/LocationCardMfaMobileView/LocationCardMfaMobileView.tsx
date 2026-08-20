@@ -17,8 +17,16 @@ import { useMfaMobileConnect } from '../../hooks/useMfaMobileConnect';
 type Screen = 'loading' | 'qr' | 'error';
 
 export const LocationCardMfaMobileView = () => {
-  const { setView, setPostureError, location } = useLocationCardContext();
+  const {
+    setView,
+    setPostureError,
+    location,
+    stepLabel,
+    onStepPassed,
+    canPickOtherMethod,
+  } = useLocationCardContext();
   const { start, startError, qrValue, connectionError } = useMfaMobileConnect(location, {
+    onStepPassed,
     onConnected: () => setView(LocationCardViews.Connected),
     onPostureError: (message) => setPostureError(message ?? null),
     onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
@@ -51,7 +59,7 @@ export const LocationCardMfaMobileView = () => {
   return (
     <div className="location-card-mfa-mobile">
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title="Two-factor authentication">
+      <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
         {screen === 'loading' && <p>Preparing authentication...</p>}
         {screen === 'qr' && (
           <p>Open your Defguard mobile app and scan the QR code you see bellow.</p>
@@ -71,13 +79,15 @@ export const LocationCardMfaMobileView = () => {
           onClick={() => setView(LocationCardViews.Default)}
         />
         <div className="right">
-          <Button
-            variant={ButtonVariant.Outlined}
-            text="Other methods"
-            onClick={() => {
-              setView(LocationCardViews.MfaSettings);
-            }}
-          />
+          {canPickOtherMethod && (
+            <Button
+              variant={ButtonVariant.Outlined}
+              text="Other methods"
+              onClick={() => {
+                setView(LocationCardViews.MfaSettings);
+              }}
+            />
+          )}
           {screen === 'error' && (
             <Button
               text="Try again"

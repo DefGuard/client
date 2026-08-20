@@ -18,8 +18,12 @@ import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
+// TODO: delete this
+const MOCK_OIDC_URL = 'https://example.com/openid/mfa?token=mock-step-token';
+const MOCK_OIDC_DELAY_MS = 1500;
+
 export const useMfaOidcConnect = () => {
-  const { location, setPostureError, setView } = useLocationCardContext();
+  const { location, setPostureError, setView, onStepPassed } = useLocationCardContext();
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -62,6 +66,13 @@ export const useMfaOidcConnect = () => {
     cleanup();
 
     try {
+      // TODO(mock): open the real proxy link and call onStepPassed from the poll result, instead of faking it on a timer
+      if (onStepPassed) {
+        await api.openLink(MOCK_OIDC_URL);
+        setIsPolling(true);
+        window.setTimeout(onStepPassed, MOCK_OIDC_DELAY_MS);
+        return;
+      }
       const info = await api.mfaStart(instance.id, location.id, MfaMethod.Oidc);
       await api.openLink(`${instance.proxy_url}openid/mfa?token=${info.token}`);
 
@@ -116,7 +127,7 @@ export const useMfaOidcConnect = () => {
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, setPostureError, setView, cleanup]);
+  }, [instance, location, setPostureError, setView, cleanup, onStepPassed]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

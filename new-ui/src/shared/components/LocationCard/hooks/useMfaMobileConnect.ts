@@ -15,19 +15,27 @@ import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo, MfaErrorPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 
+// TODO: delete this
+
+const MOCK_TOKEN = 'mock-step-token';
+const MOCK_CHALLENGE = 'mock-step-challenge';
+const MOCK_APPROVE_DELAY_MS = 2500;
+
 type TokenData = {
   token: string;
   challenge: string;
 };
 
 type Options = {
+  onStepPassed?: () => void;
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
   onServiceUnavailable?: () => void;
 };
 
 export const useMfaMobileConnect = (location: LocationInfo, options?: Options) => {
-  const { onConnected, onPostureError, onServiceUnavailable } = options ?? {};
+  const { onStepPassed, onConnected, onPostureError, onServiceUnavailable } =
+    options ?? {};
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
@@ -62,6 +70,13 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
   // Connect WebSocket via Rust when tokenData is available
   useEffect(() => {
     if (!tokenData || !instance) return;
+
+    // TODO(mock): keep the websocket in a step too and call onStepPassed once the
+    // approval arrives, instead of faking it on a timer
+    if (onStepPassed) {
+      const timeout = window.setTimeout(onStepPassed, MOCK_APPROVE_DELAY_MS);
+      return () => window.clearTimeout(timeout);
+    }
 
     let cancelled = false;
     cleanupListeners();
@@ -123,7 +138,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
       cleanupListeners();
       setIsConnecting(false);
     };
-  }, [tokenData, instance, location, onConnected, cleanupListeners]);
+  }, [tokenData, instance, location, onStepPassed, onConnected, cleanupListeners]);
 
   const qrValue = useMemo(() => {
     if (!tokenData || !instance) return null;
@@ -148,6 +163,11 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     setTokenData(null);
 
     try {
+      // TODO(mock): drop this branch and always call mfaStart for the real challenge
+      if (onStepPassed) {
+        setTokenData({ token: MOCK_TOKEN, challenge: MOCK_CHALLENGE });
+        return;
+      }
       const info = await api.mfaStart(instance.id, location.id, MfaMethod.MobileApprove);
       if (!info.challenge) {
         setStartError('Unsupported response from proxy');
@@ -169,7 +189,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, onPostureError, onServiceUnavailable]);
+  }, [instance, location, onStepPassed, onPostureError, onServiceUnavailable]);
 
   const reset = useCallback(() => {
     cleanupListeners();
