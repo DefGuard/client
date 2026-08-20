@@ -130,6 +130,9 @@ pub async fn mfa_start(
         Ok(response) => response,
         Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
     };
+    // TODO(multi-step-mfa): a non-empty `rejections` in the response means the sent
+    // plan was refused and no session was created. Surface it instead of returning
+    // the response as if it were a success.
     response.json().await.map_err(|e| MfaError::Other {
         message: format!("Invalid MFA start response: {e}"),
     })
@@ -374,9 +377,11 @@ async fn wait_for_mfa_success(
             if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
                 if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
                     if let Some(key) = parsed["preshared_key"].as_str() {
+                        // #TODO (multi-step-mfa) MfaStepResult here once the step loop exists.
                         return Ok(ClientMfaFinishResponse {
                             preshared_key: key.to_string(),
                             token: None,
+                            result: None,
                         });
                     }
                 }
@@ -408,6 +413,7 @@ mod tests {
             pubkey: "pk".into(),
             method: 0, // TOTP
             posture_data: None,
+            selected_methods: Vec::new(),
         }
     }
 
@@ -545,6 +551,7 @@ mod tests {
             pubkey: "pk".into(),
             method: MfaMethod::MobileApprove as i32,
             posture_data: None,
+            selected_methods: Vec::new(),
         };
         match mfa_start(url, request).await.unwrap_err() {
             MfaError::MfaRejected { message } => {
