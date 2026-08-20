@@ -206,6 +206,7 @@ mod tests {
             mfa_method: None,
             posture_check_required: false,
             mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
         }
         .save(pool)
         .await

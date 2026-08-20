@@ -198,6 +198,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
                 .map(LocationMfaStep::from)
                 .collect::<Vec<_>>(),
         ),
+        mfa_step_plan: Json::default(),
     }
 }
 

@@ -165,6 +165,8 @@ pub struct Location<I = NoId> {
     pub posture_check_required: bool,
     #[serde(default)]
     pub mfa_steps: Json<Vec<LocationMfaStep>>,
+    #[serde(default)]
+    pub mfa_step_plan: Json<Vec<LocationMfaMethod>>,
 }
 
 impl fmt::Display for Location<Id> {
@@ -193,7 +195,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\" \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC",
             max_service_location_mode
@@ -231,7 +234,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\" \
             FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
             name,
             max,
@@ -249,8 +253,9 @@ impl Location<Id> {
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
             keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12, \
-            mfa_method = $13, posture_check_required = $14, mfa_steps = $15 \
-            WHERE id = $16",
+            mfa_method = $13, posture_check_required = $14, mfa_steps = $15, \
+            mfa_step_plan = $16 \
+            WHERE id = $17",
             self.instance_id,
             self.name,
             self.address,
@@ -266,6 +271,7 @@ impl Location<Id> {
             self.mfa_method,
             self.posture_check_required,
             self.mfa_steps,
+            self.mfa_step_plan,
             self.id,
         )
         .execute(executor)
@@ -284,7 +290,8 @@ impl Location<Id> {
             network_id, route_all_traffic,  keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\" \
             FROM location WHERE id = $1",
             location_id
         )
@@ -308,7 +315,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\" \
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
@@ -328,7 +336,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\" \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\" \
             FROM location WHERE pubkey = $1",
             pubkey
         )
@@ -491,6 +500,19 @@ impl Location<Id> {
         Ok(())
     }
 
+    pub async fn set_mfa_step_plan(
+        pool: &DbPool,
+        location_id: Id,
+        plan: Vec<LocationMfaMethod>,
+    ) -> Result<(), Error> {
+        let mut location = Self::find_by_id(pool, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        location.mfa_step_plan = Json(plan);
+        location.save(pool).await?;
+        Ok(())
+    }
+
     /// Persist the route-all-traffic flag for a location, rejecting the update if
     /// the owning instance's [`ClientTrafficPolicy`] forbids the requested value.
     pub async fn update_routing(
@@ -547,8 +569,9 @@ impl Location<NoId> {
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
             dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, \
-            service_location_mode, mfa_method, posture_check_required, mfa_steps) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) \
+            service_location_mode, mfa_method, posture_check_required, mfa_steps, \
+            mfa_step_plan) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -565,6 +588,7 @@ impl Location<NoId> {
             self.mfa_method,
             self.posture_check_required,
             self.mfa_steps,
+            self.mfa_step_plan,
         )
         .fetch_one(executor)
         .await?;
@@ -586,6 +610,7 @@ impl Location<NoId> {
             mfa_method: self.mfa_method,
             posture_check_required: self.posture_check_required,
             mfa_steps: self.mfa_steps,
+            mfa_step_plan: self.mfa_step_plan,
         })
     }
 }
@@ -616,6 +641,7 @@ impl From<Location<Id>> for Location {
             mfa_method: location.mfa_method,
             posture_check_required: location.posture_check_required,
             mfa_steps: location.mfa_steps,
+            mfa_step_plan: location.mfa_step_plan,
         }
     }
 }
@@ -661,6 +687,7 @@ mod tests {
             mfa_method: None,
             posture_check_required: false,
             mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
         }
     }
 

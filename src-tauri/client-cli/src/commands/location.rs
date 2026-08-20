@@ -350,6 +350,7 @@ mod tests {
     ) -> Location<Id> {
         Location {
             mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
             id,
             instance_id,
             network_id: 1,

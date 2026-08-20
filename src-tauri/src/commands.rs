@@ -586,6 +586,7 @@ pub struct LocationInfo {
     pub posture_check_required: bool,
     pub mfa_method: Option<LocationMfaMethod>,
     pub mfa_steps: Vec<LocationMfaStep>,
+    pub mfa_step_plan: Vec<LocationMfaMethod>,
 }
 
 impl LocationInfo {
@@ -641,6 +642,7 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             posture_check_required: location.posture_check_required,
             mfa_method: location.mfa_method,
             mfa_steps: location.mfa_steps.0,
+            mfa_step_plan: location.mfa_step_plan.0,
         };
         location_info.push(info);
     }
@@ -903,6 +905,21 @@ pub async fn set_location_mfa_method(
     debug!("Received command to set MFA method for location {location_id}");
     Location::set_mfa_method(&DB_POOL, location_id, mfa_method).await?;
     debug!("MFA method updated for location (ID: {location_id})");
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn set_location_mfa_step_plan(
+    location_id: Id,
+    mfa_step_plan: Vec<LocationMfaMethod>,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!("Received command to set MFA step plan for location {location_id}");
+    Location::set_mfa_step_plan(&DB_POOL, location_id, mfa_step_plan).await?;
+    debug!("MFA step plan updated for location (ID: {location_id})");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
         .map_err(tauri_err_to_app_err)?;

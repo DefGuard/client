@@ -407,6 +407,7 @@ mod tests {
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {
             mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
             id: 1,
             instance_id: 1,
             network_id: 1,

@@ -1,1 +1,2 @@
 ALTER TABLE location ADD COLUMN mfa_steps TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE location ADD COLUMN mfa_step_plan TEXT NOT NULL DEFAULT '[]';
