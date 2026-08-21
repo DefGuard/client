@@ -14,7 +14,12 @@ import type { InstanceInfo, LocationInfo, MfaStep } from '../../../rust-api/type
 import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
 import { useAppStore } from '../../../store/useAppStore';
 import { isPresent } from '../../../utils/isPresent';
-import { isMfaMethodUsable, mfaToText, shouldStartMfa } from '../../../utils/mfa';
+import {
+  mfaToText,
+  resolveMfaStepPlan,
+  shouldStartMfa,
+  usableMfaMethods,
+} from '../../../utils/mfa';
 import {
   LocationCardViews,
   type LocationCardViewsValue,
@@ -72,7 +77,7 @@ export const LocationCardProvider = ({
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
   const [mfaMethod, setMfaMethod] = useState<MfaMethodValue>(
-    location.mfa_method ?? MfaMethod.Totp,
+    resolveMfaStepPlan(location)[0] ?? MfaMethod.Totp,
   );
 
   const mfaSteps = useMemo<MfaStep[]>(
@@ -84,15 +89,8 @@ export const LocationCardProvider = ({
   // one-off choice made through "Other methods", dropped when a new flow starts
   const [stepPlanOnce, setStepPlanOnce] = useState<MfaMethodValue[]>([]);
   const stepPlan = useMemo<MfaMethodValue[]>(
-    () =>
-      mfaSteps.map((step, index) => {
-        const usable = step.methods.filter(isMfaMethodUsable);
-        const chosen = [stepPlanOnce[index], location.mfa_step_plan[index]].find(
-          (method) => usable.some((entry) => entry.method === method),
-        );
-        return chosen ?? (usable[0] ?? step.methods[0]).method;
-      }),
-    [mfaSteps, stepPlanOnce, location.mfa_step_plan],
+    () => resolveMfaStepPlan(location, stepPlanOnce),
+    [location, stepPlanOnce],
   );
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -102,7 +100,7 @@ export const LocationCardProvider = ({
     if (location.active) {
       setCurrentView(LocationCardViews.Connected);
     } else {
-      setMfaMethod(location.mfa_method ?? MfaMethod.Totp);
+      setMfaMethod(resolveMfaStepPlan(location)[0] ?? MfaMethod.Totp);
       setCurrentView(LocationCardViews.Default);
       setStepIndex(0);
     }
@@ -117,10 +115,10 @@ export const LocationCardProvider = ({
   );
 
   const passStep = useCallback(() => {
-    const next = stepIndex + 1;
-    if (next < stepPlan.length) {
-      setStepIndex(next);
-      setView(mfaMethodToLocationCardView(stepPlan[next]));
+    const nextStepIndex = stepIndex + 1;
+    if (nextStepIndex < stepPlan.length) {
+      setStepIndex(nextStepIndex);
+      setView(mfaMethodToLocationCardView(stepPlan[nextStepIndex]));
       return;
     }
     setStepIndex(0);
@@ -135,14 +133,12 @@ export const LocationCardProvider = ({
     mfaStarted.current = true;
     const appConfig = await api.getAppConfig();
     setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
-    if (isMultiStep) {
-      setStepPlanOnce([]);
-      setStepIndex(0);
-      setView(mfaMethodToLocationCardView(stepPlan[0]));
-      return;
-    }
-    setView(mfaMethodToLocationCardView(mfaMethod));
-  }, [setView, mfaMethod, isMultiStep, stepPlan]);
+    const defaultPlan = resolveMfaStepPlan(location);
+    setStepPlanOnce([]);
+    setStepIndex(0);
+    setMfaMethod(defaultPlan[0]);
+    setView(mfaMethodToLocationCardView(defaultPlan[0]));
+  }, [setView, location]);
 
   const mfaAutoStartRequested = useAppStore(
     (s) => s.mfaAutoStartLocationId === location.id,
@@ -177,10 +173,9 @@ export const LocationCardProvider = ({
     }
   }, [location.active]);
 
-  const usableStepMethods = (mfaSteps[stepIndex]?.methods ?? []).filter(
-    isMfaMethodUsable,
-  );
-  const canPickOtherMethod = !isMultiStep || usableStepMethods.length > 1;
+  const currentStep = mfaSteps[stepIndex];
+  const canPickOtherMethod =
+    isPresent(currentStep) && usableMfaMethods(currentStep).length > 1;
 
   const stepMethod = stepPlan[stepIndex];
   const showStepLabel = isMultiStep && isPresent(stepMethod);

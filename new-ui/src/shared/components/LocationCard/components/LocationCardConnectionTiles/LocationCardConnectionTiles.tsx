@@ -6,10 +6,14 @@ import {
   ClientTrafficPolicy,
   type InstanceInfo,
   type LocationInfo,
-  LocationMfaMode,
 } from '../../../../rust-api/types';
 import { isPresent } from '../../../../utils/isPresent';
-import { mfaStepCount, mfaStepsToText, mfaToText } from '../../../../utils/mfa';
+import {
+  mfaStepCount,
+  mfaStepsToText,
+  mfaToText,
+  shouldStartMfa,
+} from '../../../../utils/mfa';
 import { BoxIcon } from '../../../BoxIcon/BoxIcon';
 import { Icon, IconKind } from '../../../Icon';
 
@@ -53,7 +57,7 @@ export const LocationCardConnectionTiles = ({ location, instance, variant }: Pro
           {routeAllTraffic ? 'All traffic' : 'Predefined traffic'}
         </p>
       </div>
-      {location.location_mfa_mode !== LocationMfaMode.Disabled && isPresent(mfaLabel) && (
+      {shouldStartMfa(location) && isPresent(mfaLabel) && (
         <div className="tile">
           <BoxIcon>
             <Icon icon={IconKind.LockClosed} />

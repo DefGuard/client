@@ -1,7 +1,13 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { LocationInfo } from '../../../../rust-api/types';
-import { mfaStepCount, mfaStepsToText, mfaToText } from '../../../../utils/mfa';
+import {
+  mfaStepCount,
+  mfaStepsToText,
+  mfaToText,
+  resolveMfaStepPlan,
+  usableMfaMethods,
+} from '../../../../utils/mfa';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
 
@@ -13,17 +19,12 @@ interface Props {
 
 export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
   const stepCount = mfaStepCount(location);
-  const isMultiStep = stepCount > 1;
+  const label =
+    stepCount > 1
+      ? mfaStepsToText(stepCount)
+      : mfaToText(resolveMfaStepPlan(location)[0]);
 
-  const label = isMultiStep
-    ? mfaStepsToText(stepCount)
-    : location.mfa_method && mfaToText(location.mfa_method);
-
-  const canEdit = isMultiStep
-    ? location.mfa_steps.some((step) => step.methods.length > 1)
-    : location.location_mfa_mode === 'internal';
-
-  if ((location.location_mfa_mode === 'disabled' && !isMultiStep) || !label) return null;
+  const canEdit = location.mfa_steps.some((step) => usableMfaMethods(step).length > 1);
 
   return (
     <div className={clsx('location-card-mfa-edit', `variant-${variant}`)}>

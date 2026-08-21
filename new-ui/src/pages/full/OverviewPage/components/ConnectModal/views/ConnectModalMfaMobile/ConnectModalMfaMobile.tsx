@@ -10,6 +10,7 @@ import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
+import { useMfaStep } from '../../hooks/useMfaStep';
 
 type Screen = 'loading' | 'qr' | 'error';
 
@@ -18,9 +19,12 @@ export const ConnectModalMfaMobile = () => {
     useShallow((s) => [s.perviousView, s.location]),
   );
 
+  const { canPickOtherMethod, onStepPassed } = useMfaStep();
+
   const { start, isStarting, startError, qrValue, connectionError } = useMfaMobileConnect(
     location as LocationInfo,
     {
+      onStepPassed,
       onPostureError: (msg) => {
         useConnectModal.setState({ postureError: msg });
         useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
@@ -68,11 +72,11 @@ export const ConnectModalMfaMobile = () => {
         </div>
       )}
       <Controls>
-        {screen === 'qr' && (
+        {screen === 'qr' && canPickOtherMethod && (
           <Button
             containerProps={{ className: 'full' }}
             variant={ButtonVariant.Secondary}
-            text="Use different MFA"
+            text="Other methods"
             onClick={() => {
               useConnectModal.getState().setView(ConnectModalView.MfaSettings);
             }}

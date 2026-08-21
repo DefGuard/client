@@ -18,13 +18,19 @@ import type { MfaErrorPayload } from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
 import { useConnectModal } from './useConnectModal';
 
+// TODO: delete this
+const MOCK_OIDC_URL = 'https://example.com/openid/mfa?token=mock-step-token';
+const MOCK_OIDC_DELAY_MS = 1500;
+
 type Options = {
+  onStepPassed?: () => void;
   onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
   onServiceUnavailable?: () => void;
 };
 
 export const useConnectModalMfaOidc = ({
+  onStepPassed,
   onPostureError,
   onSessionExpired,
   onServiceUnavailable,
@@ -71,6 +77,13 @@ export const useConnectModalMfaOidc = ({
     cleanup();
 
     try {
+      // TODO(mock): open the real proxy link and call onStepPassed from the poll result, instead of faking it on a timer
+      if (onStepPassed) {
+        await api.openLink(MOCK_OIDC_URL);
+        setIsPolling(true);
+        window.setTimeout(onStepPassed, MOCK_OIDC_DELAY_MS);
+        return;
+      }
       const info = await api.mfaStart(instance.id, location.id, MfaMethod.Oidc);
       await api.openLink(`${instance.proxy_url}openid/mfa?token=${info.token}`);
 
@@ -127,6 +140,7 @@ export const useConnectModalMfaOidc = ({
     instance,
     location,
     cleanup,
+    onStepPassed,
     onPostureError,
     onSessionExpired,
     onServiceUnavailable,

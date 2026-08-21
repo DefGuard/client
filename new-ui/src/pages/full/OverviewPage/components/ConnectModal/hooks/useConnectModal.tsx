@@ -4,7 +4,9 @@ import {
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../../../shared/rust-api/types';
-import type { ConnectModalViewValue } from './types';
+import { isPresent } from '../../../../../../shared/utils/isPresent';
+import { resolveMfaStepPlan } from '../../../../../../shared/utils/mfa';
+import { type ConnectModalViewValue, mfaMethodToConnectModalView } from './types';
 
 interface StoreValues {
   visible: boolean;
@@ -14,6 +16,8 @@ interface StoreValues {
   postureError: string | null;
   autoStartOpenId: boolean;
   mfaMethod: MfaMethodValue;
+  stepIndex: number;
+  stepPlan: MfaMethodValue[];
 }
 
 const defaults: StoreValues = {
@@ -24,11 +28,14 @@ const defaults: StoreValues = {
   perviousView: null,
   postureError: null,
   autoStartOpenId: false,
+  stepIndex: 0,
+  stepPlan: [],
 } as const;
 
 interface Store extends StoreValues {
   open: (init?: Partial<StoreValues>) => void;
   setView: (view: ConnectModalViewValue, values?: Partial<StoreValues>) => void;
+  passStep: () => void;
   reset: () => void;
 }
 
@@ -38,7 +45,22 @@ export const useConnectModal = create<Store>((set, get) => ({
     set(defaults);
   },
   open: (init) => {
-    set({ ...defaults, ...init, visible: true });
+    const location = init?.location ?? null;
+    const stepPlan = isPresent(location) ? resolveMfaStepPlan(location) : [];
+    set({ ...defaults, ...init, stepPlan, visible: true });
+  },
+  passStep: () => {
+    const { stepIndex, stepPlan, setView } = get();
+    const nextStepIndex = stepIndex + 1;
+    if (nextStepIndex < stepPlan.length) {
+      setView(mfaMethodToConnectModalView(stepPlan[nextStepIndex]), {
+        stepIndex: nextStepIndex,
+      });
+      return;
+    }
+    // TODO(mock): the last step closes the modal without connecting; connect here once
+    // MfaCompleted brings up the tunnel
+    set({ stepIndex: 0, visible: false });
   },
   setView: (view, vals) => {
     const pervious = get().view ?? null;

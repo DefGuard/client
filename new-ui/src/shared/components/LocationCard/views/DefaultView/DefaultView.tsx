@@ -1,12 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { Fragment } from 'react/jsx-runtime';
 import { api } from '../../../../rust-api/api';
-import {
-  ClientTrafficPolicy,
-  LocationMfaMode,
-  MfaMethod,
-} from '../../../../rust-api/types';
+import { ClientTrafficPolicy } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
+import { shouldStartMfa } from '../../../../utils/mfa';
 import { Divider } from '../../../Divider/Divider';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { Toggle } from '../../../Toggle/Toggle';
@@ -17,8 +14,6 @@ import { LocationCardViews } from '../../context/types';
 
 export const DefaultView = () => {
   const { location, instance, setView } = useLocationCardContext();
-
-  const mfaMethod = location.mfa_method ?? MfaMethod.Totp;
 
   const { mutate: updateRouting } = useMutation({
     mutationFn: api.updateLocationRouting,
@@ -50,7 +45,7 @@ export const DefaultView = () => {
           />
         </Fragment>
       )}
-      {location.location_mfa_mode !== LocationMfaMode.Disabled && mfaMethod && (
+      {shouldStartMfa(location) && (
         <Fragment>
           <Divider spacing={ThemeSpacing.Md} />
           <LocationCardMfaEdit

@@ -2,13 +2,15 @@ import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api } from '../../../../rust-api/api';
-import {
-  LocationMfaMode,
-  MfaMethod,
-  type MfaMethodValue,
-} from '../../../../rust-api/types';
+import type { MfaMethodValue } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
-import { isMfaMethodUsable, mfaStepCount } from '../../../../utils/mfa';
+import { isPresent } from '../../../../utils/isPresent';
+import {
+  mfaStepCount,
+  pickableMfaMethods,
+  resolveMfaStepPlan,
+  usableMfaMethods,
+} from '../../../../utils/mfa';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
@@ -24,13 +26,6 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews, mfaMethodToLocationCardView } from '../../context/types';
 
 export const LocationCardMfaSettings = () => {
-  const { mutate: setMfaMethod } = useMutation({
-    mutationFn: api.setLocationMfaMethod,
-    meta: {
-      invalidate: [['locations']],
-    },
-  });
-
   const { mutate: setMfaStepPlan } = useMutation({
     mutationFn: api.setLocationMfaStepPlan,
     meta: {
@@ -42,7 +37,6 @@ export const LocationCardMfaSettings = () => {
     previousView,
     setView,
     location,
-    mfaMethod: currentMethod,
     setMfaMethod: setContextMethod,
     stepPlan,
     stepIndex,
@@ -51,119 +45,93 @@ export const LocationCardMfaSettings = () => {
 
   const mfaSteps = location.mfa_steps;
   const isMultiStep = mfaStepCount(location) > 1;
+  const defaultPlan = resolveMfaStepPlan(location);
 
-  const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
+  const isEditingDefaults = previousView === LocationCardViews.Default;
 
-  const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(currentMethod);
-  const [selectedStepMethods, setSelectedStepMethods] =
-    useState<MfaMethodValue[]>(stepPlan);
+  const [selectedStepMethods, setSelectedStepMethods] = useState<MfaMethodValue[]>(
+    isEditingDefaults ? defaultPlan : stepPlan,
+  );
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
-  const isFromDefault = previousView === LocationCardViews.Default;
-  const [setAsDefault, setSetAsDefault] = useState(true);
-
-  const editedSteps = useMemo(() => {
-    const steps = isFromDefault
-      ? mfaSteps.map((step, index) => ({ step, index }))
-      : [{ step: mfaSteps[stepIndex], index: stepIndex }];
-    return steps.map(({ step, index }) => ({
-      index,
-      // Unconfigured factors stay visible while editing the plan, so they can later be
-      // set up in place. Biometrics show up only when a step has nothing else, which shouldn't happen
-      // because core won't send such a location, it is here so the step still renders.
-      methods: isFromDefault
-        ? step.methods.filter(
-            (entry) => entry.method !== MfaMethod.Biometric || step.methods.length === 1,
-          )
-        : step.methods.filter(isMfaMethodUsable),
-    }));
-  }, [isFromDefault, mfaSteps, stepIndex]);
-
-  const MfaFactorsList = useMemo((): MfaMethodValue[] => {
-    if (location.location_mfa_mode === LocationMfaMode.Internal) {
-      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove];
+  const editableSteps = useMemo(() => {
+    if (isEditingDefaults) {
+      return mfaSteps.map((step, index) => ({
+        stepIndex: index,
+        methods: pickableMfaMethods(step),
+      }));
     }
-    return [MfaMethod.Oidc];
-  }, [location.location_mfa_mode]);
+    const currentStep = mfaSteps[stepIndex];
+    if (!isPresent(currentStep)) return [];
+    return [{ stepIndex, methods: usableMfaMethods(currentStep) }];
+  }, [isEditingDefaults, mfaSteps, stepIndex]);
 
-  const selectStepMethod = (stepIndex: number, method: MfaMethodValue) => {
-    setSelectedStepMethods((current) =>
-      current.map((value, index) => (index === stepIndex ? method : value)),
+  const selectMethodForStep = (targetStepIndex: number, method: MfaMethodValue) => {
+    setSelectedStepMethods((currentPlan) =>
+      currentPlan.map((selected, index) =>
+        index === targetStepIndex ? method : selected,
+      ),
     );
   };
 
   const handleSubmit = () => {
-    if (isMultiStep) {
-      if (isFromDefault) {
-        setMfaStepPlan({ locationId: location.id, mfaStepPlan: selectedStepMethods });
-        setView(LocationCardViews.Default);
-        return;
-      }
-      setStepPlanOnce(selectedStepMethods);
-      setView(mfaMethodToLocationCardView(selectedStepMethods[stepIndex]));
-      return;
-    }
-
-    setContextMethod(selectedMethod);
-    if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
-      setMfaMethod({
-        locationId: location.id,
-        mfaMethod: selectedMethod,
-      });
-    }
-    if (isFromDefault) {
+    if (isEditingDefaults) {
+      setMfaStepPlan({ locationId: location.id, mfaStepPlan: selectedStepMethods });
       setView(LocationCardViews.Default);
       return;
     }
-    setView(mfaMethodToLocationCardView(selectedMethod));
+
+    if (!isMultiStep && saveAsDefault) {
+      setMfaStepPlan({ locationId: location.id, mfaStepPlan: selectedStepMethods });
+    }
+
+    const methodForCurrentStep = selectedStepMethods[stepIndex];
+    setStepPlanOnce(selectedStepMethods);
+    setContextMethod(methodForCurrentStep);
+    setView(mfaMethodToLocationCardView(methodForCurrentStep));
   };
 
   return (
     <div className="location-card-mfa-settings">
       <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title="Change MFA Method">
-        <p>
-          If you're having issues with your current verification method, you can choose
-          another one or set a new default.
-        </p>
+        {isEditingDefaults && (
+          <p>{`Choose the default verification method for each step of this location.`}</p>
+        )}
+        {!isEditingDefaults && (
+          <p>
+            {isMultiStep
+              ? `If you're having issues with your current verification method, you can choose another one for this login.`
+              : `If you're having issues with your current verification method, you can choose another one or set a new default.`}
+          </p>
+        )}
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
-      {isMultiStep ? (
-        <div className="steps">
-          {editedSteps.map(({ methods, index }) => (
-            <div className="step" key={index}>
-              {isFromDefault && <p className="step-label">Step {index + 1}</p>}
-              <div className="methods">
-                {methods.map((entry) => (
-                  <MfaSelector
-                    key={entry.method}
-                    factor={entry.method}
-                    selected={selectedStepMethods[index] === entry.method}
-                    isDefault={stepPlan[index] === entry.method}
-                    configured={entry.configured}
-                    onClick={() => selectStepMethod(index, entry.method)}
-                  />
-                ))}
-              </div>
+      <div className="steps">
+        {editableSteps.map(({ methods, stepIndex: index }) => (
+          <div className="step" key={index}>
+            {isMultiStep && isEditingDefaults && (
+              <p className="step-label">Step {index + 1}</p>
+            )}
+            <div className="methods">
+              {methods.map((entry) => (
+                <MfaSelector
+                  key={entry.method}
+                  factor={entry.method}
+                  selected={selectedStepMethods[index] === entry.method}
+                  isDefault={defaultPlan[index] === entry.method}
+                  configured={entry.configured}
+                  onClick={() => selectMethodForStep(index, entry.method)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="methods">
-          {MfaFactorsList.map((factor) => (
-            <MfaSelector
-              key={factor}
-              factor={factor}
-              selected={selectedMethod === factor}
-              isDefault={locationDefaultMfaMethod === factor}
-              onClick={() => setSelectedPref(factor)}
-            />
-          ))}
-        </div>
-      )}
-      {!isMultiStep && !isFromDefault && (
+          </div>
+        ))}
+      </div>
+      {!isEditingDefaults && !isMultiStep && (
         <Checkbox
-          active={isFromDefault ? true : setAsDefault}
-          onClick={() => setSetAsDefault((prev) => !prev)}
+          active={saveAsDefault}
+          onClick={() => setSaveAsDefault((current) => !current)}
           text="Set as default MFA method"
         />
       )}
@@ -180,7 +148,7 @@ export const LocationCardMfaSettings = () => {
           <Button
             variant={ButtonVariant.Primary}
             size={'primary'}
-            text={isMultiStep && !isFromDefault ? 'Confirm' : 'Save changes'}
+            text={isEditingDefaults ? 'Save changes' : 'Continue'}
             onClick={handleSubmit}
           />
         </div>
