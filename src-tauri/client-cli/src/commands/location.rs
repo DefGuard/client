@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use defguard_core::database::models::{
-    instance::Instance,
+    instance::{ClientTrafficPolicy, Instance},
     location::{Location, LocationMfaMethod},
     Id,
 };
@@ -20,15 +20,23 @@ const MIN_INST_COL_WIDTH: usize = 8;
 pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
 
-    let instance_names = Instance::all(&state.pool)
+    let instance_details = Instance::all(&state.pool)
         .await?
         .into_iter()
-        .map(|inst| (inst.id, inst.name))
+        .map(|instance| {
+            (
+                instance.id,
+                InstanceDetails {
+                    name: instance.name,
+                    client_traffic_policy: instance.client_traffic_policy,
+                },
+            )
+        })
         .collect::<HashMap<_, _>>();
 
     Ok(LocationListResult {
         locations,
-        instance_names,
+        instance_details,
     })
 }
 
@@ -93,6 +101,11 @@ pub async fn handle_show(
     let ResolvedTarget::Location(location) = &target else {
         return Err(CliError::NotFound(format!("Location '{name}' not found")));
     };
+    let client_traffic_policy = Instance::find_by_id(&state.pool, location.instance_id)
+        .await?
+        .map_or(ClientTrafficPolicy::None, |instance| {
+            instance.client_traffic_policy
+        });
 
     Ok(LocationShowResult {
         name: location.name.clone(),
@@ -102,7 +115,11 @@ pub async fn handle_show(
         allowed_ips: location.allowed_ips.clone(),
         dns: location.dns.clone(),
         mfa_method: mfa_label(location.mfa_method).to_string(),
-        route_all_traffic: location.route_all_traffic,
+        route_all_traffic: match client_traffic_policy {
+            ClientTrafficPolicy::None => location.route_all_traffic,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::ForceAllTraffic => true,
+        },
         keepalive_interval: location.keepalive_interval,
     })
 }
@@ -128,9 +145,14 @@ pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
     }
 }
 
+pub(crate) struct InstanceDetails {
+    pub name: String,
+    pub client_traffic_policy: ClientTrafficPolicy,
+}
+
 pub struct LocationListResult {
     pub locations: Vec<Location<Id>>,
-    pub instance_names: HashMap<Id, String>,
+    pub instance_details: HashMap<Id, InstanceDetails>,
 }
 
 impl CommandOutput for LocationListResult {
@@ -138,7 +160,7 @@ impl CommandOutput for LocationListResult {
         if self.locations.is_empty() {
             "No locations configured. Use the desktop app to enroll an instance first.".to_string()
         } else {
-            format_location_list_table(&self.locations, &self.instance_names)
+            format_location_list_table(&self.locations, &self.instance_details)
         }
     }
 
@@ -146,15 +168,26 @@ impl CommandOutput for LocationListResult {
         let locations = self
             .locations
             .iter()
-            .map(|l| LocationEntry {
-                id: l.id,
-                name: l.name.clone(),
-                instance: self.instance_names.get(&l.instance_id).cloned(),
-                address: l.address.clone(),
-                endpoint: l.endpoint.clone(),
-                mfa_enabled: None,
-                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
-                route_all_traffic: Some(l.route_all_traffic),
+            .map(|l| {
+                let details = self.instance_details.get(&l.instance_id);
+                let route_all_traffic = match details
+                    .map_or(&ClientTrafficPolicy::None, |details| {
+                        &details.client_traffic_policy
+                    }) {
+                    ClientTrafficPolicy::None => l.route_all_traffic,
+                    ClientTrafficPolicy::DisableAllTraffic => false,
+                    ClientTrafficPolicy::ForceAllTraffic => true,
+                };
+                LocationEntry {
+                    id: l.id,
+                    name: l.name.clone(),
+                    instance: details.map(|details| details.name.clone()),
+                    address: l.address.clone(),
+                    endpoint: l.endpoint.clone(),
+                    mfa_enabled: None,
+                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    route_all_traffic: Some(route_all_traffic),
+                }
             })
             .collect::<Vec<_>>();
         json!({ "locations": locations })
@@ -163,7 +196,7 @@ impl CommandOutput for LocationListResult {
 
 fn format_location_list_table(
     locations: &[Location<Id>],
-    instance_names: &HashMap<Id, String>,
+    instance_details: &HashMap<Id, InstanceDetails>,
 ) -> String {
     let name_col_width = locations
         .iter()
@@ -180,9 +213,9 @@ fn format_location_list_table(
     let inst_col_width = locations
         .iter()
         .filter_map(|l| {
-            instance_names
+            instance_details
                 .get(&l.instance_id)
-                .map(std::string::String::len)
+                .map(|details| details.name.len())
         })
         .max()
         .unwrap_or(MIN_INST_COL_WIDTH)
@@ -193,22 +226,34 @@ fn format_location_list_table(
         "ID", "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
     )];
     for location in locations {
-        let instance = instance_names
-            .get(&location.instance_id)
-            .map_or("?", String::as_str);
+        let details = instance_details.get(&location.instance_id);
+
+        let instance_name = details.map_or("?", |instance| instance.name.as_str());
+        let instance_traffic_policy = details.map_or(&ClientTrafficPolicy::None, |instance| {
+            &instance.client_traffic_policy
+        });
+
+        let route_all_traffic = match instance_traffic_policy {
+            ClientTrafficPolicy::None => location.route_all_traffic,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::ForceAllTraffic => true,
+        };
+
+        let route_label = if route_all_traffic {
+            "All-traffic"
+        } else {
+            "Predefined"
+        };
+
         lines.push(format!(
             "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
             location.id,
             location.name,
             location.address,
             location.endpoint,
-            instance,
+            instance_name,
             mfa_label(location.mfa_method),
-            if location.route_all_traffic {
-                "All-traffic"
-            } else {
-                "Predefined"
-            }
+            route_label
         ));
     }
     lines.join("\n")
@@ -323,11 +368,21 @@ mod tests {
         }
     }
 
+    fn make_instance_details(
+        name: &str,
+        client_traffic_policy: ClientTrafficPolicy,
+    ) -> InstanceDetails {
+        InstanceDetails {
+            name: name.to_string(),
+            client_traffic_policy,
+        }
+    }
+
     #[test]
     fn test_list_human_empty() {
         let result = LocationListResult {
             locations: Vec::new(),
-            instance_names: HashMap::new(),
+            instance_details: HashMap::new(),
         };
         assert_eq!(
             result.human(),
@@ -338,11 +393,11 @@ mod tests {
     #[test]
     fn test_list_human_with_data() {
         let loc = make_location(1, 10, "office", "1.2.3.4:51820", false);
-        let mut names = HashMap::new();
-        names.insert(10, "acme".to_string());
+        let mut instance_details = HashMap::new();
+        instance_details.insert(10, make_instance_details("acme", ClientTrafficPolicy::None));
         let result = LocationListResult {
             locations: vec![loc],
-            instance_names: names,
+            instance_details,
         };
         let s = result.human();
         assert!(s.contains("ID"));
@@ -351,11 +406,46 @@ mod tests {
         assert!(s.contains("1.2.3.4:51820"));
     }
 
+    fn routing_column(
+        route_all_traffic: bool,
+        client_traffic_policy: ClientTrafficPolicy,
+    ) -> String {
+        let mut location = make_location(1, 10, "office", "1.2.3.4:51820", false);
+        location.route_all_traffic = route_all_traffic;
+        let mut instance_details = HashMap::new();
+        instance_details.insert(10, make_instance_details("acme", client_traffic_policy));
+        LocationListResult {
+            locations: vec![location],
+            instance_details,
+        }
+        .human()
+    }
+
+    #[test]
+    fn test_list_human_force_all_traffic_overrides_location() {
+        let table = routing_column(false, ClientTrafficPolicy::ForceAllTraffic);
+        assert!(table.contains("All-traffic"));
+        assert!(!table.contains("Predefined"));
+    }
+
+    #[test]
+    fn test_list_human_disable_all_traffic_overrides_location() {
+        let table = routing_column(true, ClientTrafficPolicy::DisableAllTraffic);
+        assert!(table.contains("Predefined"));
+        assert!(!table.contains("All-traffic"));
+    }
+
+    #[test]
+    fn test_list_human_no_policy_keeps_location_setting() {
+        assert!(routing_column(true, ClientTrafficPolicy::None).contains("All-traffic"));
+        assert!(routing_column(false, ClientTrafficPolicy::None).contains("Predefined"));
+    }
+
     #[test]
     fn test_list_json_empty() {
         let result = LocationListResult {
             locations: Vec::new(),
-            instance_names: HashMap::new(),
+            instance_details: HashMap::new(),
         };
         let json = result.json();
         assert_eq!(json["locations"].as_array().unwrap().len(), 0);
@@ -365,11 +455,11 @@ mod tests {
     #[test]
     fn test_list_json_with_data() {
         let loc = make_location(1, 10, "office", "1.2.3.4:51820", false);
-        let mut names = HashMap::new();
-        names.insert(10, "acme".to_string());
+        let mut instance_details = HashMap::new();
+        instance_details.insert(10, make_instance_details("acme", ClientTrafficPolicy::None));
         let result = LocationListResult {
             locations: vec![loc],
-            instance_names: names,
+            instance_details,
         };
         let json = result.json();
         let locations = json["locations"].as_array().unwrap();
@@ -459,7 +549,7 @@ mod tests {
         assert_eq!(
             LocationListResult {
                 locations: Vec::new(),
-                instance_names: HashMap::new(),
+                instance_details: HashMap::new(),
             }
             .exit_code(),
             0
