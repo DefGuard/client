@@ -138,6 +138,7 @@ export const LocationCardMfaSettings = () => {
                     key={entry.method}
                     factor={entry.method}
                     selected={selectedStepMethods[index] === entry.method}
+                    isDefault={stepPlan[index] === entry.method}
                     configured={entry.configured}
                     onClick={() => selectStepMethod(index, entry.method)}
                   />
