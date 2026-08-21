@@ -228,6 +228,7 @@ pub async fn poll_openid_mfa(
         token,
         code: None,
         auth_pub_key: None,
+        // #TODO (multi-step-mfa) pass the id minted by StepStart for this step.
         step_attempt_id: None,
     };
 
