@@ -1662,6 +1662,7 @@ pub async fn mfa_finish_code(
         token,
         code: Some(code),
         auth_pub_key: None,
+        step_attempt_id: None,
     };
     let response = mfa::mfa_finish_code(proxy_url, request)
         .await
