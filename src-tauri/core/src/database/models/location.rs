@@ -130,6 +130,28 @@ impl From<ProtoMfaStep> for LocationMfaStep {
 }
 
 #[must_use]
+pub fn legacy_mfa_steps(mode: LocationMfaMode) -> Vec<LocationMfaStep> {
+    let methods = match mode {
+        LocationMfaMode::Disabled => return Vec::new(),
+        LocationMfaMode::Internal => vec![
+            LocationMfaMethod::Totp,
+            LocationMfaMethod::Email,
+            LocationMfaMethod::MobileApprove,
+        ],
+        LocationMfaMode::External => vec![LocationMfaMethod::Oidc],
+    };
+    vec![LocationMfaStep {
+        methods: methods
+            .into_iter()
+            .map(|method| LocationMfaStepMethod {
+                method,
+                configured: true,
+            })
+            .collect(),
+    }]
+}
+
+#[must_use]
 pub fn infer_mfa_method(
     mode: LocationMfaMode,
     method: Option<LocationMfaMethod>,
