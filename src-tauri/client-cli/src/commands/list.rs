@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use defguard_core::database::models::{instance::Instance, location::Location, tunnel::Tunnel, Id};
+use defguard_core::database::models::{
+    instance::{ClientTrafficPolicy, Instance},
+    location::Location,
+    tunnel::Tunnel,
+    Id,
+};
 use serde_json::{json, Value};
 
 use crate::{
@@ -44,10 +49,10 @@ impl CommandOutput for ListResult {
     }
 
     fn json(&self) -> Value {
-        let instance_names = self
+        let instances_by_id = self
             .instances
             .iter()
-            .map(|i| (i.id, i.name.clone()))
+            .map(|i| (i.id, i))
             .collect::<HashMap<_, _>>();
 
         let instances = self
@@ -63,15 +68,25 @@ impl CommandOutput for ListResult {
         let locations = self
             .locations
             .iter()
-            .map(|l| LocationEntry {
-                id: l.id,
-                name: l.name.clone(),
-                instance: instance_names.get(&l.instance_id).cloned(),
-                address: l.address.clone(),
-                endpoint: l.endpoint.clone(),
-                mfa_enabled: Some(l.mfa_enabled()),
-                mfa_method: Some(mfa_label(l.mfa_method).to_string()),
-                route_all_traffic: Some(l.route_all_traffic),
+            .map(|l| {
+                let instance = instances_by_id.get(&l.instance_id);
+                let route_all_traffic = match instance
+                    .map_or(&ClientTrafficPolicy::None, |i| &i.client_traffic_policy)
+                {
+                    ClientTrafficPolicy::None => l.route_all_traffic,
+                    ClientTrafficPolicy::DisableAllTraffic => false,
+                    ClientTrafficPolicy::ForceAllTraffic => true,
+                };
+                LocationEntry {
+                    id: l.id,
+                    name: l.name.clone(),
+                    instance: instance.map(|i| i.name.clone()),
+                    address: l.address.clone(),
+                    endpoint: l.endpoint.clone(),
+                    mfa_enabled: Some(l.mfa_enabled()),
+                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    route_all_traffic: Some(route_all_traffic),
+                }
             })
             .collect::<Vec<_>>();
 
@@ -131,11 +146,18 @@ fn format_list_table(
             ));
             for location in locations {
                 let mfa = if location.mfa_enabled() { "yes" } else { "no" };
-                let route_label = if location.route_all_traffic {
+                let route_all_traffic = match instance.client_traffic_policy {
+                    ClientTrafficPolicy::None => location.route_all_traffic,
+                    ClientTrafficPolicy::DisableAllTraffic => false,
+                    ClientTrafficPolicy::ForceAllTraffic => true,
+                };
+
+                let route_label = if route_all_traffic {
                     "All-traffic"
                 } else {
                     "Predefined"
                 };
+
                 lines.push(format!(
                     "  {:>4}  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {mfa:>3}  {route_label:<11}",
                     location.id, location.name, location.address, location.endpoint

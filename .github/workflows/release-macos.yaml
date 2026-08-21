@@ -101,7 +101,7 @@ jobs:
           TAURI_BUNDLER_DMG_IGNORE_CI: "false"
         with:
           tauriScript: cargo tauri
-          args: --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
+          args: --ignore-version-mismatches --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
       # - name: Upload DMG
       #   uses: shogo82148/actions-upload-release-asset@v1

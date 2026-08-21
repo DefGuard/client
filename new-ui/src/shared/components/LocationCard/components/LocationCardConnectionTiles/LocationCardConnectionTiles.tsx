@@ -2,7 +2,12 @@ import './style.scss';
 import clsx from 'clsx';
 import { useMemo } from 'react';
 import { useAppData } from '../../../../providers/AppDataContext';
-import { type LocationInfo, LocationMfaMode } from '../../../../rust-api/types';
+import {
+  ClientTrafficPolicy,
+  type InstanceInfo,
+  type LocationInfo,
+  LocationMfaMode,
+} from '../../../../rust-api/types';
 import { isPresent } from '../../../../utils/isPresent';
 import { mfaToText } from '../../../../utils/mfa';
 import { BoxIcon } from '../../../BoxIcon/BoxIcon';
@@ -11,10 +16,15 @@ import { Icon, IconKind } from '../../../Icon';
 interface Props {
   variant: 'compact' | 'full';
   location: LocationInfo;
+  instance?: InstanceInfo;
 }
 
-export const LocationCardConnectionTiles = ({ location, variant }: Props) => {
+export const LocationCardConnectionTiles = ({ location, instance, variant }: Props) => {
   const { connectionMfaMethod } = useAppData();
+
+  const routeAllTraffic =
+    location.route_all_traffic ||
+    instance?.client_traffic_policy === ClientTrafficPolicy.ForceAllTraffic;
 
   const mfaMethod = useMemo(() => {
     const key = `${location.connection_type.toLowerCase()}-${location.id}`;
@@ -30,7 +40,7 @@ export const LocationCardConnectionTiles = ({ location, variant }: Props) => {
         </BoxIcon>
         <p className="label">Allowed traffic</p>
         <p className="label-value">
-          {location.route_all_traffic ? 'All traffic' : 'Predefined traffic'}
+          {routeAllTraffic ? 'All traffic' : 'Predefined traffic'}
         </p>
       </div>
       {location.location_mfa_mode !== LocationMfaMode.Disabled &&
