@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import {
-  cidrRegex,
   patternValidEndpoint,
+  patternValidIpV6WithMask,
   patternValidIpV6WithPort,
+  patternValidIpWithMask,
   patternValidWireguardKey,
 } from './patterns';
 
@@ -36,11 +37,11 @@ export const optionalWireguardKeySchema = z
   .string()
   .refine((v) => !v || patternValidWireguardKey.test(v), 'Invalid WireGuard key');
 
-// Comma-separated list of CIDR ranges; an empty value is allowed.
+// Comma-separated list of IP addresses or CIDR ranges; an empty value is allowed.
 export const allowedIpsSchema = z.string().refine((v) => {
   if (!v) return true;
   return v
     .split(',')
     .map((s) => s.trim())
-    .every((cidr) => cidrRegex.test(cidr));
-}, 'Invalid CIDR notation');
+    .every((ip) => patternValidIpWithMask.test(ip) || patternValidIpV6WithMask.test(ip));
+}, 'Invalid IP address or CIDR notation');
