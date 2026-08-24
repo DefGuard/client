@@ -9,8 +9,9 @@ use std::{
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::{
-    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode,
+use defguard_client_proto::{
+    conversions::normalize_allowed_ips,
+    defguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
 };
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
@@ -374,7 +375,7 @@ impl ServiceLocationManager {
             .collect::<Result<Vec<_>, _>>()?;
 
         let ifname = get_interface_name(&location.name);
-        let config = InterfaceConfiguration {
+        let mut config = InterfaceConfiguration {
             name: ifname.clone(),
             prvkey: private_key.to_string(),
             addresses,
@@ -383,6 +384,7 @@ impl ServiceLocationManager {
             mtu: None,
             fwmark: None,
         };
+        normalize_allowed_ips(&mut config);
 
         let mut wgapi = WGApi::new(&ifname).map_err(|err| {
             ServiceLocationError::InterfaceError(format!(
