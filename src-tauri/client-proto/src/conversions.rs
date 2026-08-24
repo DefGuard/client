@@ -1,4 +1,6 @@
 use std::{
+    collections::HashSet,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
     time::{Duration, UNIX_EPOCH},
 };
@@ -8,6 +10,45 @@ use defguard_wireguard_rs::{
 };
 
 use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
+
+/// Clears host bits from a peer allowed IP.
+///
+/// This runs before `WGApi` classifies default routes. In particular, a non-canonical `/0` must
+/// become an unspecified address so it takes the default-route loop-prevention path.
+#[must_use]
+pub fn mask_allowed_ip(mut allowed_ip: IpAddrMask) -> IpAddrMask {
+    allowed_ip.address = match allowed_ip.address {
+        IpAddr::V4(address) => {
+            let mask = if allowed_ip.cidr == 0 {
+                0
+            } else {
+                u32::MAX << (32 - u32::from(allowed_ip.cidr))
+            };
+            IpAddr::V4(Ipv4Addr::from(u32::from(address) & mask))
+        }
+        IpAddr::V6(address) => {
+            let mask = if allowed_ip.cidr == 0 {
+                0
+            } else {
+                u128::MAX << (128 - u32::from(allowed_ip.cidr))
+            };
+            IpAddr::V6(Ipv6Addr::from(u128::from(address) & mask))
+        }
+    };
+    allowed_ip
+}
+
+/// Normalizes and deduplicates peer allowed IPs before they reach `WGApi`.
+pub fn normalize_allowed_ips(config: &mut InterfaceConfiguration) {
+    for peer in &mut config.peers {
+        let mut seen = HashSet::new();
+        peer.allowed_ips = std::mem::take(&mut peer.allowed_ips)
+            .into_iter()
+            .map(mask_allowed_ip)
+            .filter(|allowed_ip| seen.insert(allowed_ip.clone()))
+            .collect();
+    }
+}
 
 impl From<InterfaceConfiguration> for InterfaceConfig {
     fn from(config: InterfaceConfiguration) -> Self {
@@ -151,6 +192,79 @@ mod tests {
         peer.endpoint = Some("127.0.0.1:8080".parse().unwrap());
         peer.persistent_keepalive_interval = Some(25);
         peer
+    }
+
+    #[test]
+    fn test_mask_allowed_ip_clears_ipv4_host_bits() {
+        let allowed_ip = "172.16.0.1/24".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(
+            mask_allowed_ip(allowed_ip),
+            "172.16.0.0/24".parse::<IpAddrMask>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_mask_allowed_ip_keeps_ipv4_host_route() {
+        let allowed_ip = "172.16.0.1/32".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(mask_allowed_ip(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_mask_allowed_ip_keeps_canonical_address() {
+        let allowed_ip = "172.16.0.0/24".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(mask_allowed_ip(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_mask_allowed_ip_handles_ipv4_default_route() {
+        let allowed_ip = "10.0.0.1/0".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(
+            mask_allowed_ip(allowed_ip),
+            "0.0.0.0/0".parse::<IpAddrMask>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_mask_allowed_ip_clears_ipv6_host_bits() {
+        let allowed_ip = "2001:db8::1/96".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(
+            mask_allowed_ip(allowed_ip),
+            "2001:db8::/96".parse::<IpAddrMask>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_normalize_allowed_ips_deduplicates_after_masking() {
+        let mut peer = sample_peer();
+        peer.allowed_ips = ["172.16.0.1/24", "172.16.0.2/24", "10.0.0.0/24"]
+            .into_iter()
+            .map(|allowed_ip| allowed_ip.parse().unwrap())
+            .collect();
+        let mut config = InterfaceConfiguration {
+            name: "wg0".into(),
+            prvkey: String::new(),
+            addresses: vec!["10.0.0.1/24".parse().unwrap()],
+            port: 0,
+            peers: vec![peer],
+            mtu: None,
+            fwmark: None,
+        };
+
+        normalize_allowed_ips(&mut config);
+
+        assert_eq!(
+            config.peers[0].allowed_ips,
+            ["172.16.0.0/24", "10.0.0.0/24"]
+                .into_iter()
+                .map(|allowed_ip| allowed_ip.parse().unwrap())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(config.addresses, vec!["10.0.0.1/24".parse().unwrap()]);
     }
 
     #[test]
