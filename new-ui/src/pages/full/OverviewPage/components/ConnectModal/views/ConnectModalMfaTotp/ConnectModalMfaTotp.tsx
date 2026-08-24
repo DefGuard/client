@@ -108,7 +108,6 @@ export const ConnectModalMfaTotp = () => {
             variant={ButtonVariant.Primary}
             onClick={() => handleVerify()}
             loading={isVerifying}
-            disabled={isStarting}
           />
         </div>
       </Controls>

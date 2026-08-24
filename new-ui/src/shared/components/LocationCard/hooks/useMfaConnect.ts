@@ -106,7 +106,7 @@ export const useMfaConnect = (
 
   const verifyCode = useCallback(
     async (code: string) => {
-      if (!token || !instance) return;
+      if (isStarting || !token || !instance) return;
 
       setIsVerifying(true);
       setVerifyError(null);
@@ -141,6 +141,7 @@ export const useMfaConnect = (
       }
     },
     [
+      isStarting,
       token,
       stepAttemptId,
       instance,

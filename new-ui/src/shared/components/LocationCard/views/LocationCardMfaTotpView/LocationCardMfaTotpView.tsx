@@ -131,7 +131,6 @@ export const LocationCardMfaTotpView = () => {
             variant={ButtonVariant.Primary}
             onClick={() => handleVerify(totpCode)}
             loading={isVerifying}
-            disabled={isStarting}
           />
         </div>
       </Controls>
