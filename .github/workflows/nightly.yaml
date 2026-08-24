@@ -19,8 +19,19 @@ jobs:
       aws_region: eu-central-1
     secrets: inherit
 
-  main:
+  dev:
     needs: release-2-1
+    if: always()
+    uses: ./.github/workflows/nightly-build-2x.yaml
+    with:
+      branch: dev
+      s3_bucket: nightly.defguard.net
+      s3_prefix: defguard-client
+      aws_region: eu-central-1
+    secrets: inherit
+
+  main:
+    needs: dev
     if: always()
     uses: ./.github/workflows/nightly-build-1x.yaml
     with:
@@ -33,6 +44,7 @@ jobs:
   update-index:
     needs:
       - release-2-1
+      - dev
       - main
     if: always()
     runs-on:
@@ -49,7 +61,16 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
+          VERSION_RELEASE_2_1: ${{ needs.release-2-1.outputs.version }}
+          VERSION_DEV: ${{ needs.dev.outputs.version }}
+          VERSION_MAIN: ${{ needs.main.outputs.version }}
         run: |
+          jq -n \
+            --arg release_2_1 "${VERSION_RELEASE_2_1:-unknown}" \
+            --arg dev "${VERSION_DEV:-unknown}" \
+            --arg main "${VERSION_MAIN:-unknown}" \
+            '{"release-2.1": $release_2_1, "dev": $dev, "main": $main}' > versions.json
+
           aws s3api list-objects-v2 \
             --bucket "${S3_BUCKET}" \
             --prefix "${S3_PREFIX}/" \
@@ -62,13 +83,15 @@ jobs:
             echo '<title>defguard-client nightly builds</title>'
             echo '<style>body{font-family:sans-serif;margin:2rem}table{border-collapse:collapse;margin-bottom:2rem}th,td{padding:.3rem 1.5rem .3rem 0;border-bottom:1px solid #ddd;white-space:nowrap}</style>'
             echo '<h1>defguard-client nightly builds</h1>'
-            jq -r '
+            jq -r --slurpfile versions versions.json '
               (. // [])
               | group_by(.key | split("/")[1])
               | map(sort_by(.modified) | reverse)
               | sort_by(.[0].modified) | reverse
               | .[]
-              | "<h2>\(.[0].key | split("/")[1])</h2>",
+              | (.[0].key | split("/")[1]) as $directory
+              | ($versions[0][$directory] // "unknown") as $version
+              | "<h2>\($directory) (\($version))</h2>",
                 "<table><tr><th align=\"left\">File</th><th align=\"right\">Size</th><th align=\"left\">Uploaded on (UTC)</th></tr>",
                 (.[] | "<tr><td><a href=\"/\(.key)\">\(.key | split("/")[2])</a></td><td align=\"right\">\((.size / 104857.6 | round) / 10) MiB</td><td>\(.modified[0:10]) \(.modified[11:16])</td></tr>"),
                 "</table>"

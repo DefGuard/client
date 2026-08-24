@@ -16,6 +16,10 @@ on:
         required: true
         type: string
 
+    outputs:
+      version:
+        value: ${{ jobs.build-linux.outputs.version }}
+
 env:
   S3_BUCKET: ${{ inputs.s3_bucket }}
   S3_PREFIX: ${{ inputs.s3_prefix }}
@@ -23,6 +27,8 @@ env:
 
 jobs:
   build-linux:
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       CARGO_TERM_COLOR: always
       # sccache
@@ -83,10 +89,12 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm awscli jq
 
       - name: Write build version
+        id: version
         run: |
           VERSION=$(jq -r .version src-tauri/tauri.conf.json)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
+          echo "version=$VERSION" >> ${GITHUB_OUTPUT}
           BRANCH="${{ inputs.branch }}"
           echo "BRANCH=${BRANCH//\//-}" >> ${GITHUB_ENV}
           echo "SHA=$(git rev-parse --short HEAD)" >> ${GITHUB_ENV}
