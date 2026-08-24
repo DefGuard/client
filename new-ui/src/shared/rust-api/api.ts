@@ -27,7 +27,6 @@ import type {
   SaveDeviceConfigResponse,
   SessionState,
   SessionStatePatch,
-  SetLocationMfaMethodArgs,
   SetLocationMfaStepPlanArgs,
   StatsArgs,
   TunnelInfo,
@@ -59,9 +58,6 @@ const getLocationDetails = (args: LocationDetailsArgs): Promise<LocationDetails>
 
 const updateLocationRouting = (args: RoutingArgs): Promise<Connection> =>
   invoke(TauriCommand.UpdateLocationRouting, args);
-
-const setLocationMfaMethod = (args: SetLocationMfaMethodArgs): Promise<void> =>
-  invoke(TauriCommand.SetLocationMfaMethod, args);
 
 const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void> =>
   invoke(TauriCommand.SetLocationMfaStepPlan, args);
@@ -253,7 +249,7 @@ const startMfaStep = async (
   stepPlan: MfaMethodValue[],
   mfaToken: string | null,
 ): Promise<MfaStepSession> => {
-  if (isPresent(mfaToken)) {
+  if (isPresent(mfaToken) && stepPlan.length > 1) {
     const startedStep = await mfaStepStart(instanceId, mfaToken, method);
     return {
       token: mfaToken,
@@ -282,7 +278,6 @@ export const api = {
   hasAnyVisibleLocations,
   getLocationDetails,
   updateLocationRouting,
-  setLocationMfaMethod,
   setLocationMfaStepPlan,
   // Connections
   connect,

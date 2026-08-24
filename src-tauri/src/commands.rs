@@ -898,21 +898,6 @@ pub async fn update_location_routing(
 }
 
 #[tauri::command(async)]
-pub async fn set_location_mfa_method(
-    location_id: Id,
-    mfa_method: LocationMfaMethod,
-    handle: AppHandle,
-) -> Result<(), Error> {
-    debug!("Received command to set MFA method for location {location_id}");
-    Location::set_mfa_method(&DB_POOL, location_id, mfa_method).await?;
-    debug!("MFA method updated for location (ID: {location_id})");
-    handle
-        .emit(EventKey::LocationUpdate.into(), ())
-        .map_err(tauri_err_to_app_err)?;
-    Ok(())
-}
-
-#[tauri::command(async)]
 pub async fn set_location_mfa_step_plan(
     location_id: Id,
     mfa_step_plan: Vec<LocationMfaMethod>,

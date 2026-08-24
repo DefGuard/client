@@ -106,7 +106,6 @@ export const TauriCommand = {
   HasAnyVisibleLocations: 'has_any_visible_locations',
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
-  SetLocationMfaMethod: 'set_location_mfa_method',
   SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
@@ -410,11 +409,6 @@ export type SaveConfigArgs = {
 export type UpdateInstanceArgs = {
   instanceId: number;
   response: CreateDeviceResponse;
-};
-
-export type SetLocationMfaMethodArgs = {
-  locationId: number;
-  mfaMethod: MfaMethodValue;
 };
 
 export type SetLocationMfaStepPlanArgs = {
