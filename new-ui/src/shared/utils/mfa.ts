@@ -28,6 +28,11 @@ export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
 
 export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];
 
+const mfaSteps = (
+  location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
+): MfaStep[] =>
+  location.connection_type === ConnectionType.Tunnel ? [] : location.mfa_steps;
+
 /**
  * Whether connecting this location should trigger the MFA flow: only for
  * server-managed locations (never bare tunnels) that have MFA enabled.
@@ -38,8 +43,7 @@ export const shouldStartMfa = (
 
 export const mfaStepCount = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): number =>
-  location.connection_type !== ConnectionType.Tunnel ? location.mfa_steps.length : 0;
+): number => mfaSteps(location).length;
 
 export const usableMfaMethods = (step: MfaStep): MfaStepMethod[] =>
   step.methods.filter(
@@ -54,10 +58,10 @@ export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
 };
 
 export const resolveMfaStepPlan = (
-  location: Pick<LocationInfo, 'mfa_steps' | 'mfa_step_plan'>,
+  location: Pick<LocationInfo, 'connection_type' | 'mfa_steps' | 'mfa_step_plan'>,
   oneOffPlan: MfaMethodValue[] = [],
 ): MfaMethodValue[] =>
-  location.mfa_steps.map((step, index) => {
+  mfaSteps(location).map((step, index) => {
     const usableMethods = usableMfaMethods(step);
     const isUsable = (method: MfaMethodValue) =>
       usableMethods.some((entry) => entry.method === method);
@@ -77,8 +81,8 @@ export const resolveMfaStepPlan = (
  * TODO: block connecting only until the user can configure the missing factors in place.
  */
 export const hasUnpassableMfaStep = (
-  location: Pick<LocationInfo, 'mfa_steps'>,
-): boolean => location.mfa_steps.some((step) => usableMfaMethods(step).length === 0);
+  location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
+): boolean => mfaSteps(location).some((step) => usableMfaMethods(step).length === 0);
 
 export const mfaStepsToText = (stepCount: number): string =>
   `${stepCount}-step verification`;
