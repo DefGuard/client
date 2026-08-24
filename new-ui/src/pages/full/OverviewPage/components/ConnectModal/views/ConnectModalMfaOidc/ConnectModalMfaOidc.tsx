@@ -14,7 +14,6 @@ import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPo
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 import { useConnectModalMfaOidc } from '../../hooks/useConnectModalMfaOidc';
-import { useMfaStep } from '../../hooks/useMfaStep';
 
 type Screen = 'idle' | 'polling' | 'error';
 
@@ -24,10 +23,7 @@ export const ConnectModalMfaOidc = () => {
     useShallow((s) => [s.perviousView, s.location, s.autoStartOpenId]),
   );
 
-  const { onStepPassed } = useMfaStep();
-
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
-    onStepPassed,
     onSessionExpired: () =>
       useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
     onPostureError: (msg) => {

@@ -11,21 +11,22 @@ import {
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { LocationInfo, MfaMethod } from '../../../rust-api/types';
+import type { LocationInfo, MfaMethod, MfaMethodValue } from '../../../rust-api/types';
+import { isPresent } from '../../../utils/isPresent';
 
 type CodeMfaMethod = typeof MfaMethod.Totp | typeof MfaMethod.Email;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
-  onStepPassed?: () => void;
+  stepPlan: MfaMethodValue[];
+  mfaToken: string | null;
+  setMfaToken: (token: string) => void;
+  onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onSessionExpired?: () => void;
   onPostureError?: (message: string) => void;
   onServiceUnavailable?: () => void;
 };
-
-// TODO: delete this
-const MOCK_STEP_TOKEN = 'mock-step-token';
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
   const remainingMs = Math.max(minimumMs - (performance.now() - startedAt), 0);
@@ -39,14 +40,18 @@ export const useMfaConnect = (
   method: CodeMfaMethod,
   {
     debounceMs = 0,
-    onStepPassed,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    onStepAdvanced,
     onConnected,
     onSessionExpired,
     onPostureError,
     onServiceUnavailable,
-  }: UseMfaConnectOptions = {},
+  }: UseMfaConnectOptions,
 ) => {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(mfaToken);
+  const [stepAttemptId, setStepAttemptId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(debounceMs > 0);
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -70,15 +75,17 @@ export const useMfaConnect = (
 
     (async () => {
       try {
-        // TODO(mock): drop this branch and always call mfaStart with the step's method
-        if (onStepPassed) {
-          await waitForMinimumDuration(startedAt, debounceMs);
-          setToken(MOCK_STEP_TOKEN);
-          return;
-        }
-        const info = await api.mfaStart(instance.id, location.id, method);
+        const session = await api.startMfaStep(
+          instance.id,
+          location.id,
+          method,
+          stepPlan,
+          mfaToken,
+        );
         await waitForMinimumDuration(startedAt, debounceMs);
-        setToken(info.token);
+        setToken(session.token);
+        setStepAttemptId(session.stepAttemptId);
+        setMfaToken(session.token);
       } catch (err) {
         void error(`MFA start failed: ${err}`);
         await waitForMinimumDuration(startedAt, debounceMs);
@@ -105,15 +112,17 @@ export const useMfaConnect = (
       setVerifyError(null);
 
       try {
-        // TODO(mock): call mfaFinishCode here too and advance only on MfaAdvanced,
-        // falling through to onConnected on MfaCompleted
-        if (onStepPassed) {
-          onStepPassed();
+        const nextStepIndex = await api.mfaFinishCode(
+          instance.id,
+          location.id,
+          token,
+          code,
+          stepAttemptId,
+        );
+        if (isPresent(nextStepIndex)) {
+          onStepAdvanced(nextStepIndex);
           return;
         }
-        // mfaFinishCode completes MFA and brings up the connection in the
-        // backend; the preshared key never reaches the frontend.
-        await api.mfaFinishCode(instance.id, location.id, token, code);
         onConnected?.();
       } catch (err) {
         void error(`MFA verification failed: ${err}`);
@@ -131,7 +140,15 @@ export const useMfaConnect = (
         setIsVerifying(false);
       }
     },
-    [token, instance, location, onStepPassed, onConnected, onSessionExpired],
+    [
+      token,
+      stepAttemptId,
+      instance,
+      location,
+      onStepAdvanced,
+      onConnected,
+      onSessionExpired,
+    ],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

@@ -25,14 +25,20 @@ export const LocationCardMfaTotpView = () => {
     location,
     setPostureError,
     stepLabel,
-    onStepPassed,
     canPickOtherMethod,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    goToStep,
   } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location,
     MfaMethod.Totp,
     {
-      onStepPassed,
+      stepPlan,
+      mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),
       onSessionExpired: () => setView(LocationCardViews.Default),

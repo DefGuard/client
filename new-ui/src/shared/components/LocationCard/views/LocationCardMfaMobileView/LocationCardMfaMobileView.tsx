@@ -22,11 +22,15 @@ export const LocationCardMfaMobileView = () => {
     setPostureError,
     location,
     stepLabel,
-    onStepPassed,
     canPickOtherMethod,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
   } = useLocationCardContext();
   const { start, startError, qrValue, connectionError } = useMfaMobileConnect(location, {
-    onStepPassed,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
     onConnected: () => setView(LocationCardViews.Connected),
     onPostureError: (message) => setPostureError(message ?? null),
     onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),

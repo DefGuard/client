@@ -91,6 +91,7 @@ export const TauriCommand = {
   EnrollmentFinish: 'enrollment_finish',
   // MFA
   MfaStart: 'mfa_start',
+  MfaStepStart: 'mfa_step_start',
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
@@ -507,6 +508,17 @@ export type EnrollmentMfaFinishResult = {
 export type MfaStartResult = {
   token: string;
   challenge: string | null;
+};
+
+export type MfaStepStartResult = {
+  step_attempt_id: string;
+  challenge: string | null;
+};
+
+export type MfaStepSession = {
+  token: string;
+  challenge: string | null;
+  stepAttemptId: string | null;
 };
 
 /** Payload for mfa-openid-error / mfa-mobile-error events. */

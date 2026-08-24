@@ -18,6 +18,7 @@ interface StoreValues {
   mfaMethod: MfaMethodValue;
   stepIndex: number;
   stepPlan: MfaMethodValue[];
+  mfaToken: string | null;
 }
 
 const defaults: StoreValues = {
@@ -30,12 +31,14 @@ const defaults: StoreValues = {
   autoStartOpenId: false,
   stepIndex: 0,
   stepPlan: [],
+  mfaToken: null,
 } as const;
 
 interface Store extends StoreValues {
   open: (init?: Partial<StoreValues>) => void;
   setView: (view: ConnectModalViewValue, values?: Partial<StoreValues>) => void;
-  passStep: () => void;
+  setMfaToken: (token: string) => void;
+  goToStep: (stepIndex: number) => void;
   reset: () => void;
 }
 
@@ -49,18 +52,12 @@ export const useConnectModal = create<Store>((set, get) => ({
     const stepPlan = isPresent(location) ? resolveMfaStepPlan(location) : [];
     set({ ...defaults, ...init, stepPlan, visible: true });
   },
-  passStep: () => {
-    const { stepIndex, stepPlan, setView } = get();
-    const nextStepIndex = stepIndex + 1;
-    if (nextStepIndex < stepPlan.length) {
-      setView(mfaMethodToConnectModalView(stepPlan[nextStepIndex]), {
-        stepIndex: nextStepIndex,
-      });
-      return;
-    }
-    // TODO(mock): the last step closes the modal without connecting; connect here once
-    // MfaCompleted brings up the tunnel
-    set({ stepIndex: 0, visible: false });
+  setMfaToken: (token) => {
+    set({ mfaToken: token });
+  },
+  goToStep: (stepIndex) => {
+    const { stepPlan, setView } = get();
+    setView(mfaMethodToConnectModalView(stepPlan[stepIndex]), { stepIndex });
   },
   setView: (view, vals) => {
     const pervious = get().view ?? null;

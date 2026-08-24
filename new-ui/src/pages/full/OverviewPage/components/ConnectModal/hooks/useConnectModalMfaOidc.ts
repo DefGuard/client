@@ -18,24 +18,20 @@ import type { MfaErrorPayload } from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
 import { useConnectModal } from './useConnectModal';
 
-// TODO: delete this
-const MOCK_OIDC_URL = 'https://example.com/openid/mfa?token=mock-step-token';
-const MOCK_OIDC_DELAY_MS = 1500;
-
 type Options = {
-  onStepPassed?: () => void;
   onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
   onServiceUnavailable?: () => void;
 };
 
 export const useConnectModalMfaOidc = ({
-  onStepPassed,
   onPostureError,
   onSessionExpired,
   onServiceUnavailable,
 }: Options = {}) => {
-  const location = useConnectModal(useShallow((s) => s.location));
+  const [location, stepPlan, mfaToken, setMfaToken] = useConnectModal(
+    useShallow((s) => [s.location, s.stepPlan, s.mfaToken, s.setMfaToken]),
+  );
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -77,20 +73,21 @@ export const useConnectModalMfaOidc = ({
     cleanup();
 
     try {
-      // TODO(mock): open the real proxy link and call onStepPassed from the poll result, instead of faking it on a timer
-      if (onStepPassed) {
-        await api.openLink(MOCK_OIDC_URL);
-        setIsPolling(true);
-        window.setTimeout(onStepPassed, MOCK_OIDC_DELAY_MS);
-        return;
-      }
-      const info = await api.mfaStart(instance.id, location.id, MfaMethod.Oidc);
-      await api.openLink(`${instance.proxy_url}openid/mfa?token=${info.token}`);
+      const session = await api.startMfaStep(
+        instance.id,
+        location.id,
+        MfaMethod.Oidc,
+        stepPlan,
+        mfaToken,
+      );
+      setMfaToken(session.token);
+
+      await api.openLink(`${instance.proxy_url}openid/mfa?token=${session.token}`);
 
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, location.id, info.token);
+      const taskId = await api.mfaPollOpenId(instance.id, location.id, session.token);
       taskIdRef.current = taskId;
 
       // The backend brings up the connection itself; completion means connected.
@@ -139,8 +136,10 @@ export const useConnectModalMfaOidc = ({
   }, [
     instance,
     location,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
     cleanup,
-    onStepPassed,
     onPostureError,
     onSessionExpired,
     onServiceUnavailable,

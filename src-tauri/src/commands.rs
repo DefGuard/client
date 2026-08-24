@@ -19,7 +19,8 @@ use defguard_client_proto::defguard::client::v1::{
 };
 use defguard_client_proto::defguard::{
     client_types::{
-        AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        mfa_step_result, AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse,
+        ClientMfaStartRequest, ClientMfaStepStartRequest, ClientMfaStepStartResponse,
         CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
         EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
@@ -1603,10 +1604,16 @@ fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
 pub async fn mfa_start(
     instance_id: Id,
     location_id: Id,
-    method: String,
+    methods: Vec<String>,
 ) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
     debug!("Starting MFA session for location {location_id}");
-    let method = parse_mfa_method(&method)?;
+    let step_methods = methods
+        .iter()
+        .map(|method| parse_mfa_method(method))
+        .collect::<Result<Vec<MfaMethod>, String>>()?;
+    let first_step_method = *step_methods
+        .first()
+        .ok_or_else(|| "MFA method plan is empty".to_string())?;
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1633,12 +1640,37 @@ pub async fn mfa_start(
     let request = ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
-        method: method as i32,
+        method: first_step_method as i32,
         posture_data,
-        // TODO(multi-step-mfa): empty = legacy path; send one method per step
-        selected_methods: Vec::new(),
+        selected_methods: step_methods
+            .iter()
+            .map(|method| *method as i32)
+            .collect::<Vec<i32>>(),
     };
     mfa::mfa_start(proxy_url, request)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn mfa_step_start(
+    instance_id: Id,
+    token: String,
+    method: String,
+) -> Result<ClientMfaStepStartResponse, String> {
+    debug!("Starting MFA step for instance {instance_id}");
+    let method = parse_mfa_method(&method)?;
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let request = ClientMfaStepStartRequest {
+        token,
+        method: method as i32,
+    };
+    mfa::mfa_step_start(proxy_url, request)
         .await
         .map_err(err_to_json)
 }
@@ -1649,8 +1681,9 @@ pub async fn mfa_finish_code(
     location_id: Id,
     token: String,
     code: String,
+    step_attempt_id: Option<String>,
     handle: AppHandle,
-) -> Result<(), String> {
+) -> Result<Option<u32>, String> {
     debug!("Finishing MFA with code for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
@@ -1662,13 +1695,37 @@ pub async fn mfa_finish_code(
         token,
         code: Some(code),
         auth_pub_key: None,
-        // #TODO (multi-step-mfa) pass the id minted by StepStart for this step.
-        step_attempt_id: None,
+        step_attempt_id,
     };
     let response = mfa::mfa_finish_code(proxy_url, request)
         .await
         .map_err(err_to_json)?;
-    connect_after_mfa(location_id, response.preshared_key, &handle).await
+
+    #[allow(deprecated)]
+    let legacy_preshared_key = response.preshared_key;
+
+    match response.result.and_then(|result| result.outcome) {
+        Some(mfa_step_result::Outcome::Advanced(advanced)) => {
+            debug!(
+                "MFA step passed, advancing to step index {}",
+                advanced.next_step
+            );
+            Ok(Some(advanced.next_step))
+        }
+        Some(mfa_step_result::Outcome::Completed(completed)) => {
+            connect_after_mfa(location_id, completed.preshared_key, &handle).await?;
+            Ok(None)
+        }
+        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {
+            Err(err_to_json(mfa::MfaError::Other {
+                message: "The server returned an unexpected verification state".to_string(),
+            }))
+        }
+        None => {
+            connect_after_mfa(location_id, legacy_preshared_key, &handle).await?;
+            Ok(None)
+        }
+    }
 }
 
 /// Register a long-running MFA task, run its future in the background, and on

@@ -212,6 +212,7 @@ pub fn run_app() {
             enrollment_network_info,
             enrollment_finish,
             mfa_start,
+            mfa_step_start,
             mfa_finish_code,
             mfa_poll_openid,
             mfa_connect_mobile_approve,

@@ -38,8 +38,10 @@ interface LocationCardContextValue {
   stepPlan: MfaMethodValue[];
   stepIndex: number;
   stepLabel: string | null;
-  onStepPassed?: () => void;
+  mfaToken: string | null;
   setMfaMethod: (value: MfaMethodValue) => void;
+  setMfaToken: (token: string) => void;
+  goToStep: (stepIndex: number) => void;
   setStepPlanOnce: (plan: MfaMethodValue[]) => void;
   setView: (view: LocationCardViewsValue) => void;
   setPostureError: (error: string | null) => void;
@@ -93,6 +95,7 @@ export const LocationCardProvider = ({
     [location, stepPlanOnce],
   );
   const [stepIndex, setStepIndex] = useState(0);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
 
   // Other location updates must not undo an optimistic connection transition.
   // biome-ignore lint/correctness/useExhaustiveDependencies: synchronize only on active state
@@ -103,6 +106,7 @@ export const LocationCardProvider = ({
       setMfaMethod(resolveMfaStepPlan(location)[0] ?? MfaMethod.Totp);
       setCurrentView(LocationCardViews.Default);
       setStepIndex(0);
+      setMfaToken(null);
     }
   }, [location.active]);
 
@@ -114,20 +118,13 @@ export const LocationCardProvider = ({
     [currentView],
   );
 
-  const passStep = useCallback(() => {
-    const nextStepIndex = stepIndex + 1;
-    if (nextStepIndex < stepPlan.length) {
+  const goToStep = useCallback(
+    (nextStepIndex: number) => {
       setStepIndex(nextStepIndex);
       setView(mfaMethodToLocationCardView(stepPlan[nextStepIndex]));
-      return;
-    }
-    setStepIndex(0);
-    // TODO(mock): the last step ends the flow without connecting; connect here once
-    // MfaCompleted brings up the tunnel
-    setView(LocationCardViews.Default);
-  }, [setView, stepPlan, stepIndex]);
-
-  const onStepPassed = isMultiStep ? passStep : undefined;
+    },
+    [setView, stepPlan],
+  );
 
   const startMfa = useCallback(async () => {
     mfaStarted.current = true;
@@ -136,6 +133,7 @@ export const LocationCardProvider = ({
     const defaultPlan = resolveMfaStepPlan(location);
     setStepPlanOnce([]);
     setStepIndex(0);
+    setMfaToken(null);
     setMfaMethod(defaultPlan[0]);
     setView(mfaMethodToLocationCardView(defaultPlan[0]));
   }, [setView, location]);
@@ -197,12 +195,14 @@ export const LocationCardProvider = ({
         stepPlan,
         stepIndex,
         stepLabel,
-        onStepPassed,
+        mfaToken,
         setView,
         setPostureError,
         startMfa,
         setMfaMethod,
+        setMfaToken,
         setStepPlanOnce,
+        goToStep,
       }}
     >
       {children}

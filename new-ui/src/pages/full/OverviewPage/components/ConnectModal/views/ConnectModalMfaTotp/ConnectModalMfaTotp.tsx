@@ -19,13 +19,16 @@ export const ConnectModalMfaTotp = () => {
     useShallow((s) => [s.perviousView, s.location]),
   );
 
-  const { canPickOtherMethod, onStepPassed } = useMfaStep();
+  const { canPickOtherMethod, stepPlan, mfaToken, setMfaToken, goToStep } = useMfaStep();
 
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location as LocationInfo,
     MfaMethod.Totp,
     {
-      onStepPassed,
+      stepPlan,
+      mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       debounceMs: location?.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onSessionExpired: () =>
         useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
