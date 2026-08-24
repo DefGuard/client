@@ -108,6 +108,7 @@ pub(crate) fn validate_mfa_flags(
 ///
 /// The HTTP calls are handled by `defguard_core::mfa`; this function
 /// handles CLI-specific code sourcing (TTY / --code / --code-command).
+#[allow(deprecated)]
 pub(crate) async fn authorize(
     location: &Location<Id>,
     source: &CodeSource,
@@ -194,6 +195,7 @@ pub(crate) async fn authorize(
 ///
 /// When `json_mode` is true, progress messages on stderr are suppressed so
 /// that `--json` output consumers only see the final result/error.
+#[allow(deprecated)]
 pub(crate) async fn authorize_oidc(
     location: &Location<Id>,
     instance: &Instance<Id>,
@@ -264,6 +266,7 @@ pub(crate) async fn authorize_oidc(
 ///
 /// When `json_mode` is true, progress messages on stderr are suppressed so
 /// that `--json` output consumers only see the final result/error.
+#[allow(deprecated)]
 pub(crate) async fn authorize_mobile_approve(
     location: &Location<Id>,
     instance: &Instance<Id>,

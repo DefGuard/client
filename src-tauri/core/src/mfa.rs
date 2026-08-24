@@ -127,6 +127,7 @@ pub async fn mfa_start(
         message: format!("Failed to reach proxy: {e}"),
     })?;
 
+    #[allow(deprecated)]
     let response = match check_mfa_response(response).await {
         Ok(response) => response,
         Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
@@ -437,6 +438,7 @@ async fn wait_for_mfa_success(
             if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
                 if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
                     if let Some(key) = parsed["preshared_key"].as_str() {
+                        #[allow(deprecated)]
                         return Ok(ClientMfaFinishResponse {
                             preshared_key: key.to_string(),
                             token: None,
@@ -450,6 +452,7 @@ async fn wait_for_mfa_success(
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use reqwest::Url;
     use serde_json::json;

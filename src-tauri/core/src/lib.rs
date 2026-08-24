@@ -160,6 +160,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
     use LocationMfaMode as MfaMode;
     use ServiceLocationMode as SLocationMode;
 
+    #[allow(deprecated)]
     let location_mfa_mode = match dev_config.location_mfa_mode {
         Some(_location_mfa_mode) => dev_config.location_mfa_mode().into(),
         None =>
@@ -208,6 +209,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use chrono::{Duration, Utc};
     use defguard_client_proto::defguard::client_types::{

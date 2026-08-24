@@ -1622,6 +1622,7 @@ pub async fn mfa_start(
     } else {
         None
     };
+    #[allow(deprecated)]
     let request = ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
@@ -1753,7 +1754,9 @@ where
         match result {
             Ok(response) => {
                 info!("MFA completed for task {task_id_for_task}");
-                match connect_after_mfa(location_id, response.preshared_key, &listen_handle).await {
+                #[allow(deprecated)]
+                let preshared_key = response.preshared_key;
+                match connect_after_mfa(location_id, preshared_key, &listen_handle).await {
                     Ok(()) => {
                         let _ = listen_handle.emit(complete_event.into(), ());
                     }
