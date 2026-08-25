@@ -8,6 +8,7 @@ use std::{
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
+use crate::database::db_file_path;
 #[cfg(unix)]
 use crate::set_perms;
 
@@ -18,6 +19,7 @@ pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const LOG_FILENAME: &str = "defguard-client";
 pub const WELCOME_FORCE_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_FORCE";
 pub const WELCOME_SKIP_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_SKIP";
+pub const WELCOME_CONTENT_VERSION: Version = Version::new(2, 1, 0);
 pub use defguard_client_common::VERSION as PKG_VERSION;
 
 /// Selects the version string the client should report: the build-version override when present
@@ -144,6 +146,21 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
             }
             .save(config_dir);
             VersionCheckResult::Init
+        }
+    }
+}
+
+#[must_use]
+pub fn should_show_welcome(result: &VersionCheckResult) -> bool {
+    if welcome_force_enabled() {
+        return true;
+    }
+
+    match result {
+        VersionCheckResult::Init => db_file_path().is_some_and(|path| path.exists()),
+        VersionCheckResult::Unchanged => false,
+        VersionCheckResult::Upgraded { previous, current } => {
+            *previous < WELCOME_CONTENT_VERSION && WELCOME_CONTENT_VERSION <= *current
         }
     }
 }
