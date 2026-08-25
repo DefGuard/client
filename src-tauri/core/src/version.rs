@@ -194,9 +194,62 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        check_app_version, select_reported_app_version, Version, VersionCheckResult,
-        VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
+        check_app_version, mark_welcome_shown, select_reported_app_version, should_show_welcome,
+        Version, VersionCheckResult, VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR,
+        WELCOME_SKIP_ENV_VAR,
     };
+
+    #[test]
+    fn test_should_show_welcome_when_state_file_missing() {
+        let dir = tempdir().unwrap();
+
+        assert!(should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_should_show_welcome_when_never_marked() {
+        let dir = tempdir().unwrap();
+        let _ = check_app_version(dir.path(), &Version::new(2, 1, 0));
+
+        assert!(should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_should_not_show_welcome_after_marking() {
+        let dir = tempdir().unwrap();
+        let current = Version::new(2, 1, 0);
+        let _ = check_app_version(dir.path(), &current);
+
+        mark_welcome_shown(dir.path(), &current);
+
+        assert!(!should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_should_show_welcome_when_marked_below_content_version() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join(VERSION_STATE_FILE_NAME),
+            br#"{"version":"2.1.0","welcome_shown":"2.0.0"}"#,
+        )
+        .unwrap();
+
+        assert!(should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_check_app_version_preserves_welcome_shown_on_upgrade() {
+        let dir = tempdir().unwrap();
+        let previous = Version::new(2, 1, 0);
+        let _ = check_app_version(dir.path(), &previous);
+        mark_welcome_shown(dir.path(), &previous);
+
+        let current = Version::new(2, 1, 1);
+        let result = check_app_version(dir.path(), &current);
+
+        assert_eq!(result, VersionCheckResult::Upgraded { previous, current });
+        assert!(!should_show_welcome(dir.path()));
+    }
 
     #[test]
     fn test_reported_app_version_uses_override_when_present() {
