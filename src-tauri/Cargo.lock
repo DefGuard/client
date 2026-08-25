@@ -1771,6 +1771,7 @@ version = "2.1.0"
 dependencies = [
  "clap",
  "defguard-client-common",
+ "defguard-client-proto",
  "defguard_wireguard_rs",
  "dirs-next",
  "prost",
