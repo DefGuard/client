@@ -41,7 +41,7 @@ const renderSlide = (slide: CarouselSlide) => {
     case 'image':
       return <SlideImage src={slide.slideSrc} />;
     case 'video':
-      return <SlideVideo src={slide.slideSrc} />;
+      return <SlideVideo src={slide.slideSrc} poster={slide.posterSrc} />;
   }
 };
 
@@ -82,7 +82,7 @@ export const WelcomeCarousel = ({ slides }: WelcomeCarouselProps) => {
             {renderSlide(activeSlide)}
             <div className="content">
               <p className="title">{activeSlide.title}</p>
-              <SizedBox height={ThemeSpacing.Xs} />
+              <SizedBox height={ThemeSpacing.Sm} />
               <p className="description">{activeSlide.description}</p>
               {isPresent(activeSlide.blogLink) && isPresent(activeSlide.blogLinkText) && (
                 <Fragment>
