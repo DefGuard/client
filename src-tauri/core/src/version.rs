@@ -8,7 +8,6 @@ use std::{
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::database::db_file_path;
 #[cfg(unix)]
 use crate::set_perms;
 
@@ -63,6 +62,8 @@ fn get_version_state_file(config_dir: &Path, for_write: bool) -> File {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct VersionState {
     version: Version,
+    #[serde(default)]
+    welcome_shown: Option<Version>,
 }
 
 impl VersionState {
@@ -118,6 +119,7 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
     if !path.exists() {
         VersionState {
             version: current_version.clone(),
+            welcome_shown: None,
         }
         .save(config_dir);
         return VersionCheckResult::Init;
@@ -131,6 +133,7 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
                 let previous = state.version;
                 VersionState {
                     version: current_version.clone(),
+                    welcome_shown: state.welcome_shown,
                 }
                 .save(config_dir);
                 VersionCheckResult::Upgraded {
@@ -143,6 +146,7 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
             error!("Failed to deserialize version state file: {err}. Treating as first run.");
             VersionState {
                 version: current_version.clone(),
+                welcome_shown: None,
             }
             .save(config_dir);
             VersionCheckResult::Init
@@ -150,19 +154,37 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
     }
 }
 
+fn read_version_state(config_dir: &Path) -> Option<VersionState> {
+    let path = get_version_state_file_path(config_dir);
+    if !path.exists() {
+        return None;
+    }
+    let file = get_version_state_file(config_dir, false);
+    serde_json::from_reader::<_, VersionState>(file).ok()
+}
+
 #[must_use]
-pub fn should_show_welcome(result: &VersionCheckResult) -> bool {
+pub fn should_show_welcome(config_dir: &Path) -> bool {
+    if welcome_skip_enabled() {
+        return false;
+    }
+
     if welcome_force_enabled() {
         return true;
     }
 
-    match result {
-        VersionCheckResult::Init => db_file_path().is_some_and(|path| path.exists()),
-        VersionCheckResult::Unchanged => false,
-        VersionCheckResult::Upgraded { previous, current } => {
-            *previous < WELCOME_CONTENT_VERSION && WELCOME_CONTENT_VERSION <= *current
-        }
-    }
+    read_version_state(config_dir)
+        .and_then(|state| state.welcome_shown)
+        .is_none_or(|shown| shown < WELCOME_CONTENT_VERSION)
+}
+
+pub fn mark_welcome_shown(config_dir: &Path, current_version: &Version) {
+    let mut state = read_version_state(config_dir).unwrap_or(VersionState {
+        version: current_version.clone(),
+        welcome_shown: None,
+    });
+    state.welcome_shown = Some(WELCOME_CONTENT_VERSION);
+    state.save(config_dir);
 }
 
 #[cfg(test)]
