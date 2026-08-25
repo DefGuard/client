@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    mem::take,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
     time::{Duration, UNIX_EPOCH},
@@ -11,29 +12,29 @@ use defguard_wireguard_rs::{
 
 use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
 
-/// Clears host bits from a peer allowed IP.
+/// Truncates host bits from a peer allowed IP.
 ///
 /// This runs before `WGApi` classifies default routes. In particular, a non-canonical `/0` must
 /// become an unspecified address so it takes the default-route loop-prevention path.
 #[must_use]
-pub fn mask_allowed_ip(mut allowed_ip: IpAddrMask) -> IpAddrMask {
-    allowed_ip.address = match allowed_ip.address {
-        IpAddr::V4(address) => {
-            let mask = if allowed_ip.cidr == 0 {
-                0
-            } else {
-                u32::MAX << (32 - u32::from(allowed_ip.cidr))
-            };
-            IpAddr::V4(Ipv4Addr::from(u32::from(address) & mask))
+fn truncate_to_network(mut allowed_ip: IpAddrMask) -> IpAddrMask {
+    let max_cidr = if allowed_ip.address.is_ipv4() {
+        32
+    } else {
+        128
+    };
+    if allowed_ip.cidr > max_cidr {
+        return allowed_ip;
+    }
+
+    allowed_ip.address = match (allowed_ip.address, allowed_ip.mask()) {
+        (IpAddr::V4(address), IpAddr::V4(mask)) => {
+            IpAddr::V4(Ipv4Addr::from(u32::from(address) & u32::from(mask)))
         }
-        IpAddr::V6(address) => {
-            let mask = if allowed_ip.cidr == 0 {
-                0
-            } else {
-                u128::MAX << (128 - u32::from(allowed_ip.cidr))
-            };
-            IpAddr::V6(Ipv6Addr::from(u128::from(address) & mask))
+        (IpAddr::V6(address), IpAddr::V6(mask)) => {
+            IpAddr::V6(Ipv6Addr::from(u128::from(address) & u128::from(mask)))
         }
+        _ => return allowed_ip,
     };
     allowed_ip
 }
@@ -42,9 +43,9 @@ pub fn mask_allowed_ip(mut allowed_ip: IpAddrMask) -> IpAddrMask {
 pub fn normalize_allowed_ips(config: &mut InterfaceConfiguration) {
     for peer in &mut config.peers {
         let mut seen = HashSet::new();
-        peer.allowed_ips = std::mem::take(&mut peer.allowed_ips)
+        peer.allowed_ips = take(&mut peer.allowed_ips)
             .into_iter()
-            .map(mask_allowed_ip)
+            .map(truncate_to_network)
             .filter(|allowed_ip| seen.insert(allowed_ip.clone()))
             .collect();
     }
@@ -195,47 +196,61 @@ mod tests {
     }
 
     #[test]
-    fn test_mask_allowed_ip_clears_ipv4_host_bits() {
+    fn test_truncate_to_network_clears_ipv4_host_bits() {
         let allowed_ip = "172.16.0.1/24".parse::<IpAddrMask>().unwrap();
 
         assert_eq!(
-            mask_allowed_ip(allowed_ip),
+            truncate_to_network(allowed_ip),
             "172.16.0.0/24".parse::<IpAddrMask>().unwrap()
         );
     }
 
     #[test]
-    fn test_mask_allowed_ip_keeps_ipv4_host_route() {
+    fn test_truncate_to_network_keeps_ipv4_host_route() {
         let allowed_ip = "172.16.0.1/32".parse::<IpAddrMask>().unwrap();
 
-        assert_eq!(mask_allowed_ip(allowed_ip.clone()), allowed_ip);
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
     }
 
     #[test]
-    fn test_mask_allowed_ip_keeps_canonical_address() {
+    fn test_truncate_to_network_keeps_canonical_address() {
         let allowed_ip = "172.16.0.0/24".parse::<IpAddrMask>().unwrap();
 
-        assert_eq!(mask_allowed_ip(allowed_ip.clone()), allowed_ip);
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
     }
 
     #[test]
-    fn test_mask_allowed_ip_handles_ipv4_default_route() {
+    fn test_truncate_to_network_handles_ipv4_default_route() {
         let allowed_ip = "10.0.0.1/0".parse::<IpAddrMask>().unwrap();
 
         assert_eq!(
-            mask_allowed_ip(allowed_ip),
+            truncate_to_network(allowed_ip),
             "0.0.0.0/0".parse::<IpAddrMask>().unwrap()
         );
     }
 
     #[test]
-    fn test_mask_allowed_ip_clears_ipv6_host_bits() {
+    fn test_truncate_to_network_clears_ipv6_host_bits() {
         let allowed_ip = "2001:db8::1/96".parse::<IpAddrMask>().unwrap();
 
         assert_eq!(
-            mask_allowed_ip(allowed_ip),
+            truncate_to_network(allowed_ip),
             "2001:db8::/96".parse::<IpAddrMask>().unwrap()
         );
+    }
+
+    #[test]
+    fn test_truncate_to_network_preserves_invalid_ipv4_cidr() {
+        let allowed_ip = IpAddrMask::new("172.16.0.1".parse().unwrap(), 33);
+
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_truncate_to_network_preserves_invalid_ipv6_cidr() {
+        let allowed_ip = IpAddrMask::new("2001:db8::1".parse().unwrap(), 129);
+
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
     }
 
     #[test]
