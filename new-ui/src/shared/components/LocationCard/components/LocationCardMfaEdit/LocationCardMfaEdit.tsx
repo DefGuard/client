@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import type { LocationInfo } from '../../../../rust-api/types';
 import {
   mfaStepCount,
+  mfaStepsOf,
   mfaStepsToText,
   mfaToText,
   resolveMfaStepPlan,
@@ -24,7 +25,7 @@ export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
       ? mfaStepsToText(stepCount)
       : mfaToText(resolveMfaStepPlan(location)[0]);
 
-  const canEdit = location.mfa_steps.some((step) => usableMfaMethods(step).length > 1);
+  const canEdit = mfaStepsOf(location).some((step) => usableMfaMethods(step).length > 1);
 
   return (
     <div className={clsx('location-card-mfa-edit', `variant-${variant}`)}>

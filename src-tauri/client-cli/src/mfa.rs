@@ -359,6 +359,7 @@ fn infer_method(location: &Location<Id>) -> MfaMethod {
         Some(LocationMfaMethod::Oidc) => MfaMethod::Oidc,
         Some(LocationMfaMethod::Biometric) => MfaMethod::Biometric,
         Some(LocationMfaMethod::MobileApprove) => MfaMethod::MobileApprove,
+        Some(LocationMfaMethod::Fido2) => MfaMethod::Fido2,
         None => {
             // infer_mfa_method only returns None for Disabled mode, but this is
             // only called when MFA is enabled. Default to TOTP as a safe fallback.

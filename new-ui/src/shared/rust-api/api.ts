@@ -239,6 +239,14 @@ const mfaConnectMobileApprove = (
 ): Promise<string> =>
   invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
 
+// Hands the security key PIN to the backend, which verifies it and brings the
+// connection up, the same way mfaFinishCode does for the code-based methods.
+const mfaFido2Pin = (
+  instanceId: number,
+  locationId: number,
+  pin: string,
+): Promise<void> => invoke(TauriCommand.MfaFido2Pin, { instanceId, locationId, pin });
+
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
@@ -326,6 +334,7 @@ export const api = {
   mfaFinishCode,
   mfaPollOpenId,
   mfaConnectMobileApprove,
+  mfaFido2Pin,
   cancelMfa,
   startMfaStep,
 };

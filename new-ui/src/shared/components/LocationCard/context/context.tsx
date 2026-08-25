@@ -15,6 +15,7 @@ import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-ap
 import { useAppStore } from '../../../store/useAppStore';
 import { isPresent } from '../../../utils/isPresent';
 import {
+  mfaStepsOf,
   mfaToText,
   resolveMfaStepPlan,
   shouldStartMfa,
@@ -83,7 +84,7 @@ export const LocationCardProvider = ({
   );
 
   const mfaSteps = useMemo<MfaStep[]>(
-    () => (shouldStartMfa(location) ? location.mfa_steps : []),
+    () => (shouldStartMfa(location) ? mfaStepsOf(location) : []),
     [location],
   );
   const isMultiStep = mfaSteps.length > 1;

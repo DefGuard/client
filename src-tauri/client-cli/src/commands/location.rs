@@ -135,8 +135,9 @@ fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
         "oidc" => Ok(LocationMfaMethod::Oidc),
         "biometric" => Ok(LocationMfaMethod::Biometric),
         "mobile" | "mobile_approve" => Ok(LocationMfaMethod::MobileApprove),
+        "fido2" => Ok(LocationMfaMethod::Fido2),
         _ => Err(CliError::Usage(format!(
-            "Invalid MFA method '{raw}'. Valid: totp, email, oidc, biometric, mobile."
+            "Invalid MFA method '{raw}'. Valid: totp, email, oidc, biometric, mobile, fido2."
         ))),
     }
 }

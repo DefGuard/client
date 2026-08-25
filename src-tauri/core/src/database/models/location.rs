@@ -66,7 +66,9 @@ impl From<ProtoServiceLocationMode> for ServiceLocationMode {
     }
 }
 
-/// Discriminants match the proto `MfaMethod` enum.
+/// Discriminants match the proto `MfaMethod` enum, except for `Fido2`, which the
+/// protocol does not carry yet and which is therefore handled entirely on the
+/// client.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
 #[repr(u32)]
 #[serde(rename_all = "lowercase")]
@@ -76,6 +78,7 @@ pub enum LocationMfaMethod {
     Oidc = 2,
     Biometric = 3,
     MobileApprove = 4,
+    Fido2 = 5,
 }
 
 impl LocationMfaMethod {
@@ -87,6 +90,7 @@ impl LocationMfaMethod {
             Self::Oidc => "oidc",
             Self::Biometric => "biometric",
             Self::MobileApprove => "mobile",
+            Self::Fido2 => "fido2",
         }
     }
 }
@@ -94,11 +98,12 @@ impl LocationMfaMethod {
 impl From<ProtoMfaMethod> for LocationMfaMethod {
     fn from(value: ProtoMfaMethod) -> Self {
         match value {
-            ProtoMfaMethod::Totp => LocationMfaMethod::Totp,
-            ProtoMfaMethod::Email => LocationMfaMethod::Email,
-            ProtoMfaMethod::Oidc => LocationMfaMethod::Oidc,
-            ProtoMfaMethod::Biometric => LocationMfaMethod::Biometric,
-            ProtoMfaMethod::MobileApprove => LocationMfaMethod::MobileApprove,
+            ProtoMfaMethod::Totp => Self::Totp,
+            ProtoMfaMethod::Email => Self::Email,
+            ProtoMfaMethod::Oidc => Self::Oidc,
+            ProtoMfaMethod::Biometric => Self::Biometric,
+            ProtoMfaMethod::MobileApprove => Self::MobileApprove,
+            ProtoMfaMethod::Fido2 => Self::Fido2,
         }
     }
 }

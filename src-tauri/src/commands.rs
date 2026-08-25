@@ -1553,19 +1553,20 @@ pub struct MfaErrorPayload {
     pub error: String,
 }
 
-/// Bring up a location connection with a preshared key obtained from a
-/// completed MFA handshake. Keeps the preshared key inside the backend - it is
-/// never returned to or emitted at the frontend.
+/// Bring up a location connection once MFA has passed, with the preshared key
+/// obtained from the handshake. Keeps the preshared key inside the backend - it
+/// is never returned to or emitted at the frontend. None is for the methods the
+/// client verifies on its own, which have no proxy session to issue a key.
 async fn connect_after_mfa(
     location_id: Id,
-    preshared_key: String,
+    preshared_key: Option<String>,
     handle: &AppHandle,
 ) -> Result<(), String> {
     let location = Location::find_by_id(&*DB_POOL, location_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Location not found".to_string())?;
-    connect_location_with_psk(location, Some(preshared_key), handle)
+    connect_location_with_psk(location, preshared_key, handle)
         .await
         // Distinct prefix so the frontend can tell a post-MFA connection
         // failure apart from an MFA/auth failure.
@@ -1699,7 +1700,7 @@ pub async fn mfa_finish_code(
             Ok(Some(advanced.next_step))
         }
         Some(mfa_step_result::Outcome::Completed(completed)) => {
-            connect_after_mfa(location_id, completed.preshared_key, &handle).await?;
+            connect_after_mfa(location_id, Some(completed.preshared_key), &handle).await?;
             Ok(None)
         }
         Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {
@@ -1708,7 +1709,7 @@ pub async fn mfa_finish_code(
             }))
         }
         None => {
-            connect_after_mfa(location_id, legacy_preshared_key, &handle).await?;
+            connect_after_mfa(location_id, Some(legacy_preshared_key), &handle).await?;
             Ok(None)
         }
     }
@@ -1756,7 +1757,7 @@ where
                 info!("MFA completed for task {task_id_for_task}");
                 #[allow(deprecated)]
                 let preshared_key = response.preshared_key;
-                match connect_after_mfa(location_id, preshared_key, &listen_handle).await {
+                match connect_after_mfa(location_id, Some(preshared_key), &listen_handle).await {
                     Ok(()) => {
                         let _ = listen_handle.emit(complete_event.into(), ());
                     }
@@ -1829,6 +1830,34 @@ pub async fn mfa_connect_mobile_approve(
         EventKey::MfaMobileError,
         move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
     ))
+}
+
+/// Dummy FIDO2 MFA handler: takes the security key PIN and brings the location
+/// up as if the key had signed the challenge.
+///
+/// Talking to the security key and to the proxy is not implemented yet - the
+/// proxy protocol carries no FIDO2 method - so the PIN is only checked for
+/// presence and no MFA session is opened, which means there is no server-issued
+/// preshared key for the tunnel. The PIN itself is never logged.
+#[tauri::command(async)]
+pub async fn mfa_fido2_pin(
+    instance_id: Id,
+    location_id: Id,
+    pin: String,
+    handle: AppHandle,
+) -> Result<(), String> {
+    debug!(
+        "Received FIDO2 PIN ({} characters) for location {location_id} of instance {instance_id}",
+        pin.chars().count()
+    );
+    if pin.trim().is_empty() {
+        return Err("PIN is required".to_string());
+    }
+    warn!(
+        "FIDO2 verification is not implemented yet: accepting the PIN for location \
+        {location_id} without checking it and connecting without a preshared key"
+    );
+    connect_after_mfa(location_id, None, &handle).await
 }
 
 #[tauri::command(async)]
