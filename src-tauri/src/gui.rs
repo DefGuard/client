@@ -8,6 +8,17 @@ use std::{
     thread::spawn,
 };
 
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::sync_locations_and_tunnels;
+use defguard_client_core::{
+    connection::active_connections::close_all_connections,
+    version::{check_app_version, VersionCheckResult},
+};
+use log::{Level, LevelFilter};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_log::{Target, TargetKind};
+
 #[cfg(unix)]
 use crate::set_perms;
 #[cfg(windows)]
@@ -38,16 +49,6 @@ use crate::{
 };
 #[cfg(all(target_os = "macos", feature = "macos_installer"))]
 use crate::{connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension};
-#[cfg(target_os = "macos")]
-use defguard_client_core::connection::sync_locations_and_tunnels;
-use defguard_client_core::{
-    connection::active_connections::close_all_connections,
-    version::{check_app_version, VersionCheckResult},
-};
-use log::{Level, LevelFilter};
-use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
-use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_log::{Target, TargetKind};
 
 const ENABLE_WELCOME_SCREEN: bool = false;
 
