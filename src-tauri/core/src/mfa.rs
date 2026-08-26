@@ -288,6 +288,7 @@ pub async fn poll_openid_mfa(
         auth_pub_key: None,
         step_attempt_id: None,
         auth_data: None,
+        credential_id: None,
     };
 
     loop {

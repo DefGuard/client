@@ -215,6 +215,7 @@ async fn test_mfa_finish_code_success() {
             auth_pub_key: None,
             step_attempt_id: None,
             auth_data: None,
+            credential_id: None,
         },
     )
     .await
@@ -242,6 +243,7 @@ async fn test_mfa_finish_code_rejected() {
             auth_pub_key: None,
             step_attempt_id: None,
             auth_data: None,
+            credential_id: None,
         },
     )
     .await
@@ -445,4 +447,40 @@ fn test_derive_ws_url_rejects_non_http_scheme() {
     let base = Url::parse("ftp://proxy.example.com/").unwrap();
     let err = derive_ws_url(&base, "tok").unwrap_err();
     assert!(matches!(err, MfaError::Other { .. }));
+}
+
+#[tokio::test]
+async fn test_mfa_start_without_credential_ids_parses() {
+    // Only an Edge that knows FIDO2 sends `credential_ids`; every older one
+    // leaves the field out and must keep working.
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "token": "no-fido2" })))
+        .mount(&server)
+        .await;
+
+    let info = mfa_start(mock_url(&server), start_request()).await.unwrap();
+    assert!(info.credential_ids.is_empty());
+}
+
+#[tokio::test]
+async fn test_mfa_start_reads_fido2_credential_ids() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "token": "fido2-token",
+            "challenge": "chal",
+            // base64url, no padding - how webauthn-rs writes a CredentialID.
+            "credential_ids": ["a-b_c", "ZmlkbzI"],
+        })))
+        .mount(&server)
+        .await;
+
+    let info = mfa_start(mock_url(&server), start_request()).await.unwrap();
+    assert_eq!(info.challenge.as_deref(), Some("chal"));
+    assert_eq!(info.credential_ids, vec!["a-b_c", "ZmlkbzI"]);
 }

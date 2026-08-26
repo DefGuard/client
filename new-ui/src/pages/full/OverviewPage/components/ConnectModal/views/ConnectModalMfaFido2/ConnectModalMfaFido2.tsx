@@ -13,10 +13,20 @@ import { useMfaStep } from '../../hooks/useMfaStep';
 
 export const ConnectModalMfaFido2 = () => {
   const [location] = useConnectModal(useShallow((s) => [s.location]));
-  const { canPickOtherMethod } = useMfaStep();
+  const { canPickOtherMethod, stepPlan, mfaToken } = useMfaStep();
 
   const { verifyPin, isVerifying, verifyError } = useMfaFido2Connect(
     location as LocationInfo,
+    {
+      stepPlan,
+      mfaToken,
+      onPostureError: (message) => {
+        useConnectModal.setState({ postureError: message });
+        useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
+      },
+      onServiceUnavailable: () =>
+        useConnectModal.getState().setView(ConnectModalView.ConnectionError),
+    },
   );
 
   const [pin, setPin] = useState<string | null>(null);

@@ -16,9 +16,24 @@ import { LocationCardViews } from '../../context/types';
 import { useMfaFido2Connect } from '../../hooks/useMfaFido2Connect';
 
 export const LocationCardMfaFido2View = () => {
-  const { setView, location, stepLabel, canPickOtherMethod } = useLocationCardContext();
+  const {
+    setView,
+    location,
+    stepLabel,
+    canPickOtherMethod,
+    stepPlan,
+    mfaToken,
+    setPostureError,
+  } = useLocationCardContext();
   const { verifyPin, isVerifying, verifyError } = useMfaFido2Connect(location, {
+    stepPlan,
+    mfaToken,
     onConnected: () => setView(LocationCardViews.Connected),
+    onPostureError: (message) => {
+      setPostureError(message);
+      setView(LocationCardViews.PostureCheckFail);
+    },
+    onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
   });
 
   const [pin, setPin] = useState<string | null>(null);

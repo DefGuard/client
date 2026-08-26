@@ -30,57 +30,17 @@ export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
 
 export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];
 
-const FIDO2_STEP_METHOD: MfaStepMethod = {
-  method: MfaMethod.Fido2,
-  configured: true,
-};
-
 /**
- * The client verifies FIDO2 itself, against the key the user has in hand, so it
- * needs no prior server-side registration: wherever a step offers FIDO2 it
- * counts as configured, even when the server marks it otherwise.
+ * MFA steps the connect flow runs on, exactly as Core configured them - never
+ * for bare tunnels. Always read steps through this instead of
+ * `location.mfa_steps`.
  *
- * The protocol cannot carry FIDO2 yet, so a step that does not mention it gets
- * the entry synthesized, under two limits:
- *
- * - single-step locations only, because a locally verified step inside a
- *   multi-step plan would desynchronize the server-side step sequence;
- * - never on a step the identity provider owns outright (OIDC only), where the
- *   server accepts no other factor.
- *
- * Drop the synthesis - not the normalization - once FIDO2 reaches `mfa_steps`
- * on its own.
- */
-const withClientVerifiedMethods = (steps: MfaStep[]): MfaStep[] => {
-  const normalized = steps.map((step) => ({
-    methods: step.methods.map((entry) =>
-      entry.method === MfaMethod.Fido2 ? FIDO2_STEP_METHOD : entry,
-    ),
-  }));
-
-  const onlyStep = normalized.length === 1 ? normalized[0] : undefined;
-  if (!isPresent(onlyStep)) return normalized;
-
-  const offersFido2 = onlyStep.methods.some((entry) => entry.method === MfaMethod.Fido2);
-  const isExternallyOwned = onlyStep.methods.every(
-    (entry) => entry.method === MfaMethod.Oidc,
-  );
-  if (offersFido2 || isExternallyOwned) return normalized;
-
-  return [{ methods: [...onlyStep.methods, FIDO2_STEP_METHOD] }];
-};
-
-/**
- * MFA steps the connect flow runs on: never for bare tunnels, and with the
- * client-verified factors folded into the server-provided ones. Always read
- * steps through this instead of `location.mfa_steps`.
+ * FIDO2 is listed here like any other method, including its `configured` flag:
+ * the key signs a challenge for a credential Core registered for this user, so
+ * a key that was never registered cannot pass the step, and offering it anyway
+ * only earns a rejected plan from Edge.
  */
 export const mfaStepsOf = (
-  location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): MfaStep[] => withClientVerifiedMethods(serverMfaSteps(location));
-
-/** The steps exactly as the server configured them. */
-const serverMfaSteps = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
 ): MfaStep[] =>
   location.connection_type === ConnectionType.Tunnel ? [] : location.mfa_steps;
@@ -128,13 +88,20 @@ export const resolveMfaStepPlan = (
   });
 
 /**
- * A step with no usable factor cannot be passed on the desktop. This shouldn't happen
- * because such configuration won't be sent from core.
- * TODO: block connecting only until the user can configure the missing factors in place.
+ * A step the desktop cannot drive at all blocks connecting: every method in it
+ * needs the mobile client, so there is nothing the user could do here.
+ *
+ * A method Core reports as not yet configured does NOT block. Whether a factor
+ * can actually be used is Core's call, and Edge says so with a message the user
+ * can act on - "set it up first, or pick a different one" - which beats a mute
+ * disabled button that explains nothing.
  */
 export const hasUnpassableMfaStep = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): boolean => mfaStepsOf(location).some((step) => usableMfaMethods(step).length === 0);
+): boolean =>
+  mfaStepsOf(location).some(
+    (step) => !step.methods.some((entry) => entry.method !== MfaMethod.Biometric),
+  );
 
 export const mfaStepsToText = (stepCount: number): string =>
   `${stepCount}-step verification`;

@@ -169,6 +169,8 @@ export const TauriEvent = {
   MfaOpenIdError: 'mfa-openid-error',
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
+  MfaFido2Complete: 'mfa-fido2-complete',
+  MfaFido2Error: 'mfa-fido2-error',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;
