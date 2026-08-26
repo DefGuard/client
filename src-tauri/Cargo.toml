@@ -6,6 +6,7 @@ default-members = ["cli", "client-cli", "daemon", "."]
 base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["cargo", "derive", "env"] }
+ctap-hid-fido2 = "3.5"
 defguard_wireguard_rs = "0.11"
 dirs-next = "2.0"
 log = { version = "0.4", features = ["serde"] }
@@ -85,6 +86,7 @@ redundant_closure = "warn"
 anyhow = "1.0"
 base64.workspace = true
 chrono.workspace = true
+ctap-hid-fido2.workspace = true
 defguard-cli.path = "client-cli"
 defguard-client-proto.path = "client-proto"
 defguard-client-core.path = "core"

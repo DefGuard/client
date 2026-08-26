@@ -138,6 +138,11 @@ pub(crate) async fn authorize(
                 "Internal error: OIDC MFA must use authorize_oidc, not authorize".into(),
             ));
         }
+        MfaMethod::Fido2 => {
+            return Err(CliError::Other(
+                "MFA method {method:?} is not yet supported by the CLI.".into(),
+            ));
+        }
         _ => {}
     }
 
@@ -179,6 +184,7 @@ pub(crate) async fn authorize(
         code: Some(code.expose_secret().to_string()),
         auth_pub_key: None,
         step_attempt_id: None,
+        auth_data: None,
     };
     let psk = mfa::mfa_finish_code(proxy_url, finish_req)
         .await

@@ -2,6 +2,9 @@ use core::fmt;
 use std::{collections::HashMap, env, str::FromStr};
 
 use chrono::{DateTime, Duration, Utc};
+use ctap_hid_fido2::{
+    FidoKeyHidFactory, LibCfg,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
@@ -1683,6 +1686,7 @@ pub async fn mfa_finish_code(
         code: Some(code),
         auth_pub_key: None,
         step_attempt_id,
+        auth_data: None,
     };
     let response = mfa::mfa_finish_code(proxy_url, request)
         .await
@@ -1798,7 +1802,7 @@ pub async fn mfa_poll_openid(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
     Ok(spawn_mfa_task(
         &handle,
         location_id,
@@ -1821,7 +1825,7 @@ pub async fn mfa_connect_mobile_approve(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
     let ws_url = mfa::derive_ws_url(&proxy_url, &token).map_err(|e| e.to_string())?;
     Ok(spawn_mfa_task(
         &handle,
@@ -1834,25 +1838,30 @@ pub async fn mfa_connect_mobile_approve(
 
 /// Dummy FIDO2 MFA handler: takes the security key PIN and brings the location
 /// up as if the key had signed the challenge.
-///
-/// Talking to the security key and to the proxy is not implemented yet - the
-/// proxy protocol carries no FIDO2 method - so the PIN is only checked for
-/// presence and no MFA session is opened, which means there is no server-issued
-/// preshared key for the tunnel. The PIN itself is never logged.
 #[tauri::command(async)]
 pub async fn mfa_fido2_pin(
-    instance_id: Id,
+    _instance_id: Id,
     location_id: Id,
     pin: String,
     handle: AppHandle,
 ) -> Result<(), String> {
-    debug!(
-        "Received FIDO2 PIN ({} characters) for location {location_id} of instance {instance_id}",
-        pin.chars().count()
-    );
-    if pin.trim().is_empty() {
+    // First, check PIN.
+    let pin = pin.trim();
+    if pin.is_empty() {
         return Err("PIN is required".to_string());
     }
+
+    let mut cfg = LibCfg::init();
+    // Suppress messages
+    cfg.enable_keep_alive_msg = false;
+
+    let _device = FidoKeyHidFactory::create(&cfg)
+        .map_err(|err| format!("no FIDO2 device detected: {err:?}"))?;
+
+    // TODO: get challenge and credential_id from Core
+    // let assertion =
+    //     device.get_assertion(RP_ID, challenge.as_bytes(), &[credential_id], Some(&pin))?;
+
     warn!(
         "FIDO2 verification is not implemented yet: accepting the PIN for location \
         {location_id} without checking it and connecting without a preshared key"
