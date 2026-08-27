@@ -46,13 +46,6 @@
     --icon: var(--fg-white-40);
 
     cursor: not-allowed;
-
-    &:hover {
-      --bg: transparent;
-      --border: var(--border-action-disabled);
-      --color: var(--fg-white-40);
-      --icon: var(--fg-white-40);
-    }
   }
 
   > .middle {
