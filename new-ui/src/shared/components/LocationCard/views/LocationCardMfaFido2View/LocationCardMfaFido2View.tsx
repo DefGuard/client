@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
@@ -10,6 +10,7 @@ import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
 import { Input } from '../../../Input/Input';
 import { SizedBox } from '../../../SizedBox/SizedBox';
+import { Fido2TouchPrompt } from '../../components/Fido2TouchPrompt/Fido2TouchPrompt';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
@@ -25,16 +26,19 @@ export const LocationCardMfaFido2View = () => {
     mfaToken,
     setPostureError,
   } = useLocationCardContext();
-  const { verifyPin, isVerifying, verifyError } = useMfaFido2Connect(location, {
-    stepPlan,
-    mfaToken,
-    onConnected: () => setView(LocationCardViews.Connected),
-    onPostureError: (message) => {
-      setPostureError(message);
-      setView(LocationCardViews.PostureCheckFail);
+  const { verifyPin, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
+    location,
+    {
+      stepPlan,
+      mfaToken,
+      onConnected: () => setView(LocationCardViews.Connected),
+      onPostureError: (message) => {
+        setPostureError(message);
+        setView(LocationCardViews.PostureCheckFail);
+      },
+      onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
     },
-    onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
-  });
+  );
 
   const [pin, setPin] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,17 +69,23 @@ export const LocationCardMfaFido2View = () => {
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
-        <p>Insert your security key and enter its PIN to continue.</p>
-      </LocationViewHeader>
-      <SizedBox height={ThemeSpacing.Xl} />
-      <Input
-        type="password"
-        label="PIN"
-        value={pin}
-        onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
-        error={error}
-      />
+      {isAwaitingTouch ? (
+        <Fido2TouchPrompt />
+      ) : (
+        <Fragment>
+          <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
+            <p>Insert your security key and enter its PIN to continue.</p>
+          </LocationViewHeader>
+          <SizedBox height={ThemeSpacing.Xl} />
+          <Input
+            type="password"
+            label="PIN"
+            value={pin}
+            onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
+            error={error}
+          />
+        </Fragment>
+      )}
       <Controls>
         <IconButton
           variant={IconButtonVariant.BigSelected}

@@ -57,16 +57,16 @@ export const mfaStepCount = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
 ): number => mfaStepsOf(location).length;
 
+/** Biometric is the mobile client's to drive; the desktop can run the rest. */
+const isDesktopDrivable = (entry: MfaStepMethod): boolean =>
+  entry.method !== MfaMethod.Biometric;
+
 export const usableMfaMethods = (step: MfaStep): MfaStepMethod[] =>
-  step.methods.filter(
-    (entry) => entry.configured && entry.method !== MfaMethod.Biometric,
-  );
+  step.methods.filter((entry) => entry.configured && isDesktopDrivable(entry));
 
 export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
-  const withoutBiometric = step.methods.filter(
-    (entry) => entry.method !== MfaMethod.Biometric,
-  );
-  return withoutBiometric.length > 0 ? withoutBiometric : step.methods;
+  const drivable = step.methods.filter(isDesktopDrivable);
+  return drivable.length > 0 ? drivable : step.methods;
 };
 
 export const resolveMfaStepPlan = (
@@ -98,10 +98,7 @@ export const resolveMfaStepPlan = (
  */
 export const hasUnpassableMfaStep = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): boolean =>
-  mfaStepsOf(location).some(
-    (step) => !step.methods.some((entry) => entry.method !== MfaMethod.Biometric),
-  );
+): boolean => mfaStepsOf(location).some((step) => !step.methods.some(isDesktopDrivable));
 
 export const mfaStepsToText = (stepCount: number): string =>
   `${stepCount}-step verification`;

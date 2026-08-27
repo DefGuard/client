@@ -18,8 +18,8 @@
     "@stablelib/base64": "^2.0.1",
     "@stablelib/x25519": "^2.0.1",
     "@tanstack/react-form": "^1.33.5",
-    "@tanstack/react-query": "^5.101.4",
-    "@tanstack/react-router": "^1.170.29",
+    "@tanstack/react-query": "^5.102.4",
+    "@tanstack/react-router": "^1.170.32",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
@@ -47,24 +47,24 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "rxjs": "^7.8.2",
-    "sass": "^1.102.0",
+    "sass": "^1.103.1",
     "zod": "^4.4.3",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@tanstack/devtools-vite": "^0.8.3",
-    "@tanstack/router-plugin": "^1.168.32",
+    "@tanstack/devtools-vite": "^0.8.5",
+    "@tanstack/router-plugin": "^1.168.35",
     "@types/byte-size": "^8.1.2",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.3.0",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "autoprefixer": "^10.5.4",
     "globals": "^17.11.0",
     "stylelint": "^17.14.1",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.2.0",
     "typescript": "~6.0.3",
-    "vite": "^8.2.1"
+    "vite": "^8.2.2"
   }
 }

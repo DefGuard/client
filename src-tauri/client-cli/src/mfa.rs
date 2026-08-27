@@ -139,8 +139,8 @@ pub(crate) async fn authorize(
             ));
         }
         MfaMethod::Fido2 => {
-            return Err(CliError::Other(
-                "MFA method {method:?} is not yet supported by the CLI.".into(),
+            return Err(CliError::MfaFailed(
+                "FIDO2 MFA is not supported by the CLI. Use the desktop client.".into(),
             ));
         }
         _ => {}

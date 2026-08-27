@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
 import { Input } from '../../../../../../../shared/components/Input/Input';
+import { Fido2TouchPrompt } from '../../../../../../../shared/components/LocationCard/components/Fido2TouchPrompt/Fido2TouchPrompt';
 import { useMfaFido2Connect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaFido2Connect';
 import type { LocationInfo } from '../../../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
@@ -15,7 +16,7 @@ export const ConnectModalMfaFido2 = () => {
   const [location] = useConnectModal(useShallow((s) => [s.location]));
   const { canPickOtherMethod, stepPlan, mfaToken } = useMfaStep();
 
-  const { verifyPin, isVerifying, verifyError } = useMfaFido2Connect(
+  const { verifyPin, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
     location as LocationInfo,
     {
       stepPlan,
@@ -56,16 +57,22 @@ export const ConnectModalMfaFido2 = () => {
         if (e.key === 'Enter') handleVerify();
       }}
     >
-      <p className="view-description">
-        Insert your security key and enter its PIN to continue.
-      </p>
-      <Input
-        type="password"
-        label="PIN"
-        value={pin}
-        onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
-        error={error}
-      />
+      {isAwaitingTouch ? (
+        <Fido2TouchPrompt />
+      ) : (
+        <Fragment>
+          <p className="view-description">
+            Insert your security key and enter its PIN to continue.
+          </p>
+          <Input
+            type="password"
+            label="PIN"
+            value={pin}
+            onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
+            error={error}
+          />
+        </Fragment>
+      )}
       <Controls>
         {canPickOtherMethod && (
           <Button

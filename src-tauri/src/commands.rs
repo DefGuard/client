@@ -2,13 +2,14 @@ use core::fmt;
 use std::{collections::HashMap, env, future::Future, str::FromStr};
 
 use base64::{
-    prelude::{BASE64_STANDARD, BASE64_STANDARD_NO_PAD, BASE64_URL_SAFE, BASE64_URL_SAFE_NO_PAD},
+    alphabet,
+    engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
+    prelude::BASE64_URL_SAFE_NO_PAD,
     Engine,
 };
 use chrono::{DateTime, Duration, Utc};
 use ctap_hid_fido2::{
-    fidokey::{get_assertion::get_assertion_params::Assertion, GetAssertionArgsBuilder},
-    FidoKeyHid, FidoKeyHidFactory, LibCfg,
+    fidokey::get_assertion::get_assertion_params::Assertion, FidoKeyHidFactory, LibCfg,
 };
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
@@ -1857,14 +1858,63 @@ pub async fn mfa_connect_mobile_approve(
 /// Decode a base64 value handed out by Edge.
 ///
 /// Core deals in `webauthn-rs` types, whose `Base64UrlSafeData` writes URL-safe
-/// base64 without padding and reads any of the four alphabets. Be equally
-/// forgiving here rather than assuming one of them.
+/// base64 without padding but reads either alphabet, padded or not. Be equally
+/// forgiving rather than assuming one of them.
 fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    BASE64_URL_SAFE_NO_PAD
+    /// Padding is accepted but not required, so one engine covers both the
+    /// padded and unpadded spelling of its alphabet.
+    fn engine(alphabet: alphabet::Alphabet) -> GeneralPurpose {
+        GeneralPurpose::new(
+            &alphabet,
+            GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+        )
+    }
+
+    engine(alphabet::URL_SAFE)
         .decode(value)
-        .or_else(|_| BASE64_URL_SAFE.decode(value))
-        .or_else(|_| BASE64_STANDARD.decode(value))
-        .or_else(|err| BASE64_STANDARD_NO_PAD.decode(value).map_err(|_| err))
+        .or_else(|err| engine(alphabet::STANDARD).decode(value).map_err(|_| err))
+}
+
+/// CTAP status codes worth telling the user apart, as defined by the spec and
+/// rendered into the crate's error text.
+const CTAP2_ERR_NO_CREDENTIALS: u8 = 0x2E;
+const CTAP2_ERR_USER_ACTION_TIMEOUT: u8 = 0x2F;
+const CTAP2_ERR_PIN_INVALID: u8 = 0x31;
+const CTAP2_ERR_PIN_BLOCKED: u8 = 0x32;
+const CTAP2_ERR_PIN_AUTH_BLOCKED: u8 = 0x34;
+const CTAP2_ERR_ACTION_TIMEOUT: u8 = 0x3A;
+
+/// The CTAP status behind a failed operation.
+///
+/// The crate surfaces status codes only inside its error text, rendered as
+/// `"0x31 CTAP2_ERR_PIN_INVALID   PIN Invalid."` - so read back the leading
+/// byte rather than matching on the name, which would conflate, say, a rejected
+/// PIN with one that was never set.
+fn ctap_status(err: &impl fmt::Display) -> Option<u8> {
+    let text = err.to_string();
+    let code = text.strip_prefix("0x")?.get(..2)?;
+    u8::from_str_radix(code, 16).ok()
+}
+
+/// Turn a failed assertion into something the user can act on.
+///
+/// Everything here is user-fixable, so it is reported as a rejection rather
+/// than an internal error.
+fn assertion_error(err: &impl fmt::Display) -> mfa::MfaError {
+    let message = match ctap_status(err) {
+        // The key was blinking for a touch that never came.
+        Some(CTAP2_ERR_USER_ACTION_TIMEOUT | CTAP2_ERR_ACTION_TIMEOUT) => {
+            "Security key timed out waiting to be touched".to_string()
+        }
+        Some(CTAP2_ERR_NO_CREDENTIALS) => {
+            "This security key is not registered for your account".to_string()
+        }
+        Some(CTAP2_ERR_PIN_INVALID | CTAP2_ERR_PIN_BLOCKED | CTAP2_ERR_PIN_AUTH_BLOCKED) => {
+            format!("Security key rejected the PIN: {err}")
+        }
+        _ => format!("Security key did not authorize the request: {err}"),
+    };
+    mfa::MfaError::MfaRejected { message }
 }
 
 /// Everything the key needs to produce an assertion, as handed out by Edge.
@@ -1891,89 +1941,45 @@ async fn fido2_challenge(
     proxy_url: &Url,
     start: Fido2Start,
 ) -> Result<Fido2Challenge, mfa::MfaError> {
-    // Edge only sends these for a FIDO2 step, so a missing one means the server
-    // does not know the method rather than that the user did anything wrong.
-    fn required(value: Option<String>, field: &str) -> Result<String, mfa::MfaError> {
-        value.ok_or_else(|| mfa::MfaError::Other {
-            message: format!("Edge did not return a FIDO2 {field}"),
-        })
-    }
-
-    fn credentials(credential_ids: Vec<String>) -> Result<Vec<String>, mfa::MfaError> {
-        if credential_ids.is_empty() {
-            return Err(mfa::MfaError::Other {
-                message: "Edge did not return any FIDO2 credentials".to_string(),
-            });
-        }
-        Ok(credential_ids)
-    }
-
-    match start {
+    let (token, step_attempt_id, challenge, credential_ids) = match start {
         Fido2Start::Fresh(request) => {
             let response = mfa::mfa_start(proxy_url.clone(), request).await?;
-            Ok(Fido2Challenge {
-                token: response.token,
-                step_attempt_id: None,
-                challenge: required(response.challenge, "challenge")?,
-                credential_ids: credentials(response.credential_ids)?,
-            })
+            (
+                response.token,
+                None,
+                response.challenge,
+                response.credential_ids,
+            )
         }
         Fido2Start::Step(request) => {
             let token = request.token.clone();
             let response = mfa::mfa_step_start(proxy_url.clone(), request).await?;
-            Ok(Fido2Challenge {
+            (
                 token,
-                step_attempt_id: Some(response.step_attempt_id),
-                challenge: required(response.challenge, "challenge")?,
-                credential_ids: credentials(response.credential_ids)?,
-            })
+                Some(response.step_attempt_id),
+                response.challenge,
+                response.credential_ids,
+            )
         }
-    }
-}
+    };
 
-/// Ask the key which of the offered credentials it holds, without asking the
-/// user for anything.
-///
-/// `up = false` means no touch is required, so this either narrows the list to
-/// one credential or tells us early that this key is not registered at all.
-/// Keys that refuse a presence-less assertion return an error, which is not
-/// fatal - the caller just offers the whole list instead. A rejected PIN is
-/// fatal though: the key allows only a handful of attempts before it locks, so
-/// it must not be spent twice on one submission.
-fn probe_credential(
-    device: &FidoKeyHid,
-    rp_id: &str,
-    challenge: &[u8],
-    credential_ids: &[Vec<u8>],
-    pin: &str,
-) -> Result<Option<Vec<u8>>, mfa::MfaError> {
-    let mut builder = GetAssertionArgsBuilder::new(rp_id, challenge)
-        .pin(pin)
-        .without_up();
-    for credential_id in credential_ids {
-        builder = builder.add_credential_id(credential_id);
+    // Edge only sends these for a FIDO2 step, so a missing one means the server
+    // does not know the method rather than that the user did anything wrong.
+    let challenge = challenge.ok_or_else(|| mfa::MfaError::Other {
+        message: "Edge did not return a FIDO2 challenge".to_string(),
+    })?;
+    if credential_ids.is_empty() {
+        return Err(mfa::MfaError::Other {
+            message: "Edge did not return any FIDO2 credentials".to_string(),
+        });
     }
 
-    match device.get_assertion_with_args(&builder.build()) {
-        Ok(assertions) => Ok(assertions
-            .into_iter()
-            .next()
-            .map(|assertion| assertion.credential_id)
-            .filter(|credential_id| !credential_id.is_empty())),
-        Err(err) if is_pin_failure(&err) => Err(mfa::MfaError::MfaRejected {
-            message: format!("Security key rejected the PIN: {err}"),
-        }),
-        Err(err) => {
-            debug!("FIDO2 silent probe unavailable, offering every credential: {err}");
-            Ok(None)
-        }
-    }
-}
-
-/// CTAP reports PIN trouble as a status code, which the crate renders into the
-/// error text (`CTAP2_ERR_PIN_INVALID`, `_PIN_BLOCKED`, `_PIN_AUTH_BLOCKED`).
-fn is_pin_failure(err: &impl fmt::Display) -> bool {
-    err.to_string().contains("CTAP2_ERR_PIN")
+    Ok(Fido2Challenge {
+        token,
+        step_attempt_id,
+        challenge,
+        credential_ids,
+    })
 }
 
 /// Drive the security key over CTAP-HID, returning the assertion and the
@@ -2004,31 +2010,21 @@ async fn fido2_assertion(
             message: format!("No FIDO2 device detected: {err}"),
         })?;
 
-        let challenge_bytes = challenge.challenge.as_bytes();
-        // Narrow to the credential this key holds before spending the user's
-        // touch on it. With a single candidate there is nothing to narrow.
-        let offered = match credential_ids.as_slice() {
-            [_] => credential_ids.clone(),
-            _ => probe_credential(&device, &rp_id, challenge_bytes, &credential_ids, &pin)?
-                .map_or_else(
-                    || credential_ids.clone(),
-                    |credential_id| vec![credential_id],
-                ),
-        };
-
+        // The key picks the credential it holds out of the ones offered and
+        // names it back, so there is nothing to narrow beforehand.
         let assertion = device
-            .get_assertion(&rp_id, challenge_bytes, &offered, Some(&pin))
-            // A wrong PIN, a missing touch or a key registered to nobody all
-            // surface here; they are user-fixable, so report them as a
-            // rejection.
-            .map_err(|err| mfa::MfaError::MfaRejected {
-                message: format!("Security key did not authorize the request: {err}"),
-            })?;
+            .get_assertion(
+                &rp_id,
+                challenge.challenge.as_bytes(),
+                &credential_ids,
+                Some(&pin),
+            )
+            .map_err(|err| assertion_error(&err))?;
 
         // CTAP may leave the credential out when it was offered only one, so
         // fall back to what we asked for.
         let credential_id = if assertion.credential_id.is_empty() {
-            offered.first().cloned().unwrap_or_default()
+            credential_ids.into_iter().next().unwrap_or_default()
         } else {
             assertion.credential_id.clone()
         };
@@ -2048,6 +2044,7 @@ async fn run_fido2_mfa(
     start: Fido2Start,
     pin: String,
     cancel: CancellationToken,
+    handle: AppHandle,
 ) -> Result<ClientMfaFinishResponse, mfa::MfaError> {
     let challenge = tokio::select! {
         () = cancel.cancelled() => return Err(mfa::MfaError::Cancelled),
@@ -2055,6 +2052,10 @@ async fn run_fido2_mfa(
     };
     let token = challenge.token.clone();
     let step_attempt_id = challenge.step_attempt_id.clone();
+
+    // The key blinks and waits for a touch from here on, and CTAP gives up if
+    // none comes, so tell the frontend to ask for one.
+    let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
 
     // The key cannot be interrupted once it is waiting for a touch, so
     // cancelling here abandons the assertion instead of aborting it.
@@ -2136,12 +2137,13 @@ pub async fn mfa_fido2_pin(
         _ => Fido2Start::Fresh(mfa_start_request(instance_id, location_id, &step_methods).await?),
     };
 
+    let task_handle = handle.clone();
     Ok(spawn_mfa_task(
         &handle,
         location_id,
         EventKey::MfaFido2Complete,
         EventKey::MfaFido2Error,
-        move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, cancel),
+        move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, cancel, task_handle),
     ))
 }
 
@@ -2161,6 +2163,8 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
 
 #[cfg(test)]
 mod tests {
+    use base64::prelude::{BASE64_STANDARD, BASE64_STANDARD_NO_PAD, BASE64_URL_SAFE};
+
     use super::*;
 
     #[test]
