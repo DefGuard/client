@@ -1,5 +1,4 @@
 import './style.scss';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { AnimatePresence, motion } from 'motion/react';
 import { Fragment, useState } from 'react';
 import { Button } from '../../../../shared/components/Button/Button';
@@ -7,6 +6,7 @@ import { ButtonVariant } from '../../../../shared/components/Button/types';
 import { Divider } from '../../../../shared/components/Divider/Divider';
 import { SizedBox } from '../../../../shared/components/SizedBox/SizedBox';
 import { motionTransitionStandard } from '../../../../shared/consts';
+import { api } from '../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../shared/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
 import { SlideImage } from '../SlideImage';
@@ -82,15 +82,17 @@ export const WelcomeCarousel = ({ slides }: WelcomeCarouselProps) => {
             {renderSlide(activeSlide)}
             <div className="content">
               <p className="title">{activeSlide.title}</p>
-              <SizedBox height={ThemeSpacing.Sm} />
+              <SizedBox height={ThemeSpacing.Xs} />
               <p className="description">{activeSlide.description}</p>
-              {isPresent(activeSlide.blogLink) && isPresent(activeSlide.blogLinkText) && (
+              {isPresent(activeSlide.actionText) && (
                 <Fragment>
-                  <SizedBox height={ThemeSpacing.Xl} />
+                  <SizedBox height={ThemeSpacing.Xl2} />
                   <Button
-                    text={activeSlide.blogLinkText}
+                    text={activeSlide.actionText}
                     variant={ButtonVariant.Primary}
-                    onClick={() => openUrl(activeSlide.blogLink as string)}
+                    onClick={() => {
+                      void api.closeWelcomeWindow();
+                    }}
                   />
                 </Fragment>
               )}

@@ -9,7 +9,6 @@ export const welcomeSlides: CarouselSlide[] = [
     posterSrc: whatsNewPoster,
     title: `New Defguard Desktop App`,
     description: `A new compact interface gives you one-click connections and quick switching between locations, while the redesigned main window puts settings and logs within instant reach - all in a cleaner, more intuitive design.`,
-    blogLink: 'https://defguard.net/blog/',
-    blogLinkText: 'Check how it works',
+    actionText: 'Get started',
   },
 ];

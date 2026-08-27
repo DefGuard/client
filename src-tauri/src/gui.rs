@@ -42,7 +42,7 @@ use crate::{connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_syst
 use defguard_client_core::connection::sync_locations_and_tunnels;
 use defguard_client_core::{
     connection::active_connections::close_all_connections,
-    version::{check_app_version, mark_welcome_shown, should_show_welcome, VersionCheckResult},
+    version::{check_app_version, should_show_welcome, VersionCheckResult},
 };
 use log::{Level, LevelFilter};
 use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
@@ -433,9 +433,7 @@ pub fn run_app() {
                 let _ = WindowManager::open_full_view(app_handle);
             } else if open_welcome_view {
                 info!("Opening welcome view.");
-                if WindowManager::open_welcome_view(app_handle).is_ok() {
-                    mark_welcome_shown(&config_dir, &current_version);
-                }
+                let _ = WindowManager::open_welcome_view(app_handle);
             } else {
                 show_tray_or_full_view(app_handle);
             }

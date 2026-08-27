@@ -10,6 +10,7 @@ use crate::{
     },
     events::EventKey,
 };
+use defguard_client_core::version::mark_welcome_shown;
 
 /// Returns `true` if there are any non-service locations in the database.
 pub async fn has_non_service_locations() -> bool {
@@ -29,7 +30,7 @@ pub const COMPACT_WINDOW_ID: &str = "compact-view";
 pub const FULL_VIEW_WINDOW_ID: &str = "full-view";
 pub const WELCOME_WINDOW_ID: &str = "welcome";
 pub const WELCOME_WINDOW_WIDTH: f64 = 640.0;
-pub const WELCOME_WINDOW_HEIGHT: f64 = 580.0;
+pub const WELCOME_WINDOW_HEIGHT: f64 = 585.0;
 pub const COMPACT_WINDOW_WIDTH: f64 = 380.0;
 pub const COMPACT_WINDOW_HEIGHT: f64 = 680.0;
 pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
@@ -124,7 +125,7 @@ impl WindowManager {
             .maximizable(false)
             .decorations(false)
             .skip_taskbar(false)
-            .always_on_top(false)
+            .always_on_top(true)
             .visible(false);
         #[cfg(target_os = "macos")]
         let window = window.hidden_title(true);
@@ -292,6 +293,12 @@ pub fn close_welcome_window(app: AppHandle) {
     } else {
         warn!("close_welcome_window task: welcome window not found");
     }
+
+    let config_dir = app
+        .path()
+        .app_data_dir()
+        .expect("Failed to access app data");
+    mark_welcome_shown(&config_dir, &app.package_info().version);
 
     show_tray_or_full_view(&app);
 }
