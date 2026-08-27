@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isPresent } from '../utils/isPresent';
 import { mfaToApi } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
@@ -17,6 +18,8 @@ import type {
   LocationStats,
   MfaMethodValue,
   MfaStartResult,
+  MfaStepSession,
+  MfaStepStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -24,7 +27,7 @@ import type {
   SaveDeviceConfigResponse,
   SessionState,
   SessionStatePatch,
-  SetLocationMfaMethodArgs,
+  SetLocationMfaStepPlanArgs,
   StatsArgs,
   TunnelInfo,
   TunnelRequest,
@@ -56,8 +59,8 @@ const getLocationDetails = (args: LocationDetailsArgs): Promise<LocationDetails>
 const updateLocationRouting = (args: RoutingArgs): Promise<Connection> =>
   invoke(TauriCommand.UpdateLocationRouting, args);
 
-const setLocationMfaMethod = (args: SetLocationMfaMethodArgs): Promise<void> =>
-  invoke(TauriCommand.SetLocationMfaMethod, args);
+const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void> =>
+  invoke(TauriCommand.SetLocationMfaStepPlan, args);
 
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
@@ -196,19 +199,31 @@ const enrollmentFinish = (sessionId: string): Promise<void> =>
 const mfaStart = (
   instanceId: number,
   locationId: number,
-  method: string,
+  methods: MfaMethodValue[],
 ): Promise<MfaStartResult> =>
-  invoke(TauriCommand.MfaStart, { instanceId, locationId, method });
+  invoke(TauriCommand.MfaStart, { instanceId, locationId, methods });
 
-// Completes MFA and brings up the connection in the backend; the preshared key
-// never crosses back to the frontend.
+const mfaStepStart = (
+  instanceId: number,
+  token: string,
+  method: MfaMethodValue,
+): Promise<MfaStepStartResult> =>
+  invoke(TauriCommand.MfaStepStart, { instanceId, token, method });
+
 const mfaFinishCode = (
   instanceId: number,
   locationId: number,
   token: string,
   code: string,
-): Promise<void> =>
-  invoke(TauriCommand.MfaFinishCode, { instanceId, locationId, token, code });
+  stepAttemptId: string | null,
+): Promise<number | null> =>
+  invoke(TauriCommand.MfaFinishCode, {
+    instanceId,
+    locationId,
+    token,
+    code,
+    stepAttemptId,
+  });
 
 const mfaPollOpenId = (
   instanceId: number,
@@ -227,6 +242,30 @@ const mfaConnectMobileApprove = (
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
+const startMfaStep = async (
+  instanceId: number,
+  locationId: number,
+  method: MfaMethodValue,
+  stepPlan: MfaMethodValue[],
+  mfaToken: string | null,
+): Promise<MfaStepSession> => {
+  if (isPresent(mfaToken) && stepPlan.length > 1) {
+    const startedStep = await mfaStepStart(instanceId, mfaToken, method);
+    return {
+      token: mfaToken,
+      challenge: startedStep.challenge,
+      stepAttemptId: startedStep.step_attempt_id,
+    };
+  }
+
+  const startedSession = await mfaStart(instanceId, locationId, stepPlan);
+  return {
+    token: startedSession.token,
+    challenge: startedSession.challenge,
+    stepAttemptId: null,
+  };
+};
+
 export const api = {
   closeWelcomeWindow,
   // Instances
@@ -239,7 +278,7 @@ export const api = {
   hasAnyVisibleLocations,
   getLocationDetails,
   updateLocationRouting,
-  setLocationMfaMethod,
+  setLocationMfaStepPlan,
   // Connections
   connect,
   disconnect,
@@ -288,4 +327,5 @@ export const api = {
   mfaPollOpenId,
   mfaConnectMobileApprove,
   cancelMfa,
+  startMfaStep,
 };

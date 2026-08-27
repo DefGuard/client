@@ -64,6 +64,7 @@ pub struct ServiceLocationManager {
 
 /// Runtime state for a connected location.
 #[derive(Clone)]
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 struct ConnectedServiceLocation {
     location: ServiceLocation,
     /// Records when a posture-gated service location was authorized for staleness detection.

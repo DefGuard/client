@@ -20,7 +20,11 @@ const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 
 pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
-    let locations = Location::all(&state.pool, false).await?;
+    let locations = Location::all(&state.pool, false)
+        .await?
+        .into_iter()
+        .filter(|location| location.mfa_steps.len() <= 1)
+        .collect::<Vec<_>>();
     let tunnels = if Instance::tunnels_disabled(&state.pool).await? {
         Vec::new()
     } else {
@@ -242,6 +246,8 @@ mod tests {
             service_location_mode: ServiceLocationMode::Disabled,
             mfa_method: None,
             posture_check_required: false,
+            mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
         }
     }
 

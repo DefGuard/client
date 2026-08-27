@@ -12,8 +12,13 @@ import {
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { LocationInfo, MfaErrorPayload } from '../../../rust-api/types';
+import type {
+  LocationInfo,
+  MfaErrorPayload,
+  MfaMethodValue,
+} from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
+import { isPresent } from '../../../utils/isPresent';
 
 type TokenData = {
   token: string;
@@ -21,14 +26,25 @@ type TokenData = {
 };
 
 type Options = {
+  stepPlan: MfaMethodValue[];
+  mfaToken: string | null;
+  setMfaToken: (token: string) => void;
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
   onServiceUnavailable?: () => void;
 };
 
-export const useMfaMobileConnect = (location: LocationInfo, options?: Options) => {
-  const { onConnected, onPostureError, onServiceUnavailable } = options ?? {};
-
+export const useMfaMobileConnect = (
+  location: LocationInfo,
+  {
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    onConnected,
+    onPostureError,
+    onServiceUnavailable,
+  }: Options,
+) => {
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
 
@@ -148,13 +164,21 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     setTokenData(null);
 
     try {
-      const info = await api.mfaStart(instance.id, location.id, MfaMethod.MobileApprove);
-      if (!info.challenge) {
+      const session = await api.startMfaStep(
+        instance.id,
+        location.id,
+        MfaMethod.MobileApprove,
+        stepPlan,
+        mfaToken,
+      );
+      setMfaToken(session.token);
+
+      if (!isPresent(session.challenge)) {
         setStartError('Unsupported response from proxy');
         return;
       }
 
-      setTokenData({ token: info.token, challenge: info.challenge });
+      setTokenData({ token: session.token, challenge: session.challenge });
     } catch (e) {
       void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
@@ -169,7 +193,15 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, onPostureError, onServiceUnavailable]);
+  }, [
+    instance,
+    location,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    onPostureError,
+    onServiceUnavailable,
+  ]);
 
   const reset = useCallback(() => {
     cleanupListeners();

@@ -10,6 +10,7 @@ import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
+import { useMfaStep } from '../../hooks/useMfaStep';
 
 const MIN_POSTURE_LOADER_MS = 500;
 
@@ -18,10 +19,16 @@ export const ConnectModalMfaTotp = () => {
     useShallow((s) => [s.perviousView, s.location]),
   );
 
+  const { canPickOtherMethod, stepPlan, mfaToken, setMfaToken, goToStep } = useMfaStep();
+
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location as LocationInfo,
     MfaMethod.Totp,
     {
+      stepPlan,
+      mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       debounceMs: location?.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onSessionExpired: () =>
         useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
@@ -86,20 +93,21 @@ export const ConnectModalMfaTotp = () => {
         }}
       />
       <Controls>
-        <Button
-          variant={ButtonVariant.Secondary}
-          text="Use different MFA"
-          onClick={() => {
-            useConnectModal.getState().setView(ConnectModalView.MfaSettings);
-          }}
-        />
+        {canPickOtherMethod && (
+          <Button
+            variant={ButtonVariant.Secondary}
+            text="Other methods"
+            onClick={() => {
+              useConnectModal.getState().setView(ConnectModalView.MfaSettings);
+            }}
+          />
+        )}
         <div className="right">
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={() => handleVerify()}
             loading={isVerifying}
-            disabled={isStarting}
           />
         </div>
       </Controls>

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12, mfa_method = $13, posture_check_required = $14, mfa_steps = $15, mfa_step_plan = $16 WHERE id = $17",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 17
+    },
+    "nullable": []
+  },
+  "hash": "84effef815ae3f82276e4ad5a5f6ec1f8180d976de306997946742a8b597a398"
+}

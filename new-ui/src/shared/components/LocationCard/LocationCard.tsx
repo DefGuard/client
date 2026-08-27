@@ -1,6 +1,7 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
+import { Fragment } from 'react/jsx-runtime';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
 import { Direction } from '../../types';
 import { Fold } from '../Fold/Fold';
@@ -48,7 +49,7 @@ interface InnerProps {
 }
 
 const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
-  const { location, currentView } = useLocationCardContext();
+  const { location, currentView, stepIndex } = useLocationCardContext();
 
   return (
     <div
@@ -73,7 +74,9 @@ const LocationCardInner = ({ isOpen, onOpen, disableOpen }: InnerProps) => {
           )}
         </div>
       </div>
-      <Fold open={isOpen}>{views[currentView]}</Fold>
+      <Fold open={isOpen}>
+        <Fragment key={`${currentView}-${stepIndex}`}>{views[currentView]}</Fragment>
+      </Fold>
     </div>
   );
 };

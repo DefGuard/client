@@ -6,7 +6,7 @@
   --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 0%);
 
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   column-gap: var(--spacing-sm);
   background: var(--bg);
   border: 1px solid var(--border);
@@ -39,12 +39,29 @@
     --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 5%);
   }
 
+  &.disabled {
+    --bg: transparent;
+    --border: var(--border-action-disabled);
+    --color: var(--fg-white-40);
+    --icon: var(--fg-white-40);
+
+    cursor: not-allowed;
+  }
+
   > .middle {
     display: flex;
     flex-flow: row nowrap;
     align-items: center;
     justify-content: flex-start;
     column-gap: var(--spacing-md);
+  }
+
+  > .right {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    column-gap: var(--spacing-sm);
   }
 
   .default-badge {
@@ -61,6 +78,12 @@
       line-height: normal;
       letter-spacing: -0.11px;
     }
+  }
+
+  .disabled-label {
+    color: var(--fg-white-40);
+    font: var(--t-body-sm-400);
+    white-space: nowrap;
   }
 
   .factor-icon {

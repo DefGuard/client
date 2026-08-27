@@ -22,7 +22,8 @@ type Screen = 'idle' | 'polling' | 'error';
 
 export const LocationCardMfaOidcView = () => {
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
-  const { setView, setPostureError, autoConnectOpenid } = useLocationCardContext();
+  const { setView, setPostureError, autoConnectOpenid, stepLabel } =
+    useLocationCardContext();
   const { start, isStarting, startError, isPolling, pollError } = useMfaOidcConnect();
   const [screen, setScreen] = useState<Screen>('idle');
 
@@ -56,7 +57,7 @@ export const LocationCardMfaOidcView = () => {
   return (
     <div className="location-card-mfa-oidc">
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title="Two-factor authentication">
+      <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
         {screen === 'idle' && (
           <p>
             To connect to the VPN, authenticate via your OpenID provider. A browser window

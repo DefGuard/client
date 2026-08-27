@@ -18,4 +18,28 @@
     row-gap: var(--spacing-md);
     padding-bottom: var(--spacing-md);
   }
+
+  > .steps {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-xl);
+    padding-bottom: var(--spacing-md);
+
+    > .step {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-sm);
+
+      > .step-label {
+        font: var(--t-body-xs-400);
+        color: var(--fg-white-70);
+      }
+
+      > .methods {
+        display: flex;
+        flex-flow: column;
+        row-gap: var(--spacing-md);
+      }
+    }
+  }
 }

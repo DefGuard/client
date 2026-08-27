@@ -26,6 +26,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client.v1.ServiceLocation.posture_check_required",
             "#[serde(default)]",
         )
+        // [2.2] These repeated fields are absent in responses from pre-2.2 edges.
+        .field_attribute(
+            ".defguard.client_types.DeviceConfig.steps",
+            "#[serde(default)]",
+        )
+        .field_attribute(
+            ".defguard.client_types.ClientMfaStartResponse.rejections",
+            "#[serde(default)]",
+        )
         // Use proto defaults for missing fields in enrollment types that
         // may differ across proxy versions.
         .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")
