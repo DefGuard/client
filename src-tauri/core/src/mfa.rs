@@ -137,9 +137,14 @@ pub async fn mfa_start(
             message: format!("Invalid MFA start response: {e}"),
         })?;
 
-    if let Some(rejection) = start_response.rejections.first() {
+    if !start_response.rejections.is_empty() {
+        let messages: Vec<String> = start_response
+            .rejections
+            .iter()
+            .map(rejection_message)
+            .collect();
         return Err(MfaError::MfaRejected {
-            message: rejection_message(rejection),
+            message: messages.join(" "),
         });
     }
 
