@@ -84,11 +84,11 @@ export const WelcomeCarousel = ({ slides }: WelcomeCarouselProps) => {
               <p className="title">{activeSlide.title}</p>
               <SizedBox height={ThemeSpacing.Xs} />
               <p className="description">{activeSlide.description}</p>
-              {isPresent(activeSlide.blogLinkText) && (
+              {isPresent(activeSlide.actionText) && (
                 <Fragment>
                   <SizedBox height={ThemeSpacing.Xl2} />
                   <Button
-                    text={activeSlide.blogLinkText}
+                    text={activeSlide.actionText}
                     variant={ButtonVariant.Primary}
                     onClick={() => {
                       void api.closeWelcomeWindow();

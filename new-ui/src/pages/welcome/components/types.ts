@@ -5,5 +5,5 @@ export interface CarouselSlide {
   posterSrc?: string;
   description: string;
   blogLink?: string;
-  blogLinkText?: string;
+  actionText?: string;
 }
