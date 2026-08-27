@@ -82,11 +82,11 @@ export const WelcomeCarousel = ({ slides }: WelcomeCarouselProps) => {
             {renderSlide(activeSlide)}
             <div className="content">
               <p className="title">{activeSlide.title}</p>
-              <SizedBox height={ThemeSpacing.Sm} />
+              <SizedBox height={ThemeSpacing.Xs} />
               <p className="description">{activeSlide.description}</p>
               {isPresent(activeSlide.blogLinkText) && (
                 <Fragment>
-                  <SizedBox height={ThemeSpacing.Xl} />
+                  <SizedBox height={ThemeSpacing.Xl2} />
                   <Button
                     text={activeSlide.blogLinkText}
                     variant={ButtonVariant.Primary}
