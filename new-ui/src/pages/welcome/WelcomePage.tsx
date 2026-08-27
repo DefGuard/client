@@ -22,7 +22,7 @@ export const WelcomePage = () => {
       ></div>
       <FullPage hideScrollContainer id="welcome-page">
         <header data-tauri-drag-region>
-          <h1 data-tauri-drag-region>{`What's new`}</h1>
+          <h1 data-tauri-drag-region>{`What's new in Defguard`}</h1>
           <IconButton
             icon={IconKind.Close}
             variant={IconButtonVariant.Big}
