@@ -124,7 +124,7 @@ impl WindowManager {
             .maximizable(false)
             .decorations(false)
             .skip_taskbar(false)
-            .always_on_top(false)
+            .always_on_top(true)
             .visible(false);
         #[cfg(target_os = "macos")]
         let window = window.hidden_title(true);
