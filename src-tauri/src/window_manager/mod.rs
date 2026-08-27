@@ -10,6 +10,7 @@ use crate::{
     },
     events::EventKey,
 };
+use defguard_client_core::version::mark_welcome_shown;
 
 /// Returns `true` if there are any non-service locations in the database.
 pub async fn has_non_service_locations() -> bool {
@@ -292,6 +293,12 @@ pub fn close_welcome_window(app: AppHandle) {
     } else {
         warn!("close_welcome_window task: welcome window not found");
     }
+
+    let config_dir = app
+        .path()
+        .app_data_dir()
+        .expect("Failed to access app data");
+    mark_welcome_shown(&config_dir, &app.package_info().version);
 
     show_tray_or_full_view(&app);
 }
