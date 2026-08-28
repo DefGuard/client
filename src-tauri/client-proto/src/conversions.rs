@@ -9,6 +9,7 @@ use std::{
 use defguard_wireguard_rs::{
     host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
 };
+use tonic::Status;
 use tracing::debug;
 
 use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
@@ -74,22 +75,29 @@ impl From<InterfaceConfiguration> for InterfaceConfig {
     }
 }
 
-impl From<InterfaceConfig> for InterfaceConfiguration {
-    fn from(config: InterfaceConfig) -> Self {
+impl TryFrom<InterfaceConfig> for InterfaceConfiguration {
+    type Error = Status;
+
+    fn try_from(config: InterfaceConfig) -> Result<Self, Self::Error> {
         let addresses = config
             .address
             .split(',')
             .filter_map(|ip| IpAddrMask::from_str(ip.trim()).ok())
             .collect();
-        Self {
+        let peers = config
+            .peers
+            .into_iter()
+            .map(Peer::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
             name: config.name,
             prvkey: config.prvkey,
             addresses,
             port: config.port as u16,
-            peers: config.peers.into_iter().map(Into::into).collect(),
+            peers,
             mtu: config.mtu,
             fwmark: None, // TODO: add to config
-        }
+        })
     }
 }
 
@@ -102,7 +110,7 @@ impl From<Peer> for ProtoPeer {
             endpoint: peer.endpoint.map(|addr| addr.to_string()),
             last_handshake: peer.last_handshake.map(|time| {
                 time.duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
+                    .unwrap_or_default()
                     .as_secs()
             }),
             tx_bytes: peer.tx_bytes,
@@ -117,18 +125,42 @@ impl From<Peer> for ProtoPeer {
     }
 }
 
-impl From<ProtoPeer> for Peer {
-    fn from(peer: ProtoPeer) -> Self {
-        Self {
-            public_key: Key::decode(peer.public_key).expect("Failed to parse public key"),
-            preshared_key: peer.preshared_key.map(|key| {
-                Key::decode(&key).unwrap_or_else(|_| panic!("Failed to parse preshared key: {key}"))
-            }),
+impl TryFrom<ProtoPeer> for Peer {
+    type Error = Status;
+
+    fn try_from(peer: ProtoPeer) -> Result<Self, Self::Error> {
+        let public_key = Key::decode(peer.public_key)
+            .map_err(|err| Status::invalid_argument(format!("Invalid peer public key: {err}")))?;
+        let preshared_key = peer
+            .preshared_key
+            .map(|key| {
+                Key::decode(key).map_err(|err| {
+                    Status::invalid_argument(format!("Invalid preshared key: {err}"))
+                })
+            })
+            .transpose()?;
+        let endpoint = peer
+            .endpoint
+            .map(|addr| {
+                addr.parse().map_err(|err| {
+                    Status::invalid_argument(format!("Invalid endpoint {addr}: {err}"))
+                })
+            })
+            .transpose()?;
+        let allowed_ips = peer
+            .allowed_ips
+            .into_iter()
+            .map(|addr| {
+                addr.parse().map_err(|err| {
+                    Status::invalid_argument(format!("Invalid allowed IP {addr}: {err}"))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            public_key,
+            preshared_key,
             protocol_version: peer.protocol_version,
-            endpoint: peer.endpoint.map(|addr| {
-                addr.parse()
-                    .unwrap_or_else(|_| panic!("Failed to parse endpoint address: {addr}"))
-            }),
+            endpoint,
             last_handshake: peer
                 .last_handshake
                 .map(|timestamp| UNIX_EPOCH + Duration::from_secs(timestamp)),
@@ -137,15 +169,8 @@ impl From<ProtoPeer> for Peer {
             persistent_keepalive_interval: peer
                 .persistent_keepalive_interval
                 .and_then(|interval| u16::try_from(interval).ok()),
-            allowed_ips: peer
-                .allowed_ips
-                .into_iter()
-                .map(|addr| {
-                    addr.parse()
-                        .unwrap_or_else(|_| panic!("Failed to parse allowed IP: {addr}"))
-                })
-                .collect(),
-        }
+            allowed_ips,
+        })
     }
 }
 
@@ -184,7 +209,7 @@ mod tests {
 
         let proto_peer: ProtoPeer = base_peer.clone().into();
 
-        let converted_peer: Peer = proto_peer.into();
+        let converted_peer: Peer = proto_peer.try_into().unwrap();
 
         assert_eq!(base_peer, converted_peer);
     }
@@ -306,8 +331,44 @@ mod tests {
     fn test_proto_peer_to_peer_roundtrip() {
         let peer = sample_peer();
         let proto: ProtoPeer = peer.clone().into();
-        let converted: Peer = proto.into();
+        let converted: Peer = proto.try_into().unwrap();
         assert_eq!(peer, converted);
+    }
+
+    #[test]
+    fn test_invalid_peer_fields_are_rejected() {
+        let base: ProtoPeer = sample_peer().into();
+        let invalid = [
+            ProtoPeer {
+                public_key: "NOT-A-VALID-WIREGUARD-KEY".to_string(),
+                ..base.clone()
+            },
+            ProtoPeer {
+                preshared_key: Some("not-a-key".to_string()),
+                ..base.clone()
+            },
+            ProtoPeer {
+                endpoint: Some("not-an-endpoint".to_string()),
+                ..base.clone()
+            },
+            ProtoPeer {
+                allowed_ips: vec!["999.999.999.999/32".to_string()],
+                ..base
+            },
+        ];
+
+        for peer in invalid {
+            let config = InterfaceConfig {
+                name: "dg0".to_string(),
+                prvkey: String::new(),
+                address: "10.20.30.1/24".to_string(),
+                port: 51820,
+                peers: vec![peer],
+                mtu: None,
+            };
+            let err = InterfaceConfiguration::try_from(config).unwrap_err();
+            assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        }
     }
 
     #[test]
@@ -315,7 +376,7 @@ mod tests {
         let mut proto: ProtoPeer = sample_peer().into();
         // A value exceeding u16::MAX can't be represented as a keepalive interval.
         proto.persistent_keepalive_interval = Some(u32::from(u16::MAX) + 1);
-        let converted: Peer = proto.into();
+        let converted: Peer = proto.try_into().unwrap();
         assert_eq!(converted.persistent_keepalive_interval, None);
     }
 }
