@@ -20,14 +20,14 @@ use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoP
 #[must_use]
 fn truncate_to_network(mut allowed_ip: IpAddrMask) -> IpAddrMask {
     let max_cidr = if allowed_ip.address.is_ipv4() {
-        32
+        Ipv4Addr::BITS
     } else {
-        128
+        Ipv6Addr::BITS
     };
 
     // Unreachable via `FromStr`, which rejects an out-of-range cidr, but `IpAddrMask::new` and the
     // public `cidr` field don't. Bail out rather than let `mask()` underflow its shift.
-    if allowed_ip.cidr > max_cidr {
+    if allowed_ip.cidr as u32 > max_cidr {
         debug!("Leaving allowed IP {allowed_ip} unnormalized, its cidr exceeds {max_cidr}");
         return allowed_ip;
     }
