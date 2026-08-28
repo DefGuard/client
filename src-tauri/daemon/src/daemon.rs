@@ -294,7 +294,8 @@ impl DesktopDaemonService for DaemonService {
                 Code::InvalidArgument,
                 "Missing interface config in request",
             ))?
-            .into();
+            .try_into()
+            .inspect_err(|err| error!("Invalid interface config in request: {err}"))?;
         let ifname = &config.name;
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
         // Setup WireGuard API.
