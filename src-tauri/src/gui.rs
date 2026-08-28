@@ -10,8 +10,6 @@ use std::{
 
 #[cfg(target_os = "macos")]
 use defguard_client_core::connection::sync_locations_and_tunnels;
-#[cfg(target_os = "macos")]
-use defguard_client_core::connection::sync_locations_and_tunnels;
 use defguard_client_core::{
     connection::active_connections::close_all_connections,
     version::{check_app_version, should_show_welcome, VersionCheckResult},
