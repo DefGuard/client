@@ -242,7 +242,11 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                 let peers = interface_data
                     .peers
                     .into_iter()
-                    .map(Into::into)
+                    .filter_map(|peer| {
+                        Peer::try_from(peer)
+                            .inspect_err(|err| error!("Skipping malformed peer: {err}"))
+                            .ok()
+                    })
                     .collect::<Vec<Peer>>();
                 let mut pending_totals = Vec::new();
                 for peer in peers {
