@@ -9,6 +9,7 @@ use std::{
 use defguard_wireguard_rs::{
     host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
 };
+use tracing::debug;
 
 use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
 
@@ -23,7 +24,11 @@ fn truncate_to_network(mut allowed_ip: IpAddrMask) -> IpAddrMask {
     } else {
         128
     };
+
+    // Unreachable via `FromStr`, which rejects an out-of-range cidr, but `IpAddrMask::new` and the
+    // public `cidr` field don't. Bail out rather than let `mask()` underflow its shift.
     if allowed_ip.cidr > max_cidr {
+        debug!("Leaving allowed IP {allowed_ip} unnormalized, its cidr exceeds {max_cidr}");
         return allowed_ip;
     }
 

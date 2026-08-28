@@ -1697,6 +1697,7 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+ "tracing",
  "wmi",
  "x25519-dalek 3.0.0",
 ]
