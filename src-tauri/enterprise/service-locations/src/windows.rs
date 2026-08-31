@@ -28,7 +28,8 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
+    instance_file_path, is_unchanged_on_disk, load_service_locations_from_directory,
+    load_service_locations_from_file,
     reconciler::{
         reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
         ReconcileSignal,
@@ -259,9 +260,7 @@ fn set_protected_acls(path: &str) -> Result<(), ServiceLocationError> {
 }
 
 fn get_instance_file_path(instance_id: &str) -> Result<PathBuf, ServiceLocationError> {
-    let mut path = get_shared_directory()?;
-    path.push(format!("{instance_id}.json"));
-    Ok(path)
+    instance_file_path(&get_shared_directory()?, instance_id)
 }
 
 pub(crate) fn is_user_logged_in() -> bool {

@@ -25,7 +25,7 @@ use defguard_client_proto::defguard::{
 use defguard_client_service_locations::reconciler::{run_reconciler, ReconcileSignal};
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
-use defguard_client_service_locations::ServiceLocationManager;
+use defguard_client_service_locations::{validate_instance_id, ServiceLocationManager};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -222,7 +222,13 @@ impl DesktopDaemonService for DaemonService {
         request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
         debug!("Received a request to save service locations");
-        let service_location = request.into_inner();
+        let mut service_location = request.into_inner();
+        service_location.instance_id = validate_instance_id(&service_location.instance_id)
+            .map_err(|err| {
+                let msg = format!("Failed to save service locations: {err}");
+                error!("{msg}");
+                Status::invalid_argument(msg)
+            })?;
 
         self.service_location_manager
             .write()
@@ -259,6 +265,11 @@ impl DesktopDaemonService for DaemonService {
     ) -> Result<Response<()>, Status> {
         debug!("Received a request to delete service locations");
         let instance_id = request.into_inner().instance_id;
+        let instance_id = validate_instance_id(&instance_id).map_err(|err| {
+            let msg = format!("Failed to delete service locations: {err}");
+            error!("{msg}");
+            Status::invalid_argument(msg)
+        })?;
 
         let mut manager = self.service_location_manager.write().unwrap();
         manager
