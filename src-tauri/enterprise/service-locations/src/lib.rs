@@ -1,6 +1,6 @@
-#[cfg(any(windows, target_os = "linux", test))]
-use std::ffi::OsStr;
 use std::{collections::HashMap, fmt, fs, path::Path, time::SystemTime};
+#[cfg(any(windows, target_os = "linux", test))]
+use std::{ffi::OsStr, path::PathBuf};
 
 use defguard_client_core::{
     database::models::{
@@ -17,6 +17,7 @@ use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 use log::debug;
 use log::warn;
 use serde::{Deserialize, Serialize};
+use uuid::fmt::Hyphenated;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -34,6 +35,8 @@ pub enum ServiceLocationError {
     InitError(String),
     #[error("Failed to load service location storage: {0}")]
     LoadError(String),
+    #[error("Invalid instance ID: {0}")]
+    InvalidInstanceId(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -191,6 +194,21 @@ impl fmt::Debug for SingleServiceLocationData {
     }
 }
 
+pub fn validate_instance_id(instance_id: &str) -> Result<String, ServiceLocationError> {
+    instance_id
+        .parse::<Hyphenated>()
+        .map(|uuid| uuid.to_string())
+        .map_err(|_| ServiceLocationError::InvalidInstanceId(instance_id.to_string()))
+}
+
+#[cfg(any(windows, target_os = "linux", test))]
+fn instance_file_path(
+    directory: &Path,
+    instance_id: &str,
+) -> Result<PathBuf, ServiceLocationError> {
+    Ok(directory.join(format!("{}.json", validate_instance_id(instance_id)?)))
+}
+
 /// Whether the file at `path` already holds exactly `contents`. Makes a save idempotent thus
 /// allowing pushing service locations on every poll cycle.
 ///
@@ -283,6 +301,60 @@ pub fn to_service_location(location: &Location<Id>) -> Result<ServiceLocation, C
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const VALID_INSTANCE_ID: &str = "0f8fad5b-d9cb-469f-a165-70867728950e";
+
+    #[test]
+    fn test_instance_id_is_normalized() {
+        assert_eq!(
+            validate_instance_id("0F8FAD5B-D9CB-469F-A165-70867728950E").unwrap(),
+            VALID_INSTANCE_ID
+        );
+    }
+
+    #[test]
+    fn test_non_uuid_instance_ids_are_rejected() {
+        let invalid = [
+            "",
+            "..",
+            "../../etc/defguard/evil",
+            "..\\..\\Windows\\Temp\\evil",
+            "C:\\Windows\\Temp\\evil",
+            "/etc/defguard/evil",
+            "0f8fad5b-d9cb-469f-a165-70867728950e/../evil",
+            "0f8fad5b-d9cb-469f-a165-70867728950",
+            "0f8fad5b-d9cb-469f-a165-70867728950eb",
+            "0f8fad5b-d9cb-469f-a165-7086772895ez",
+            "0f8fad5bd9cb469fa16570867728950e",
+            "{0f8fad5b-d9cb-469f-a165-70867728950e}",
+            "urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e",
+        ];
+
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+
+        for instance_id in invalid {
+            assert!(
+                validate_instance_id(instance_id).is_err(),
+                "instance ID {instance_id} should be rejected"
+            );
+            assert!(
+                instance_file_path(dir.path(), instance_id).is_err(),
+                "instance ID {instance_id} must not produce a file path"
+            );
+        }
+    }
+
+    #[test]
+    fn test_instance_file_path_stays_in_the_storage_directory() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = instance_file_path(dir.path(), VALID_INSTANCE_ID).unwrap();
+
+        assert_eq!(path.parent(), Some(dir.path()));
+        assert_eq!(
+            path.file_name().unwrap(),
+            OsStr::new(&format!("{VALID_INSTANCE_ID}.json"))
+        );
+    }
 
     /// A save is a no-op only if this comparison is exact: getting it wrong does not merely cost a
     /// disk write, it drops and rebuilds every tunnel on the box.

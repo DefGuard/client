@@ -18,7 +18,8 @@ use defguard_wireguard_rs::{
 use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
+    instance_file_path, is_unchanged_on_disk, load_service_locations_from_directory,
+    load_service_locations_from_file,
     reconciler::{
         reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
     },
@@ -35,8 +36,8 @@ fn get_shared_directory() -> PathBuf {
     PathBuf::from(DEFGUARD_DIR).join(SERVICE_LOCATIONS_SUBDIR)
 }
 
-fn get_instance_file_path(instance_id: &str) -> PathBuf {
-    get_shared_directory().join(format!("{instance_id}.json"))
+fn get_instance_file_path(instance_id: &str) -> Result<PathBuf, ServiceLocationError> {
+    instance_file_path(&get_shared_directory(), instance_id)
 }
 
 fn ensure_shared_directory() -> Result<PathBuf, ServiceLocationError> {
@@ -119,7 +120,7 @@ impl ServiceLocationManager {
             ServiceLocationData::from_save_request(request, service_locations.clone());
 
         ensure_shared_directory()?;
-        let instance_file_path = get_instance_file_path(instance_id);
+        let instance_file_path = get_instance_file_path(instance_id)?;
         let json = serde_json::to_string_pretty(&service_location_data)?;
 
         // Saving is pushed unconditionally on every poll cycle, so nothing having changed is the
@@ -653,7 +654,7 @@ impl ServiceLocationManager {
     ) -> Result<(), ServiceLocationError> {
         debug!("Deleting Linux service locations for instance {instance_id}");
 
-        let instance_file_path = get_instance_file_path(instance_id);
+        let instance_file_path = get_instance_file_path(instance_id)?;
         if instance_file_path.exists() {
             fs::remove_file(&instance_file_path)?;
             debug!("Deleted Linux service locations for instance {instance_id}");
@@ -676,7 +677,7 @@ impl ServiceLocationManager {
         &self,
         instance_id: &str,
     ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
-        let instance_file_path = get_instance_file_path(instance_id);
+        let instance_file_path = get_instance_file_path(instance_id)?;
         load_service_locations_from_file(&instance_file_path)
     }
 }
