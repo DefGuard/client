@@ -34,12 +34,8 @@ fn truncate_to_network(mut allowed_ip: IpAddrMask) -> IpAddrMask {
     }
 
     allowed_ip.address = match (allowed_ip.address, allowed_ip.mask()) {
-        (IpAddr::V4(address), IpAddr::V4(mask)) => {
-            IpAddr::V4(Ipv4Addr::from(u32::from(address) & u32::from(mask)))
-        }
-        (IpAddr::V6(address), IpAddr::V6(mask)) => {
-            IpAddr::V6(Ipv6Addr::from(u128::from(address) & u128::from(mask)))
-        }
+        (IpAddr::V4(address), IpAddr::V4(mask)) => IpAddr::V4(address & mask),
+        (IpAddr::V6(address), IpAddr::V6(mask)) => IpAddr::V6(address & mask),
         _ => return allowed_ip,
     };
     allowed_ip
