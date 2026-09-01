@@ -22,13 +22,7 @@ use crate::{
         manager_for_key_and_value, LOCATION_ID, OBSERVER_COMMS, PLUGIN_BUNDLE_ID, TUNNEL_ID,
     },
     database::{
-        models::{
-            instance::{ClientTrafficPolicy, Instance},
-            location::Location,
-            tunnel::Tunnel,
-            wireguard_keys::WireguardKeys,
-            Id,
-        },
+        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
         DB_POOL,
     },
     error::Error,
@@ -313,18 +307,7 @@ impl Location<Id> {
         }
 
         debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
-        let Some(instance) = Instance::find_by_id(&*DB_POOL, self.instance_id).await? else {
-            error!("Instance {} not found", self.instance_id);
-            return Err(Error::InternalError(format!(
-                "Instance {} not found",
-                self.instance_id
-            )));
-        };
-        let route_all_traffic = match instance.client_traffic_policy {
-            ClientTrafficPolicy::ForceAllTraffic => true,
-            ClientTrafficPolicy::DisableAllTraffic => false,
-            ClientTrafficPolicy::None => self.route_all_traffic,
-        };
+        let route_all_traffic = self.effective_route_all_traffic(&DB_POOL, None).await?;
         let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]

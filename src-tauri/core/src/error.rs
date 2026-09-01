@@ -58,6 +58,8 @@ pub enum Error {
     PostureCheckFailed(String),
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
+    #[error("{0}")]
+    AllTrafficConflict(String),
 }
 
 // we must manually implement serde::Serialize

@@ -23,6 +23,8 @@ export const LocationCardConnectButton = () => {
       ) {
         setPostureError(connectError.message);
         setView(LocationCardViews.PostureCheckFail);
+      } else if (connectError?.kind === 'allTrafficConflict') {
+        setView(LocationCardViews.ConnectionError, connectError.message);
       } else if (connectError?.kind === 'serviceUnavailable') {
         setView(LocationCardViews.ConnectionError);
       }

@@ -7,7 +7,7 @@ use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
     connection::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
-        disconnect_interface,
+        disconnect_interface, ConnectionTarget,
     },
     enrollment::{self},
     mfa,
@@ -81,6 +81,8 @@ pub enum ConnectError {
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
     #[error("{0}")]
+    AllTrafficConflict(String),
+    #[error("{0}")]
     Other(String),
 }
 
@@ -89,6 +91,7 @@ impl From<Error> for ConnectError {
         match error {
             Error::PostureCheckFailed(message) => Self::PostureCheckFailed(message),
             Error::ServiceUnavailable(message) => Self::ServiceUnavailable(message),
+            Error::AllTrafficConflict(message) => Self::AllTrafficConflict(message),
             error => Self::Other(error.to_string()),
         }
     }
@@ -1602,6 +1605,11 @@ pub async fn mfa_start(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Location not found".to_string())?;
+    // FIXME: ugly struct
+    ConnectionTarget::Location(location.clone())
+        .ensure_single_all_traffic_connection(&DB_POOL, None)
+        .await
+        .map_err(|err| err.to_string())?;
     let posture_data = if location.posture_check_required {
         Some(
             defguard_client_posture::get_posture_data()
