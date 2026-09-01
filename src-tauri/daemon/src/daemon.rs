@@ -12,14 +12,17 @@ use std::{fs, path::Path};
 use defguard_client_common::dns_borrow;
 #[cfg(windows)]
 use defguard_client_posture::inspector::{device_posture_data, DiskEncryptionTarget};
-use defguard_client_proto::defguard::{
-    client::v1::{
-        desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
-        ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
-        RemoveInterfaceRequest, SaveServiceLocationsRequest,
+use defguard_client_proto::{
+    conversions::normalize_allowed_ips,
+    defguard::{
+        client::v1::{
+            desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+            CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
+            ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
+            RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        },
+        enterprise::posture::v2::DevicePostureData,
     },
-    enterprise::posture::v2::DevicePostureData,
 };
 #[cfg(target_os = "linux")]
 use defguard_client_service_locations::reconciler::{run_reconciler, ReconcileSignal};
@@ -125,8 +128,10 @@ fn configure_new_interface(
     ifname: &str,
     request: &CreateInterfaceRequest,
     wgapi: &mut WG,
-    interface_config: &InterfaceConfiguration,
+    interface_config: &mut InterfaceConfiguration,
 ) -> Result<(), Status> {
+    normalize_allowed_ips(interface_config);
+
     // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
     // be used as DNS servers and search domains respectively.
     debug!("Preparing DNS configuration for interface {ifname}");
@@ -298,7 +303,7 @@ impl DesktopDaemonService for DaemonService {
     ) -> Result<Response<()>, Status> {
         debug!("Received a request to create a new interface");
         let request = request.into_inner();
-        let config: InterfaceConfiguration = request
+        let mut config: InterfaceConfiguration = request
             .config
             .clone()
             .ok_or(Status::new(
@@ -307,7 +312,7 @@ impl DesktopDaemonService for DaemonService {
             ))?
             .try_into()
             .inspect_err(|err| error!("Invalid interface config in request: {err}"))?;
-        let ifname = &config.name;
+        let ifname = config.name.clone();
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
         // Setup WireGuard API.
         let Ok(mut wgapis_map) = self.wgapis.write() else {
@@ -316,7 +321,7 @@ impl DesktopDaemonService for DaemonService {
         };
         let wgapi = wgapis_map
             .entry(ifname.clone())
-            .or_insert(setup_wgapi(ifname)?);
+            .or_insert(setup_wgapi(&ifname)?);
 
         // create new interface
         debug!("Creating new interface {ifname}");
@@ -329,7 +334,7 @@ impl DesktopDaemonService for DaemonService {
 
         // attempt to configure new interface
         // remove interface if configuration fails to avoid duplicate interfaces
-        match configure_new_interface(ifname, &request, wgapi, &config) {
+        match configure_new_interface(&ifname, &request, wgapi, &mut config) {
             Ok(()) => info!("Finished configuring new interface {ifname}"),
             Err(err) => {
                 error!("Failed to configure interface {ifname}. Error: {err}");

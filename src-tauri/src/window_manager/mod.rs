@@ -1,3 +1,4 @@
+use defguard_client_core::version::mark_welcome_shown;
 use tauri::{
     async_runtime::block_on, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
@@ -10,7 +11,6 @@ use crate::{
     },
     events::EventKey,
 };
-use defguard_client_core::version::mark_welcome_shown;
 
 /// Returns `true` if there are any non-service locations in the database.
 pub async fn has_non_service_locations() -> bool {

@@ -1,4 +1,7 @@
 use std::{
+    collections::HashSet,
+    mem::take,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
     time::{Duration, UNIX_EPOCH},
 };
@@ -6,10 +9,49 @@ use std::{
 use defguard_wireguard_rs::{
     host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
 };
-
 use tonic::Status;
+use tracing::debug;
 
 use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
+
+/// Truncates host bits from a peer allowed IP.
+///
+/// This runs before `WGApi` classifies default routes. In particular, a non-canonical `/0` must
+/// become an unspecified address so it takes the default-route loop-prevention path.
+#[must_use]
+fn truncate_to_network(mut allowed_ip: IpAddrMask) -> IpAddrMask {
+    let max_cidr = if allowed_ip.address.is_ipv4() {
+        Ipv4Addr::BITS
+    } else {
+        Ipv6Addr::BITS
+    };
+
+    // Unreachable via `FromStr`, which rejects an out-of-range cidr, but `IpAddrMask::new` and the
+    // public `cidr` field don't. Bail out rather than let `mask()` underflow its shift.
+    if allowed_ip.cidr as u32 > max_cidr {
+        debug!("Leaving allowed IP {allowed_ip} unnormalized, its cidr exceeds {max_cidr}");
+        return allowed_ip;
+    }
+
+    allowed_ip.address = match (allowed_ip.address, allowed_ip.mask()) {
+        (IpAddr::V4(address), IpAddr::V4(mask)) => IpAddr::V4(address & mask),
+        (IpAddr::V6(address), IpAddr::V6(mask)) => IpAddr::V6(address & mask),
+        _ => return allowed_ip,
+    };
+    allowed_ip
+}
+
+/// Normalizes and deduplicates peer allowed IPs before they reach `WGApi`.
+pub fn normalize_allowed_ips(config: &mut InterfaceConfiguration) {
+    for peer in &mut config.peers {
+        let mut seen = HashSet::new();
+        peer.allowed_ips = take(&mut peer.allowed_ips)
+            .into_iter()
+            .map(truncate_to_network)
+            .filter(|allowed_ip| seen.insert(allowed_ip.clone()))
+            .collect();
+    }
+}
 
 impl From<InterfaceConfiguration> for InterfaceConfig {
     fn from(config: InterfaceConfiguration) -> Self {
@@ -177,6 +219,93 @@ mod tests {
         peer.endpoint = Some("127.0.0.1:8080".parse().unwrap());
         peer.persistent_keepalive_interval = Some(25);
         peer
+    }
+
+    #[test]
+    fn test_truncate_to_network_clears_ipv4_host_bits() {
+        let allowed_ip = "172.16.0.1/24".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(
+            truncate_to_network(allowed_ip),
+            "172.16.0.0/24".parse::<IpAddrMask>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_truncate_to_network_keeps_ipv4_host_route() {
+        let allowed_ip = "172.16.0.1/32".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_truncate_to_network_keeps_canonical_address() {
+        let allowed_ip = "172.16.0.0/24".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_truncate_to_network_handles_ipv4_default_route() {
+        let allowed_ip = "10.0.0.1/0".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(
+            truncate_to_network(allowed_ip),
+            "0.0.0.0/0".parse::<IpAddrMask>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_truncate_to_network_clears_ipv6_host_bits() {
+        let allowed_ip = "2001:db8::1/96".parse::<IpAddrMask>().unwrap();
+
+        assert_eq!(
+            truncate_to_network(allowed_ip),
+            "2001:db8::/96".parse::<IpAddrMask>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_truncate_to_network_preserves_invalid_ipv4_cidr() {
+        let allowed_ip = IpAddrMask::new("172.16.0.1".parse().unwrap(), 33);
+
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_truncate_to_network_preserves_invalid_ipv6_cidr() {
+        let allowed_ip = IpAddrMask::new("2001:db8::1".parse().unwrap(), 129);
+
+        assert_eq!(truncate_to_network(allowed_ip.clone()), allowed_ip);
+    }
+
+    #[test]
+    fn test_normalize_allowed_ips_deduplicates_after_masking() {
+        let mut peer = sample_peer();
+        peer.allowed_ips = ["172.16.0.1/24", "172.16.0.2/24", "10.0.0.0/24"]
+            .into_iter()
+            .map(|allowed_ip| allowed_ip.parse().unwrap())
+            .collect();
+        let mut config = InterfaceConfiguration {
+            name: "wg0".into(),
+            prvkey: String::new(),
+            addresses: vec!["10.0.0.1/24".parse().unwrap()],
+            port: 0,
+            peers: vec![peer],
+            mtu: None,
+            fwmark: None,
+        };
+
+        normalize_allowed_ips(&mut config);
+
+        assert_eq!(
+            config.peers[0].allowed_ips,
+            ["172.16.0.0/24", "10.0.0.0/24"]
+                .into_iter()
+                .map(|allowed_ip| allowed_ip.parse().unwrap())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(config.addresses, vec!["10.0.0.1/24".parse().unwrap()]);
     }
 
     #[test]
