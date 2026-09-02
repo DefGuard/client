@@ -2,6 +2,7 @@ import './style.scss';
 
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
+import dayjs from 'dayjs';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
@@ -10,6 +11,7 @@ import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPage
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { getLocationDetailsQueryOptions } from '../../../shared/rust-api/query';
 import { ThemeSpacing } from '../../../shared/types';
+import { formatDuration } from '../../../shared/utils/formatDuration';
 
 const fallback = '–';
 
@@ -51,7 +53,7 @@ export const LocationDetailsPage = () => {
                 label: 'Latest Handshake',
                 value:
                   data?.last_handshake != null
-                    ? `${data.last_handshake} sec ago`
+                    ? `${formatDuration(dayjs.duration(data.last_handshake, 'seconds'))} ago`
                     : fallback,
               },
             ],
