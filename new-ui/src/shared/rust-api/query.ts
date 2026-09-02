@@ -75,6 +75,7 @@ export const getLocationStatsQueryOptions = (args: StatsArgs) =>
       args.from,
     ] as const,
     queryFn: () => api.getLocationStats(args),
+    refetchInterval: 10_000,
   });
 
 export const getTunnelsQueryOptions = queryOptions({
