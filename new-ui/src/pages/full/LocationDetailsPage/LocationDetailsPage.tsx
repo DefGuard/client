@@ -53,7 +53,7 @@ export const LocationDetailsPage = () => {
                 label: 'Latest Handshake',
                 value:
                   data?.last_handshake != null
-                    ? `${formatDuration(dayjs.duration(data.last_handshake, 'seconds'))} ago`
+                    ? `${formatDuration(dayjs.duration(dayjs().diff(dayjs.unix(data.last_handshake))))} ago`
                     : fallback,
               },
             ],
