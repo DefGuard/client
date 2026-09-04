@@ -179,6 +179,8 @@ pub(crate) async fn authorize(
         code: Some(code.expose_secret().to_string()),
         auth_pub_key: None,
         step_attempt_id: None,
+        auth_data: None,
+        credential_id: None,
     };
     let psk = mfa::mfa_finish_code(proxy_url, finish_req)
         .await

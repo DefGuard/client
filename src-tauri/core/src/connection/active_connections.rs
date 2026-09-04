@@ -15,6 +15,15 @@ use crate::{
 pub static ACTIVE_CONNECTIONS: LazyLock<Mutex<Vec<ActiveConnection>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 
+pub(crate) async fn active_connection_ids() -> Vec<(Id, ConnectionType)> {
+    ACTIVE_CONNECTIONS
+        .lock()
+        .await
+        .iter()
+        .map(|con| (con.location_id, con.connection_type))
+        .collect()
+}
+
 pub async fn get_connection_id_by_type(connection_type: ConnectionType) -> Vec<Id> {
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
 

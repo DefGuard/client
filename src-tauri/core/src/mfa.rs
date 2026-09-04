@@ -296,6 +296,8 @@ pub async fn poll_openid_mfa(
         code: None,
         auth_pub_key: None,
         step_attempt_id: None,
+        auth_data: None,
+        credential_id: None,
     };
 
     loop {
@@ -677,6 +679,8 @@ mod tests {
                 code: Some("123456".into()),
                 auth_pub_key: None,
                 step_attempt_id: None,
+                auth_data: None,
+                credential_id: None,
             },
         )
         .await
@@ -705,6 +709,8 @@ mod tests {
                 code: Some("000000".into()),
                 auth_pub_key: None,
                 step_attempt_id: None,
+                auth_data: None,
+                credential_id: None,
             },
         )
         .await
