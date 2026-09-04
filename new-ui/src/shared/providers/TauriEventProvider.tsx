@@ -15,12 +15,11 @@ import {
   type DeadConnectionDroppedPayload,
   type DeadConnectionReconnectedPayload,
   type LocationInfo,
-  MfaMethod,
   TauriEvent,
   type TunnelsDisabledPayload,
 } from '../rust-api/types';
 import { useAppStore } from '../store/useAppStore';
-import { decideLocationMfaMethod } from '../utils/decideLocationMfaMethod';
+import { resolveMfaStepPlan } from '../utils/mfa';
 
 export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   const navigate = useNavigate();
@@ -69,8 +68,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             };
             void (async () => {
               const appConfig = await api.getAppConfig();
-              const mfaMethod =
-                decideLocationMfaMethod(location, location.mfa_method) ?? MfaMethod.Totp;
+              const mfaMethod = resolveMfaStepPlan(location)[0];
 
               await navigate({ to: '/full/overview' });
               useConnectModal.getState().open({

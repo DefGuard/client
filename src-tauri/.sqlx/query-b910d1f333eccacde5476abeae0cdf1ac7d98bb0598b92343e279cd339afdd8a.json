@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, service_location_mode, mfa_method, posture_check_required, mfa_steps, mfa_step_plan) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b910d1f333eccacde5476abeae0cdf1ac7d98bb0598b92343e279cd339afdd8a"
+}

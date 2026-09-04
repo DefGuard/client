@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../../rust-api/api';
-import { shouldStartMfa } from '../../../utils/mfa';
+import { hasUnpassableMfaStep, shouldStartMfa } from '../../../utils/mfa';
 import { parseConnectError } from '../api/connectError';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
@@ -61,6 +61,10 @@ export const LocationCardConnectButton = () => {
   };
 
   return (
-    <ConnectButton active={location.active} onClick={handleClick} disabled={isBusy} />
+    <ConnectButton
+      active={location.active}
+      onClick={handleClick}
+      disabled={isBusy || hasUnpassableMfaStep(location)}
+    />
   );
 };

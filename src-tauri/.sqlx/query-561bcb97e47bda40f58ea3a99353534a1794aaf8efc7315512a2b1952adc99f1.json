@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\", mfa_method \"mfa_method: _\", posture_check_required FROM location WHERE service_location_mode <= $1 ORDER BY name ASC",
+  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\",\n            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", mfa_step_plan \"mfa_step_plan: _\" FROM location WHERE instance_id = $1 AND service_location_mode <= $2 ORDER BY name ASC",
   "describe": {
     "columns": [
       {
-        "name": "id",
+        "name": "id: _",
         "ordinal": 0,
         "type_info": "Integer"
       },
@@ -77,10 +77,20 @@
         "name": "posture_check_required",
         "ordinal": 14,
         "type_info": "Bool"
+      },
+      {
+        "name": "mfa_steps: _",
+        "ordinal": 15,
+        "type_info": "Text"
+      },
+      {
+        "name": "mfa_step_plan: _",
+        "ordinal": 16,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -97,8 +107,10 @@
       false,
       false,
       true,
+      false,
+      false,
       false
     ]
   },
-  "hash": "c6a5e793cccc520039e28da8b4fb73e0c79c6a8d671c300ec2ea3eb0d58342b5"
+  "hash": "561bcb97e47bda40f58ea3a99353534a1794aaf8efc7315512a2b1952adc99f1"
 }

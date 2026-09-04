@@ -1,7 +1,13 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { LocationInfo } from '../../../../rust-api/types';
-import { mfaToText } from '../../../../utils/mfa';
+import {
+  mfaStepCount,
+  mfaStepsToText,
+  mfaToText,
+  resolveMfaStepPlan,
+  usableMfaMethods,
+} from '../../../../utils/mfa';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
 
@@ -12,15 +18,21 @@ interface Props {
 }
 
 export const LocationCardMfaEdit = ({ location, onEdit, variant }: Props) => {
-  if (location.location_mfa_mode === 'disabled' || !location.mfa_method) return null;
+  const stepCount = mfaStepCount(location);
+  const label =
+    stepCount > 1
+      ? mfaStepsToText(stepCount)
+      : mfaToText(resolveMfaStepPlan(location)[0]);
+
+  const canEdit = location.mfa_steps.some((step) => usableMfaMethods(step).length > 1);
 
   return (
     <div className={clsx('location-card-mfa-edit', `variant-${variant}`)}>
       <div className="mfa-badge">
         <p>MFA</p>
       </div>
-      <p className="name">{mfaToText(location.mfa_method)}</p>
-      {location.location_mfa_mode === 'internal' && !location.active && (
+      <p className="name">{label}</p>
+      {canEdit && !location.active && (
         <IconButton
           variant={IconButtonVariant.SmallSelected}
           icon="edit"

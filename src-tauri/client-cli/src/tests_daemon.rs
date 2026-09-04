@@ -192,6 +192,8 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         service_location_mode: ServiceLocationMode::Disabled,
         mfa_method: None,
         posture_check_required: false,
+        mfa_steps: Default::default(),
+        mfa_step_plan: Default::default(),
     }
     .save(&pool)
     .await

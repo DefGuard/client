@@ -1,6 +1,5 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: temp */
 import './style.scss';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Fragment, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
@@ -10,113 +9,128 @@ import { Controls } from '../../../../../../../shared/components/Controls/Contro
 import { MfaSelector } from '../../../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
 import { api } from '../../../../../../../shared/rust-api/api';
-import { getLocationDetailsQueryOptions } from '../../../../../../../shared/rust-api/query';
-import {
-  LocationMfaMode,
-  MfaMethod,
-  type MfaMethodValue,
-} from '../../../../../../../shared/rust-api/types';
+import type { MfaMethodValue } from '../../../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../../../shared/types';
-import { ConnectModalView } from '../../hooks/types';
+import { isPresent } from '../../../../../../../shared/utils/isPresent';
+import {
+  mfaStepCount,
+  pickableMfaMethods,
+  resolveMfaStepPlan,
+  usableMfaMethods,
+} from '../../../../../../../shared/utils/mfa';
+import { mfaMethodToConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 
 export const ConnectModalMfaSettings = () => {
-  const { mutate: setMfaMethod } = useMutation({
-    mutationFn: api.setLocationMfaMethod,
+  const { mutate: setMfaStepPlan } = useMutation({
+    mutationFn: api.setLocationMfaStepPlan,
     meta: { invalidate: [['locations']] },
   });
 
-  const [perviousView, location, currentMethod] = useConnectModal(
-    useShallow((s) => [s.perviousView, s.location, s.mfaMethod]),
+  const [perviousView, location, stepPlan, stepIndex] = useConnectModal(
+    useShallow((s) => [s.perviousView, s.location, s.stepPlan, s.stepIndex]),
   );
 
-  const { data: locationDetails } = useQuery(
-    getLocationDetailsQueryOptions({
-      locationId: location!.id,
-      connectionType: 'Location',
-    }),
+  const isEditingDefaults = perviousView === null;
+  const mfaSteps = location?.mfa_steps ?? [];
+  const isMultiStep = isPresent(location) && mfaStepCount(location) > 1;
+  const defaultPlan = isPresent(location) ? resolveMfaStepPlan(location) : [];
+
+  const [selectedStepMethods, setSelectedStepMethods] = useState<MfaMethodValue[]>(
+    isEditingDefaults ? defaultPlan : stepPlan,
   );
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
-  const locationDefaultMfaMethod = locationDetails?.mfa_method ?? MfaMethod.Totp;
-
-  const [selectedMethod, setSelectedMethod] = useState<MfaMethodValue>(currentMethod);
-
-  const [setAsDefault, setSetAsDefault] = useState(perviousView === null);
-
-  const MfaFactorsList = useMemo((): MfaMethodValue[] => {
-    if (location?.location_mfa_mode === LocationMfaMode.Internal) {
-      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove];
+  const editableSteps = useMemo(() => {
+    if (isEditingDefaults) {
+      return mfaSteps.map((step, index) => ({
+        stepIndex: index,
+        methods: pickableMfaMethods(step),
+      }));
     }
-    return [MfaMethod.Oidc];
-  }, [location?.location_mfa_mode]);
+    const currentStep = mfaSteps[stepIndex];
+    if (!isPresent(currentStep)) return [];
+    return [{ stepIndex, methods: usableMfaMethods(currentStep) }];
+  }, [isEditingDefaults, mfaSteps, stepIndex]);
+
+  const selectMethodForStep = (targetStepIndex: number, method: MfaMethodValue) => {
+    setSelectedStepMethods((currentPlan) =>
+      currentPlan.map((selected, index) =>
+        index === targetStepIndex ? method : selected,
+      ),
+    );
+  };
 
   const handleSubmit = () => {
-    if (!location) return;
-    useConnectModal.setState({ mfaMethod: selectedMethod });
-    if (setAsDefault && selectedMethod !== locationDefaultMfaMethod && location) {
-      setMfaMethod({ locationId: location.id, mfaMethod: selectedMethod });
-    }
-    if (perviousView === null) {
+    if (!isPresent(location)) return;
+
+    if (isEditingDefaults) {
+      setMfaStepPlan({ locationId: location.id, mfaStepPlan: selectedStepMethods });
       useConnectModal.setState({ visible: false });
-    } else {
-      switch (selectedMethod) {
-        case 'totp':
-          useConnectModal.setState({ view: ConnectModalView.MfaTotp });
-          break;
-        case 'email':
-          useConnectModal.setState({ view: ConnectModalView.MfaEmail });
-          break;
-        case 'mobileapprove':
-          useConnectModal.setState({ view: ConnectModalView.MfaMobile });
-          break;
-        case 'oidc':
-          useConnectModal.setState({ view: ConnectModalView.MfaOidc });
-          break;
-        default:
-          useConnectModal.setState({ visible: false });
-          break;
-      }
+      return;
     }
+
+    if (!isMultiStep && saveAsDefault) {
+      setMfaStepPlan({ locationId: location.id, mfaStepPlan: selectedStepMethods });
+    }
+
+    const methodForCurrentStep = selectedStepMethods[stepIndex];
+    useConnectModal
+      .getState()
+      .setView(mfaMethodToConnectModalView(methodForCurrentStep), {
+        stepPlan: selectedStepMethods,
+        mfaMethod: methodForCurrentStep,
+      });
   };
 
   return (
     <div id="mfa-settings-view">
-      {perviousView !== null && (
+      {!isEditingDefaults && (
         <p className="view-description">
-          If you're having issues with your current verification method, you can choose
-          another one or set a new default.
+          {isMultiStep
+            ? `If you're having issues with your current verification method, you can choose another one for this login.`
+            : `If you're having issues with your current verification method, you can choose another one or set a new default.`}
         </p>
       )}
-      {perviousView === null && (
+      {isEditingDefaults && (
         <p className="view-description">
-          {`You can change the MFA method for a one-time login or set a new default method.`}
+          {`Choose the default verification method for each step of this location.`}
         </p>
       )}
-      <div className="methods">
-        {MfaFactorsList.map((factor) => (
-          <MfaSelector
-            key={factor}
-            factor={factor}
-            selected={selectedMethod === factor}
-            isDefault={locationDefaultMfaMethod === factor}
-            onClick={() => setSelectedMethod(factor)}
-          />
+      <div className="steps">
+        {editableSteps.map(({ methods, stepIndex: index }) => (
+          <div className="step" key={index}>
+            {isMultiStep && isEditingDefaults && (
+              <p className="step-label">Step {index + 1}</p>
+            )}
+            <div className="methods">
+              {methods.map((entry) => (
+                <MfaSelector
+                  key={entry.method}
+                  factor={entry.method}
+                  selected={selectedStepMethods[index] === entry.method}
+                  isDefault={defaultPlan[index] === entry.method}
+                  configured={entry.configured}
+                  onClick={() => selectMethodForStep(index, entry.method)}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
-      {perviousView !== null && (
+      {!isEditingDefaults && !isMultiStep && (
         <Fragment>
           <SizedBox height={ThemeSpacing.Xl2} />
           <Checkbox
-            active={setAsDefault}
-            onClick={() => setSetAsDefault((prev) => !prev)}
+            active={saveAsDefault}
+            onClick={() => setSaveAsDefault((current) => !current)}
             text="Set as default MFA method"
           />
-          <SizedBox height={ThemeSpacing.Xl2} />
         </Fragment>
       )}
-      {perviousView === null && <SizedBox height={ThemeSpacing.Xl3} />}
+      <SizedBox height={isEditingDefaults ? ThemeSpacing.Xl3 : ThemeSpacing.Xl2} />
       <Controls>
-        {perviousView !== null && (
+        {!isEditingDefaults && (
           <Button
             variant={ButtonVariant.Secondary}
             text="Cancel"
@@ -127,7 +141,7 @@ export const ConnectModalMfaSettings = () => {
           <Button
             variant={ButtonVariant.Primary}
             size="primary"
-            text={perviousView === null ? 'Save changes' : 'Continue'}
+            text={isEditingDefaults ? 'Save changes' : 'Continue'}
             onClick={handleSubmit}
           />
         </div>

@@ -20,11 +20,25 @@ import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/Locati
 const MIN_POSTURE_LOADER_MS = 500;
 
 export const LocationCardMfaEmailView = () => {
-  const { setView, location, setPostureError } = useLocationCardContext();
+  const {
+    setView,
+    location,
+    setPostureError,
+    stepLabel,
+    canPickOtherMethod,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    goToStep,
+  } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location,
     MfaMethod.Email,
     {
+      stepPlan,
+      mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),
       onSessionExpired: () => setView(LocationCardViews.Default),
@@ -79,7 +93,7 @@ export const LocationCardMfaEmailView = () => {
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title="Email verification">
+      <LocationViewHeader title={stepLabel ?? 'Email verification'}>
         <p>Enter the 6-digit code sent to your email address.</p>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
@@ -102,13 +116,15 @@ export const LocationCardMfaEmailView = () => {
           }}
         />
         <div className="right">
-          <Button
-            variant={ButtonVariant.Outlined}
-            text="Other methods"
-            onClick={() => {
-              setView(LocationCardViews.MfaSettings);
-            }}
-          />
+          {canPickOtherMethod && (
+            <Button
+              variant={ButtonVariant.Outlined}
+              text="Other methods"
+              onClick={() => {
+                setView(LocationCardViews.MfaSettings);
+              }}
+            />
+          )}
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}

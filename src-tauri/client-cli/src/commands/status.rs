@@ -60,7 +60,7 @@ fn format_status_table(connections: &[ActiveConnectionInfo]) -> String {
         .unwrap_or(MIN_IFACE_COL_WIDTH)
         .max(MIN_IFACE_COL_WIDTH);
 
-    let mut lines = vec![format!("\nActive Connections")];
+    let mut lines = vec!["\nActive Connections".to_string()];
     lines.push(format!(
         "  {:<name_col_width$}  TYPE       {:<iface_col_width$}  TX          RX          {:<9}",
         "NAME", "INTERFACE", "HANDSHAKE"

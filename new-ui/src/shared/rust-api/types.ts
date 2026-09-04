@@ -91,6 +91,7 @@ export const TauriCommand = {
   EnrollmentFinish: 'enrollment_finish',
   // MFA
   MfaStart: 'mfa_start',
+  MfaStepStart: 'mfa_step_start',
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
@@ -105,7 +106,7 @@ export const TauriCommand = {
   HasAnyVisibleLocations: 'has_any_visible_locations',
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
-  SetLocationMfaMethod: 'set_location_mfa_method',
+  SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
   Disconnect: 'disconnect',
@@ -233,6 +234,15 @@ export type InstanceInfo = {
   openid_display_name: string | null;
 };
 
+export type MfaStepMethod = {
+  method: MfaMethodValue;
+  configured: boolean;
+};
+
+export type MfaStep = {
+  methods: MfaStepMethod[];
+};
+
 export type LocationInfo = {
   id: number;
   instance_id: number;
@@ -247,6 +257,8 @@ export type LocationInfo = {
   location_mfa_mode: LocationMfaMode;
   mfa_method?: MfaMethodValue;
   posture_check_required: boolean;
+  mfa_steps: MfaStep[];
+  mfa_step_plan: MfaMethodValue[];
 };
 
 export type LocationStats = {
@@ -399,9 +411,9 @@ export type UpdateInstanceArgs = {
   response: CreateDeviceResponse;
 };
 
-export type SetLocationMfaMethodArgs = {
+export type SetLocationMfaStepPlanArgs = {
   locationId: number;
-  mfaMethod: MfaMethodValue;
+  mfaStepPlan: MfaMethodValue[];
 };
 
 export type OverviewViewSelection = {
@@ -490,6 +502,17 @@ export type EnrollmentMfaFinishResult = {
 export type MfaStartResult = {
   token: string;
   challenge: string | null;
+};
+
+export type MfaStepStartResult = {
+  step_attempt_id: string;
+  challenge: string | null;
+};
+
+export type MfaStepSession = {
+  token: string;
+  challenge: string | null;
+  stepAttemptId: string | null;
 };
 
 /** Payload for mfa-openid-error / mfa-mobile-error events. */

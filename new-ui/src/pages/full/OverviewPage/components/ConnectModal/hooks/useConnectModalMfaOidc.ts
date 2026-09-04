@@ -29,7 +29,9 @@ export const useConnectModalMfaOidc = ({
   onSessionExpired,
   onServiceUnavailable,
 }: Options = {}) => {
-  const location = useConnectModal(useShallow((s) => s.location));
+  const [location, stepPlan, mfaToken, setMfaToken] = useConnectModal(
+    useShallow((s) => [s.location, s.stepPlan, s.mfaToken, s.setMfaToken]),
+  );
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -71,13 +73,21 @@ export const useConnectModalMfaOidc = ({
     cleanup();
 
     try {
-      const info = await api.mfaStart(instance.id, location.id, MfaMethod.Oidc);
-      await api.openLink(`${instance.proxy_url}openid/mfa?token=${info.token}`);
+      const session = await api.startMfaStep(
+        instance.id,
+        location.id,
+        MfaMethod.Oidc,
+        stepPlan,
+        mfaToken,
+      );
+      setMfaToken(session.token);
+
+      await api.openLink(`${instance.proxy_url}openid/mfa?token=${session.token}`);
 
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, location.id, info.token);
+      const taskId = await api.mfaPollOpenId(instance.id, location.id, session.token);
       taskIdRef.current = taskId;
 
       // The backend brings up the connection itself; completion means connected.
@@ -126,6 +136,9 @@ export const useConnectModalMfaOidc = ({
   }, [
     instance,
     location,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
     cleanup,
     onPostureError,
     onSessionExpired,

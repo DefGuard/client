@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use defguard_client_proto::defguard::client_types::{
     ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest, ClientMfaStartResponse,
-    MfaMethod,
+    ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod, MfaStartRejectionReason,
+    MfaStepRejection,
 };
 use futures_util::StreamExt;
 use reqwest::{Client, Response, StatusCode, Url};
@@ -126,12 +127,79 @@ pub async fn mfa_start(
         message: format!("Failed to reach proxy: {e}"),
     })?;
 
+    #[allow(deprecated)]
     let response = match check_mfa_response(response).await {
         Ok(response) => response,
         Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
     };
+    let start_response: ClientMfaStartResponse =
+        response.json().await.map_err(|e| MfaError::Other {
+            message: format!("Invalid MFA start response: {e}"),
+        })?;
+
+    if !start_response.rejections.is_empty() {
+        let messages: Vec<String> = start_response
+            .rejections
+            .iter()
+            .map(rejection_message)
+            .collect();
+        return Err(MfaError::MfaRejected {
+            message: messages.join(" "),
+        });
+    }
+
+    Ok(start_response)
+}
+
+fn rejection_message(rejection: &MfaStepRejection) -> String {
+    let step = rejection.step + 1;
+    match rejection.reason() {
+        MfaStartRejectionReason::MfaStartRejectionMethodNotInStep => format!(
+            "The method chosen for verification step {step} is not allowed. \
+             The location's MFA settings have changed, so pick a method again."
+        ),
+        MfaStartRejectionReason::MfaStartRejectionStepEmptyAfterLicense => format!(
+            "Verification step {step} has no method available on this server. \
+             Contact your administrator."
+        ),
+        MfaStartRejectionReason::MfaStartRejectionStepUnavailable => format!(
+            "The method chosen for verification step {step} cannot be used. \
+             Set it up first, or pick a different one."
+        ),
+        MfaStartRejectionReason::MfaStartRejectionUnspecified => {
+            format!("The server rejected verification step {step}.")
+        }
+    }
+}
+
+pub async fn mfa_step_start(
+    proxy_url: Url,
+    request: ClientMfaStepStartRequest,
+) -> Result<ClientMfaStepStartResponse, MfaError> {
+    let client = build_client();
+
+    let url = proxy_url
+        .join("api/v1/client-mfa/step-start")
+        .map_err(|e| MfaError::Other {
+            message: format!("Failed to build MFA step start URL: {e}"),
+        })?;
+
+    let mut request_builder = client.post(url).json(&request);
+
+    for (header_name, header_value) in standard_headers() {
+        request_builder = request_builder.header(header_name, header_value);
+    }
+
+    let response = request_builder
+        .send()
+        .await
+        .map_err(|e| MfaError::NetworkError {
+            message: format!("Failed to reach proxy: {e}"),
+        })?;
+
+    let response = check_mfa_response(response).await?;
     response.json().await.map_err(|e| MfaError::Other {
-        message: format!("Invalid MFA start response: {e}"),
+        message: format!("Invalid MFA step start response: {e}"),
     })
 }
 
@@ -227,6 +295,7 @@ pub async fn poll_openid_mfa(
         token,
         code: None,
         auth_pub_key: None,
+        step_attempt_id: None,
     };
 
     loop {
@@ -374,9 +443,11 @@ async fn wait_for_mfa_success(
             if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
                 if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
                     if let Some(key) = parsed["preshared_key"].as_str() {
+                        #[allow(deprecated)]
                         return Ok(ClientMfaFinishResponse {
                             preshared_key: key.to_string(),
                             token: None,
+                            result: None,
                         });
                     }
                 }
@@ -386,6 +457,7 @@ async fn wait_for_mfa_success(
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use reqwest::Url;
     use serde_json::json;
@@ -408,6 +480,7 @@ mod tests {
             pubkey: "pk".into(),
             method: 0, // TOTP
             posture_data: None,
+            selected_methods: Vec::new(),
         }
     }
 
@@ -545,6 +618,7 @@ mod tests {
             pubkey: "pk".into(),
             method: MfaMethod::MobileApprove as i32,
             posture_data: None,
+            selected_methods: Vec::new(),
         };
         match mfa_start(url, request).await.unwrap_err() {
             MfaError::MfaRejected { message } => {
@@ -602,6 +676,7 @@ mod tests {
                 token: "token".into(),
                 code: Some("123456".into()),
                 auth_pub_key: None,
+                step_attempt_id: None,
             },
         )
         .await
@@ -629,6 +704,7 @@ mod tests {
                 token: "token".into(),
                 code: Some("000000".into()),
                 auth_pub_key: None,
+                step_attempt_id: None,
             },
         )
         .await

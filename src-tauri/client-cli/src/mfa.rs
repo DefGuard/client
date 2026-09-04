@@ -108,6 +108,7 @@ pub(crate) fn validate_mfa_flags(
 ///
 /// The HTTP calls are handled by `defguard_core::mfa`; this function
 /// handles CLI-specific code sourcing (TTY / --code / --code-command).
+#[allow(deprecated)]
 pub(crate) async fn authorize(
     location: &Location<Id>,
     source: &CodeSource,
@@ -160,6 +161,8 @@ pub(crate) async fn authorize(
         pubkey: wireguard_keys.pubkey,
         method: method as i32,
         posture_data,
+        // empty = legacy path; the CLI has no multi-step MFA
+        selected_methods: Vec::new(),
     };
     let info = mfa::mfa_start(proxy_url.clone(), request)
         .await
@@ -175,6 +178,7 @@ pub(crate) async fn authorize(
         token: info.token,
         code: Some(code.expose_secret().to_string()),
         auth_pub_key: None,
+        step_attempt_id: None,
     };
     let psk = mfa::mfa_finish_code(proxy_url, finish_req)
         .await
@@ -191,6 +195,7 @@ pub(crate) async fn authorize(
 ///
 /// When `json_mode` is true, progress messages on stderr are suppressed so
 /// that `--json` output consumers only see the final result/error.
+#[allow(deprecated)]
 pub(crate) async fn authorize_oidc(
     location: &Location<Id>,
     instance: &Instance<Id>,
@@ -218,6 +223,8 @@ pub(crate) async fn authorize_oidc(
         pubkey: wireguard_keys.pubkey,
         method: MfaMethod::Oidc as i32,
         posture_data,
+        // empty = legacy path; the CLI has no multi-step MFA
+        selected_methods: Vec::new(),
     };
     let info = mfa::mfa_start(proxy_url.clone(), request)
         .await
@@ -259,6 +266,7 @@ pub(crate) async fn authorize_oidc(
 ///
 /// When `json_mode` is true, progress messages on stderr are suppressed so
 /// that `--json` output consumers only see the final result/error.
+#[allow(deprecated)]
 pub(crate) async fn authorize_mobile_approve(
     location: &Location<Id>,
     instance: &Instance<Id>,
@@ -290,6 +298,8 @@ pub(crate) async fn authorize_mobile_approve(
         pubkey: wireguard_keys.pubkey,
         method: MfaMethod::MobileApprove as i32,
         posture_data,
+        // empty = legacy path; the CLI has no multi-step MFA
+        selected_methods: Vec::new(),
     };
     let info = mfa::mfa_start(proxy_url.clone(), request)
         .await
@@ -400,6 +410,8 @@ mod tests {
 
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {
+            mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
             id: 1,
             instance_id: 1,
             network_id: 1,
