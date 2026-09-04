@@ -99,6 +99,7 @@ impl From<ProtoMfaMethod> for LocationMfaMethod {
             ProtoMfaMethod::Oidc => LocationMfaMethod::Oidc,
             ProtoMfaMethod::Biometric => LocationMfaMethod::Biometric,
             ProtoMfaMethod::MobileApprove => LocationMfaMethod::MobileApprove,
+            ProtoMfaMethod::Fido2 => todo!(),
         }
     }
 }

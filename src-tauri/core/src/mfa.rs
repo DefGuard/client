@@ -296,6 +296,8 @@ pub async fn poll_openid_mfa(
         code: None,
         auth_pub_key: None,
         step_attempt_id: None,
+        auth_data: None,
+        credential_id: None,
     };
 
     loop {
@@ -574,6 +576,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_mfa_start_accepts_response_without_2_2_fields() {
+        // A pre-2.2 edge knows nothing about `rejections` or `credential_ids`
+        // and omits them entirely. Those fields must decode as empty rather
+        // than failing the whole response with a missing-field error.
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "token": "t" })))
+            .mount(&server)
+            .await;
+
+        let url = mock_url(&server);
+        let response = mfa_start(url, start_request())
+            .await
+            .expect("legacy start response must decode");
+        assert_eq!(response.token, "t");
+        assert!(response.challenge.is_none());
+        assert!(response.credential_ids.is_empty());
+        assert!(response.rejections.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_mfa_step_start_accepts_response_without_2_2_fields() {
+        // Same contract for step start: `credential_ids` is absent unless the
+        // edge is FIDO2-aware.
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/step-start"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "step_attempt_id": "a1" })),
+            )
+            .mount(&server)
+            .await;
+
+        let response = mfa_step_start(
+            mock_url(&server),
+            ClientMfaStepStartRequest {
+                token: "token".into(),
+                method: MfaMethod::Totp as i32,
+            },
+        )
+        .await
+        .expect("legacy step start response must decode");
+        assert_eq!(response.step_attempt_id, "a1");
+        assert!(response.credential_ids.is_empty());
+    }
+
+    #[tokio::test]
     async fn test_mfa_start_network_error() {
         // Nothing listening on this port.
         let url = "http://127.0.0.1:1".parse().unwrap();
@@ -677,6 +729,8 @@ mod tests {
                 code: Some("123456".into()),
                 auth_pub_key: None,
                 step_attempt_id: None,
+                auth_data: None,
+                credential_id: None,
             },
         )
         .await
@@ -705,6 +759,8 @@ mod tests {
                 code: Some("000000".into()),
                 auth_pub_key: None,
                 step_attempt_id: None,
+                auth_data: None,
+                credential_id: None,
             },
         )
         .await
