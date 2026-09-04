@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use semver::Prerelease;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -13,12 +14,24 @@ use crate::set_perms;
 
 pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
 pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
+pub const MIN_MULTI_STEP_MFA_VERSION: Version = Version::new(2, 2, 0);
+pub const CORE_VERSION_HEADER: &str = "defguard-core-version";
+pub const PROXY_VERSION_HEADER: &str = "defguard-component-version";
 pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
 pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const LOG_FILENAME: &str = "defguard-client";
 pub const WELCOME_FORCE_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_FORCE";
 pub const WELCOME_SKIP_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_SKIP";
 pub use defguard_client_common::VERSION as PKG_VERSION;
+
+/// Returns whether `version` meets or exceeds `minimum`, ignoring pre-release and build metadata.
+#[must_use]
+pub fn is_version_at_least(version: &Version, minimum: &Version) -> bool {
+    let (mut version, mut minimum) = (version.clone(), minimum.clone());
+    version.pre = Prerelease::EMPTY;
+    minimum.pre = Prerelease::EMPTY;
+    version.cmp_precedence(&minimum) != Ordering::Less
+}
 
 /// Selects the version string the client should report: the build-version override when present
 /// and non-blank, otherwise the package version.
@@ -155,8 +168,9 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        check_app_version, select_reported_app_version, Version, VersionCheckResult,
-        VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
+        check_app_version, is_version_at_least, select_reported_app_version, Version,
+        VersionCheckResult, MIN_MULTI_STEP_MFA_VERSION, VERSION_STATE_FILE_NAME,
+        WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
     };
 
     #[test]
@@ -175,6 +189,20 @@ mod tests {
     #[test]
     fn test_reported_app_version_ignores_empty_override() {
         assert_eq!(select_reported_app_version("1.6.8", Some("   ")), "1.6.8");
+    }
+
+    #[test]
+    fn test_version_at_least_ignores_prerelease() {
+        let version = Version::parse("2.2.0-alpha1").unwrap();
+
+        assert!(is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION));
+    }
+
+    #[test]
+    fn test_version_at_least_rejects_older_version() {
+        let version = Version::parse("2.1.9").unwrap();
+
+        assert!(!is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION));
     }
 
     #[test]
