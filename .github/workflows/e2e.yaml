@@ -102,8 +102,8 @@ jobs:
 
       - name: Stub resolvconf
         run: |
-          printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolvconf
-          chmod +x /usr/local/sbin/resolvconf
+          printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolveconf
+          chmod +x /usr/local/sbin/resolveconf
 
       - name: Start defguard-service
         run: |
