@@ -6,6 +6,7 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import {
+  isCancelled,
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
@@ -14,6 +15,7 @@ import {
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo, MfaErrorPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
+import { isPresent } from '../../../utils/isPresent';
 
 type TokenData = {
   token: string;
@@ -27,10 +29,18 @@ type Options = {
 };
 
 export const useMfaMobileConnect = (location: LocationInfo, options?: Options) => {
-  const { onConnected, onPostureError, onServiceUnavailable } = options ?? {};
-
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
+  const instanceId = instance?.id;
+  const instanceUuid = instance?.uuid;
+  const locationId = location.id;
+
+  // Read through refs so callers passing inline callbacks or a re-fetched
+  // `location` object don't restart the mobile-approve task on every render.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  const locationRef = useRef(location);
+  locationRef.current = location;
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -61,7 +71,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
 
   // Connect WebSocket via Rust when tokenData is available
   useEffect(() => {
-    if (!tokenData || !instance) return;
+    if (!tokenData || !isPresent(instanceId)) return;
 
     let cancelled = false;
     cleanupListeners();
@@ -71,8 +81,8 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     (async () => {
       try {
         const taskId = await api.mfaConnectMobileApprove(
-          instance.id,
-          location.id,
+          instanceId,
+          locationId,
           tokenData.token,
         );
         if (cancelled) {
@@ -84,18 +94,20 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
         // The backend brings up the connection itself; completion means connected.
         const completeUnlisten = await listen(TauriEvent.MfaMobileComplete, () => {
           cleanupListeners();
+          taskIdRef.current = null;
           setIsConnecting(false);
-          onConnected?.();
+          optionsRef.current?.onConnected?.();
         });
 
         const errorUnlisten = await listen<MfaErrorPayload>(
           TauriEvent.MfaMobileError,
           (event) => {
+            // Emitted app-wide without a task id, so our own cancels land here.
+            if (isCancelled(event.payload.error)) return;
             cleanupListeners();
+            taskIdRef.current = null;
             setIsConnecting(false);
-            error(
-              `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
-            );
+            error(`Mobile MFA failed for location ${locationId}: ${event.payload.error}`);
             const message = mfaErrorMessage(event.payload.error);
             setConnectionError(
               isConnectFailure(message)
@@ -113,7 +125,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
         if (!cancelled) {
           setIsConnecting(false);
           setConnectionError('Failed to start mobile approval. Please try again.');
-          error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
+          error(`Mobile MFA connect failed for location ${locationId}: ${e}`);
         }
       }
     })();
@@ -121,22 +133,27 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     return () => {
       cancelled = true;
       cleanupListeners();
+      const taskId = taskIdRef.current;
+      if (taskId) {
+        taskIdRef.current = null;
+        void api.cancelMfa(taskId).catch(() => {});
+      }
       setIsConnecting(false);
     };
-  }, [tokenData, instance, location, onConnected, cleanupListeners]);
+  }, [tokenData, instanceId, locationId, cleanupListeners]);
 
   const qrValue = useMemo(() => {
-    if (!tokenData || !instance) return null;
+    if (!tokenData || !isPresent(instanceUuid)) return null;
     const json = JSON.stringify({
       token: tokenData.token,
       challenge: tokenData.challenge,
-      instance_id: instance.uuid,
+      instance_id: instanceUuid,
     });
     return encode(new TextEncoder().encode(json));
-  }, [tokenData, instance]);
+  }, [tokenData, instanceUuid]);
 
   const start = useCallback(async () => {
-    if (!instance) {
+    if (!isPresent(instanceId)) {
       setStartError('Instance not found');
       return;
     }
@@ -148,7 +165,7 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
     setTokenData(null);
 
     try {
-      const info = await api.mfaStart(instance.id, location.id, MfaMethod.MobileApprove);
+      const info = await api.mfaStart(instanceId, locationId, MfaMethod.MobileApprove);
       if (!info.challenge) {
         setStartError('Unsupported response from proxy');
         return;
@@ -156,20 +173,20 @@ export const useMfaMobileConnect = (location: LocationInfo, options?: Options) =
 
       setTokenData({ token: info.token, challenge: info.challenge });
     } catch (e) {
-      void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
-      if (isMfaPostureError(e, location)) {
-        onPostureError?.(mfaErrorMessage(e));
+      void error(`Mobile MFA start failed for location ${locationId}: ${e}`);
+      if (isMfaPostureError(e, locationRef.current)) {
+        optionsRef.current?.onPostureError?.(mfaErrorMessage(e));
         return;
       }
       if (isServiceUnavailable(e)) {
-        onServiceUnavailable?.();
+        optionsRef.current?.onServiceUnavailable?.();
         return;
       }
       setStartError(mfaErrorMessage(e));
     } finally {
       setIsStarting(false);
     }
-  }, [instance, location, onPostureError, onServiceUnavailable]);
+  }, [instanceId, locationId]);
 
   const reset = useCallback(() => {
     cleanupListeners();

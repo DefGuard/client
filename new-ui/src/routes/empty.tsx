@@ -1,22 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect } from 'react';
-
-import { hasAnyVisibleLocationsQueryOptions } from '../shared/rust-api/query';
+import { createFileRoute } from '@tanstack/react-router';
+import { CompactEmptyPage } from '../pages/compact/CompactEmptyPage/CompactEmptyPage';
 
 export const Route = createFileRoute('/empty')({
-  component: RouteComponent,
+  component: CompactEmptyPage,
 });
-
-function RouteComponent() {
-  const navigate = useNavigate();
-  const { data: hasLocations } = useQuery(hasAnyVisibleLocationsQueryOptions);
-
-  useEffect(() => {
-    if (hasLocations === true) {
-      void navigate({ to: '/' });
-    }
-  }, [hasLocations, navigate]);
-
-  return <div></div>;
-}
