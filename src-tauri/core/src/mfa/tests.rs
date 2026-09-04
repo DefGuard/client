@@ -30,6 +30,20 @@ fn start_response_json(token: &str) -> serde_json::Value {
     })
 }
 
+fn start_response_template(
+    core_version: Option<&str>,
+    proxy_version: Option<&str>,
+) -> ResponseTemplate {
+    let mut response = ResponseTemplate::new(200).set_body_json(start_response_json("mfa-token"));
+    if let Some(version) = core_version {
+        response = response.insert_header(CORE_VERSION_HEADER, version);
+    }
+    if let Some(version) = proxy_version {
+        response = response.insert_header(PROXY_VERSION_HEADER, version);
+    }
+    response
+}
+
 fn finish_response_json(key: &str) -> serde_json::Value {
     json!({
         "preshared_key": key,
@@ -51,6 +65,51 @@ async fn test_mfa_start_success() {
     let info = mfa_start(url, start_request()).await.unwrap();
     assert_eq!(info.token, "mfa-token-1");
     assert!(info.challenge.is_none());
+}
+
+#[tokio::test]
+async fn test_mfa_start_with_capability_accepts_supported_versions() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(start_response_template(Some("2.2.0"), Some("2.2.0")))
+        .mount(&server)
+        .await;
+
+    let result = mfa_start_with_capability(mock_url(&server), start_request())
+        .await
+        .unwrap();
+
+    assert_eq!(result.response.token, "mfa-token");
+    assert!(result.multi_step_mfa_capable);
+}
+
+#[tokio::test]
+async fn test_mfa_start_with_capability_requires_supported_versions() {
+    let cases = [
+        ("missing core version", None, Some("2.2.0")),
+        ("missing proxy version", Some("2.2.0"), None),
+        ("invalid core version", Some("invalid"), Some("2.2.0")),
+        ("invalid proxy version", Some("2.2.0"), Some("invalid")),
+        ("old core version", Some("2.1.9"), Some("2.2.0")),
+        ("old proxy version", Some("2.2.0"), Some("2.1.9")),
+    ];
+
+    for (case, core_version, proxy_version) in cases {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(start_response_template(core_version, proxy_version))
+            .mount(&server)
+            .await;
+
+        let result = mfa_start_with_capability(mock_url(&server), start_request())
+            .await
+            .unwrap();
+
+        assert!(!result.multi_step_mfa_capable, "{case}");
+    }
 }
 
 #[tokio::test]

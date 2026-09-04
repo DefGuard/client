@@ -1590,6 +1590,7 @@ pub async fn mfa_start(
     instance_id: Id,
     location_id: Id,
     methods: Vec<String>,
+    state: State<'_, AppState>,
 ) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
     debug!("Starting MFA session for location {location_id}");
     let step_methods = methods
@@ -1633,9 +1634,11 @@ pub async fn mfa_start(
             .map(|method| *method as i32)
             .collect::<Vec<i32>>(),
     };
-    mfa::mfa_start(proxy_url, request)
+    let result = mfa::mfa_start_with_capability(proxy_url, request)
         .await
-        .map_err(err_to_json)
+        .map_err(err_to_json)?;
+    state.set_multi_step_mfa_capable(instance_id, result.multi_step_mfa_capable);
+    Ok(result.response)
 }
 
 #[tauri::command(async)]

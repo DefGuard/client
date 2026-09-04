@@ -28,7 +28,10 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     proxy::construct_platform_header,
-    version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
+    version::{
+        is_version_at_least, Version, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER,
+        CORE_VERSION_HEADER, MIN_MULTI_STEP_MFA_VERSION, PKG_VERSION, PROXY_VERSION_HEADER,
+    },
 };
 
 /// Error type returned by MFA operations.
@@ -58,6 +61,12 @@ pub enum MfaError {
 
     #[error("{message}")]
     Other { message: String },
+}
+
+#[derive(Debug)]
+pub struct MfaStartResult {
+    pub response: ClientMfaStartResponse,
+    pub multi_step_mfa_capable: bool,
 }
 
 fn build_client() -> Client {
@@ -109,6 +118,15 @@ pub async fn mfa_start(
     proxy_url: Url,
     request: ClientMfaStartRequest,
 ) -> Result<ClientMfaStartResponse, MfaError> {
+    Ok(mfa_start_with_capability(proxy_url, request)
+        .await?
+        .response)
+}
+
+pub async fn mfa_start_with_capability(
+    proxy_url: Url,
+    request: ClientMfaStartRequest,
+) -> Result<MfaStartResult, MfaError> {
     let client = build_client();
 
     let url = proxy_url
@@ -132,6 +150,7 @@ pub async fn mfa_start(
         Ok(response) => response,
         Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
     };
+    let multi_step_mfa_capable = is_multi_step_mfa_capable(response.headers());
     let start_response: ClientMfaStartResponse =
         response.json().await.map_err(|e| MfaError::Other {
             message: format!("Invalid MFA start response: {e}"),
@@ -148,7 +167,22 @@ pub async fn mfa_start(
         });
     }
 
-    Ok(start_response)
+    Ok(MfaStartResult {
+        response: start_response,
+        multi_step_mfa_capable,
+    })
+}
+
+fn is_multi_step_mfa_capable(headers: &reqwest::header::HeaderMap) -> bool {
+    [CORE_VERSION_HEADER, PROXY_VERSION_HEADER]
+        .into_iter()
+        .all(|header| {
+            headers
+                .get(header)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<Version>().ok())
+                .is_some_and(|version| is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION))
+        })
 }
 
 fn rejection_message(rejection: &MfaStepRejection) -> String {
