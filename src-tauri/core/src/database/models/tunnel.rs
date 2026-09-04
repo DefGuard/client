@@ -8,8 +8,8 @@ use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{connection::ActiveConnection, Id, NoId, PURGE_DURATION};
 use crate::{
-    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
-    DateTimeAggregation,
+    contains_default_route, CommonConnection, CommonConnectionInfo, CommonLocationStats,
+    ConnectionType, DateTimeAggregation,
 };
 
 #[serde_as]
@@ -58,6 +58,20 @@ impl fmt::Display for Tunnel<NoId> {
 }
 
 impl Tunnel<Id> {
+    #[must_use]
+    pub fn effective_route_all_traffic(&self, route_all_traffic: Option<bool>) -> bool {
+        route_all_traffic.unwrap_or(self.route_all_traffic)
+    }
+
+    #[must_use]
+    pub fn holds_default_route(&self, route_all_traffic: Option<bool>) -> bool {
+        self.effective_route_all_traffic(route_all_traffic)
+            || self
+                .allowed_ips
+                .as_deref()
+                .is_some_and(contains_default_route)
+    }
+
     pub async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>
     where
         E: SqliteExecutor<'e>,

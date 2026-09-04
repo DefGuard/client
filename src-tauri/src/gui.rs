@@ -8,6 +8,17 @@ use std::{
     thread::spawn,
 };
 
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::sync_locations_and_tunnels;
+use defguard_client_core::{
+    connection::active_connections::close_all_connections,
+    version::{check_app_version, should_show_welcome, VersionCheckResult},
+};
+use log::{Level, LevelFilter};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_log::{Target, TargetKind};
+
 #[cfg(unix)]
 use crate::set_perms;
 #[cfg(windows)]
@@ -38,18 +49,6 @@ use crate::{
 };
 #[cfg(all(target_os = "macos", feature = "macos_installer"))]
 use crate::{connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension};
-#[cfg(target_os = "macos")]
-use defguard_client_core::connection::sync_locations_and_tunnels;
-use defguard_client_core::{
-    connection::active_connections::close_all_connections,
-    version::{check_app_version, VersionCheckResult},
-};
-use log::{Level, LevelFilter};
-use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
-use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_log::{Target, TargetKind};
-
-const ENABLE_WELCOME_SCREEN: bool = false;
 
 // For tauri logging plugin:
 // if found in metadata target name it will ignore the log if it was below info level.
@@ -321,24 +320,19 @@ pub fn run_app() {
                 .expect("Failed to access app data");
             let config = AppConfig::new(&config_dir);
             let current_version = app_handle.package_info().version.clone();
-            let mut open_welcome_view = match check_app_version(&config_dir, &current_version) {
+            let version_check = check_app_version(&config_dir, &current_version);
+            match &version_check {
                 VersionCheckResult::Init => {
                     debug!("No previous version recorded; initializing at {current_version}.");
-                    true
                 }
                 VersionCheckResult::Unchanged => {
                     debug!("Application version unchanged ({current_version}).");
-                     false
                 }
                 VersionCheckResult::Upgraded { previous, current } => {
                     info!("Application upgraded from {previous} to {current}.");
-                     true
                 }
-            };
-            if !ENABLE_WELCOME_SCREEN {
-                open_welcome_view = false;
             }
-
+            let open_welcome_view = should_show_welcome(&config_dir);
             // Setup logging.
 
             // If deriving from env value fails, use config default (env overrides config file).

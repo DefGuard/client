@@ -1,19 +1,17 @@
 import z from 'zod';
 
-const connectErrorSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('postureCheckFailed'),
-    message: z.string(),
-  }),
-  z.object({
-    kind: z.literal('serviceUnavailable'),
-    message: z.string(),
-  }),
-  z.object({
-    kind: z.literal('other'),
-    message: z.string(),
-  }),
-]);
+export const DEFAULT_CONNECTION_ERROR =
+  'One or more external services are unavailable or unreachable. This may be caused by a network issue or a temporary service outage. Please try again later.';
+
+const connectErrorSchema = z.object({
+  kind: z.enum([
+    'postureCheckFailed',
+    'serviceUnavailable',
+    'allTrafficConflict',
+    'other',
+  ]),
+  message: z.string(),
+});
 
 export type ConnectError = z.infer<typeof connectErrorSchema>;
 

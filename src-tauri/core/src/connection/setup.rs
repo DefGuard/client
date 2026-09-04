@@ -130,7 +130,7 @@ pub async fn setup_interface_tunnel(
         "Parsing tunnel {tunnel} allowed ips: {:?}",
         tunnel.allowed_ips
     );
-    let route_all_traffic = route_all_traffic.unwrap_or(tunnel.route_all_traffic);
+    let route_all_traffic = tunnel.effective_route_all_traffic(route_all_traffic);
     let allowed_ips = if route_all_traffic {
         debug!("Using all traffic routing for tunnel {tunnel}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]

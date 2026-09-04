@@ -5,6 +5,7 @@ on:
       - main
       - dev
       - "release/**"
+      - "stable/**"
     paths-ignore:
       - "*.md"
       - "LICENSE"
@@ -12,6 +13,8 @@ on:
       - v*.*.*
 
 env:
+  CARGO_TERM_COLOR: always
+  # sccache
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   SQLX_OFFLINE: "1"
@@ -39,7 +42,8 @@ jobs:
             echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
           fi
 
-      - uses: actions/setup-node@v6
+      - name: Install NodeJS
+        uses: actions/setup-node@v6
         with:
           node-version-file: new-ui/.nvmrc
 

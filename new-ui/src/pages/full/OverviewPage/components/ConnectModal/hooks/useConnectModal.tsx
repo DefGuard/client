@@ -14,6 +14,7 @@ interface StoreValues {
   view: ConnectModalViewValue | null;
   perviousView: ConnectModalViewValue | null;
   postureError: string | null;
+  connectionError: string | null;
   autoStartOpenId: boolean;
   mfaMethod: MfaMethodValue;
   stepIndex: number;
@@ -28,6 +29,7 @@ const defaults: StoreValues = {
   view: null,
   perviousView: null,
   postureError: null,
+  connectionError: null,
   autoStartOpenId: false,
   stepIndex: 0,
   stepPlan: [],
