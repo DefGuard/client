@@ -39,7 +39,7 @@ jobs:
             libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf libssl-dev libxdo-dev protobuf-compiler \
             libprotobuf-dev webkit2gtk-driver xvfb wireguard-tools iproute2 \
-            iputils-ping procps xclip desktop-file-utils xdg-utils systemd-resolved
+            iputils-ping procps xclip desktop-file-utils xdg-utils
 
       - uses: actions/checkout@v7
         with:
@@ -100,11 +100,18 @@ jobs:
       - name: Check deployment is reachable
         run: curl -sf --max-time 15 "${{ secrets.E2E_CORE_URL }}/api/v1/health"
 
+      - name: Stub resolvconf
+        run: |
+          printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolvconf
+          chmod +x /usr/local/sbin/resolvconf
+
       - name: Start defguard-service
         run: |
           groupadd -f defguard
           modprobe wireguard || true
-          setsid src-tauri/target/release/defguard-service < /dev/null &
+          mkdir -p /tmp/e2e-logs
+          setsid src-tauri/target/release/defguard-service < /dev/null \
+            > /tmp/e2e-logs/defguard-service.log 2>&1 &
           for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
           test -S /var/run/defguard.socket
 
@@ -119,6 +126,23 @@ jobs:
       - name: Run e2e tests
         run: xvfb-run -a pnpm test
         working-directory: e2e
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p e2e-logs/client
+          cp -r /tmp/e2e-logs/. e2e-logs/ || true
+          cp -r /var/log/defguard-service e2e-logs/service-json || true
+          cp -r e2e/logs/. e2e-logs/client/ || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs
+          path: e2e-logs
+          if-no-files-found: warn
+          retention-days: 7
 
   lint-e2e:
     runs-on:
