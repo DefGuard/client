@@ -164,7 +164,7 @@ export const useMfaMobileConnect = (
     setTokenData(null);
 
     try {
-      const session = await api.startMfaStep(
+      const session = await api.mfaBeginStep(
         instance.id,
         location.id,
         MfaMethod.MobileApprove,

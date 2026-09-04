@@ -75,7 +75,7 @@ export const useMfaConnect = (
 
     (async () => {
       try {
-        const session = await api.startMfaStep(
+        const session = await api.mfaBeginStep(
           instance.id,
           location.id,
           method,
@@ -84,7 +84,7 @@ export const useMfaConnect = (
         );
         await waitForMinimumDuration(startedAt, debounceMs);
         setToken(session.token);
-        setStepAttemptId(session.stepAttemptId);
+        setStepAttemptId(session.step_attempt_id);
         setMfaToken(session.token);
       } catch (err) {
         void error(`MFA start failed: ${err}`);

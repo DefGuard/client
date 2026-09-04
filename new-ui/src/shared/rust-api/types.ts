@@ -90,8 +90,7 @@ export const TauriCommand = {
   EnrollmentNetworkInfo: 'enrollment_network_info',
   EnrollmentFinish: 'enrollment_finish',
   // MFA
-  MfaStart: 'mfa_start',
-  MfaStepStart: 'mfa_step_start',
+  MfaBeginStep: 'mfa_begin_step',
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
@@ -498,21 +497,11 @@ export type EnrollmentMfaFinishResult = {
   recovery_codes: string[];
 };
 
-/** Result from mfa_start Tauri command. */
-export type MfaStartResult = {
+/** Result from mfa_begin_step Tauri command. */
+export type MfaBeginStepResult = {
   token: string;
   challenge: string | null;
-};
-
-export type MfaStepStartResult = {
-  step_attempt_id: string;
-  challenge: string | null;
-};
-
-export type MfaStepSession = {
-  token: string;
-  challenge: string | null;
-  stepAttemptId: string | null;
+  step_attempt_id: string | null;
 };
 
 /** Payload for mfa-openid-error / mfa-mobile-error events. */

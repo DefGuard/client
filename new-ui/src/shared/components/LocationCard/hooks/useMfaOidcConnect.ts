@@ -63,7 +63,7 @@ export const useMfaOidcConnect = () => {
     cleanup();
 
     try {
-      const session = await api.startMfaStep(
+      const session = await api.mfaBeginStep(
         instance.id,
         location.id,
         MfaMethod.Oidc,

@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { isPresent } from '../utils/isPresent';
 import { mfaToApi } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
@@ -16,10 +15,8 @@ import type {
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaBeginStepResult,
   MfaMethodValue,
-  MfaStartResult,
-  MfaStepSession,
-  MfaStepStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -196,20 +193,6 @@ const enrollmentFinish = (sessionId: string): Promise<void> =>
 
 // MFA (connect-time)
 
-const mfaStart = (
-  instanceId: number,
-  locationId: number,
-  methods: MfaMethodValue[],
-): Promise<MfaStartResult> =>
-  invoke(TauriCommand.MfaStart, { instanceId, locationId, methods });
-
-const mfaStepStart = (
-  instanceId: number,
-  token: string,
-  method: MfaMethodValue,
-): Promise<MfaStepStartResult> =>
-  invoke(TauriCommand.MfaStepStart, { instanceId, token, method });
-
 const mfaFinishCode = (
   instanceId: number,
   locationId: number,
@@ -242,29 +225,20 @@ const mfaConnectMobileApprove = (
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
-const startMfaStep = async (
+const mfaBeginStep = (
   instanceId: number,
   locationId: number,
   method: MfaMethodValue,
   stepPlan: MfaMethodValue[],
-  mfaToken: string | null,
-): Promise<MfaStepSession> => {
-  if (isPresent(mfaToken) && stepPlan.length > 1) {
-    const startedStep = await mfaStepStart(instanceId, mfaToken, method);
-    return {
-      token: mfaToken,
-      challenge: startedStep.challenge,
-      stepAttemptId: startedStep.step_attempt_id,
-    };
-  }
-
-  const startedSession = await mfaStart(instanceId, locationId, stepPlan);
-  return {
-    token: startedSession.token,
-    challenge: startedSession.challenge,
-    stepAttemptId: null,
-  };
-};
+  token: string | null,
+): Promise<MfaBeginStepResult> =>
+  invoke(TauriCommand.MfaBeginStep, {
+    instanceId,
+    locationId,
+    method,
+    stepPlan,
+    token,
+  });
 
 export const api = {
   closeWelcomeWindow,
@@ -322,10 +296,9 @@ export const api = {
   enrollmentNetworkInfo,
   enrollmentFinish,
   // MFA
-  mfaStart,
+  mfaBeginStep,
   mfaFinishCode,
   mfaPollOpenId,
   mfaConnectMobileApprove,
   cancelMfa,
-  startMfaStep,
 };
