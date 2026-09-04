@@ -20,9 +20,9 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::{
         mfa_step_result, AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse,
-        ClientMfaStartRequest, ClientMfaStepStartRequest, ClientMfaStepStartResponse,
-        CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
-        EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
+        ClientMfaStartRequest, ClientMfaStepStartRequest, CodeMfaSetupFinishResponse,
+        CodeMfaSetupStartResponse, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -1585,69 +1585,70 @@ fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
     }
 }
 
-#[tauri::command(async)]
-pub async fn mfa_start(
+#[derive(Debug, Serialize)]
+pub struct MfaBeginStepResponse {
+    token: String,
+    challenge: Option<String>,
+    step_attempt_id: Option<String>,
+}
+
+enum MfaBeginStepInput {
+    Start(ClientMfaStartRequest),
+    Continue(String),
+}
+
+async fn begin_mfa_step(
+    state: &AppState,
     instance_id: Id,
-    location_id: Id,
-    methods: Vec<String>,
-    state: State<'_, AppState>,
-) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
-    debug!("Starting MFA session for location {location_id}");
-    let step_methods = methods
-        .iter()
-        .map(|method| parse_mfa_method(method))
-        .collect::<Result<Vec<MfaMethod>, String>>()?;
-    let first_step_method = *step_methods
-        .first()
-        .ok_or_else(|| "MFA method plan is empty".to_string())?;
-    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Instance not found".to_string())?;
-    let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "WireGuard keys not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let location = Location::find_by_id(&*DB_POOL, location_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Location not found".to_string())?;
-    let posture_data = if location.posture_check_required {
-        Some(
-            defguard_client_posture::get_posture_data()
-                .await
-                .map_err(|e| format!("Failed to collect posture data: {e}"))?,
+    proxy_url: Url,
+    method: MfaMethod,
+    input: MfaBeginStepInput,
+) -> Result<MfaBeginStepResponse, mfa::MfaError> {
+    let (token, start_challenge, capable) = match input {
+        MfaBeginStepInput::Start(request) => {
+            let result = mfa::mfa_start_with_capability(proxy_url.clone(), request).await?;
+            let capable = result.multi_step_mfa_capable;
+            state.set_multi_step_mfa_capable(instance_id, capable);
+            (result.response.token, result.response.challenge, capable)
+        }
+        MfaBeginStepInput::Continue(token) => {
+            (token, None, state.is_multi_step_mfa_capable(instance_id))
+        }
+    };
+
+    if capable {
+        let response = mfa::mfa_step_start(
+            proxy_url,
+            ClientMfaStepStartRequest {
+                token: token.clone(),
+                method: method as i32,
+            },
         )
-    } else {
-        None
-    };
-    #[allow(deprecated)]
-    let request = ClientMfaStartRequest {
-        location_id: location.network_id,
-        pubkey: keys.pubkey,
-        method: first_step_method as i32,
-        posture_data,
-        selected_methods: step_methods
-            .iter()
-            .map(|method| *method as i32)
-            .collect::<Vec<i32>>(),
-    };
-    let result = mfa::mfa_start_with_capability(proxy_url, request)
-        .await
-        .map_err(err_to_json)?;
-    state.set_multi_step_mfa_capable(instance_id, result.multi_step_mfa_capable);
-    Ok(result.response)
+        .await?;
+        return Ok(MfaBeginStepResponse {
+            token,
+            challenge: response.challenge.or(start_challenge),
+            step_attempt_id: Some(response.step_attempt_id),
+        });
+    }
+
+    Ok(MfaBeginStepResponse {
+        token,
+        challenge: start_challenge,
+        step_attempt_id: None,
+    })
 }
 
 #[tauri::command(async)]
-pub async fn mfa_step_start(
+pub async fn mfa_begin_step(
     instance_id: Id,
-    token: String,
+    location_id: Id,
     method: String,
-) -> Result<ClientMfaStepStartResponse, String> {
-    debug!("Starting MFA step for instance {instance_id}");
+    step_plan: Vec<String>,
+    token: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<MfaBeginStepResponse, String> {
+    debug!("Beginning MFA step for location {location_id}");
     let method = parse_mfa_method(&method)?;
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
@@ -1655,11 +1656,49 @@ pub async fn mfa_step_start(
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let request = ClientMfaStepStartRequest {
-        token,
-        method: method as i32,
+
+    let input = if let Some(token) = token {
+        MfaBeginStepInput::Continue(token)
+    } else {
+        let step_methods = step_plan
+            .iter()
+            .map(|method| parse_mfa_method(method))
+            .collect::<Result<Vec<MfaMethod>, String>>()?;
+        let first_step_method = *step_methods
+            .first()
+            .ok_or_else(|| "MFA method plan is empty".to_string())?;
+        let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "WireGuard keys not found".to_string())?;
+        let location = Location::find_by_id(&*DB_POOL, location_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Location not found".to_string())?;
+        let posture_data = if location.posture_check_required {
+            Some(
+                defguard_client_posture::get_posture_data()
+                    .await
+                    .map_err(|e| format!("Failed to collect posture data: {e}"))?,
+            )
+        } else {
+            None
+        };
+        #[allow(deprecated)]
+        let request = ClientMfaStartRequest {
+            location_id: location.network_id,
+            pubkey: keys.pubkey,
+            method: first_step_method as i32,
+            posture_data,
+            selected_methods: step_methods
+                .iter()
+                .map(|method| *method as i32)
+                .collect::<Vec<i32>>(),
+        };
+        MfaBeginStepInput::Start(request)
     };
-    mfa::mfa_step_start(proxy_url, request)
+
+    begin_mfa_step(&state, instance_id, proxy_url, method, input)
         .await
         .map_err(err_to_json)
 }
@@ -1846,4 +1885,194 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
     };
     cancel.cancel();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use defguard_client_core::version::{CORE_VERSION_HEADER, PROXY_VERSION_HEADER};
+    use serde_json::json;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    use super::*;
+
+    fn mock_url(server: &MockServer) -> Url {
+        Url::parse(&server.uri()).expect("MockServer URI should be valid")
+    }
+
+    fn start_request() -> ClientMfaStartRequest {
+        ClientMfaStartRequest {
+            location_id: 1,
+            pubkey: "pk".into(),
+            #[allow(deprecated)]
+            method: MfaMethod::Totp as i32,
+            posture_data: None,
+            selected_methods: vec![MfaMethod::Totp as i32],
+        }
+    }
+
+    fn start_response(
+        token: &str,
+        challenge: Option<&str>,
+        core_version: Option<&str>,
+        proxy_version: Option<&str>,
+    ) -> ResponseTemplate {
+        let mut response = ResponseTemplate::new(200).set_body_json(json!({
+            "token": token,
+            "challenge": challenge,
+        }));
+        if let Some(version) = core_version {
+            response = response.insert_header(CORE_VERSION_HEADER, version);
+        }
+        if let Some(version) = proxy_version {
+            response = response.insert_header(PROXY_VERSION_HEADER, version);
+        }
+        response
+    }
+
+    fn step_response(attempt_id: &str, challenge: Option<&str>) -> ResponseTemplate {
+        ResponseTemplate::new(200).set_body_json(json!({
+            "step_attempt_id": attempt_id,
+            "challenge": challenge,
+        }))
+    }
+
+    #[tokio::test]
+    async fn test_mfa_begin_step_starts_capable_step_zero() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(start_response(
+                "token-1",
+                Some("start-challenge"),
+                Some("2.2.0"),
+                Some("2.2.0"),
+            ))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/step-start"))
+            .respond_with(step_response("attempt-1", Some("step-challenge")))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = AppState::new(AppConfig::default(), None);
+        let result = begin_mfa_step(
+            &state,
+            1,
+            mock_url(&server),
+            MfaMethod::Totp,
+            MfaBeginStepInput::Start(start_request()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.token, "token-1");
+        assert_eq!(result.challenge.as_deref(), Some("step-challenge"));
+        assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-1"));
+        assert!(state.is_multi_step_mfa_capable(1));
+        server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn test_mfa_begin_step_keeps_legacy_step_zero() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(start_response(
+                "token-1",
+                Some("start-challenge"),
+                None,
+                None,
+            ))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = AppState::new(AppConfig::default(), None);
+        let result = begin_mfa_step(
+            &state,
+            1,
+            mock_url(&server),
+            MfaMethod::Totp,
+            MfaBeginStepInput::Start(start_request()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.token, "token-1");
+        assert_eq!(result.challenge.as_deref(), Some("start-challenge"));
+        assert!(result.step_attempt_id.is_none());
+        assert!(!state.is_multi_step_mfa_capable(1));
+        server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn test_mfa_begin_step_falls_back_to_start_challenge() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(start_response(
+                "token-1",
+                Some("start-challenge"),
+                Some("2.2.0"),
+                Some("2.2.0"),
+            ))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/step-start"))
+            .respond_with(step_response("attempt-1", None))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = AppState::new(AppConfig::default(), None);
+        let result = begin_mfa_step(
+            &state,
+            1,
+            mock_url(&server),
+            MfaMethod::Totp,
+            MfaBeginStepInput::Start(start_request()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.challenge.as_deref(), Some("start-challenge"));
+        assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-1"));
+        server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn test_mfa_begin_step_continues_existing_token_without_start() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/step-start"))
+            .respond_with(step_response("attempt-2", Some("step-challenge")))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = AppState::new(AppConfig::default(), None);
+        state.set_multi_step_mfa_capable(1, true);
+        let result = begin_mfa_step(
+            &state,
+            1,
+            mock_url(&server),
+            MfaMethod::Email,
+            MfaBeginStepInput::Continue("token-2".into()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.token, "token-2");
+        assert_eq!(result.challenge.as_deref(), Some("step-challenge"));
+        assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-2"));
+        server.verify().await;
+    }
 }

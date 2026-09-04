@@ -55,7 +55,7 @@ impl AppState {
     }
 
     #[must_use]
-    pub fn is_multi_step_mfa_capable(&self, instance_id: Id) -> bool {
+    pub(crate) fn is_multi_step_mfa_capable(&self, instance_id: Id) -> bool {
         self.multi_step_mfa_capabilities
             .lock()
             .expect("multi_step_mfa_capabilities mutex poisoned")
