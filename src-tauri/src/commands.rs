@@ -237,9 +237,6 @@ pub async fn disconnect(
             {connection_type} {name}({location_id})"
         );
         trace!("Connection: {connection:?}");
-        // The connection is already out of the application state, so the frontend, the log
-        // watcher and the tray have to be brought in line even if the interface removal failed.
-        // The error is returned once that is done.
         let teardown = disconnect_interface(&connection).await;
         debug!(
             "Emitting the event informing the frontend about the disconnection from \
