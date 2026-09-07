@@ -54,6 +54,7 @@
   "devDependencies": {
     "@tanstack/devtools-vite": "^0.8.3",
     "@tanstack/router-plugin": "^1.168.32",
+    "@testing-library/react": "^16.3.3",
     "@types/byte-size": "^8.1.2",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
@@ -61,10 +62,12 @@
     "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.5.4",
     "globals": "^17.11.0",
+    "jsdom": "^30.0.1",
     "stylelint": "^17.14.1",
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.2.0",
     "typescript": "~6.0.3",
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "vitest": "^5.0.0"
   }
 }
