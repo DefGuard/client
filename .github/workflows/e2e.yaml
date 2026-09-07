@@ -35,7 +35,7 @@ jobs:
       - name: Install system dependencies
         run: |
           apt-get update
-          apt-get install -y git curl ca-certificates build-essential \
+          apt-get install -y build-essential ca-certificates curl git \
             libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf libssl-dev libxdo-dev protobuf-compiler \
             libprotobuf-dev webkit2gtk-driver xvfb wireguard-tools iproute2 \
@@ -45,36 +45,21 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.11
           run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          STORE_PATH=$(pnpm store path --silent)
-          mkdir -p "$STORE_PATH"
-          echo "STORE_PATH=$STORE_PATH" >> $GITHUB_ENV
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('new-ui/pnpm-lock.yaml', 'e2e/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
+          version: 11.11
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
@@ -100,15 +85,15 @@ jobs:
       - name: Check deployment is reachable
         run: curl -sf --max-time 15 "${{ secrets.E2E_CORE_URL }}/api/v1/health"
 
-      - name: Stub resolvconf
+      - name: Stub resolvectl
         run: |
-          printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolvconf
-          chmod +x /usr/local/sbin/resolvconf
+          printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolvectl
+          chmod +x /usr/local/sbin/resolvectl
 
       - name: Start defguard-service
         run: |
-          groupadd -f defguard
-          modprobe wireguard || true
+          /usr/sbin/groupadd -f defguard
+          /usr/sbin/modprobe wireguard || true
           setsid src-tauri/target/release/defguard-service < /dev/null &
           for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
           test -S /var/run/defguard.socket
@@ -125,21 +110,36 @@ jobs:
         run: xvfb-run -a pnpm test
         working-directory: e2e
 
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p e2e-logs/client
+          cp -r /var/log/defguard-service e2e-logs/service-logs || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs
+          path: e2e-logs
+          if-no-files-found: warn
+          retention-days: 7
+
   lint-e2e:
     runs-on:
       - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.11
           run_install: false
+          version: 11.11
 
       - name: Install e2e dependencies
         run: pnpm install --no-frozen-lockfile

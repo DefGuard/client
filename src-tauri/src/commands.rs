@@ -237,7 +237,7 @@ pub async fn disconnect(
             {connection_type} {name}({location_id})"
         );
         trace!("Connection: {connection:?}");
-        disconnect_interface(&connection).await?;
+        let teardown = disconnect_interface(&connection).await;
         debug!(
             "Emitting the event informing the frontend about the disconnection from \
             {connection_type} {name}({location_id})"
@@ -275,10 +275,11 @@ pub async fn disconnect(
                 }
             };
         }
-        info!("Disconnected from {connection_type} {name}(ID: {location_id})");
-
         // Update tray icon to reflect connection state.
         configure_tray_icon(&handle).await?;
+
+        teardown?;
+        info!("Disconnected from {connection_type} {name}(ID: {location_id})");
 
         Ok(())
     } else {
@@ -307,7 +308,10 @@ pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
             .remove_connection(*tunnel_id, ConnectionType::Tunnel)
             .await
         {
-            disconnect_interface(&connection).await?;
+            // Work through the whole batch; a failed removal is already logged in detail.
+            if let Err(err) = disconnect_interface(&connection).await {
+                error!("Failed to disconnect tunnel {name}(ID: {tunnel_id}): {err}");
+            }
             stop_log_watcher_task(handle, &connection.interface_name)?;
             info!("Tunnel {name}(ID: {tunnel_id}) disconnected (disabled by server administrator)");
             names.push(name);
@@ -355,7 +359,10 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
             .remove_connection(location_id, ConnectionType::Location)
             .await
         {
-            disconnect_interface(&connection).await?;
+            // Work through the whole batch; a failed removal is already logged in detail.
+            if let Err(err) = disconnect_interface(&connection).await {
+                error!("Failed to disconnect location {name}(ID: {location_id}): {err}");
+            }
             stop_log_watcher_task(&handle, &connection.interface_name)?;
             if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
                 match err {

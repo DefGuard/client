@@ -51,7 +51,12 @@ pub async fn close_all_connections() -> Result<(), Error> {
         );
         trace!("Connection: {connection:#?}");
         debug!("Removing interface {}", connection.interface_name);
-        disconnect_interface(connection).await?;
+        if let Err(err) = disconnect_interface(connection).await {
+            error!(
+                "Failed to close the connection on interface {}: {err}",
+                connection.interface_name
+            );
+        }
     }
     if active_connections_count > 0 {
         info!("All active connections ({active_connections_count}) have been closed.");
