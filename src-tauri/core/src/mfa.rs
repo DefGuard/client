@@ -8,11 +8,11 @@ use std::time::Duration;
 use defguard_client_proto::defguard::client_types::{
     mfa_step_result, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
     ClientMfaStartResponse, ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod,
-    MfaStartRejectionReason, MfaStepRejection,
+    MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
 };
 use futures_util::StreamExt;
 use reqwest::{Client, Response, StatusCode, Url};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
     net::TcpStream,
@@ -72,6 +72,15 @@ pub enum MfaError {
 pub struct MfaStartResult {
     pub response: ClientMfaStartResponse,
     pub multi_step_mfa_capable: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum MobileMfaResponse {
+    #[serde(rename = "mfa_success")]
+    Legacy { preshared_key: String },
+    #[serde(rename = "mfa_result")]
+    Result { result: MfaStepResult },
 }
 
 fn build_client() -> Client {
@@ -410,10 +419,9 @@ pub async fn poll_openid_mfa(
 /// completion.
 ///
 /// The caller must have already displayed the QR code to the user
-/// (the token from `mfa_start` encodes the challenge).  This function
-/// opens a WebSocket to `ws_url` and waits for a
-/// `{"type":"mfa_success","preshared_key":"..."}` text frame.
-/// Returns [`MfaError::Cancelled`] if the token fires or
+/// (the token from `mfa_start` encodes the challenge). This function
+/// opens a WebSocket to `ws_url` and waits for a tagged mobile MFA outcome
+/// frame. Returns [`MfaError::Cancelled`] if the token fires or
 /// [`MfaError::Timeout`] if the deadline expires.
 pub async fn connect_mobile_approve(
     ws_url: &str,
@@ -434,7 +442,7 @@ pub async fn connect_mobile_approve(
                 },
             })?;
 
-    wait_for_mfa_success(ws_stream, cancel).await
+    wait_for_mfa_outcome(ws_stream, cancel).await
 }
 
 /// Derive the WebSocket URL from the proxy's base URL and MFA token.
@@ -463,8 +471,8 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
     Ok(ws_url.to_string())
 }
 
-/// Wait on the WebSocket for an `mfa_success` frame.
-async fn wait_for_mfa_success(
+/// Wait on the WebSocket for an MFA outcome frame.
+async fn wait_for_mfa_outcome(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
@@ -500,17 +508,32 @@ async fn wait_for_mfa_success(
         };
 
         if let Message::Text(text) = msg {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
-                if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
-                    if let Some(key) = parsed["preshared_key"].as_str() {
-                        #[allow(deprecated)]
-                        return Ok(ClientMfaFinishResponse {
-                            preshared_key: key.to_string(),
-                            token: None,
-                            result: None,
+            match serde_json::from_str::<MobileMfaResponse>(&text) {
+                Ok(MobileMfaResponse::Legacy { preshared_key }) => {
+                    if preshared_key.is_empty() {
+                        return Err(MfaError::MfaRejected {
+                            message:
+                                "mobile approval failed: proxy returned an empty preshared key"
+                                    .into(),
                         });
                     }
+
+                    #[allow(deprecated)]
+                    return Ok(ClientMfaFinishResponse {
+                        preshared_key,
+                        token: None,
+                        result: None,
+                    });
                 }
+                Ok(MobileMfaResponse::Result { result }) => {
+                    #[allow(deprecated)]
+                    return Ok(ClientMfaFinishResponse {
+                        preshared_key: String::new(),
+                        token: None,
+                        result: Some(result),
+                    });
+                }
+                Err(_) => {}
             }
         }
     }
