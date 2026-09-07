@@ -65,6 +65,16 @@ fn finish_response_json_with_result(outcome: mfa_step_result::Outcome) -> serde_
     .expect("MFA finish response should serialize")
 }
 
+fn mobile_result_frame(outcome: mfa_step_result::Outcome) -> String {
+    serde_json::to_string(&json!({
+        "type": "mfa_result",
+        "result": MfaStepResult {
+            outcome: Some(outcome),
+        },
+    }))
+    .expect("MFA result frame should serialize")
+}
+
 #[tokio::test]
 async fn test_mfa_start_success() {
     let server = MockServer::start().await;
@@ -566,6 +576,80 @@ async fn test_poll_openid_cancelled() {
         .await
         .unwrap_err();
     assert!(matches!(err, MfaError::Cancelled));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_advanced_result() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(mobile_result_frame(
+        mfa_step_result::Outcome::Advanced(MfaAdvanced { next_step: 1 }),
+    )))
+    .unwrap();
+
+    let response = handle.await.unwrap().unwrap();
+    assert!(response.preshared_key.is_empty());
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
+        }) if advanced.next_step == 1
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_completed_result_uses_nested_key() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(mobile_result_frame(
+        mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "mobile-psk".into(),
+        }),
+    )))
+    .unwrap();
+
+    let response = handle.await.unwrap().unwrap();
+    assert!(response.preshared_key.is_empty());
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+        }) if completed.preshared_key == "mobile-psk"
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_empty_legacy_key_is_rejected() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(
+        r#"{"type":"mfa_success","preshared_key":""}"#.into(),
+    ))
+    .unwrap();
+
+    let err = handle.await.unwrap().unwrap_err();
+    assert!(matches!(
+        err,
+        MfaError::MfaRejected { message } if message.contains("empty preshared key")
+    ));
 }
 
 #[tokio::test]
