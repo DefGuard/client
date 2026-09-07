@@ -1803,7 +1803,7 @@ fn spawn_mfa_task<F, R>(
     handle: &AppHandle,
     location_id: Id,
     complete_event: EventKey,
-    advanced_event: &'static str,
+    advanced_event: EventKey,
     error_event: EventKey,
     run: R,
 ) -> String
@@ -1848,7 +1848,8 @@ where
                 debug!(
                     "MFA step passed for task {task_id_for_task}, advancing to step {next_step}"
                 );
-                let _ = listen_handle.emit(advanced_event, MfaStepAdvancedPayload { next_step });
+                let _ =
+                    listen_handle.emit(advanced_event.into(), MfaStepAdvancedPayload { next_step });
             }
             Err(err) => {
                 warn!("MFA task {task_id_for_task} failed: {err}");
@@ -1885,7 +1886,7 @@ pub async fn mfa_poll_openid(
         &handle,
         location_id,
         EventKey::MfaOpenIdComplete,
-        "mfa-openid-step-advanced",
+        EventKey::MfaOpenIdStepAdvanced,
         EventKey::MfaOpenIdError,
         move |cancel| async move {
             mfa::poll_openid_mfa(proxy_url, token, cancel)
@@ -1914,7 +1915,7 @@ pub async fn mfa_connect_mobile_approve(
         &handle,
         location_id,
         EventKey::MfaMobileComplete,
-        "mfa-mobile-step-advanced",
+        EventKey::MfaMobileStepAdvanced,
         EventKey::MfaMobileError,
         move |cancel| async move {
             mfa::connect_mobile_approve(&ws_url, cancel)

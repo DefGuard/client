@@ -164,8 +164,10 @@ export const TauriEvent = {
   SessionStateChanged: 'session-state-changed',
   MfaOpenIdComplete: 'mfa-openid-complete',
   MfaOpenIdError: 'mfa-openid-error',
+  MfaOpenIdStepAdvanced: 'mfa-openid-step-advanced',
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
+  MfaMobileStepAdvanced: 'mfa-mobile-step-advanced',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;
@@ -507,6 +509,11 @@ export type MfaBeginStepResult = {
 /** Payload for mfa-openid-error / mfa-mobile-error events. */
 export type MfaErrorPayload = {
   error: string;
+};
+
+/** Payload for mfa-openid-step-advanced / mfa-mobile-step-advanced events. */
+export type MfaStepAdvancedPayload = {
+  next_step: number;
 };
 
 /** `network`: the request could not be sent, most likely a bad URL.

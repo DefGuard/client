@@ -19,8 +19,10 @@ pub enum EventKey {
     InstanceUpdated,
     MfaOpenIdComplete,
     MfaOpenIdError,
+    MfaOpenIdStepAdvanced,
     MfaMobileComplete,
     MfaMobileError,
+    MfaMobileStepAdvanced,
     TunnelsDisabled,
     TunnelsEnabled,
 }
@@ -45,8 +47,10 @@ impl From<EventKey> for &'static str {
             EventKey::InstanceUpdated => "instance-updated",
             EventKey::MfaOpenIdComplete => "mfa-openid-complete",
             EventKey::MfaOpenIdError => "mfa-openid-error",
+            EventKey::MfaOpenIdStepAdvanced => "mfa-openid-step-advanced",
             EventKey::MfaMobileComplete => "mfa-mobile-complete",
             EventKey::MfaMobileError => "mfa-mobile-error",
+            EventKey::MfaMobileStepAdvanced => "mfa-mobile-step-advanced",
             EventKey::TunnelsDisabled => "tunnel-disabled-by-policy",
             EventKey::TunnelsEnabled => "tunnel-enabled-by-policy",
         }
