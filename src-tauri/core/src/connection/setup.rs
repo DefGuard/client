@@ -300,6 +300,8 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                 debug!("stop_tunnel() for location {} succeeded", location.name);
             }
 
+            // Remove the network interface, but delay error handling until connection state is
+            // saved.
             #[cfg(not(target_os = "macos"))]
             let removal =
                 request_interface_removal(interface_name, location.endpoint.clone()).await;
@@ -309,6 +311,7 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                 location.name
             );
             trace!("Saved connection: {connection:?}");
+            // Now handle a potential error from interface removal.
             #[cfg(not(target_os = "macos"))]
             removal?;
             info!(
@@ -349,6 +352,8 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                 debug!("stop_tunnel() for tunnel {} succeeded", tunnel.name);
             }
 
+            // Remove the network interface, but delay error handling until connection state is
+            // saved.
             #[cfg(not(target_os = "macos"))]
             let removal = request_interface_removal(interface_name, tunnel.endpoint.clone()).await;
             if let Some(post_down) = &tunnel.post_down {
@@ -372,7 +377,7 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                 tunnel.name
             );
             trace!("Saved connection: {connection:#?}");
-            // The connection history is recorded either way; report the removal failure now.
+            // Now handle a potential error from interface removal.
             #[cfg(not(target_os = "macos"))]
             removal?;
             info!(
