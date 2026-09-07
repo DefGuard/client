@@ -16,6 +16,7 @@ import type {
   LocationInfo,
   MfaErrorPayload,
   MfaMethodValue,
+  MfaStepAdvancedPayload,
 } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { isPresent } from '../../../utils/isPresent';
@@ -29,6 +30,7 @@ type Options = {
   stepPlan: MfaMethodValue[];
   mfaToken: string | null;
   setMfaToken: (token: string) => void;
+  onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
   onServiceUnavailable?: () => void;
@@ -40,6 +42,7 @@ export const useMfaMobileConnect = (
     stepPlan,
     mfaToken,
     setMfaToken,
+    onStepAdvanced,
     onConnected,
     onPostureError,
     onServiceUnavailable,
@@ -104,6 +107,15 @@ export const useMfaMobileConnect = (
           onConnected?.();
         });
 
+        const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
+          TauriEvent.MfaMobileStepAdvanced,
+          (event) => {
+            cleanupListeners();
+            setIsConnecting(false);
+            onStepAdvanced(event.payload.next_step);
+          },
+        );
+
         const errorUnlisten = await listen<MfaErrorPayload>(
           TauriEvent.MfaMobileError,
           (event) => {
@@ -123,6 +135,7 @@ export const useMfaMobileConnect = (
 
         unlistenRef.current = () => {
           completeUnlisten();
+          stepAdvancedUnlisten();
           errorUnlisten();
         };
       } catch (e) {
@@ -139,7 +152,7 @@ export const useMfaMobileConnect = (
       cleanupListeners();
       setIsConnecting(false);
     };
-  }, [tokenData, instance, location, onConnected, cleanupListeners]);
+  }, [tokenData, instance, location, onStepAdvanced, onConnected, cleanupListeners]);
 
   const qrValue = useMemo(() => {
     if (!tokenData || !instance) return null;
