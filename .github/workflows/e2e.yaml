@@ -22,7 +22,7 @@ jobs:
       options: --privileged
     env:
       DEBIAN_FRONTEND: noninteractive
-      CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/debug/defguard-client
+      CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/release/defguard-client
       NATIVE_DRIVER: /usr/bin/WebKitWebDriver
       SQLX_OFFLINE: '1'
       RUSTC_WRAPPER: sccache
@@ -92,9 +92,9 @@ jobs:
 
       - name: Start defguard-service
         run: |
-          groupadd -f defguard
-          modprobe wireguard || true
-          setsid src-tauri/target/debug/defguard-service < /dev/null &
+          /usr/sbin/groupadd -f defguard
+          /usr/sbin/modprobe wireguard || true
+          setsid src-tauri/target/release/defguard-service < /dev/null &
           for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
           test -S /var/run/defguard.socket
 
