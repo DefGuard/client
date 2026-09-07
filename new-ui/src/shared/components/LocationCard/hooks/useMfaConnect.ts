@@ -3,11 +3,13 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import {
+  isAttemptLimit,
   isConnectFailure,
   isInvalidCode,
   isMfaPostureError,
   isServiceUnavailable,
   isSessionExpired,
+  isStaleAttempt,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
@@ -127,7 +129,11 @@ export const useMfaConnect = (
       } catch (err) {
         void error(`MFA verification failed: ${err}`);
         const message = mfaErrorMessage(err);
-        if (isConnectFailure(message)) {
+        if (isAttemptLimit(err)) {
+          setVerifyError(message);
+        } else if (isStaleAttempt(message)) {
+          setVerifyError('This MFA attempt is no longer valid. Please try again.');
+        } else if (isConnectFailure(message)) {
           setVerifyError('Failed to establish VPN connection');
         } else if (isInvalidCode(message)) {
           setVerifyError('Invalid code');

@@ -86,6 +86,23 @@ async fn test_mfa_start_with_capability_accepts_supported_versions() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_with_capability_accepts_prerelease_version() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(start_response_template(Some("2.2.0-alpha1"), Some("2.2.0")))
+        .mount(&server)
+        .await;
+
+    let result = mfa_start_with_capability(mock_url(&server), start_request())
+        .await
+        .unwrap();
+
+    assert!(result.multi_step_mfa_capable);
+}
+
+#[tokio::test]
 async fn test_mfa_start_with_capability_requires_supported_versions() {
     let cases = [
         ("missing core version", None, Some("2.2.0")),
@@ -128,9 +145,28 @@ async fn test_mfa_start_rejected() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_attempt_limit_on_403() {
+    let server = MockServer::start().await;
+    let message = "Too many failed MFA attempts. Please try connecting again.";
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({ "error": message })))
+        .mount(&server)
+        .await;
+
+    let err = mfa_start(mock_url(&server), start_request())
+        .await
+        .unwrap_err();
+    match err {
+        MfaError::AttemptLimit { message: actual } => assert_eq!(actual, message),
+        other => panic!("expected AttemptLimit, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn test_mfa_start_posture_rejected_on_403() {
-    // 403 is the proxy's posture-check-failure status; it must map to the
-    // dedicated PostureRejected variant, not the generic MfaRejected.
+    // A non-cap 403 must remain a dedicated posture rejection.
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))

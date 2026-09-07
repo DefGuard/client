@@ -24,10 +24,18 @@ export const mfaErrorMessage = (err: unknown): string =>
   parseMfaError(err)?.message ?? String(err);
 
 /** True when the error is a posture rejection for a posture-gated location.
- *  The backend maps only HTTP 403 (a failed device posture check) to
- *  `posture_rejected`; ordinary MFA rejections stay `mfa_rejected`. */
+ *  The backend maps non-cap HTTP 403 responses to `posture_rejected`; ordinary
+ *  MFA rejections stay `mfa_rejected`. */
 export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
   location.posture_check_required && parseMfaError(err)?.type === 'posture_rejected';
+
+/** The MFA attempt limit was reached and the session must be restarted. */
+export const isAttemptLimit = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'attempt_limit';
+
+/** The submitted proof belongs to an older MFA step attempt. */
+export const isStaleAttempt = (message: string): boolean =>
+  message.includes('stale MFA attempt');
 
 /** The proxy session/token is no longer valid. */
 export const isSessionExpired = (message: string): boolean =>
