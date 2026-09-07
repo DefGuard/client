@@ -6,15 +6,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { api } from '../../../../../../shared/rust-api/api';
 import {
+  isAttemptLimit,
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
   isSessionExpired,
+  isStaleAttempt,
   isTimeout,
   mfaErrorMessage,
 } from '../../../../../../shared/rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../../../../shared/rust-api/query';
-import type { MfaErrorPayload } from '../../../../../../shared/rust-api/types';
+import type {
+  MfaErrorPayload,
+  MfaStepAdvancedPayload,
+} from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
 import { useConnectModal } from './useConnectModal';
 
@@ -29,8 +34,8 @@ export const useConnectModalMfaOidc = ({
   onSessionExpired,
   onServiceUnavailable,
 }: Options = {}) => {
-  const [location, stepPlan, mfaToken, setMfaToken] = useConnectModal(
-    useShallow((s) => [s.location, s.stepPlan, s.mfaToken, s.setMfaToken]),
+  const [location, stepPlan, mfaToken, setMfaToken, goToStep] = useConnectModal(
+    useShallow((s) => [s.location, s.stepPlan, s.mfaToken, s.setMfaToken, s.goToStep]),
   );
 
   const [isStarting, setIsStarting] = useState(false);
@@ -87,7 +92,12 @@ export const useConnectModalMfaOidc = ({
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, location.id, session.token);
+      const taskId = await api.mfaPollOpenId(
+        instance.id,
+        location.id,
+        session.token,
+        session.step_attempt_id,
+      );
       taskIdRef.current = taskId;
 
       // The backend brings up the connection itself; completion means connected.
@@ -96,6 +106,15 @@ export const useConnectModalMfaOidc = ({
         setIsPolling(false);
       });
 
+      const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
+        TauriEvent.MfaOpenIdStepAdvanced,
+        (event) => {
+          cleanup();
+          setIsPolling(false);
+          goToStep(event.payload.next_step);
+        },
+      );
+
       const errorUnlisten = await listen<MfaErrorPayload>(
         TauriEvent.MfaOpenIdError,
         (event) => {
@@ -103,7 +122,11 @@ export const useConnectModalMfaOidc = ({
           setIsPolling(false);
           error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
           const message = mfaErrorMessage(event.payload.error);
-          if (isTimeout(event.payload.error)) {
+          if (isAttemptLimit(event.payload.error)) {
+            setPollError(message);
+          } else if (isStaleAttempt(message)) {
+            setPollError('This MFA attempt is no longer valid. Please try again.');
+          } else if (isTimeout(event.payload.error)) {
             setPollError('Authentication timed out. Please try again.');
           } else if (isConnectFailure(message)) {
             setPollError('Failed to establish VPN connection');
@@ -117,6 +140,7 @@ export const useConnectModalMfaOidc = ({
 
       unlistenRef.current = () => {
         completeUnlisten();
+        stepAdvancedUnlisten();
         errorUnlisten();
       };
     } catch (e) {
@@ -139,6 +163,7 @@ export const useConnectModalMfaOidc = ({
     stepPlan,
     mfaToken,
     setMfaToken,
+    goToStep,
     cleanup,
     onPostureError,
     onSessionExpired,

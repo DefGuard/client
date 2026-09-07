@@ -212,8 +212,9 @@ const mfaPollOpenId = (
   instanceId: number,
   locationId: number,
   token: string,
+  stepAttemptId: string | null,
 ): Promise<string> =>
-  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token });
+  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token, stepAttemptId });
 
 const mfaConnectMobileApprove = (
   instanceId: number,

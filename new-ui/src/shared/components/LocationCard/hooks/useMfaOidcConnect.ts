@@ -5,22 +5,31 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import {
+  isAttemptLimit,
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
   isSessionExpired,
+  isStaleAttempt,
   isTimeout,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { MfaErrorPayload } from '../../../rust-api/types';
+import type { MfaErrorPayload, MfaStepAdvancedPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
 export const useMfaOidcConnect = () => {
-  const { location, setPostureError, setView, stepPlan, mfaToken, setMfaToken } =
-    useLocationCardContext();
+  const {
+    location,
+    setPostureError,
+    setView,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    goToStep,
+  } = useLocationCardContext();
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -77,7 +86,12 @@ export const useMfaOidcConnect = () => {
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, location.id, session.token);
+      const taskId = await api.mfaPollOpenId(
+        instance.id,
+        location.id,
+        session.token,
+        session.step_attempt_id,
+      );
       taskIdRef.current = taskId;
 
       // The backend brings up the connection itself; completion means connected.
@@ -87,6 +101,15 @@ export const useMfaOidcConnect = () => {
         setView(LocationCardViews.Connected);
       });
 
+      const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
+        TauriEvent.MfaOpenIdStepAdvanced,
+        (event) => {
+          cleanup();
+          setIsPolling(false);
+          goToStep(event.payload.next_step);
+        },
+      );
+
       const errorUnlisten = await listen<MfaErrorPayload>(
         TauriEvent.MfaOpenIdError,
         (event) => {
@@ -94,7 +117,11 @@ export const useMfaOidcConnect = () => {
           setIsPolling(false);
           error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
           const message = mfaErrorMessage(event.payload.error);
-          if (isTimeout(event.payload.error)) {
+          if (isAttemptLimit(event.payload.error)) {
+            setPollError(message);
+          } else if (isStaleAttempt(message)) {
+            setPollError('This MFA attempt is no longer valid. Please try again.');
+          } else if (isTimeout(event.payload.error)) {
             setPollError('Authentication timed out. Please try again.');
           } else if (isConnectFailure(message)) {
             setPollError('Failed to establish VPN connection');
@@ -108,6 +135,7 @@ export const useMfaOidcConnect = () => {
 
       unlistenRef.current = () => {
         completeUnlisten();
+        stepAdvancedUnlisten();
         errorUnlisten();
       };
     } catch (e) {
@@ -133,6 +161,7 @@ export const useMfaOidcConnect = () => {
     setMfaToken,
     setPostureError,
     setView,
+    goToStep,
     cleanup,
   ]);
 
