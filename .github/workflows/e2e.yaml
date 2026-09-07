@@ -45,30 +45,16 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.11
+          cache: true
           run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          STORE_PATH=$(pnpm store path --silent)
-          mkdir -p "$STORE_PATH"
-          echo "STORE_PATH=$STORE_PATH" >> $GITHUB_ENV
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('new-ui/pnpm-lock.yaml', 'e2e/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
+          version: 11.11
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -108,6 +94,7 @@ jobs:
       - name: Start defguard-service
         run: |
           /usr/sbin/groupadd -f defguard
+          /usr/sbin/modprobe wireguard || true
           mkdir -p /tmp/e2e-logs
           setsid src-tauri/target/debug/defguard-service < /dev/null \
             > /tmp/e2e-logs/defguard-service.log 2>&1 &
@@ -149,15 +136,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.11
+          cache: true
           run_install: false
+          version: 11.11
 
       - name: Install e2e dependencies
         run: pnpm install --no-frozen-lockfile
