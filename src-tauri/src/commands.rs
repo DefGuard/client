@@ -22,7 +22,7 @@ use defguard_client_proto::defguard::{
         mfa_step_result, AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse,
         ClientMfaStartRequest, ClientMfaStepStartRequest, CodeMfaSetupFinishResponse,
         CodeMfaSetupStartResponse, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
-        InstanceInfo as ProtoInstanceInfo, MfaMethod,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod, MfaStepResult,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -1553,6 +1553,45 @@ pub struct MfaErrorPayload {
     pub error: String,
 }
 
+enum MfaTaskOutcome {
+    Completed { preshared_key: String },
+    Advanced { next_step: u32 },
+}
+
+#[derive(Clone, Serialize)]
+struct MfaStepAdvancedPayload {
+    next_step: u32,
+}
+
+fn classify_mfa_response(
+    response: ClientMfaFinishResponse,
+) -> Result<MfaTaskOutcome, mfa::MfaError> {
+    #[allow(deprecated)]
+    let legacy_preshared_key = response.preshared_key;
+
+    match response.result {
+        Some(MfaStepResult {
+            outcome: Some(outcome),
+        }) => match outcome {
+            mfa_step_result::Outcome::Advanced(advanced) => Ok(MfaTaskOutcome::Advanced {
+                next_step: advanced.next_step,
+            }),
+            mfa_step_result::Outcome::Completed(completed) => Ok(MfaTaskOutcome::Completed {
+                preshared_key: completed.preshared_key,
+            }),
+            mfa_step_result::Outcome::AwaitingExternal(_) => Err(mfa::MfaError::Other {
+                message: "The server returned an unexpected verification state".to_string(),
+            }),
+        },
+        Some(MfaStepResult { outcome: None }) => Err(mfa::MfaError::Other {
+            message: "The server returned an unexpected verification state".to_string(),
+        }),
+        None => Ok(MfaTaskOutcome::Completed {
+            preshared_key: legacy_preshared_key,
+        }),
+    }
+}
+
 /// Bring up a location connection with a preshared key obtained from a
 /// completed MFA handshake. Keeps the preshared key inside the backend - it is
 /// never returned to or emitted at the frontend.
@@ -1756,23 +1795,21 @@ pub async fn mfa_finish_code(
     }
 }
 
-/// Register a long-running MFA task, run its future in the background, and on
-/// success bring up the connection Rust-side before emitting a payload-free
-/// completion event (or an error event). Shared by the OpenID poll and mobile
-/// approve flows so the preshared key never leaves the backend. Returns the
-/// task id the frontend uses to cancel.
+/// Register a long-running MFA task, run its future in the background, and
+/// connect only after the final MFA outcome. Shared by the OpenID poll and
+/// mobile approve flows so the preshared key never leaves the backend. Returns
+/// the task id the frontend uses to cancel.
 fn spawn_mfa_task<F, R>(
     handle: &AppHandle,
     location_id: Id,
     complete_event: EventKey,
+    advanced_event: &'static str,
     error_event: EventKey,
     run: R,
 ) -> String
 where
     R: FnOnce(CancellationToken) -> F + Send + 'static,
-    F: std::future::Future<Output = Result<ClientMfaFinishResponse, mfa::MfaError>>
-        + Send
-        + 'static,
+    F: std::future::Future<Output = Result<MfaTaskOutcome, mfa::MfaError>> + Send + 'static,
 {
     let cancel = CancellationToken::new();
     let task_id = Uuid::new_v4().to_string();
@@ -1794,10 +1831,8 @@ where
             .expect("mfa_tasks mutex poisoned")
             .remove(&task_id_for_task);
         match result {
-            Ok(response) => {
+            Ok(MfaTaskOutcome::Completed { preshared_key }) => {
                 info!("MFA completed for task {task_id_for_task}");
-                #[allow(deprecated)]
-                let preshared_key = response.preshared_key;
                 match connect_after_mfa(location_id, preshared_key, &listen_handle).await {
                     Ok(()) => {
                         let _ = listen_handle.emit(complete_event.into(), ());
@@ -1808,6 +1843,12 @@ where
                             listen_handle.emit(error_event.into(), MfaErrorPayload { error: err });
                     }
                 }
+            }
+            Ok(MfaTaskOutcome::Advanced { next_step }) => {
+                debug!(
+                    "MFA step passed for task {task_id_for_task}, advancing to step {next_step}"
+                );
+                let _ = listen_handle.emit(advanced_event, MfaStepAdvancedPayload { next_step });
             }
             Err(err) => {
                 warn!("MFA task {task_id_for_task} failed: {err}");
@@ -1844,8 +1885,13 @@ pub async fn mfa_poll_openid(
         &handle,
         location_id,
         EventKey::MfaOpenIdComplete,
+        "mfa-openid-step-advanced",
         EventKey::MfaOpenIdError,
-        move |cancel| mfa::poll_openid_mfa(proxy_url, token, cancel),
+        move |cancel| async move {
+            mfa::poll_openid_mfa(proxy_url, token, cancel)
+                .await
+                .and_then(classify_mfa_response)
+        },
     ))
 }
 
@@ -1868,8 +1914,13 @@ pub async fn mfa_connect_mobile_approve(
         &handle,
         location_id,
         EventKey::MfaMobileComplete,
+        "mfa-mobile-step-advanced",
         EventKey::MfaMobileError,
-        move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
+        move |cancel| async move {
+            mfa::connect_mobile_approve(&ws_url, cancel)
+                .await
+                .and_then(classify_mfa_response)
+        },
     ))
 }
 
@@ -1890,6 +1941,9 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
 #[cfg(test)]
 mod tests {
     use defguard_client_core::version::{CORE_VERSION_HEADER, PROXY_VERSION_HEADER};
+    use defguard_client_proto::defguard::client_types::{
+        MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
+    };
     use serde_json::json;
     use wiremock::{
         matchers::{method, path},
@@ -2074,5 +2128,63 @@ mod tests {
         assert_eq!(result.challenge.as_deref(), Some("step-challenge"));
         assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-2"));
         server.verify().await;
+    }
+
+    #[allow(deprecated)]
+    fn finish_response(outcome: Option<mfa_step_result::Outcome>) -> ClientMfaFinishResponse {
+        ClientMfaFinishResponse {
+            preshared_key: "legacy-key".into(),
+            token: None,
+            result: outcome.map(|outcome| MfaStepResult {
+                outcome: Some(outcome),
+            }),
+        }
+    }
+
+    #[test]
+    fn test_classify_mfa_response_advanced() {
+        let response = finish_response(Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+            next_step: 2,
+        })));
+
+        assert!(matches!(
+            classify_mfa_response(response),
+            Ok(MfaTaskOutcome::Advanced { next_step: 2 })
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_completed() {
+        let response = finish_response(Some(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "completed-key".into(),
+        })));
+
+        assert!(matches!(
+            classify_mfa_response(response),
+            Ok(MfaTaskOutcome::Completed { preshared_key }) if preshared_key == "completed-key"
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_legacy_completion() {
+        let response = finish_response(None);
+
+        assert!(matches!(
+            classify_mfa_response(response),
+            Ok(MfaTaskOutcome::Completed { preshared_key }) if preshared_key == "legacy-key"
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_rejects_awaiting_external() {
+        let response = finish_response(Some(mfa_step_result::Outcome::AwaitingExternal(
+            MfaAwaitingExternal {},
+        )));
+
+        assert!(matches!(
+            classify_mfa_response(response),
+            Err(mfa::MfaError::Other { message })
+                if message == "The server returned an unexpected verification state"
+        ));
     }
 }
