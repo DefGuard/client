@@ -252,7 +252,7 @@ pub(crate) async fn authorize_oidc(
         cancel_clone.cancel();
     });
 
-    let result = mfa::poll_openid_mfa(proxy_url, info.token, cancel).await;
+    let result = mfa::poll_openid_mfa(proxy_url, info.token, None, cancel).await;
     ctrlc_handle.abort();
 
     let psk = result.map_err(into_cli)?;

@@ -6,9 +6,9 @@
 use std::time::Duration;
 
 use defguard_client_proto::defguard::client_types::{
-    ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest, ClientMfaStartResponse,
-    ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod, MfaStartRejectionReason,
-    MfaStepRejection,
+    mfa_step_result, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+    ClientMfaStartResponse, ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod,
+    MfaStartRejectionReason, MfaStepRejection,
 };
 use futures_util::StreamExt;
 use reqwest::{Client, Response, StatusCode, Url};
@@ -315,11 +315,13 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 /// The caller must already have opened the browser to the OIDC provider
 /// URL (the token from `mfa_start` encodes the redirect).  This function
 /// POSTs a `ClientMfaFinishRequest` to `/api/v1/client-mfa/finish` every
-/// [`OIDC_POLL_INTERVAL`] until the server returns a 200 (success),
-/// the deadline expires, or the [`CancellationToken`] is fired.
+/// [`OIDC_POLL_INTERVAL`] until the server returns an advanced or completed
+/// 200 response, the deadline expires, or the [`CancellationToken`] is fired.
+/// Pending `AwaitingExternal` and legacy 428 responses continue polling.
 pub async fn poll_openid_mfa(
     proxy_url: Url,
     token: String,
+    step_attempt_id: Option<String>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
     let client = build_client();
@@ -335,7 +337,7 @@ pub async fn poll_openid_mfa(
         token,
         code: None,
         auth_pub_key: None,
-        step_attempt_id: None,
+        step_attempt_id,
     };
 
     loop {
@@ -362,18 +364,36 @@ pub async fn poll_openid_mfa(
 
                 let status = response.status();
                 if status == StatusCode::OK {
-                    return response.json().await.map_err(|e| MfaError::Other {
-                        message: format!("Invalid MFA finish response: {e}"),
-                    });
-                }
-                if status != StatusCode::PRECONDITION_REQUIRED {
+                    let response = response.json::<ClientMfaFinishResponse>().await.map_err(|e| {
+                        MfaError::Other {
+                            message: format!("Invalid MFA finish response: {e}"),
+                        }
+                    })?;
+
+                    match response.result.as_ref() {
+                        None => return Ok(response),
+                        Some(result) => match result.outcome.as_ref() {
+                            Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
+                            Some(
+                                mfa_step_result::Outcome::Advanced(_)
+                                | mfa_step_result::Outcome::Completed(_),
+                            ) => return Ok(response),
+                            None => {
+                                return Err(MfaError::Other {
+                                    message: "The server returned an unexpected verification state"
+                                        .to_string(),
+                                });
+                            }
+                        },
+                    }
+                } else if status != StatusCode::PRECONDITION_REQUIRED {
                     return Err(check_mfa_response(response).await.err().unwrap_or(
                         MfaError::Other {
                             message: format!("Unexpected status: {status}"),
                         },
                     ));
                 }
-                // 428: not complete yet — fall through to sleep.
+                // 428: not complete yet - fall through to sleep.
             }
         }
 

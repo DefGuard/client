@@ -1873,6 +1873,7 @@ pub async fn mfa_poll_openid(
     instance_id: Id,
     location_id: Id,
     token: String,
+    step_attempt_id: Option<String>,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting OpenID MFA poll for instance {instance_id}");
@@ -1889,7 +1890,7 @@ pub async fn mfa_poll_openid(
         EventKey::MfaOpenIdStepAdvanced,
         EventKey::MfaOpenIdError,
         move |cancel| async move {
-            mfa::poll_openid_mfa(proxy_url, token, cancel)
+            mfa::poll_openid_mfa(proxy_url, token, step_attempt_id, cancel)
                 .await
                 .and_then(classify_mfa_response)
         },

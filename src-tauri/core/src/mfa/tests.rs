@@ -355,7 +355,9 @@ async fn test_poll_openid_success() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let psk = poll_openid_mfa(url, "token".into(), cancel).await.unwrap();
+    let psk = poll_openid_mfa(url, "token".into(), None, cancel)
+        .await
+        .unwrap();
     assert_eq!(psk.preshared_key, "oidc-psk");
 }
 
@@ -379,7 +381,9 @@ async fn test_poll_openid_428_then_success() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let psk = poll_openid_mfa(url, "token".into(), cancel).await.unwrap();
+    let psk = poll_openid_mfa(url, "token".into(), None, cancel)
+        .await
+        .unwrap();
     assert_eq!(psk.preshared_key, "oidc-psk");
 }
 
@@ -395,7 +399,7 @@ async fn test_poll_openid_stops_on_error() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let err = poll_openid_mfa(url, "token".into(), cancel)
+    let err = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap_err();
     match err {
@@ -419,7 +423,7 @@ async fn test_poll_openid_timeout() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let err = poll_openid_mfa(url, "token".into(), cancel)
+    let err = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap_err();
     assert!(matches!(err, MfaError::Timeout));
@@ -438,7 +442,7 @@ async fn test_poll_openid_cancelled() {
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
     cancel.cancel();
-    let err = poll_openid_mfa(url, "token".into(), cancel)
+    let err = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap_err();
     assert!(matches!(err, MfaError::Cancelled));
