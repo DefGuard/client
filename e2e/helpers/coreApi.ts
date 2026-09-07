@@ -101,13 +101,25 @@ export class CoreApi {
 	}
 
 	async listNetworks(): Promise<
-		Array<{ id: number; location_mfa_mode: LocationMfaMode }>
+		Array<{ id: number; name: string; location_mfa_mode: LocationMfaMode }>
 	> {
 		const response = await this.request("GET", "/api/v1/network");
 		return (await response.json()) as Array<{
 			id: number;
+			name: string;
 			location_mfa_mode: LocationMfaMode;
 		}>;
+	}
+
+	async testNetworkId(): Promise<number> {
+		const name = requireEnv("NETWORK_NAME");
+		const network = (await this.listNetworks()).find(
+			(candidate) => candidate.name === name,
+		);
+		if (!network) {
+			throw new Error(`The core has no location named ${name}`);
+		}
+		return network.id;
 	}
 
 	async addUserDevice(name: string, pubkey: string): Promise<AddedUserDevice> {

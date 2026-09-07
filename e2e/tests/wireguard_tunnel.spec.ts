@@ -102,7 +102,7 @@ describe("WireGuard tunnel", () => {
 
 	before(async () => {
 		core = await loggedInCoreApi();
-		networkId = (await core.listNetworks())[0].id;
+		networkId = await core.testNetworkId();
 		previousMfaMode = await core.setLocationMfaMode(networkId, "disabled");
 		config = await provisionTunnel(core, networkId, `e2e-tunnel-${Date.now()}`);
 	});
