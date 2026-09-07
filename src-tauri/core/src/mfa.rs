@@ -34,6 +34,8 @@ use crate::{
     },
 };
 
+const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try connecting again.";
+
 /// Error type returned by MFA operations.
 ///
 /// Serialized as a tagged JSON union so the TypeScript frontend can
@@ -52,6 +54,9 @@ pub enum MfaError {
 
     #[error("Posture check failed: {message}")]
     PostureRejected { message: String },
+
+    #[error("{message}")]
+    AttemptLimit { message: String },
 
     #[error("MFA operation timed out")]
     Timeout,
@@ -95,10 +100,11 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         .unwrap_or_else(|| format!("HTTP {status}"));
 
     match status {
-        // The proxy returns 403 only for a failed device posture check
-        // (ApiError::PostureRejected); 401 and other 4xx are ordinary MFA
-        // rejections. Keeping them distinct lets the frontend route posture
-        // failures to the dedicated posture-check-failed view.
+        // A 403 can mean either a failed device posture check or the MFA
+        // attempt limit. The response message distinguishes the two cases.
+        StatusCode::FORBIDDEN if message == ATTEMPT_LIMIT_MESSAGE => {
+            Err(MfaError::AttemptLimit { message })
+        }
         StatusCode::FORBIDDEN => Err(MfaError::PostureRejected { message }),
         StatusCode::UNAUTHORIZED => Err(MfaError::MfaRejected { message }),
         _ if status.is_client_error() => Err(MfaError::MfaRejected { message }),
