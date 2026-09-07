@@ -100,7 +100,7 @@ jobs:
       - name: Check deployment is reachable
         run: curl -sf --max-time 15 "${{ secrets.E2E_CORE_URL }}/api/v1/health"
 
-      - name: Stub resolvconf
+      - name: Stub resolveconf
         run: |
           printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolveconf
           chmod +x /usr/local/sbin/resolveconf
