@@ -1,3 +1,6 @@
+use defguard_client_proto::defguard::client_types::{
+    MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaStepResult,
+};
 use reqwest::Url;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
@@ -48,6 +51,18 @@ fn finish_response_json(key: &str) -> serde_json::Value {
     json!({
         "preshared_key": key,
     })
+}
+
+#[allow(deprecated)]
+fn finish_response_json_with_result(outcome: mfa_step_result::Outcome) -> serde_json::Value {
+    serde_json::to_value(ClientMfaFinishResponse {
+        preshared_key: String::new(),
+        token: None,
+        result: Some(MfaStepResult {
+            outcome: Some(outcome),
+        }),
+    })
+    .expect("MFA finish response should serialize")
 }
 
 #[tokio::test]
@@ -340,6 +355,111 @@ async fn test_mfa_finish_code_rejected() {
     .await
     .unwrap_err();
     assert!(matches!(err, MfaError::MfaRejected { .. }));
+}
+
+#[tokio::test]
+async fn test_poll_openid_advanced_returns_empty_legacy_key() {
+    let server = MockServer::start().await;
+    let body = finish_response_json_with_result(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+        next_step: 1,
+    }));
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+        .mount(&server)
+        .await;
+
+    let response = poll_openid_mfa(
+        mock_url(&server),
+        "token".into(),
+        None,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    assert!(response.preshared_key.is_empty());
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
+        }) if advanced.next_step == 1
+    ));
+}
+
+#[tokio::test]
+async fn test_poll_openid_awaiting_external_then_completed() {
+    let server = MockServer::start().await;
+    let awaiting_body = finish_response_json_with_result(
+        mfa_step_result::Outcome::AwaitingExternal(MfaAwaitingExternal {}),
+    );
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&awaiting_body))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    let completed_body =
+        finish_response_json_with_result(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "oidc-psk".into(),
+        }));
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&completed_body))
+        .mount(&server)
+        .await;
+
+    let response = poll_openid_mfa(
+        mock_url(&server),
+        "token".into(),
+        None,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+        }) if completed.preshared_key == "oidc-psk"
+    ));
+}
+
+#[tokio::test]
+async fn test_poll_openid_sends_step_attempt_id() {
+    let server = MockServer::start().await;
+    let body =
+        finish_response_json_with_result(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "oidc-psk".into(),
+        }));
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .and(body_partial_json(json!({
+            "step_attempt_id": "attempt-123",
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+        .mount(&server)
+        .await;
+
+    let response = poll_openid_mfa(
+        mock_url(&server),
+        "token".into(),
+        Some("attempt-123".into()),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+        }) if completed.preshared_key == "oidc-psk"
+    ));
 }
 
 #[tokio::test]
