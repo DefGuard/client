@@ -59,7 +59,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
@@ -92,11 +92,9 @@ jobs:
 
       - name: Start defguard-service
         run: |
-          /usr/sbin/groupadd -f defguard
-          /usr/sbin/modprobe wireguard || true
-          mkdir -p /tmp/e2e-logs
-          setsid src-tauri/target/debug/defguard-service < /dev/null \
-            > /tmp/e2e-logs/defguard-service.log 2>&1 &
+          groupadd -f defguard
+          modprobe wireguard || true
+          setsid src-tauri/target/debug/defguard-service < /dev/null &
           for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
           test -S /var/run/defguard.socket
 
@@ -116,9 +114,7 @@ jobs:
         if: always()
         run: |
           mkdir -p e2e-logs/client
-          cp -r /tmp/e2e-logs/. e2e-logs/ || true
-          cp -r /var/log/defguard-service e2e-logs/service-json || true
-          cp -r e2e/logs/. e2e-logs/client/ || true
+          cp -r /var/log/defguard-service e2e-logs/service-logs || true
 
       - name: Upload logs
         if: always()
